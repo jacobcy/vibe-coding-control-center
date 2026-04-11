@@ -6,10 +6,6 @@ from pathlib import Path
 
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.contracts import ExecutionRequest
-
-# Planner/executor/reviewer are still defined here until their role modules
-# are created. They use gate configs from role_contracts for now.
-from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
@@ -19,39 +15,14 @@ from vibe3.roles.manager import (
     build_manager_request,
     resolve_orchestra_repo_root,
 )
-
-PLANNER_ROLE = TriggerableRoleDefinition(
-    name="planner",
-    registry_role="planner",
-    gate_config=GOVERNANCE_GATE_CONFIG,
-    trigger_name="plan",
-    trigger_state=IssueState.CLAIMED,
-    status_field="planner_status",
-    dispatch_predicate=lambda fs, live: not fs.get("plan_ref") and not live,
+from vibe3.roles.plan import (
+    PLANNER_ROLE,
 )
-
-EXECUTOR_ROLE = TriggerableRoleDefinition(
-    name="executor",
-    registry_role="executor",
-    gate_config=GOVERNANCE_GATE_CONFIG,
-    trigger_name="run",
-    trigger_state=IssueState.IN_PROGRESS,
-    status_field="executor_status",
-    dispatch_predicate=lambda fs, live: (
-        bool(fs.get("plan_ref")) and not fs.get("report_ref") and not live
-    ),
+from vibe3.roles.review import (
+    REVIEWER_ROLE,
 )
-
-REVIEWER_ROLE = TriggerableRoleDefinition(
-    name="reviewer",
-    registry_role="reviewer",
-    gate_config=GOVERNANCE_GATE_CONFIG,
-    trigger_name="review",
-    trigger_state=IssueState.REVIEW,
-    status_field="reviewer_status",
-    dispatch_predicate=lambda fs, live: (
-        bool(fs.get("report_ref")) and not fs.get("audit_ref") and not live
-    ),
+from vibe3.roles.run import (
+    EXECUTOR_ROLE,
 )
 
 LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (

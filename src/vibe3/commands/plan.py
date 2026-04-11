@@ -15,8 +15,8 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.config.settings import VibeConfig
-from vibe3.services.flow_service import FlowService
+from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+from vibe3.roles.plan import PLAN_SYNC_SPEC
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -25,16 +25,6 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-
-
-def _build_plan_usecase(
-    flow_service: FlowService | None = None,
-) -> PlanUsecase:
-    """Construct plan usecase with command-local dependencies."""
-    return PlanUsecase(
-        flow_service=flow_service,
-        config=VibeConfig.get_defaults(),
-    )
 
 
 def _plan_issue_impl(
@@ -51,28 +41,14 @@ def _plan_issue_impl(
     if trace:
         enable_trace()
 
-    flow_service, branch = ensure_flow_for_current_branch()
-    usecase = _build_plan_usecase(flow_service=flow_service)
+    _ = instructions, agent, backend, model
 
-    # 1. Resolve task input
-    task_input = usecase.resolve_task_plan(branch, issue_number=issue)
-
-    # 2. Execute
-    if dry_run:
-        typer.echo(f"Plan dry run for issue #{task_input.issue_number}")
-        return
-
-    usecase.execute_plan(
-        request=task_input.request,
-        issue_number=task_input.issue_number,
-        branch=task_input.branch,
+    run_issue_role_mode(
+        issue_number=issue,
+        dry_run=dry_run,
         async_mode=not no_async,
-        cli_args=[
-            "plan",
-            "issue",
-            str(task_input.issue_number),
-            *([instructions] if instructions else []),
-        ],
+        fresh_session=False,
+        spec=PLAN_SYNC_SPEC,
     )
 
 
@@ -91,8 +67,10 @@ def _plan_spec_impl(
     if trace:
         enable_trace()
 
+    _ = agent, backend, model
+
     flow_service, branch = ensure_flow_for_current_branch()
-    usecase = _build_plan_usecase(flow_service=flow_service)
+    usecase = PlanUsecase(flow_service=flow_service)
 
     # 1. Resolve spec input
     try:

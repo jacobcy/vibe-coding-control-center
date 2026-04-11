@@ -16,6 +16,56 @@ if TYPE_CHECKING:
     pass
 
 
+def fail_reviewer_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:review",
+) -> None:
+    """Fail a reviewer issue with comment and state transition.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Failure reason to include in comment
+        actor: Actor performing the transition (defaults to "agent:review")
+    """
+    GitHubClient().add_comment(
+        issue_number,
+        f"[review] 审查执行报错,已切换为 state/failed。\n\n原因:{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
+
+
+def fail_planner_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:plan",
+) -> None:
+    """Fail a planner issue with comment and state transition.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Failure reason to include in comment
+        actor: Actor performing the transition (defaults to "agent:plan")
+    """
+    GitHubClient().add_comment(
+        issue_number,
+        f"[plan] 规划执行报错,已切换为 state/failed。\n\n原因:{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
+
+
 def fail_executor_issue(
     *,
     issue_number: int,

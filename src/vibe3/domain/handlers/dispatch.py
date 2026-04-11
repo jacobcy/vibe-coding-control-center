@@ -1,15 +1,17 @@
 """Event handlers for agent dispatch-intent events.
 
 Handlers for planner, executor, and reviewer dispatch.
-These handlers listen to dispatch-intent events and trigger actual execution.
+These handlers listen to dispatch-intent events and trigger actual execution
+through role request builders from src/vibe3/roles/.
 """
 
-import os
-from pathlib import Path
+from __future__ import annotations
+
 from typing import Callable
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events import (
     ExecutorDispatched,
@@ -17,84 +19,63 @@ from vibe3.domain.events import (
     ReviewerDispatched,
 )
 from vibe3.domain.events.flow_lifecycle import DomainEvent
-from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.orchestration import IssueInfo
+from vibe3.roles.plan import build_plan_request
+from vibe3.roles.review import build_review_request
+from vibe3.roles.run import build_run_request
+
+_RequestBuilder = Callable[..., ExecutionRequest]
 
 
-def _current_cli_entry() -> str:
-    """Resolve the CLI entry point."""
-    return "src/vibe3/cli.py"
+def _load_issue_info(config: OrchestraConfig, issue_number: int) -> IssueInfo:
+    """Load issue info for dispatch."""
+    issue_payload = GitHubClient().view_issue(issue_number, repo=config.repo)
+    if not isinstance(issue_payload, dict):
+        return IssueInfo(
+            number=issue_number,
+            title=f"Issue {issue_number}",
+            labels=[],
+        )
+
+    issue = IssueInfo.from_github_payload(issue_payload)
+    if issue is not None:
+        return issue
+
+    title = str(issue_payload.get("title") or f"Issue {issue_number}")
+    labels = [
+        label.get("name", "")
+        for label in issue_payload.get("labels", [])
+        if isinstance(label, dict)
+    ]
+    return IssueInfo(number=issue_number, title=title, labels=labels)
 
 
-def _current_repo_root() -> str:
-    """Resolve the current repository root."""
-    return str(Path.cwd())
-
-
-def _resolve_dispatch_cwd(
-    *,
-    config: OrchestraConfig,
-    store: SQLiteClient,
-    issue_number: int,
-    fallback_branch: str,
-) -> str | None:
-    """Resolve worktree cwd for a role dispatch."""
-    flow_manager = FlowManager(config, store=store)
-    flow = flow_manager.get_flow_for_issue(issue_number)
-    branch = str(flow.get("branch") or "").strip() if flow else fallback_branch
-    if not branch:
-        return None
-
-    cwd = WorktreeManager(
-        config,
-        Path.cwd(),
-        flow_manager=flow_manager,
-    )._resolve_manager_cwd(issue_number, branch)[0]
-    return str(cwd) if cwd else None
-
-
-def _dispatch_agent_intent(
+def _dispatch_role_intent(
     *,
     role: str,
     handler_domain: str,
     issue_number: int,
-    branch: str,
-    cmd: list[str],
-    refs: dict[str, str],
+    request_builder: _RequestBuilder,
+    **builder_kwargs: object,
 ) -> None:
-    """Dispatch a planner/executor/reviewer intent through ExecutionCoordinator."""
+    """Dispatch a role intent through role request builder + ExecutionCoordinator."""
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
-    coordinator = ExecutionCoordinator(config, store)
+    issue = _load_issue_info(config, issue_number)
 
     logger.bind(
         domain=handler_domain,
         issue_number=issue_number,
-        cmd=" ".join(cmd),
-    ).debug(f"Executing {role} command")
+    ).debug(f"Building {role} request")
 
-    request = ExecutionRequest(
-        role=role,  # type: ignore[arg-type]
-        target_branch=branch,
-        target_id=issue_number,
-        execution_name=f"vibe3-{role}-issue-{issue_number}",
-        cmd=cmd,
-        cwd=_resolve_dispatch_cwd(
-            config=config,
-            store=store,
-            issue_number=issue_number,
-            fallback_branch=branch,
-        ),
-        env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        refs=refs,
-        actor=f"orchestra:{role}",
-        mode="async",
-    )
+    request = request_builder(config, issue, **builder_kwargs)
 
+    coordinator = ExecutionCoordinator(config, store)
     result = coordinator.dispatch_execution(request)
+
     if result.launched:
         logger.bind(
             domain=handler_domain,
@@ -110,11 +91,7 @@ def _dispatch_agent_intent(
 
 
 def handle_planner_dispatched(event: PlannerDispatched) -> None:
-    """Handle PlannerDispatched event.
-
-    Triggers planner execution when plan trigger is activated.
-    Uses ExecutionCoordinator to execute CLI command.
-    """
+    """Handle PlannerDispatched event via role request builder."""
     logger.bind(
         domain="planner_handler",
         issue_number=event.issue_number,
@@ -122,26 +99,12 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
     ).info("Planner dispatch triggered")
 
     try:
-        cmd = [
-            "uv",
-            "run",
-            "--project",
-            _current_repo_root(),
-            "python",
-            "-I",
-            _current_cli_entry(),
-            "plan",
-            "--issue",
-            str(event.issue_number),
-            "--no-async",
-        ]
-        _dispatch_agent_intent(
+        _dispatch_role_intent(
             role="planner",
             handler_domain="planner_handler",
             issue_number=event.issue_number,
+            request_builder=build_plan_request,
             branch=event.branch,
-            cmd=cmd,
-            refs={"issue_number": str(event.issue_number)},
         )
     except Exception as exc:
         logger.bind(
@@ -151,11 +114,7 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
 
 
 def handle_executor_dispatched(event: ExecutorDispatched) -> None:
-    """Handle ExecutorDispatched event.
-
-    Triggers executor execution when run trigger is activated.
-    Uses ExecutionCoordinator to execute CLI command.
-    """
+    """Handle ExecutorDispatched event via role request builder."""
     logger.bind(
         domain="executor_handler",
         issue_number=event.issue_number,
@@ -164,33 +123,13 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
     ).info("Executor dispatch triggered")
 
     try:
-        cmd = [
-            "uv",
-            "run",
-            "--project",
-            _current_repo_root(),
-            "python",
-            "-I",
-            _current_cli_entry(),
-            "run",
-            "--issue",
-            str(event.issue_number),
-            "--no-async",
-        ]
-
-        if event.plan_ref:
-            cmd.extend(["--plan-ref", event.plan_ref])
-
-        refs = {"issue_number": str(event.issue_number)}
-        if event.plan_ref:
-            refs["plan_ref"] = event.plan_ref
-        _dispatch_agent_intent(
+        _dispatch_role_intent(
             role="executor",
             handler_domain="executor_handler",
             issue_number=event.issue_number,
+            request_builder=build_run_request,
             branch=event.branch,
-            cmd=cmd,
-            refs=refs,
+            plan_ref=event.plan_ref,
         )
     except Exception as exc:
         logger.bind(
@@ -200,11 +139,7 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
 
 
 def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
-    """Handle ReviewerDispatched event.
-
-    Triggers reviewer execution when review trigger is activated.
-    Uses ExecutionCoordinator to execute CLI command.
-    """
+    """Handle ReviewerDispatched event via role request builder."""
     logger.bind(
         domain="reviewer_handler",
         issue_number=event.issue_number,
@@ -213,33 +148,13 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
     ).info("Reviewer dispatch triggered")
 
     try:
-        cmd = [
-            "uv",
-            "run",
-            "--project",
-            _current_repo_root(),
-            "python",
-            "-I",
-            _current_cli_entry(),
-            "review",
-            "--issue",
-            str(event.issue_number),
-            "--no-async",
-        ]
-
-        if event.report_ref:
-            cmd.extend(["--report-ref", event.report_ref])
-
-        refs = {"issue_number": str(event.issue_number)}
-        if event.report_ref:
-            refs["report_ref"] = event.report_ref
-        _dispatch_agent_intent(
+        _dispatch_role_intent(
             role="reviewer",
             handler_domain="reviewer_handler",
             issue_number=event.issue_number,
+            request_builder=build_review_request,
             branch=event.branch,
-            cmd=cmd,
-            refs=refs,
+            report_ref=event.report_ref,
         )
     except Exception as exc:
         logger.bind(
@@ -250,7 +165,7 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
 
 def register_dispatch_handlers() -> None:
     """Register all dispatch-intent event handlers."""
-    from typing import cast
+    from typing import Callable, cast
 
     from vibe3.domain.publisher import subscribe
 

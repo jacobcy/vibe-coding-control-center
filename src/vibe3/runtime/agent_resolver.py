@@ -65,6 +65,63 @@ def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
     return _resolve_and_sync(raw_options)
 
 
+def resolve_planner_agent_options(
+    config: OrchestraConfig,
+    runtime_config: VibeConfig,
+) -> AgentOptions:
+    """Resolve agent options for planner role.
+
+    Planner shares the same assignee_dispatch configuration as manager,
+    since both operate within the same orchestra context.
+
+    Args:
+        config: Orchestra configuration with assignee dispatch settings
+        runtime_config: Unused compatibility parameter kept for existing callers
+
+    Returns:
+        Effective agent options with preset resolved from config/models.json
+    """
+    return resolve_manager_agent_options(config, runtime_config)
+
+
+def resolve_executor_agent_options(
+    config: OrchestraConfig,
+    runtime_config: VibeConfig,
+) -> AgentOptions:
+    """Resolve agent options for executor role.
+
+    Executor shares the same assignee_dispatch configuration as manager,
+    since both operate within the same orchestra context.
+
+    Args:
+        config: Orchestra configuration with assignee dispatch settings
+        runtime_config: Unused compatibility parameter kept for existing callers
+
+    Returns:
+        Effective agent options with preset resolved from config/models.json
+    """
+    return resolve_manager_agent_options(config, runtime_config)
+
+
+def resolve_reviewer_agent_options(
+    config: OrchestraConfig,
+    runtime_config: VibeConfig,
+) -> AgentOptions:
+    """Resolve agent options for reviewer role.
+
+    Reviewer shares the same assignee_dispatch configuration as manager,
+    since both operate within the same orchestra context.
+
+    Args:
+        config: Orchestra configuration with assignee dispatch settings
+        runtime_config: Unused compatibility parameter kept for existing callers
+
+    Returns:
+        Effective agent options with preset resolved from config/models.json
+    """
+    return resolve_manager_agent_options(config, runtime_config)
+
+
 def resolve_manager_agent_options(
     config: OrchestraConfig,
     runtime_config: VibeConfig,

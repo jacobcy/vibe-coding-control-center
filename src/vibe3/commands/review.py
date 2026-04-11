@@ -16,15 +16,17 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
+from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+from vibe3.roles.review import REVIEW_SYNC_SPEC
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
-    help="Code review with two modes:\n\n"
+    help="Code review with three modes:\n\n"
+    "  --issue <n>  - Review issue implementation (orchestra-driven)\n"
     "  pr <number>  - Review existing PR from GitHub (analyzes PR diff)\n"
     "  base [branch] - Review local changes vs base branch (compares snapshots)",
-    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
@@ -48,6 +50,79 @@ def _build_review_usecase(
         snapshot_diff_builder=build_snapshot_diff,
         review_parser=parse_codex_review,
         context_builder=make_review_context_builder,
+    )
+
+
+def _review_issue_impl(
+    issue: int,
+    report_ref: str | None,
+    trace: bool,
+    dry_run: bool,
+    no_async: bool,
+) -> None:
+    """Review implementation for an issue via role sync runner."""
+    if trace:
+        enable_trace()
+
+    _ = report_ref
+
+    run_issue_role_mode(
+        issue_number=issue,
+        dry_run=dry_run,
+        async_mode=not no_async,
+        fresh_session=False,
+        spec=REVIEW_SYNC_SPEC,
+    )
+
+
+@app.callback(invoke_without_command=True)
+def default(
+    ctx: typer.Context,
+    issue: Annotated[
+        Optional[int],
+        typer.Option("--issue", "-i", help="Review issue implementation"),
+    ] = None,
+    report_ref: Annotated[
+        Optional[str],
+        typer.Option("--report-ref", help="Report reference for context"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    no_async: _ASYNC_OPT = False,
+) -> None:
+    """Review with --issue for orchestra-driven review, or use pr/base subcommands."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if issue is not None:
+        _review_issue_impl(
+            issue=issue,
+            report_ref=report_ref,
+            trace=trace,
+            dry_run=dry_run,
+            no_async=no_async,
+        )
+        return
+    typer.echo(ctx.get_help())
+
+
+@app.command(name="issue")
+def issue_command(
+    issue: Annotated[int, typer.Argument(help="GitHub issue number")],
+    report_ref: Annotated[
+        Optional[str],
+        typer.Option("--report-ref", help="Report reference for context"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    no_async: _ASYNC_OPT = False,
+) -> None:
+    """Review implementation for a specific issue (orchestra-driven)."""
+    _review_issue_impl(
+        issue=issue,
+        report_ref=report_ref,
+        trace=trace,
+        dry_run=dry_run,
+        no_async=no_async,
     )
 
 

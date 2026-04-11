@@ -1,6 +1,8 @@
-"""Usecase layer for plan command orchestration.
+"""Usecase layer for plan command orchestration (spec mode).
 
-Migrated from vibe3.services.plan_usecase.
+Issue-mode planning is now handled by roles/plan.py via run_issue_role_mode.
+This module retains spec-mode logic until spec mode also migrates to the role
+module pattern.
 """
 
 import os
@@ -17,15 +19,14 @@ from vibe3.config.settings import VibeConfig
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput, PlanTaskInput
+from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.services.flow_service import FlowService
 from vibe3.services.spec_ref_service import SpecRefService
 
 
 class PlanUsecase:
-    """Coordinate plan command request building with reusable services."""
+    """Coordinate spec-mode plan command request building."""
 
     def __init__(
         self,
@@ -43,41 +44,9 @@ class PlanUsecase:
         self.execution_service = execution_service or CodeagentExecutionService(
             self.config
         )
-        # WorktreeManager 需要 OrchestraConfig，从 VibeConfig 转换
         orchestra_config = OrchestraConfig.from_settings()
         self.worktree_manager = worktree_manager or WorktreeManager(
             config=orchestra_config, repo_path=Path.cwd()
-        )
-
-    def resolve_task_plan(
-        self,
-        branch: str,
-        issue_number: int | None = None,
-    ) -> PlanTaskInput:
-        """Resolve task planning input from explicit issue or current flow."""
-        used_flow_issue = False
-        if issue_number is None:
-            flow = self.flow_service.get_flow_status(branch)
-            if not flow or not flow.task_issue_number:
-                raise ValueError(
-                    "No issue number provided and current flow has no task issue.\n"
-                    "Use 'vibe3 plan --issue <issue>' or bind a task to the "
-                    "current flow."
-                )
-            issue_number = flow.task_issue_number
-            used_flow_issue = True
-
-        flow = self.flow_service.get_flow_status(branch)
-        guidance = self._build_flow_plan_guidance(flow, issue_number) if flow else None
-        request = PlanRequest(
-            scope=PlanScope.for_task(issue_number),
-            task_guidance=guidance,
-        )
-        return PlanTaskInput(
-            issue_number=issue_number,
-            branch=branch,
-            request=request,
-            used_flow_issue=used_flow_issue,
         )
 
     def resolve_spec_plan(
@@ -113,43 +82,6 @@ class PlanUsecase:
         """Bind resolved spec path to current flow."""
         self.flow_service.bind_spec(branch, spec_path, "user")
 
-    def _build_issue_context(self, issue_number: int, heading: str) -> str | None:
-        try:
-            issue = self.github_client.view_issue(issue_number)
-        except (FileNotFoundError, RuntimeError):
-            return None
-        if not isinstance(issue, dict):
-            return None
-        parts = [f"## {heading}", f"Issue: #{issue_number}"]
-        title = issue.get("title")
-        body = issue.get("body")
-        if title:
-            parts.append(f"Title: {title}")
-        if body:
-            parts.extend(["", body])
-        return "\n".join(parts)
-
-    def _build_flow_plan_guidance(
-        self,
-        flow: FlowStatusResponse | None,
-        issue_number: int,
-    ) -> str | None:
-        sections: list[str] = []
-        task_context = self._build_issue_context(issue_number, "Task Issue Context")
-        if task_context:
-            sections.append(task_context)
-
-        spec_ref = getattr(flow, "spec_ref", None)
-        if spec_ref:
-            spec_info = self.spec_ref_service.parse_spec_ref(spec_ref)
-            spec_content = self.spec_ref_service.get_spec_content_for_prompt(spec_info)
-            if spec_info.display and spec_info.display != spec_ref:
-                sections.append(f"## Spec Reference\nSpec Ref: {spec_info.display}")
-            if spec_content:
-                sections.append(f"## Spec Context\n{spec_content}")
-
-        return "\n\n".join(sections) if sections else None
-
     def execute_plan(
         self,
         request: PlanRequest,
@@ -158,7 +90,7 @@ class PlanUsecase:
         async_mode: bool = True,
         cli_args: list[str] | None = None,
     ) -> CodeagentResult:
-        """执行 plan 并在同步成功/失败后发布领域事件。"""
+        """Execute plan (spec mode) with codeagent backend."""
         log = logger.bind(
             domain="plan_usecase",
             action="execute_plan",
@@ -238,60 +170,41 @@ class PlanUsecase:
         issue_number: int,
         branch: str,
     ) -> None:
-        """处理 plan 执行成功。
-
-        职责：
-        - 发布 PlanCompleted 事件（验证 plan_ref 并转换状态）
-
-        Args:
-            result: 执行结果
-            issue_number: GitHub issue 编号
-            branch: Git 分支名
-        """
+        """Handle plan execution success - publish PlanCompleted event."""
         from vibe3.domain.events import PlanCompleted
         from vibe3.domain.publisher import publish
 
-        log = logger.bind(
+        logger.bind(
             domain="plan_usecase",
             action="handle_plan_success",
             issue=issue_number,
+        ).info("Publishing PlanCompleted event")
+        publish(
+            PlanCompleted(
+                issue_number=issue_number,
+                branch=branch,
+                actor="agent:plan",
+            )
         )
-
-        log.info("Publishing PlanCompleted event")
-        event = PlanCompleted(
-            issue_number=issue_number,
-            branch=branch,
-            actor="agent:plan",
-        )
-        publish(event)
 
     def _handle_plan_failure(
         self,
         error: Exception,
         issue_number: int,
     ) -> None:
-        """处理 plan 执行失败。
-
-        职责：
-        - 发布 IssueFailed 事件
-
-        Args:
-            error: 异常对象
-            issue_number: GitHub issue 编号
-        """
+        """Handle plan execution failure - publish IssueFailed event."""
         from vibe3.domain.events import IssueFailed
         from vibe3.domain.publisher import publish
 
-        log = logger.bind(
+        logger.bind(
             domain="plan_usecase",
             action="handle_plan_failure",
             issue=issue_number,
+        ).error("Plan execution failed", error=str(error))
+        publish(
+            IssueFailed(
+                issue_number=issue_number,
+                reason=str(error),
+                actor="agent:plan",
+            )
         )
-
-        log.error("Plan execution failed", error=str(error))
-        event = IssueFailed(
-            issue_number=issue_number,
-            reason=str(error),
-            actor="agent:plan",
-        )
-        publish(event)

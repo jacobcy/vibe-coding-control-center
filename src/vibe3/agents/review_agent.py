@@ -1,6 +1,7 @@
-"""Usecase layer for review command orchestration.
+"""Usecase layer for PR and base review command modes.
 
-Migrated from vibe3.services.review_usecase.
+Issue-based review is handled by roles/review.py + issue_role_sync_runner.
+This module serves the manual CLI modes: `review pr` and `review base`.
 """
 
 from dataclasses import dataclass
