@@ -136,7 +136,7 @@ def build_manager_request(
     issue: IssueInfo,
     *,
     registry: SessionRegistryService | None = None,
-    _repo_path: Path | None = None,
+    repo_path: Path | None = None,
     actor: str = "orchestra:manager",
 ) -> ExecutionRequest | None:
     """Build the manager execution request from declarative role policy."""
@@ -175,8 +175,10 @@ def build_manager_request(
         refs=refs,
         worktree_requirement=MANAGER_ROLE.gate_config.worktree,
         completion_gate=MANAGER_ROLE.gate_config.completion_contract,
+        repo_path=repo_path,
     )
-    request.env = env
+    if request.env is not None:
+        request.env.update(env)
     return request
 
 
@@ -329,7 +331,7 @@ MANAGER_SYNC_SPEC = IssueRoleSyncSpec(
     build_async_request=lambda config, issue, actor: build_manager_request(
         config,
         issue,
-        _repo_path=resolve_orchestra_repo_root(),
+        repo_path=resolve_orchestra_repo_root(),
         actor=actor,
     ),
     build_sync_request=build_manager_sync_request,

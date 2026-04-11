@@ -60,6 +60,6 @@ def build_issue_state_request(
             config,
             issue,
             registry=registry,
-            _repo_path=repo_path or resolve_orchestra_repo_root(),
+            repo_path=repo_path or resolve_orchestra_repo_root(),
         )
     return None
