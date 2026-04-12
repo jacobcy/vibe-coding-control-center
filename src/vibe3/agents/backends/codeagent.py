@@ -46,6 +46,28 @@ RESUME_RETRY_ERROR_SNIPPETS: Final[tuple[str, ...]] = (
     "resume error",
 )
 
+# Known backend-internal error patterns with suggested fixes
+KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
+    (
+        "schema._zod.def",
+        "OpenCode Zod schema error",
+        "OpenCode internal schema parsing failed. Try: 1) Update codeagent-wrapper, "
+        "2) Use a different model, 3) Check ~/.codeagent/models.json",
+    ),
+    (
+        "Failed to parse event",
+        "Backend event parsing error",
+        "Backend event parse failed. Try: 1) Use a different model/backend, "
+        "2) Simplify the prompt, 3) Check codeagent-wrapper logs",
+    ),
+    (
+        "completed without agent_message output",
+        "No agent output",
+        "Backend completed but produced no output. Try: 1) Use a different model, "
+        "2) Check if the model supports structured output, 3) Simplify the task",
+    ),
+)
+
 
 @dataclass(frozen=True)
 class AsyncExecutionHandle:
@@ -70,6 +92,21 @@ def extract_session_id(stdout: str) -> str | None:
     if not match:
         match = re.search(r'\\"sessionID\\":\\"([A-Za-z0-9_-]+)\\"', stdout)
     return match.group(1) if match else None
+
+
+def _diagnose_backend_error(output: str) -> str | None:
+    """Diagnose known backend error patterns and return suggested fix.
+
+    Args:
+        output: Combined stdout/stderr from codeagent-wrapper
+
+    Returns:
+        Diagnosis string with title and suggestion, or None if no match.
+    """
+    for pattern, title, suggestion in KNOWN_BACKEND_ERROR_PATTERNS:
+        if pattern in output:
+            return f"[{title}] {suggestion}"
+    return None
 
 
 class CodeagentBackend:
@@ -539,6 +576,9 @@ class CodeagentBackend:
             )
 
             if not agent_result.is_success():
+                combined_output = f"{agent_result.stdout}\n{agent_result.stderr}"
+                diagnosis = _diagnose_backend_error(combined_output)
+
                 if agent_result.stderr:
                     stderr_preview = agent_result.stderr[:500]
                 elif agent_result.stdout:
@@ -546,10 +586,14 @@ class CodeagentBackend:
                 else:
                     stderr_preview = "(no output)"
 
-                raise AgentExecutionError(
+                error_msg = (
                     f"codeagent-wrapper failed with exit code "
                     f"{agent_result.exit_code}:\n{stderr_preview}"
                 )
+                if diagnosis:
+                    error_msg += f"\n\n{diagnosis}"
+
+                raise AgentExecutionError(error_msg)
 
             return agent_result
         finally:
