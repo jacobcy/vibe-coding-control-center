@@ -10,6 +10,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
+from vibe3.models.flow import FlowEvent
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -19,6 +20,20 @@ class _GitClientProtocol(Protocol):
 
     def get_current_branch(self) -> str: ...
     def get_git_common_dir(self) -> str: ...
+
+
+class _BranchBoundGitClient:
+    """Git client shim that pins handoff artifact writes to a target branch."""
+
+    def __init__(self, branch: str) -> None:
+        self._branch = branch
+        self._delegate = GitClient()
+
+    def get_current_branch(self) -> str:
+        return self._branch
+
+    def get_git_common_dir(self) -> str:
+        return self._delegate.get_git_common_dir()
 
 
 class HandoffService:
@@ -171,6 +186,63 @@ class HandoffService:
                 "Cleared handoff directory for branch"
             )
         return handoff_dir
+
+    def get_handoff_events(
+        self, branch: str, event_type_prefix: str = "handoff_", limit: int | None = None
+    ) -> list[FlowEvent]:
+        """Return handoff events for a branch from the authoritative store."""
+        events_data = self.store.get_events(
+            branch, event_type_prefix=event_type_prefix, limit=limit
+        )
+        return [FlowEvent(**event) for event in events_data]
+
+    def create_artifact(
+        self,
+        prefix: str,
+        content: str | None,
+        *,
+        branch: str | None = None,
+    ) -> tuple[str, Path] | None:
+        """Create a timestamped handoff artifact file.
+
+        When ``branch`` is omitted, uses the service's bound git client. When
+        provided, artifact creation is pinned to that branch without requiring
+        callers to write directly against git/common-dir internals.
+        """
+        if branch is None:
+            try:
+                branch = self.git_client.get_current_branch()
+            except Exception:
+                return None
+            artifact_service = self
+        else:
+            artifact_service = HandoffService(
+                store=self.store,
+                git_client=_BranchBoundGitClient(branch),
+            )
+
+        handoff_dir = artifact_service.ensure_handoff_dir()
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        artifact_path = handoff_dir / f"{prefix}-{timestamp}.md"
+        if content is not None:
+            artifact_path.write_text(content, encoding="utf-8")
+
+        return branch, artifact_path
+
+    def persist_artifact_event(
+        self,
+        *,
+        branch: str,
+        event_type: str,
+        actor: str,
+        detail: str,
+        refs: dict[str, str],
+        flow_state_updates: dict[str, object] | None = None,
+    ) -> None:
+        """Persist a handoff event and any matching flow-state updates."""
+        self.store.add_event(branch, event_type, actor, detail=detail, refs=refs)
+        if flow_state_updates:
+            self.store.update_flow_state(branch, **flow_state_updates)
 
     def append_current_handoff(
         self,

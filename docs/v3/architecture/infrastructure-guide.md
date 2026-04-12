@@ -134,7 +134,7 @@ CapacityService 提供单一的容量检查点，结合 live session count 和 i
 ### API
 
 ```python
-from vibe3.services.capacity_service import CapacityService
+from vibe3.execution.capacity_service import CapacityService
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.agents.backends.codeagent import CodeagentBackend
 

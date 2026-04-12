@@ -1,4 +1,4 @@
-"""AI service for text generation suggestions."""
+"""AI suggestion client for higher-level text generation workflows."""
 
 from pathlib import Path
 
@@ -44,43 +44,25 @@ DEFAULT_PROMPTS = {
 }
 
 
-class AIService:
-    """Service for AI-assisted text generation.
-
-    Provides business-level APIs for flow slug suggestions and PR content.
-    """
+class AISuggestionClient:
+    """Higher-level AI text suggestion client built on top of AIClient."""
 
     def __init__(
         self,
         config: AIConfig,
         prompts_path: Path | None = None,
     ) -> None:
-        """Initialize AI service.
-
-        Args:
-            config: AI configuration
-            prompts_path: Path to prompts.yaml file (optional)
-        """
         self.config = config
         self.prompts = self._load_prompts(prompts_path)
-        self.ai_client: AIClient | None = None
+        self.ai_client: AIClient | None = AIClient(config)
 
-        self.ai_client = AIClient(config)
         if self.ai_client._api_key is None:
             self.ai_client = None
-            logger.bind(module="ai_service").debug(
-                "AI client not available, service will return None"
+            logger.bind(module="ai_suggestion_client").debug(
+                "AI client not available, suggestion client will return None"
             )
 
     def _load_prompts(self, prompts_path: Path | None) -> dict:
-        """Load prompts from YAML file or use defaults.
-
-        Args:
-            prompts_path: Path to prompts.yaml file
-
-        Returns:
-            Dict with prompts configuration
-        """
         if prompts_path and prompts_path.exists():
             try:
                 with open(prompts_path) as f:
@@ -88,11 +70,11 @@ class AIService:
                     if loaded:
                         return dict(loaded)
             except yaml.YAMLError:
-                logger.bind(module="ai_service").warning(
+                logger.bind(module="ai_suggestion_client").warning(
                     f"Invalid YAML in {prompts_path}, using defaults"
                 )
             except OSError as e:
-                logger.bind(module="ai_service").warning(
+                logger.bind(module="ai_suggestion_client").warning(
                     f"Cannot read {prompts_path}: {e}, using defaults"
                 )
 
@@ -103,15 +85,6 @@ class AIService:
         issue_title: str,
         issue_body: str | None = None,
     ) -> list[str] | None:
-        """Suggest flow slugs based on issue title and body.
-
-        Args:
-            issue_title: Issue title
-            issue_body: Issue body (optional)
-
-        Returns:
-            List of suggested slugs or None if generation fails
-        """
         if self.ai_client is None:
             return None
 
@@ -123,10 +96,9 @@ class AIService:
             "user", DEFAULT_PROMPTS["flow"]["slug_suggestion"]["user"]
         )
 
-        body_text = issue_body if issue_body else ""
         user_prompt = user_template.format(
             issue_title=issue_title,
-            issue_body=body_text,
+            issue_body=issue_body or "",
         )
 
         result = self.ai_client.generate_text(system_prompt, user_prompt)
@@ -136,11 +108,10 @@ class AIService:
         slugs = [
             line.strip().lower() for line in result.strip().split("\n") if line.strip()
         ]
-
         if not slugs:
             return None
 
-        logger.bind(module="ai_service").debug(
+        logger.bind(module="ai_suggestion_client").debug(
             f"Generated {len(slugs)} flow slug suggestions"
         )
         return slugs
@@ -150,15 +121,6 @@ class AIService:
         commits: list[str],
         changed_files: list[str] | None = None,
     ) -> tuple[str | None, str | None] | None:
-        """Suggest PR title and body based on commits.
-
-        Args:
-            commits: List of commit messages
-            changed_files: List of changed files (optional)
-
-        Returns:
-            Tuple of (title, body) or None if generation fails
-        """
         if self.ai_client is None:
             return None
 
@@ -193,5 +155,7 @@ class AIService:
             body_template.format(commits=commits_text, changed_files=files_text),
         )
 
-        logger.bind(module="ai_service").debug("Generated PR content suggestions")
+        logger.bind(module="ai_suggestion_client").debug(
+            "Generated PR content suggestions"
+        )
         return (title_result.strip(), body_result.strip() if body_result else None)

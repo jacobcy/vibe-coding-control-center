@@ -7,10 +7,10 @@ from typing import Annotated, Any, Iterator
 
 import typer
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
-from vibe3.services.milestone_service import MilestoneService
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
@@ -27,9 +27,9 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def _build_milestone_service() -> MilestoneService:
+def _build_github_client() -> GitHubClient:
     """Construct a milestone service."""
-    return MilestoneService()
+    return GitHubClient()
 
 
 def _build_resume_usecase() -> TaskResumeUsecase:
@@ -95,7 +95,7 @@ def show(
 ) -> None:
     """Show task details."""
     task_svc = TaskService()
-    milestone_svc = _build_milestone_service()
+    milestone_svc = _build_github_client()
 
     try:
         target_branch = task_svc.resolve_branch(branch)

@@ -15,13 +15,13 @@ runner = CliRunner()
 def stub_pr_show_service(monkeypatch):
     """Keep pr show output tests focused on formatting, not remote lookups."""
     mock_service = MagicMock()
-    mock_service.resolve_pr_target.return_value = SimpleNamespace(
+    target = SimpleNamespace(
         pr_number=123,
         branch=None,
         current_branch="task/test",
         from_flow=False,
     )
-    mock_service.fetch_pr_or_raise.return_value = SimpleNamespace(
+    pr = SimpleNamespace(
         model_dump=lambda: {
             "number": 123,
             "title": "Test PR",
@@ -33,11 +33,11 @@ def stub_pr_show_service(monkeypatch):
             "draft": True,
         }
     )
-    mock_service.load_pr_analysis_summary.return_value = {
+    analysis_summary = {
         "raw": {},
         "score": {"level": "LOW", "score": 1},
     }
-    mock_service.build_pr_output_payload.return_value = {
+    payload = {
         "number": 123,
         "title": "Test PR",
         "trace": {"command": "pr show"},
@@ -45,6 +45,19 @@ def stub_pr_show_service(monkeypatch):
     monkeypatch.setattr(
         "vibe3.commands.pr_query.PRService",
         lambda: mock_service,
+    )
+    monkeypatch.setattr("vibe3.commands.pr_query._resolve_pr_target", lambda *_: target)
+    monkeypatch.setattr(
+        "vibe3.commands.pr_query._fetch_pr_or_raise",
+        lambda *_args, **_kwargs: pr,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.pr_query._load_pr_analysis_summary",
+        lambda *_: analysis_summary,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.pr_query._build_pr_output_payload",
+        lambda *_: payload,
     )
     return mock_service
 

@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
-    from vibe3.services.issue_close_service import IssueCloseService
     from vibe3.services.pr_service import PRService
 
 
@@ -24,7 +24,7 @@ class AbandonFlowService:
     """Orchestrates complete flow abandonment.
 
     This service coordinates multiple operations for abandoning a flow:
-    1. Close the GitHub issue via IssueCloseService
+    1. Close the GitHub issue via GitHubClient
     2. Close any open PR for the branch via PRService
     3. Mark the flow as aborted via FlowService
 
@@ -32,29 +32,25 @@ class AbandonFlowService:
     but the process continues to attempt remaining steps.
     """
 
-    _issue_close: IssueCloseService
+    _github: GitHubClient
     _pr_service: PRService
     _flow_service: FlowService
 
     def __init__(
         self,
-        issue_close: IssueCloseService | None = None,
+        github: GitHubClient | None = None,
         pr_service: PRService | None = None,
         flow_service: FlowService | None = None,
     ) -> None:
         """Initialize abandon flow service.
 
         Args:
-            issue_close: Service for closing issues
+            github: GitHub client for issue operations
             pr_service: Service for managing PRs
             flow_service: Service for flow lifecycle
         """
-        # Lazy load if not provided
-        if issue_close is None:
-            from vibe3.clients.github_client import GitHubClient
-            from vibe3.services.issue_close_service import IssueCloseService
-
-            issue_close = IssueCloseService(github=GitHubClient())
+        if github is None:
+            github = GitHubClient()
 
         if pr_service is None:
             from vibe3.services.pr_service import PRService
@@ -66,7 +62,7 @@ class AbandonFlowService:
 
             flow_service = FlowService()
 
-        self._issue_close = issue_close
+        self._github = github
         self._pr_service = pr_service
         self._flow_service = flow_service
 
@@ -113,7 +109,7 @@ class AbandonFlowService:
             results["issue"] = "closed"
         else:
             try:
-                results["issue"] = self._issue_close.close_issue(
+                results["issue"] = self._github.close_issue_if_open(
                     issue_number, closing_comment=closing_comment
                 )
             except Exception as e:

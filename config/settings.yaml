@@ -67,8 +67,11 @@ code_limits:
         limit: 600
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
       - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 450
+        limit: 500
         reason: "Issue 状态异常转换聚合，职责单一，去重辅助函数共享，与测试对称"
+      - path: "src/vibe3/services/handoff_service.py"
+        limit: 500
+        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/git_client.py"
@@ -107,7 +110,7 @@ code_limits:
         limit: 600
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 570
+        limit: 610
         reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 450
@@ -117,7 +120,7 @@ code_limits:
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
         limit: 450
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
-      - path: "tests/vibe3/services/test_execution_lifecycle.py"
+      - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
 

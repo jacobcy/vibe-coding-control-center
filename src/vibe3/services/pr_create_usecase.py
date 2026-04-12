@@ -8,8 +8,8 @@ from loguru import logger
 from rich.console import Console
 from rich.prompt import Prompt
 
+from vibe3.clients.ai_suggestion_client import AISuggestionClient
 from vibe3.config.settings import VibeConfig
-from vibe3.services.ai_service import AIService
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_binding_guard import ensure_task_issue_bound
@@ -83,8 +83,8 @@ class PRCreateUsecase:
 
         config = VibeConfig.get_defaults()
         prompts_path = Path("config/prompts.yaml")
-        ai_service = AIService(config.ai, prompts_path=prompts_path)
-        result = ai_service.suggest_pr_content(commits, changed_files)
+        ai_client = AISuggestionClient(config.ai, prompts_path=prompts_path)
+        result = ai_client.suggest_pr_content(commits, changed_files)
 
         if not result:
             if interactive:

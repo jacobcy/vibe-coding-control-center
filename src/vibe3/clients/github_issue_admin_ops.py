@@ -124,6 +124,71 @@ class IssueAdminMixin:
             return False
         return True
 
+    def close_issue_if_open(
+        self: Any,
+        issue_number: int,
+        closing_comment: str | None = None,
+        repo: str | None = None,
+    ) -> str:
+        """Close a GitHub issue with pre-check for already-closed state.
+
+        Handles the "already closed" case gracefully to support
+        abandonment flows where the issue may already be closed.
+
+        Args:
+            issue_number: Issue number to close
+            closing_comment: Optional comment explaining why
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            Result string: "closed", "already_closed", or "failed"
+        """
+        logger.bind(
+            external="github",
+            operation="close_issue_if_open",
+            issue_number=issue_number,
+        ).debug("Closing issue with pre-check")
+
+        # Check if already closed (avoid unnecessary API call)
+        try:
+            issue_payload = self.view_issue(issue_number, repo=repo)
+        except (FileNotFoundError, OSError, RuntimeError) as exc:
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+                error=str(exc),
+            ).warning(
+                "Failed to fetch issue payload before close, "
+                "proceeding with close operation"
+            )
+            issue_payload = None
+
+        if isinstance(issue_payload, dict) and issue_payload.get("state") == "closed":
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+            ).debug("Issue already closed")
+            return "already_closed"
+
+        success = self.close_issue(
+            issue_number=issue_number,
+            comment=closing_comment,
+            repo=repo,
+        )
+
+        if success:
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+            ).debug("Issue closed successfully")
+            return "closed"
+        else:
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+            ).error("Failed to close issue")
+            return "failed"
+
     def get_pr_for_issue(
         self: Any,
         issue_number: int,

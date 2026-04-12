@@ -16,6 +16,71 @@ if TYPE_CHECKING:
     pass
 
 
+def _transition_issue_state(
+    *,
+    issue_number: int,
+    to_state: IssueState,
+    actor: str,
+    force: bool,
+    comment: str | None = None,
+    repo: str | None = None,
+    dedupe_latest_comment: bool = False,
+    dedupe_reason: str | None = None,
+) -> None:
+    """Apply optional comment side effect, then transition the issue state."""
+    github = GitHubClient()
+    if comment:
+        if dedupe_latest_comment:
+            _add_comment_if_missing(
+                github=github,
+                issue_number=issue_number,
+                body=comment,
+                repo=repo,
+            )
+        elif dedupe_reason is not None:
+            issue_payload = github.view_issue(issue_number, repo=repo)
+            if not (
+                isinstance(issue_payload, dict)
+                and _has_matching_block_comment(issue_payload, dedupe_reason)
+            ):
+                github.add_comment(issue_number, comment, repo=repo)
+        else:
+            github.add_comment(issue_number, comment, repo=repo)
+
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        to_state,
+        actor=actor,
+        force=force,
+    )
+
+
+def _build_failure_comment(role: str, reason: str) -> str:
+    return f"[{role}] {_ROLE_FAILURE_COPY[role]}\n\n原因:{reason}"
+
+
+def _build_missing_ref_comment(role: str, ref_name: str, reason: str) -> str:
+    return (
+        f"[{role}] {_ROLE_MISSING_REF_COPY[role]} {ref_name}，"
+        "已切换为 state/blocked。\n\n"
+        f"原因:{reason}"
+    )
+
+
+_ROLE_FAILURE_COPY = {
+    "review": "审查执行报错,已切换为 state/failed。",
+    "plan": "规划执行报错,已切换为 state/failed。",
+    "run": "执行报错,已切换为 state/failed。",
+    "manager": "管理执行报错,已切换为 state/failed。",
+}
+
+_ROLE_MISSING_REF_COPY = {
+    "plan": "规划执行完成，但未登记 authoritative",
+    "run": "执行完成，但未登记 authoritative",
+    "review": "审查完成，但未登记 authoritative",
+}
+
+
 def fail_reviewer_issue(
     *,
     issue_number: int,
@@ -29,15 +94,12 @@ def fail_reviewer_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (defaults to "agent:review")
     """
-    GitHubClient().add_comment(
-        issue_number,
-        f"[review] 审查执行报错,已切换为 state/failed。\n\n原因:{reason}",
-    )
-    LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.FAILED,
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.FAILED,
         actor=actor,
         force=True,
+        comment=_build_failure_comment("review", reason),
     )
 
 
@@ -54,15 +116,12 @@ def fail_planner_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (defaults to "agent:plan")
     """
-    GitHubClient().add_comment(
-        issue_number,
-        f"[plan] 规划执行报错,已切换为 state/failed。\n\n原因:{reason}",
-    )
-    LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.FAILED,
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.FAILED,
         actor=actor,
         force=True,
+        comment=_build_failure_comment("plan", reason),
     )
 
 
@@ -79,15 +138,12 @@ def fail_executor_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (e.g., "agent:executor")
     """
-    GitHubClient().add_comment(
-        issue_number,
-        f"[run] 执行报错,已切换为 state/failed。\n\n原因:{reason}",
-    )
-    LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.FAILED,
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.FAILED,
         actor=actor,
         force=True,
+        comment=_build_failure_comment("run", reason),
     )
 
 
@@ -104,15 +160,12 @@ def fail_manager_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (defaults to "agent:manager")
     """
-    GitHubClient().add_comment(
-        issue_number,
-        f"[manager] 管理执行报错,已切换为 state/failed。\n\n原因:{reason}",
-    )
-    LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.FAILED,
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.FAILED,
         actor=actor,
         force=True,
+        comment=_build_failure_comment("manager", reason),
     )
 
 
@@ -131,22 +184,18 @@ def resume_failed_issue_to_handoff(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
-    github = GitHubClient()
-    _add_comment_if_missing(
-        github=github,
+    _transition_issue_state(
         issue_number=issue_number,
-        body=_build_resume_comment(
+        to_state=IssueState.HANDOFF,
+        actor=actor,
+        force=False,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_resume_comment(
             header="[resume] 已从 state/failed 继续到 state/handoff。",
             detail="manager 将重新判断现场并决定下一步。",
             reason=reason,
         ),
-        repo=repo,
-    )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.HANDOFF,
-        actor=actor,
-        force=False,
     )
 
 
@@ -165,22 +214,18 @@ def resume_failed_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
-    github = GitHubClient()
-    _add_comment_if_missing(
-        github=github,
+    _transition_issue_state(
         issue_number=issue_number,
-        body=_build_resume_comment(
+        to_state=IssueState.READY,
+        actor=actor,
+        force=True,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_resume_comment(
             header="[resume] 已从 state/failed 继续到 state/ready。",
             detail="将重新进入 manager 标准入口。",
             reason=reason,
         ),
-        repo=repo,
-    )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.READY,
-        actor=actor,
-        force=True,  # Force transition from FAILED to READY
     )
 
 
@@ -199,22 +244,18 @@ def resume_blocked_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
-    github = GitHubClient()
-    _add_comment_if_missing(
-        github=github,
+    _transition_issue_state(
         issue_number=issue_number,
-        body=_build_resume_comment(
+        to_state=IssueState.READY,
+        actor=actor,
+        force=True,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_resume_comment(
             header="[resume] 已从 state/blocked 恢复到 state/ready。",
             detail="阻塞已解除,准备继续执行。",
             reason=reason,
         ),
-        repo=repo,
-    )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.READY,
-        actor=actor,
-        force=True,  # Force transition from BLOCKED to READY
     )
 
 
@@ -236,20 +277,14 @@ def block_manager_noop_issue(
         reason: Block reason to include in comment
         actor: Actor performing the transition
     """
-    issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
-    if isinstance(issue_payload, dict) and not _has_matching_block_comment(
-        issue_payload, reason
-    ):
-        GitHubClient().add_comment(
-            issue_number,
-            "[manager] 无法推进,已切换为 state/blocked。\n\n" f"原因:{reason}",
-            repo=repo,
-        )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.BLOCKED,
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.BLOCKED,
         actor=actor,
         force=True,
+        repo=repo,
+        dedupe_reason=reason,
+        comment=f"[manager] 无法推进,已切换为 state/blocked。\n\n原因:{reason}",
     )
 
 
@@ -268,22 +303,14 @@ def block_planner_noop_issue(
         actor: Actor performing the block
         repo: Repository (owner/repo format, optional)
     """
-    github = GitHubClient()
-    _add_comment_if_missing(
-        github=github,
+    _transition_issue_state(
         issue_number=issue_number,
-        body=(
-            "[plan] 规划执行完成，但未登记 authoritative plan_ref，"
-            "已切换为 state/blocked。\n\n"
-            f"原因:{reason}"
-        ),
-        repo=repo,
-    )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.BLOCKED,
+        to_state=IssueState.BLOCKED,
         actor=actor,
         force=True,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_missing_ref_comment("plan", "plan_ref", reason),
     )
 
 
@@ -302,22 +329,14 @@ def block_executor_noop_issue(
         actor: Actor performing the block
         repo: Repository (owner/repo format, optional)
     """
-    github = GitHubClient()
-    _add_comment_if_missing(
-        github=github,
+    _transition_issue_state(
         issue_number=issue_number,
-        body=(
-            "[run] 执行完成，但未登记 authoritative report_ref，"
-            "已切换为 state/blocked。\n\n"
-            f"原因:{reason}"
-        ),
-        repo=repo,
-    )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.BLOCKED,
+        to_state=IssueState.BLOCKED,
         actor=actor,
         force=True,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_missing_ref_comment("run", "report_ref", reason),
     )
 
 
@@ -336,22 +355,14 @@ def block_reviewer_noop_issue(
         actor: Actor performing the block
         repo: Repository (owner/repo format, optional)
     """
-    github = GitHubClient()
-    _add_comment_if_missing(
-        github=github,
+    _transition_issue_state(
         issue_number=issue_number,
-        body=(
-            "[review] 审查完成，但未登记 authoritative audit_ref，"
-            "已切换为 state/blocked。\n\n"
-            f"原因:{reason}"
-        ),
-        repo=repo,
-    )
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.BLOCKED,
+        to_state=IssueState.BLOCKED,
         actor=actor,
         force=True,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_missing_ref_comment("review", "audit_ref", reason),
     )
 
 

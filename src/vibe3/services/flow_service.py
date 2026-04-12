@@ -422,24 +422,6 @@ class FlowService(FlowLifecycleMixin):
     # Flow Query Methods (migrated from FlowQueryMixin)
     # ========================================================================
 
-    def get_handoff_events(
-        self, branch: str, event_type_prefix: str = "handoff_", limit: int | None = None
-    ) -> list[FlowEvent]:
-        """Get handoff events for branch.
-
-        Args:
-            branch: Branch name
-            event_type_prefix: Event type filter prefix
-            limit: Maximum number of events
-
-        Returns:
-            List of FlowEvent objects
-        """
-        events_data = self.store.get_events(
-            branch, event_type_prefix=event_type_prefix, limit=limit
-        )
-        return [FlowEvent(**e) for e in events_data]
-
     def get_flow_state(self, branch: str) -> FlowState | None:
         """Get flow state for branch.
 

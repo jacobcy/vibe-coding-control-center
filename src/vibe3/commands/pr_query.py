@@ -7,26 +7,139 @@ Removed from public CLI:
 - version-bump: No clear project packaging value
 """
 
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any, Callable
 
 import typer
 from loguru import logger
 from rich.console import Console
 
 from vibe3.agents.review_pipeline_helpers import run_inspect_json
-from vibe3.analysis.inspect_output_adapter import as_list, dag, impact, score
+from vibe3.analysis.inspect_output_adapter import (
+    as_list,
+    dag,
+    impact,
+    pr_analysis_summary,
+    score,
+)
 from vibe3.commands.output_format import (
     add_execution_step,
     create_trace_output,
     output_result,
 )
 from vibe3.commands.pr_helpers import noop_context
+from vibe3.models.pr import PRResponse
 from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_details
+
+
+@dataclass(frozen=True)
+class PrQueryTarget:
+    """Resolved PR query target from explicit args or current flow."""
+
+    pr_number: int | None
+    branch: str | None
+    current_branch: str | None
+    from_flow: bool = False
+
+
+def _resolve_pr_target(
+    pr_svc: PRService,
+    pr_number: int | None,
+    branch: str | None,
+) -> PrQueryTarget:
+    """Resolve explicit target or infer PR number from current flow."""
+    if pr_number or branch:
+        return PrQueryTarget(
+            pr_number=pr_number,
+            branch=branch,
+            current_branch=None,
+            from_flow=False,
+        )
+
+    current_branch = pr_svc.git_client.get_current_branch()
+    try:
+        pr = pr_svc.github_client.get_pr(None, current_branch)
+        resolved_pr = pr.number if pr else None
+    except Exception:
+        resolved_pr = None
+
+    return PrQueryTarget(
+        pr_number=resolved_pr,
+        branch=None,
+        current_branch=current_branch,
+        from_flow=resolved_pr is not None,
+    )
+
+
+def _fetch_pr_or_raise(
+    pr_svc: PRService,
+    pr_number: int | None,
+    branch: str | None,
+    *,
+    current_branch: str | None = None,
+) -> "PRResponse":
+    """Load PR or raise a command-facing lookup error."""
+    pr = pr_svc.get_pr(pr_number, branch)
+    if not pr and pr_number is not None and current_branch:
+        pr = pr_svc.get_pr(branch=current_branch)
+    if not pr:
+        raise LookupError("PR not found")
+    return pr
+
+
+def _build_missing_pr_message(
+    pr_svc: PRService,
+    *,
+    pr_number: int | None,
+    branch: str | None,
+    current_branch: str | None,
+) -> str:
+    """Build a command-facing not-found message."""
+    if not pr_number and not branch:
+        branch_name = current_branch or pr_svc.git_client.get_current_branch()
+        flow_status = FlowService(store=pr_svc.store).get_flow_status(branch_name)
+        bind_hint = ""
+        if not flow_status or flow_status.task_issue_number is None:
+            bind_hint = (
+                "\n提示：当前 flow 还没有 task，建议先执行\n"
+                "  vibe3 flow bind <issue> --role task"
+            )
+        return (
+            f"No PR found for current branch '{branch_name}'\n\n"
+            "To create a PR, run:\n"
+            f'  vibe3 pr create -t "Your PR title"{bind_hint}'
+        )
+
+    target = f"PR #{pr_number}" if pr_number else f"branch '{branch}'"
+    return f"{target} not found"
+
+
+def _load_pr_analysis_summary(
+    pr_number: int,
+    inspect_runner: Callable[[list[str]], dict[str, object]],
+) -> dict[str, Any]:
+    """Load inspect summary used by command outputs."""
+    analysis = inspect_runner(["pr", str(pr_number)])
+    return pr_analysis_summary(analysis)
+
+
+def _build_pr_output_payload(
+    pr: "PRResponse",
+    analysis_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Merge PR data with optional analysis summary for structured output."""
+    payload = pr.model_dump()
+    if analysis_summary:
+        payload["analysis"] = {
+            key: value for key, value in analysis_summary.items() if key != "raw"
+        }
+    return payload
 
 
 def register_query_commands(app: typer.Typer) -> None:
@@ -78,7 +191,7 @@ def register_query_commands(app: typer.Typer) -> None:
                 )
 
             pr_svc = PRService()
-            target = pr_svc.resolve_pr_target(pr_number, branch)
+            target = _resolve_pr_target(pr_svc, pr_number, branch)
             pr_number = target.pr_number
             branch = target.branch
             if target.from_flow and target.current_branch is not None:
@@ -88,14 +201,16 @@ def register_query_commands(app: typer.Typer) -> None:
                 ).debug("Found PR number in flow state")
 
             try:
-                pr = pr_svc.fetch_pr_or_raise(
+                pr = _fetch_pr_or_raise(
+                    pr_svc,
                     pr_number,
                     branch,
                     current_branch=target.current_branch,
                 )
             except LookupError:
                 typer.echo(
-                    pr_svc.build_missing_pr_message(
+                    _build_missing_pr_message(
+                        pr_svc,
                         pr_number=pr_number,
                         branch=branch,
                         current_branch=target.current_branch,
@@ -106,13 +221,13 @@ def register_query_commands(app: typer.Typer) -> None:
 
             analysis_summary = None
             if pr_number:
-                analysis_summary = pr_svc.load_pr_analysis_summary(
+                analysis_summary = _load_pr_analysis_summary(
                     pr_number, run_inspect_json
                 )
                 logger.debug("Successfully retrieved change analysis")
 
             if trace_output or json_output or yaml_output:
-                result = pr_svc.build_pr_output_payload(pr, analysis_summary)
+                result = _build_pr_output_payload(pr, analysis_summary)
                 output_result(
                     result=result,
                     trace_output=trace_output,

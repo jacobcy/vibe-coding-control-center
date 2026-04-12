@@ -92,25 +92,36 @@ def test_pr_create_allows_yes_when_task_issue_missing(
     mock_pr_service.create_draft_pr.assert_called_once()
 
 
+@patch("vibe3.commands.pr_query.FlowService")
 @patch("vibe3.commands.pr_query.PRService")
-def test_pr_show_missing_pr_includes_bind_hint(mock_pr_service_cls) -> None:
+def test_pr_show_missing_pr_includes_bind_hint(
+    mock_pr_service_cls, mock_flow_service_cls
+) -> None:
     """pr show should include bind hint when current flow has no task."""
+    # Mock git_client
+    git_client = MagicMock()
+    git_client.get_current_branch.return_value = "task/demo"
+
+    # Mock github_client to return no PR
+    github_client = MagicMock()
+    github_client.get_pr.return_value = None
+
     pr_service = MagicMock()
-    pr_service.resolve_pr_target.return_value = MagicMock(
-        pr_number=None,
-        branch=None,
-        current_branch="task/demo",
-        from_flow=True,
-    )
-    pr_service.fetch_pr_or_raise.side_effect = LookupError("PR not found")
-    pr_service.build_missing_pr_message.return_value = (
-        "No PR found for current branch 'task/demo'\n\n"
-        "To create a PR, run:\n"
-        '  vibe3 pr create -t "Your PR title"\n'
-        "\n提示：当前 flow 还没有 task，建议先执行\n"
-        "  vibe3 flow bind <issue> --role task"
-    )
+    pr_service.git_client = git_client
+    pr_service.github_client = github_client
+    pr_service.get_pr.return_value = None
     mock_pr_service_cls.return_value = pr_service
+
+    # Mock FlowService to return flow status without task_issue_number
+    flow_service = MagicMock()
+    flow_status = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    flow_service.get_flow_status.return_value = flow_status
+    mock_flow_service_cls.return_value = flow_service
 
     result = runner.invoke(app, ["pr", "show"])
 
