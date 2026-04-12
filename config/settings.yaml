@@ -67,8 +67,11 @@ code_limits:
         limit: 600
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
       - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 450
+        limit: 500
         reason: "Issue 状态异常转换聚合，职责单一，去重辅助函数共享，与测试对称"
+      - path: "src/vibe3/services/handoff_service.py"
+        limit: 500
+        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/git_client.py"
