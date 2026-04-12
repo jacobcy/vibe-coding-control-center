@@ -1,4 +1,8 @@
-"""Tests for async dispatch intent handlers."""
+"""Tests for async dispatch intent handlers.
+
+Verifies that dispatch handlers delegate to role request builders
+and ExecutionCoordinator without hand-crafting CLI commands.
+"""
 
 from unittest.mock import MagicMock, patch
 
@@ -7,39 +11,65 @@ from vibe3.domain.events import (
     PlannerDispatched,
     ReviewerDispatched,
 )
-from vibe3.execution.contracts import ExecutionLaunchResult
+from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+
+
+def _make_mock_request(
+    role: str,
+    issue_number: int,
+    **overrides: object,
+) -> ExecutionRequest:
+    """Create a minimal ExecutionRequest for testing."""
+    defaults = {
+        "role": role,
+        "target_branch": f"task/issue-{issue_number}",
+        "target_id": issue_number,
+        "execution_name": f"vibe3-{role}-issue-{issue_number}",
+        "repo_path": "/tmp/repo",
+    }
+    defaults.update(overrides)
+    return ExecutionRequest(**defaults)  # type: ignore[arg-type]
 
 
 class TestPlannerDispatchHandler:
-    """Planner dispatch should invoke ExecutionCoordinator."""
+    """Planner dispatch should delegate to build_plan_request + coordinator."""
 
-    @patch("vibe3.domain.handlers.dispatch.WorktreeManager")
-    @patch("vibe3.domain.handlers.dispatch.FlowManager")
+    @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
-    def test_planner_async_launch(
+    def test_planner_dispatch_delegates_to_role_builder(
         self,
         mock_config_cls: MagicMock,
+        mock_github_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_flow_manager_cls: MagicMock,
-        mock_worktree_cls: MagicMock,
+        mock_build_request: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.dispatch import handle_planner_dispatched
 
-        mock_config_cls.from_settings.return_value = MagicMock(dry_run=False)
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.from_settings.return_value = config
+
+        # Mock GitHub issue loading
+        mock_github_cls.return_value.view_issue.return_value = {
+            "title": "Test issue",
+            "labels": [],
+        }
+
+        # Mock request builder
+        expected_request = _make_mock_request("planner", 42)
+        mock_build_request.return_value = expected_request
+
+        # Mock coordinator
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
-            launched=True, tmux_session="vibe3-plan-42", log_path="/tmp/test.async.log"
+            launched=True,
+            tmux_session="vibe3-planner-issue-42",
+            log_path="/tmp/test.log",
         )
         mock_coordinator_cls.return_value = mock_coordinator
-
-        mock_flow_manager = MagicMock()
-        mock_flow_manager.get_flow_for_issue.return_value = None
-        mock_flow_manager_cls.return_value = mock_flow_manager
-
-        mock_worktree = MagicMock()
-        mock_worktree._resolve_manager_cwd.return_value = ("/tmp/wt", None)
-        mock_worktree_cls.return_value = mock_worktree
 
         handle_planner_dispatched(
             PlannerDispatched(
@@ -49,51 +79,56 @@ class TestPlannerDispatchHandler:
             )
         )
 
+        # Verify request builder was called with config, issue, and branch
+        mock_build_request.assert_called_once()
+        call_kwargs = mock_build_request.call_args
+        assert call_kwargs[0][0] is config  # first positional = config
+        assert call_kwargs[0][1].number == 42  # second positional = issue
+        assert call_kwargs[1].get("branch") == "task/issue-42"
+
+        # Verify coordinator dispatched the request
         mock_coordinator.dispatch_execution.assert_called_once()
         request = mock_coordinator.dispatch_execution.call_args[0][0]
         assert request.role == "planner"
-        assert request.target_branch == "task/issue-42"
         assert request.target_id == 42
-        assert request.execution_name == "vibe3-planner-issue-42"
-        assert "plan" in request.cmd
-        assert request.cwd == "/tmp/wt"
-        assert request.actor == "orchestra:planner"
-        assert request.mode == "async"
-        assert request.refs["issue_number"] == "42"
 
 
 class TestExecutorDispatchHandler:
-    """Executor dispatch should invoke ExecutionCoordinator."""
+    """Executor dispatch should delegate to build_run_request + coordinator."""
 
-    @patch("vibe3.domain.handlers.dispatch.WorktreeManager")
-    @patch("vibe3.domain.handlers.dispatch.FlowManager")
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
-    def test_executor_async_launch(
+    def test_executor_dispatch_passes_plan_ref(
         self,
         mock_config_cls: MagicMock,
+        mock_github_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_flow_manager_cls: MagicMock,
-        mock_worktree_cls: MagicMock,
+        mock_build_request: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.dispatch import handle_executor_dispatched
 
-        mock_config_cls.from_settings.return_value = MagicMock(dry_run=False)
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.from_settings.return_value = config
+
+        mock_github_cls.return_value.view_issue.return_value = {
+            "title": "Test issue",
+            "labels": [],
+        }
+
+        expected_request = _make_mock_request("executor", 42)
+        mock_build_request.return_value = expected_request
+
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
             launched=True,
-            tmux_session="vibe3-executor-42",
-            log_path="/tmp/test.async.log",
+            tmux_session="vibe3-executor-issue-42",
+            log_path="/tmp/test.log",
         )
         mock_coordinator_cls.return_value = mock_coordinator
-
-        mock_flow_manager = MagicMock()
-        mock_flow_manager.get_flow_for_issue.return_value = None
-        mock_flow_manager_cls.return_value = mock_flow_manager
-
-        mock_worktree = MagicMock()
-        mock_worktree._resolve_manager_cwd.return_value = ("/tmp/wt", None)
-        mock_worktree_cls.return_value = mock_worktree
 
         handle_executor_dispatched(
             ExecutorDispatched(
@@ -104,52 +139,51 @@ class TestExecutorDispatchHandler:
             )
         )
 
+        # Verify request builder was called with plan_ref
+        mock_build_request.assert_called_once()
+        call_kwargs = mock_build_request.call_args
+        assert call_kwargs[1].get("branch") == "task/issue-42"
+        assert call_kwargs[1].get("plan_ref") == "plan.md"
+
         mock_coordinator.dispatch_execution.assert_called_once()
-        request = mock_coordinator.dispatch_execution.call_args[0][0]
-        assert request.role == "executor"
-        assert request.target_branch == "task/issue-42"
-        assert request.target_id == 42
-        assert request.execution_name == "vibe3-executor-issue-42"
-        assert "run" in request.cmd
-        assert request.cwd == "/tmp/wt"
-        assert request.actor == "orchestra:executor"
-        assert request.mode == "async"
-        assert request.refs["issue_number"] == "42"
-        assert request.refs["plan_ref"] == "plan.md"
 
 
 class TestReviewerDispatchHandler:
-    """Reviewer dispatch should invoke ExecutionCoordinator."""
+    """Reviewer dispatch should delegate to build_review_request + coordinator."""
 
-    @patch("vibe3.domain.handlers.dispatch.WorktreeManager")
-    @patch("vibe3.domain.handlers.dispatch.FlowManager")
+    @patch("vibe3.domain.handlers.dispatch.build_review_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
-    def test_reviewer_async_launch(
+    def test_reviewer_dispatch_passes_report_ref(
         self,
         mock_config_cls: MagicMock,
+        mock_github_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_flow_manager_cls: MagicMock,
-        mock_worktree_cls: MagicMock,
+        mock_build_request: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.dispatch import handle_reviewer_dispatched
 
-        mock_config_cls.from_settings.return_value = MagicMock(dry_run=False)
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.from_settings.return_value = config
+
+        mock_github_cls.return_value.view_issue.return_value = {
+            "title": "Test issue",
+            "labels": [],
+        }
+
+        expected_request = _make_mock_request("reviewer", 42)
+        mock_build_request.return_value = expected_request
+
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
             launched=True,
-            tmux_session="vibe3-reviewer-42",
-            log_path="/tmp/test.async.log",
+            tmux_session="vibe3-reviewer-issue-42",
+            log_path="/tmp/test.log",
         )
         mock_coordinator_cls.return_value = mock_coordinator
-
-        mock_flow_manager = MagicMock()
-        mock_flow_manager.get_flow_for_issue.return_value = None
-        mock_flow_manager_cls.return_value = mock_flow_manager
-
-        mock_worktree = MagicMock()
-        mock_worktree._resolve_manager_cwd.return_value = ("/tmp/wt", None)
-        mock_worktree_cls.return_value = mock_worktree
 
         handle_reviewer_dispatched(
             ReviewerDispatched(
@@ -160,15 +194,58 @@ class TestReviewerDispatchHandler:
             )
         )
 
+        # Verify request builder was called with report_ref
+        mock_build_request.assert_called_once()
+        call_kwargs = mock_build_request.call_args
+        assert call_kwargs[1].get("branch") == "task/issue-42"
+        assert call_kwargs[1].get("report_ref") == "report.md"
+
         mock_coordinator.dispatch_execution.assert_called_once()
-        request = mock_coordinator.dispatch_execution.call_args[0][0]
-        assert request.role == "reviewer"
-        assert request.target_branch == "task/issue-42"
-        assert request.target_id == 42
-        assert request.execution_name == "vibe3-reviewer-issue-42"
-        assert "review" in request.cmd
-        assert request.cwd == "/tmp/wt"
-        assert request.actor == "orchestra:reviewer"
-        assert request.mode == "async"
-        assert request.refs["issue_number"] == "42"
-        assert request.refs["report_ref"] == "report.md"
+
+
+class TestDispatchNotLaunched:
+    """When coordinator does not launch, handler should log warning without error."""
+
+    @patch("vibe3.domain.handlers.dispatch.build_plan_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    def test_dispatch_not_launched_logs_warning(
+        self,
+        mock_config_cls: MagicMock,
+        mock_github_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+    ) -> None:
+        from vibe3.domain.handlers.dispatch import handle_planner_dispatched
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.from_settings.return_value = config
+
+        mock_github_cls.return_value.view_issue.return_value = {
+            "title": "Test issue",
+            "labels": [],
+        }
+
+        mock_build_request.return_value = _make_mock_request("planner", 42)
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=False,
+            reason="capacity exceeded",
+            reason_code="capacity",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        # Should not raise
+        handle_planner_dispatched(
+            PlannerDispatched(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="claimed",
+            )
+        )
+
+        mock_coordinator.dispatch_execution.assert_called_once()

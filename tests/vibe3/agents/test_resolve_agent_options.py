@@ -1,4 +1,4 @@
-"""Tests for CodeagentExecutionService.resolve_agent_options.
+"""Tests for resolve_command_agent_options.
 
 Tests the resolution priority logic for CLI overrides and config defaults.
 """
@@ -7,12 +7,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.config.settings import VibeConfig
+from vibe3.execution.codeagent_support import resolve_command_agent_options
 
 
 class TestResolveAgentOptions:
-    """Tests for resolve_agent_options priority logic."""
+    """Tests for resolve_command_agent_options priority logic."""
 
     def test_cli_agent_overrides_config_agent(self) -> None:
         """CLI --agent should override config agent."""
@@ -24,8 +24,9 @@ class TestResolveAgentOptions:
         config.run.agent_config.model = "config-model"
         config.run.agent_config.timeout_seconds = 1800
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="run", agent="cli-agent")
+        result = resolve_command_agent_options(
+            config=config, section="run", agent="cli-agent"
+        )
 
         assert result.agent == "cli-agent"
         assert result.backend is None
@@ -42,9 +43,11 @@ class TestResolveAgentOptions:
         config.run.agent_config.model = "config-model"
         config.run.agent_config.timeout_seconds = 1800
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(
-            section="run", backend="cli-backend", model="cli-model"
+        result = resolve_command_agent_options(
+            config=config,
+            section="run",
+            backend="cli-backend",
+            model="cli-model",
         )
 
         assert result.backend == "cli-backend"
@@ -62,8 +65,7 @@ class TestResolveAgentOptions:
         config.run.agent_config.model = "config-model"
         config.run.agent_config.timeout_seconds = 1800
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="run")
+        result = resolve_command_agent_options(config=config, section="run")
 
         assert result.agent == "config-agent"
         assert result.backend is None
@@ -80,8 +82,7 @@ class TestResolveAgentOptions:
         config.run.agent_config.model = "config-model"
         config.run.agent_config.timeout_seconds = 1800
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="run")
+        result = resolve_command_agent_options(config=config, section="run")
 
         assert result.backend == "config-backend"
         assert result.model == "config-model"
@@ -98,8 +99,9 @@ class TestResolveAgentOptions:
         config.run.agent_config.model = "config-model"
         config.run.agent_config.timeout_seconds = 1800
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="run", backend="cli-backend")
+        result = resolve_command_agent_options(
+            config=config, section="run", backend="cli-backend"
+        )
 
         assert result.backend == "cli-backend"
         assert result.model is None  # No model from config
@@ -111,9 +113,8 @@ class TestResolveAgentOptions:
         config = MagicMock(spec=VibeConfig)
         config.run = None
 
-        service = CodeagentExecutionService(config)
         with pytest.raises(ValueError, match="No agent configuration found"):
-            service.resolve_agent_options(section="run")
+            resolve_command_agent_options(config=config, section="run")
 
     def test_empty_agent_config_raises_error(self) -> None:
         """Empty agent_config should raise ValueError."""
@@ -124,9 +125,8 @@ class TestResolveAgentOptions:
         config.run.agent_config.backend = None
         config.run.agent_config.model = None
 
-        service = CodeagentExecutionService(config)
         with pytest.raises(ValueError, match="No agent configuration found"):
-            service.resolve_agent_options(section="run")
+            resolve_command_agent_options(config=config, section="run")
 
     def test_custom_timeout_preserved(self) -> None:
         """Custom timeout should be preserved through resolution."""
@@ -138,8 +138,7 @@ class TestResolveAgentOptions:
         config.run.agent_config.model = None
         config.run.agent_config.timeout_seconds = 3600
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="run")
+        result = resolve_command_agent_options(config=config, section="run")
 
         assert result.timeout_seconds == 3600
 
@@ -154,8 +153,7 @@ class TestResolveAgentOptions:
         # Use spec to prevent auto-creation of attributes
         del config.run.agent_config.timeout_seconds  # Remove the MagicMock
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="run")
+        result = resolve_command_agent_options(config=config, section="run")
 
         # Should use default timeout
         assert result.timeout_seconds == 1800
@@ -170,8 +168,7 @@ class TestResolveAgentOptions:
         config.plan.agent_config.model = None
         config.plan.agent_config.timeout_seconds = 2400
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="plan")
+        result = resolve_command_agent_options(config=config, section="plan")
 
         assert result.agent == "plan-agent"
         assert result.timeout_seconds == 2400
@@ -186,8 +183,7 @@ class TestResolveAgentOptions:
         config.review.agent_config.model = "review-model"
         config.review.agent_config.timeout_seconds = 1200
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(section="review")
+        result = resolve_command_agent_options(config=config, section="review")
 
         assert result.backend == "review-backend"
         assert result.model == "review-model"
@@ -200,9 +196,11 @@ class TestResolveAgentOptions:
         config.run.agent_config = MagicMock()
         config.run.agent_config.timeout_seconds = 1800
 
-        service = CodeagentExecutionService(config)
-        result = service.resolve_agent_options(
-            section="run", agent="cli-agent", backend="cli-backend"
+        result = resolve_command_agent_options(
+            config=config,
+            section="run",
+            agent="cli-agent",
+            backend="cli-backend",
         )
 
         assert result.agent == "cli-agent"

@@ -15,19 +15,36 @@ def strip_ansi(text: str) -> str:
     return ansi_escape.sub("", text)
 
 
-def _patch_fast_plan_runtime(monkeypatch) -> MagicMock:
+def _patch_issue_runtime(monkeypatch) -> MagicMock:
+    """Patch issue mode to use mocked run_issue_role_mode."""
+    mock_runner = MagicMock()
+    monkeypatch.setattr(
+        "vibe3.commands.plan.run_issue_role_mode",
+        mock_runner,
+    )
+    return mock_runner
+
+
+def _patch_spec_runtime(monkeypatch) -> MagicMock:
+    """Patch spec mode dependencies."""
     monkeypatch.setattr(
         "vibe3.commands.command_options.ensure_flow_for_current_branch",
         lambda: (MagicMock(), "task/test-branch"),
     )
-    # PlanUsecase signature might have changed, but command uses _build_plan_usecase
-    mock_usecase = MagicMock()
-    # Handle both new and old signature if necessary, but here we patch the builder
     monkeypatch.setattr(
-        "vibe3.commands.plan._build_plan_usecase",
-        lambda flow_service=None: mock_usecase,
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        MagicMock(),
     )
-    return mock_usecase
+    monkeypatch.setattr(
+        "vibe3.commands.plan.bind_plan_spec",
+        MagicMock(),
+    )
+    mock_execute = MagicMock()
+    monkeypatch.setattr(
+        "vibe3.commands.plan.execute_spec_plan",
+        mock_execute,
+    )
+    return mock_execute
 
 
 def test_plan_help_shows_options() -> None:
@@ -45,30 +62,33 @@ def test_plan_issue_exclusive_with_spec() -> None:
 
 
 def test_plan_spec_requires_file_or_msg() -> None:
-    # Typer raises SystemExit(1) for resolve_spec_plan validation error in current impl
     result = runner.invoke(plan_app, ["--spec"])
     assert result.exit_code != 0
 
 
 def test_plan_issue_basic_flow(monkeypatch) -> None:
-    """Test basic plan issue flow."""
-    _patch_fast_plan_runtime(monkeypatch)
-    # Use 'issue' subcommand explicitly to be safe
+    """Test basic plan issue flow delegates to run_issue_role_mode."""
+    mock_runner = _patch_issue_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["issue", "42"])
     assert result.exit_code == 0
+    mock_runner.assert_called_once()
+    call_kwargs = mock_runner.call_args[1]
+    assert call_kwargs["issue_number"] == 42
 
 
 def test_plan_spec_msg_basic_flow(monkeypatch) -> None:
     """Test basic plan spec flow."""
-    _patch_fast_plan_runtime(monkeypatch)
+    _patch_spec_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["spec", "--msg", "Add dark mode"])
     assert result.exit_code == 0
 
 
 def test_plan_spec_file_not_found(monkeypatch) -> None:
-    mock_usecase = _patch_fast_plan_runtime(monkeypatch)
-    # Make resolve_spec_plan raise the error to simulate missing file
-    mock_usecase.resolve_spec_plan.side_effect = FileNotFoundError("File not found")
+    _patch_spec_runtime(monkeypatch)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        MagicMock(side_effect=FileNotFoundError("File not found")),
+    )
 
     result = runner.invoke(plan_app, ["spec", "--file", "nonexistent.md"])
     assert result.exit_code != 0
@@ -76,13 +96,14 @@ def test_plan_spec_file_not_found(monkeypatch) -> None:
 
 def test_plan_issue_subcommand_still_works(monkeypatch) -> None:
     """Test that the 'issue' subcommand works."""
-    _patch_fast_plan_runtime(monkeypatch)
+    mock_runner = _patch_issue_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["issue", "42"])
     assert result.exit_code == 0
+    mock_runner.assert_called_once()
 
 
 def test_plan_spec_subcommand_still_works(monkeypatch) -> None:
     """Test that the 'spec' subcommand works."""
-    _patch_fast_plan_runtime(monkeypatch)
+    _patch_spec_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["spec", "--msg", "Add dark mode"])
     assert result.exit_code == 0

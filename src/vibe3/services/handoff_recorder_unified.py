@@ -6,12 +6,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from vibe3.agents.review_runner import (
+from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.actor_support import (
     format_agent_actor,
     resolve_actor_backend_model,
 )
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService

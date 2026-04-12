@@ -8,8 +8,8 @@ from typer.testing import CliRunner
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
-from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.runtime.service_protocol import GitHubEvent
 from vibe3.server.app import app
 
 
@@ -94,7 +94,7 @@ async def test_event_dispatch_blocked() -> None:
 @pytest.mark.asyncio
 async def test_event_dispatch_not_blocked_for_non_dispatchers() -> None:
     """Non-dispatching services like CommentReplyService should still process events."""
-    from vibe3.runtime.event_bus import ServiceBase
+    from vibe3.runtime.service_protocol import ServiceBase
 
     class NonDispatchService(ServiceBase):
         event_types = ["issue_comment"]

@@ -1,10 +1,5 @@
-"""Unified execution coordinator module."""
+"""Execution control plane package.
 
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.coordinator import ExecutionCoordinator
-
-__all__ = [
-    "ExecutionCoordinator",
-    "ExecutionLaunchResult",
-    "ExecutionRequest",
-]
+Import concrete modules directly from ``vibe3.execution.*`` to keep package
+boundaries explicit and avoid re-export compatibility layers.
+"""

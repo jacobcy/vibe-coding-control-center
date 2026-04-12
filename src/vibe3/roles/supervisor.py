@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.agent_resolver import resolve_supervisor_agent_options
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.issue_role_support import use_current_branch
 from vibe3.execution.role_contracts import (
     SUPERVISOR_APPLY_GATE_CONFIG,
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
@@ -14,7 +15,6 @@ from vibe3.execution.role_contracts import (
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
-from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
@@ -204,15 +204,6 @@ def build_supervisor_cli_request(
     )
 
 
-def resolve_supervisor_branch(
-    store: SQLiteClient,
-    issue_number: int,
-    current_branch: str,
-) -> str:
-    """Resolve target branch for supervisor execution."""
-    return current_branch
-
-
 def build_supervisor_cli_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
@@ -254,7 +245,7 @@ def build_supervisor_cli_sync_request(
 SUPERVISOR_CLI_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="supervisor",
     resolve_options=resolve_supervisor_agent_options,
-    resolve_branch=resolve_supervisor_branch,
+    resolve_branch=use_current_branch,
     build_async_request=lambda config, issue, actor: build_supervisor_cli_request(
         config,
         issue.number,
