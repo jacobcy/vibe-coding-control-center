@@ -13,6 +13,7 @@ from vibe3.commands.common import trace_scope
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.services.flow_service import FlowService
+from vibe3.services.handoff_service import HandoffService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,
@@ -172,10 +173,11 @@ def list_handoffs(
 ) -> None:
     """List handoff events for current or specified branch."""
     with trace_scope(trace, "handoff list", domain="handoff"):
-        service = FlowService()
+        flow_service = FlowService()
+        handoff_service = HandoffService(store=flow_service.store)
 
-        target_branch = branch if branch else service.get_current_branch()
-        events = service.get_handoff_events(target_branch)
+        target_branch = branch if branch else flow_service.get_current_branch()
+        events = handoff_service.get_handoff_events(target_branch)
 
         allowed_kinds = {"plan", "run", "review"}
         filter_kind = kind.lower() if kind else None
@@ -247,6 +249,7 @@ def show(
         )
 
         service = FlowService()
+        handoff_service = HandoffService(store=service.store)
         if branch:
             try:
                 target_branch = resolve_issue_branch_input(branch, service) or branch
@@ -262,7 +265,7 @@ def show(
             raise typer.Exit(1)
 
         limit = None if show_all else 5
-        handoff_events = service.get_handoff_events(target_branch, limit=limit)
+        handoff_events = handoff_service.get_handoff_events(target_branch, limit=limit)
 
         if json_output:
             output = {

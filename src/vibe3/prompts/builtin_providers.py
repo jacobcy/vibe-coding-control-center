@@ -8,15 +8,28 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.agents.run_agent import RunUsecase
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
 
 
 def find_skill_file(skill_name: str) -> Path | None:
-    """Delegate to RunUsecase.find_skill_file for skill lookup."""
-    return RunUsecase.find_skill_file(skill_name)
+    """Resolve repo-local skill path without depending on run command shells."""
+    cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
+    if cwd_candidate.exists():
+        return cwd_candidate
+
+    try:
+        from vibe3.services.flow_service import FlowService
+
+        repo_root = Path(FlowService().get_git_common_dir()).parent
+    except Exception:
+        repo_root = Path.cwd()
+
+    candidate = repo_root / "skills" / skill_name / "SKILL.md"
+    if candidate.exists():
+        return candidate
+    return None
 
 
 def _resolve_literal(src: PromptVariableSource) -> str:

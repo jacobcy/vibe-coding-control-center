@@ -4,8 +4,8 @@ import re
 
 from typer.testing import CliRunner
 
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.cli import app as cli_app
+from vibe3.execution.codeagent_support import build_self_invocation
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -45,9 +45,7 @@ class TestAsyncDefaults:
 
     def test_build_self_invocation_appends_no_async_for_tmux_child(self) -> None:
         """Verify that self-invocation logic correctly standardizes on --no-async."""
-        cmd = CodeagentExecutionService.build_self_invocation(
-            ["run", "--plan", "/tmp/demo.md"]
-        )
+        cmd = build_self_invocation(["run", "--plan", "/tmp/demo.md"])
 
         assert "--no-async" in cmd
         assert "--sync" not in cmd
@@ -55,9 +53,7 @@ class TestAsyncDefaults:
 
     def test_build_self_invocation_drops_legacy_async_and_standardizes(self) -> None:
         """Verify that legacy --async flag is dropped and standardized to --no-async."""
-        cmd = CodeagentExecutionService.build_self_invocation(
-            ["review", "base", "--async"]
-        )
+        cmd = build_self_invocation(["review", "base", "--async"])
 
         assert "--async" not in cmd
         assert "--no-async" in cmd

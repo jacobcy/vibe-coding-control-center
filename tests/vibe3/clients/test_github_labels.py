@@ -1,6 +1,6 @@
-"""Tests for state sync ports."""
+"""Tests for GitHub label client ports."""
 
-from vibe3.services.state_sync_ports import GhIssueLabelPort
+from vibe3.clients.github_labels import GhIssueLabelPort
 
 
 def test_gh_issue_label_port_appends_repo(monkeypatch) -> None:
@@ -19,7 +19,7 @@ def test_gh_issue_label_port_appends_repo(monkeypatch) -> None:
             return Result(stdout='{"labels": []}')
         return Result()
 
-    monkeypatch.setattr("vibe3.services.state_sync_ports.subprocess.run", fake_run)
+    monkeypatch.setattr("vibe3.clients.github_labels.subprocess.run", fake_run)
 
     port = GhIssueLabelPort(repo="owner/repo")
 

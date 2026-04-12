@@ -145,6 +145,27 @@ GOVERNANCE_GATE_CONFIG = RoleGateConfig(
     requires_issue=False,
 )
 
+PLANNER_GATE_CONFIG = RoleGateConfig(
+    worktree=WorktreeRequirement.PERMANENT,
+    completion_contract=CompletionContract.MAY_COMMENT_OR_PROPOSE,
+    requires_flow=True,
+    requires_issue=True,
+)
+
+EXECUTOR_GATE_CONFIG = RoleGateConfig(
+    worktree=WorktreeRequirement.PERMANENT,
+    completion_contract=CompletionContract.MAY_COMMENT_OR_PROPOSE,
+    requires_flow=True,
+    requires_issue=True,
+)
+
+REVIEWER_GATE_CONFIG = RoleGateConfig(
+    worktree=WorktreeRequirement.PERMANENT,
+    completion_contract=CompletionContract.MAY_COMMENT_OR_PROPOSE,
+    requires_flow=True,
+    requires_issue=True,
+)
+
 SUPERVISOR_IDENTIFY_GATE_CONFIG = RoleGateConfig(
     worktree=WorktreeRequirement.NONE,
     completion_contract=CompletionContract.MAY_COMMENT_OR_PROPOSE,

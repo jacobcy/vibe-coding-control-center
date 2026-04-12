@@ -8,11 +8,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.agents.execution_lifecycle import (
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.execution_lifecycle import (
     ExecutionLifecycleService,
     persist_execution_lifecycle_event,
 )
-from vibe3.clients.sqlite_client import SQLiteClient
 
 
 @pytest.fixture

@@ -2,34 +2,17 @@
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from vibe3.agents.review_runner import (
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.actor_support import (
     format_agent_actor,
     resolve_actor_backend_model,
 )
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
-
-
-class _BranchBoundGitClient:
-    """Git client shim that pins handoff artifact writes to a target branch."""
-
-    def __init__(self, branch: str) -> None:
-        self._branch = branch
-        self._delegate = GitClient()
-
-    def get_current_branch(self) -> str:
-        return self._branch
-
-    def get_git_common_dir(self) -> str:
-        return self._delegate.get_git_common_dir()
-
 
 HandoffKind = Literal["plan", "run", "review"]
 
@@ -50,59 +33,6 @@ _RESERVED_REF_KEYS = {
 }
 
 _AGENT_PROMPT_BLOCK_RE = re.compile(r"<agent-prompt>.*?</agent-prompt>\s*", re.DOTALL)
-
-
-# ---------------------------------------------------------------------------
-# Handoff artifact & event helpers (inlined from handoff_event_service)
-# ---------------------------------------------------------------------------
-
-
-def create_handoff_artifact(
-    prefix: str,
-    content: str | None,
-    branch: str | None = None,
-) -> tuple[str, Path] | None:
-    """Create a timestamped handoff artifact file for current branch.
-
-    Uses HandoffService.ensure_handoff_dir() as unified entry point
-    for directory creation (idempotent).
-
-    Returns:
-        tuple(branch, file_path) when branch is available, else None.
-    """
-    if branch is None:
-        git = GitClient()
-        try:
-            branch = git.get_current_branch()
-        except Exception:
-            return None
-        handoff_service = HandoffService(git_client=git)
-    else:
-        handoff_service = HandoffService(git_client=_BranchBoundGitClient(branch))
-
-    handoff_dir = handoff_service.ensure_handoff_dir()
-
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    artifact_path = handoff_dir / f"{prefix}-{timestamp}.md"
-    if content is not None:
-        artifact_path.write_text(content, encoding="utf-8")
-
-    return branch, artifact_path
-
-
-def persist_handoff_event(
-    branch: str,
-    event_type: str,
-    actor: str,
-    detail: str,
-    refs: dict[str, str],
-    flow_state_updates: dict[str, object] | None = None,
-) -> None:
-    """Persist handoff event and optional flow-state updates."""
-    store = SQLiteClient()
-    store.add_event(branch, event_type, actor, detail=detail, refs=refs)
-    if flow_state_updates:
-        store.update_flow_state(branch, **flow_state_updates)
 
 
 @dataclass(frozen=True)
@@ -189,7 +119,8 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
     """Persist a plan/run/review artifact and corresponding handoff event."""
 
     sanitized_content = sanitize_handoff_content(record.content)
-    artifact = create_handoff_artifact(
+    handoff_service = HandoffService()
+    artifact = handoff_service.create_artifact(
         record.kind,
         sanitized_content,
         branch=record.branch,
@@ -228,7 +159,7 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         _ACTOR_ROLE_BY_KIND[record.kind]: actor,
     }
 
-    persist_handoff_event(
+    handoff_service.persist_artifact_event(
         branch=branch,
         event_type=f"handoff_{record.kind}",
         actor=actor,

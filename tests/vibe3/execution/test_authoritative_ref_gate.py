@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from vibe3.services.authoritative_ref_gate import (
+from vibe3.execution.authoritative_ref_gate import (
     has_authoritative_ref,
     require_authoritative_ref,
 )

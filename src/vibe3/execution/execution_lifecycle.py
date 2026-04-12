@@ -8,13 +8,11 @@ from loguru import logger
 
 from vibe3.clients.sqlite_client import SQLiteClient
 
-# Extended to support all orchestration roles
 ExecutionRole = Literal[
     "planner", "executor", "reviewer", "manager", "supervisor", "governance"
 ]
 ExecutionLifecycleEvent = Literal["started", "completed", "aborted", "failed"]
 
-# Role prefixes for event naming
 _ROLE_PREFIX: dict[ExecutionRole, str] = {
     "planner": "plan",
     "executor": "run",
@@ -24,17 +22,15 @@ _ROLE_PREFIX: dict[ExecutionRole, str] = {
     "governance": "governance",
 }
 
-# Status fields for L3 agent roles (planner/executor/reviewer)
 _ROLE_STATUS_FIELD: dict[ExecutionRole, str | None] = {
     "planner": "planner_status",
     "executor": "executor_status",
     "reviewer": "reviewer_status",
-    "manager": None,  # Manager doesn't write to flow_state
-    "supervisor": None,  # Supervisor doesn't write to flow_state
-    "governance": None,  # Governance doesn't write to flow_state
+    "manager": None,
+    "supervisor": None,
+    "governance": None,
 }
 
-# Actor fields for L3 agent roles
 _ROLE_ACTOR_FIELD: dict[ExecutionRole, str | None] = {
     "planner": "planner_actor",
     "executor": "executor_actor",
@@ -51,18 +47,9 @@ def execution_prefix(role: ExecutionRole) -> str:
 
 
 class ExecutionLifecycleService:
-    """Unified execution lifecycle recording for all roles.
-
-    提供统一的生命周期记录接口，避免每个链路重复实现。
-    支持 manager、supervisor、governance、planner、executor、reviewer。
-    """
+    """Unified execution lifecycle recording for all roles."""
 
     def __init__(self, store: SQLiteClient) -> None:
-        """Initialize with SQLite store.
-
-        Args:
-            store: SQLiteClient instance for persistence
-        """
         self._store = store
 
     def record_started(
@@ -73,16 +60,6 @@ class ExecutionLifecycleService:
         session_id: str | None = None,
         refs: dict[str, str] | None = None,
     ) -> None:
-        """Record execution started event.
-
-        Args:
-            role: Execution role (manager/planner/executor/reviewer/
-                supervisor/governance)
-            target: Target identifier (usually branch name)
-            actor: Actor who initiated the execution
-            session_id: Optional backend session ID
-            refs: Optional reference dict (e.g., tmux_session)
-        """
         persist_execution_lifecycle_event(
             store=self._store,
             branch=target,
@@ -102,15 +79,6 @@ class ExecutionLifecycleService:
         detail: str | None = None,
         refs: dict[str, str] | None = None,
     ) -> None:
-        """Record execution completed event.
-
-        Args:
-            role: Execution role
-            target: Target identifier
-            actor: Actor who completed the execution
-            detail: Optional detail message
-            refs: Optional reference dict
-        """
         persist_execution_lifecycle_event(
             store=self._store,
             branch=target,
@@ -129,20 +97,11 @@ class ExecutionLifecycleService:
         error: str | None = None,
         refs: dict[str, str] | None = None,
     ) -> None:
-        """Record execution failed event.
-
-        Args:
-            role: Execution role
-            target: Target identifier
-            actor: Actor when execution failed
-            error: Optional error message
-            refs: Optional reference dict
-        """
         persist_execution_lifecycle_event(
             store=self._store,
             branch=target,
             role=role,
-            lifecycle="aborted",  # Use aborted for failed state
+            lifecycle="aborted",
             actor=actor,
             detail=error or f"{role} execution failed",
             refs=refs,
@@ -150,13 +109,7 @@ class ExecutionLifecycleService:
 
 
 def _parse_branch_target(branch: str) -> tuple[str, str]:
-    """Extract (target_type, target_id) from branch name.
-
-    Examples:
-      task/issue-42  -> ("issue", "42")
-      dev/issue-123  -> ("issue", "123")
-      other-branch   -> ("branch", branch)
-    """
+    """Extract (target_type, target_id) from branch name."""
     match = re.search(r"issue-(\d+)", branch)
     if match:
         return ("issue", match.group(1))
@@ -171,12 +124,7 @@ def _sync_registry_from_lifecycle_event(
     session_id: str | None,
     refs: dict[str, str] | None = None,
 ) -> None:
-    """Sync runtime_session registry based on lifecycle event.
-
-    - started  -> create a new running session in registry
-    - completed -> mark the live session for this branch+role as done
-    - aborted/failed -> mark the live session for this branch+role as aborted
-    """
+    """Sync runtime_session registry based on lifecycle event."""
     if lifecycle == "started":
         tmux_session = None
         if refs:
@@ -184,13 +132,9 @@ def _sync_registry_from_lifecycle_event(
             if isinstance(candidate, str) and candidate.strip():
                 tmux_session = candidate.strip()
 
-        # Check if a live session already exists for this branch+role
         live_sessions = store.list_live_runtime_sessions(role=role)
         for session in live_sessions:
             if session.get("branch") == branch:
-                # Already have a live session for this context.
-                # If the parent async launcher now knows the tmux session, bind it
-                # so later liveness reconciliation can track the real wrapper.
                 if tmux_session and not session.get("tmux_session"):
                     store.update_runtime_session(
                         session["id"],
@@ -206,7 +150,6 @@ def _sync_registry_from_lifecycle_event(
                 )
                 return
 
-        # No duplicate found, proceed with creation
         target_type, target_id = _parse_branch_target(branch)
         session_name = f"vibe3-{role}-{target_type}-{target_id}"
         store.create_runtime_session(
@@ -222,7 +165,6 @@ def _sync_registry_from_lifecycle_event(
         )
         return
 
-    # terminal events: find live sessions for this branch+role and close them
     terminal_status = {
         "completed": "done",
         "aborted": "aborted",
@@ -249,35 +191,25 @@ def persist_execution_lifecycle_event(
     refs: dict[str, str] | None = None,
     extra_state_updates: dict[str, object] | None = None,
 ) -> None:
-    """Persist lifecycle state and timeline event for an execution role.
-
-    Terminal events (completed/aborted) no longer write to legacy session_id fields.
-    The runtime_session registry is the single source of truth for session tracking.
-    """
+    """Persist lifecycle state and timeline event for an execution role."""
     now = datetime.now().isoformat()
     status_field = _ROLE_STATUS_FIELD[role]
-
-    # Only update flow_state for L3 agent roles (planner/executor/reviewer)
     state_updates: dict[str, object] = {}
 
-    if status_field:  # L3 agent role
+    if status_field:
         if lifecycle == "started":
-            status = "running"
-            state_updates[status_field] = status
+            state_updates[status_field] = "running"
             state_updates["execution_started_at"] = now
             state_updates["execution_completed_at"] = None
         elif lifecycle == "completed":
-            status = "done"
-            state_updates[status_field] = status
+            state_updates[status_field] = "done"
             state_updates["execution_completed_at"] = now
             state_updates["execution_pid"] = None
-        else:  # aborted or failed
-            status = "crashed"
-            state_updates[status_field] = status
+        else:
+            state_updates[status_field] = "crashed"
             state_updates["execution_completed_at"] = now
             state_updates["execution_pid"] = None
 
-        # Update actor field for L3 roles
         actor_field = _ROLE_ACTOR_FIELD[role]
         if actor_field:
             state_updates[actor_field] = actor
@@ -285,7 +217,6 @@ def persist_execution_lifecycle_event(
     if extra_state_updates:
         state_updates.update(extra_state_updates)
 
-    # Only update flow_state if we have updates
     if state_updates:
         store.update_flow_state(branch, **state_updates)
 

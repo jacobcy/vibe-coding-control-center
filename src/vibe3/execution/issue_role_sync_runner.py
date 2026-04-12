@@ -5,12 +5,12 @@ from __future__ import annotations
 import typer
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.review_runner import format_agent_actor
-from vibe3.agents.session_service import load_session_id
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.actor_support import format_agent_actor
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.execution.session_service import load_session_id
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec

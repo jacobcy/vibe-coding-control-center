@@ -125,16 +125,24 @@ def test_flow_status_all_includes_terminal_states(
 @patch("vibe3.commands.flow_status.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
-@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.commands.common.execute_check_mode")
 @patch("vibe3.clients.git_client.GitClient")
 def test_flow_status_check_runs_verification(
     _mock_git_client,
-    mock_check_service,
+    mock_execute_check_mode,
     mock_projection_service_class,
     _render_dashboard,
     mock_service_class,
 ) -> None:
     """flow status --check should run consistency verification before render."""
+    from vibe3.commands.check_support import ExecuteCheckResult
+
+    mock_execute_check_mode.return_value = ExecuteCheckResult(
+        mode="fix_all",
+        success=True,
+        summary="All checks passed",
+        details={},
+    )
     mock_service = MagicMock()
     mock_service.list_flows.return_value = [_make_flow_state("task/active-1")]
     mock_service_class.return_value = mock_service
@@ -145,25 +153,25 @@ def test_flow_status_check_runs_verification(
     result = runner.invoke(app, ["flow", "status", "--check"])
 
     assert result.exit_code == 0
-    mock_check_service.return_value.execute_check.assert_called_once_with("fix_all")
+    mock_execute_check_mode.assert_called_once()
 
 
 @patch("vibe3.commands.flow_status.FlowService")
 @patch("vibe3.commands.flow_status.render_flows_status_dashboard")
 @patch("vibe3.commands.flow_status.FlowProjectionService")
-@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.commands.common.execute_check_mode")
 @patch("vibe3.clients.git_client.GitClient")
 def test_flow_status_check_surfaces_check_warning(
     _mock_git_client,
-    mock_check_service,
+    mock_execute_check_mode,
     mock_projection_service_class,
     _render_dashboard,
     mock_service_class,
 ) -> None:
     """flow status --check should warn if the full check returns issues."""
-    from vibe3.services.check_service import ExecuteCheckResult
+    from vibe3.commands.check_support import ExecuteCheckResult
 
-    mock_check_service.return_value.execute_check.return_value = ExecuteCheckResult(
+    mock_execute_check_mode.return_value = ExecuteCheckResult(
         mode="fix_all",
         success=False,
         summary="Fixed 1/2, 1 had unfixable issues",

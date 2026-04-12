@@ -19,7 +19,7 @@ from vibe3.models.orchestration import (
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -62,13 +62,11 @@ class StateLabelDispatchService(ServiceBase):
         self,
         config: OrchestraConfig,
         *,
-        trigger_state: IssueState,
-        trigger_name: str,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         flow_manager: FlowManager | None = None,
         registry: "SessionRegistryService | None" = None,
-        role_def: TriggerableRoleDefinition | None = None,
+        role_def: TriggerableRoleDefinition,
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
@@ -79,13 +77,7 @@ class StateLabelDispatchService(ServiceBase):
         self._store = SQLiteClient()
         self._registry = registry
         self._dispatch_guard = asyncio.Lock()
-
-        # Resolve role definition: prefer explicit role_def, fall back to
-        # legacy trigger_name/trigger_state lookup for backwards compatibility.
-        if role_def is not None:
-            self.role_def = role_def
-        else:
-            self.role_def = _find_role_def(trigger_name, trigger_state)
+        self.role_def = role_def
 
     # trigger_name / trigger_state kept as properties for callers that access them.
     @property
@@ -157,65 +149,15 @@ class StateLabelDispatchService(ServiceBase):
 
     def _emit_dispatch_intent(self, issue: IssueInfo) -> None:
         from vibe3.domain import publish
-        from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+        from vibe3.roles.registry import build_label_dispatch_event
 
-        trigger = self.role_def.trigger_name
         branch, flow_state = self._flow_context(issue.number)
-        if trigger == "manager":
-            to_state = self.role_def.trigger_state.value
-            publish(
-                IssueStateChanged(
-                    issue_number=issue.number,
-                    from_state=None,
-                    to_state=to_state,
-                    issue_title=issue.title if issue.title else None,
-                )
-            )
-            return
-        if trigger == "plan":
-            from vibe3.domain.events import PlannerDispatched
-
-            publish(
-                PlannerDispatched(
-                    issue_number=issue.number,
-                    branch=branch,
-                    trigger_state="claimed",
-                )
-            )
-            return
-        if trigger == "run":
-            from vibe3.domain.events import ExecutorDispatched
-
-            plan_ref = flow_state.get("plan_ref") if flow_state else None
-            publish(
-                ExecutorDispatched(
-                    issue_number=issue.number,
-                    branch=branch,
-                    trigger_state="in-progress",
-                    plan_ref=str(plan_ref) if plan_ref else None,
-                )
-            )
-            return
-        if trigger == "review":
-            from vibe3.domain.events import ReviewerDispatched
-
-            report_ref = flow_state.get("report_ref") if flow_state else None
-            publish(
-                ReviewerDispatched(
-                    issue_number=issue.number,
-                    branch=branch,
-                    trigger_state="review",
-                    report_ref=str(report_ref) if report_ref else None,
-                )
-            )
-            return
-        to_state = self.role_def.trigger_state.value
         publish(
-            IssueStateChanged(
-                issue_number=issue.number,
-                from_state=None,
-                to_state=to_state,
-                issue_title=issue.title if issue.title else None,
+            build_label_dispatch_event(
+                self.role_def,
+                issue,
+                branch=branch,
+                flow_state=flow_state,
             )
         )
 
@@ -288,30 +230,3 @@ class StateLabelDispatchService(ServiceBase):
             target_id=str(issue_number),
         )
         return len(sessions) > 0
-
-
-def _find_role_def(
-    trigger_name: str,
-    trigger_state: IssueState,
-) -> TriggerableRoleDefinition:
-    """Resolve a TriggerableRoleDefinition by trigger_name and trigger_state.
-
-    Used as a backwards-compatibility fallback when role_def is not passed
-    directly to StateLabelDispatchService.__init__.
-    """
-    from vibe3.roles.registry import LABEL_DISPATCH_ROLES
-
-    for role in LABEL_DISPATCH_ROLES:
-        if role.trigger_name == trigger_name and role.trigger_state == trigger_state:
-            return role
-
-    # Construct a minimal definition so callers don't break.
-    from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
-
-    return TriggerableRoleDefinition(
-        name=trigger_name,
-        registry_role=trigger_name,
-        gate_config=GOVERNANCE_GATE_CONFIG,
-        trigger_name=trigger_name,  # type: ignore[arg-type]
-        trigger_state=trigger_state,
-    )

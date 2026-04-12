@@ -1,8 +1,10 @@
 """Tests for ExecutionRolePolicyService."""
 
+from unittest.mock import patch
+
 import pytest
 
-from vibe3.agents.execution_role_policy import (
+from vibe3.execution.execution_role_policy import (
     ConcurrencyClass,
     ExecutionRolePolicyService,
     PromptContract,
@@ -14,6 +16,7 @@ from vibe3.models.orchestra_config import (
     OrchestraConfig,
     SupervisorHandoffConfig,
 )
+from vibe3.models.review_runner import AgentOptions
 
 
 @pytest.fixture
@@ -148,3 +151,21 @@ def test_all_roles_resolve_prompt_contract(sample_config: OrchestraConfig) -> No
         contract = service.resolve_prompt_contract(role)
         assert isinstance(contract, PromptContract)
         assert contract.template  # Non-empty template
+
+
+@patch("vibe3.execution.execution_role_policy.sync_models_json")
+@patch(
+    "vibe3.execution.execution_role_policy.resolve_backend_effective_agent_options",
+    side_effect=lambda options: options,
+)
+def test_resolve_effective_agent_options_syncs_models(
+    mock_resolve_effective, mock_sync, sample_config: OrchestraConfig
+) -> None:
+    """Effective resolution should reuse raw policy and sync models once."""
+    service = ExecutionRolePolicyService(config=sample_config)
+
+    result = service.resolve_effective_agent_options("manager")
+
+    assert isinstance(result, AgentOptions)
+    mock_resolve_effective.assert_called_once()
+    mock_sync.assert_called_once_with(result)

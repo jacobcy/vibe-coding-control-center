@@ -1,16 +1,14 @@
-"""Tests for PR review request service."""
+"""Tests for AI review request functionality via GitHubClient."""
 
 from unittest.mock import MagicMock
 
-from vibe3.services.pr_review_request_service import PRReviewRequestService
+from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_comment_ops import _generate_ai_review_mention_body
 
 
 def test_generate_mention_body():
     """Test mention comment body generation."""
-    gh_client = MagicMock()
-    service = PRReviewRequestService(gh_client)
-
-    body = service._generate_mention_body(["codex", "copilot"])
+    body = _generate_ai_review_mention_body(["codex", "copilot"])
 
     expected = """@codex
 @copilot
@@ -22,10 +20,7 @@ Focus on code quality, test coverage, and potential issues."""
 
 def test_generate_mention_body_single_reviewer():
     """Test mention comment body with single reviewer."""
-    gh_client = MagicMock()
-    service = PRReviewRequestService(gh_client)
-
-    body = service._generate_mention_body(["claude"])
+    body = _generate_ai_review_mention_body(["claude"])
 
     expected = """@claude
 
@@ -34,13 +29,14 @@ Focus on code quality, test coverage, and potential issues."""
     assert body == expected
 
 
-def test_request_review_sends_comment():
+def test_request_ai_review_sends_comment():
     """Test review request sends GitHub comment."""
-    gh_client = MagicMock()
-    gh_client.create_pr_comment.return_value = "https://github.com/comment/123"
+    gh_client = GitHubClient()
+    gh_client.create_pr_comment = MagicMock(  # type: ignore[method-assign]
+        return_value="https://github.com/comment/123"
+    )
 
-    service = PRReviewRequestService(gh_client)
-    result = service.request_review(42, ["codex", "copilot"])
+    result = gh_client.request_ai_review(42, ["codex", "copilot"])
 
     assert result == "https://github.com/comment/123"
     gh_client.create_pr_comment.assert_called_once()
@@ -50,23 +46,24 @@ def test_request_review_sends_comment():
     assert "@copilot" in call_args[0][1]
 
 
-def test_request_review_returns_none_on_empty_reviewers():
+def test_request_ai_review_returns_none_on_empty_reviewers():
     """Test review request returns None when no reviewers specified."""
-    gh_client = MagicMock()
-    service = PRReviewRequestService(gh_client)
+    gh_client = GitHubClient()
+    gh_client.create_pr_comment = MagicMock()  # type: ignore[method-assign]
 
-    result = service.request_review(42, [])
+    result = gh_client.request_ai_review(42, [])
 
     assert result is None
     gh_client.create_pr_comment.assert_not_called()
 
 
-def test_request_review_handles_exception():
+def test_request_ai_review_handles_exception():
     """Test review request handles GitHub API errors gracefully."""
-    gh_client = MagicMock()
-    gh_client.create_pr_comment.side_effect = Exception("API error")
+    gh_client = GitHubClient()
+    gh_client.create_pr_comment = MagicMock(  # type: ignore[method-assign]
+        side_effect=Exception("API error")
+    )
 
-    service = PRReviewRequestService(gh_client)
-    result = service.request_review(42, ["codex"])
+    result = gh_client.request_ai_review(42, ["codex"])
 
     assert result is None

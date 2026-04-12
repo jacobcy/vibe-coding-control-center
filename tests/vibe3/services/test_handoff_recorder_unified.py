@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
-    create_handoff_artifact,
     parse_modified_files,
     parse_review_verdict,
     record_handoff_unified,
     sanitize_handoff_content,
 )
+from vibe3.services.handoff_service import HandoffService
 
 
 def test_parse_modified_files_extracts_paths() -> None:
@@ -50,10 +50,10 @@ def test_create_handoff_artifact_uses_explicit_branch(tmp_path) -> None:
     git_client.get_git_common_dir.return_value = str(tmp_path)
 
     with patch(
-        "vibe3.services.handoff_recorder_unified.GitClient",
+        "vibe3.services.handoff_service.GitClient",
         return_value=git_client,
     ):
-        branch, artifact = create_handoff_artifact(
+        branch, artifact = HandoffService().create_artifact(
             "review",
             "VERDICT: PASS",
             branch="task/issue-42",
@@ -64,8 +64,8 @@ def test_create_handoff_artifact_uses_explicit_branch(tmp_path) -> None:
     assert "task-issue-42" in str(artifact.parent)
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     artifact = Path("/tmp/plan-2026-03-26T10:00:00.md")
     mock_create.return_value = ("feature/test", artifact)
@@ -88,8 +88,8 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     assert "plan_ref" not in kwargs["flow_state_updates"]
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_for_run_tracks_modified_files(
     mock_create, mock_persist
 ) -> None:
@@ -121,8 +121,8 @@ def test_record_handoff_unified_for_run_tracks_modified_files(
     assert "report_ref" not in kwargs["flow_state_updates"]
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
     mock_create, mock_persist
 ) -> None:
@@ -149,8 +149,8 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
     assert "audit_ref" not in kwargs["flow_state_updates"]
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_ignores_reserved_metadata_keys(
     mock_create, mock_persist
 ) -> None:
@@ -171,8 +171,8 @@ def test_record_handoff_unified_ignores_reserved_metadata_keys(
     assert refs["custom"] == "ok"
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_sanitizes_prompt_before_writing(
     mock_create, mock_persist
 ) -> None:
@@ -197,8 +197,8 @@ def test_record_handoff_unified_sanitizes_prompt_before_writing(
     assert "plan body" in mock_create.call_args.args[1]
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_uses_sanitized_run_content_for_refs(
     mock_create, mock_persist
 ) -> None:
@@ -222,8 +222,8 @@ def test_record_handoff_unified_uses_sanitized_run_content_for_refs(
     assert refs["modified_count"] == "1"
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_uses_sanitized_review_content_for_verdict(
     mock_create, mock_persist
 ) -> None:
@@ -244,8 +244,8 @@ def test_record_handoff_unified_uses_sanitized_review_content_for_verdict(
     assert refs["verdict"] == "MAJOR"
 
 
-@patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
-@patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
 def test_record_handoff_unified_review_prefers_sanitized_content_over_metadata(
     mock_create, mock_persist
 ) -> None:

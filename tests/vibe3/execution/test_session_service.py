@@ -2,11 +2,11 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.agents.session_service import load_session_id
+from vibe3.execution.session_service import load_session_id
 
 
-@patch("vibe3.agents.session_service.SessionRegistryService")
-@patch("vibe3.agents.session_service.GitClient")
+@patch("vibe3.execution.session_service.SessionRegistryService")
+@patch("vibe3.execution.session_service.GitClient")
 def test_load_session_id_returns_registry_session(git_cls, registry_cls) -> None:
     """load_session_id should return session from registry."""
     git_cls.return_value.get_current_branch.return_value = "task/demo"
@@ -21,7 +21,7 @@ def test_load_session_id_returns_registry_session(git_cls, registry_cls) -> None
     assert session_id == "sess-123"
 
 
-@patch("vibe3.agents.session_service.SessionRegistryService")
+@patch("vibe3.execution.session_service.SessionRegistryService")
 def test_load_session_id_supports_manager_role_with_explicit_branch(
     registry_cls,
 ) -> None:
@@ -37,8 +37,8 @@ def test_load_session_id_supports_manager_role_with_explicit_branch(
     assert session_id == "sess-manager"
 
 
-@patch("vibe3.agents.session_service.SessionRegistryService")
-@patch("vibe3.agents.session_service.GitClient")
+@patch("vibe3.execution.session_service.SessionRegistryService")
+@patch("vibe3.execution.session_service.GitClient")
 def test_load_session_id_returns_none_when_no_matching_role(
     git_cls, registry_cls
 ) -> None:
@@ -55,8 +55,8 @@ def test_load_session_id_returns_none_when_no_matching_role(
     assert session_id is None
 
 
-@patch("vibe3.agents.session_service.SessionRegistryService")
-@patch("vibe3.agents.session_service.GitClient")
+@patch("vibe3.execution.session_service.SessionRegistryService")
+@patch("vibe3.execution.session_service.GitClient")
 def test_load_session_id_ignores_tmux_session_names(git_cls, registry_cls) -> None:
     """load_session_id should ignore session IDs that look like tmux names."""
     git_cls.return_value.get_current_branch.return_value = "task/demo"

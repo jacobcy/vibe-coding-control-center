@@ -11,18 +11,18 @@ from pathlib import Path
 from fastapi import FastAPI
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.roles import LABEL_DISPATCH_ROLES
+from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
@@ -33,23 +33,6 @@ from vibe3.services.orchestra_status_service import (
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
 
-def _resolve_orchestra_repo_root() -> Path:
-    """Resolve the shared repo root for orchestra-managed auto scenes.
-
-    We intentionally anchor orchestra to the git common-dir parent (the main
-    repository root), not the caller's current worktree cwd. This keeps auto
-    task scenes under ``<repo>/.worktrees/`` instead of nesting them under the
-    current debug/manual worktree.
-    """
-    try:
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except Exception:
-        pass
-    return Path.cwd()
-
-
 def _resolve_dispatcher_repo_root(
     config: OrchestraConfig,
     launch_cwd: Path | None = None,
@@ -57,7 +40,7 @@ def _resolve_dispatcher_repo_root(
     """Resolve the worktree root used for dispatcher-managed auto scenes."""
     _ = config
     _ = launch_cwd
-    return _resolve_orchestra_repo_root().resolve()
+    return resolve_orchestra_repo_root().resolve()
 
 
 def _resolve_dispatcher_models_root(
@@ -68,7 +51,7 @@ def _resolve_dispatcher_models_root(
     resolved_cwd = (launch_cwd or Path.cwd()).resolve()
     if config.debug:
         return resolved_cwd
-    return _resolve_orchestra_repo_root().resolve()
+    return resolve_orchestra_repo_root().resolve()
 
 
 def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
@@ -134,12 +117,11 @@ def _build_server_with_launch_cwd(
             dispatch_services.append(
                 StateLabelDispatchService(
                     config,
-                    trigger_state=role_service.trigger_state,
-                    trigger_name=role_service.trigger_name,
                     github=shared_github,
                     executor=shared_executor,
                     flow_manager=shared_flow_manager,
                     registry=shared_registry,
+                    role_def=role_service,
                 )
             )
 

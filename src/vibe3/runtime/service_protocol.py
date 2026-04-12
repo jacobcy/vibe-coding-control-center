@@ -1,4 +1,8 @@
-"""Event bus for orchestra: event model and service base class."""
+"""Service protocol for runtime observers.
+
+This module defines the GitHub-facing observation model and the minimal runtime
+service contract used by HeartbeatServer.
+"""
 
 from abc import ABC, abstractmethod
 from typing import Any, Literal
@@ -23,11 +27,7 @@ class GitHubEvent(BaseModel):
 
 
 class ServiceBase(ABC):
-    """Abstract base for all orchestra services.
-
-    Subclasses declare which event_types they handle and implement
-    handle_event(). They may also override on_tick() for polling behaviour.
-    """
+    """Abstract protocol for runtime services observed by HeartbeatServer."""
 
     event_types: list[str] = []
     """GitHub event types this service subscribes to."""
@@ -39,11 +39,7 @@ class ServiceBase(ABC):
 
     @property
     def is_dispatch_service(self) -> bool:
-        """Whether this service initiates automated flow/task actions.
-
-        True for dispatchers that push the flow forward (manager/run/review).
-        False for non-dispatching services like comment replies.
-        """
+        """Whether this service initiates automated flow/task actions."""
         return True
 
     @abstractmethod
@@ -52,8 +48,4 @@ class ServiceBase(ABC):
         ...
 
     async def on_tick(self) -> None:
-        """Called on each heartbeat tick (every polling_interval seconds).
-
-        Override to add polling-based behaviour as a fallback.
-        The default implementation is a no-op.
-        """
+        """Called on each heartbeat tick."""

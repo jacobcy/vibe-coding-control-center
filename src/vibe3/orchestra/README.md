@@ -67,7 +67,7 @@ driver 在 heartbeat tick 中消费已有 `state/*`：
 ## 注册自定义 Service
 
 ```python
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 from vibe3.runtime.heartbeat import HeartbeatServer
 
 class MyService(ServiceBase):
@@ -122,8 +122,8 @@ orchestra:
 
 ```
 orchestra/
-  event_bus.py           GitHubEvent 模型 + ServiceBase 抽象基类
-  heartbeat.py           HeartbeatServer：事件循环 + 服务注册表
+  runtime/service_protocol.py   GitHubEvent 模型 + ServiceBase 协议
+  heartbeat.py                  HeartbeatServer：事件循环 + 服务注册表
   webhook_handler.py     FastAPI router：HMAC 验签 + 事件解析
   serve.py               CLI 入口（start / stop / status）
   config.py              OrchestraConfig

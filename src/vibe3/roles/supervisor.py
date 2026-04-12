@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
+from vibe3.execution.agent_resolver import resolve_supervisor_agent_options
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.issue_role_support import use_current_branch
 from vibe3.execution.role_contracts import (
     SUPERVISOR_APPLY_GATE_CONFIG,
     SUPERVISOR_IDENTIFY_GATE_CONFIG,
@@ -14,7 +17,6 @@ from vibe3.execution.role_contracts import (
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
-from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
@@ -204,15 +206,6 @@ def build_supervisor_cli_request(
     )
 
 
-def resolve_supervisor_branch(
-    store: SQLiteClient,
-    issue_number: int,
-    current_branch: str,
-) -> str:
-    """Resolve target branch for supervisor execution."""
-    return current_branch
-
-
 def build_supervisor_cli_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
@@ -254,7 +247,7 @@ def build_supervisor_cli_sync_request(
 SUPERVISOR_CLI_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="supervisor",
     resolve_options=resolve_supervisor_agent_options,
-    resolve_branch=resolve_supervisor_branch,
+    resolve_branch=use_current_branch,
     build_async_request=lambda config, issue, actor: build_supervisor_cli_request(
         config,
         issue.number,
@@ -263,3 +256,41 @@ SUPERVISOR_CLI_SYNC_SPEC = IssueRoleSyncSpec(
     ),
     build_sync_request=build_supervisor_cli_sync_request,
 )
+
+
+def iter_supervisor_identified_events(
+    config: OrchestraConfig,
+    raw_issues: Iterable[dict[str, object]],
+) -> list[SupervisorIssueIdentified]:
+    """Filter raw GitHub issues into supervisor observation events."""
+    issue_label = config.supervisor_handoff.issue_label
+    handoff_label = config.supervisor_handoff.handoff_state_label
+    supervisor_file = config.supervisor_handoff.supervisor_file
+
+    events: list[SupervisorIssueIdentified] = []
+    for item in raw_issues:
+        number = item.get("number")
+        title = item.get("title")
+        if not isinstance(number, int) or not isinstance(title, str):
+            continue
+
+        labels_raw = item.get("labels", [])
+        labels: list[str] = []
+        if isinstance(labels_raw, list):
+            for lbl in labels_raw:
+                if isinstance(lbl, dict):
+                    name = lbl.get("name")
+                    if isinstance(name, str):
+                        labels.append(name)
+
+        if issue_label not in labels or handoff_label not in labels:
+            continue
+
+        events.append(
+            SupervisorIssueIdentified(
+                issue_number=number,
+                issue_title=title,
+                supervisor_file=supervisor_file,
+            )
+        )
+    return events

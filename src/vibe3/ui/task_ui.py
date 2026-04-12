@@ -3,7 +3,7 @@
 import json
 from typing import TYPE_CHECKING
 
-from vibe3.services.milestone_service import MilestoneContext
+from vibe3.clients.github_issues_ops import MilestoneContext
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_milestone
 
