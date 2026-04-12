@@ -72,7 +72,7 @@ def test_default_db_path_uses_shared_git_common_dir(tmp_path, monkeypatch):
     shared_git_dir.mkdir(parents=True)
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        "vibe3.clients.sqlite_client.GitClient.get_git_common_dir",
+        "vibe3.clients.sqlite_base.GitClient.get_git_common_dir",
         lambda self: str(shared_git_dir),
     )
 
@@ -88,7 +88,7 @@ def test_default_db_path_fails_fast_on_invalid_git_common_dir(tmp_path, monkeypa
     repo_root.mkdir()
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        "vibe3.clients.sqlite_client.GitClient.get_git_common_dir",
+        "vibe3.clients.sqlite_base.GitClient.get_git_common_dir",
         lambda self: "",
     )
 

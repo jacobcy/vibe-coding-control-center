@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
 
 from loguru import logger
 
@@ -40,16 +39,6 @@ class FixResult:
     applied: list[str] = field(default_factory=list)
 
 
-@dataclass
-class ExecuteCheckResult:
-    """Result of unified check execution."""
-
-    mode: Literal["default", "init", "all", "fix", "fix_all"]
-    success: bool
-    summary: str
-    details: dict = field(default_factory=dict)
-
-
 class CheckService(CheckRemote):
     """Service for verifying handoff store consistency and auto-fixing issues."""
 
@@ -62,132 +51,6 @@ class CheckService(CheckRemote):
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
-
-    # ------------------------------------------------------------------
-    # Unified Execution
-    # ------------------------------------------------------------------
-
-    def execute_check(
-        self,
-        mode: Literal["default", "init", "all", "fix", "fix_all"] = "default",
-        branch: str | None = None,
-    ) -> ExecuteCheckResult:
-        """Unified check execution with mode-based routing."""
-        if mode == "init":
-            return self._handle_init_mode()
-        elif mode == "all":
-            return self._handle_all_mode()
-        elif mode == "fix":
-            return self._handle_fix_mode(branch)
-        elif mode == "fix_all":
-            return self._handle_fix_all_mode()
-        else:
-            return self._handle_default_mode(branch)
-
-    def _handle_init_mode(self) -> ExecuteCheckResult:
-        """Handle --init mode: scan merged PRs to back-fill task_issue_number."""
-        result = self.init_remote_index()
-        summary = (
-            f"Done  total={result.total_flows}  "
-            f"updated={result.updated}  skipped={result.skipped}"
-        )
-        return ExecuteCheckResult(
-            mode="init",
-            success=True,
-            summary=summary,
-            details=(
-                {"unresolvable": result.unresolvable} if result.unresolvable else {}
-            ),
-        )
-
-    def _handle_all_mode(self) -> ExecuteCheckResult:
-        """Handle --all mode: check active flows."""
-        results = self.verify_all_flows(status="active")
-        invalid = [r for r in results if not r.is_valid]
-        return ExecuteCheckResult(
-            mode="all",
-            success=len(invalid) == 0,
-            summary=(
-                f"All {len(results)} active flows passed"
-                if not invalid
-                else f"{len(invalid)}/{len(results)} active flows have issues"
-            ),
-            details={"invalid": invalid},
-        )
-
-    def _handle_fix_all_mode(self) -> ExecuteCheckResult:
-        """Handle --fix --all mode: check active flows and auto-fix fixable issues."""
-        results = self.verify_all_flows(status=["active", "stale"])
-        invalid = [r for r in results if not r.is_valid]
-        if not invalid:
-            return ExecuteCheckResult(
-                mode="fix_all",
-                success=True,
-                summary=f"All {len(results)} active flows passed",
-            )
-
-        fixed_count = 0
-        failed: list[str] = []
-        for r in invalid:
-            fix_result = self.auto_fix_branch(r.branch, r.issues)
-            if fix_result.success:
-                fixed_count += 1
-            else:
-                error_msg = fix_result.error or "unknown error"
-                failed.append(f"{r.branch}: {error_msg}")
-
-        total = len(invalid)
-        if failed:
-            summary = f"Fixed {fixed_count}/{total}, {len(failed)} had unfixable issues"
-            return ExecuteCheckResult(
-                mode="fix_all",
-                success=False,
-                summary=summary,
-                details={"fixed": fixed_count, "failed": failed},
-            )
-        summary = (
-            f"All {fixed_count} fixable issues resolved across {len(results)} flows"
-        )
-        return ExecuteCheckResult(
-            mode="fix_all",
-            success=True,
-            summary=summary,
-            details={"fixed": fixed_count},
-        )
-
-    def _handle_fix_mode(self, branch: str | None) -> ExecuteCheckResult:
-        """Handle --fix mode: auto-fix current branch."""
-        result_single = self.verify_current_flow()
-        if result_single.is_valid:
-            return ExecuteCheckResult(
-                mode="fix", success=True, summary="All checks passed"
-            )
-
-        fix_result = self.auto_fix(result_single.issues, branch=branch)
-        return ExecuteCheckResult(
-            mode="fix",
-            success=fix_result.success,
-            summary=(
-                "All issues fixed"
-                if fix_result.success
-                else f"Error: {fix_result.error}"
-            ),
-            details={"issues": result_single.issues},
-        )
-
-    def _handle_default_mode(self, branch: str | None) -> ExecuteCheckResult:
-        """Handle default mode: check current branch."""
-        result_single = self.verify_current_flow()
-        return ExecuteCheckResult(
-            mode="default",
-            success=result_single.is_valid,
-            summary=(
-                "All checks passed"
-                if result_single.is_valid
-                else f"Issues found for branch '{result_single.branch}'"
-            ),
-            details={"issues": result_single.issues},
-        )
 
     # ------------------------------------------------------------------
     # Core Logic

@@ -33,8 +33,37 @@ from vibe3.domain.events import (
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
-from vibe3.domain.handlers import register_event_handlers
-from vibe3.domain.publisher import get_publisher, publish, subscribe
+
+
+def register_event_handlers() -> None:
+    """Register domain event handlers lazily to avoid import cycles."""
+    from vibe3.domain.handlers import (
+        register_event_handlers as _register_event_handlers,
+    )
+
+    _register_event_handlers()
+
+
+def get_publisher():  # type: ignore[no-untyped-def]
+    """Return the global domain event publisher lazily."""
+    from vibe3.domain.publisher import get_publisher as _get_publisher
+
+    return _get_publisher()
+
+
+def publish(event):  # type: ignore[no-untyped-def]
+    """Publish a domain event lazily."""
+    from vibe3.domain.publisher import publish as _publish
+
+    return _publish(event)
+
+
+def subscribe(event_type, handler):  # type: ignore[no-untyped-def]
+    """Subscribe a handler lazily."""
+    from vibe3.domain.publisher import subscribe as _subscribe
+
+    return _subscribe(event_type, handler)
+
 
 __all__ = [
     # Base

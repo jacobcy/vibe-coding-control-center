@@ -130,3 +130,15 @@ class GitHubClientProtocol(Protocol):
     def update_pr_comment(self, comment_id: str, body: str) -> str:
         """Update an existing PR comment. Returns comment URL."""
         ...
+
+    def request_ai_review(self, pr_number: int, reviewers: list[str]) -> str | None:
+        """Request AI review by posting mention comment.
+
+        Args:
+            pr_number: PR number
+            reviewers: List of reviewer names
+
+        Returns:
+            Comment URL if successful, None if failed
+        """
+        ...

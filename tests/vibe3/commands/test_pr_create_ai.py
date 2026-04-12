@@ -142,7 +142,7 @@ class TestPRCreateCommandAI:
                     ) as mock_config:
                         mock_config.return_value.ai = AIConfig()
                         with patch(
-                            "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
+                            "vibe3.services.pr_create_usecase.AISuggestionClient.suggest_pr_content"
                         ) as mock_suggest:
                             mock_suggest.return_value = (
                                 "feat: ai title",

@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal
 
 import typer
 
+from vibe3.commands.check_support import execute_check_mode
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.check_service import CheckService
@@ -83,7 +84,7 @@ def check(
 
         if mode == "init":
             typer.echo("Scanning merged PRs to back-fill task_issue_number...")
-        result = service.execute_check(mode)
+        result = execute_check_mode(service, mode)
 
         if result.success:
             typer.echo(f"✓ {result.summary}")

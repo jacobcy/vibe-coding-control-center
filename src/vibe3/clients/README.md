@@ -24,9 +24,17 @@
 | github_pr_ops.py | PR 操作 |
 | github_issues_ops.py | Issue 操作 |
 | github_review_ops.py | Review 操作 |
+| github_labels.py | GitHub issue label CRUD |
+| github_issue_admin_ops.py | 关闭 issue 等管理操作 |
 | ai_client.py | AI 调用（LiteLLM） |
+| ai_suggestion_client.py | 面向 PR/文案建议的高层 AI 客户端 |
 | serena_client.py | Serena 符号分析 |
-| sqlite_client.py | SQLite 持久化 |
+| sqlite_client.py | SQLite 门面客户端（兼容现有调用） |
+| sqlite_base.py | SQLite 连接管理与 schema 初始化 |
+| sqlite_flow_state_repo.py | flow_state / flow_issue_links 持久化 |
+| sqlite_event_repo.py | flow_events 持久化 |
+| sqlite_session_repo.py | runtime_session 持久化 |
+| sqlite_context_cache_repo.py | flow_context_cache 持久化 |
 | protocols.py | 客户端接口协议 |
 
 ## 依赖关系

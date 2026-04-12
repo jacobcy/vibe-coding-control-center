@@ -1,4 +1,4 @@
-"""Ports for issue/pr state synchronization."""
+"""GitHub label operations — issue label CRUD via gh CLI."""
 
 from __future__ import annotations
 

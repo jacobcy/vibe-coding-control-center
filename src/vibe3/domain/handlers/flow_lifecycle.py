@@ -16,8 +16,8 @@ from vibe3.domain.events.flow_lifecycle import (
     ReportRefRequired,
     ReviewCompleted,
 )
+from vibe3.execution.authoritative_ref_gate import require_authoritative_ref
 from vibe3.models.orchestration import IssueState
-from vibe3.services.authoritative_ref_gate import require_authoritative_ref
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import (
     block_executor_noop_issue,
