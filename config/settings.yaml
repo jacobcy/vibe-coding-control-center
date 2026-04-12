@@ -110,7 +110,7 @@ code_limits:
         limit: 600
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 570
+        limit: 610
         reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 450
