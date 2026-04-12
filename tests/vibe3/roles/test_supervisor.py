@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.execution.role_contracts import (
     CompletionContract,
     WorktreeRequirement,
@@ -13,6 +14,7 @@ from vibe3.roles.supervisor import (
     build_supervisor_apply_request,
     build_supervisor_handoff_payload,
     build_supervisor_task_string,
+    iter_supervisor_identified_events,
 )
 
 
@@ -162,3 +164,38 @@ class TestBuildSupervisorApplyRequest:
         config = _make_config()
         req = build_supervisor_apply_request(config, 42)
         assert req.env.get("VIBE3_ASYNC_CHILD") == "1"
+
+
+class TestSupervisorIdentifiedEvents:
+    """Supervisor observation filtering should stay in role layer."""
+
+    def test_iter_supervisor_identified_events_filters_matching_labels(self):
+        config = _make_config(
+            repo="owner/repo",
+            supervisor_handoff={
+                "issue_label": "supervisor",
+                "handoff_state_label": "state/handoff",
+                "supervisor_file": "supervisor/apply.md",
+            },
+        )
+
+        events = iter_supervisor_identified_events(
+            config,
+            [
+                {
+                    "number": 1,
+                    "title": "match",
+                    "labels": [{"name": "supervisor"}, {"name": "state/handoff"}],
+                },
+                {
+                    "number": 2,
+                    "title": "skip",
+                    "labels": [{"name": "supervisor"}],
+                },
+            ],
+        )
+
+        assert len(events) == 1
+        assert isinstance(events[0], SupervisorIssueIdentified)
+        assert events[0].issue_number == 1
+        assert events[0].issue_title == "match"

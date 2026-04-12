@@ -12,7 +12,6 @@ from loguru import logger
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
-from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.logging import append_orchestra_event
@@ -226,6 +225,7 @@ class OrchestrationFacade(ServiceBase):
         执行装配由 supervisor_scan handler 负责，facade 只做 observation。
         """
         from vibe3.clients.github_client import GitHubClient
+        from vibe3.roles.supervisor import iter_supervisor_identified_events
 
         github = GitHubClient()
         config = self._config
@@ -237,36 +237,10 @@ class OrchestrationFacade(ServiceBase):
             repo=config.repo,
         )
 
-        issue_label = config.supervisor_handoff.issue_label
-        handoff_label = config.supervisor_handoff.handoff_state_label
-
-        for item in raw_issues:
-            number = item.get("number")
-            title = item.get("title")
-            if not isinstance(number, int) or not isinstance(title, str):
-                continue
-
-            labels_raw = item.get("labels", [])
-            labels = []
-            if isinstance(labels_raw, list):
-                for lbl in labels_raw:
-                    if isinstance(lbl, dict):
-                        name = lbl.get("name")
-                        if isinstance(name, str):
-                            labels.append(name)
-
-            if issue_label not in labels or handoff_label not in labels:
-                continue
-
+        for event in iter_supervisor_identified_events(config, raw_issues):
             logger.bind(
                 domain="orchestration_facade",
-                issue_number=number,
-                supervisor_file=config.supervisor_handoff.supervisor_file,
+                issue_number=event.issue_number,
+                supervisor_file=event.supervisor_file,
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
-
-            event = SupervisorIssueIdentified(
-                issue_number=number,
-                issue_title=title,
-                supervisor_file=config.supervisor_handoff.supervisor_file,
-            )
             publish(event)

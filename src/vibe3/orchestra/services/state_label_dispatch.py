@@ -149,65 +149,15 @@ class StateLabelDispatchService(ServiceBase):
 
     def _emit_dispatch_intent(self, issue: IssueInfo) -> None:
         from vibe3.domain import publish
-        from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+        from vibe3.roles.registry import build_label_dispatch_event
 
-        trigger = self.role_def.trigger_name
         branch, flow_state = self._flow_context(issue.number)
-        if trigger == "manager":
-            to_state = self.role_def.trigger_state.value
-            publish(
-                IssueStateChanged(
-                    issue_number=issue.number,
-                    from_state=None,
-                    to_state=to_state,
-                    issue_title=issue.title if issue.title else None,
-                )
-            )
-            return
-        if trigger == "plan":
-            from vibe3.domain.events import PlannerDispatched
-
-            publish(
-                PlannerDispatched(
-                    issue_number=issue.number,
-                    branch=branch,
-                    trigger_state="claimed",
-                )
-            )
-            return
-        if trigger == "run":
-            from vibe3.domain.events import ExecutorDispatched
-
-            plan_ref = flow_state.get("plan_ref") if flow_state else None
-            publish(
-                ExecutorDispatched(
-                    issue_number=issue.number,
-                    branch=branch,
-                    trigger_state="in-progress",
-                    plan_ref=str(plan_ref) if plan_ref else None,
-                )
-            )
-            return
-        if trigger == "review":
-            from vibe3.domain.events import ReviewerDispatched
-
-            report_ref = flow_state.get("report_ref") if flow_state else None
-            publish(
-                ReviewerDispatched(
-                    issue_number=issue.number,
-                    branch=branch,
-                    trigger_state="review",
-                    report_ref=str(report_ref) if report_ref else None,
-                )
-            )
-            return
-        to_state = self.role_def.trigger_state.value
         publish(
-            IssueStateChanged(
-                issue_number=issue.number,
-                from_state=None,
-                to_state=to_state,
-                issue_title=issue.title if issue.title else None,
+            build_label_dispatch_event(
+                self.role_def,
+                issue,
+                branch=branch,
+                flow_state=flow_state,
             )
         )
 
