@@ -34,17 +34,9 @@ case "$command" in
         source "$VIBE_LIB/doctor.sh"
         vibe_doctor "$@"
         ;;
-    tools)
-        source "$VIBE_LIB/tool.sh"
-        vibe_tool "$@"
-        ;;
     keys)
         source "$VIBE_LIB/keys.sh"
         vibe_keys "$@"
-        ;;
-    clean)
-        source "$VIBE_LIB/clean.sh"
-        vibe_clean "$@"
         ;;
     skills)
         source "$VIBE_LIB/skills.sh"
@@ -65,11 +57,9 @@ case "$command" in
         echo "For flow/task/pr commands, use: ${GREEN}vibe3${NC}"
         echo ""
         echo "Utilities:"
-        echo "  ${GREEN}doctor${NC}   环境诊断与依赖检查"
+        echo "  ${GREEN}doctor${NC}   环境诊断与依赖检查（含 AI 工具状态）"
         echo "  ${GREEN}skills${NC}   Skills 物理同步与状态检查"
         echo "  ${GREEN}keys${NC}     API 密钥安全管理"
-        echo "  ${GREEN}clean${NC}    清理项目临时/构建文件"
-        echo "  ${GREEN}tools${NC}    AI 开发工具链安装/更新"
         echo "  ${GREEN}alias${NC}    加载 Shell 快捷别名"
         echo ""
         echo "V3 Capability Domains (redirects to vibe3):"
