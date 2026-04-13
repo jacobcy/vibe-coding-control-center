@@ -50,9 +50,11 @@ _get_shell_rc() {
     case "$SHELL" in
         */zsh) echo "$HOME/.zshrc" ;;
         */bash) echo "$HOME/.bashrc" ;;
-        */fish) echo "$HOME/.config/fish/config.fish" ;;
-        */nu) echo "$HOME/.config/nushell/config.nu" ;;
-        *) echo "$HOME/.zshrc" ;; # Default to zsh
+        *)
+            log_warn "Unsupported shell: $SHELL (loader.sh requires zsh)"
+            log_info "Defaulting to zshrc - please install zsh or manually configure"
+            echo "$HOME/.zshrc"
+            ;;
     esac
 }
 
@@ -156,6 +158,16 @@ CLAUDE_HOOKS_DIR="$HOME/.claude/hooks"
 PROJECT_HOOKS_DIR="$SOURCE_ROOT/.claude/hooks"
 if [[ -d "$PROJECT_HOOKS_DIR" ]]; then
     mkdir -p "$CLAUDE_HOOKS_DIR"
+
+    # 检查已有文件，避免静默覆盖
+    if [[ -d "$CLAUDE_HOOKS_DIR" && "$(ls -A "$CLAUDE_HOOKS_DIR" 2>/dev/null)" ]]; then
+        log_warning "发现已有 hooks 文件，将备份后覆盖"
+        backup_dir="$CLAUDE_HOOKS_DIR.backup.$(date +%Y%m%d_%H%M%S)"
+        mv "$CLAUDE_HOOKS_DIR" "$backup_dir"
+        log_info "已备份旧 hooks 到: $backup_dir"
+        mkdir -p "$CLAUDE_HOOKS_DIR"
+    fi
+
     cp -R "$PROJECT_HOOKS_DIR/." "$CLAUDE_HOOKS_DIR/"
     # Make all hooks executable
     chmod +x "$CLAUDE_HOOKS_DIR"/*.sh 2>/dev/null || true

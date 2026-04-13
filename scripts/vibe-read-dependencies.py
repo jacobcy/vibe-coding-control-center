@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 vibe3 inspect dependencies - 读取并输出 dependencies.toml 配置
 
@@ -16,7 +16,7 @@ def load_dependencies() -> dict[str, Any]:
     # 优先从项目根目录查找
     config_paths = [
         Path.cwd() / "config" / "dependencies.toml",
-        Path(__file__).parent.parent.parent / "config" / "dependencies.toml",
+        Path(__file__).parent.parent / "config" / "dependencies.toml",
     ]
 
     for config_path in config_paths:
@@ -37,11 +37,16 @@ def format_shell_output(config: dict[str, Any]) -> str:
         for tool in config["tools"]["essential"]:
             lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
 
-    # Optional tools
-    if "tools" in config and "optional" in config["tools"]:
-        lines.append("# OPTIONAL_TOOLS")
-        for tool in config["tools"]["optional"]:
-            lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
+    # Optional tools - 支持嵌套分组结构
+    lines.append("# OPTIONAL_TOOLS")
+    if "tools" in config:
+        # 遍历所有可能的分组
+        for group_name in ["productivity", "alternative_ai", "development", "remote"]:
+            if group_name in config["tools"]:
+                group = config["tools"][group_name]
+                if isinstance(group, dict) and "tools" in group:
+                    for tool in group["tools"]:
+                        lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
 
     # API Keys
     if "api_keys" in config:
@@ -87,7 +92,15 @@ def main():
             print(format_json_output(config))
         else:  # summary
             print("✓ Dependencies Configuration Summary")
-            print(f"  Tools: {len(config.get('tools', {}).get('essential', []))} essential, {len(config.get('tools', {}).get('optional', []))} optional")
+            # 统计可选工具数量（从嵌套分组）
+            optional_count = 0
+            if "tools" in config:
+                for group_name in ["productivity", "alternative_ai", "development", "remote"]:
+                    if group_name in config["tools"]:
+                        group = config["tools"][group_name]
+                        if isinstance(group, dict) and "tools" in group:
+                            optional_count += len(group["tools"])
+            print(f"  Tools: {len(config.get('tools', {}).get('essential', []))} essential, {optional_count} optional")
             print(f"  Plugins: {len(config.get('plugins', {}).get('global', {}).get('plugins', []))} global, {len(config.get('plugins', {}).get('project', {}).get('plugins', []))} project")
             print(f"  Skills: {len(config.get('skills', {}).get('essential_skills', []))} essential, {len(config.get('skills', {}).get('support_skills', []))} support")
             print(f"  Workflows: {len(config.get('workflows', {}))} defined")

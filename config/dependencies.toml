@@ -19,7 +19,7 @@ essential = [
 # 【生产力工具】提升开发效率
 [tools.productivity]
 tools = [
-  { name = "cc-switch", check = "cc-switch --version", install = "见项目文档", description = "Claude 配置切换工具（重要）", required_for = "多 Claude 配置管理", priority = "高" },
+  { name = "cc-switch", check = "cc-switch --version", install = "https://github.com/farion1231/cc-switch", description = "Claude 配置切换工具（可选）", required_for = "多 Claude 配置管理", priority = "低" },
   { name = "rtk", check = "rtk --version", install = "见项目文档 RTK.md", description = "Token 优化代理", required_for = "Claude Code hook token 优化", priority = "中" },
 ]
 

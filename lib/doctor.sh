@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # v2/lib/doctor.sh - Environment Diagnostics for Vibe 2.0
-# Target: ~80 lines | Detects tools, reports versions
+# Target: ~200 lines | Detects tools, reports versions
 # 支持必要依赖检查(--essential)和完整检查(默认)
 
 # ── Tool Check Tables ────────────────────────────────────
@@ -14,6 +14,7 @@ _VIBE_ESSENTIAL_TOOLS=(
 _VIBE_AI_TOOLS=(
     "claude:claude:--version"
     "opencode:opencode:--version"
+    "codex:codex:--version"
 )
 
 # 可选依赖：增强体验的工具，缺失不影响核心功能
