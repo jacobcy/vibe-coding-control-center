@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
-# scripts/vibe-check-optional.sh - 可选依赖检查和安装引导
-# 用于vibe-onboard skill调用，或用户手动运行检查可选组件
+# scripts/vibe-check-optional.sh - 可选依赖检查（配置驱动）
+# 从 config/dependencies.toml 读取配置，动态检查所有依赖
 
 set -euo pipefail
 
@@ -9,86 +9,99 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 [[ -f "$VIBE_ROOT/lib/config.sh" ]] && source "$VIBE_ROOT/lib/config.sh"
 
 # ── Helper Functions ─────────────────────────────────────
-_check_optional_tool() {
-    local name="$1" cmd="$2" install_hint="$3"
+_read_config() {
+    uv run python "$VIBE_ROOT/scripts/vibe-read-dependencies.py" --format shell
+}
 
-    if command -v "$cmd" >/dev/null 2>&1; then
-        local version="$("$cmd" --version 2>&1 | head -1 | sed 's/^[^0-9]*//')"
+_check_tool_from_config() {
+    local line="$1"
+    # 解析格式：name|check|install|description
+    local name="${line%%|*}"
+    local rest="${line#*|}"
+    local check="${rest%%|*}"
+    local rest2="${rest#*|}"
+    local install="${rest2%%|*}"
+    local description="${rest2#*|}"
+
+    if command -v "$name" >/dev/null 2>&1 || eval "$check" >/dev/null 2>&1; then
+        local version="$(eval "$check" 2>&1 | head -1 | sed 's/^[^0-9]*//')"
         printf "  ${GREEN}✓${NC} %-15s %s\n" "$name" "${version:-installed}"
         return 0
     else
         printf "  ${YELLOW}!${NC} %-15s %s\n" "$name" "未安装"
-        echo "      安装: $install_hint"
+        echo "      $description"
+        echo "      安装: $install"
         return 1
     fi
 }
 
-# ── Remote Development Tools ─────────────────────────────
-check_remote_dev_tools() {
-    echo "${BOLD}远程开发工具:${NC}"
+_check_key_from_config() {
+    local line="$1"
+    # 解析格式：name|env_var|description|get_from
+    local name="${line%%|*}"
+    local rest="${line#*|}"
+    local env_var="${rest%%|*}"
+    local rest2="${rest#*|}"
+    local description="${rest2%%|*}"
+    local get_from="${rest2#*|}"
+
+    if [[ -n "${(P)env_var:-}" ]]; then
+        printf "  ${GREEN}✓${NC} %-15s configured\n" "$name"
+        return 0
+    else
+        printf "  ${YELLOW}!${NC} %-15s 未配置\n" "$name"
+        echo "      $description"
+        echo "      获取: $get_from"
+        return 1
+    fi
+}
+
+# ── Dynamic Checking from Config ────────────────────────
+check_optional_tools() {
+    echo "${BOLD}可选工具（按需安装）:${NC}"
     echo ""
 
-    _check_optional_tool "tailscale" "tailscale" "brew install tailscale"
-    _check_optional_tool "ncat" "ncat" "brew install nmap"
-    _check_optional_tool "tsu.sh" "tsu" "ln -sf ~/scripts/tsu.sh ~/.local/bin/tsu"
+    local config_output="$(_read_config)"
+    local in_optional_tools=false
 
-    # SSH Agent check
-    if ssh-add -l >/dev/null 2>&1; then
-        printf "  ${GREEN}✓${NC} %-15s running\n" "ssh-agent"
-    else
-        printf "  ${YELLOW}!${NC} %-15s 未运行\n" "ssh-agent"
-        echo "      启动: eval \"$(ssh-agent -s)\" && ssh-add ~/.ssh/id_ed25519"
-    fi
+    while IFS= read -r line; do
+        if [[ "$line" == "# OPTIONAL_TOOLS" ]]; then
+            in_optional_tools=true
+            continue
+        elif [[ "$line" =~ "^#" ]]; then
+            in_optional_tools=false
+            continue
+        fi
+
+        if $in_optional_tools && [[ -n "$line" ]]; then
+            _check_tool_from_config "$line"
+        fi
+    done <<< "$config_output"
+
     echo ""
 }
 
-# ── AI Backend Extensions ───────────────────────────────
-check_ai_backends() {
-    echo "${BOLD}AI后端扩展:${NC}"
+check_optional_keys() {
+    echo "${BOLD}可选密钥（按需配置）:${NC}"
     echo ""
 
-    _check_optional_tool "gemini CLI" "gemini" "npm install -g @google/gemini-cli"
+    local config_output="$(_read_config)"
+    local in_optional_keys=false
 
-    # MCP check (check Python package)
-    if python3 -c "import mcp" 2>/dev/null; then
-        printf "  ${GREEN}✓${NC} %-15s installed\n" "mcp"
-    else
-        printf "  ${YELLOW}!${NC} %-15s 未安装\n" "mcp"
-        echo "      安装: cd $VIBE_ROOT && uv sync --extra mcp"
-    fi
-    echo ""
-}
+    while IFS= read -r line; do
+        if [[ "$line" == "# OPTIONAL_KEYS" ]]; then
+            in_optional_keys=true
+            continue
+        elif [[ "$line" =~ "^#" ]]; then
+            in_optional_keys=false
+            continue
+        fi
 
-# ── API Keys Check ─────────────────────────────────────
-check_api_keys() {
-    echo "${BOLD}API密钥配置:${NC}"
-    echo ""
+        if $in_optional_keys && [[ -n "$line" ]]; then
+            _check_key_from_config "$line"
+        fi
+    done <<< "$config_output"
 
-    # Check environment or keys.env
-    if [[ -n "$EXA_API_KEY" ]]; then
-        printf "  ${GREEN}✓${NC} %-15s configured\n" "EXA_API_KEY"
-    else
-        printf "  ${YELLOW}!${NC} %-15s 未配置\n" "EXA_API_KEY"
-        echo "      获取: https://exa.ai"
-    fi
-
-    if [[ -n "$CONTEXT7_API_KEY" ]]; then
-        printf "  ${GREEN}✓${NC} %-15s configured\n" "CONTEXT7_API_KEY"
-    else
-        printf "  ${YELLOW}!${NC} %-15s 未配置\n" "CONTEXT7_API_KEY"
-        echo "      获取: https://context7.com"
-    fi
-    echo ""
-}
-
-# ── Development Helpers ─────────────────────────────────
-check_dev_helpers() {
-    echo "${BOLD}开发辅助工具:${NC}"
-    echo ""
-
-    _check_optional_tool "direnv" "direnv" "brew install direnv"
-    _check_optional_tool "pre-commit" "pre-commit" "pip install pre-commit 或 uv pip install pre-commit"
-    _check_optional_tool "supervisor" "supervisord" "brew install supervisor"
     echo ""
 }
 
@@ -97,48 +110,41 @@ vibe_check_optional() {
     local category="${1:-all}"
 
     case "$category" in
-        remote)
-            check_remote_dev_tools
-            ;;
-        ai)
-            check_ai_backends
+        tools)
+            check_optional_tools
             ;;
         keys)
-            check_api_keys
-            ;;
-        helpers)
-            check_dev_helpers
+            check_optional_keys
             ;;
         all|"")
-            check_remote_dev_tools
-            check_ai_backends
-            check_api_keys
-            check_dev_helpers
+            check_optional_tools
+            check_optional_keys
             ;;
         *)
-            echo "用法: vibe-check-optional [remote|ai|keys|helpers|all]"
+            echo "用法: vibe-check-optional [tools|keys|all]"
             return 1
             ;;
     esac
 
     echo "${BOLD}提示:${NC} 这些都是可选组件，不影响Vibe核心功能。"
     echo "根据你的开发需求选择性安装即可。"
+    echo ""
+    echo "安装引导：${CYAN}/vibe-onboard${NC}"
 }
 
 # ── Entry Point ────────────────────────────────────────
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    echo "${BOLD}Vibe可选依赖检查工具${NC}"
+    echo "${BOLD}Vibe可选依赖检查工具（配置驱动）${NC}"
     echo ""
     echo "Usage: ${CYAN}vibe-check-optional${NC} [category]"
     echo ""
     echo "Categories:"
-    echo "  remote    远程开发工具（tailscale、ncat、ssh-agent等）"
-    echo "  ai        AI后端扩展（gemini CLI、mcp等）"
-    echo "  keys      API密钥配置（EXA_API_KEY、CONTEXT7_API_KEY等）"
-    echo "  helpers   开发辅助工具（direnv、pre-commit、supervisor等）"
-    echo "  all       检查所有可选组件（默认）"
+    echo "  tools    可选工具检查（rtk、gemini、tailscale等）"
+    echo "  keys     可选密钥检查（ANTHROPIC_AUTH_TOKEN、OPENAI_API_KEY等）"
+    echo "  all      检查所有可选组件（默认）"
     echo ""
-    echo "这些组件都是可选的，根据你的实际需求选择性安装。"
+    echo "配置来源：${CYAN}config/dependencies.toml${NC}"
+    echo "安装引导：${CYAN}/vibe-onboard${NC}"
 else
     vibe_check_optional "${1:-all}"
 fi

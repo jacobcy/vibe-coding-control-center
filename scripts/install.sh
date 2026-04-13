@@ -150,6 +150,20 @@ for dir in bin lib lib3 config scripts alias; do
 done
 log_success "Core modules synced"
 
+# Sync Claude Code hooks to global directory
+log_info "Installing Claude Code hooks..."
+CLAUDE_HOOKS_DIR="$HOME/.claude/hooks"
+PROJECT_HOOKS_DIR="$SOURCE_ROOT/.claude/hooks"
+if [[ -d "$PROJECT_HOOKS_DIR" ]]; then
+    mkdir -p "$CLAUDE_HOOKS_DIR"
+    cp -R "$PROJECT_HOOKS_DIR/." "$CLAUDE_HOOKS_DIR/"
+    # Make all hooks executable
+    chmod +x "$CLAUDE_HOOKS_DIR"/*.sh 2>/dev/null || true
+    log_success "Claude Code hooks installed to $CLAUDE_HOOKS_DIR"
+else
+    log_info "No project hooks found, skipping"
+fi
+
 # 4. Handle Key Template
 if [[ ! -f "$INSTALL_DIR/keys.env" ]]; then
     log_info "Initializing keys.env from template..."

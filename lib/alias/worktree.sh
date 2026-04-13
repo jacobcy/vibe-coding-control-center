@@ -282,7 +282,7 @@ wtrm() {
 # @featured
 vup() {
   vibe_require tmux git || return 1
-  local mode="dash" target="" agent="${VIBE_DEFAULT_TOOL:-claude}"
+  local mode="dash" target="" agent="claude"
 
   # Parse flags and subcommands
   while [[ $# -gt 0 ]]; do
