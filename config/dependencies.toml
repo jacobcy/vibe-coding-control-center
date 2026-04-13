@@ -13,18 +13,19 @@ required = [
   { name = "tmux", check = "tmux -V", install = "brew install tmux", description = "Worktree 工作流核心" },
   { name = "lazygit", check = "lazygit --version", install = "brew install lazygit", description = "Git 终端 UI" },
   { name = "claude", check = "claude --version", install = "claude.ai", description = "Claude Code（至少需要一个 AI 工具）" },
+  { name = "codeagent-wrapper", check = "command -v codeagent-wrapper", install = "见 codeagent-wrapper 文档", description = "AI Agent 执行 wrapper" },
 ]
 
 # 可选工具（提升开发效率，按需求安装）
 optional = [
-  { name = "cc-switch", check = "cc-switch --version", install = "https://github.com/farion1231/cc-switch", description = "Claude 配置切换工具" },
+  { name = "cc-switch", check = "brew list --cask cc-switch 2>/dev/null && echo installed", install = "brew install --cask cc-switch", description = "Claude 配置切换工具" },
   { name = "rtk", check = "rtk --version", install = "见 RTK.md", description = "Token 优化代理" },
   { name = "codex", check = "codex --version", install = "见 OpenAI Codex 文档", description = "OpenAI GPT-5.4 CLI wrapper" },
   { name = "opencode", check = "opencode --version", install = "npm install -g opencode", description = "OpenCode（开源 AI 工具）" },
   { name = "gemini", check = "gemini --version", install = "brew install gemini", description = "Gemini API CLI" },
   { name = "pre-commit", check = "pre-commit --version", install = "brew install pre-commit", description = "Git hooks 检查（仅开发需要）" },
   { name = "direnv", check = "direnv version", install = "brew install direnv", description = "自动环境加载" },
-  { name = "tailscale", check = "tailscale version", install = "brew install tailscale", description = "Tailscale VPN（远程开发）" },
+  { name = "tailscale", check = "command -v tailscale", install = "brew install tailscale", description = "Tailscale VPN（远程开发）" },
   { name = "ncat", check = "ncat --version", install = "brew install nmap", description = "SSH ProxyCommand（远程开发）" },
 ]
 

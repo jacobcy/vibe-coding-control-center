@@ -60,6 +60,25 @@ def format_shell_output(config: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def format_summary_output(config: dict[str, Any]) -> str:
+    """输出统计摘要（工具和密钥数量）"""
+    lines = []
+
+    # Tools统计
+    if "tools" in config:
+        required_count = len(config["tools"].get("required", []))
+        optional_count = len(config["tools"].get("optional", []))
+        lines.append(f"Tools: {required_count} required, {optional_count} optional")
+
+    # Keys统计
+    if "keys" in config:
+        required_count = len(config["keys"].get("required", []))
+        optional_count = len(config["keys"].get("optional", []))
+        lines.append(f"Keys: {required_count} required, {optional_count} optional")
+
+    return "\n".join(lines)
+
+
 def format_json_output(config: dict[str, Any]) -> str:
     """输出 JSON 格式（供调试使用）"""
     import json
@@ -73,9 +92,9 @@ def main():
     parser = argparse.ArgumentParser(description="读取 dependencies.toml 配置")
     parser.add_argument(
         "--format",
-        choices=["shell", "json"],
+        choices=["shell", "json", "summary"],
         default="shell",
-        help="输出格式：shell（脚本用）、json（调试用）",
+        help="输出格式：shell（脚本用）、json（调试用）、summary（统计摘要）",
     )
 
     args = parser.parse_args()
@@ -85,6 +104,8 @@ def main():
 
         if args.format == "shell":
             print(format_shell_output(config))
+        elif args.format == "summary":
+            print(format_summary_output(config))
         else:  # json
             print(format_json_output(config))
 
