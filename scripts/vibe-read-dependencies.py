@@ -2,7 +2,7 @@
 """
 vibe3 inspect dependencies - 读取并输出 dependencies.toml 配置
 
-用于 Shell 脚本和 Skills 获取配置驱动的依赖列表。
+用于 Shell 脚本（vibe doctor / vibe keys）获取配置驱动的依赖列表。
 """
 
 import sys
@@ -13,7 +13,7 @@ from typing import Any
 
 def load_dependencies() -> dict[str, Any]:
     """加载 dependencies.toml 配置文件"""
-    # 优先从项目根目录查找
+    # 优先从项目根目录查找，fallback 到脚本相对路径
     config_paths = [
         Path.cwd() / "config" / "dependencies.toml",
         Path(__file__).parent.parent / "config" / "dependencies.toml",
@@ -28,43 +28,40 @@ def load_dependencies() -> dict[str, Any]:
 
 
 def format_shell_output(config: dict[str, Any]) -> str:
-    """输出 Shell 脚本可解析的格式"""
+    """输出 Shell 脚本可解析的格式（固定段名）"""
     lines = []
 
-    # Essential tools
-    if "tools" in config and "essential" in config["tools"]:
-        lines.append("# ESSENTIAL_TOOLS")
-        for tool in config["tools"]["essential"]:
+    # REQUIRED_TOOLS
+    lines.append("# REQUIRED_TOOLS")
+    if "tools" in config and "required" in config["tools"]:
+        for tool in config["tools"]["required"]:
             lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
 
-    # Optional tools - 支持嵌套分组结构
+    # OPTIONAL_TOOLS
     lines.append("# OPTIONAL_TOOLS")
-    if "tools" in config:
-        # 遍历所有可能的分组
-        for group_name in ["productivity", "alternative_ai", "development", "remote"]:
-            if group_name in config["tools"]:
-                group = config["tools"][group_name]
-                if isinstance(group, dict) and "tools" in group:
-                    for tool in group["tools"]:
-                        lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
+    if "tools" in config and "optional" in config["tools"]:
+        for tool in config["tools"]["optional"]:
+            lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
 
-    # API Keys
-    if "api_keys" in config:
-        if "essential" in config["api_keys"]:
-            lines.append("# ESSENTIAL_KEYS")
-            for key in config["api_keys"]["essential"]:
-                lines.append(f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}")
+    # REQUIRED_KEYS
+    lines.append("# REQUIRED_KEYS")
+    if "keys" in config and "required" in config["keys"]:
+        for key in config["keys"]["required"]:
+            note = key.get("note", "")
+            lines.append(f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}|{note}")
 
-        if "optional" in config["api_keys"]:
-            lines.append("# OPTIONAL_KEYS")
-            for key in config["api_keys"]["optional"]:
-                lines.append(f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}")
+    # OPTIONAL_KEYS
+    lines.append("# OPTIONAL_KEYS")
+    if "keys" in config and "optional" in config["keys"]:
+        for key in config["keys"]["optional"]:
+            note = key.get("note", "")
+            lines.append(f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}|{note}")
 
     return "\n".join(lines)
 
 
 def format_json_output(config: dict[str, Any]) -> str:
-    """输出 JSON 格式（供 skill 使用）"""
+    """输出 JSON 格式（供调试使用）"""
     import json
     return json.dumps(config, indent=2)
 
@@ -76,9 +73,9 @@ def main():
     parser = argparse.ArgumentParser(description="读取 dependencies.toml 配置")
     parser.add_argument(
         "--format",
-        choices=["shell", "json", "summary"],
-        default="summary",
-        help="输出格式：shell（脚本用）、json（skill用）、summary（人类可读）"
+        choices=["shell", "json"],
+        default="shell",
+        help="输出格式：shell（脚本用）、json（调试用）",
     )
 
     args = parser.parse_args()
@@ -88,29 +85,8 @@ def main():
 
         if args.format == "shell":
             print(format_shell_output(config))
-        elif args.format == "json":
+        else:  # json
             print(format_json_output(config))
-        else:  # summary
-            print("✓ Dependencies Configuration Summary")
-            # 统计可选工具数量（从嵌套分组）
-            optional_count = 0
-            if "tools" in config:
-                for group_name in ["productivity", "alternative_ai", "development", "remote"]:
-                    if group_name in config["tools"]:
-                        group = config["tools"][group_name]
-                        if isinstance(group, dict) and "tools" in group:
-                            optional_count += len(group["tools"])
-            print(f"  Tools: {len(config.get('tools', {}).get('essential', []))} essential, {optional_count} optional")
-            # 统计 plugins：global (essential + optional) + project (optional)
-            global_plugins = (
-                len(config.get('plugins', {}).get('global', {}).get('essential', [])) +
-                len(config.get('plugins', {}).get('global', {}).get('optional', []))
-            )
-            project_plugins = len(config.get('plugins', {}).get('project', {}).get('optional', []))
-            print(f"  Plugins: {global_plugins} global, {project_plugins} project")
-            print(f"  Skills: {len(config.get('skills', {}).get('essential_skills', []))} essential, {len(config.get('skills', {}).get('support_skills', []))} support")
-            print(f"  Workflows: {len(config.get('workflows', {}))} defined")
-            print(f"  API Keys: {len(config.get('api_keys', {}).get('essential', []))} essential, {len(config.get('api_keys', {}).get('optional', []))} optional")
 
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
