@@ -7,6 +7,7 @@ from typing import Any, cast
 from loguru import logger
 
 from vibe3.clients.github_client_base import raise_gh_pr_error
+from vibe3.exceptions import VibeError
 
 
 def _generate_ai_review_mention_body(reviewers: list[str]) -> str:
@@ -153,6 +154,8 @@ class CommentMixin:
             comment_url: str = self.create_pr_comment(pr_number, body)
             logger.info(f"Review request comment posted: {comment_url}")
             return comment_url
-        except Exception as e:
+        except (VibeError, OSError) as e:
+            # VibeError: 项目异常（UserError 或 GitHubError）
+            # OSError: 网络/进程相关异常
             logger.error(f"Failed to post review request comment: {e}")
             return None

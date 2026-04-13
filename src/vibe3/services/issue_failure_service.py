@@ -6,14 +6,9 @@ executor or manager runs fail or make no progress.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.label_service import LabelService
-
-if TYPE_CHECKING:
-    pass
 
 
 def _transition_issue_state(

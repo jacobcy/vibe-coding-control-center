@@ -9,7 +9,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.exceptions import UserError
+from vibe3.exceptions import GitError, UserError
 from vibe3.models.flow import FlowEvent
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -212,7 +212,8 @@ class HandoffService:
         if branch is None:
             try:
                 branch = self.git_client.get_current_branch()
-            except Exception:
+            except GitError:
+                # Git 操作失败（可能不在 git 仓库中，或 git 命令失败）
                 return None
             artifact_service = self
         else:
