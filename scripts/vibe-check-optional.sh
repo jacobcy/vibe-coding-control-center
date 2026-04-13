@@ -23,8 +23,12 @@ _check_tool_from_config() {
     local install="${rest2%%|*}"
     local description="${rest2#*|}"
 
-    if command -v "$name" >/dev/null 2>&1 || eval "$check" >/dev/null 2>&1; then
-        local version="$(eval "$check" 2>&1 | head -1 | sed 's/^[^0-9]*//')"
+    # 安全执行：拆分 check 命令为数组，避免 eval 注入风险
+    local check_cmd
+    check_cmd=(${(@s: :)check})  # zsh 数组拆分
+
+    if command -v "$name" >/dev/null 2>&1 || "${check_cmd[@]}" >/dev/null 2>&1; then
+        local version="$("${check_cmd[@]}" 2>&1 | head -1 | sed 's/^[^^0-9]*//')"
         printf "  ${GREEN}✓${NC} %-15s %s\n" "$name" "${version:-installed}"
         return 0
     else
@@ -58,11 +62,16 @@ _check_key_from_config() {
 
 # ── Dynamic Checking from Config ────────────────────────
 check_optional_tools() {
+    local config_output="${1:-}"  # 接受缓存配置，避免重复调用
+    if [[ -z "$config_output" ]]; then
+        config_output="$(_read_config)"
+    fi
+
     echo "${BOLD}可选工具（按需安装）:${NC}"
     echo ""
 
-    local config_output="$(_read_config)"
     local in_optional_tools=false
+    local missing_count=0
 
     while IFS= read -r line; do
         if [[ "$line" == "# OPTIONAL_TOOLS" ]]; then
@@ -74,19 +83,30 @@ check_optional_tools() {
         fi
 
         if $in_optional_tools && [[ -n "$line" ]]; then
-            _check_tool_from_config "$line"
+            # 捕获返回值，防止 set -e 提前退出
+            if ! _check_tool_from_config "$line"; then
+                missing_count=$((missing_count + 1))
+            fi
         fi
     done <<< "$config_output"
 
     echo ""
+    if [[ $missing_count -gt 0 ]]; then
+        echo "${YELLOW}发现 $missing_count 个未安装的可选工具${NC}"
+    fi
 }
 
 check_optional_keys() {
+    local config_output="${1:-}"  # 接受缓存配置，避免重复调用
+    if [[ -z "$config_output" ]]; then
+        config_output="$(_read_config)"
+    fi
+
     echo "${BOLD}可选密钥（按需配置）:${NC}"
     echo ""
 
-    local config_output="$(_read_config)"
     local in_optional_keys=false
+    local missing_count=0
 
     while IFS= read -r line; do
         if [[ "$line" == "# OPTIONAL_KEYS" ]]; then
@@ -98,11 +118,17 @@ check_optional_keys() {
         fi
 
         if $in_optional_keys && [[ -n "$line" ]]; then
-            _check_key_from_config "$line"
+            # 捕获返回值，防止 set -e 提前退出
+            if ! _check_key_from_config "$line"; then
+                missing_count=$((missing_count + 1))
+            fi
         fi
     done <<< "$config_output"
 
     echo ""
+    if [[ $missing_count -gt 0 ]]; then
+        echo "${YELLOW}发现 $missing_count 个未配置的可选密钥${NC}"
+    fi
 }
 
 # ── Main Function ───────────────────────────────────────
@@ -117,8 +143,10 @@ vibe_check_optional() {
             check_optional_keys
             ;;
         all|"")
-            check_optional_tools
-            check_optional_keys
+            # 缓存配置输出，避免重复调用 _read_config
+            local cached_config="$(_read_config)"
+            check_optional_tools "$cached_config"
+            check_optional_keys "$cached_config"
             ;;
         *)
             echo "用法: vibe-check-optional [tools|keys|all]"
