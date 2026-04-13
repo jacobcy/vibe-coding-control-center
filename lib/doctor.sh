@@ -78,6 +78,37 @@ vibe_doctor_essential() {
     fi
 }
 
+# ── Plugin Check ────────────────────────────────────────
+_doctor_check_plugins() {
+    echo "${BOLD}Claude Plugins:${NC}"
+    echo ""
+
+    local plugin_output
+    plugin_output="$(claude plugin list 2>&1)"
+
+    if [[ $? -ne 0 ]]; then
+        log_warn "无法获取 plugin 列表（claude plugin list 失败）"
+        echo "  建议：确保 Claude CLI 正确安装并配置"
+        return 1
+    fi
+
+    if [[ -z "$plugin_output" || "$plugin_output" == "No plugins installed" ]]; then
+        log_warn "未安装任何 Claude plugins"
+        echo "  建议：根据项目需求安装相应 plugin"
+        echo "  安装命令：claude plugin install <plugin@marketplace>"
+        return 0
+    fi
+
+    # 显示已安装的 plugins
+    echo "$plugin_output" | while IFS= read -r line; do
+        if [[ -n "$line" && "$line" != "No plugins installed" ]]; then
+            printf "  ${GREEN}✓${NC} %s\n" "$line"
+        fi
+    done
+
+    return 0
+}
+
 # ── Full Check (Default) ────────────────────────────────
 vibe_doctor() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
@@ -156,6 +187,10 @@ vibe_doctor() {
     # Claude Plugins
     _doctor_check_plugins "$config_output" || true
     plugin_missing=$DOCTOR_PLUGIN_REQUIRED_MISSING
+    echo ""
+
+    # Claude Plugins
+    _doctor_check_plugins
     echo ""
 
     # 总结
