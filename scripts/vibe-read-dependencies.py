@@ -101,7 +101,13 @@ def main():
                         if isinstance(group, dict) and "tools" in group:
                             optional_count += len(group["tools"])
             print(f"  Tools: {len(config.get('tools', {}).get('essential', []))} essential, {optional_count} optional")
-            print(f"  Plugins: {len(config.get('plugins', {}).get('global', {}).get('plugins', []))} global, {len(config.get('plugins', {}).get('project', {}).get('plugins', []))} project")
+            # 统计 plugins：global (essential + optional) + project (optional)
+            global_plugins = (
+                len(config.get('plugins', {}).get('global', {}).get('essential', [])) +
+                len(config.get('plugins', {}).get('global', {}).get('optional', []))
+            )
+            project_plugins = len(config.get('plugins', {}).get('project', {}).get('optional', []))
+            print(f"  Plugins: {global_plugins} global, {project_plugins} project")
             print(f"  Skills: {len(config.get('skills', {}).get('essential_skills', []))} essential, {len(config.get('skills', {}).get('support_skills', []))} support")
             print(f"  Workflows: {len(config.get('workflows', {}))} defined")
             print(f"  API Keys: {len(config.get('api_keys', {}).get('essential', []))} essential, {len(config.get('api_keys', {}).get('optional', []))} optional")

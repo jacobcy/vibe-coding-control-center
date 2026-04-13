@@ -161,7 +161,7 @@ if [[ -d "$PROJECT_HOOKS_DIR" ]]; then
 
     # 检查已有文件，避免静默覆盖
     if [[ -d "$CLAUDE_HOOKS_DIR" && "$(ls -A "$CLAUDE_HOOKS_DIR" 2>/dev/null)" ]]; then
-        log_warning "发现已有 hooks 文件，将备份后覆盖"
+        log_warn "发现已有 hooks 文件，将备份后覆盖"
         backup_dir="$CLAUDE_HOOKS_DIR.backup.$(date +%Y%m%d_%H%M%S)"
         mv "$CLAUDE_HOOKS_DIR" "$backup_dir"
         log_info "已备份旧 hooks 到: $backup_dir"
