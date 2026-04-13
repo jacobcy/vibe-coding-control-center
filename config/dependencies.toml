@@ -1,124 +1,47 @@
 # Vibe Center Dependencies Configuration
-# 配置驱动的依赖声明：工具、Plugin、Skill、密钥
-# 用途：vibe doctor、vibe-check-optional.sh、/vibe-onboard skill
-# 职责：仅用于依赖检查，不包含使用指南或 workflow 说明
+# Shell 环境建议真源：工具与密钥配置
+# 职责：仅用于 shell 环境检查，不包含插件/技能目录
 
 # ── Tools ──────────────────────────────────────────────────────────────
 
 [tools]
-# 核心依赖（必须安装，缺失会导致核心功能无法使用）
-essential = [
-  { name = "git", check = "git --version", install = "brew install git", description = "版本控制核心", required_for = "所有开发流程" },
-  { name = "uv", check = "uv --version", install = "brew install uv", description = "Python 包管理器（自带 Python 管理）", required_for = "Vibe 3.0 运行环境", note = "无需单独安装 Python，uv 自动管理" },
-  { name = "gh", check = "gh --version", install = "brew install gh", description = "GitHub CLI（创建 PR、管理 issue）", required_for = "GitHub 操作" },
-  { name = "tmux", check = "tmux -V", install = "brew install tmux", description = "Worktree 工作流核心（cockpit 工具链）", required_for = "vup/vnew/wtls 命令" },
-  { name = "lazygit", check = "lazygit --version", install = "brew install lazygit", description = "Git 终端 UI（代码审查工具）", required_for = "最终审查点" },
-  { name = "claude", check = "claude --version", install = "claude.ai 或 brew install claude", description = "Claude Code（AI 开发核心）", required_for = "AI 开发能力（至少需要一个 AI 工具）" },
+# 必要工具（缺失会阻塞核心功能）
+required = [
+  { name = "git", check = "git --version", install = "brew install git", description = "版本控制核心" },
+  { name = "uv", check = "uv --version", install = "brew install uv", description = "Python 包管理器" },
+  { name = "gh", check = "gh --version", install = "brew install gh", description = "GitHub CLI" },
+  { name = "tmux", check = "tmux -V", install = "brew install tmux", description = "Worktree 工作流核心" },
+  { name = "lazygit", check = "lazygit --version", install = "brew install lazygit", description = "Git 终端 UI" },
+  { name = "claude", check = "claude --version", install = "claude.ai", description = "Claude Code（至少需要一个 AI 工具）" },
 ]
 
-# 【生产力工具】提升开发效率
-[tools.productivity]
-tools = [
-  { name = "cc-switch", check = "cc-switch --version", install = "https://github.com/farion1231/cc-switch", description = "Claude 配置切换工具（可选）", required_for = "多 Claude 配置管理", priority = "低" },
-  { name = "rtk", check = "rtk --version", install = "见项目文档 RTK.md", description = "Token 优化代理", required_for = "Claude Code hook token 优化", priority = "中" },
-]
-
-# 【替代 AI 工具】免费或其他 AI 后端
-[tools.alternative_ai]
-tools = [
-  { name = "codex", check = "codex --version", install = "见 OpenAI Codex 文档", description = "Codex（OpenAI GPT-5.4 CLI wrapper）", required_for = "AI 开发（plugin 依赖）", note = "支持 OAuth 登陆，无需 OPENAI_API_KEY" },
-  { name = "opencode", check = "opencode --version", install = "npm install -g opencode", description = "OpenCode（免费开源 AI 工具）", required_for = "AI 开发（免费替代 Claude）" },
-  { name = "gemini", check = "gemini --version", install = "brew install gemini", description = "Gemini API CLI", required_for = "额外 AI 后端" },
-]
-
-# 【开发辅助】仅开发项目时需要
-[tools.development]
-tools = [
-  { name = "pre-commit", check = "pre-commit --version", install = "brew install pre-commit", description = "Git hooks 检查", required_for = "代码质量自动化（仅开发需要）" },
-  { name = "direnv", check = "direnv version", install = "brew install direnv", description = "自动环境加载", required_for = "环境隔离" },
-]
-
-# 【远程开发】远程访问场景
-[tools.remote]
-tools = [
-  { name = "tailscale", check = "tailscale version", install = "brew install tailscale", description = "Tailscale VPN", required_for = "远程开发 VPN" },
-  { name = "ncat", check = "ncat --version", install = "brew install nmap", description = "SSH ProxyCommand", required_for = "远程开发 SSH 代理" },
-]
-
-# ── Claude Plugins ─────────────────────────────────────────────────────
-
-[plugins.global]
-# 全局启用的 Claude plugins（~/.claude/settings.json）
-# 说明：这些 plugin 提供跨项目的基础能力，适合全局启用
-
-# 【必选】所有项目都需要的基础能力（缺失会严重影响使用）
-essential = [
-  { name = "context7", package = "context7@claude-plugins-official", check = "echo $CONTEXT7_API_KEY", env_key = "CONTEXT7_API_KEY", description = "文档检索（全局必选）", required_for = "最新文档查询（核心能力）", scope = "全局", reason = "所有项目都需要实时文档查询能力" },
-  { name = "pyright-lsp", package = "pyright-lsp@claude-plugins-official", check = "", description = "Python LSP（全局必选）", required_for = "代码智能（核心能力）", scope = "全局", reason = "Python 项目必须的代码智能支持" },
-  { name = "superpowers", package = "superpowers@claude-plugins-official", check = "", description = "增强能力（全局必选）", required_for = "AI 增强（核心能力）", scope = "全局", reason = "所有项目都需要的基础 AI 增强" },
-]
-
-# 【可选】建议全局安装，但按需求配置
+# 可选工具（提升开发效率，按需求安装）
 optional = [
-  { name = "claude-mem", package = "claude-mem@thedotmack", check = "curl -s http://localhost:37777/health", health_endpoint = "http://localhost:37777/health", description = "代码记忆与索引（建议全局）", known_issues = "tree-sitter 故障（v12.1.0 已知 bug）", required_for = "代码智能检索", scope = "全局", priority = "中" },
-  { name = "codex", package = "codex@openai-codex", check = "echo $OPENAI_API_KEY", env_key = "OPENAI_API_KEY", description = "OpenAI Codex CLI wrapper（建议全局）", required_for = "GPT-5.4 执行", scope = "全局", priority = "高", note = "支持 OAuth 登陆，无需 OPENAI_API_KEY" },
-  { name = "linear", package = "linear@claude-plugins-official", check = "echo $LINEAR_API_KEY", env_key = "LINEAR_API_KEY", description = "Linear issue 集成（建议全局）", required_for = "Issue 管理", scope = "全局", priority = "中" },
-  { name = "discord", package = "discord@claude-plugins-official", check = "/discord:access", access_skill = "/discord:access", description = "Discord 消息集成（建议全局）", required_for = "团队协作通知", scope = "全局", priority = "低" },
-  { name = "telegram", package = "telegram@claude-plugins-official", check = "/telegram:access", access_skill = "/telegram:access", description = "Telegram 消息集成（建议全局）", required_for = "团队协作通知", scope = "全局", priority = "低" },
-  { name = "security-guidance", package = "security-guidance@claude-plugins-official", check = "", description = "安全检查（建议全局）", required_for = "安全审计", scope = "全局", priority = "中" },
-  { name = "prompt-improver", package = "prompt-improver@severity1-marketplace", check = "", description = "Prompt 优化（建议全局）", required_for = "Prompt 质量", scope = "全局", priority = "低" },
+  { name = "cc-switch", check = "cc-switch --version", install = "https://github.com/farion1231/cc-switch", description = "Claude 配置切换工具" },
+  { name = "rtk", check = "rtk --version", install = "见 RTK.md", description = "Token 优化代理" },
+  { name = "codex", check = "codex --version", install = "见 OpenAI Codex 文档", description = "OpenAI GPT-5.4 CLI wrapper" },
+  { name = "opencode", check = "opencode --version", install = "npm install -g opencode", description = "OpenCode（开源 AI 工具）" },
+  { name = "gemini", check = "gemini --version", install = "brew install gemini", description = "Gemini API CLI" },
+  { name = "pre-commit", check = "pre-commit --version", install = "brew install pre-commit", description = "Git hooks 检查（仅开发需要）" },
+  { name = "direnv", check = "direnv version", install = "brew install direnv", description = "自动环境加载" },
+  { name = "tailscale", check = "tailscale version", install = "brew install tailscale", description = "Tailscale VPN（远程开发）" },
+  { name = "ncat", check = "ncat --version", install = "brew install nmap", description = "SSH ProxyCommand（远程开发）" },
 ]
 
-[plugins.project]
-# 项目级启用的 Claude plugins（.claude/settings.json）
-# 说明：这些 plugin 提供项目特定的能力，都是可选，按项目需求启用
+# ── Keys ───────────────────────────────────────────────────────────────
 
+[keys]
+# 必要密钥（缺失会阻塞核心功能）
+required = [
+  { name = "GH_TOKEN", env_var = "GH_TOKEN", description = "GitHub API Token", get_from = "gh auth login 或 GitHub token" },
+]
+
+# 可选密钥（按需求配置，部分支持 OAuth）
 optional = [
-  { name = "code-review", package = "code-review@claude-plugins-official", check = "", description = "代码评审（项目级可选）", required_for = "项目 PR review", scope = "项目", note = "仅在项目 .claude/settings.json 启用", priority = "中" },
-  { name = "claude-md-management", package = "claude-md-management@claude-plugins-official", check = "", description = "CLAUDE.md 管理（项目级可选）", required_for = "项目 CLAUDE.md 维护", scope = "项目", note = "仅在项目 .claude/settings.json 启用", priority = "低" },
-  { name = "commit-commands", package = "commit-commands@claude-plugins-official", check = "", description = "Commit 命令（项目级可选）", required_for = "项目 Git 操作", scope = "项目", note = "仅在项目 .claude/settings.json 启用", priority = "低" },
-  { name = "claude-code-setup", package = "claude-code-setup@claude-plugins-official", check = "", description = "Claude Code 配置（项目级可选）", required_for = "项目 Claude Code 配置", scope = "项目", note = "仅在项目 .claude/settings.json 启用", priority = "低" },
-]
-
-# ── Skills ──────────────────────────────────────────────────────────────
-
-[skills]
-# 核心开发入口 skills（必须可用）
-
-essential_skills = [
-  { name = "vibe-new", path = "skills/vibe-new/SKILL.md", description = "创建新开发任务", usage = "/vibe-new <feature>" },
-  { name = "vibe-continue", path = "skills/vibe-continue/SKILL.md", description = "继续开发任务", usage = "/vibe-continue" },
-  { name = "vibe-commit", path = "skills/vibe-commit/SKILL.md", description = "提交代码", usage = "/vibe-commit" },
-  { name = "vibe-review", path = "skills/vibe-review/SKILL.md", description = "代码评审", usage = "/vibe-review" },
-]
-
-# 引导与辅助 skills
-
-support_skills = [
-  { name = "vibe-onboard", path = "skills/vibe-onboard/SKILL.md", description = "安装后引导", usage = "/vibe-onboard" },
-  { name = "vibe-check", path = "skills/vibe-check/SKILL.md", description = "状态检查", usage = "/vibe-check" },
-  { name = "vibe-issue", path = "skills/vibe-issue/SKILL.md", description = "Issue 管理", usage = "/vibe-issue" },
-  { name = "vibe-task", path = "skills/vibe-task/SKILL.md", description = "Task 管理", usage = "/vibe-task" },
-  { name = "vibe-done", path = "skills/vibe-done/SKILL.md", description = "完成任务", usage = "/vibe-done" },
-]
-
-# ── API Keys ────────────────────────────────────────────────────────────
-
-[api_keys]
-# 核心密钥（缺失会阻塞核心功能）
-
-essential = [
-  { name = "GH_TOKEN", env_var = "GH_TOKEN", description = "GitHub API Token", get_from = "gh auth login 或 https://github.com/settings/tokens", permissions = "repo, read:org" },
+  { name = "OPENAI_API_KEY", env_var = "OPENAI_API_KEY", description = "OpenAI API", get_from = "platform.openai.com", note = "OAuth 可替代" },
   { name = "EXA_API_KEY", env_var = "EXA_API_KEY", description = "Exa Search API", get_from = "https://exa.ai" },
   { name = "CONTEXT7_API_KEY", env_var = "CONTEXT7_API_KEY", description = "Context7 文档检索", get_from = "https://context7.com" },
-]
-
-# 可选密钥（按需配置）
-
-optional = [
-  { name = "ANTHROPIC_AUTH_TOKEN", env_var = "ANTHROPIC_AUTH_TOKEN", description = "Claude Code API", get_from = "claude.ai", required_for_plugin = "claude" },
-  { name = "OPENAI_API_KEY", env_var = "OPENAI_API_KEY", description = "OpenAI API (Codex plugin) - OAuth 登陆无需配置", get_from = "https://platform.openai.com 或使用 OAuth", required_for_plugin = "codex", note = "使用 OAuth 登陆时无需配置，仅第三方 API 需要此 key" },
-  { name = "LINEAR_API_KEY", env_var = "LINEAR_API_KEY", description = "Linear API (Linear plugin)", get_from = "https://linear.app/settings/api", required_for_plugin = "linear" },
+  { name = "LINEAR_API_KEY", env_var = "LINEAR_API_KEY", description = "Linear API", get_from = "https://linear.app/settings/api" },
   { name = "DEEPSEEK_API_KEY", env_var = "DEEPSEEK_API_KEY", description = "DeepSeek API", get_from = "https://api.deepseek.com" },
-  { name = "GEMINI_API_KEY", env_var = "GEMINI_API_KEY", description = "Gemini API（AI 辅助文案 + claude-mem 总结）", get_from = "https://ai.google.dev 或使用 OAuth", required_for_plugin = "claude-mem", note = "支持 OAuth 登陆，用于 claude-mem 总结功能" },
+  { name = "GEMINI_API_KEY", env_var = "GEMINI_API_KEY", description = "Gemini API", get_from = "https://ai.google.dev", note = "OAuth 可替代" },
 ]
