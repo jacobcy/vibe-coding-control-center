@@ -10,6 +10,18 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 
 
+@pytest.fixture(autouse=True)
+def cleanup_capacity_state():
+    """Auto-cleanup class-level shared state after each test.
+
+    CapacityService uses a class-level _shared_in_flight_dispatches dict
+    for in-flight dispatch tracking. This fixture ensures test isolation
+    by clearing the state after each test, preventing cross-test pollution.
+    """
+    yield
+    CapacityService._shared_in_flight_dispatches.clear()
+
+
 @pytest.fixture()
 def store(tmp_path: Path) -> SQLiteClient:
     return SQLiteClient(db_path=str(tmp_path / "capacity.db"))

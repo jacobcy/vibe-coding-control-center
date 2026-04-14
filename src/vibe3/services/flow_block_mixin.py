@@ -1,4 +1,4 @@
-"""Flow lifecycle operations - block."""
+"""Flow block/abort operations mixin."""
 
 from typing import Any
 
