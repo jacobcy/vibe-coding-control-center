@@ -101,6 +101,9 @@ code_limits:
       - path: "lib/alias/worktree.sh"
         limit: 450
         reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
+      - path: "lib/keys_support.sh"
+        limit: 500
+        reason: "Keys 工具函数集合（trim、plugin scope hint 等），职责单一但函数较多"
       - path: "scripts/tsu.sh"
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
