@@ -246,7 +246,7 @@ class ExecutionCoordinator:
                         domain="execution_coordinator",
                         role=request.role,
                         target_id=request.target_id,
-                    ).exception(f"Execution threw for {request.role} (sync): {run_exc}")
+                    ).error(f"Execution threw for {request.role} (sync): {run_exc}")
 
                     return ExecutionLaunchResult(
                         launched=False,
@@ -261,7 +261,7 @@ class ExecutionCoordinator:
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
-            ).exception(f"Execution launch failed: {exc}")
+            ).error(f"Execution launch failed: {exc}")
 
             self.lifecycle.record_failed(
                 role=request.role,  # type: ignore

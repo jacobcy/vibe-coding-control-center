@@ -344,5 +344,8 @@ MANAGER_SYNC_SPEC = IssueRoleSyncSpec(
         )
     ),
     post_sync_hook=handle_manager_post_sync,
-    failure_handler=fail_manager_issue,
+    failure_handler=lambda issue_number, reason: fail_manager_issue(
+        issue_number=issue_number,
+        reason=reason,
+    ),
 )

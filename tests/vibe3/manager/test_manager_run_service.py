@@ -121,6 +121,18 @@ def test_run_manager_capacity_full_does_not_fail_issue() -> None:
         mock_fail.assert_not_called()
 
 
+def test_manager_failure_handler_maps_positional_args_to_keywords() -> None:
+    """Manager sync spec should adapt runner positional args for fail_manager_issue."""
+    with patch("vibe3.roles.manager.fail_manager_issue") as mock_fail:
+        from vibe3.roles.manager import MANAGER_SYNC_SPEC
+
+        assert MANAGER_SYNC_SPEC.failure_handler is not None
+
+        MANAGER_SYNC_SPEC.failure_handler(301, "boom")
+
+        mock_fail.assert_called_once_with(issue_number=301, reason="boom")
+
+
 def test_run_manager_sync_uses_execution_worktree_requirement() -> None:
     """Sync manager should delegate permanent worktree resolution to execution."""
     with (

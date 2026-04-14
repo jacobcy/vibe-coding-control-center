@@ -109,6 +109,70 @@ def _diagnose_backend_error(output: str) -> str | None:
     return None
 
 
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from backend output."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+def _summarize_backend_output(stderr: str, stdout: str) -> str:
+    """Build a short, readable summary from backend stdout/stderr."""
+    raw_output = stderr or stdout
+    if not raw_output.strip():
+        return "(no output)"
+
+    lines = [
+        _strip_ansi(line).strip()
+        for line in raw_output.splitlines()
+        if _strip_ansi(line).strip()
+    ]
+    if not lines:
+        return "(no output)"
+
+    metadata_prefixes = (
+        "[codeagent-wrapper]",
+        "Backend:",
+        "Command:",
+        "PID:",
+        "Log:",
+        "Traceback (most recent call last):",
+    )
+    detail_markers = (
+        "TypeError:",
+        "ValueError:",
+        "RuntimeError:",
+        "Error:",
+        "Exception:",
+        "Failed to parse event",
+        "completed without agent_message output",
+        "Unexpected error:",
+    )
+
+    selected: list[str] = []
+    for line in lines:
+        if line.startswith(metadata_prefixes):
+            continue
+        if line.startswith("at ") or line.startswith("File "):
+            continue
+        if line.startswith("│") or line.startswith("└") or line.startswith("> File "):
+            continue
+        if any(marker in line for marker in detail_markers):
+            selected.append(line)
+
+    if not selected:
+        selected = [
+            line
+            for line in lines
+            if not line.startswith(metadata_prefixes)
+            and not line.startswith("at ")
+            and not line.startswith("File ")
+        ]
+
+    preview = " | ".join(selected[:3]).strip()
+    if not preview:
+        preview = lines[0]
+    return preview[:500]
+
+
 class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
 
@@ -563,11 +627,6 @@ class CodeagentBackend:
                     "Consider increasing the timeout or splitting the review scope."
                 ) from None
 
-            if result.stdout:
-                print(result.stdout, end="", flush=True)
-            if result.stderr:
-                print(result.stderr, file=sys.stderr, end="", flush=True)
-
             agent_result = AgentResult(
                 exit_code=result.returncode,
                 stdout=result.stdout,
@@ -578,13 +637,9 @@ class CodeagentBackend:
             if not agent_result.is_success():
                 combined_output = f"{agent_result.stdout}\n{agent_result.stderr}"
                 diagnosis = _diagnose_backend_error(combined_output)
-
-                if agent_result.stderr:
-                    stderr_preview = agent_result.stderr[:500]
-                elif agent_result.stdout:
-                    stderr_preview = agent_result.stdout[:500]
-                else:
-                    stderr_preview = "(no output)"
+                stderr_preview = _summarize_backend_output(
+                    agent_result.stderr, agent_result.stdout
+                )
 
                 error_msg = (
                     f"codeagent-wrapper failed with exit code "
@@ -594,6 +649,11 @@ class CodeagentBackend:
                     error_msg += f"\n\n{diagnosis}"
 
                 raise AgentExecutionError(error_msg)
+
+            if result.stdout:
+                print(result.stdout, end="", flush=True)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr, end="", flush=True)
 
             return agent_result
         finally:
