@@ -322,6 +322,46 @@ class SessionRegistryService:
                 truly_live.append(session)
         return truly_live
 
+    def cleanup_stale_sessions(self) -> int:
+        """Mark sessions with dead tmux as stopped. Called at server startup.
+
+        Scans all sessions in starting/running status and confirms tmux
+        liveness. Sessions whose tmux window is gone are marked stopped so
+        they don't accumulate and inflate the capacity count across restarts.
+
+        Returns:
+            Number of sessions pruned.
+        """
+        from loguru import logger
+
+        sessions = self._store.list_live_runtime_sessions()
+        pruned = 0
+        for session in sessions:
+            tmux = session.get("tmux_session")
+            if not tmux:
+                # Still in "starting" state with no tmux yet — leave it.
+                continue
+            if not self._has_tmux_session(tmux):
+                session_id = session.get("id")
+                if session_id is not None:
+                    self._store.update_runtime_session(
+                        int(session_id), status="stopped"
+                    )
+                    pruned += 1
+                    logger.bind(
+                        domain="session_registry",
+                        session_id=session_id,
+                        tmux=tmux,
+                    ).debug(
+                        f"cleanup_stale_sessions: marked session {session_id} "
+                        f"(tmux={tmux}) as stopped"
+                    )
+        if pruned:
+            logger.bind(domain="session_registry", pruned=pruned).info(
+                f"Startup cleanup: marked {pruned} stale sessions as stopped"
+            )
+        return pruned
+
 
 def _now_iso() -> str:
     return datetime.datetime.now().isoformat()

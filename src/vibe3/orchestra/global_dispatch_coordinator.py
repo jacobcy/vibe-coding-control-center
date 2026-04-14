@@ -37,7 +37,10 @@ class ReadyIssueWithRole:
 
     @property
     def role(self) -> str:
-        return str(self.service.role_def.trigger_name)
+        # Use registry_role ("planner"/"executor"/"reviewer") not trigger_name
+        # ("plan"/"run"/"review") so CapacityService queries SQLite with the
+        # same role name that sessions are stored under.
+        return str(self.service.role_def.registry_role)
 
 
 class GlobalDispatchCoordinator:

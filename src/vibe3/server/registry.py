@@ -77,6 +77,11 @@ def _build_server_with_launch_cwd(
     shared_store = SQLiteClient()
     shared_backend = CodeagentBackend()
     shared_registry = SessionRegistryService(store=shared_store, backend=shared_backend)
+
+    # Startup cleanup: mark sessions whose tmux window is dead as stopped.
+    # This ensures capacity starts from a clean slate after restarts.
+    shared_registry.cleanup_stale_sessions()
+
     failed_gate = FailedGate(github=shared_github, repo=config.repo)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)

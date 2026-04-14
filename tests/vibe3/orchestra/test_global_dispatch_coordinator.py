@@ -23,6 +23,7 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service = MagicMock()
     service.service_name = f"mock-{role}"
     service.role_def.trigger_name = role
+    service.role_def.registry_role = role
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
     return service

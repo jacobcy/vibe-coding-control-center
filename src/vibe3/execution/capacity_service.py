@@ -76,7 +76,12 @@ class CapacityService:
         self._in_flight_dispatches = shared
 
     def can_dispatch(self, role: str, target_id: int) -> bool:
-        """Check if role can dispatch target given current capacity.
+        """Check if global capacity allows another dispatch.
+
+        Uses a GLOBAL pool shared across all worker roles, so the total
+        number of concurrently active agents (any role) is capped at
+        max_concurrent_flows. This prevents role-local pools from
+        individually filling up to 3× or 4× the intended concurrency.
 
         Args:
             role: Execution role (manager, planner, executor, reviewer, supervisor)
@@ -85,9 +90,11 @@ class CapacityService:
         Returns:
             True if capacity available, False if should throttle/queue
         """
-        active_count = self._registry.count_live_worker_sessions(role=role)
-        in_flight_count = len(self._in_flight_dispatches.get(role, set()))
-        max_capacity = self._get_max_capacity(role)
+        # Count ALL live worker sessions, not just this role's.
+        active_count = self._registry.count_live_worker_sessions()
+        # Count ALL in-flight dispatches across every role.
+        in_flight_count = sum(len(v) for v in self._in_flight_dispatches.values())
+        max_capacity = self.config.max_concurrent_flows
         remaining = max(0, max_capacity - active_count - in_flight_count)
 
         can_dispatch = remaining > 0
@@ -101,7 +108,7 @@ class CapacityService:
                 in_flight=in_flight_count,
                 max=max_capacity,
             ).info(
-                f"Capacity full for {role} #{target_id} "
+                f"Global capacity full, skipping {role} #{target_id} "
                 f"(live={active_count}, in_flight={in_flight_count}, "
                 f"max={max_capacity})"
             )
