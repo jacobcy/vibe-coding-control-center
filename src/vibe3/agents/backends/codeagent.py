@@ -208,7 +208,8 @@ class CodeagentBackend:
         project_root: str,
         timeout_seconds: int,
     ) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        """Run subprocess and capture output with optional full log save."""
+        result = subprocess.run(
             command,
             cwd=project_root,
             capture_output=True,
@@ -216,6 +217,30 @@ class CodeagentBackend:
             timeout=timeout_seconds,
             check=False,
         )
+
+        # Save complete wrapper logs for diagnostics (sync execution)
+        # Extract issue number from command or cwd if available
+        log_dir = Path(project_root) / "temp" / "logs" / "issues"
+        if "issue-" in project_root or any("issue-" in arg for arg in command):
+            # Try to find issue number from execution context
+            import re
+
+            issue_match = re.search(r"issue-(\d+)", project_root)
+            if not issue_match:
+                for arg in command:
+                    issue_match = re.search(r"issue-(\d+)", arg)
+                    if issue_match:
+                        break
+
+            if issue_match:
+                issue_number = issue_match.group(1)
+                wrapper_log_path = (
+                    log_dir / f"issue-{issue_number}" / "wrapper.sync.full.log"
+                )
+                wrapper_log_path.parent.mkdir(parents=True, exist_ok=True)
+                wrapper_log_path.write_text(f"{result.stdout}\n{result.stderr}")
+
+        return result
 
     @staticmethod
     def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
@@ -319,8 +344,14 @@ class CodeagentBackend:
             command_with_env = env_prefix + command
         cmd_str = shlex.join(command_with_env)
         log_str = shlex.quote(str(log_path))
+
+        # Save complete wrapper logs for diagnostics (before filtering)
+        wrapper_log_path = log_path.parent / "wrapper.full.log"
+        wrapper_log_str = shlex.quote(str(wrapper_log_path))
+
         shell = (
-            f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
+            f"{cmd_str} 2>&1 | tee {wrapper_log_str} | "
+            f"{filter_command} | tee {log_str}; "
             "cmd_status=${PIPESTATUS[0]:-$?}; "
             "echo; "
             'echo "[vibe3 async] command exited with status: ${cmd_status}"; '
