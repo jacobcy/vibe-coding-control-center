@@ -4,8 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.vibe3.conftest import CompletedProcess
-from vibe3.environment.worktree import WorktreeManager
-from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.environment.worktree_support import find_worktree_for_branch
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_command, render_manager_prompt
@@ -35,14 +34,9 @@ class TestManagerCommandBuilding:
         assert "状态控制器" in cmd[-1]
         assert "不是实现 agent" in cmd[-1]
 
-    def test_find_worktree_for_branch_parses_porcelain_output(self):
-        config = OrchestraConfig()
-        flow_manager = FlowManager(config)
-        worktree_manager = WorktreeManager(
-            config,
-            repo_path=Path("/tmp/repo"),
-            flow_manager=flow_manager,
-        )
+    def test_find_worktree_for_branch_parses_porcelain_output(self) -> None:
+        """Test parsing git worktree list porcelain output."""
+        repo_path = Path("/tmp/repo")
         output = (
             "worktree /tmp/repo\n"
             "HEAD abcdef0\n"
@@ -58,8 +52,6 @@ class TestManagerCommandBuilding:
             "subprocess.run",
             return_value=CompletedProcess(returncode=0, stdout=output),
         ):
-            wt = worktree_manager._find_worktree_for_branch(
-                "task/issue250-orchestra-manager"
-            )
+            wt = find_worktree_for_branch(repo_path, "task/issue250-orchestra-manager")
 
         assert wt == Path("/tmp/wt-feature")
