@@ -123,7 +123,7 @@ code_limits:
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
         limit: 500
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
-      - path: "tests/domain/test_orchestration_facade.py"
+      - path: "tests/vibe3/domain/test_orchestration_facade.py"
         limit: 450
         reason: "单一测试类，刚超限，拆分收益低"       
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
