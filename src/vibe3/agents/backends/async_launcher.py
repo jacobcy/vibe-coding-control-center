@@ -94,18 +94,6 @@ def has_tmux_session(session_name: str) -> bool:
     return session_name in list_tmux_sessions()
 
 
-def has_tmux_session_prefix(prefix: str) -> bool:
-    """Return whether any tmux session exists for the given prefix.
-
-    Args:
-        prefix: Prefix to check for existing sessions
-
-    Returns:
-        True if any session with prefix exists, False otherwise
-    """
-    return bool(list_tmux_sessions(prefix=prefix))
-
-
 def allocate_tmux_session_name(base_name: str) -> str:
     """Return a non-colliding tmux session name.
 

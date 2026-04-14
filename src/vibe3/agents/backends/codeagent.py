@@ -152,20 +152,6 @@ class CodeagentBackend:
         return _has(session_name)
 
     @staticmethod
-    def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
-        """List tmux sessions, optionally filtered by prefix.
-
-        Args:
-            prefix: Optional prefix to filter sessions
-
-        Returns:
-            Set of tmux session names
-        """
-        from vibe3.agents.backends.async_launcher import list_tmux_sessions as _list
-
-        return _list(prefix=prefix)
-
-    @staticmethod
     def _build_prompt_file_content(prompt: str) -> str:
         """Apply configured global notice to the prompt file content."""
         notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()

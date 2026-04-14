@@ -27,17 +27,6 @@ class BackendProtocol(Protocol):
         """
         ...
 
-    def list_tmux_sessions(self, *, prefix: str | None = None) -> set[str]:
-        """List tmux sessions, optionally filtered by prefix.
-
-        Args:
-            prefix: Optional prefix to filter sessions (e.g., "vibe3-manager")
-
-        Returns:
-            Set of tmux session names
-        """
-        ...
-
     def run(
         self,
         prompt: str,
