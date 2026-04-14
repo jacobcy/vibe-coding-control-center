@@ -4,6 +4,7 @@ Vibe 3.0 CLI Entry Point
 Thin wrapper that sets up Typer app and registers subcommands.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
@@ -189,6 +190,7 @@ def version() -> None:
 
 @app.command()
 def help(
+    ctx: typer.Context,
     command: Annotated[Optional[str], typer.Argument(help="Command name")] = None,
 ) -> None:
     """Show help for commands.
@@ -203,21 +205,27 @@ def help(
     # Get the underlying Click command
     click_app = typer.main.get_command(app)
 
+    context = click.Context(
+        click_app,
+        info_name=ctx.info_name or os.environ.get("VIBE3_PROG_NAME") or "vibe3",
+        parent=ctx.parent,
+    )
+
     if command:
-        # Show subcommand help (simplified: show main help)
-        click.echo(click_app.get_help(click.Context(click_app)))
-    else:
-        # Show main help
-        click.echo(click_app.get_help(click.Context(click_app)))
+        click.echo(click_app.get_help(context))
+        return
+
+    click.echo(click_app.get_help(context))
 
 
 def main() -> None:
     """CLI entry point with unified error handling."""
     # Support -h as --help shorthand (globally replace all positions)
     sys.argv = ["--help" if a == "-h" else a for a in sys.argv]
+    prog_name = os.environ.get("VIBE3_PROG_NAME") or Path(sys.argv[0]).name or "vibe3"
 
     try:
-        app(prog_name="vibe")
+        app(prog_name=prog_name)
 
     except UserError as e:
         # User error: concise message

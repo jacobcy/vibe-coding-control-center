@@ -5,6 +5,23 @@
 # @featured
 alias wtls='git worktree list'
 
+_vibe_worktree_run_init() {
+  local repo_root="$1"
+  local worktree_path="$2"
+  local init_script="$repo_root/scripts/init.sh"
+
+  [[ -f "$init_script" ]] || return 0
+
+  echo "🔧 Running initialization script..."
+  (
+    cd "$worktree_path" &&
+      bash "$init_script"
+  ) || {
+    echo "⚠️  Init script failed (non-fatal)"
+    return 0
+  }
+}
+
 # ── Shared worktree finding logic ───────────────────────────────────────────
 # Returns worktree path(s) matching the given name/pattern
 # Usage: _wt_find "name" → prints path(s)
@@ -132,11 +149,7 @@ wtnew() {
     echo "👤 Set worktree actor -> $actor"
   fi
 
-  # Run init script to setup environment (git hooks, skills, etc.)
-  if [[ -f "$repo_root/scripts/init.sh" ]]; then
-    echo "🔧 Running initialization script..."
-    bash "$repo_root/scripts/init.sh" || echo "⚠️  Init script failed (non-fatal)"
-  fi
+  _vibe_worktree_run_init "$repo_root" "$path"
 
   echo "💡 Next: Run ${CYAN}vup${NC} to initialize your cockpit."
 }
@@ -282,7 +295,7 @@ wtrm() {
 # @featured
 vup() {
   vibe_require tmux git || return 1
-  local mode="dash" target="" agent="${VIBE_DEFAULT_TOOL:-claude}"
+  local mode="dash" target="" agent="claude"
 
   # Parse flags and subcommands
   while [[ $# -gt 0 ]]; do

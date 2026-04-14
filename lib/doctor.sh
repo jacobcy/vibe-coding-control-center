@@ -1,51 +1,112 @@
 #!/usr/bin/env zsh
-# v2/lib/doctor.sh - Environment Diagnostics for Vibe 2.0
-# Target: ~80 lines | Detects tools, reports versions
+# lib/doctor.sh - Environment Diagnostics for Vibe 2.0
+# 目标：成为唯一环境诊断入口，从配置驱动生成检查结果
+# 职责：检查工具与 Claude plugins，不检查密钥（密钥检查交给 vibe keys check）
 
-# ── Tool Check Table ────────────────────────────────────
-# Each entry: name, check_command, version_flag
-_VIBE_TOOLS=(
-    "claude:claude:--version"
-    "opencode:opencode:--version"
-    "codex:codex:--version"
-    "git:git:--version"
-    "gh:gh:--version"
-    "tmux:tmux:-V"
-    "jq:jq:--version"
-    "lazygit:lazygit:--version"
-    "node:node:--version"
-    "npm:npm:--version"
-)
+# ── 配置读取 ─────────────────────────────────────────────
+_doctor_read_config() {
+    python3 "$VIBE_ROOT/scripts/vibe-read-dependencies.py" --format shell
+}
 
-# ── Check Single Tool ───────────────────────────────────
-_check_tool() {
-    local name="$1" cmd="$2" flag="$3"
-    local version=""
+if [[ "${VIBE_DOCTOR_PLUGINS_LOADED:-}" != "$VIBE_LIB/doctor_plugins.sh" ]]; then
+    source "$VIBE_LIB/doctor_plugins.sh"
+    VIBE_DOCTOR_PLUGINS_LOADED="$VIBE_LIB/doctor_plugins.sh"
+fi
 
-    if vibe_has "$cmd"; then
-        version="$("$cmd" "$flag" 2>&1 | head -1 | sed 's/^[^0-9]*//')"
-        printf "  ${GREEN}✓${NC} %-12s %s\n" "$name" "${version:-installed}"
+# ── 工具检查函数 ─────────────────────────────────────────
+_doctor_check_tool() {
+    local name="$1" check="$2"
+    local install="$3" description="$4"
+    local output=""
+    local exit_status=0
+
+    output="$(zsh -c "$check" 2>&1)"
+    exit_status=$?
+
+    if [[ $exit_status -eq 0 ]]; then
+        local first_line="${output%%$'\n'*}"
+        printf "  ${GREEN}✓${NC} %-15s %s\n" "$name" "${first_line:-installed}"
+        return 0
+    fi
+
+    printf "  ${YELLOW}!${NC} %-15s 未安装\n" "$name"
+    echo "      $description"
+    echo "      安装建议: $install"
+    return 1
+}
+
+# ── Essential Check ──────────────────────────────────────
+vibe_doctor_essential() {
+    local missing=0
+    local config_output
+
+    config_output="$(_doctor_read_config)"
+
+    echo "${BOLD}必要依赖检查${NC}"
+    echo "$(printf '%.0s─' {1..50})"
+    echo ""
+
+    # 检查 REQUIRED_TOOLS
+    local in_required=false
+    while IFS= read -r line; do
+        if [[ "$line" == "# REQUIRED_TOOLS" ]]; then
+            in_required=true
+            continue
+        fi
+        if [[ "$line" =~ "^#" ]]; then
+            in_required=false
+            continue
+        fi
+        if $in_required && [[ -n "$line" ]]; then
+            IFS='|' read -r name check install description <<< "$line"
+            _doctor_check_tool "$name" "$check" "$install" "$description" || ((missing+=1))
+        fi
+    done <<< "$config_output"
+
+    echo ""
+
+    if ((missing == 0)); then
+        log_success "所有必要依赖已满足"
+        echo ""
+        echo "下一步："
+        echo "  检查可选工具：${CYAN}vibe doctor${NC}"
+        echo "  检查密钥状态：${CYAN}vibe keys check${NC}"
         return 0
     else
-        printf "  ${RED}✗${NC} %-12s %s\n" "$name" "not found"
+        log_error "缺少必要依赖，请先安装"
         return 1
     fi
 }
 
-# ── Main Check ──────────────────────────────────────────
+# ── Full Check (Default) ────────────────────────────────
 vibe_doctor() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        echo "${BOLD}Vibe Environment Doctor${NC}"
+        echo "${BOLD}Vibe 环境诊断${NC}"
         echo ""
-        echo "Usage: ${CYAN}vibe doctor${NC}"
+        echo "Usage: ${CYAN}vibe doctor${NC} [options]"
         echo ""
-        echo "功能：检测开发环境工具版本、依赖状态及配置完整性。"
+        echo "Options:"
+        echo "  --essential    只检查必要工具（git、uv、gh、tmux、lazygit、至少一个 AI 工具）"
+        echo "  --help         显示此帮助信息"
+        echo ""
+        echo "职责：检查开发环境工具与 Claude plugins 状态（不检查密钥）"
+        echo "密钥检查：请使用 ${CYAN}vibe keys check${NC}"
         return 0
     fi
-    local missing=0
-    local total=${#_VIBE_TOOLS[@]}
 
-    echo "${BOLD}Vibe Coding Control Center${NC} — Environment Check"
+    if [[ "$1" == "--essential" ]]; then
+        vibe_doctor_essential
+        return $?
+    fi
+
+    local missing=0
+    local optional_missing=0
+    local plugin_missing=0
+    local config_output
+
+    config_output="$(_doctor_read_config)"
+
+    echo "${BOLD}Vibe Coding Control Center${NC} — 环境诊断"
     echo "$(printf '%.0s─' {1..50})"
     echo ""
 
@@ -54,37 +115,62 @@ vibe_doctor() {
     echo "${CYAN}VIBE_ROOT:${NC}    $VIBE_ROOT"
     echo ""
 
-    # Tools
-    echo "${BOLD}Tools:${NC}"
-    for entry in "${_VIBE_TOOLS[@]}"; do
-        local name="${entry%%:*}"
-        local rest="${entry#*:}"
-        local cmd="${rest%%:*}"
-        local flag="${rest#*:}"
-        _check_tool "$name" "$cmd" "$flag" || ((missing+=1))
-    done
+    # 必要工具
+    echo "${BOLD}必要工具:${NC}"
+    local in_required=false
+    while IFS= read -r line; do
+        if [[ "$line" == "# REQUIRED_TOOLS" ]]; then
+            in_required=true
+            continue
+        fi
+        if [[ "$line" =~ "^#" ]]; then
+            in_required=false
+            continue
+        fi
+        if $in_required && [[ -n "$line" ]]; then
+            IFS='|' read -r name check install description <<< "$line"
+            _doctor_check_tool "$name" "$check" "$install" "$description" || ((missing+=1))
+        fi
+    done <<< "$config_output"
     echo ""
 
-    # Keys status
-    echo "${BOLD}API Keys:${NC}"
-    [[ -n "$ANTHROPIC_AUTH_TOKEN" ]] && \
-        echo "  ${GREEN}✓${NC} ANTHROPIC_AUTH_TOKEN  configured" || \
-        echo "  ${YELLOW}!${NC} ANTHROPIC_AUTH_TOKEN  not set"
-    [[ -n "$GH_TOKEN" ]] && \
-        echo "  ${GREEN}✓${NC} GH_TOKEN              configured" || \
-        echo "  ${YELLOW}!${NC} GH_TOKEN              not set"
-    [[ -n "$BRAVE_API_KEY" ]] && \
-        echo "  ${GREEN}✓${NC} BRAVE_API_KEY         configured" || \
-        echo "  ${YELLOW}!${NC} BRAVE_API_KEY         not set"
+    # 可选工具
+    echo "${BOLD}可选工具:${NC}"
+    local in_optional=false
+    while IFS= read -r line; do
+        if [[ "$line" == "# OPTIONAL_TOOLS" ]]; then
+            in_optional=true
+            continue
+        fi
+        if [[ "$line" =~ "^#" ]]; then
+            in_optional=false
+            continue
+        fi
+        if $in_optional && [[ -n "$line" ]]; then
+            IFS='|' read -r name check install description <<< "$line"
+            _doctor_check_tool "$name" "$check" "$install" "$description" || ((optional_missing+=1))
+        fi
+    done <<< "$config_output"
     echo ""
 
-    # Summary
-    local found=$((total - missing))
-    if ((missing == 0)); then
-        log_success "All $total tools detected"
-    else
-        log_warn "$found/$total tools found ($missing missing)"
+    # Claude Plugins
+    _doctor_check_plugins "$config_output" || true
+    plugin_missing=$DOCTOR_PLUGIN_REQUIRED_MISSING
+    echo ""
+
+    # 总结
+    if ((missing == 0 && plugin_missing == 0)); then
+        log_success "必要工具已满足"
+        if ((optional_missing > 0)); then
+            log_warn "可选工具缺失 $optional_missing 个（不影响核心功能）"
+        fi
         echo ""
-        echo "Install missing tools: ${CYAN}vibe tools${NC}"
+        echo "密钥检查：${CYAN}vibe keys check${NC}"
+    else
+        local required_missing=$((missing + plugin_missing))
+        log_error "必要环境项缺失 $required_missing 个，请先处理建议项"
+        echo ""
+        echo "查看必要依赖安装提示："
+        echo "  ${CYAN}vibe doctor --essential${NC}"
     fi
 }

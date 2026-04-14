@@ -124,7 +124,8 @@ openspec/
 .agent/skills/
 .agents/
 .github/prompts/
-.codex
+.codex/
+.copilot/
 .trae/
 .kiro/
 .augment/

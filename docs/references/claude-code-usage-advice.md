@@ -61,7 +61,7 @@
 - **Tmux 提醒**：如果你看到 "[Hook] BLOCKED" 提示，说明你在非 tmux 环境下尝试运行 dev server。这是为了防止 AI 丢失进程控制权。请按提示使用 `tmux`。
 
 ## 6. Google Generative AI (Gemini) MCP
-如果在 `keys.env` 中配置了 `GOOGLE_GENERATIVE_AI_API_KEY`，安装脚本会生成对应 MCP 服务配置。
+如果在 `keys.env` 中配置了 `GEMINI_API_KEY`，安装脚本会生成对应 MCP 服务配置。
 - **用法示例**：`Ask Gemini to analyze this complex logic`
 - **适用场景**：超长上下文、多模态任务或复杂推理时的辅助分析
 

@@ -7,36 +7,35 @@ if [[ "${VIBE_SKILLS_SYNC_LOADED:-}" != "$VIBE_LIB/skills_sync.sh" ]]; then
 fi
 
 _skills_help() {
-    echo "${BOLD}Vibe Skills Manager${NC}"
+    echo "${BOLD}Vibe Skills Check${NC}"
     echo ""
     echo "Usage: ${CYAN}vibe skills <subcommand>${NC}"
     echo ""
     echo "Subcommands:"
-    echo "  ${GREEN}sync${NC}      一键同步所有 skills（Claude plugin + 全局 + 本地）"
-    echo "  ${GREEN}check${NC}     检查各 Agent skills 状态"
+    echo "  ${GREEN}check${NC}     检查 Claude skills / 插件与各 Agent 项目 skills 同步状态"
+    echo "  ${GREEN}sync${NC}      已废弃；物理同步请运行 zsh scripts/init.sh"
     echo ""
-    echo "💡 物理同步后，建议在对话中使用 ${CYAN}/vibe-skills-manager${NC} 进行逻辑确认。"
+    echo "💡 物理修复统一交给 ${CYAN}zsh scripts/init.sh${NC}，逻辑审计交给 ${CYAN}/vibe-skills-manager${NC}。"
 }
 
 vibe_skills() {
-    local subcmd="${1:-help}"
+    local subcmd="${1:-check}"
     shift 2>/dev/null || true
-    vibe_require jq || return 1
-
-    echo ""
-    echo "🔄 Vibe Skills 同步工具"
-    echo ""
 
     case "$subcmd" in
-        sync|"")
-            vibe_require npx || return 1
-            _vibe_skills_sync_claude_plugin
-            _vibe_skills_sync_global_superpowers
-            _vibe_skills_sync_local_skills
-            _vibe_skills_run_audit
-            log_success "同步完成！"
+        check|"")
+            echo ""
+            echo "🔍 Vibe Skills 状态检查"
+            echo ""
+            _vibe_skills_check_status
             ;;
-        check) _vibe_skills_check_status ;;
+        sync)
+            log_warn "vibe skills sync 已废弃；物理同步统一由 zsh scripts/init.sh 负责。"
+            echo "建议："
+            echo "  1. 运行 ${CYAN}zsh scripts/init.sh${NC}"
+            echo "  2. 再用 ${CYAN}vibe skills check${NC} 查看状态"
+            echo "  3. 如需逻辑治理，使用 ${CYAN}/vibe-skills-manager${NC}"
+            ;;
         help|--help|-h) _skills_help ;;
         *)
             log_error "Unknown subcommand: $subcmd"

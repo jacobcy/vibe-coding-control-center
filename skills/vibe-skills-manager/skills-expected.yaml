@@ -4,9 +4,9 @@
 # 本项目使用的 Agents
 agents:
   - claude-code
-  - antigravity
   - codex
-  - kiro
+  - gemini
+  - opencode
   - copilot
 
 # 全局期望 - 所有项目共享
@@ -14,10 +14,10 @@ global:
   # Claude Code 全局期望
   claude:
     expected:
-      ECC:
-        description: Everything Claude Code 技能集，包含 37+ skills（api-design, python-patterns, tdd-workflow 等）
-        install: claude plugin add <ecc-plugin-name>
-        # Claude Code 主要使用 ECC，已涵盖 Superpowers 的能力
+      superpowers-plugin:
+        description: Claude Code 官方 plugin 形态的 Superpowers 能力集
+        install: claude plugin install superpowers@claude-plugins-official
+        # Claude Code 优先走官方 plugin 生态，不用 npx skills 模拟
 
   # 其他 Agents 全局期望
   agents:
@@ -25,7 +25,7 @@ global:
       superpowers:
         description: 开发方法论工具集，包含 brainstorming, systematic-debugging, writing-plans 等 14+ skills
         install: npx skills add obra/superpowers -g --agent antigravity codex kiro -y
-        # 其他 Agents (Antigravity, Codex, Kiro) 主要使用 Superpowers
+        # 其他 Agents (Antigravity, Codex, Kiro) 主要使用 npx skills 分发的 Superpowers
 
 # 项目级期望 - 当前项目专属
 project:
@@ -50,9 +50,8 @@ project:
       install: openspec init --tools antigravity,claude,codex,trae
       # OpenSpec 自己管理，不通过 npx skills 或 claude plugin
 
-  # 项目独有 - 特定需求
-  additional: []
-    # 示例：
-    # some-project-skill:
-    #   description: 项目特定的需求，例如数据库迁移工具
-    #   install: npx skills add namespace/skill-name --agent antigravity codex -y
+  # 用户可选增强
+  optional:
+    gstack:
+      description: Gstack 系列增强能力，提供 QA、部署、浏览器自动化、设计评审等扩展技能
+      install: git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack && cd ~/.claude/skills/gstack && ./setup

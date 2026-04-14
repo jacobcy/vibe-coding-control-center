@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_comment_ops import _generate_ai_review_mention_body
+from vibe3.exceptions import GitHubError
 
 
 def test_generate_mention_body():
@@ -61,7 +62,7 @@ def test_request_ai_review_handles_exception():
     """Test review request handles GitHub API errors gracefully."""
     gh_client = GitHubClient()
     gh_client.create_pr_comment = MagicMock(  # type: ignore[method-assign]
-        side_effect=Exception("API error")
+        side_effect=GitHubError(404, "API error")
     )
 
     result = gh_client.request_ai_review(42, ["codex"])
