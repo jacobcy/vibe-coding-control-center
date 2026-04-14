@@ -3,26 +3,26 @@
 import subprocess
 from pathlib import Path
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.async_launcher import build_async_log_filter
 
 
 class TestSessionIdExtraction:
     def test_extract_session_id_supports_modern_wrapper_format(self) -> None:
-        from vibe3.agents.backends.codeagent import extract_session_id
+        from vibe3.agents.backends.session_manager import extract_session_id
 
         output = "some text\nSESSION_ID: ses_2aea4d6b6ffexDUssWC9tEP4Nh\nmore text\n"
 
         assert extract_session_id(output) == "ses_2aea4d6b6ffexDUssWC9tEP4Nh"
 
     def test_extract_session_id_supports_wrapper_json_event(self) -> None:
-        from vibe3.agents.backends.codeagent import extract_session_id
+        from vibe3.agents.backends.session_manager import extract_session_id
 
         output = '{"type":"step_start","sessionID":"ses_2ae4422c7ffeYDHGar7ZxRsnTC"}'
 
         assert extract_session_id(output) == "ses_2ae4422c7ffeYDHGar7ZxRsnTC"
 
     def test_extract_session_id_supports_escaped_wrapper_json_event(self) -> None:
-        from vibe3.agents.backends.codeagent import extract_session_id
+        from vibe3.agents.backends.session_manager import extract_session_id
 
         output = (
             '{"message":"{\\"type\\":\\"step_start\\",'
@@ -35,8 +35,7 @@ class TestSessionIdExtraction:
 class TestAsyncLogFilter:
     def test_async_log_filter_strips_agent_prompt_block(self, tmp_path: Path) -> None:
         """Async log filter should remove <agent-prompt> blocks."""
-        backend = CodeagentBackend()
-        filter_cmd = backend._build_async_log_filter()
+        filter_cmd = build_async_log_filter()
 
         # Create test input file
         input_file = tmp_path / "input.log"
@@ -72,8 +71,7 @@ It may contain sensitive information or be very long.
         self, tmp_path: Path
     ) -> None:
         """Filter should preserve session ID, exit status, and other diagnostics."""
-        backend = CodeagentBackend()
-        filter_cmd = backend._build_async_log_filter()
+        filter_cmd = build_async_log_filter()
 
         input_file = tmp_path / "input.log"
         input_text = """SESSION_ID: ses_abc123

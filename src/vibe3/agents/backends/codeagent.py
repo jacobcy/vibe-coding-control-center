@@ -1,18 +1,28 @@
-import os
+"""Codeagent backend - execute agents via codeagent-wrapper.
+
+Core execution logic with session and async launching delegated to dedicated modules.
+"""
+
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
 
 from loguru import logger
 
+from vibe3.agents.backends.async_launcher import (
+    AsyncExecutionHandle,
+    spawn_tmux_command,
+)
 from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
+)
+from vibe3.agents.backends.session_manager import (
+    extract_session_id,
+    should_retry_without_session,
 )
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import AgentExecutionError
@@ -20,30 +30,6 @@ from vibe3.models.review_runner import AgentOptions, AgentResult
 
 DEFAULT_WRAPPER_PATH: Final[Path] = (
     Path.home() / ".claude" / "bin" / "codeagent-wrapper"
-)
-
-KNOWN_CODEX_STATE_DB_WARNINGS: Final[tuple[str, ...]] = (
-    r"failed to open state db at .*migration .*missing in the resolved migrations",
-    r"failed to initialize state runtime at .*migration "
-    r".*missing in the resolved migrations",  # noqa: E501
-    r"state db discrepancy during "
-    r"find_thread_path_by_id_str_in_subdir: falling_back",  # noqa: E501
-)
-KNOWN_CODEX_SNAPSHOT_WARNING: Final[str] = (
-    r'Failed to delete shell snapshot at ".*": Os \{ code: 2, kind: NotFound, '
-    r'message: "No such file or directory" \}'
-)
-KNOWN_CODEX_ANALYTICS_WARNING: Final[str] = (
-    r"analytics_client: events failed with status 403 Forbidden:"
-)
-RESUME_RETRY_EXIT_CODES: Final[frozenset[int]] = frozenset({42})
-RESUME_RETRY_ERROR_SNIPPETS: Final[tuple[str, ...]] = (
-    "session not found",
-    "invalid session",
-    "failed to resume",
-    "unable to resume",
-    "could not resume",
-    "resume error",
 )
 
 # Known backend-internal error patterns with suggested fixes
@@ -67,31 +53,6 @@ KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
         "2) Check if the model supports structured output, 3) Simplify the task",
     ),
 )
-
-
-@dataclass(frozen=True)
-class AsyncExecutionHandle:
-    """Async execution metadata returned by the wrapper adapter."""
-
-    tmux_session: str
-    log_path: Path
-    prompt_file_path: Path
-
-
-def extract_session_id(stdout: str) -> str | None:
-    """Extract session ID from codeagent-wrapper output.
-
-    Pattern:
-        SESSION_ID: 262f0fea-eacb-4223-b842-b5b5097f94e8
-    """
-    if not stdout:
-        return None
-    match = re.search(r"SESSION_ID:\s*([A-Za-z0-9_-]+)", stdout)
-    if not match:
-        match = re.search(r'"sessionID":"([A-Za-z0-9_-]+)"', stdout)
-    if not match:
-        match = re.search(r'\\"sessionID\\":\\"([A-Za-z0-9_-]+)\\"', stdout)
-    return match.group(1) if match else None
 
 
 def _diagnose_backend_error(output: str) -> str | None:
@@ -177,6 +138,34 @@ class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
 
     @staticmethod
+    def has_tmux_session(session_name: str) -> bool:
+        """Check if tmux session exists.
+
+        Args:
+            session_name: Exact tmux session name to check
+
+        Returns:
+            True if session exists, False otherwise
+        """
+        from vibe3.agents.backends.async_launcher import has_tmux_session as _has
+
+        return _has(session_name)
+
+    @staticmethod
+    def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
+        """List tmux sessions, optionally filtered by prefix.
+
+        Args:
+            prefix: Optional prefix to filter sessions
+
+        Returns:
+            Set of tmux session names
+        """
+        from vibe3.agents.backends.async_launcher import list_tmux_sessions as _list
+
+        return _list(prefix=prefix)
+
+    @staticmethod
     def _build_prompt_file_content(prompt: str) -> str:
         """Apply configured global notice to the prompt file content."""
         notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()
@@ -185,21 +174,50 @@ class CodeagentBackend:
         return f"{notice}\n\n---\n\n{prompt}"
 
     @staticmethod
-    def _should_retry_without_session(
-        result: subprocess.CompletedProcess[str],
-        *,
-        session_id: str | None,
-    ) -> bool:
-        """Return True when wrapper failure indicates the resume target is invalid."""
-        if not session_id:
-            return False
-        if result.returncode not in RESUME_RETRY_EXIT_CODES:
-            return False
+    def _prepare_prompt_file(prompt: str) -> Path:
+        """Create temporary prompt file with global notice."""
+        prompt_dir = Path.home() / ".codeagent" / "agents"
+        prompt_dir.mkdir(parents=True, exist_ok=True)
+        prompt_content = CodeagentBackend._build_prompt_file_content(prompt)
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, dir=prompt_dir
+        ) as f:
+            f.write(prompt_content)
+            return Path(f.name)
 
-        combined_output = f"{result.stdout}\n{result.stderr}".lower()
-        return any(
-            snippet in combined_output for snippet in RESUME_RETRY_ERROR_SNIPPETS
-        )
+    @staticmethod
+    def _build_command(
+        options: AgentOptions,
+        prompt_file_path: str,
+        task: str | None = None,
+        session_id: str | None = None,
+    ) -> list[str]:
+        """Build codeagent-wrapper command."""
+        options = resolve_effective_agent_options(options)
+        command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
+
+        if options.agent:
+            command.extend(["--agent", options.agent])
+        elif options.backend:
+            command.extend(["--backend", options.backend])
+            if options.model:
+                command.extend(["--model", options.model])
+        else:
+            command.extend(["--agent", "code-reviewer"])
+
+        command.extend(["--prompt-file", prompt_file_path])
+
+        if session_id:
+            command.append("resume")
+            command.append(cast(str, session_id))
+            if task:
+                command.append(task)
+            else:
+                command.append("continue")
+        elif task:
+            command.append(task)
+
+        return command
 
     @staticmethod
     def _run_subprocess(
@@ -242,318 +260,6 @@ class CodeagentBackend:
 
         return result
 
-    @staticmethod
-    def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
-        """Return tmux session names, optionally filtered by prefix."""
-        try:
-            result = subprocess.run(
-                ["tmux", "ls"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-        except FileNotFoundError:
-            return set()
-        except Exception:
-            return set()
-        if result.returncode != 0:
-            return set()
-
-        sessions: set[str] = set()
-        for line in result.stdout.splitlines():
-            session_name = line.split(":", 1)[0].strip()
-            if not session_name:
-                continue
-            if (
-                prefix is None
-                or session_name == prefix
-                or session_name.startswith(f"{prefix}-")
-            ):
-                sessions.add(session_name)
-        return sessions
-
-    @classmethod
-    def has_tmux_session(cls, session_name: str) -> bool:
-        """Return whether the exact tmux session currently exists."""
-        return session_name in cls.list_tmux_sessions()
-
-    @classmethod
-    def has_tmux_session_prefix(cls, prefix: str) -> bool:
-        """Return whether any tmux session exists for the given prefix."""
-        return bool(cls.list_tmux_sessions(prefix=prefix))
-
-    @staticmethod
-    def _build_async_log_filter() -> list[str]:
-        """Return awk filter that strips known Codex runtime noise from async logs.
-
-        Also filters out <agent-prompt> blocks to prevent full prompts from
-        appearing in repository logs.
-        """
-        state_patterns = " || ".join(
-            f"$0 ~ /{pattern}/" for pattern in KNOWN_CODEX_STATE_DB_WARNINGS
-        )
-        script = (
-            # Filter agent-prompt blocks
-            "$0 ~ /<agent-prompt>/ { skip_prompt=1; prompt_lines++; next }\n"
-            "skip_prompt { if ($0 ~ /<\\/agent-prompt>/) { skip_prompt=0 } next }\n"
-            # Filter known Codex warnings
-            f"({state_patterns}) {{ state_db++; next }}\n"
-            f"$0 ~ /{KNOWN_CODEX_SNAPSHOT_WARNING}/ "
-            f"{{ shell_snapshot++; next }}\n"
-            f"$0 ~ /{KNOWN_CODEX_ANALYTICS_WARNING}/ "
-            f"{{ analytics++; skip_html=1; next }}\n"
-            "skip_html { if ($0 ~ /<\\/html>/) { skip_html=0 } next }\n"
-            "{ print }\n"
-            "END {\n"
-            '  if (prompt_lines > 0) print "[vibe3 async] suppressed " '
-            'prompt_lines " agent-prompt line(s)"\n'
-            '  if (state_db > 0) print "[vibe3 async] suppressed " '
-            'state_db " codex state-db warning line(s)"\n'
-            '  if (shell_snapshot > 0) print "[vibe3 async] suppressed " '
-            'shell_snapshot " codex shell-snapshot cleanup warning line(s)"\n'
-            '  if (analytics > 0) print "[vibe3 async] suppressed " '
-            'analytics " codex analytics 403 warning block(s)"\n'
-            "}\n"
-        )
-        # tmux send-keys feeds literal newlines as Enter presses; keep the awk
-        # program on a single shell line so async sessions don't get stuck in
-        # zsh "pipe quote>" continuation mode.
-        script = script.replace("\n", "; ").replace("{;", "{ ").strip()
-        return ["awk", script]
-
-    @classmethod
-    def _build_async_shell_command(
-        cls,
-        command: list[str],
-        *,
-        log_path: Path,
-        keep_alive_seconds: int,
-        env: dict[str, str] | None = None,
-    ) -> str:
-        filter_command = shlex.join(cls._build_async_log_filter())
-        env = env or {}
-        env_overrides = {
-            key: value for key, value in env.items() if os.environ.get(key) != value
-        }
-        command_with_env = command
-        if env_overrides:
-            env_prefix = ["env"] + [
-                f"{key}={value}" for key, value in sorted(env_overrides.items())
-            ]
-            command_with_env = env_prefix + command
-        cmd_str = shlex.join(command_with_env)
-        log_str = shlex.quote(str(log_path))
-
-        # Save complete wrapper logs for diagnostics (before filtering)
-        wrapper_log_path = log_path.parent / "wrapper.full.log"
-        wrapper_log_str = shlex.quote(str(wrapper_log_path))
-
-        shell = (
-            f"{cmd_str} 2>&1 | tee {wrapper_log_str} | "
-            f"{filter_command} | tee {log_str}; "
-            "cmd_status=${PIPESTATUS[0]:-$?}; "
-            "echo; "
-            'echo "[vibe3 async] command exited with status: ${cmd_status}"; '
-        )
-        if keep_alive_seconds > 0:
-            shell += (
-                f'echo "[vibe3 async] keeping tmux session alive for '
-                f'{keep_alive_seconds}s for inspection..."; '
-                f"sleep {keep_alive_seconds}; "
-            )
-        return shell + "exit ${cmd_status}"
-
-    @staticmethod
-    def _allocate_tmux_session_name(base_name: str) -> str:
-        """Return a non-colliding tmux session name."""
-        candidate = base_name
-        counter = 2
-        while True:
-            probe = subprocess.run(
-                ["tmux", "has-session", "-t", candidate],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if probe.returncode != 0:
-                return candidate
-            candidate = f"{base_name}-{counter}"
-            counter += 1
-
-    @staticmethod
-    def _prepare_prompt_file(prompt: str) -> Path:
-        prompt_dir = Path.home() / ".codeagent" / "agents"
-        prompt_dir.mkdir(parents=True, exist_ok=True)
-        prompt_content = CodeagentBackend._build_prompt_file_content(prompt)
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, dir=prompt_dir
-        ) as f:
-            f.write(prompt_content)
-            return Path(f.name)
-
-    @staticmethod
-    def _build_command(
-        options: AgentOptions,
-        prompt_file_path: str,
-        task: str | None = None,
-        session_id: str | None = None,
-    ) -> list[str]:
-        options = resolve_effective_agent_options(options)
-        command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
-
-        if options.agent:
-            command.extend(["--agent", options.agent])
-        elif options.backend:
-            command.extend(["--backend", options.backend])
-            if options.model:
-                command.extend(["--model", options.model])
-        else:
-            command.extend(["--agent", "code-reviewer"])
-
-        command.extend(["--prompt-file", prompt_file_path])
-
-        if session_id:
-            command.append("resume")
-            command.append(cast(str, session_id))
-            if task:
-                command.append(task)
-            else:
-                command.append("continue")
-        elif task:
-            command.append(task)
-
-        return command
-
-    @staticmethod
-    def _default_log_dir() -> Path:
-        override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
-        if override_dir:
-            return Path(override_dir).expanduser().resolve()
-        return Path(__file__).resolve().parents[4] / "temp" / "logs"
-
-    @classmethod
-    def _resolve_async_log_path(cls, log_dir: Path, execution_name: str) -> Path:
-        issue_match = re.match(
-            r"^vibe3-(manager|planner|executor|reviewer|supervisor|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
-            execution_name,
-        )
-        if issue_match:
-            role, issue_number, suffix = issue_match.groups()
-            role_name = {
-                "manager": "manager",
-                "planner": "plan",
-                "executor": "run",
-                "reviewer": "review",
-                "supervisor": "supervisor",
-                "plan": "plan",
-                "run": "run",
-                "review": "review",
-            }[role]
-            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
-            return (
-                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
-            )
-
-        governance_match = re.match(
-            r"^vibe3-governance-(.+)$",
-            execution_name,
-        )
-        if governance_match:
-            return (
-                log_dir
-                / "orchestra"
-                / "governance"
-                / f"{governance_match.group(1)}.async.log"
-            )
-
-        return log_dir / f"{execution_name}.async.log"
-
-    def _spawn_tmux_command(
-        self,
-        command: list[str],
-        *,
-        execution_name: str,
-        cwd: Path | None = None,
-        env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 0,
-    ) -> AsyncExecutionHandle:
-        project_root = cwd or Path.cwd()
-
-        log_dir = self._default_log_dir()
-        prefix = execution_name.replace("/", "-")[:50]
-        session_id = self._allocate_tmux_session_name(prefix)
-
-        # Use codeagent's specialized log path resolution (includes issue number)
-        # Use actual session_id (may include counter suffix like -2, -3)
-        log_path = self._resolve_async_log_path(log_dir, session_id)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        if log_path.exists():
-            log_path.unlink()
-
-        shell_command = self._build_async_shell_command(
-            command,
-            log_path=log_path,
-            keep_alive_seconds=keep_alive_seconds,
-            env=env,
-        )
-        wrapper_path = self._write_async_wrapper_script(
-            shell_command,
-            execution_name=execution_name,
-        )
-
-        subprocess.run(
-            ["tmux", "new-session", "-d", "-s", session_id, "zsh", str(wrapper_path)],
-            cwd=project_root,
-            check=True,
-        )
-
-        return AsyncExecutionHandle(
-            tmux_session=session_id,
-            log_path=log_path,
-            prompt_file_path=Path(""),
-        )
-
-    @staticmethod
-    def _write_async_wrapper_script(shell_command: str, *, execution_name: str) -> Path:
-        """Persist the async wrapper command to a script file for tmux launch.
-
-        Launching tmux with a script avoids racing interactive shell startup
-        output against `send-keys`, which can corrupt long async commands.
-        """
-        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", execution_name).strip("-") or "async"
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            prefix=f"vibe3-{slug}-",
-            suffix=".sh",
-            delete=False,
-        ) as tmp:
-            tmp.write("#!/usr/bin/env zsh\n")
-            tmp.write(shell_command)
-            tmp.write("\n")
-        path = Path(tmp.name)
-        path.chmod(0o700)
-        return path
-
-    def start_async_command(
-        self,
-        command: list[str],
-        *,
-        execution_name: str,
-        cwd: Path | None = None,
-        env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 0,
-    ) -> AsyncExecutionHandle:
-        """Start an already-built command in tmux with repo-local logging."""
-        return self._spawn_tmux_command(
-            command,
-            execution_name=execution_name,
-            cwd=cwd,
-            env=env,
-            keep_alive_seconds=keep_alive_seconds,
-        )
-
     def start_async(
         self,
         prompt: str,
@@ -576,7 +282,7 @@ class CodeagentBackend:
             task=task,
             session_id=session_id,
         )
-        handle = self._spawn_tmux_command(
+        handle = spawn_tmux_command(
             command,
             execution_name=execution_name,
             cwd=cwd,
@@ -630,7 +336,7 @@ class CodeagentBackend:
                     timeout_seconds=options.timeout_seconds,
                 )
 
-                if self._should_retry_without_session(result, session_id=session_id):
+                if should_retry_without_session(result, session_id=session_id):
                     retry_command = self._build_command(
                         options,
                         cast(str, prompt_file_path),

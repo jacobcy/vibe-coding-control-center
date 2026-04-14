@@ -121,7 +121,24 @@ class StateLabelDispatchService(ServiceBase):
             return ready
 
     async def on_tick(self) -> None:
-        """Periodic scan and async dispatch for the configured trigger state."""
+        """Periodic scan and async dispatch for the configured trigger state.
+
+        **DEPRECATED**: This method bypasses capacity checks and should not be
+        called directly. Use GlobalDispatchCoordinator.coordinate() instead,
+        which properly checks capacity before emitting dispatch intents.
+
+        This method is kept for backward compatibility but will raise a warning
+        if called outside of GlobalDispatchCoordinator context.
+        """
+        import warnings
+
+        warnings.warn(
+            f"{self.service_name}.on_tick() is deprecated: "
+            "bypasses capacity checks. Use GlobalDispatchCoordinator instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         ready = await self.collect_ready_issues()
 
         for issue in ready:

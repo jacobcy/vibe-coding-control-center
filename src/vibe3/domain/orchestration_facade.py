@@ -17,7 +17,6 @@ from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
@@ -74,7 +73,6 @@ class OrchestrationFacade(ServiceBase):
         2. Publishes SupervisorIssueIdentified for matching issues
         3. Polls issue labels for all dispatch services
         """
-        import asyncio
 
         self.on_heartbeat_tick()
 
@@ -85,34 +83,23 @@ class OrchestrationFacade(ServiceBase):
         if not self._dispatch_services:
             return
 
-        if self._capacity is not None:
-            # New path: capacity-aware dispatch with GlobalDispatchCoordinator
-            from vibe3.orchestra.global_dispatch_coordinator import (
-                GlobalDispatchCoordinator,
-            )
+        # Capacity-aware dispatch with GlobalDispatchCoordinator
+        # (shared_capacity is always injected by registry.py)
+        assert self._capacity is not None, (
+            "CapacityService must be injected by registry.py "
+            "(capacity=None path is dead code since registry.py "
+            "always creates shared_capacity)"
+        )
 
-            coordinator = GlobalDispatchCoordinator(
-                capacity=self._capacity,
-                dispatch_services=self._dispatch_services,
-            )
-            await coordinator.coordinate()
-        else:
-            # Legacy path: concurrent gather (backward compatibility)
-            results = await asyncio.gather(
-                *(service.on_tick() for service in self._dispatch_services),
-                return_exceptions=True,
-            )
-            for service, result in zip(self._dispatch_services, results, strict=False):
-                if not isinstance(result, Exception):
-                    continue
-                append_orchestra_event(
-                    "server",
-                    f"tick error in {service.service_name}: {result}",
-                )
-                logger.bind(
-                    domain="orchestration_facade",
-                    service=service.service_name,
-                ).error(f"Dispatch service tick failed: {result}")
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        coordinator = GlobalDispatchCoordinator(
+            capacity=self._capacity,
+            dispatch_services=self._dispatch_services,
+        )
+        await coordinator.coordinate()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event.

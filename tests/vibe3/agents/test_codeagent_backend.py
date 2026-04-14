@@ -9,6 +9,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.agents.backends.async_launcher import (
+    default_log_dir,
+    resolve_async_log_path,
+)
 from vibe3.agents.backends.codeagent import (
     CodeagentBackend,
     _summarize_backend_output,
@@ -50,13 +54,11 @@ class TestCodeagentBackend:
         """Async log dir should honor orchestra-provided override."""
         monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", "/tmp/orchestra-logs")
 
-        assert (
-            CodeagentBackend._default_log_dir() == Path("/tmp/orchestra-logs").resolve()
-        )
+        assert default_log_dir() == Path("/tmp/orchestra-logs").resolve()
 
     def test_resolve_async_log_path_routes_plan_issue_logs_into_issue_dir(self) -> None:
         """Plan issue async logs should live under temp/logs/issues/issue-N."""
-        log_path = CodeagentBackend._resolve_async_log_path(
+        log_path = resolve_async_log_path(
             Path("/tmp/logs"),
             "vibe3-plan-issue-419",
         )

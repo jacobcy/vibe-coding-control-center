@@ -6,6 +6,7 @@ from typing import Optional
 
 from loguru import logger
 
+from vibe3.agents.backends.async_launcher import start_async_command
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
@@ -114,7 +115,7 @@ class ExecutionCoordinator:
             # Ensure we launch async
             if request.mode == "async":
                 if request.cmd:
-                    handle = self.backend.start_async_command(
+                    handle = start_async_command(
                         request.cmd,
                         execution_name=request.execution_name,
                         cwd=cwd_path,
