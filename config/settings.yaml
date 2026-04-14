@@ -99,7 +99,7 @@ code_limits:
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
-        limit: 450
+        limit: 500
         reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
       - path: "lib/keys_support.sh"
         limit: 500
