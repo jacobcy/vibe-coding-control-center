@@ -46,6 +46,7 @@ from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import (
     block_reviewer_noop_issue,
+    confirm_review_handoff,
     fail_reviewer_issue,
 )
 
@@ -186,6 +187,11 @@ def publish_review_command_failure(
     )
 
 
+def _confirm_review_handoff_wrapper(*, issue_number: int, actor: str) -> None:
+    """Wrapper for confirm_review_handoff that discards the return value."""
+    confirm_review_handoff(issue_number=issue_number, actor=actor)
+
+
 REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
@@ -203,6 +209,8 @@ REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
         issue_number=issue_number,
         reason=reason,
     ),
+    # Advance state: REVIEW → HANDOFF after audit_ref produced.
+    success_handler=_confirm_review_handoff_wrapper,
 )
 
 

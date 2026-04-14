@@ -445,3 +445,51 @@ def _latest_comment_matches(
         body = comment.get("body")
         return isinstance(body, str) and body.strip() == normalized_comment
     return False
+
+
+def confirm_run_handoff(
+    *,
+    issue_number: int,
+    actor: str = "agent:run",
+) -> str:
+    """Transition executor issue to handoff after successful run.
+
+    Called from the async tmux path (success_handler in RUN_SYNC_SPEC) to
+    advance IN_PROGRESS → HANDOFF so the reviewer can be dispatched.
+
+    Args:
+        issue_number: GitHub issue number
+        actor: Actor performing the transition (defaults to "agent:run")
+
+    Returns:
+        Transition result string (e.g., "advanced" or "blocked")
+    """
+    return LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.HANDOFF,
+        actor=actor,
+    )
+
+
+def confirm_review_handoff(
+    *,
+    issue_number: int,
+    actor: str = "agent:review",
+) -> str:
+    """Transition reviewer issue to handoff after successful review.
+
+    Called from the async tmux path (success_handler in REVIEW_SYNC_SPEC) to
+    advance REVIEW → HANDOFF so the next stage can be dispatched.
+
+    Args:
+        issue_number: GitHub issue number
+        actor: Actor performing the transition (defaults to "agent:review")
+
+    Returns:
+        Transition result string (e.g., "advanced" or "blocked")
+    """
+    return LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.HANDOFF,
+        actor=actor,
+    )

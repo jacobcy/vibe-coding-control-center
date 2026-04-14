@@ -234,6 +234,7 @@ def apply_required_ref_post_sync(
     required_ref: str,
     missing_reason: str,
     missing_ref_handler: Callable[..., None],
+    success_handler: Callable[..., None] | None = None,
 ) -> bool:
     """Apply standard completion gate with required-ref protection.
 
@@ -241,6 +242,12 @@ def apply_required_ref_post_sync(
         _branch: Required to match IssueRoleSyncSpec.post_sync_hook signature,
             but not used in this implementation. Prefix underscore indicates
             intentional unused parameter.
+        success_handler: Optional callback invoked when required_ref is present
+            after execution. Called as success_handler(issue_number, actor).
+            Use this to trigger state transitions (e.g. confirm_plan_handoff)
+            directly from the sync completion path, bypassing the domain event
+            bus (which is in-process only and not accessible from async tmux
+            subprocess executions).
     """
     before_refs = before_snapshot.get("refs")
     after_refs = after_snapshot.get("refs")
@@ -255,6 +262,13 @@ def apply_required_ref_post_sync(
                 repo=config.repo,
             )
             return True
+
+    # required_ref is present — call success_handler to advance state.
+    # This is the correct place for state transitions in the async tmux path:
+    # domain events published here would be in the subprocess event bus, not
+    # in the orchestra process, so direct calls are used instead.
+    if success_handler is not None:
+        success_handler(issue_number=issue_number, actor=actor)
 
     return apply_request_completion_gate(
         request=request,
@@ -278,8 +292,17 @@ def build_required_ref_sync_spec(
     missing_reason: str,
     missing_ref_handler: Callable[..., None],
     failure_handler: Callable[..., None],
+    success_handler: Callable[..., None] | None = None,
 ) -> IssueRoleSyncSpec:
-    """Build the standard sync spec shared by plan/run/review-style roles."""
+    """Build the standard sync spec shared by plan/run/review-style roles.
+
+    Args:
+        success_handler: Optional state-transition callback invoked when
+            required_ref is present after execution completes. Called as
+            success_handler(issue_number=..., actor=...).
+            Use this instead of domain events for async tmux paths where the
+            subprocess event bus is separate from the orchestra process.
+    """
     from vibe3.roles.definitions import IssueRoleSyncSpec
 
     return IssueRoleSyncSpec(
@@ -301,6 +324,7 @@ def build_required_ref_sync_spec(
             required_ref=required_ref,
             missing_reason=missing_reason,
             missing_ref_handler=missing_ref_handler,
+            success_handler=success_handler,
         ),
         failure_handler=failure_handler,
     )
