@@ -1,0 +1,42 @@
+{
+  "_comment": "Vibe Center canonical skills manifest. install.sh syncs this file to ~/.vibe/skills.json and init.sh consumes it.",
+  "_updated": "2026-04-14",
+  "global": {
+    "_comment": "Global third-party skills for non-Claude agents",
+    "agents": [
+      "antigravity",
+      "codex",
+      "kiro"
+    ],
+    "packages": [
+      {
+        "source": "obra/superpowers",
+        "skills": [
+          "brainstorming",
+          "systematic-debugging",
+          "verification-before-completion",
+          "writing-skills",
+          "using-git-worktrees",
+          "test-driven-development",
+          "executing-plans",
+          "writing-plans",
+          "finishing-a-development-branch",
+          "receiving-code-review",
+          "requesting-code-review",
+          "dispatching-parallel-agents",
+          "subagent-driven-development"
+        ]
+      }
+    ]
+  },
+  "project": {
+    "_comment": "Project-visible local skills are linked by scripts/init.sh",
+    "agents": [
+      "antigravity",
+      "codex",
+      "claude-code",
+      "kiro"
+    ],
+    "packages": []
+  }
+}

@@ -36,16 +36,53 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 ## 快速开始
 
 ```bash
-# 1. 安装依赖
+# 1. 全局安装；会同步基础文件，并自动对当前项目补跑一次 init
 zsh scripts/install.sh
 
-# 2. 同步 Python 依赖
-uv sync --dev
+# 2. 重新加载 shell
+source ~/.zshrc   # 或你的实际 shell rc
 
-# 3. 基础检查
-vibe check
-uv run python src/vibe3/cli.py status
+# 3. 启动 Claude / Codex / Gemini 等工具后，优先用引导式入口
+/vibe-onboard
+
+# 4. 或手工检查
+vibe doctor
+vibe keys check
+
+# 5. 手动编辑密钥文件
+$EDITOR ~/.vibe/keys.env
+
+# 6. 检查 skills / 能力体系
+vibe skills check
+/vibe-skills-manager
 ```
+
+说明：
+
+- `scripts/install.sh` 负责全局安装与命令可用性，并会自动对当前项目补跑一次 `scripts/init.sh`
+- `scripts/init.sh` 负责当前项目 / worktree 的初始化（第三方 skills、OpenSpec、symlink、hooks、任务迁移等），不是安装脚本，而且可重复执行
+- `wtnew` 与 V3 worktree 创建路径也会自动补跑一次 `scripts/init.sh`
+- `vibe doctor` 负责工具与 Claude plugins 的事实检查
+- `vibe keys check` 负责认证 / key 来源检查
+- `/vibe-onboard` 负责引导用户检查和配置工具、Claude plugins、keys，并介绍项目与下一步
+- `vibe skills check` / `/vibe-skills-manager` 负责把 skills 体系梳理清楚，避免 codeagent-wrapper 缺少必要能力
+- `~/.vibe/keys.env` 由 `config/keys.template.env` 初始化而来，按需手动编辑
+- 如果在安装、初始化或使用过程中遇到任何问题，欢迎向项目开发者提交 issue 说明现场与复现步骤
+- skills 体系建议：
+  - Superpowers：Claude 用官方 plugin；其他 agent 用 `npx skills`
+  - OpenSpec：项目内初始化，按需启用
+  - Gstack：用户可选增强，建议全局安装到 `~/.claude/skills/gstack`
+
+## Skills 入门
+
+当 `/vibe-onboard` 和 `/vibe-skills-manager` 帮你把环境与能力体系梳理清楚后，可以从这些入口开始理解 skills：
+
+- Superpowers
+  - `/brainstorming`
+- Gstack（可选增强）
+  - `/office-hours`
+- OpenSpec（项目内工具链）
+  - `/openspec-onboard`
 
 ## 推荐工作方式
 

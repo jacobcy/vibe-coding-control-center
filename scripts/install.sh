@@ -159,6 +159,13 @@ if [[ ! -f "$INSTALL_DIR/keys.env" ]]; then
     chmod 600 "$INSTALL_DIR/keys.env"
 fi
 
+# 4.5 Sync canonical skills manifest
+if [[ -f "$SOURCE_ROOT/config/skills.json" ]]; then
+    log_info "Syncing canonical skills manifest..."
+    cp "$SOURCE_ROOT/config/skills.json" "$INSTALL_DIR/skills.json"
+    chmod 644 "$INSTALL_DIR/skills.json"
+fi
+
 # 5. Bootstrap loader.sh
 LOADER_DST="$INSTALL_DIR/loader.sh"
 log_info "Installing loader at $LOADER_DST..."
@@ -213,6 +220,7 @@ _setup_uv_environment() {
 
     local uv_env_export='export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"'
     _append_to_rc "$RC_FILE" "$uv_env_export" "UV_PROJECT_ENVIRONMENT"
+    export UV_PROJECT_ENVIRONMENT="$venv_path"
 
     # 安装项目依赖
     log_info "Installing Python dependencies..."
@@ -228,13 +236,23 @@ _setup_uv_environment() {
 
 _setup_uv_environment
 
-# 8. Finalize
+# 8. Auto-initialize current project/worktree
+if [[ -f "$SOURCE_ROOT/scripts/init.sh" ]]; then
+    log_step "Running project initialization..."
+    (
+        cd "$SOURCE_ROOT" &&
+            bash "$SOURCE_ROOT/scripts/init.sh"
+    ) || log_warn "Project initialization failed during install; you can rerun zsh scripts/init.sh later."
+fi
+
+# 9. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"
 log_success "Base installation complete!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
 echo "1. Reload shell: ${CYAN}source $RC_FILE${NC}"
-echo "2. 检查环境：${CYAN}vibe doctor${NC}"
-echo "3. 检查密钥：${CYAN}vibe keys check${NC}"
-echo "4. 新手引导：${CYAN}/vibe-onboard${NC}"
+echo "2. 进入项目后使用引导式入口：${CYAN}/vibe-onboard${NC}"
+echo "3. 或手工检查：${CYAN}vibe doctor${NC} / ${CYAN}vibe keys check${NC}"
+echo "4. 手动编辑密钥文件：${CYAN}\${EDITOR:-vim} ~/.vibe/keys.env${NC}"
+echo "5. 检查 skills 体系：${CYAN}vibe skills check${NC} / ${CYAN}/vibe-skills-manager${NC}"
 echo "----------------------------------------"

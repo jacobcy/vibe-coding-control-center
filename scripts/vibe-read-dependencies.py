@@ -43,25 +43,56 @@ def format_shell_output(config: dict[str, Any]) -> str:
         for tool in config["tools"]["optional"]:
             lines.append(f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}")
 
+    # REQUIRED_PLUGINS
+    lines.append("# REQUIRED_PLUGINS")
+    if "plugins" in config and "required" in config["plugins"]:
+        for plugin in config["plugins"]["required"]:
+            scope = plugin.get("scope", "")
+            lines.append(f"{plugin['name']}|{scope}|{plugin['description']}")
+
+    # RECOMMENDED_PLUGINS
+    lines.append("# RECOMMENDED_PLUGINS")
+    if "plugins" in config and "recommended" in config["plugins"]:
+        for plugin in config["plugins"]["recommended"]:
+            scope = plugin.get("scope", "")
+            lines.append(f"{plugin['name']}|{scope}|{plugin['description']}")
+
+    # OPTIONAL_PLUGINS
+    lines.append("# OPTIONAL_PLUGINS")
+    if "plugins" in config and "optional" in config["plugins"]:
+        for plugin in config["plugins"]["optional"]:
+            scope = plugin.get("scope", "")
+            lines.append(f"{plugin['name']}|{scope}|{plugin['description']}")
+
     # REQUIRED_KEYS
     lines.append("# REQUIRED_KEYS")
     if "keys" in config and "required" in config["keys"]:
         for key in config["keys"]["required"]:
             note = key.get("note", "")
-            lines.append(f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}|{note}")
+            used_by = ",".join(key.get("used_by", []))
+            resolution = ",".join(key.get("resolution", []))
+            activation = key.get("activation", "always")
+            lines.append(
+                f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}|{note}|{used_by}|{resolution}|{activation}"
+            )
 
     # OPTIONAL_KEYS
     lines.append("# OPTIONAL_KEYS")
     if "keys" in config and "optional" in config["keys"]:
         for key in config["keys"]["optional"]:
             note = key.get("note", "")
-            lines.append(f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}|{note}")
+            used_by = ",".join(key.get("used_by", []))
+            resolution = ",".join(key.get("resolution", []))
+            activation = key.get("activation", "any_used")
+            lines.append(
+                f"{key['name']}|{key['env_var']}|{key['description']}|{key['get_from']}|{note}|{used_by}|{resolution}|{activation}"
+            )
 
     return "\n".join(lines)
 
 
 def format_summary_output(config: dict[str, Any]) -> str:
-    """输出统计摘要（工具和密钥数量）"""
+    """输出统计摘要（工具、插件和密钥数量）"""
     lines = []
 
     # Tools统计
@@ -75,6 +106,15 @@ def format_summary_output(config: dict[str, Any]) -> str:
         required_count = len(config["keys"].get("required", []))
         optional_count = len(config["keys"].get("optional", []))
         lines.append(f"Keys: {required_count} required, {optional_count} optional")
+
+    # Plugins统计
+    if "plugins" in config:
+        required_count = len(config["plugins"].get("required", []))
+        recommended_count = len(config["plugins"].get("recommended", []))
+        optional_count = len(config["plugins"].get("optional", []))
+        lines.append(
+            f"Plugins: {required_count} required, {recommended_count} recommended, {optional_count} optional"
+        )
 
     return "\n".join(lines)
 

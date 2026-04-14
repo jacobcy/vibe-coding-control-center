@@ -289,6 +289,44 @@ class WorktreeManager:
 
     # --- Internal Implementation ---
 
+    def _initialize_worktree(self, wt_path: Path, reason: str) -> None:
+        """Run project init script inside a newly created worktree."""
+        init_script = self.repo_path / "scripts" / "init.sh"
+        if not init_script.exists():
+            return
+
+        try:
+            result = subprocess.run(
+                ["bash", str(init_script)],
+                cwd=wt_path,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to execute init script for worktree",
+                reason=reason,
+                path=str(wt_path),
+                error=str(exc),
+            )
+            return
+
+        if result.returncode != 0:
+            logger.warning(
+                "Init script failed for worktree",
+                reason=reason,
+                path=str(wt_path),
+                stderr=(result.stderr or result.stdout).strip(),
+            )
+            return
+
+        logger.info(
+            "Initialized worktree environment",
+            reason=reason,
+            path=str(wt_path),
+        )
+
     def _create_issue_worktree(
         self,
         wt_path: Path,
@@ -367,6 +405,7 @@ class WorktreeManager:
             branch=branch,
             path=str(wt_path),
         )
+        self._initialize_worktree(wt_path, reason="issue")
 
         return WorktreeContext(
             path=wt_path,
@@ -432,6 +471,7 @@ class WorktreeManager:
             base=base_branch,
             path=str(wt_path),
         )
+        self._initialize_worktree(wt_path, reason="temporary")
 
         return WorktreeContext(
             path=wt_path,

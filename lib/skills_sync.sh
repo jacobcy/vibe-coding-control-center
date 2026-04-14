@@ -4,34 +4,88 @@
 _vibe_skills_registry_file() { echo "$VIBE_ROOT/skills/vibe-skills-manager/registry.json"; }
 _vibe_skills_count_entries() { [[ -d "$1" ]] && find "$1" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ' || echo 0; }
 _vibe_skills_project_count() {
-    local c1=$(find "$VIBE_ROOT/skills" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l)
-    local c2=$(find "$VIBE_ROOT/supervisor" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l)
-    echo $(( ${c1:-0} + ${c2:-0} )) | tr -d ' '
+    find "$VIBE_ROOT/skills" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l | tr -d ' '
+}
+_vibe_skills_expected_project_names() {
+    local skill_dir
+    for skill_dir in "$VIBE_ROOT"/skills/vibe-*(/N); do
+        echo "${skill_dir:t}"
+    done | sort -u
+}
+_vibe_skills_target_health() {
+    local target="$1"
+    local linked=0 missing=0 broken=0 name
+
+    [[ -d "$target" ]] || {
+        echo "skip|0|0"
+        return 0
+    }
+
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        if [[ -L "$target/$name" ]]; then
+            if [[ -e "$target/$name" ]]; then
+                linked=$((linked + 1))
+            else
+                broken=$((broken + 1))
+            fi
+        elif [[ -e "$target/$name" ]]; then
+            linked=$((linked + 1))
+        else
+            missing=$((missing + 1))
+        fi
+    done < <(_vibe_skills_expected_project_names)
+
+    echo "$linked|$missing|$broken"
+}
+_vibe_skills_target_missing_names() {
+    local target="$1"
+    local name
+
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        [[ -e "$target/$name" ]] || echo "$name"
+    done < <(_vibe_skills_expected_project_names)
+}
+_vibe_skills_claude_plugin_count() {
+    if ! command -v claude >/dev/null 2>&1; then
+        echo ""
+        return 0
+    fi
+    claude plugin list 2>&1 | grep -c '^  ❯ ' | tr -d ' '
 }
 
 # Read agents list from skills-expected.yaml (replaced registry.json in #204)
 _vibe_skills_expected_file() { echo "$VIBE_ROOT/skills/vibe-skills-manager/skills-expected.yaml"; }
+_vibe_skills_manifest_file() {
+    if [[ -f "$VIBE_ROOT/config/skills.json" ]]; then
+        echo "$VIBE_ROOT/config/skills.json"
+    else
+        echo "$HOME/.vibe/skills.json"
+    fi
+}
 
 _vibe_skills_global_agents() {
-    local yaml_file="$(_vibe_skills_expected_file)"
-    if [[ -f "$yaml_file" ]]; then
-        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
+    local manifest="$(_vibe_skills_manifest_file)"
+    if [[ -f "$manifest" ]] && command -v jq >/dev/null 2>&1; then
+        jq -r '.global.agents[]?' "$manifest"
+    else
+        echo "antigravity"
+        echo "codex"
+        echo "kiro"
+        echo "copilot"
+    fi
+}
+
+_vibe_skills_project_agents() {
+    local manifest="$(_vibe_skills_manifest_file)"
+    if [[ -f "$manifest" ]] && command -v jq >/dev/null 2>&1; then
+        jq -r '.project.agents[]?' "$manifest"
     else
         echo "claude-code"
         echo "antigravity"
         echo "codex"
         echo "kiro"
-    fi
-}
-
-_vibe_skills_project_agents() {
-    local yaml_file="$(_vibe_skills_expected_file)"
-    if [[ -f "$yaml_file" ]]; then
-        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
-    else
-        echo "claude-code"
-        echo "antigravity"
-        echo "codex"
     fi
 }
 
@@ -127,7 +181,7 @@ _vibe_skills_sync_local_skills() {
     targets=(${(f)"$(_vibe_skills_project_targets "${agents[@]}")"})
     log_step "同步本地 vibe-* skills"
     for target in "${targets[@]}"; do mkdir -p "$target"; done
-    for skill_dir in "$VIBE_ROOT"/skills/vibe-*(/N) "$VIBE_ROOT"/supervisor/vibe-*(/N); do
+    for skill_dir in "$VIBE_ROOT"/skills/vibe-*(/N); do
         name="${skill_dir:t}"
         for target in "${targets[@]}"; do ln -sfn "$skill_dir" "$target/$name"; done
         count=$((count + 1))
@@ -136,40 +190,84 @@ _vibe_skills_sync_local_skills() {
 }
 
 _vibe_skills_check_status() {
-    local plugin_file="$HOME/.claude/plugins/installed_plugins.json"
-    local global_count linked_count project_count count agent agent_dir
+    local claude_plugins global_count project_count count agent agent_dir target
+    local linked missing broken
     local -a agents
-    echo ""
+    local -a missing_names
+
     echo "${BOLD}Skills 状态检查${NC}"
     echo "---------------------------------"
     echo ""
-    echo "${CYAN}Claude Code Plugin:${NC}"
-    [[ -f "$plugin_file" ]] && grep -q "superpowers@claude-plugins-official" "$plugin_file" 2>/dev/null &&
-        echo "  OK superpowers plugin 已安装" || echo "  X  superpowers plugin 未安装"
+    echo "${CYAN}Claude Code:${NC}"
+    if command -v claude >/dev/null 2>&1; then
+        claude_plugins="$(_vibe_skills_claude_plugin_count)"
+        echo "  CLI: 已安装"
+        if [[ -n "$claude_plugins" ]]; then
+            echo "  Plugins: $claude_plugins 个（以 claude plugin list 为准）"
+        else
+            echo "  Plugins: 无法读取（claude plugin list 不可用）"
+        fi
+    else
+        echo "  CLI: 未安装 claude"
+    fi
+    project_count="$(_vibe_skills_project_count)"
+    target="$VIBE_ROOT/.claude/skills"
+    IFS='|' read -r linked missing broken <<< "$(_vibe_skills_target_health "$target")"
+    echo "  项目 Skills: $linked/$project_count"
+    (( broken > 0 )) && echo "  Broken links: $broken"
+    if (( missing > 0 )); then
+        echo "  Missing links: $missing"
+        missing_names=(${(f)"$(_vibe_skills_target_missing_names "$target")"})
+        if (( ${#missing_names[@]} > 0 )); then
+            echo "  缺失项: ${(j:, :)missing_names}"
+        fi
+        echo "  建议: ${CYAN}zsh scripts/init.sh${NC}"
+    fi
     echo ""
-    echo "${CYAN}全局 Skills (~/.agents/skills/):${NC}"
+    echo "${CYAN}全局共享 Skills (~/.agents/skills/，可选增强):${NC}"
     global_count="$(_vibe_skills_count_entries "$HOME/.agents/skills")"
     echo "  已安装: $global_count 个"
     echo ""
-    echo "${CYAN}各 Agent Skills 状态:${NC}"
+    echo "${CYAN}各 Agent 全局 Skills 镜像（非阻塞）:${NC}"
     agents=(${(f)"$(_vibe_skills_global_agents)"})
     for agent in "${agents[@]}"; do
         agent_dir="$(_vibe_skills_agent_dir "$agent")"
-        if [[ "$agent" == "codex" ]]; then
-            echo "  $agent: $global_count skills (universal mode)"
+        if [[ "$agent" == "claude-code" ]]; then
+            continue
+        elif [[ "$agent" == "codex" ]]; then
+            echo "  $agent: $global_count skills (共享 ~/.agents/skills，可选)"
         elif [[ -d "$agent_dir" ]]; then
             count="$(_vibe_skills_count_entries "$agent_dir")"
-            echo "  $agent: $count skills (symlinked)"
+            echo "  $agent: $count/$global_count (可选)"
         else
-            echo "  $agent: 目录不存在 ($agent_dir)"
+            echo "  $agent: 未启用（目录不存在，跳过）"
         fi
     done
     echo ""
-    echo "${CYAN}本地 vibe-* skills:${NC}"
-    project_count="$(_vibe_skills_project_count)"
-    linked_count="$(_vibe_skills_count_entries "$VIBE_ROOT/.agent/skills")"
-    echo "  项目级: $project_count 个"
-    echo "  已链接: $linked_count 个"
+    echo "${CYAN}项目级 Skills 同步:${NC}"
+    for target in "$VIBE_ROOT/.agent/skills" "$VIBE_ROOT/.claude/skills" "$VIBE_ROOT/.codex/skills" "$VIBE_ROOT/.kiro/skills" "$VIBE_ROOT/.copilot/skills"; do
+        IFS='|' read -r linked missing broken <<< "$(_vibe_skills_target_health "$target")"
+        if [[ "$linked" == "skip" ]]; then
+            echo "  ${target#$VIBE_ROOT/}: 未启用（目录不存在，跳过）"
+            continue
+        fi
+        echo "  ${target#$VIBE_ROOT/}: $linked/$project_count"
+        if (( missing > 0 )); then
+            echo "    missing: $missing"
+            missing_names=(${(f)"$(_vibe_skills_target_missing_names "$target")"})
+            (( ${#missing_names[@]} > 0 )) && echo "    缺失项: ${(j:, :)missing_names}"
+        fi
+        (( broken > 0 )) && echo "    broken: $broken"
+    done
+    echo ""
+    echo "修复建议:"
+    echo "  - Claude / 项目级 skills 缺失：${CYAN}zsh scripts/init.sh${NC}"
+    echo "  - 其他 Agent 全局第三方 skills：仅在你实际使用这些 agent 时再装，属于可选增强"
+    echo "    ${CYAN}npx skills add obra/superpowers -g --agent antigravity codex kiro -y${NC}"
+    echo "  - 逻辑审计 / 推荐：${CYAN}/vibe-skills-manager${NC}"
+    echo ""
+    echo "结论:"
+    echo "  - 只安装 Claude Code 也可以正常使用，本节其余项默认不阻塞"
     echo ""
 }
 
