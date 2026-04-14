@@ -119,25 +119,6 @@ def format_summary_output(config: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def format_summary_output(config: dict[str, Any]) -> str:
-    """输出统计摘要（工具和密钥数量）"""
-    lines = []
-
-    # Tools统计
-    if "tools" in config:
-        required_count = len(config["tools"].get("required", []))
-        optional_count = len(config["tools"].get("optional", []))
-        lines.append(f"Tools: {required_count} required, {optional_count} optional")
-
-    # Keys统计
-    if "keys" in config:
-        required_count = len(config["keys"].get("required", []))
-        optional_count = len(config["keys"].get("optional", []))
-        lines.append(f"Keys: {required_count} required, {optional_count} optional")
-
-    return "\n".join(lines)
-
-
 def format_json_output(config: dict[str, Any]) -> str:
     """输出 JSON 格式（供调试使用）"""
     import json

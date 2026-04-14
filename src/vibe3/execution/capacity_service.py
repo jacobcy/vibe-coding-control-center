@@ -190,17 +190,20 @@ class CapacityService:
         return self._in_flight_dispatches
 
     def get_capacity_status(self, role: str) -> dict[str, int]:
-        """Get current capacity status for role.
+        """Get current capacity status.
+
+        Uses the same global pool model as can_dispatch for consistency.
+        The role parameter is kept for logging/context only.
 
         Args:
-            role: Execution role
+            role: Execution role (used for context/logging)
 
         Returns:
             Dict with active_count, in_flight_count, max_capacity, remaining
         """
-        active_count = self._registry.count_live_worker_sessions(role=role)
-        in_flight_count = len(self._in_flight_dispatches.get(role, set()))
-        max_capacity = self._get_max_capacity(role)
+        active_count = self._registry.count_live_worker_sessions()
+        in_flight_count = sum(len(v) for v in self._in_flight_dispatches.values())
+        max_capacity = self.config.max_concurrent_flows
         remaining = max(0, max_capacity - active_count - in_flight_count)
 
         return {

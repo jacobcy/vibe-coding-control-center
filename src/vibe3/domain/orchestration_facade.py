@@ -21,6 +21,7 @@ from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
+    from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
 
@@ -64,6 +65,17 @@ class OrchestrationFacade(ServiceBase):
         self._last_governance_started_at: float | None = None
         self._dispatch_services = list(dispatch_services or [])
         self._capacity = capacity
+        self._coordinator: GlobalDispatchCoordinator | None = None
+
+        if self._dispatch_services and self._capacity is not None:
+            from vibe3.orchestra.global_dispatch_coordinator import (
+                GlobalDispatchCoordinator,
+            )
+
+            self._coordinator = GlobalDispatchCoordinator(
+                capacity=self._capacity,
+                dispatch_services=self._dispatch_services,
+            )
 
     async def on_tick(self) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
@@ -83,23 +95,13 @@ class OrchestrationFacade(ServiceBase):
         if not self._dispatch_services:
             return
 
-        # Capacity-aware dispatch with GlobalDispatchCoordinator
-        # (shared_capacity is always injected by registry.py)
-        assert self._capacity is not None, (
-            "CapacityService must be injected by registry.py "
-            "(capacity=None path is dead code since registry.py "
-            "always creates shared_capacity)"
-        )
+        if self._coordinator is None:
+            raise RuntimeError(
+                "OrchestrationFacade: GlobalDispatchCoordinator not initialized. "
+                "Both dispatch_services and capacity must be provided at init time."
+            )
 
-        from vibe3.orchestra.global_dispatch_coordinator import (
-            GlobalDispatchCoordinator,
-        )
-
-        coordinator = GlobalDispatchCoordinator(
-            capacity=self._capacity,
-            dispatch_services=self._dispatch_services,
-        )
-        await coordinator.coordinate()
+        await self._coordinator.coordinate()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event.

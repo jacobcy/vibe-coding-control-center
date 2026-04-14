@@ -3,16 +3,15 @@
 Inherits from FlowReadMixin to access get_flow_status method.
 """
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import Self
 
 from loguru import logger
 
+from vibe3.clients import SQLiteClient
+from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_read_mixin import FlowReadMixin
 from vibe3.services.signature_service import SignatureService
-
-if TYPE_CHECKING:
-    pass
 
 
 class FlowWriteMixin(FlowReadMixin):
@@ -22,8 +21,8 @@ class FlowWriteMixin(FlowReadMixin):
     - get_flow_status (flow status query)
     """
 
-    store: Any
-    config: Any
+    store: SQLiteClient
+    config: VibeConfig
 
     def _is_main_branch(self: Self, branch: str) -> bool:
         """Check if branch is a protected main branch.

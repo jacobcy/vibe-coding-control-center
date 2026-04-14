@@ -185,11 +185,6 @@ vibe_doctor() {
     echo ""
 
     # Claude Plugins
-    _doctor_check_plugins "$config_output" || true
-    plugin_missing=$DOCTOR_PLUGIN_REQUIRED_MISSING
-    echo ""
-
-    # Claude Plugins
     _doctor_check_plugins
     echo ""
 

@@ -361,16 +361,19 @@ def block_reviewer_noop_issue(
     )
 
 
-def confirm_plan_handoff(
+def confirm_role_handoff(
     *,
     issue_number: int,
-    actor: str = "agent:plan",
+    actor: str,
 ) -> str:
-    """Transition planner issue to handoff after successful plan.
+    """Transition issue to handoff after successful role execution.
+
+    Called from success_handler in SYNC_SPEC to advance state → HANDOFF
+    so the next stage can be dispatched.
 
     Args:
         issue_number: GitHub issue number
-        actor: Actor performing the transition (defaults to "agent:plan")
+        actor: Actor performing the transition (e.g., "agent:plan")
 
     Returns:
         Transition result string (e.g., "advanced" or "blocked")
@@ -380,6 +383,12 @@ def confirm_plan_handoff(
         IssueState.HANDOFF,
         actor=actor,
     )
+
+
+# Role-specific aliases for backward compatibility
+confirm_plan_handoff = confirm_role_handoff
+confirm_run_handoff = confirm_role_handoff
+confirm_review_handoff = confirm_role_handoff
 
 
 def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -> bool:
@@ -445,51 +454,3 @@ def _latest_comment_matches(
         body = comment.get("body")
         return isinstance(body, str) and body.strip() == normalized_comment
     return False
-
-
-def confirm_run_handoff(
-    *,
-    issue_number: int,
-    actor: str = "agent:run",
-) -> str:
-    """Transition executor issue to handoff after successful run.
-
-    Called from the async tmux path (success_handler in RUN_SYNC_SPEC) to
-    advance IN_PROGRESS → HANDOFF so the reviewer can be dispatched.
-
-    Args:
-        issue_number: GitHub issue number
-        actor: Actor performing the transition (defaults to "agent:run")
-
-    Returns:
-        Transition result string (e.g., "advanced" or "blocked")
-    """
-    return LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.HANDOFF,
-        actor=actor,
-    )
-
-
-def confirm_review_handoff(
-    *,
-    issue_number: int,
-    actor: str = "agent:review",
-) -> str:
-    """Transition reviewer issue to handoff after successful review.
-
-    Called from the async tmux path (success_handler in REVIEW_SYNC_SPEC) to
-    advance REVIEW → HANDOFF so the next stage can be dispatched.
-
-    Args:
-        issue_number: GitHub issue number
-        actor: Actor performing the transition (defaults to "agent:review")
-
-    Returns:
-        Transition result string (e.g., "advanced" or "blocked")
-    """
-    return LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.HANDOFF,
-        actor=actor,
-    )

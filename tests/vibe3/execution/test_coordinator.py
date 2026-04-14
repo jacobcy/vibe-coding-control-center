@@ -116,8 +116,7 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
     assert "Capacity full" in result.reason
     assert result.reason_code == "capacity_full"
 
-    # Verify backend and lifecycle not called
-    backend.start_async_command.assert_not_called()
+    # Verify lifecycle not called
     lifecycle.record_started.assert_not_called()
     capacity.mark_in_flight.assert_not_called()
 

@@ -26,7 +26,6 @@ def store(tmp_path: Path) -> SQLiteClient:
 def backend() -> MagicMock:
     mock = MagicMock()
     mock.has_tmux_session.return_value = True
-    mock.has_tmux_session_prefix.return_value = True
     return mock
 
 
@@ -204,8 +203,8 @@ def test_get_capacity_status_governance(
 
     assert status["active_count"] == 0
     assert status["in_flight_count"] == 1
-    assert status["max_capacity"] == 1
-    assert status["remaining"] == 0
+    assert status["max_capacity"] == 3  # global pool
+    assert status["remaining"] == 2  # 3 - 0 - 1 = 2
 
 
 def test_get_capacity_status_supervisor(
@@ -218,8 +217,8 @@ def test_get_capacity_status_supervisor(
 
     assert status["active_count"] == 1
     assert status["in_flight_count"] == 1
-    assert status["max_capacity"] == 2
-    assert status["remaining"] == 0
+    assert status["max_capacity"] == 3  # global pool
+    assert status["remaining"] == 1  # 3 - 1 - 1 = 1
 
 
 # --- Full lifecycle for governance and supervisor ---

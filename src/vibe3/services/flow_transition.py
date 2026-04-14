@@ -1,28 +1,27 @@
 """Flow transition operations mixin.
 
-Inherits from FlowWriteMixin and FlowReadMixin to access:
+Inherits from FlowWriteMixin to access:
 - _is_main_branch (protected branch check)
 - create_flow (flow creation)
 - get_flow_status (flow status query)
 - SAFE_BRANCH_PREFIX constant
 """
 
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import Self, cast
 
 from loguru import logger
 
+from vibe3.clients import SQLiteClient
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
-from vibe3.services.flow_read_mixin import FlowReadMixin
 from vibe3.services.flow_write_mixin import FlowWriteMixin
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.signature_service import SignatureService
 
-if TYPE_CHECKING:
-    pass
 
-
-class FlowTransitionMixin(FlowWriteMixin, FlowReadMixin):
+class FlowTransitionMixin(FlowWriteMixin):
     """Mixin providing flow transition operations.
 
     Inherits FlowWriteMixin and FlowReadMixin for:
@@ -32,9 +31,9 @@ class FlowTransitionMixin(FlowWriteMixin, FlowReadMixin):
     - SAFE_BRANCH_PREFIX constant
     """
 
-    store: Any
-    git_client: Any
-    config: Any
+    store: SQLiteClient
+    git_client: GitClient
+    config: VibeConfig
 
     def ensure_flow_for_branch(
         self: Self, branch: str, slug: str | None = None

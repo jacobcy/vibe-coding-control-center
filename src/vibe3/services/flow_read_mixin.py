@@ -1,22 +1,21 @@
 """Flow read operations mixin."""
 
-from typing import TYPE_CHECKING, Any, Literal, Self, cast
+from typing import Literal, Self, cast
 
 from loguru import logger
 from pydantic import ValidationError
 
+from vibe3.clients import SQLiteClient
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
-
-if TYPE_CHECKING:
-    pass
 
 
 class FlowReadMixin:
     """Mixin providing flow read operations."""
 
-    store: Any
-    git_client: Any
+    store: SQLiteClient
+    git_client: GitClient
 
     def get_flow_state(self: Self, branch: str) -> FlowState | None:
         """Get flow state for branch.
