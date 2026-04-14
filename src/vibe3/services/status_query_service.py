@@ -20,7 +20,7 @@ from vibe3.orchestra.queue_ordering import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.services.flow_service import FlowStatusResponse
+    from vibe3.models.flow import FlowStatusResponse
 
 
 def _state_from_labels(raw_labels: object) -> IssueState | None:

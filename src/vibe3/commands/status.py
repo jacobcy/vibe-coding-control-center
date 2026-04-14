@@ -6,10 +6,11 @@ from typing import Annotated, cast
 import typer
 
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.server.registry import _validate_pid_file
-from vibe3.services.flow_service import FlowService, FlowStatusResponse
+from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.status_query_service import (
     StatusQueryService,

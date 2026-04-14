@@ -27,7 +27,7 @@ class TestTaskRetrieval:
         ]
 
         service = TaskService(store=mock_store)
-        with patch("vibe3.services.flow_service.GitHubClient"):
+        with patch("vibe3.services.flow_read_mixin.GitHubClient"):
             result = service.get_task("test-branch")
 
         assert result is not None
