@@ -1,10 +1,10 @@
 """Tests for CapacityService governance and supervisor role support.
 
 Tests cover:
-- Governance role capacity control
-- Supervisor role capacity control
-- Per-role capacity configuration
-- Live session count integration
+- Global capacity pool shared across all roles
+- In-flight dispatch tracking per role
+- Capacity status reporting
+- Full dispatch lifecycle
 """
 
 from pathlib import Path
@@ -33,8 +33,8 @@ def backend() -> MagicMock:
 @pytest.fixture()
 def config() -> MagicMock:
     cfg = MagicMock(spec=OrchestraConfig)
-    # Per-role capacity configuration
-    cfg.max_concurrent_flows = 3  # default for manager
+    # Global capacity configuration
+    cfg.max_concurrent_flows = 3  # shared across all roles
     cfg.governance_max_concurrent = 1
     cfg.supervisor_max_concurrent = 2
     return cfg
@@ -61,47 +61,39 @@ def test_can_dispatch_governance_when_capacity_available(
 def test_can_dispatch_governance_rejects_when_at_max(
     service: CapacityService,
 ) -> None:
-    """can_dispatch returns False for governance when live sessions == max."""
-    with patch.object(service._registry, "count_live_worker_sessions", return_value=1):
-        # governance_max_concurrent = 1, so at capacity
+    """can_dispatch returns False for governance when global pool is full."""
+    with patch.object(service._registry, "count_live_worker_sessions", return_value=3):
+        # 3 live == max_concurrent_flows, global pool full
         assert service.can_dispatch("governance", 2) is False
 
 
 def test_can_dispatch_governance_accounts_for_in_flight(
     service: CapacityService,
 ) -> None:
-    """can_dispatch considers in-flight dispatches for governance capacity."""
+    """can_dispatch considers in-flight dispatches in global pool."""
+    # Fill 3 slots via in-flight
     service.mark_in_flight("governance", 1)
+    service.mark_in_flight("governance", 2)
+    service.mark_in_flight("governance", 3)
 
-    # 1 in-flight + 0 live = 1 == governance_max_concurrent
     with patch.object(service._registry, "count_live_worker_sessions", return_value=0):
-        assert service.can_dispatch("governance", 2) is False
+        assert service.can_dispatch("governance", 4) is False
 
 
-def test_governance_capacity_independent_from_manager(
+def test_governance_shares_global_pool_with_manager(
     service: CapacityService,
 ) -> None:
-    """Governance capacity is independent from manager capacity."""
-    # Fill manager capacity
+    """Governance and manager share the same global capacity pool."""
+    # Fill global pool via manager in-flight
     service.mark_in_flight("manager", 10)
     service.mark_in_flight("manager", 20)
 
-    # Mock different live session counts for different roles
-    def mock_count_sessions(role: str) -> int:
-        if role == "manager":
-            return 1
-        elif role == "governance":
-            return 0
-        return 0
-
-    with patch.object(
-        service._registry, "count_live_worker_sessions", side_effect=mock_count_sessions
-    ):
-        # Manager at capacity (2 in-flight + 1 live = 3)
+    with patch.object(service._registry, "count_live_worker_sessions", return_value=1):
+        # Manager full (2 in-flight + 1 live = 3)
         assert service.can_dispatch("manager", 30) is False
 
-        # Governance still has capacity (0 live + 0 in-flight = 0 < 1)
-        assert service.can_dispatch("governance", 1) is True
+        # Governance also blocked — same global pool
+        assert service.can_dispatch("governance", 1) is False
 
 
 # --- Supervisor role capacity ---
@@ -118,60 +110,63 @@ def test_can_dispatch_supervisor_when_capacity_available(
 def test_can_dispatch_supervisor_rejects_when_at_max(
     service: CapacityService,
 ) -> None:
-    """can_dispatch returns False for supervisor when live sessions == max."""
-    with patch.object(service._registry, "count_live_worker_sessions", return_value=2):
-        # supervisor_max_concurrent = 2, so at capacity
+    """can_dispatch returns False for supervisor when global pool is full."""
+    with patch.object(service._registry, "count_live_worker_sessions", return_value=3):
+        # 3 live == max_concurrent_flows, global pool full
         assert service.can_dispatch("supervisor", 99) is False
 
 
 def test_can_dispatch_supervisor_accounts_for_in_flight(
     service: CapacityService,
 ) -> None:
-    """can_dispatch considers in-flight dispatches for supervisor capacity."""
+    """can_dispatch considers in-flight dispatches in global pool."""
+    # Fill 3 slots via supervisor in-flight
     service.mark_in_flight("supervisor", 10)
     service.mark_in_flight("supervisor", 20)
+    service.mark_in_flight("supervisor", 30)
 
-    # 2 in-flight + 0 live = 2 == supervisor_max_concurrent
     with patch.object(service._registry, "count_live_worker_sessions", return_value=0):
-        assert service.can_dispatch("supervisor", 30) is False
+        assert service.can_dispatch("supervisor", 40) is False
 
 
-def test_supervisor_capacity_independent_from_manager(
+def test_supervisor_shares_global_pool_with_manager(
     service: CapacityService,
 ) -> None:
-    """Supervisor capacity is independent from manager capacity."""
-    # Fill manager capacity
+    """Supervisor and manager share the same global capacity pool."""
+    # Fill global pool via manager
     service.mark_in_flight("manager", 10)
     service.mark_in_flight("manager", 20)
     with patch.object(service._registry, "count_live_worker_sessions", return_value=1):
         # Manager at capacity (2 in-flight + 1 live = 3)
         assert service.can_dispatch("manager", 30) is False
 
-        # Supervisor still has capacity
-        assert service.can_dispatch("supervisor", 42) is True
+        # Supervisor also blocked — same global pool
+        assert service.can_dispatch("supervisor", 42) is False
 
 
-def test_supervisor_capacity_independent_from_governance(
+def test_supervisor_shares_global_pool_with_governance(
     service: CapacityService,
 ) -> None:
-    """Supervisor capacity is independent from governance capacity."""
-    # Fill governance capacity
+    """Supervisor and governance share the same global capacity pool."""
+    # Fill 3 slots via governance
     service.mark_in_flight("governance", 1)
+    service.mark_in_flight("governance", 2)
+    service.mark_in_flight("governance", 3)
     with patch.object(service._registry, "count_live_worker_sessions", return_value=0):
         # Governance at capacity
-        assert service.can_dispatch("governance", 2) is False
+        assert service.can_dispatch("governance", 4) is False
 
-        # Supervisor still has capacity
-        assert service.can_dispatch("supervisor", 42) is True
+        # Supervisor also blocked — same global pool
+        assert service.can_dispatch("supervisor", 42) is False
 
 
 # --- Multi-role capacity isolation ---
 
 
-def test_all_roles_use_separate_capacity_pools(
+def test_all_roles_share_global_capacity_pool(
     service: CapacityService,
 ) -> None:
-    """Each role has its own capacity pool."""
+    """All roles share a single global capacity pool."""
     with patch.object(service._registry, "count_live_worker_sessions", return_value=0):
         # All roles should have capacity initially
         assert service.can_dispatch("manager", 1) is True

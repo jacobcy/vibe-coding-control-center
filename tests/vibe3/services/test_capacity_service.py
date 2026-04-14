@@ -201,19 +201,19 @@ def test_full_dispatch_lifecycle(
 # --- multi-role tests ---
 
 
-def test_can_dispatch_separates_roles(
+def test_can_dispatch_uses_global_pool(
     service: CapacityService,
 ) -> None:
-    """Capacity is tracked separately per role."""
-    # Manager at capacity
+    """Capacity is shared globally across all roles."""
+    # Manager takes 2 in-flight slots
     service.mark_in_flight("manager", 10)
     service.mark_in_flight("manager", 20)
     with patch.object(service._registry, "count_live_worker_sessions", return_value=1):
-        # Manager full (2 in-flight + 1 live = 3)
+        # Manager full (2 in-flight + 1 live = 3 == max)
         assert service.can_dispatch("manager", 30) is False
 
-        # Planner still has capacity
-        assert service.can_dispatch("planner", 40) is True
+        # Planner also blocked — same global pool
+        assert service.can_dispatch("planner", 40) is False
 
 
 def test_mark_in_flight_separates_roles(
