@@ -1,26 +1,17 @@
-"""Tests for WorktreeManager safety improvements."""
+"""Tests for worktree cleanup safety checks."""
 
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from vibe3.environment.worktree import WorktreeManager
-from vibe3.models.orchestra_config import OrchestraConfig
-
-
-def make_config() -> OrchestraConfig:
-    """Create a minimal config for testing."""
-    return OrchestraConfig()
+from vibe3.environment.worktree_support import recycle_worktree_path
 
 
 class TestWorktreeManagerSafety:
     """Tests for worktree cleanup safety checks."""
 
     def test_recycle_skips_when_active_tmux_session_found(self, tmp_path: Path) -> None:
-        """WorktreeManager should skip cleanup if tmux session is using worktree."""
-        config = make_config()
-        manager = WorktreeManager(config, repo_path=tmp_path)
-
+        """Skip cleanup if tmux session is using worktree."""
         worktree_path = tmp_path / ".worktrees" / "issue-123"
         worktree_path.mkdir(parents=True)
 
@@ -37,7 +28,7 @@ class TestWorktreeManagerSafety:
                 ),
             ]
 
-            manager._recycle_worktree_path(worktree_path)
+            recycle_worktree_path(tmp_path, worktree_path)
 
         # Verify tmux check was called
         assert mock_run.call_count == 1
@@ -49,10 +40,7 @@ class TestWorktreeManagerSafety:
         assert worktree_path.exists()
 
     def test_recycle_proceeds_when_no_tmux_sessions(self, tmp_path: Path) -> None:
-        """WorktreeManager should proceed with cleanup when no tmux sessions."""
-        config = make_config()
-        manager = WorktreeManager(config, repo_path=tmp_path)
-
+        """recycle_worktree_path should proceed with cleanup when no tmux sessions."""
         worktree_path = tmp_path / ".worktrees" / "issue-456"
         worktree_path.mkdir(parents=True)
 
@@ -74,7 +62,7 @@ class TestWorktreeManagerSafety:
                 ),
             ]
 
-            manager._recycle_worktree_path(worktree_path)
+            recycle_worktree_path(tmp_path, worktree_path)
 
         # Verify cleanup proceeded
         assert mock_run.call_count == 2
@@ -82,10 +70,7 @@ class TestWorktreeManagerSafety:
         assert git_remove_call[:3] == ["git", "worktree", "remove"]
 
     def test_recycle_proceeds_when_tmux_not_installed(self, tmp_path: Path) -> None:
-        """WorktreeManager should proceed with cleanup when tmux not installed."""
-        config = make_config()
-        manager = WorktreeManager(config, repo_path=tmp_path)
-
+        """recycle_worktree_path should proceed with cleanup when tmux not installed."""
         worktree_path = tmp_path / ".worktrees" / "issue-789"
         worktree_path.mkdir(parents=True)
 
@@ -102,16 +87,13 @@ class TestWorktreeManagerSafety:
                 ),
             ]
 
-            manager._recycle_worktree_path(worktree_path)
+            recycle_worktree_path(tmp_path, worktree_path)
 
         # Verify cleanup proceeded despite tmux not being available
         assert mock_run.call_count == 2
 
     def test_recycle_skips_for_nested_worktree_path(self, tmp_path: Path) -> None:
-        """WorktreeManager should skip if session path starts with worktree path."""
-        config = make_config()
-        manager = WorktreeManager(config, repo_path=tmp_path)
-
+        """Skip if session path starts with worktree path."""
         worktree_path = tmp_path / ".worktrees" / "issue-999"
         worktree_path.mkdir(parents=True)
 
@@ -126,7 +108,7 @@ class TestWorktreeManagerSafety:
                 stderr="",
             )
 
-            manager._recycle_worktree_path(worktree_path)
+            recycle_worktree_path(tmp_path, worktree_path)
 
         # Verify cleanup was skipped
         assert worktree_path.exists()
