@@ -23,7 +23,18 @@ if TYPE_CHECKING:
 
 
 def resolve_orchestra_repo_root() -> Path:
-    """Resolve shared repo root anchored at git common dir."""
+    """Resolve the active repo root for orchestra self-invocation.
+
+    Prefer the current worktree root so async/sync self-invocations execute the
+    same checked-out code the operator is running. Fall back to the shared git
+    common dir parent only when worktree resolution is unavailable.
+    """
+    try:
+        worktree_root = GitClient().get_worktree_root()
+        if worktree_root:
+            return Path(worktree_root)
+    except Exception:
+        pass
     try:
         git_common_dir = GitClient().get_git_common_dir()
         if git_common_dir:
@@ -211,19 +222,26 @@ def snapshot_issue_role_progress(
 
 
 def apply_required_ref_post_sync(
-    *,
-    required_ref: str,
-    missing_reason: str,
-    missing_ref_handler: Callable[..., None],
     store: SQLiteClient,
     issue_number: int,
+    _branch: str,  # Required for signature compatibility, unused
     actor: str,
     config: Any,
     before_snapshot: dict[str, object],
     after_snapshot: dict[str, object],
     request: ExecutionRequest,
+    *,
+    required_ref: str,
+    missing_reason: str,
+    missing_ref_handler: Callable[..., None],
 ) -> bool:
-    """Apply standard completion gate with required-ref protection."""
+    """Apply standard completion gate with required-ref protection.
+
+    Args:
+        _branch: Required to match IssueRoleSyncSpec.post_sync_hook signature,
+            but not used in this implementation. Prefix underscore indicates
+            intentional unused parameter.
+    """
     before_refs = before_snapshot.get("refs")
     after_refs = after_snapshot.get("refs")
     if isinstance(before_refs, dict) and isinstance(after_refs, dict):

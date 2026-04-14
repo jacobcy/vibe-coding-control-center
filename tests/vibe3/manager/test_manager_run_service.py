@@ -205,6 +205,73 @@ def test_run_manager_sync_uses_execution_worktree_requirement() -> None:
         assert request.cwd is None
 
 
+def test_run_manager_sync_capacity_full_does_not_fail_issue() -> None:
+    """Sync capacity rejection should throttle without marking the issue failed."""
+    with (
+        patch("vibe3.execution.issue_role_sync_runner.OrchestraConfig") as mock_config,
+        patch("vibe3.execution.issue_role_sync_runner.GitHubClient") as mock_gh,
+        patch("vibe3.execution.issue_role_sync_runner.SQLiteClient") as mock_store_cls,
+        patch("vibe3.execution.issue_role_sync_runner.GitClient") as mock_git_cls,
+        patch("vibe3.execution.issue_role_sync_runner.CodeagentBackend"),
+        patch(
+            "vibe3.execution.issue_role_sync_runner.ExecutionCoordinator"
+        ) as mock_coord_cls,
+        patch(
+            "vibe3.execution.issue_role_sync_runner.format_agent_actor",
+            return_value="agent:manager",
+        ),
+        patch(
+            "vibe3.roles.manager.render_manager_prompt",
+            return_value=MagicMock(rendered_text="prompt"),
+        ),
+        patch(
+            "vibe3.roles.manager.snapshot_manager_progress",
+            return_value={
+                "state_label": "state/ready",
+                "issue_state": "open",
+                "flow_status": "active",
+            },
+        ),
+        patch("vibe3.roles.manager.fail_manager_issue") as mock_fail,
+        patch("vibe3.execution.issue_role_sync_runner.typer.echo") as mock_echo,
+    ):
+        mock_config.from_settings.return_value = MagicMock(repo=None)
+        mock_gh.return_value.view_issue.return_value = {
+            "number": 431,
+            "title": "sync throttle",
+            "labels": [],
+            "state": "open",
+        }
+        mock_git_cls.return_value.get_current_branch.return_value = (
+            "bug/fix-vibe-server-failed-gate"
+        )
+        mock_store_cls.return_value = MagicMock()
+
+        mock_coord = MagicMock()
+        mock_coord.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=False,
+            reason="Capacity full for manager",
+            reason_code="capacity_full",
+        )
+        mock_coord_cls.return_value = mock_coord
+
+        from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+        from vibe3.roles.manager import MANAGER_SYNC_SPEC
+
+        run_issue_role_mode(
+            issue_number=431,
+            dry_run=False,
+            async_mode=False,
+            fresh_session=False,
+            spec=MANAGER_SYNC_SPEC,
+        )
+
+        mock_fail.assert_not_called()
+        mock_echo.assert_any_call(
+            "manager dispatch queued/throttled: Capacity full for manager"
+        )
+
+
 @patch("vibe3.roles.manager.AbandonFlowService")
 def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service):
     """Closed HANDOFF issue should finalize PR close + flow abort.

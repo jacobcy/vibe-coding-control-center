@@ -10,6 +10,33 @@ class TestIssueStateDispatchHandler:
 
     # Dispatches on state/ready or state/handoff
 
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    def test_human_resume_event_does_not_dispatch(
+        self,
+        mock_config_cls: MagicMock,
+        mock_build_request: MagicMock,
+        mock_coordinator_cls: MagicMock,
+    ) -> None:
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_issue_state_changed_for_roles,
+        )
+
+        handle_issue_state_changed_for_roles(
+            IssueStateChanged(
+                issue_number=42,
+                from_state="failed",
+                to_state="ready",
+                issue_title="Test issue",
+                actor="human:resume",
+            )
+        )
+
+        mock_config_cls.from_settings.assert_not_called()
+        mock_build_request.assert_not_called()
+        mock_coordinator_cls.assert_not_called()
+
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
