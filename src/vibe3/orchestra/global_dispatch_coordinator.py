@@ -1,0 +1,172 @@
+"""全局调度协调器：统一收集、排序、容量拦截后再 dispatch。
+
+解决问题：
+  - dispatch_intent 在容量检查前发出 → 多余 issue 卡在 state/claimed
+  - manager 速度远超 planner → backlog 持续增长
+  - 各 service 独立扫描 → 无法全局排序
+
+设计原则：
+  - collect: 并行，无副作用
+  - sort: 全局，按 milestone/roadmap/priority
+  - dispatch: 顺序，check → mark_in_flight → emit（同一 asyncio 事件循环，天然原子）
+"""
+
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from loguru import logger
+
+from vibe3.execution.capacity_service import CapacityService
+from vibe3.models.orchestration import IssueInfo
+from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.queue_ordering import sort_ready_issues
+
+if TYPE_CHECKING:
+    from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+
+
+@dataclass
+class ReadyIssueWithRole:
+    """Issue + 对应的 dispatch service（含 role 信息）。"""
+
+    issue: IssueInfo
+    service: StateLabelDispatchService
+
+    @property
+    def role(self) -> str:
+        return str(self.service.role_def.trigger_name)
+
+
+class GlobalDispatchCoordinator:
+    """统一调度协调器。
+
+    取代 OrchestrationFacade 中的并发 gather(service.on_tick())，
+    实现"先检查容量，再 emit dispatch_intent"。
+
+    Usage:
+        coordinator = GlobalDispatchCoordinator(capacity_service, dispatch_services)
+        await coordinator.coordinate()
+    """
+
+    def __init__(
+        self,
+        capacity: CapacityService,
+        dispatch_services: list[StateLabelDispatchService],
+    ) -> None:
+        self._capacity = capacity
+        self._dispatch_services = dispatch_services
+
+    async def coordinate(self) -> None:
+        """主调度入口：收集 → 排序 → 容量拦截 → dispatch。"""
+        # Step 1: 并行收集所有角色的 ready issues（无副作用）
+        all_ready = await self._collect_all(self._dispatch_services)
+
+        if not all_ready:
+            return
+
+        # Step 2: 全局排序（复用 sort_ready_issues，按 issue 优先级排序）
+        # 注意：不同角色的 issue 在 pipeline 不同阶段，不直接竞争
+        # 排序目的是：同一角色内按优先级选出最重要的先 dispatch
+        sorted_ready = self._sort_with_role(all_ready)
+
+        # Step 3: 顺序尝试 dispatch（asyncio 单线程，check-mark-emit 天然原子）
+        dispatched_count = 0
+        skipped_count = 0
+        for item in sorted_ready:
+            dispatched = self._try_dispatch(item)
+            if dispatched:
+                dispatched_count += 1
+            else:
+                skipped_count += 1
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
+            f"skipped={skipped_count} (capacity full)",
+        )
+
+    async def _collect_all(
+        self, services: list[StateLabelDispatchService]
+    ) -> list[ReadyIssueWithRole]:
+        """并行调用所有 service 的 collect_ready_issues()。"""
+        results = await asyncio.gather(
+            *(svc.collect_ready_issues() for svc in services),
+            return_exceptions=True,
+        )
+        all_ready: list[ReadyIssueWithRole] = []
+        for service, result in zip(services, results, strict=False):
+            if isinstance(result, BaseException):
+                logger.bind(
+                    domain="global_dispatch",
+                    service=service.service_name,
+                ).error(f"collect_ready_issues failed: {result}")
+                continue
+            # result is now guaranteed to be list[IssueInfo]
+            for issue in result:
+                all_ready.append(ReadyIssueWithRole(issue=issue, service=service))
+        return all_ready
+
+    def _sort_with_role(
+        self, items: list[ReadyIssueWithRole]
+    ) -> list[ReadyIssueWithRole]:
+        """提取 IssueInfo 排序后重新关联 service。"""
+        # 提取 issue 排序
+        issues = [item.issue for item in items]
+        sorted_issues = sort_ready_issues(issues)
+        # 按排序后的 issue number 重新关联 service
+        issue_to_item = {item.issue.number: item for item in items}
+        return [
+            issue_to_item[issue.number]
+            for issue in sorted_issues
+            if issue.number in issue_to_item
+        ]
+
+    def _try_dispatch(self, item: ReadyIssueWithRole) -> bool:
+        """容量检查 → 标记 in_flight → emit dispatch_intent。
+
+        在同一个 asyncio 事件循环的同步代码段内执行，天然原子：
+        没有 await，不会被其他协程中断。
+
+        Returns:
+            True 如果成功 dispatch，False 如果容量满跳过
+        """
+        role = item.role
+        issue_id = item.issue.number
+
+        # 容量检查（在 emit 之前）
+        if not self._capacity.can_dispatch(role, issue_id):
+            logger.bind(
+                domain="global_dispatch",
+                role=role,
+                issue=issue_id,
+            ).debug(f"Skip #{issue_id} ({role}): capacity full, will retry next tick")
+            return False
+
+        # 先标记 in_flight，再 emit（保证 coordinator 后续检查也会看到）
+        self._capacity.mark_in_flight(role, issue_id)
+
+        try:
+            item.service._emit_dispatch_intent(item.issue)
+            logger.bind(
+                domain="global_dispatch",
+                role=role,
+                issue=issue_id,
+            ).debug(f"Dispatched #{issue_id} ({role})")
+            return True
+        except Exception as exc:
+            # emit 失败时撤销 in_flight 标记，避免永久占用容量
+            self._capacity.prune_in_flight(role, {issue_id})
+            logger.bind(
+                domain="global_dispatch",
+                role=role,
+                issue=issue_id,
+            ).error(f"emit_dispatch_intent failed for #{issue_id}: {exc}")
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: emit failed for "
+                f"#{issue_id} ({role}): {exc}",
+            )
+            return False
