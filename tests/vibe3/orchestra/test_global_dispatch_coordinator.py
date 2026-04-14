@@ -144,3 +144,34 @@ class TestGlobalDispatchCoordinator:
             "mark",
             "emit",
         ], f"Expected mark before emit, got: {call_order}"
+
+    @pytest.mark.asyncio
+    async def test_reconcile_in_flight_called_before_collect(self) -> None:
+        """coordinate() 每次调用都先 reconcile，再 collect，防止 in-flight 永久积压。"""
+        call_order: list[str] = []
+        issue = make_issue(1)
+
+        service = make_service("planner", [issue])
+        original_collect = service.collect_ready_issues
+
+        async def tracked_collect() -> list:
+            call_order.append("collect")
+            return await original_collect()
+
+        service.collect_ready_issues = tracked_collect
+
+        capacity = MagicMock()
+        capacity.can_dispatch = MagicMock(return_value=True)
+        capacity.mark_in_flight = MagicMock()
+        capacity.prune_in_flight = MagicMock()
+        capacity.reconcile_in_flight = MagicMock(
+            side_effect=lambda: call_order.append("reconcile")
+        )
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        await coordinator.coordinate()
+
+        assert (
+            call_order[0] == "reconcile"
+        ), f"reconcile_in_flight must be called first, got: {call_order}"
+        assert "collect" in call_order

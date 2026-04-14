@@ -142,6 +142,41 @@ class CapacityService:
                 remaining_in_flight=after,
             ).debug(f"Pruned {before - after} in-flight dispatches for {role}")
 
+    def reconcile_in_flight(self) -> None:
+        """Prune in-flight markers that are now live SQLite sessions.
+
+        Called at the start of each coordinator tick to prevent permanent
+        capacity deadlock: when a successfully-dispatched agent registers in
+        SQLite, its in-flight marker is no longer needed and must be removed,
+        otherwise it double-counts against capacity forever.
+        """
+        for role in list(self._in_flight_dispatches.keys()):
+            pending = self._in_flight_dispatches.get(role)
+            if not pending:
+                continue
+            # Get live sessions for this role from SQLite
+            live_sessions = self._store.list_live_runtime_sessions(role=role)
+            live_target_ids: set[int] = set()
+            for session in live_sessions:
+                raw = session.get("target_id")
+                if raw is not None:
+                    try:
+                        live_target_ids.add(int(raw))
+                    except (ValueError, TypeError):
+                        pass
+            # Prune in_flight for any target now registered as a live session
+            now_live = pending & live_target_ids
+            if now_live:
+                self.prune_in_flight(role, now_live)
+                logger.bind(
+                    domain="capacity",
+                    role=role,
+                    reconciled=sorted(now_live),
+                ).debug(
+                    f"reconcile_in_flight: pruned {len(now_live)} stale "
+                    f"in-flight entries for {role} (now live in SQLite)"
+                )
+
     @property
     def in_flight_dispatches(self) -> dict[str, set[int]]:
         """Current in-flight dispatches per role."""

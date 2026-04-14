@@ -61,6 +61,10 @@ class GlobalDispatchCoordinator:
 
     async def coordinate(self) -> None:
         """主调度入口：收集 → 排序 → 容量拦截 → dispatch。"""
+        # Step 0: 把上一轮成功 dispatch 但已注册为 live session 的 in-flight
+        # 条目清理掉，防止 in-flight 永久积压导致容量计算双重扣减（deadlock）。
+        self._capacity.reconcile_in_flight()
+
         # Step 1: 并行收集所有角色的 ready issues（无副作用）
         all_ready = await self._collect_all(self._dispatch_services)
 
