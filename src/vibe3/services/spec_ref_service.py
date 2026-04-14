@@ -4,6 +4,7 @@ import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from loguru import logger
 
@@ -123,7 +124,7 @@ class SpecRefService:
             ).warning("Failed to fetch issue data")
             return None
 
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(dict, json.loads(result.stdout))
 
     def get_spec_content_for_prompt(self, info: SpecRefInfo) -> str | None:
         """Get spec content suitable for prompt injection.

@@ -148,7 +148,7 @@ class ExecutionCoordinator:
                 # 5. Record started (which handles session registry)
                 # Type ignore because ExecutionRole is a Literal constraint
                 self.lifecycle.record_started(
-                    role=request.role,  # type: ignore
+                    role=request.role,  # type: ignore[arg-type]
                     target=request.target_branch,
                     actor=request.actor,
                     refs=refs,
@@ -175,7 +175,7 @@ class ExecutionCoordinator:
 
                 # 5. Record started
                 self.lifecycle.record_started(
-                    role=request.role,  # type: ignore
+                    role=request.role,  # type: ignore[arg-type]
                     target=request.target_branch,
                     actor=request.actor,
                     refs=request.refs,
@@ -200,7 +200,7 @@ class ExecutionCoordinator:
 
                     if result.is_success():
                         self.lifecycle.record_completed(
-                            role=request.role,  # type: ignore
+                            role=request.role,  # type: ignore[arg-type]
                             target=request.target_branch,
                             actor=request.actor,
                             detail=f"Execution completed for {request.role}",
@@ -216,7 +216,7 @@ class ExecutionCoordinator:
                     else:
                         error_msg = getattr(result, "stderr", "") or "Execution failed"
                         self.lifecycle.record_failed(
-                            role=request.role,  # type: ignore
+                            role=request.role,  # type: ignore[arg-type]
                             target=request.target_branch,
                             actor=request.actor,
                             error=error_msg,
@@ -237,7 +237,7 @@ class ExecutionCoordinator:
                         )
                 except Exception as run_exc:
                     self.lifecycle.record_failed(
-                        role=request.role,  # type: ignore
+                        role=request.role,  # type: ignore[arg-type]
                         target=request.target_branch,
                         actor=request.actor,
                         error=str(run_exc),
@@ -265,7 +265,7 @@ class ExecutionCoordinator:
             ).error(f"Execution launch failed: {exc}")
 
             self.lifecycle.record_failed(
-                role=request.role,  # type: ignore
+                role=request.role,  # type: ignore[arg-type]
                 target=request.target_branch,
                 actor=request.actor,
                 error=str(exc),

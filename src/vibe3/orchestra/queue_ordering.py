@@ -7,8 +7,8 @@ from typing import Any
 
 from vibe3.models.orchestration import IssueInfo
 
-# Legacy priority label mapping to numeric priority
-LEGACY_PRIORITY_MAP: dict[str, int] = {
+# Text-based priority label → numeric priority
+PRIORITY_LABEL_MAP: dict[str, int] = {
     "critical": 9,
     "high": 7,
     "medium": 5,
@@ -42,9 +42,9 @@ def resolve_priority(labels: list[str]) -> int:
             if re.match(r"^\d+$", suffix):
                 priorities.append(int(suffix))
 
-            # Check for legacy priority
-            elif suffix in LEGACY_PRIORITY_MAP:
-                priorities.append(LEGACY_PRIORITY_MAP[suffix])
+            # Check for text-based priority label
+            elif suffix in PRIORITY_LABEL_MAP:
+                priorities.append(PRIORITY_LABEL_MAP[suffix])
 
     # Return highest priority, or fallback to 0
     return max(priorities) if priorities else 0

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
-from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest  # type: ignore
+from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
 
