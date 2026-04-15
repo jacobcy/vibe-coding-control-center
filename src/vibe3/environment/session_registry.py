@@ -400,6 +400,42 @@ class SessionRegistryService:
             )
         return pruned
 
+    def clear_all_sessions(self) -> int:
+        """Mark ALL active sessions as stopped. Called on server start and stop.
+
+        Unlike cleanup_stale_sessions() which checks tmux liveness,
+        this unconditionally marks every starting|running session as stopped.
+
+        Design: server lifecycle owns session state. When the server starts or
+        stops, all sessions from the previous run are considered ended. The tmux
+        processes are NOT killed -- agents may continue running and writing results
+        -- but from the capacity/dispatch perspective the slots are fully released.
+
+        Returns:
+            Number of sessions cleared.
+        """
+        from loguru import logger
+
+        sessions = self._store.list_live_runtime_sessions()
+        cleared = 0
+        for session in sessions:
+            session_id = session.get("id")
+            if session_id is not None:
+                self._store.update_runtime_session(int(session_id), status="stopped")
+                cleared += 1
+                logger.bind(
+                    domain="session_registry",
+                    session_id=session_id,
+                    tmux=session.get("tmux_session"),
+                    role=session.get("role"),
+                ).debug(f"clear_all_sessions: marked session {session_id} as stopped")
+        if cleared:
+            logger.bind(domain="session_registry", cleared=cleared).info(
+                f"Server lifecycle cleanup: {cleared} sessions marked stopped "
+                f"(tmux may still be running)"
+            )
+        return cleared
+
 
 def _now_iso() -> str:
     return datetime.datetime.now().isoformat()
