@@ -145,6 +145,12 @@ class GlobalDispatchCoordinator:
 
         # 容量检查（在 emit 之前）
         if not self._capacity.can_dispatch(role, issue_id):
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: skipped #{issue_id} "
+                f"({role}) - capacity full",
+                level="DEBUG",
+            )
             logger.bind(
                 domain="global_dispatch",
                 role=role,
@@ -157,11 +163,15 @@ class GlobalDispatchCoordinator:
 
         try:
             item.service._emit_dispatch_intent(item.issue)
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: dispatched #{issue_id} ({role})",
+            )
             logger.bind(
                 domain="global_dispatch",
                 role=role,
                 issue=issue_id,
-            ).debug(f"Dispatched #{issue_id} ({role})")
+            ).info(f"✅ Dispatched #{issue_id} ({role})")
             return True
         except Exception as exc:
             # emit 失败时撤销 in_flight 标记，避免永久占用容量
