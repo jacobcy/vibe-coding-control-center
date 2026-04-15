@@ -83,6 +83,7 @@ def snapshot_progress(
         "plan_ref": state_dict.get("plan_ref"),
         "report_ref": state_dict.get("report_ref"),
         "audit_ref": state_dict.get("audit_ref"),
+        "pr_ref": state_dict.get("pr_ref"),  # PR URL as proof of PR creation
         "next_step": state_dict.get("next_step"),
         "blocked_by": state_dict.get("blocked_by"),
     }
