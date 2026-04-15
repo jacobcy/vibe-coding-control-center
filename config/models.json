@@ -8,47 +8,62 @@
     "opencode": {}
   },
   "agents": {
-    "oracle": {
-      "backend": "codex",
-      "model": "gpt-5.3-codex",
-      "yolo": true
-    },
-    "librarian": {
+    "vibe-manager": {
       "backend": "gemini",
       "model": "gemini-3-flash-preview",
-      "yolo": true
+      "yolo": true,
+      "description": "Orchestra manager: dispatch coordination and execution supervision"
     },
-    "explore": {
-      "backend": "opencode",
-      "model": "opencode/minimax-m2.5-free"
+    "vibe-planner": {
+      "backend": "claude",
+      "model": "claude-sonnet-4-6",
+      "yolo": true,
+      "description": "Strategic planner: design implementation plans and architecture"
     },
-    "develop": {
+    "vibe-executor": {
       "backend": "opencode",
       "model": "alibaba-coding-plan-cn/glm-5",
-      "yolo": true
+      "yolo": true,
+      "description": "Task executor: implement features and fix bugs"
     },
-    "frontend-ui-ux-engineer": {
+    "vibe-reviewer": {
+      "backend": "claude",
+      "model": "claude-sonnet-4-6",
+      "description": "Code reviewer: quality assurance and best practices"
+    },
+    "vibe-supervisor": {
+      "backend": "codex",
+      "model": "gpt-5.4-mini",
+      "yolo": true,
+      "description": "Governance supervisor: periodic scans and issue management"
+    },
+    "vibe-governance": {
       "backend": "gemini",
-      "model": "gemini-3.1-pro-preview",
-      "yolo": true
+      "model": "gemini-3-flash-preview",
+      "description": "Governance agent: policy enforcement and cleanup"
+    },
+    "code-explorer": {
+      "backend": "gemini",
+      "model": "gemini-3-flash-preview",
+      "description": "General code exploration and analysis"
     },
     "document-writer": {
       "backend": "gemini",
       "model": "gemini-3-flash-preview",
-      "yolo": true
+      "yolo": true,
+      "description": "Documentation generation and maintenance"
     },
-    "code-explorer": {
+    "frontend-ui-ux-engineer": {
       "backend": "gemini",
-      "model": "gemini-3-flash-preview"
+      "model": "gemini-3.1-pro-preview",
+      "yolo": true,
+      "description": "Frontend development and UI/UX implementation"
     },
     "code-architect": {
       "backend": "codex",
       "model": "gpt-5.4-mini",
-      "yolo": true
-    },
-    "code-reviewer": {
-      "backend": "claude",
-      "model": "claude-sonnet-4-6"
+      "yolo": true,
+      "description": "Architecture design and system planning"
     }
   }
 }

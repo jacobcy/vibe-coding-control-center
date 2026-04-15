@@ -36,7 +36,7 @@ class TestResolveEffectiveAgentOptions:
             json.dumps(
                 {
                     "agents": {
-                        "code-reviewer": {
+                        "vibe-reviewer": {
                             "backend": "claude",
                             "model": "claude-sonnet-4-6",
                         }
@@ -49,7 +49,7 @@ class TestResolveEffectiveAgentOptions:
             "vibe3.agents.backends.codeagent_config.repo_models_json_path",
             return_value=repo_models,
         ):
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             result = resolve_effective_agent_options(options)
 
         assert result.backend == "claude"
@@ -72,7 +72,7 @@ class TestResolveEffectiveAgentOptions:
             json.dumps(
                 {
                     "agents": {
-                        "code-reviewer": {
+                        "vibe-reviewer": {
                             "backend": "claude",
                             "model": "claude-sonnet-4-6",
                         }
@@ -85,7 +85,7 @@ class TestResolveEffectiveAgentOptions:
             "vibe3.agents.backends.codeagent_config.repo_models_json_path",
             return_value=repo_models,
         ):
-            options = AgentOptions(agent="code-reviewer", model="claude-opus-4-6")
+            options = AgentOptions(agent="vibe-reviewer", model="claude-opus-4-6")
             result = resolve_effective_agent_options(options)
 
         assert result.backend == "claude"

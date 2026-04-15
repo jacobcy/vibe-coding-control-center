@@ -168,6 +168,6 @@ def test_review_pr_rejects_unknown_agent_param():
 
     This test ensures the hook-CLI contract is enforced.
     """
-    result = runner.invoke(app, ["pr", "42", "--agent", "code-reviewer"])
+    result = runner.invoke(app, ["pr", "42", "--agent", "vibe-reviewer"])
     assert result.exit_code != 0
     assert "no such option" in result.output.lower() or "error" in result.output.lower()

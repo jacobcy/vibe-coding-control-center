@@ -279,7 +279,7 @@ review:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
     # 典型用途：保留 preset 作为实际执行入口，同时把 backend/model 写出来用于显式说明或记录。
-    agent: "code-reviewer"
+    agent: "vibe-reviewer"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -332,7 +332,7 @@ plan:
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
-    agent: "code-explorer"
+    agent: "vibe-planner"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -393,7 +393,7 @@ run:
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
-    agent: "develop"
+    agent: "vibe-executor"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -484,7 +484,7 @@ orchestra:
     # - 配置 agent：走 preset 模式，preset 从 config/models.json 解析
     # - 只配置 backend/model：走 backend 直连模式
     # 如果同时配置 agent 和 backend/model，manager 执行时 agent 优先。
-    agent: "explore"
+    agent: "vibe-manager"
     # backend/model 仅在以下场景生效：
     # - 未配置 agent，显式走 backend 直连模式
     # - 同时配置 agent 时，agent 仍是主入口；但 manager resolver 会先把 agent
@@ -524,7 +524,7 @@ orchestra:
     dry_run: false
     # Governance agent configuration (independent from run/manager)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    agent: "vibe-governance"  # Maps in config/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：governance resolver 会先解析 preset，再允许 model
@@ -540,7 +540,7 @@ orchestra:
     prompt_template: "orchestra.supervisor.apply"
     # Supervisor handoff agent configuration (independent from run/manager/governance)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    agent: "vibe-supervisor"  # Maps in config/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：supervisor resolver 会先解析 preset，再允许 model

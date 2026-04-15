@@ -189,7 +189,8 @@ class CodeagentBackend:
             if options.model:
                 command.extend(["--model", options.model])
         else:
-            command.extend(["--agent", "code-reviewer"])
+            # Default fallback: vibe-reviewer for code review tasks
+            command.extend(["--agent", "vibe-reviewer"])
 
         # Skip interactive permission prompts so worktree agents can access
         # shared paths (e.g. main/.git/vibe3/handoff/) without being blocked.
