@@ -56,7 +56,7 @@ class AssigneeDispatchConfig(BaseModel):
     backend: str | None = None
     model: str | None = None
     timeout_seconds: int = Field(
-        default=1800,
+        default=3600,
         ge=60,
         description="Manager execution timeout in seconds (default 30 minutes)",
     )

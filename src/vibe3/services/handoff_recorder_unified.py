@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from vibe3.agents.backends.async_launcher import resolve_async_log_path
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.actor_support import (
     format_agent_actor,
@@ -45,6 +46,7 @@ class HandoffRecord:
     session_id: str | None = None
     metadata: dict[str, str] | None = None
     branch: str | None = None
+    log_path: str | None = None
 
 
 def parse_modified_files(content: str) -> list[str]:
@@ -142,6 +144,8 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         options=record.options,
         session_id=record.session_id,
         metadata=record.metadata,
+        branch=record.branch,
+        log_path=record.log_path,
     )
 
     detail, derived_refs = _build_detail(sanitized_record, artifact_file)
@@ -154,6 +158,16 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         refs["model"] = model
     if record.session_id:
         refs["session_id"] = record.session_id
+
+    # Add log_path to refs if available
+    # Either use explicit log_path or infer from session_id
+    if record.log_path:
+        refs["log_path"] = record.log_path
+    elif record.session_id:
+        # Infer log_path from session_id pattern
+        log_dir = Path(__file__).resolve().parents[4] / "temp" / "logs"
+        inferred_log_path = resolve_async_log_path(log_dir, record.session_id)
+        refs["log_path"] = str(inferred_log_path)
 
     flow_state_updates: dict[str, object] = {
         _ACTOR_ROLE_BY_KIND[record.kind]: actor,

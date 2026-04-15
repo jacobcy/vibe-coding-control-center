@@ -60,13 +60,20 @@ class ExecutionLifecycleService:
         session_id: str | None = None,
         refs: dict[str, str] | None = None,
     ) -> None:
+        # Determine appropriate detail based on actor type
+        # orchestra: prefix indicates dispatch intent, not execution start
+        if actor.startswith("orchestra:"):
+            detail = f"{role} dispatched"
+        else:
+            detail = f"{role} execution started"
+
         persist_execution_lifecycle_event(
             store=self._store,
             branch=target,
             role=role,
             lifecycle="started",
             actor=actor,
-            detail=f"{role} execution started",
+            detail=detail,
             session_id=session_id,
             refs=refs,
         )

@@ -154,8 +154,14 @@ def render_flow_timeline(
             if files and isinstance(files, list):
                 for f in files:
                     console.print(f"  [dim]- {f}[/]")
+            # Priority: log_path > ref for display
+            log_path = (
+                event.refs.get("log_path") if isinstance(event.refs, dict) else None
+            )
+            if log_path:
+                console.print(f"  [dim]- {log_path}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            if ref:
+            if ref and not log_path:
                 console.print(f"  [dim]- {ref}[/]")
         console.print()
 
