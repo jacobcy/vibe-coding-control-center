@@ -23,6 +23,7 @@ from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.execution.capacity_service import CapacityService
 
 
 def _normalize_labels(raw_labels: object) -> list[str]:
@@ -66,6 +67,7 @@ class StateLabelDispatchService(ServiceBase):
         executor: ThreadPoolExecutor | None = None,
         flow_manager: FlowManager | None = None,
         registry: "SessionRegistryService | None" = None,
+        capacity: "CapacityService | None" = None,
         role_def: TriggerableRoleDefinition,
     ) -> None:
         self.config = config
@@ -76,6 +78,7 @@ class StateLabelDispatchService(ServiceBase):
         self._flow_manager = flow_manager or FlowManager(config, registry=registry)
         self._store = SQLiteClient()
         self._registry = registry
+        self._capacity = capacity
         self._dispatch_guard = asyncio.Lock()
         self.role_def = role_def
 
@@ -233,7 +236,16 @@ class StateLabelDispatchService(ServiceBase):
         issue_number: int,
         flow_state: dict[str, object],
     ) -> bool:
-        """Use role definition's status_field + dispatch_predicate."""
+        """Use role definition's status_field + dispatch_predicate.
+
+        Also checks if a session is already in-flight for this target to
+        prevent duplicate dispatches before SQLite is updated.
+        """
+        if self._capacity and self._capacity.is_in_flight(
+            self.role_def.registry_role, issue_number
+        ):
+            return False
+
         status_field = self.role_def.status_field
         if status_field is None:
             has_live_session = self._has_live_dispatch(issue_number)

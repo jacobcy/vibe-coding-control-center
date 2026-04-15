@@ -94,15 +94,20 @@ def has_tmux_session(session_name: str) -> bool:
     return session_name in list_tmux_sessions()
 
 
-def allocate_tmux_session_name(base_name: str) -> str:
+def allocate_tmux_session_name(base_name: str, *, auto_increment: bool = True) -> str:
     """Return a non-colliding tmux session name.
 
     Args:
         base_name: Desired base session name
+        auto_increment: If False, returns base_name immediately even if it exists.
+            If True, returns unique session name (may have counter suffix like -2, -3).
 
     Returns:
-        Unique session name (may have counter suffix like -2, -3)
+        Session name
     """
+    if not auto_increment:
+        return base_name
+
     candidate = base_name
     counter = 2
     while True:
@@ -313,11 +318,33 @@ def spawn_tmux_command(
     Returns:
         AsyncExecutionHandle with session and log info
     """
+    from loguru import logger
+
     project_root = cwd or Path.cwd()
 
     log_dir = default_log_dir()
     prefix = execution_name.replace("/", "-")[:50]
-    session_id = allocate_tmux_session_name(prefix)
+
+    # Rule: L3 agent roles (manager/plan/run/review) MUST NOT auto-increment
+    # to prevent multiple physical sessions running for the same task.
+    # Supervisor/Governance can auto-increment as they are often parallel or transient.
+    auto_inc = True
+    if any(
+        f"vibe3-{role}" in execution_name
+        for role in ["manager", "plan", "run", "review"]
+    ):
+        auto_inc = False
+
+    session_id = allocate_tmux_session_name(prefix, auto_increment=auto_inc)
+
+    # Intercept duplicate session if auto-increment is disabled
+    if not auto_inc and has_tmux_session(session_id):
+        logger.bind(
+            domain="async_launcher",
+            session=session_id,
+            execution_name=execution_name,
+        ).warning("Intercepted duplicate physical tmux session, aborting spawn")
+        raise RuntimeError(f"Tmux session '{session_id}' already exists")
 
     # Use codeagent's specialized log path resolution (includes issue number)
     # Use actual session_id (may include counter suffix like -2, -3)

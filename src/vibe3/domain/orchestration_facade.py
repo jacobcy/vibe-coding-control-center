@@ -111,6 +111,16 @@ class OrchestrationFacade(ServiceBase):
         # ✅ Always reconcile in-flight markers to prevent capacity deadlock
         # This must happen even when failed_gate is frozen
         if self._capacity:
+            # First reconcile session state (mark dead tmux sessions as orphaned)
+            # This ensures count_live_worker_sessions() returns accurate results.
+            from vibe3.environment.session_registry import SessionRegistryService
+
+            store = self._capacity._store
+            backend = self._capacity._backend
+            registry = SessionRegistryService(store, backend)
+            registry.reconcile_live_state()
+
+            # Then reconcile in-flight markers
             self._capacity.reconcile_in_flight()
 
         # Check if dispatch is frozen by failed gate

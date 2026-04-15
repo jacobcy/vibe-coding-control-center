@@ -166,7 +166,16 @@ class GlobalDispatchCoordinator:
         role = item.role
         issue_id = item.issue.number
 
-        # 容量检查（在 emit 之前）
+        # 1. Check if already being dispatched (concurrent guard)
+        if self._capacity.is_in_flight(role, issue_id):
+            logger.bind(
+                domain="global_dispatch",
+                role=role,
+                issue=issue_id,
+            ).debug(f"Skip #{issue_id} ({role}): already in-flight")
+            return False
+
+        # 2. 容量检查（在 emit 之前）
         if not self._capacity.can_dispatch(role, issue_id):
             append_orchestra_event(
                 "dispatcher",
@@ -181,7 +190,7 @@ class GlobalDispatchCoordinator:
             ).debug(f"Skip #{issue_id} ({role}): capacity full, will retry next tick")
             return False
 
-        # 先标记 in_flight，再 emit（保证 coordinator 后续检查也会看到）
+        # 3. 先标记 in_flight，再 emit（保证 coordinator 后续检查也会看到）
         try:
             self._capacity.mark_in_flight(role, issue_id)
         except Exception as exc:
