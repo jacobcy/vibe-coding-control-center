@@ -48,6 +48,8 @@ def resolve_repo_agent_preset(
 ) -> tuple[str | None, str | None] | None:
     """Resolve agent preset from repo-local config/models.json.
 
+    Automatically tries with 'vibe-' prefix if direct lookup fails.
+
     Returns:
         (backend, model) when repo-local mapping exists, otherwise None.
     """
@@ -55,9 +57,16 @@ def resolve_repo_agent_preset(
     agents = data.get("agents")
     if not isinstance(agents, dict):
         return None
+
+    # Try direct lookup first
     raw = agents.get(agent_name)
     if not isinstance(raw, dict):
-        return None
+        # Try with 'vibe-' prefix if direct lookup fails
+        prefixed_name = f"vibe-{agent_name}"
+        raw = agents.get(prefixed_name)
+        if not isinstance(raw, dict):
+            return None
+
     backend = raw.get("backend")
     model = raw.get("model")
     if backend is not None and not isinstance(backend, str):
@@ -77,6 +86,8 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
     2. Repo-local config/models.json mapping for agent preset
     3. Fallback to default_backend/default_model from models.json
     4. Raise error if no fallback available
+
+    Returns backend/model for database recording and sync operations.
     """
     if options.backend:
         return options

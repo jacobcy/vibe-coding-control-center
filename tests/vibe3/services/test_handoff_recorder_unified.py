@@ -83,9 +83,7 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     kwargs = mock_persist.call_args.kwargs
     assert kwargs["event_type"] == "handoff_plan"
     # Actor expands agent preset to full backend/model via format_agent_actor
-    assert (
-        kwargs["flow_state_updates"]["planner_actor"] == "opencode/volcengine/kimi-k2.5"
-    )
+    assert kwargs["flow_state_updates"]["planner_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "planner_session_id" not in kwargs["flow_state_updates"]
     assert "plan_ref" not in kwargs["flow_state_updates"]
@@ -153,10 +151,7 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
     assert kwargs["event_type"] == "handoff_review"
     assert kwargs["refs"]["verdict"] == "PASS"
     # Actor expands agent preset to full backend/model via format_agent_actor
-    assert (
-        kwargs["flow_state_updates"]["reviewer_actor"]
-        == "opencode/volcengine/kimi-k2.5"
-    )
+    assert kwargs["flow_state_updates"]["reviewer_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "reviewer_session_id" not in kwargs["flow_state_updates"]
     assert "audit_ref" not in kwargs["flow_state_updates"]
@@ -182,6 +177,7 @@ def test_record_handoff_unified_ignores_reserved_metadata_keys(
     refs = mock_persist.call_args.kwargs["refs"]
     # backend is resolved from AgentOptions by resolve_actor_backend_model
     assert refs["backend"] == "opencode"
+    assert refs["model"] == "alibaba-coding-plan-cn/glm-5"
     assert refs["custom"] == "ok"
 
 
