@@ -147,6 +147,7 @@ def _build_server_with_launch_cwd(
     facade = OrchestrationFacade(
         dispatch_services=dispatch_services,
         capacity=shared_capacity,
+        failed_gate=failed_gate,
     )
     heartbeat.register(facade)
 
