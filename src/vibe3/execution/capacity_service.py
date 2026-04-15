@@ -215,6 +215,29 @@ class CapacityService:
                         f"in-flight entries for {role} (now live in SQLite)"
                     )
 
+                # Also prune in-flight for targets whose sessions are now
+                # in a terminal state (orphaned/done/failed/stopped).
+                # This handles the case where reconcile_live_state() marks
+                # sessions orphaned BEFORE reconcile_in_flight() runs —
+                # those targets never appear in live_target_ids, so the
+                # in-flight marker would otherwise leak indefinitely.
+                not_yet_live = pending - live_target_ids
+                if not_yet_live:
+                    terminated = self._store.get_terminated_target_ids_for_role(
+                        role, not_yet_live
+                    )
+                    if terminated:
+                        self._in_flight_dispatches[role].difference_update(terminated)
+                        self._launching_targets[role].difference_update(terminated)
+                        logger.bind(
+                            domain="capacity",
+                            role=role,
+                            terminated=sorted(terminated),
+                        ).debug(
+                            f"reconcile_in_flight: pruned {len(terminated)} "
+                            f"in-flight entries for {role} (session terminated)"
+                        )
+
     @property
     def in_flight_dispatches(self) -> dict[str, set[int]]:
         """Current in-flight dispatches per role."""
