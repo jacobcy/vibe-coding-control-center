@@ -169,6 +169,9 @@ class GlobalDispatchCoordinator:
 
         try:
             item.service._emit_dispatch_intent(item.issue)
+            # 立即清理 in-flight 标记，避免依赖后续 reconcile
+            # 如果后续 reconcile 被 failed_gate frozen 阻塞，会导致永久容量死锁
+            self._capacity.prune_in_flight(role, {issue_id})
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: dispatched #{issue_id} ({role})",

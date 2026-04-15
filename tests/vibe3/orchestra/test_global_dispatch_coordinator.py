@@ -81,6 +81,22 @@ class TestGlobalDispatchCoordinator:
         capacity.prune_in_flight.assert_called_once_with("planner", {1})
 
     @pytest.mark.asyncio
+    async def test_emit_success_prunes_in_flight(self) -> None:
+        """emit 成功时，立即清理 in_flight 标记，防止后续 reconcile
+        阻塞导致容量死锁。"""
+        issue = make_issue(1)
+        service = make_service("planner", [issue])
+        capacity = make_capacity([True])
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        await coordinator.coordinate()
+
+        # 验证 emit 成功后立即清理，不依赖后续 reconcile
+        capacity.mark_in_flight.assert_called_once_with("planner", 1)
+        capacity.prune_in_flight.assert_called_once_with("planner", {1})
+        service._emit_dispatch_intent.assert_called_once_with(issue)
+
+    @pytest.mark.asyncio
     async def test_collect_failure_does_not_affect_other_services(self) -> None:
         """某 service collect 失败，其他 service 正常继续。"""
         issue_planner = make_issue(10)
