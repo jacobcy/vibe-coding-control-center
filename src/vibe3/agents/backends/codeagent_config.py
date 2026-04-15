@@ -75,10 +75,8 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
     Priority:
     1. Explicit backend/model override in options
     2. Repo-local config/models.json mapping for agent preset
-    3. Raise error if agent preset cannot be resolved
-
-    Raises:
-        AgentPresetNotFoundError: If agent preset not found in config/models.json
+    3. Fallback to default_backend/default_model from models.json
+    4. Raise error if no fallback available
     """
     if options.backend:
         return options
@@ -86,6 +84,20 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         return options
     resolved = resolve_repo_agent_preset(options.agent)
     if not resolved:
+        data = _read_models_json(repo_models_json_path())
+        default_backend = data.get("default_backend")
+        default_model = data.get("default_model")
+        if default_backend and isinstance(default_backend, str):
+            logger.bind(domain="codeagent_config").warning(
+                f"Agent preset '{options.agent}' not found in config/models.json, "
+                f"falling back to default: {default_backend}/{default_model}"
+            )
+            return AgentOptions(
+                agent=None,
+                backend=default_backend,
+                model=str(default_model) if isinstance(default_model, str) else None,
+                timeout_seconds=options.timeout_seconds,
+            )
         raise AgentPresetNotFoundError(options.agent)
     backend, mapped_model = resolved
     return AgentOptions(

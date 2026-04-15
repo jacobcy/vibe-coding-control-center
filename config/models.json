@@ -1,6 +1,6 @@
 {
   "default_backend": "opencode",
-  "default_model": "gpt-5.4-mini",
+  "default_model": "volcengine/kimi-k2.5",
   "backends": {
     "codex": {},
     "claude": {},
