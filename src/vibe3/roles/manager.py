@@ -36,10 +36,7 @@ from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
 from vibe3.runtime.no_progress_policy import snapshot_progress
 from vibe3.services.abandon_flow_service import AbandonFlowService
-from vibe3.services.issue_failure_service import (
-    block_manager_noop_issue,
-    fail_manager_issue,
-)
+from vibe3.services.issue_failure_service import fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
@@ -147,6 +144,9 @@ def build_manager_request(
     try:
         flow = flow_manager.create_flow_for_issue(issue)
     except Exception:
+        return None
+
+    if not flow:
         return None
 
     flow_branch = str(flow.get("branch") or "").strip()
@@ -286,46 +286,24 @@ def handle_manager_post_sync(
 ) -> bool:
     """Apply manager-specific post-sync hooks and completion gates.
 
-    Checks required_ref based on state:
-    - claimed -> plan_ref
-    - in-progress -> report_ref
-    - review -> audit_ref
-    - merge-ready -> pr_ref
+    Manager's responsibilities:
+    1. Check if issue was closed during execution
+    2. Verify MUST_CHANGE_LABEL completion gate (manager must change state label)
+
+    Checking agent artifacts (plan_ref, report_ref, audit_ref, pr_ref) is NOT
+    manager's job - each agent checks its own output via build_required_ref_sync_spec:
+
+    - planner checks plan_ref before calling success_handler (confirm_plan_handoff)
+    - executor checks report_ref before calling success_handler (confirm_run_handoff)
+    - reviewer checks audit_ref before calling success_handler (confirm_review_handoff)
+
+    Manager checking these refs has a timing bug: manager just transitioned the state
+    (e.g., handoff -> in-progress) and immediately checks the ref that the next agent
+    (executor) hasn't had time to produce yet. This causes false BLOCK.
+
+    The correct check happens in each agent's apply_required_ref_post_sync, which runs
+    right after that agent completes and has the ref available.
     """
-    # First check required_ref based on state
-    state_label = after_snapshot.get("state_label")
-    required_ref = None
-    missing_reason = None
-
-    if state_label == "state/claimed":
-        required_ref = "plan_ref"
-        missing_reason = "Plan not created"
-    elif state_label == "state/in-progress":
-        required_ref = "report_ref"
-        missing_reason = "Execution report not created"
-    elif state_label == "state/review":
-        required_ref = "audit_ref"
-        missing_reason = "Audit report not created"
-    elif state_label == "state/merge-ready":
-        required_ref = "pr_ref"
-        missing_reason = "PR not created"
-
-    # If required_ref is expected, check if it exists
-    if required_ref and missing_reason:
-        before_refs = before_snapshot.get("refs")
-        after_refs = after_snapshot.get("refs")
-        if isinstance(before_refs, dict) and isinstance(after_refs, dict):
-            before_value = before_refs.get(required_ref)
-            after_value = after_refs.get(required_ref)
-            if not before_value and not after_value:
-                # Required ref missing -> block issue
-                block_manager_noop_issue(
-                    issue_number=issue_number,
-                    reason=missing_reason,
-                    actor=actor,
-                    repo=config.repo,
-                )
-                return True
 
     # Check if issue was closed during execution
     if handle_closed_issue_post_run(

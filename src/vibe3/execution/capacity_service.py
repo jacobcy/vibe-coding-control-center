@@ -182,7 +182,20 @@ class CapacityService:
             live_target_ids: set[int] = set()
             for session in live_sessions:
                 raw = session.get("target_id")
-                if raw is not None:
+                if raw is None:
+                    continue
+                tmux = session.get("tmux_session")
+                # Fix: must have live tmux session (or be in starting
+                # state without tmux) to count as truly live and prune
+                # the in-flight marker
+                if tmux:
+                    if self._registry._has_tmux_session(tmux):
+                        try:
+                            live_target_ids.add(int(raw))
+                        except (ValueError, TypeError):
+                            pass
+                else:
+                    # Still in starting phase (no tmux yet), count as live
                     try:
                         live_target_ids.add(int(raw))
                     except (ValueError, TypeError):
