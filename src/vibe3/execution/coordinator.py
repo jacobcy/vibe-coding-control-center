@@ -116,6 +116,19 @@ class ExecutionCoordinator:
         if not pre_authorized:
             self.capacity.mark_in_flight(request.role, request.target_id)
 
+        # Whether to prune the in-flight marker at the end of this call.
+        # For a successful async launch we MUST keep the marker — the tmux
+        # session hasn't yet registered with the tmux server when start_async
+        # returns, so count_live_worker_sessions will not see it as live.
+        # Pruning here would create a capacity hole that lets the next tick
+        # over-dispatch. reconcile_in_flight() cleans the marker in the
+        # subsequent tick once the session is truly live in SQLite+tmux.
+        #
+        # For sync, launch failures, and exceptions we DO prune immediately:
+        # the session is either completed (no longer live) or was never
+        # registered, so reconcile_in_flight cannot recover it.
+        should_prune = True
+
         try:
             # 4. Launch
             cwd_path = self._resolve_cwd(request)
@@ -170,6 +183,10 @@ class ExecutionCoordinator:
                     tmux_session=tmux_session,
                 ).success(f"Execution launched for {request.role}")
 
+                # Async launch succeeded — keep in-flight marker so capacity
+                # stays reserved until the tmux session becomes observable.
+                # reconcile_in_flight() in the next tick will prune it.
+                should_prune = False
                 return ExecutionLaunchResult(
                     launched=True,
                     tmux_session=tmux_session,
@@ -287,12 +304,19 @@ class ExecutionCoordinator:
                 reason_code="launch_failed",
             )
         finally:
-            # 6. Prune in-flight (best-effort: must not mask the primary exception)
-            try:
-                self.capacity.prune_in_flight(request.role, {request.target_id})
-            except Exception as prune_exc:
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                ).error(f"prune_in_flight failed (capacity leak possible): {prune_exc}")
+            # 6. Prune in-flight ONLY when the caller is done with this slot.
+            # For successful async launches we keep the marker — see the
+            # should_prune comment above. reconcile_in_flight will clean up
+            # on the next tick once SQLite+tmux observe the live session.
+            if should_prune:
+                try:
+                    self.capacity.prune_in_flight(request.role, {request.target_id})
+                except Exception as prune_exc:
+                    logger.bind(
+                        domain="execution_coordinator",
+                        role=request.role,
+                        target_id=request.target_id,
+                    ).error(
+                        f"prune_in_flight failed (capacity leak possible): "
+                        f"{prune_exc}"
+                    )
