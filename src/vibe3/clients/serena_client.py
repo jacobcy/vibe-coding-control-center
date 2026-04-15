@@ -3,7 +3,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import Union
+from typing import Union, cast
 
 from loguru import logger
 
@@ -152,7 +152,7 @@ class SerenaClient:
             agent = self._get_agent()
             tool = agent.get_tool_by_name("get_symbols_overview")
             result = agent.execute_task(lambda: tool.apply(relative_path=relative_file))  # type: ignore[union-attr]
-            return json.loads(result)  # type: ignore[no-any-return]
+            return cast(dict[str, Union[str, int, list]], json.loads(result))
         except Exception as e:
             logger.bind(
                 external="serena",
@@ -183,7 +183,7 @@ class SerenaClient:
             result = agent.execute_task(
                 lambda: tool.apply(name_path=name_path, relative_path=relative_file)  # type: ignore[union-attr]
             )
-            return json.loads(result)  # type: ignore[no-any-return]
+            return cast(dict[str, Union[str, int, list]], json.loads(result))
         except Exception as e:
             logger.bind(
                 external="serena",

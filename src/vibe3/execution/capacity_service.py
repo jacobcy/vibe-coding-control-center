@@ -76,7 +76,12 @@ class CapacityService:
         self._in_flight_dispatches = shared
 
     def can_dispatch(self, role: str, target_id: int) -> bool:
-        """Check if role can dispatch target given current capacity.
+        """Check if global capacity allows another dispatch.
+
+        Uses a GLOBAL pool shared across all worker roles, so the total
+        number of concurrently active agents (any role) is capped at
+        max_concurrent_flows. This prevents role-local pools from
+        individually filling up to 3× or 4× the intended concurrency.
 
         Args:
             role: Execution role (manager, planner, executor, reviewer, supervisor)
@@ -85,9 +90,11 @@ class CapacityService:
         Returns:
             True if capacity available, False if should throttle/queue
         """
-        active_count = self._registry.count_live_worker_sessions(role=role)
-        in_flight_count = len(self._in_flight_dispatches.get(role, set()))
-        max_capacity = self._get_max_capacity(role)
+        # Count ALL live worker sessions, not just this role's.
+        active_count = self._registry.count_live_worker_sessions()
+        # Count ALL in-flight dispatches across every role.
+        in_flight_count = sum(len(v) for v in self._in_flight_dispatches.values())
+        max_capacity = self.config.max_concurrent_flows
         remaining = max(0, max_capacity - active_count - in_flight_count)
 
         can_dispatch = remaining > 0
@@ -101,7 +108,7 @@ class CapacityService:
                 in_flight=in_flight_count,
                 max=max_capacity,
             ).info(
-                f"Capacity full for {role} #{target_id} "
+                f"Global capacity full, skipping {role} #{target_id} "
                 f"(live={active_count}, in_flight={in_flight_count}, "
                 f"max={max_capacity})"
             )
@@ -142,23 +149,61 @@ class CapacityService:
                 remaining_in_flight=after,
             ).debug(f"Pruned {before - after} in-flight dispatches for {role}")
 
+    def reconcile_in_flight(self) -> None:
+        """Prune in-flight markers that are now live SQLite sessions.
+
+        Called at the start of each coordinator tick to prevent permanent
+        capacity deadlock: when a successfully-dispatched agent registers in
+        SQLite, its in-flight marker is no longer needed and must be removed,
+        otherwise it double-counts against capacity forever.
+        """
+        for role in list(self._in_flight_dispatches.keys()):
+            pending = self._in_flight_dispatches.get(role)
+            if not pending:
+                continue
+            # Get live sessions for this role from SQLite
+            live_sessions = self._store.list_live_runtime_sessions(role=role)
+            live_target_ids: set[int] = set()
+            for session in live_sessions:
+                raw = session.get("target_id")
+                if raw is not None:
+                    try:
+                        live_target_ids.add(int(raw))
+                    except (ValueError, TypeError):
+                        pass
+            # Prune in_flight for any target now registered as a live session
+            now_live = pending & live_target_ids
+            if now_live:
+                self.prune_in_flight(role, now_live)
+                logger.bind(
+                    domain="capacity",
+                    role=role,
+                    reconciled=sorted(now_live),
+                ).debug(
+                    f"reconcile_in_flight: pruned {len(now_live)} stale "
+                    f"in-flight entries for {role} (now live in SQLite)"
+                )
+
     @property
     def in_flight_dispatches(self) -> dict[str, set[int]]:
         """Current in-flight dispatches per role."""
         return self._in_flight_dispatches
 
     def get_capacity_status(self, role: str) -> dict[str, int]:
-        """Get current capacity status for role.
+        """Get current capacity status.
+
+        Uses the same global pool model as can_dispatch for consistency.
+        The role parameter is kept for logging/context only.
 
         Args:
-            role: Execution role
+            role: Execution role (used for context/logging)
 
         Returns:
             Dict with active_count, in_flight_count, max_capacity, remaining
         """
-        active_count = self._registry.count_live_worker_sessions(role=role)
-        in_flight_count = len(self._in_flight_dispatches.get(role, set()))
-        max_capacity = self._get_max_capacity(role)
+        active_count = self._registry.count_live_worker_sessions()
+        in_flight_count = sum(len(v) for v in self._in_flight_dispatches.values())
+        max_capacity = self.config.max_concurrent_flows
         remaining = max(0, max_capacity - active_count - in_flight_count)
 
         return {

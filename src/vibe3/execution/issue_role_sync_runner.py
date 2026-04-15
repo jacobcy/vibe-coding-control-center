@@ -71,6 +71,12 @@ def run_issue_role_mode(
     backend = CodeagentBackend()
     coordinator = ExecutionCoordinator(config, store, backend)
 
+    # Early capacity check to avoid wasteful request preparation
+    if async_mode and not dry_run:
+        if not coordinator.capacity.can_dispatch(spec.role_name, issue_number):
+            typer.echo(f"{spec.role_name} dispatch queued: Capacity full")
+            return
+
     if async_mode and not dry_run:
         request = spec.build_async_request(config, issue, actor)
         if request is None:
@@ -136,6 +142,11 @@ def run_issue_role_mode(
         return
 
     if not sync_result.launched:
+        if sync_result.reason_code == "capacity_full":
+            typer.echo(
+                f"{spec.role_name} dispatch queued/throttled: {sync_result.reason}"
+            )
+            return
         if spec.failure_handler is not None:
             spec.failure_handler(
                 issue_number,

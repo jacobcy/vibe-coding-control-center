@@ -18,6 +18,15 @@ def handle_issue_state_changed_for_roles(event: IssueStateChanged) -> None:
     Current supported issue-state role:
     - manager (ready / handoff)
     """
+    if event.actor == "human:resume":
+        logger.bind(
+            domain="issue_state_dispatch_handler",
+            issue_number=event.issue_number,
+            to_state=event.to_state,
+            actor=event.actor,
+        ).info("Skipping auto-dispatch for human resume event")
+        return
+
     role = resolve_issue_state_role(event.to_state)
     if role is None:
         return

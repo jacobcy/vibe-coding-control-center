@@ -4,6 +4,7 @@ from typing import Any
 
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
 
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
@@ -82,13 +83,11 @@ def render_flow_timeline(
     milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
 ) -> None:
-    from vibe3.ui.flow_ui import _kv, _status_text
-
-    status_text = _status_text(state.flow_status).plain
-    console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_text})[/]")
-    _kv("flow_slug", state.flow_slug, 1)
+    status_str = status_text(state.flow_status).plain
+    console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_str})[/]")
+    kv("flow_slug", state.flow_slug, 1)
     if parent_branch:
-        _kv("parent", parent_branch, 1)
+        kv("parent", parent_branch, 1)
     if state.task_issue_number:
         console.print(f"  [dim]task[/]        #{state.task_issue_number}")
     else:
@@ -104,27 +103,23 @@ def render_flow_timeline(
         console.print(f"  [dim]next[/]        {state.next_step}")
 
     if state.initiated_by:
-        _kv("initiated_by", state.initiated_by, 1)
+        kv("initiated_by", state.initiated_by, 1)
 
     # Always show actor — fallback to worktree identity when flow has no signature
-    from vibe3.ui.flow_ui import _display_actor
-
-    _actor, _fallback = _display_actor(state.latest_actor)
+    _actor, _fallback = display_actor(state.latest_actor)
     _suffix = " [dim](worktree)[/]" if _fallback else ""
-    actors = [
-        f"[dim]latest:[/] {_actor}{_suffix}",
-        f"[dim]plan:[/] {state.planner_actor or '—'}",
-        f"[dim]run:[/] {state.executor_actor or '—'}",
-        f"[dim]review:[/] {state.reviewer_actor or '—'}",
-    ]
-    console.print(f"  [dim]actor[/]       {'  '.join(actors)}")
+    console.print("  [dim]actor[/]")
+    console.print(f"    [dim]latest:[/] {_actor}{_suffix}")
+    console.print(f"    [dim]plan:[/]    {state.planner_actor or '—'}")
+    console.print(f"    [dim]run:[/]     {state.executor_actor or '—'}")
+    console.print(f"    [dim]review:[/]  {state.reviewer_actor or '—'}")
     console.print()
 
     if not events:
         console.print("[dim]  no events[/]")
         return
 
-    console.print("[bold]═══ Timeline ═══[/]")
+    console.print("[bold]--- Timeline ---[/]")
     console.print()
 
     for event in reversed(events):
@@ -140,10 +135,10 @@ def render_flow_timeline(
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:
-                    console.print(f"  [dim]📎 {f}[/]")
+                    console.print(f"  [dim]- {f}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             if ref:
-                console.print(f"  [dim]📎 {ref}[/]")
+                console.print(f"  [dim]- {ref}[/]")
         console.print()
 
     if milestone_data:
@@ -162,7 +157,7 @@ def render_flow_timeline(
         val = getattr(state, label, None)
         if val:
             if not refs_shown:
-                console.print("[bold]═══ Refs ═══[/]")
+                console.print("[bold]--- Refs ---[/]")
                 refs_shown = True
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""

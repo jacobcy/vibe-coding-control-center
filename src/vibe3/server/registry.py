@@ -15,6 +15,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -76,6 +77,11 @@ def _build_server_with_launch_cwd(
     shared_store = SQLiteClient()
     shared_backend = CodeagentBackend()
     shared_registry = SessionRegistryService(store=shared_store, backend=shared_backend)
+
+    # Startup cleanup: mark sessions whose tmux window is dead as stopped.
+    # This ensures capacity starts from a clean slate after restarts.
+    shared_registry.cleanup_stale_sessions()
+
     failed_gate = FailedGate(github=shared_github, repo=config.repo)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
@@ -125,10 +131,16 @@ def _build_server_with_launch_cwd(
                 )
             )
 
+    # Create shared CapacityService for capacity-aware dispatch
+    shared_capacity = CapacityService(config, shared_store, shared_backend)
+
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
-    facade = OrchestrationFacade(dispatch_services=dispatch_services)
+    facade = OrchestrationFacade(
+        dispatch_services=dispatch_services,
+        capacity=shared_capacity,
+    )
     heartbeat.register(facade)
 
     # GovernanceService and SupervisorHandoffService are deleted.

@@ -1,16 +1,17 @@
-"""Flow lifecycle operations - block."""
+"""Flow block/abort operations mixin."""
 
-from typing import Any
+from typing import Self
 
 from loguru import logger
 
+from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
 
 
-def sync_flow_blocked_task_label(store: Any, branch: str) -> None:
+def sync_flow_blocked_task_label(store: SQLiteClient, branch: str) -> None:
     """Sync task-role issues in a flow to state/blocked when flow is blocked."""
     issue_links_raw = store.get_issue_links(branch)
     issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
@@ -32,11 +33,10 @@ def sync_flow_blocked_task_label(store: Any, branch: str) -> None:
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
-    store: Any
-    git_client: Any
+    store: SQLiteClient
 
     def block_flow(
-        self: Any,
+        self: Self,
         branch: str,
         reason: str | None = None,
         blocked_by_issue: int | None = None,
@@ -93,7 +93,7 @@ class FlowLifecycleMixin:
         sync_flow_blocked_task_label(self.store, branch)
 
     def abort_flow(
-        self: Any,
+        self: Self,
         branch: str,
         reason: str,
         actor: str | None = None,

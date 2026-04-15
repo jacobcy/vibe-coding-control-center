@@ -20,8 +20,8 @@ _DISPLAY_PLACEHOLDER_ACTORS = frozenset(
     {*_PLACEHOLDER_ACTORS, "ai_assistant", "ai-assistant"}
 )
 
-# Legacy actor alias → normalized backend identifier (for display layer).
-_LEGACY_ALIAS_MAP: dict[str, str] = {
+# Actor alias → normalized identifier (for display layer).
+_ACTOR_ALIAS_MAP: dict[str, str] = {
     "agent-claude": "claude",
     "claude-ai": "claude",
     "agent-codex": "codex",
@@ -70,7 +70,7 @@ class SignatureService:
         Handles:
         - ``None`` / empty / whitespace-only → ``None``
         - Placeholder values (unknown, system, workflow, ai-assistant, …) → ``None``
-        - Legacy aliases (``Agent-Claude``) → standard backend (``claude``)
+        - Actor aliases (``Agent-Claude``) → standard backend (``claude``)
         - Already-standard format (``claude/sonnet-4.6``) → pass through, trimmed
 
         This is the single source of truth for actor normalisation at the
@@ -82,8 +82,8 @@ class SignatureService:
         key = actor.strip().lower()
         if key in _DISPLAY_PLACEHOLDER_ACTORS:
             return None
-        if key in _LEGACY_ALIAS_MAP:
-            return _LEGACY_ALIAS_MAP[key]
+        if key in _ACTOR_ALIAS_MAP:
+            return _ACTOR_ALIAS_MAP[key]
         return actor.strip()
 
     @classmethod

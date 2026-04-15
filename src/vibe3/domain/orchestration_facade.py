@@ -5,7 +5,10 @@ Governance 与 Supervisor Apply 的执行装配由各自的 domain handler 负�
 不在 facade 内内联。
 """
 
+from __future__ import annotations
+
 import time
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -14,8 +17,12 @@ from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+
+if TYPE_CHECKING:
+    from vibe3.execution.capacity_service import CapacityService
+    from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
+    from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
 
 class OrchestrationFacade(ServiceBase):
@@ -35,7 +42,8 @@ class OrchestrationFacade(ServiceBase):
     def __init__(
         self,
         tick_count: int = 0,
-        dispatch_services: "list | None" = None,
+        dispatch_services: list[StateLabelDispatchService] | None = None,
+        capacity: CapacityService | None = None,
     ) -> None:
         """Initialize facade with tick counter.
 
@@ -46,12 +54,28 @@ class OrchestrationFacade(ServiceBase):
                 on_tick() methods are called concurrently from this facade's
                 on_tick(), replacing the need to register them separately in
                 the heartbeat server.
+            capacity: Optional CapacityService for capacity-aware dispatch.
+                When provided, GlobalDispatchCoordinator is used for unified
+                dispatch with capacity checks before emitting intents.
+                When None, legacy concurrent gather path is used (backward compat).
         """
         self._tick_count = tick_count
         self._config = OrchestraConfig.from_settings()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
         self._dispatch_services = list(dispatch_services or [])
+        self._capacity = capacity
+        self._coordinator: GlobalDispatchCoordinator | None = None
+
+        if self._dispatch_services and self._capacity is not None:
+            from vibe3.orchestra.global_dispatch_coordinator import (
+                GlobalDispatchCoordinator,
+            )
+
+            self._coordinator = GlobalDispatchCoordinator(
+                capacity=self._capacity,
+                dispatch_services=self._dispatch_services,
+            )
 
     async def on_tick(self) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
@@ -61,30 +85,23 @@ class OrchestrationFacade(ServiceBase):
         2. Publishes SupervisorIssueIdentified for matching issues
         3. Polls issue labels for all dispatch services
         """
-        import asyncio
 
         self.on_heartbeat_tick()
 
         # Scan for supervisor candidates and publish events
         await self.on_supervisor_scan()
 
-        # Poll issue labels for all trigger states concurrently
-        if self._dispatch_services:
-            results = await asyncio.gather(
-                *(service.on_tick() for service in self._dispatch_services),
-                return_exceptions=True,
+        # Poll issue labels for all trigger states
+        if not self._dispatch_services:
+            return
+
+        if self._coordinator is None:
+            raise RuntimeError(
+                "OrchestrationFacade: GlobalDispatchCoordinator not initialized. "
+                "Both dispatch_services and capacity must be provided at init time."
             )
-            for service, result in zip(self._dispatch_services, results, strict=False):
-                if not isinstance(result, Exception):
-                    continue
-                append_orchestra_event(
-                    "server",
-                    f"tick error in {service.service_name}: {result}",
-                )
-                logger.bind(
-                    domain="orchestration_facade",
-                    service=service.service_name,
-                ).error(f"Dispatch service tick failed: {result}")
+
+        await self._coordinator.coordinate()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event.
@@ -144,7 +161,7 @@ class OrchestrationFacade(ServiceBase):
             to_state=to_state,
         ).info("Emitting IssueStateChanged event")
 
-        publish(event)
+        publish(event)  # type: ignore[no-untyped-call]
 
     def on_heartbeat_tick(self) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
@@ -188,7 +205,7 @@ class OrchestrationFacade(ServiceBase):
             domain="orchestration_facade",
             tick_count=self._tick_count,
         ).info("Emitting GovernanceScanStarted event")
-        publish(event)
+        publish(event)  # type: ignore[no-untyped-call]
 
     def on_governance_decision(
         self,
@@ -243,4 +260,4 @@ class OrchestrationFacade(ServiceBase):
                 issue_number=event.issue_number,
                 supervisor_file=event.supervisor_file,
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
-            publish(event)
+            publish(event)  # type: ignore[no-untyped-call]

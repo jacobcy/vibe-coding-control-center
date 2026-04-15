@@ -91,8 +91,15 @@ class StateLabelDispatchService(ServiceBase):
     async def handle_event(self, event: GitHubEvent) -> None:
         return
 
-    async def on_tick(self) -> None:
-        """Periodic scan and async dispatch for the configured trigger state."""
+    async def collect_ready_issues(self) -> list[IssueInfo]:
+        """Scan and return ready issues without dispatching.
+
+        This method is for GlobalDispatchCoordinator to collect issues for
+        capacity-aware dispatch. Capacity checking is done by coordinator.
+
+        Returns:
+            Filtered and sorted ready issues list
+        """
         async with self._dispatch_guard:
             raw_issues = await asyncio.get_event_loop().run_in_executor(
                 self._executor,
@@ -106,19 +113,33 @@ class StateLabelDispatchService(ServiceBase):
             )
 
             ready = self._select_ready_issues(raw_issues)
-            ready_count = len(ready)
 
             append_orchestra_event(
                 "dispatcher",
-                f"{self.service_name} tick: {ready_count} ready issues",
+                f"{self.service_name} collect: {len(ready)} ready issues",
             )
-            if ready:
-                ready_numbers = ", ".join(f"#{issue.number}" for issue in ready)
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} tick ready issues: {ready_numbers}",
-                    level="DEBUG",
-                )
+            return ready
+
+    async def on_tick(self) -> None:
+        """Periodic scan and async dispatch for the configured trigger state.
+
+        **DEPRECATED**: This method bypasses capacity checks and should not be
+        called directly. Use GlobalDispatchCoordinator.coordinate() instead,
+        which properly checks capacity before emitting dispatch intents.
+
+        This method is kept for backward compatibility but will raise a warning
+        if called outside of GlobalDispatchCoordinator context.
+        """
+        import warnings
+
+        warnings.warn(
+            f"{self.service_name}.on_tick() is deprecated: "
+            "bypasses capacity checks. Use GlobalDispatchCoordinator instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        ready = await self.collect_ready_issues()
 
         for issue in ready:
             try:

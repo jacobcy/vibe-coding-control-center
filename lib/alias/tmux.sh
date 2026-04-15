@@ -1,6 +1,17 @@
 #!/usr/bin/env zsh
 # Tmux session & window management
 
+# ── Guard against incomplete loading ──────────────────────
+# When user directly sources this file without loading utils.sh
+_vibe_alias_require_loaded() {
+  if [[ "$(type vibe_require 2>&1)" != *function* ]]; then
+    echo "⚠️  This alias requires Vibe to be loaded first."
+    echo "🚀 To load into current shell: source \$(vibe alias --load)"
+    return 1
+  fi
+  return 0
+}
+
 # @desc Ensure the Vibe Tmux session exists
 vibe_tmux_ensure() {
   vibe_require tmux || return 1
@@ -84,6 +95,7 @@ _vt_find() {
 #   vt <name>   → attach to matched session (only existing)
 # @featured
 vt() {
+  _vibe_alias_require_loaded || return 127
   vibe_require tmux || return 1
   local target="${1:-}"
 
@@ -131,6 +143,7 @@ vt() {
 #   vtup /abs/path  → use dir basename as session
 # @featured
 vtup() {
+  _vibe_alias_require_loaded || return 127
   vibe_require tmux git || return 1
   local target="${1:-}"
 

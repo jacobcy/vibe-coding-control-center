@@ -10,6 +10,18 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 
 
+@pytest.fixture(autouse=True)
+def cleanup_capacity_state():
+    """Auto-cleanup class-level shared state after each test.
+
+    CapacityService uses a class-level _shared_in_flight_dispatches dict
+    for in-flight dispatch tracking. This fixture ensures test isolation
+    by clearing the state after each test, preventing cross-test pollution.
+    """
+    yield
+    CapacityService._shared_in_flight_dispatches.clear()
+
+
 @pytest.fixture()
 def store(tmp_path: Path) -> SQLiteClient:
     return SQLiteClient(db_path=str(tmp_path / "capacity.db"))
@@ -19,7 +31,6 @@ def store(tmp_path: Path) -> SQLiteClient:
 def backend() -> MagicMock:
     mock = MagicMock()
     mock.has_tmux_session.return_value = True
-    mock.has_tmux_session_prefix.return_value = True
     return mock
 
 
@@ -189,19 +200,19 @@ def test_full_dispatch_lifecycle(
 # --- multi-role tests ---
 
 
-def test_can_dispatch_separates_roles(
+def test_can_dispatch_uses_global_pool(
     service: CapacityService,
 ) -> None:
-    """Capacity is tracked separately per role."""
-    # Manager at capacity
+    """Capacity is shared globally across all roles."""
+    # Manager takes 2 in-flight slots
     service.mark_in_flight("manager", 10)
     service.mark_in_flight("manager", 20)
     with patch.object(service._registry, "count_live_worker_sessions", return_value=1):
-        # Manager full (2 in-flight + 1 live = 3)
+        # Manager full (2 in-flight + 1 live = 3 == max)
         assert service.can_dispatch("manager", 30) is False
 
-        # Planner still has capacity
-        assert service.can_dispatch("planner", 40) is True
+        # Planner also blocked — same global pool
+        assert service.can_dispatch("planner", 40) is False
 
 
 def test_mark_in_flight_separates_roles(

@@ -117,6 +117,8 @@ def run_command():
 
 ## CapacityService
 
+详细文档见 **[docs/v3/architecture/capacity-control.md](capacity-control.md)**。
+
 ### 用途
 
 统一管理所有执行角色的容量控制，解决双层节流问题。
@@ -130,6 +132,13 @@ def run_command():
 **解决方案**：
 
 CapacityService 提供单一的容量检查点，结合 live session count 和 in-flight dispatch tracking。
+
+**容量检查触发路径**（详见 [capacity-control.md](capacity-control.md)）：
+
+- **Heartbeat 自动调度**: GlobalDispatchCoordinator 通过 heartbeat 定期扫描
+- **CLI 手动触发**: `vibe3 internal issue-role-sync` 命令
+
+两条路径共享同一个 `_shared_in_flight_dispatches`，确保容量计数一致。
 
 ### API
 
@@ -173,6 +182,38 @@ remaining = max_capacity(role) - active_count(role) - in_flight_count(role)
 - `active_count`：当前正在运行的 live worker sessions 数量
 - `in_flight_count`：正在分发中但尚未启动的目标数量
 - `max_capacity`：该角色的最大并发数
+
+### GlobalDispatchCoordinator 共享约束
+
+**关键要求**：GlobalDispatchCoordinator 和 ExecutionCoordinator 必须使用同一个 CapacityService 实例（或共享同一个 db_path）。
+
+**实现方式**：
+
+1. **registry.py 注入**：
+   ```python
+   shared_capacity = CapacityService(config, shared_store, shared_backend)
+   facade = OrchestrationFacade(dispatch_services=dispatch_services, capacity=shared_capacity)
+   ```
+
+2. **类变量共享机制**：
+   CapacityService 使用类变量 `_shared_in_flight_dispatches` 基于 db_path 共享状态：
+   ```python
+   _shared_in_flight_dispatches: dict[str, dict[str, set[int]]] = {}
+   # key = str(Path(store.db_path).resolve())
+   ```
+
+只要两个 CapacityService 实例使用相同的 store（指向同一个 db_path），它们会自动共享 in_flight 状态。
+
+**验证**：
+- registry.py 中的 `shared_store` 与 coordinator.py 内的 `SQLiteClient()` 默认 db_path 一致
+- facade 将 shared_capacity 传入 GlobalDispatchCoordinator
+- ExecutionCoordinator 使用同一个 shared_capacity 实例（通过依赖注入）
+
+**回滚策略**：
+如果 GlobalDispatchCoordinator 出现问题，可以回滚到旧路径：
+1. 移除 registry.py 中的 shared_capacity 注入
+2. facade.on_tick() 自动回退到 legacy asyncio.gather 路径（capacity=None）
+3. 删除 global_dispatch_coordinator.py 文件
 
 ### 配置
 

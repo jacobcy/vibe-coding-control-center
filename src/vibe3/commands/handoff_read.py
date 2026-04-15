@@ -44,9 +44,20 @@ def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict
     return registry.get_truly_live_sessions_for_branch(branch)
 
 
+def _resolve_ref_path(val: str, worktree_root: str) -> str:
+    """Resolve a ref value to absolute path if it looks like a relative file path."""
+    if not val or Path(val).is_absolute() or val.startswith("("):
+        return val
+    # Only resolve paths that look like file references
+    if "/" in val and not val.startswith("http"):
+        return str(Path(worktree_root) / val)
+    return val
+
+
 def _render_agent_chain(
     state: FlowState,
     live_sessions: list[dict] | None = None,
+    worktree_root: str | None = None,
 ) -> None:
     console.print("[bold]Agent Chain[/]")
     for label, actor_label in [
@@ -58,8 +69,19 @@ def _render_agent_chain(
         val = getattr(state, label, None)
         actor = getattr(state, actor_label, None) or ""
         actor_str = f"  [dim]{actor}[/]" if actor else ""
-        status = val if val else "[dim](pending)[/]"
-        console.print(f"  [dim]{label}[/]  {status}{actor_str}")
+        if val and worktree_root:
+            display_val: str = _resolve_ref_path(val, worktree_root)
+        else:
+            display_val = val or ""
+        if display_val:
+            # Print label + actor on one line, then path on its own line.
+            # This prevents terminal-width wrapping from mixing the actor
+            # into the path continuation (e.g. "...executio\nn-report.md  develop").
+            label_line = f"  [dim]{label}[/]{actor_str}"
+            console.print(label_line)
+            console.print(f"    {display_val}", no_wrap=True)
+        else:
+            console.print(f"  [dim]{label}[/]  [dim](pending)[/]")
     console.print()
 
     # Show live registry sessions (registry is the source of truth)
@@ -78,7 +100,7 @@ def _render_handoff_events(events: list[FlowEvent]) -> None:
         console.print("[dim]  no handoff events[/]")
         return
 
-    for event in events:
+    for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
         console.print(
             f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{event.actor}[/]"
@@ -89,10 +111,10 @@ def _render_handoff_events(events: list[FlowEvent]) -> None:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:
-                    console.print(f"  [dim]📎 {f}[/]")
+                    console.print(f"  [dim]- {f}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             if ref:
-                console.print(f"  [dim]📎 {ref}[/]")
+                console.print(f"  [dim]- {ref}[/]")
         console.print()
 
 
@@ -144,7 +166,7 @@ def _render_updates_log(updates: list[dict[str, str]], truncate: bool = True) ->
         return
 
     kind_colors = {"finding": "yellow", "blocker": "red", "next": "blue", "note": "dim"}
-    for update in reversed(updates):
+    for update in updates:
         timestamp = update["timestamp"]
         actor = update["actor"]
         kind = update["kind"]
@@ -278,9 +300,13 @@ def show(
         # Fetch live registry sessions (preferred over deprecated FlowState fields)
         live_sessions = _get_live_sessions_for_branch(service.store, target_branch)
 
+        worktree_root = service.git_client.get_worktree_root()
+
         console.print(f"\n[bold cyan]flow[/]: {state.flow_slug}")
         console.print()
-        _render_agent_chain(state, live_sessions=live_sessions)
+        _render_agent_chain(
+            state, live_sessions=live_sessions, worktree_root=worktree_root
+        )
 
         # Show resume hints from registry only (registry is source of truth)
         if live_sessions:

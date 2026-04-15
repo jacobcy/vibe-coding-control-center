@@ -19,13 +19,14 @@ def test_maps_source_file_to_related_tests() -> None:
 
 def test_dag_resolves_tests_for_unmapped_source() -> None:
     # signature_service.py has no test_signature_service.py (name miss).
-    # But check_service.py imports it, and test_flow_status.py imports check_service.
+    # But flow_dispatch.py directly imports SignatureService, and
+    # test_flow_lifecycle.py imports flow_dispatch.
     # DAG layer should narrow to those tests instead of the full services directory.
     selection = select_pre_push_tests(["src/vibe3/services/signature_service.py"])
 
     assert selection.mode == "incremental"
-    # Must include tests that import check_service (which imports the mixin)
-    assert "tests/vibe3/services/test_flow_status.py" in selection.tests
+    # Must include tests that import flow_dispatch (which imports signature_service)
+    assert "tests/vibe3/services/test_flow_lifecycle.py" in selection.tests
     # Must NOT fall back to the full directory
     assert "tests/vibe3/services" not in selection.tests
     assert selection.unmapped_sources == ["src/vibe3/services/signature_service.py"]

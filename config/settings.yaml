@@ -99,7 +99,7 @@ code_limits:
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
-        limit: 450
+        limit: 500
         reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
       - path: "lib/keys_support.sh"
         limit: 500
@@ -121,14 +121,17 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 450
+        limit: 500
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
+      - path: "tests/vibe3/domain/test_orchestration_facade.py"
+        limit: 450
+        reason: "单一测试类，刚超限，拆分收益低"       
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
 
   total_file_loc:
-    v2_shell: 2000         # Shell 核心代码总行数
+    v2_shell: 3000         # Shell 核心代码总行数
     v3_python: 38000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）

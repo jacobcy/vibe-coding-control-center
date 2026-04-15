@@ -2,7 +2,7 @@
 
 import json
 import subprocess
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
@@ -52,7 +52,7 @@ class IssueAdminMixin:
                 "Failed to list issues with assignees"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def close_issue(
         self: Any,

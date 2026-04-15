@@ -1,6 +1,17 @@
 #!/usr/bin/env zsh
 # Worktree management commands
 
+# ── Guard against incomplete loading ──────────────────────
+# When user directly sources this file without loading utils.sh
+_vibe_alias_require_loaded() {
+  if [[ "$(type vibe_require 2>&1)" != *function* ]]; then
+    echo "⚠️  This alias requires Vibe to be loaded first."
+    echo "🚀 To load into current shell: source \$(vibe alias --load)"
+    return 1
+  fi
+  return 0
+}
+
 # @desc List all worktrees
 # @featured
 alias wtls='git worktree list'
@@ -66,6 +77,7 @@ _wt_find() {
 # @desc Jump to a specific worktree by name (e.g. wt my-feat)
 # @featured
 wt() {
+  _vibe_alias_require_loaded || return 127
   local target="$1"
   [[ -z "$target" ]] && { git worktree list; return; }
 
@@ -97,6 +109,7 @@ wt() {
 # @desc Create a new feature worktree
 # @featured
 wtnew() {
+  _vibe_alias_require_loaded || return 127
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
   local branch="" base="origin/main" actor=""
 
@@ -294,6 +307,7 @@ wtrm() {
 #   vup --agent codex → specify agent (claude|codex|opencode)
 # @featured
 vup() {
+  _vibe_alias_require_loaded || return 127
   vibe_require tmux git || return 1
   local mode="dash" target="" agent="claude"
 

@@ -6,6 +6,7 @@ from typing import Optional
 
 from loguru import logger
 
+from vibe3.agents.backends.async_launcher import start_async_command
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
@@ -114,7 +115,7 @@ class ExecutionCoordinator:
             # Ensure we launch async
             if request.mode == "async":
                 if request.cmd:
-                    handle = self.backend.start_async_command(
+                    handle = start_async_command(
                         request.cmd,
                         execution_name=request.execution_name,
                         cwd=cwd_path,
@@ -147,7 +148,7 @@ class ExecutionCoordinator:
                 # 5. Record started (which handles session registry)
                 # Type ignore because ExecutionRole is a Literal constraint
                 self.lifecycle.record_started(
-                    role=request.role,  # type: ignore
+                    role=request.role,  # type: ignore[arg-type]
                     target=request.target_branch,
                     actor=request.actor,
                     refs=refs,
@@ -174,7 +175,7 @@ class ExecutionCoordinator:
 
                 # 5. Record started
                 self.lifecycle.record_started(
-                    role=request.role,  # type: ignore
+                    role=request.role,  # type: ignore[arg-type]
                     target=request.target_branch,
                     actor=request.actor,
                     refs=request.refs,
@@ -199,7 +200,7 @@ class ExecutionCoordinator:
 
                     if result.is_success():
                         self.lifecycle.record_completed(
-                            role=request.role,  # type: ignore
+                            role=request.role,  # type: ignore[arg-type]
                             target=request.target_branch,
                             actor=request.actor,
                             detail=f"Execution completed for {request.role}",
@@ -215,7 +216,7 @@ class ExecutionCoordinator:
                     else:
                         error_msg = getattr(result, "stderr", "") or "Execution failed"
                         self.lifecycle.record_failed(
-                            role=request.role,  # type: ignore
+                            role=request.role,  # type: ignore[arg-type]
                             target=request.target_branch,
                             actor=request.actor,
                             error=error_msg,
@@ -236,7 +237,7 @@ class ExecutionCoordinator:
                         )
                 except Exception as run_exc:
                     self.lifecycle.record_failed(
-                        role=request.role,  # type: ignore
+                        role=request.role,  # type: ignore[arg-type]
                         target=request.target_branch,
                         actor=request.actor,
                         error=str(run_exc),
@@ -246,7 +247,7 @@ class ExecutionCoordinator:
                         domain="execution_coordinator",
                         role=request.role,
                         target_id=request.target_id,
-                    ).exception(f"Execution threw for {request.role} (sync): {run_exc}")
+                    ).error(f"Execution threw for {request.role} (sync): {run_exc}")
 
                     return ExecutionLaunchResult(
                         launched=False,
@@ -261,10 +262,10 @@ class ExecutionCoordinator:
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
-            ).exception(f"Execution launch failed: {exc}")
+            ).error(f"Execution launch failed: {exc}")
 
             self.lifecycle.record_failed(
-                role=request.role,  # type: ignore
+                role=request.role,  # type: ignore[arg-type]
                 target=request.target_branch,
                 actor=request.actor,
                 error=str(exc),

@@ -1,8 +1,11 @@
 """Protocol definitions for clients."""
 
+from pathlib import Path
 from typing import Any, Protocol
 
-from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest  # type: ignore
+from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
+from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest
+from vibe3.models.review_runner import AgentOptions, AgentResult
 
 
 class BackendProtocol(Protocol):
@@ -24,14 +27,56 @@ class BackendProtocol(Protocol):
         """
         ...
 
-    def list_tmux_sessions(self, *, prefix: str | None = None) -> set[str]:
-        """List tmux sessions, optionally filtered by prefix.
+    def run(
+        self,
+        prompt: str,
+        options: AgentOptions,
+        task: str | None = None,
+        dry_run: bool = False,
+        session_id: str | None = None,
+        cwd: Path | None = None,
+    ) -> AgentResult:
+        """Run agent synchronously.
 
         Args:
-            prefix: Optional prefix to filter sessions (e.g., "vibe3-manager")
+            prompt: Prompt content
+            options: Agent execution options
+            task: Optional task description
+            dry_run: If True, print command without executing
+            session_id: Optional session ID to resume
+            cwd: Working directory
 
         Returns:
-            Set of tmux session names
+            Agent execution result
+        """
+        ...
+
+    def start_async(
+        self,
+        prompt: str,
+        options: AgentOptions,
+        *,
+        task: str | None = None,
+        session_id: str | None = None,
+        execution_name: str,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        keep_alive_seconds: int = 0,
+    ) -> AsyncExecutionHandle:
+        """Start agent asynchronously in tmux.
+
+        Args:
+            prompt: Prompt content
+            options: Agent execution options
+            task: Optional task description
+            session_id: Optional session ID to resume
+            execution_name: Unique execution name for session and logs
+            cwd: Working directory
+            env: Optional environment variable overrides
+            keep_alive_seconds: Seconds to keep tmux session alive after completion
+
+        Returns:
+            Async execution handle with session and log info
         """
         ...
 

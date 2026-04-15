@@ -2,49 +2,13 @@
 
 from typing import Any
 
-from rich.text import Text
-
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
 from vibe3.ui.flow_ui_timeline import (  # noqa: F401
     render_flow_timeline,
     render_milestone,
 )
-
-_STATUS_COLOR: dict[str, str] = {
-    "active": "green",
-    "done": "dim",
-    "blocked": "red",
-    "stale": "yellow",
-}
-
-
-def _status_text(status: str) -> Text:
-    color = _STATUS_COLOR.get(status.lower(), "white")
-    return Text(status, style=color)
-
-
-def _kv(key: str, value: object, indent: int = 0) -> None:
-    pad = "  " * indent
-    console.print(f"{pad}[dim]{key}:[/] {value}")
-
-
-def _display_actor(actor: str | None) -> tuple[str, bool]:
-    """Resolve actor for display.
-
-    Returns (display_value, is_worktree_fallback).
-    - If actor is set and normalizes to a meaningful value → (normalized, False)
-    - Else → (worktree git user.name, True)
-
-    Uses ``SignatureService.normalize_actor`` which maps legacy aliases and
-    filters placeholders, giving consistent output across PR body and UI.
-    """
-    from vibe3.services.signature_service import SignatureService
-
-    normalized = SignatureService.normalize_actor(actor)
-    if normalized is not None:
-        return normalized, False
-    return SignatureService.get_worktree_actor(), True
 
 
 def _render_flow_row(
@@ -53,21 +17,21 @@ def _render_flow_row(
     pr_data: dict[str, object] | None = None,
     worktree: str | None = None,
 ) -> None:
-    status_text = _status_text(flow.flow_status).plain
-    console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
-    _kv("flow_slug", flow.flow_slug, 1)
+    status_str = status_text(flow.flow_status).plain
+    console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_str})[/]")
+    kv("flow_slug", flow.flow_slug, 1)
     task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
-    _kv("task_issue", task_str, 1)
+    kv("task_issue", task_str, 1)
     if title is not None:
-        _kv("title", title, 1)
+        kv("title", title, 1)
     if worktree:
-        _kv("worktree", worktree, 1)
+        kv("worktree", worktree, 1)
     if flow.initiated_by:
-        _kv("initiated_by", flow.initiated_by, 1)
+        kv("initiated_by", flow.initiated_by, 1)
     # Always show actor — fallback to worktree identity when flow has no signature
-    _actor, _fallback = _display_actor(flow.latest_actor)
+    _actor, _fallback = display_actor(flow.latest_actor)
     _suffix = " [dim](worktree)[/]" if _fallback else ""
-    _kv("latest", f"{_actor}{_suffix}", 1)
+    kv("latest", f"{_actor}{_suffix}", 1)
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()
@@ -79,15 +43,15 @@ def _render_flow_row(
         )
         # Remove redundant worktree display since it's already shown above
     elif flow.pr_number:
-        _kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
+        kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
     console.print()
 
 
 def render_flow_created(flow: FlowStatusResponse, task_id: str | None = None) -> None:
     console.print(f"[green]✓[/] Flow created: [cyan]{flow.flow_slug}[/]")
-    _kv("branch", flow.branch, 1)
+    kv("branch", flow.branch, 1)
     if task_id:
-        _kv("task", task_id, 1)
+        kv("task", task_id, 1)
 
 
 def render_flow_status(
@@ -99,11 +63,11 @@ def render_flow_status(
 ) -> None:
     """flow show — full detail, YAML style."""
     titles = issue_titles or {}
-    status_text = _status_text(status.flow_status).plain
-    console.print(f"[cyan bold]{status.branch}[/]  [dim](Flow: {status_text})[/]")
-    _kv("flow_slug", status.flow_slug, 1)
+    status_str = status_text(status.flow_status).plain
+    console.print(f"[cyan bold]{status.branch}[/]  [dim](Flow: {status_str})[/]")
+    kv("flow_slug", status.flow_slug, 1)
     if parent_branch:
-        _kv("parent", parent_branch, 1)
+        kv("parent", parent_branch, 1)
     if status.task_issue_number:
         n = status.task_issue_number
         title = titles.get(n, "")
@@ -132,10 +96,10 @@ def render_flow_status(
         )
         worktree = pr_data.get("worktree")
         if worktree:
-            _kv("worktree", worktree, 2)
-        _kv("url", pr_data.get("url", ""), 2)
+            kv("worktree", worktree, 2)
+        kv("url", pr_data.get("url", ""), 2)
     elif status.pr_number:
-        _kv("pr", f"#{status.pr_number}  [dim](offline)[/]", 1)
+        kv("pr", f"#{status.pr_number}  [dim](offline)[/]", 1)
     else:
         console.print(
             "  [dim]pr:[/] [yellow]—[/]  "
@@ -147,20 +111,20 @@ def render_flow_status(
         ("review", status.reviewer_actor, status.audit_ref),
     ):
         console.print(f"  [dim]{stage}:[/]")
-        _kv("actor", actor or "—", 2)
-        _kv("ref", ref or "—", 2)
+        kv("actor", actor or "—", 2)
+        kv("ref", ref or "—", 2)
     if status.spec_ref:
-        _kv("spec", status.spec_ref, 1)
+        kv("spec", status.spec_ref, 1)
     if status.blocked_by:
-        _kv("blocked_by", status.blocked_by, 1)
+        kv("blocked_by", status.blocked_by, 1)
     if status.next_step:
-        _kv("next_step", status.next_step, 1)
+        kv("next_step", status.next_step, 1)
 
     if status.initiated_by:
-        _kv("initiated_by", status.initiated_by, 1)
+        kv("initiated_by", status.initiated_by, 1)
 
     # Always show actor — fallback to worktree identity when flow has no signature
-    _actor, _fallback = _display_actor(status.latest_actor)
+    _actor, _fallback = display_actor(status.latest_actor)
     _suffix = " [dim](worktree)[/]" if _fallback else ""
     actors = [
         f"[dim]latest:[/] {_actor}{_suffix}",
@@ -193,9 +157,9 @@ def render_flow_status(
                 )
                 console.print(f"    [{color}]{icon} {role}: {st}[/]")
         if status.execution_started_at:
-            _kv("started", status.execution_started_at[:19], 2)
+            kv("started", status.execution_started_at[:19], 2)
         if status.execution_pid:
-            _kv("pid", status.execution_pid, 2)
+            kv("pid", status.execution_pid, 2)
     console.print()
 
 

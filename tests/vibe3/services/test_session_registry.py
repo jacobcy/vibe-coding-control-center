@@ -17,7 +17,6 @@ def store(tmp_path: pytest.TempPathFactory) -> SQLiteClient:
 def backend() -> MagicMock:
     mock = MagicMock()
     mock.has_tmux_session.return_value = True
-    mock.has_tmux_session_prefix.return_value = True
     return mock
 
 

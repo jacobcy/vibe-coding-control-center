@@ -25,6 +25,14 @@ if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
 
 
+def _format_resume_failure_reason(exc: Exception) -> str:
+    """Return a concise, human-readable failure reason for resume output."""
+    detail = str(exc).strip()
+    if detail:
+        return detail
+    return exc.__class__.__name__
+
+
 class TaskResumeUsecase:
     """Unified usecase for resuming failed or blocked tasks."""
 
@@ -240,10 +248,20 @@ class TaskResumeUsecase:
                     {"number": issue_number, "resume_kind": resume_kind}
                 )
 
-            except Exception:
-                # Skip on error, could log here
+            except Exception as exc:
+                failure_reason = _format_resume_failure_reason(exc)
+                logger.bind(
+                    domain="resume",
+                    action="candidate_failed",
+                    issue_number=issue_number,
+                    resume_kind=resume_kind,
+                    branch=branch,
+                ).warning(f"Resume candidate failed: {failure_reason}")
                 result["skipped"].append(
-                    {"number": issue_number, "reason": "恢复操作失败"}
+                    {
+                        "number": issue_number,
+                        "reason": f"恢复操作失败: {failure_reason}",
+                    }
                 )
 
         return result

@@ -1,5 +1,7 @@
 """Tests for GitHub label client ports."""
 
+import subprocess
+
 from vibe3.clients.github_labels import GhIssueLabelPort
 
 
@@ -57,3 +59,16 @@ def test_gh_issue_label_port_appends_repo(monkeypatch) -> None:
         "--repo",
         "owner/repo",
     ]
+
+
+def test_gh_issue_label_port_returns_none_or_false_on_timeout(monkeypatch) -> None:
+    def fake_run(cmd, *_, **__) -> object:
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=30)
+
+    monkeypatch.setattr("vibe3.clients.github_labels.subprocess.run", fake_run)
+
+    port = GhIssueLabelPort(repo="owner/repo")
+
+    assert port.get_issue_labels(12) is None
+    assert port.add_issue_label(12, "state/ready") is False
+    assert port.remove_issue_label(12, "state/ready") is False

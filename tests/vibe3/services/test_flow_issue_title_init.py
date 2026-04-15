@@ -19,7 +19,7 @@ def test_issue_flow_init_caches_issue_title_without_mutating_spec_ref() -> None:
         git_client.get_current_branch = lambda: "dev/issue-328"  # type: ignore
 
         # Mock GitHub API to return issue title
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh_class:
+        with patch("vibe3.services.flow_transition.GitHubClient") as mock_gh_class:
             mock_gh = MagicMock()
             mock_gh.view_issue.return_value = {
                 "number": 328,
@@ -57,7 +57,7 @@ def test_issue_flow_init_handles_github_failure_gracefully() -> None:
         git_client.get_current_branch = lambda: "task/issue-999"  # type: ignore
 
         # Mock GitHub API to fail
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh_class:
+        with patch("vibe3.services.flow_transition.GitHubClient") as mock_gh_class:
             mock_gh = MagicMock()
             mock_gh.view_issue.side_effect = Exception("GitHub API error")
             mock_gh_class.return_value = mock_gh
@@ -92,7 +92,7 @@ def test_issue_flow_init_uses_existing_task_link() -> None:
         store.add_issue_link("task/issue-436", 123, "task")
 
         # Mock GitHub API
-        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh_class:
+        with patch("vibe3.services.flow_transition.GitHubClient") as mock_gh_class:
             mock_gh = MagicMock()
             mock_gh.view_issue.return_value = {
                 "number": 123,

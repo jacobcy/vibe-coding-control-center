@@ -5,7 +5,7 @@ import os
 import re
 import subprocess
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
@@ -121,7 +121,7 @@ class IssuesMixin(IssueAdminMixin):
                 "Failed to list merged PRs"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def list_issues(
         self,
@@ -172,7 +172,7 @@ class IssuesMixin(IssueAdminMixin):
                 "Failed to list issues"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def view_issue(
         self: Any, issue_number: int, repo: str | None = None
@@ -245,7 +245,7 @@ class IssuesMixin(IssueAdminMixin):
                 f"Issue #{issue_number} not found: {stderr.strip()}"
             )
             return None
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast("dict[str, Any] | None | str", json.loads(result.stdout))
 
     def get_milestone_issues(self: Any, milestone_number: int) -> list[dict[str, Any]]:
         """Get all issues in a milestone (open + closed).
@@ -281,7 +281,7 @@ class IssuesMixin(IssueAdminMixin):
                 f"Failed to get milestone {milestone_number} issues: {err}"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def get_milestone_context(self: Any, issue_number: int) -> MilestoneContext | None:
         """Fetch milestone orchestration context for a task issue.

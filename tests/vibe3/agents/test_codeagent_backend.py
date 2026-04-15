@@ -9,7 +9,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.async_launcher import (
+    default_log_dir,
+    resolve_async_log_path,
+)
+from vibe3.agents.backends.codeagent import (
+    CodeagentBackend,
+    _summarize_backend_output,
+)
 from vibe3.config.settings import AgentPromptConfig, VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
@@ -47,13 +54,11 @@ class TestCodeagentBackend:
         """Async log dir should honor orchestra-provided override."""
         monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", "/tmp/orchestra-logs")
 
-        assert (
-            CodeagentBackend._default_log_dir() == Path("/tmp/orchestra-logs").resolve()
-        )
+        assert default_log_dir() == Path("/tmp/orchestra-logs").resolve()
 
     def test_resolve_async_log_path_routes_plan_issue_logs_into_issue_dir(self) -> None:
         """Plan issue async logs should live under temp/logs/issues/issue-N."""
-        log_path = CodeagentBackend._resolve_async_log_path(
+        log_path = resolve_async_log_path(
             Path("/tmp/logs"),
             "vibe3-plan-issue-419",
         )
@@ -241,6 +246,51 @@ class TestCodeagentBackend:
                 backend.run("prompt body", options)
 
         assert "wrapper stderr details" in str(exc_info.value)
+
+    def test_summarize_backend_output_skips_stack_noise(self) -> None:
+        """Backend failure summary should keep signal while dropping traceback noise."""
+        stderr = """[codeagent-wrapper]
+Backend: opencode
+TypeError: undefined is not an object (evaluating 'schema._zod.def')
+    at process (/$bunfs/root/src/index.js:13485:28)
+Failed to parse event: plugin loading
+opencode completed without agent_message output
+Traceback (most recent call last):
+  File "cli.py", line 1, in <module>
+"""
+
+        summary = _summarize_backend_output(stderr, "")
+
+        assert "TypeError: undefined is not an object" in summary
+        assert "Failed to parse event: plugin loading" in summary
+        assert "opencode completed without agent_message output" in summary
+        assert "Traceback" not in summary
+        assert "at process" not in summary
+
+    def test_run_non_zero_exit_does_not_print_raw_failure_streams(self) -> None:
+        """Failure path should raise a concise error without echoing raw stderr."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mock_result.stderr = (
+            "[codeagent-wrapper]\n"
+            "TypeError: undefined is not an object (evaluating 'schema._zod.def')\n"
+            "    at process (/$bunfs/root/src/index.js:13485:28)\n"
+        )
+
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch("builtins.print") as mock_print,
+        ):
+            mock_run.return_value = mock_result
+            backend = CodeagentBackend()
+
+            with pytest.raises(AgentExecutionError) as exc_info:
+                backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+
+        assert "TypeError: undefined is not an object" in str(exc_info.value)
+        assert "at process" not in str(exc_info.value)
+        mock_print.assert_not_called()
 
     def test_run_retries_without_session_when_resume_session_is_invalid(self) -> None:
         """Invalid resume session should fall back to a fresh session once."""

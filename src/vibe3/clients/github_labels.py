@@ -8,6 +8,8 @@ from typing import Protocol
 
 from loguru import logger
 
+GH_LABEL_CMD_TIMEOUT_SECONDS = 30
+
 
 class IssueLabelPort(Protocol):
     """Port for issue label read/write operations."""
@@ -52,19 +54,44 @@ class GhIssueLabelPort:
             cmd.extend(["--repo", self.repo])
         return cmd
 
-    def get_issue_labels(self, issue_number: int) -> list[str] | None:
+    def _run_command(
+        self,
+        base: list[str],
+        *,
+        issue_number: int | None = None,
+        label: str | None = None,
+    ) -> subprocess.CompletedProcess[str] | None:
+        cmd = self._build_cmd(base)
         try:
-            result = subprocess.run(
-                self._build_cmd(
-                    ["gh", "issue", "view", str(issue_number), "--json", "labels"]
-                ),
+            return subprocess.run(
+                cmd,
                 capture_output=True,
                 text=True,
+                timeout=GH_LABEL_CMD_TIMEOUT_SECONDS,
             )
         except FileNotFoundError:
-            logger.bind(external="github", issue_number=issue_number).warning(
-                "gh command not found"
-            )
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+                label=label,
+            ).warning("gh command not found")
+            return None
+        except subprocess.TimeoutExpired:
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+                label=label,
+                timeout=GH_LABEL_CMD_TIMEOUT_SECONDS,
+                cmd=" ".join(cmd),
+            ).warning("gh label command timed out")
+            return None
+
+    def get_issue_labels(self, issue_number: int) -> list[str] | None:
+        result = self._run_command(
+            ["gh", "issue", "view", str(issue_number), "--json", "labels"],
+            issue_number=issue_number,
+        )
+        if result is None:
             return None
 
         if result.returncode != 0:
@@ -80,34 +107,22 @@ class GhIssueLabelPort:
         return [label.get("name", "") for label in labels if label.get("name")]
 
     def add_issue_label(self, issue_number: int, label: str) -> bool:
-        try:
-            result = subprocess.run(
-                self._build_cmd(
-                    ["gh", "issue", "edit", str(issue_number), "--add-label", label]
-                ),
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            logger.bind(
-                external="github", issue_number=issue_number, label=label
-            ).warning("gh command not found")
+        result = self._run_command(
+            ["gh", "issue", "edit", str(issue_number), "--add-label", label],
+            issue_number=issue_number,
+            label=label,
+        )
+        if result is None:
             return False
         return result.returncode == 0
 
     def remove_issue_label(self, issue_number: int, label: str) -> bool:
-        try:
-            result = subprocess.run(
-                self._build_cmd(
-                    ["gh", "issue", "edit", str(issue_number), "--remove-label", label]
-                ),
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            logger.bind(
-                external="github", issue_number=issue_number, label=label
-            ).warning("gh command not found")
+        result = self._run_command(
+            ["gh", "issue", "edit", str(issue_number), "--remove-label", label],
+            issue_number=issue_number,
+            label=label,
+        )
+        if result is None:
             return False
         return result.returncode == 0
 
@@ -118,25 +133,20 @@ class GhIssueLabelPort:
         color: str,
         description: str,
     ) -> bool:
-        try:
-            result = subprocess.run(
-                self._build_cmd(
-                    [
-                        "gh",
-                        "label",
-                        "create",
-                        label,
-                        "--color",
-                        color,
-                        "--description",
-                        description,
-                        "--force",
-                    ]
-                ),
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            logger.bind(external="github", label=label).warning("gh command not found")
+        result = self._run_command(
+            [
+                "gh",
+                "label",
+                "create",
+                label,
+                "--color",
+                color,
+                "--description",
+                description,
+                "--force",
+            ],
+            label=label,
+        )
+        if result is None:
             return False
         return result.returncode == 0

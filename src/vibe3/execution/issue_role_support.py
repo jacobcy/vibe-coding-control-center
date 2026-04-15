@@ -23,7 +23,18 @@ if TYPE_CHECKING:
 
 
 def resolve_orchestra_repo_root() -> Path:
-    """Resolve shared repo root anchored at git common dir."""
+    """Resolve the active repo root for orchestra self-invocation.
+
+    Prefer the current worktree root so async/sync self-invocations execute the
+    same checked-out code the operator is running. Fall back to the shared git
+    common dir parent only when worktree resolution is unavailable.
+    """
+    try:
+        worktree_root = GitClient().get_worktree_root()
+        if worktree_root:
+            return Path(worktree_root)
+    except Exception:
+        pass
     try:
         git_common_dir = GitClient().get_git_common_dir()
         if git_common_dir:
@@ -211,19 +222,33 @@ def snapshot_issue_role_progress(
 
 
 def apply_required_ref_post_sync(
-    *,
-    required_ref: str,
-    missing_reason: str,
-    missing_ref_handler: Callable[..., None],
     store: SQLiteClient,
     issue_number: int,
+    _branch: str,  # Required for signature compatibility, unused
     actor: str,
     config: Any,
     before_snapshot: dict[str, object],
     after_snapshot: dict[str, object],
     request: ExecutionRequest,
+    *,
+    required_ref: str,
+    missing_reason: str,
+    missing_ref_handler: Callable[..., None],
+    success_handler: Callable[..., None] | None = None,
 ) -> bool:
-    """Apply standard completion gate with required-ref protection."""
+    """Apply standard completion gate with required-ref protection.
+
+    Args:
+        _branch: Required to match IssueRoleSyncSpec.post_sync_hook signature,
+            but not used in this implementation. Prefix underscore indicates
+            intentional unused parameter.
+        success_handler: Optional callback invoked when required_ref is present
+            after execution. Called as success_handler(issue_number, actor).
+            Use this to trigger state transitions (e.g. confirm_plan_handoff)
+            directly from the sync completion path, bypassing the domain event
+            bus (which is in-process only and not accessible from async tmux
+            subprocess executions).
+    """
     before_refs = before_snapshot.get("refs")
     after_refs = after_snapshot.get("refs")
     if isinstance(before_refs, dict) and isinstance(after_refs, dict):
@@ -237,6 +262,13 @@ def apply_required_ref_post_sync(
                 repo=config.repo,
             )
             return True
+
+    # required_ref is present — call success_handler to advance state.
+    # This is the correct place for state transitions in the async tmux path:
+    # domain events published here would be in the subprocess event bus, not
+    # in the orchestra process, so direct calls are used instead.
+    if success_handler is not None:
+        success_handler(issue_number=issue_number, actor=actor)
 
     return apply_request_completion_gate(
         request=request,
@@ -260,8 +292,17 @@ def build_required_ref_sync_spec(
     missing_reason: str,
     missing_ref_handler: Callable[..., None],
     failure_handler: Callable[..., None],
+    success_handler: Callable[..., None] | None = None,
 ) -> IssueRoleSyncSpec:
-    """Build the standard sync spec shared by plan/run/review-style roles."""
+    """Build the standard sync spec shared by plan/run/review-style roles.
+
+    Args:
+        success_handler: Optional state-transition callback invoked when
+            required_ref is present after execution completes. Called as
+            success_handler(issue_number=..., actor=...).
+            Use this instead of domain events for async tmux paths where the
+            subprocess event bus is separate from the orchestra process.
+    """
     from vibe3.roles.definitions import IssueRoleSyncSpec
 
     return IssueRoleSyncSpec(
@@ -283,6 +324,7 @@ def build_required_ref_sync_spec(
             required_ref=required_ref,
             missing_reason=missing_reason,
             missing_ref_handler=missing_ref_handler,
+            success_handler=success_handler,
         ),
         failure_handler=failure_handler,
     )

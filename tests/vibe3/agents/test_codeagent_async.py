@@ -6,13 +6,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.agents.backends.async_launcher import (
+    build_async_log_filter,
+    build_async_shell_command,
+    start_async_command,
+)
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.models.review_runner import AgentOptions
 
 
 class TestStartAsyncCommand:
     def test_build_async_shell_command_exits_immediately_by_default(self) -> None:
-        shell = CodeagentBackend._build_async_shell_command(
+        shell = build_async_shell_command(
             ["echo", "hello"],
             log_path=Path("/tmp/test.log"),
             keep_alive_seconds=0,
@@ -26,7 +31,7 @@ class TestStartAsyncCommand:
         assert "sleep 0" not in shell
 
     def test_build_async_shell_command_can_keep_session_when_requested(self) -> None:
-        shell = CodeagentBackend._build_async_shell_command(
+        shell = build_async_shell_command(
             ["echo", "hello"],
             log_path=Path("/tmp/test.log"),
             keep_alive_seconds=5,
@@ -36,14 +41,14 @@ class TestStartAsyncCommand:
         assert "sleep 5" in shell
 
     def test_build_async_log_filter_is_single_shell_line(self) -> None:
-        filter_cmd = CodeagentBackend._build_async_log_filter()
+        filter_cmd = build_async_log_filter()
 
         assert filter_cmd[0] == "awk"
         assert "\n" not in filter_cmd[1]
         assert "END {;" not in filter_cmd[1]
 
     def test_build_async_shell_command_injects_env_overrides(self) -> None:
-        shell = CodeagentBackend._build_async_shell_command(
+        shell = build_async_shell_command(
             ["uv", "run", "python", "src/vibe3/cli.py", "internal", "manager", "328"],
             log_path=Path("/tmp/test.log"),
             keep_alive_seconds=0,
@@ -61,15 +66,13 @@ class TestStartAsyncCommand:
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:
-        backend = CodeagentBackend()
         log_dir = tmp_path / "temp" / "logs"
         stale_log = log_dir / "issues" / "issue-372" / "manager.async.log"
         stale_log.parent.mkdir(parents=True)
         stale_log.write_text("SESSION_ID: stale_session\n")
 
         monkeypatch.setattr(
-            backend,
-            "_default_log_dir",
+            "vibe3.agents.backends.async_launcher.default_log_dir",
             lambda: log_dir,
         )
 
@@ -102,13 +105,13 @@ class TestStartAsyncCommand:
             )
 
         with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+            "vibe3.agents.backends.async_launcher.subprocess.run", side_effect=fake_run
         ):
             # Also mock session.py subprocess.run to avoid actual tmux calls
             with patch(
                 "vibe3.environment.session.subprocess.run", side_effect=fake_run
             ):
-                backend.start_async_command(
+                start_async_command(
                     ["echo", "hello"],
                     execution_name="vibe3-manager-issue-372",
                 )
@@ -118,10 +121,12 @@ class TestStartAsyncCommand:
     def test_start_async_command_embeds_env_overrides_in_wrapper_script(
         self, monkeypatch, tmp_path
     ) -> None:
-        backend = CodeagentBackend()
         log_dir = tmp_path / "temp" / "logs"
         log_dir.mkdir(parents=True)
-        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
 
         launched_scripts: list[Path] = []
 
@@ -150,10 +155,11 @@ class TestStartAsyncCommand:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+                "vibe3.agents.backends.async_launcher.subprocess.run",
+                side_effect=fake_run,
             ),
         ):
-            backend.start_async_command(
+            start_async_command(
                 [
                     "uv",
                     "run",
@@ -179,11 +185,13 @@ class TestStartAsyncCommand:
     def test_start_async_command_uses_unique_tmux_session_when_name_exists(
         self, monkeypatch, tmp_path
     ) -> None:
-        backend = CodeagentBackend()
         log_dir = tmp_path / "temp" / "logs"
         log_dir.mkdir(parents=True)
 
-        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
 
         # Mock subprocess.run to simulate session name collision
         def fake_run(cmd, *args, **kwargs):
@@ -199,9 +207,9 @@ class TestStartAsyncCommand:
             return result
 
         with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+            "vibe3.agents.backends.async_launcher.subprocess.run", side_effect=fake_run
         ):
-            handle = backend.start_async_command(
+            handle = start_async_command(
                 ["echo", "hello"],
                 execution_name="vibe3-manager-issue-372",
             )
@@ -214,11 +222,13 @@ class TestStartAsyncCommand:
     def test_start_async_command_places_governance_logs_under_governance_dir(
         self, monkeypatch, tmp_path
     ) -> None:
-        backend = CodeagentBackend()
         log_dir = tmp_path / "temp" / "logs"
         log_dir.mkdir(parents=True)
 
-        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
 
         # Mock subprocess.run to break _allocate_tmux_session_name loop
         def fake_run(*args, **kwargs):
@@ -248,13 +258,13 @@ class TestStartAsyncCommand:
             )
 
         with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+            "vibe3.agents.backends.async_launcher.subprocess.run", side_effect=fake_run
         ):
             # Also mock session.py subprocess.run
             with patch(
                 "vibe3.environment.session.subprocess.run", side_effect=fake_run
             ):
-                handle = backend.start_async_command(
+                handle = start_async_command(
                     ["echo", "hello"],
                     execution_name="vibe3-governance-scan-20260405-114913-t1",
                 )

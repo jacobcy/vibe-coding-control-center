@@ -10,7 +10,8 @@ fi
 PATTERNS=(
   "rm\s+-rf\s+(/|~|\$HOME)"
   "rm\s+-rf\s+.*\s+(/|~)"
-  "git\s+push\s+.*(-f\s*|--force)"
+  # Fixed: match -f/--force as flags (with space before/after or at end), not in branch names
+  "git\s+push\s+.*(\s+(-f|--force)|(-f|--force)\s+|(-f|--force)\$)"
   "(DROP|TRUNCATE)\s+(TABLE|DATABASE)"
 )
 
