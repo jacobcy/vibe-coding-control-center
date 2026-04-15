@@ -167,8 +167,20 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
 
 
 def _preview_update_message(message: str, truncate: bool) -> str:
+    """Preview update message with intelligent truncation.
+
+    If message contains file paths (contains '/'), avoid truncating mid-path.
+    Otherwise, use standard character limit truncation.
+    """
     if not truncate or len(message) <= UPDATE_LOG_MESSAGE_PREVIEW_LIMIT:
         return message
+
+    # Check if message looks like it contains a file path
+    if "/" in message:
+        # For file path messages, don't truncate - let console handle overflow
+        return message
+
+    # For non-path messages, use standard truncation
     return message[:UPDATE_LOG_MESSAGE_PREVIEW_LIMIT] + "..."
 
 
@@ -189,7 +201,8 @@ def _render_updates_log(updates: list[dict[str, str]], truncate: bool = True) ->
         console.print(f"[dim]{time_str}[/]  [{kind_color}]{kind}[/]  [dim]{actor}[/]")
         if message:
             for msg_line in _preview_update_message(message, truncate).split("\n"):
-                console.print(f"  {msg_line}")
+                # Use overflow='ellipsis' for clean path truncation if needed
+                console.print(f"  {msg_line}", overflow="ellipsis")
         console.print()
 
 
@@ -323,7 +336,12 @@ def show(
             worktree_root = service.git_client.get_worktree_root()
 
         console.print(f"\n[bold cyan]flow[/]: {state.flow_slug}")
+
+        # Show worktree path for context (where files actually live)
+        if worktree_path:
+            console.print(f"[dim]worktree: {worktree_root}[/]")
         console.print()
+
         _render_agent_chain(
             state, live_sessions=live_sessions, worktree_root=worktree_root
         )
