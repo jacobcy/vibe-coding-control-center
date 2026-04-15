@@ -139,11 +139,24 @@ def commands(
         enable_trace()
 
     if not command:
-        names = ", ".join(_list_analyzable_top_level_commands())
-        typer.echo(f"Available commands: {names}")
-        return
+        names = _list_analyzable_top_level_commands()
+        if any([json_out, yaml_out, tree_out, mermaid_out]):
+            from vibe3.models.inspection import CallNode, CommandInspection
 
-    result = command_analyzer.analyze_command(command, subcommand or None)
+            call_tree = [CallNode(name=name, line=0) for name in names]
+            result = CommandInspection(
+                command="vibe",
+                file="src/vibe3/cli.py",
+                call_depth=1,
+                call_tree=call_tree,
+            )
+            # Proceed to formatting logic below
+        else:
+            names_str = ", ".join(names)
+            typer.echo(f"Available commands: {names_str}")
+            return
+    else:
+        result = command_analyzer.analyze_command(command, subcommand or None)
 
     # Output in requested format
     if json_out:
