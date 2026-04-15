@@ -197,6 +197,9 @@ class StateLabelDispatchService(ServiceBase):
             labels = _normalize_labels(item.get("labels"))
             if IssueState.BLOCKED.to_label() in labels:
                 continue
+            # Skip failed issues - they should not be auto-dispatched
+            if IssueState.FAILED.to_label() in labels:
+                continue
             if self.role_def.trigger_state.to_label() not in labels:
                 continue
             issue = IssueInfo.from_github_payload(item)
