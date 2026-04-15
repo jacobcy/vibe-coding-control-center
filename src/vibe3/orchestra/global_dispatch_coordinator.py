@@ -22,7 +22,10 @@ from loguru import logger
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.queue_ordering import sort_ready_issues
+from vibe3.orchestra.queue_ordering import (
+    PIPELINE_STAGE_DEFAULT,
+    PIPELINE_STAGE_ORDER,
+)
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
@@ -119,17 +122,37 @@ class GlobalDispatchCoordinator:
     def _sort_with_role(
         self, items: list[ReadyIssueWithRole]
     ) -> list[ReadyIssueWithRole]:
-        """提取 IssueInfo 排序后重新关联 service。"""
-        # 提取 issue 排序
-        issues = [item.issue for item in items]
-        sorted_issues = sort_ready_issues(issues)
-        # 按排序后的 issue number 重新关联 service
-        issue_to_item = {item.issue.number: item for item in items}
-        return [
-            issue_to_item[issue.number]
-            for issue in sorted_issues
-            if issue.number in issue_to_item
-        ]
+        """Sort cross-role ready items by pipeline stage first, then issue priority.
+
+        Primary key: pipeline stage so issues deep in pipeline dispatch first:
+            review → run → plan → manager:handoff → manager:ready
+        Secondary key: standard issue priority (milestone / roadmap / priority label).
+        """
+        from vibe3.orchestra.queue_ordering import (
+            resolve_milestone_rank,
+            resolve_priority,
+            resolve_roadmap_rank,
+        )
+
+        def sort_key(item: ReadyIssueWithRole) -> tuple[int, int, int, int, int]:
+            # Pipeline stage: lower = higher dispatch priority
+            trigger_name = item.service.role_def.trigger_name
+            trigger_state = item.service.role_def.trigger_state.value
+            stage_tag = f"{trigger_name}:{trigger_state}"
+            stage = PIPELINE_STAGE_ORDER.get(stage_tag, PIPELINE_STAGE_DEFAULT)
+
+            # Within the same stage, reuse existing issue-level ordering
+            issue = item.issue
+            milestone_dict = (
+                {"title": issue.milestone, "number": 0} if issue.milestone else None
+            )
+            milestone_rank, _ = resolve_milestone_rank(milestone_dict)
+            roadmap_rank, _ = resolve_roadmap_rank(issue.labels)
+            priority = resolve_priority(issue.labels)
+
+            return (stage, milestone_rank, roadmap_rank, -priority, issue.number)
+
+        return sorted(items, key=sort_key)
 
     def _try_dispatch(self, item: ReadyIssueWithRole) -> bool:
         """容量检查 → 标记 in_flight → emit dispatch_intent。

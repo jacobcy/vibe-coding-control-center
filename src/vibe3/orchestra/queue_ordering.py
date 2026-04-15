@@ -7,6 +7,19 @@ from typing import Any
 
 from vibe3.models.orchestration import IssueInfo
 
+# Pipeline stage ordering: issues closer to completion are dispatched first.
+# Key is "<trigger_name>:<trigger_state>" matching
+# StateLabelDispatchService.service_name.
+# Lower number = higher dispatch priority.
+PIPELINE_STAGE_ORDER: dict[str, int] = {
+    "review:review": 1,  # Closest to done — clear the pipeline first
+    "run:in-progress": 2,
+    "plan:claimed": 3,
+    "manager:handoff": 4,
+    "manager:ready": 5,  # Brand new issues — lowest priority
+}
+PIPELINE_STAGE_DEFAULT = 9  # Unknown stage falls after all known ones
+
 # Text-based priority label → numeric priority
 PRIORITY_LABEL_MAP: dict[str, int] = {
     "critical": 9,
