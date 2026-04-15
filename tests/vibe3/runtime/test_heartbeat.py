@@ -251,3 +251,29 @@ async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
         "server:debug tick limit reached (2), stopping server" == item
         for item in events
     )
+
+
+def test_set_shutdown_callback_invoked_on_cleanup() -> None:
+    """_cleanup() must invoke the registered shutdown callback exactly once."""
+    server = HeartbeatServer(_config())
+    calls: list[str] = []
+    server.set_shutdown_callback(lambda: calls.append("called"))
+
+    server._cleanup()
+
+    assert calls == ["called"], "shutdown callback was not invoked during _cleanup"
+
+
+def test_shutdown_callback_exception_does_not_propagate() -> None:
+    """A callback that raises must not crash _cleanup() (best-effort)."""
+    server = HeartbeatServer(_config())
+    server.set_shutdown_callback(lambda: 1 / 0)
+
+    # Should not raise
+    server._cleanup()
+
+
+def test_no_shutdown_callback_cleanup_still_runs() -> None:
+    """_cleanup() without a registered callback should not raise."""
+    server = HeartbeatServer(_config())
+    server._cleanup()  # must not raise

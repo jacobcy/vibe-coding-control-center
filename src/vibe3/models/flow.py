@@ -44,6 +44,7 @@ class FlowState(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    pr_ref: str | None = None  # PR URL as proof of PR creation
     planner_actor: str | None = None
     executor_actor: str | None = None
     reviewer_actor: str | None = None

@@ -22,14 +22,14 @@ def resolve_command_agent_options(
     config_agent = None
     config_backend = None
     config_model = None
-    config_timeout = 1800
+    config_timeout = 3600
 
     if target_config and hasattr(target_config, "agent_config"):
         agent_config = target_config.agent_config
         config_agent = getattr(agent_config, "agent", None)
         config_backend = getattr(agent_config, "backend", None)
         config_model = getattr(agent_config, "model", None)
-        config_timeout = getattr(agent_config, "timeout_seconds", 1800)
+        config_timeout = getattr(agent_config, "timeout_seconds", 3600)
 
     if agent:
         return AgentOptions(agent=agent, timeout_seconds=config_timeout)

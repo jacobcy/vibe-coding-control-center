@@ -286,7 +286,7 @@ class TestRunStreamingAndEdgeCases:
             "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
         ):
             backend = CodeagentBackend()
-            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+            result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         captured = capsys.readouterr()
         assert "line one" in captured.out
@@ -305,7 +305,7 @@ class TestRunStreamingAndEdgeCases:
             "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
         ):
             backend = CodeagentBackend()
-            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+            result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
         assert result.exit_code == 0
         assert result.stdout is None
 
@@ -317,7 +317,7 @@ class TestRunStreamingAndEdgeCases:
 
             backend = CodeagentBackend()
             with pytest.raises(OSError, match="I/O error"):
-                backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+                backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
     @patch("vibe3.agents.backends.codeagent.subprocess.run")
     @patch("vibe3.agents.backends.codeagent.Path.mkdir")
@@ -330,7 +330,7 @@ class TestRunStreamingAndEdgeCases:
         mock_run.return_value = mock_result
 
         backend = CodeagentBackend()
-        result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+        result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         assert result.exit_code == 0
         mock_mkdir.assert_any_call(parents=True, exist_ok=True)
@@ -348,7 +348,7 @@ class TestRunStreamingAndEdgeCases:
         mock_run.return_value = mock_result
 
         backend = CodeagentBackend()
-        backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+        backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         command = mock_run.call_args[0][0]
         prompt_file_idx = command.index("--prompt-file") + 1

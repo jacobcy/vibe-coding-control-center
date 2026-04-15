@@ -16,6 +16,7 @@ def mock_dependencies():
     store = MagicMock()
     backend = MagicMock()
     capacity = MagicMock()
+    capacity.is_in_flight.return_value = False  # not pre-authorized by default
     lifecycle = MagicMock()
     return config, store, backend, capacity, lifecycle
 
@@ -63,7 +64,8 @@ def test_coordinator_dispatch_success(mock_dependencies):
         # Verify capacity checked and in-flight managed
         capacity.can_dispatch.assert_called_once_with("planner", 42)
         capacity.mark_in_flight.assert_called_once_with("planner", 42)
-        capacity.prune_in_flight.assert_called_once_with("planner", {42})
+        # Async success keeps in-flight marker (reconcile_in_flight cleans later)
+        capacity.prune_in_flight.assert_not_called()
 
         # Verify start_async_command called correctly
         mock_start.assert_called_once_with(

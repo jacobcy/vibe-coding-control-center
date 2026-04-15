@@ -126,13 +126,13 @@ def render_flow_status(
     # Always show actor — fallback to worktree identity when flow has no signature
     _actor, _fallback = display_actor(status.latest_actor)
     _suffix = " [dim](worktree)[/]" if _fallback else ""
-    actors = [
-        f"[dim]latest:[/] {_actor}{_suffix}",
-        f"[dim]plan:[/] {status.planner_actor or '—'}",
-        f"[dim]run:[/] {status.executor_actor or '—'}",
-        f"[dim]review:[/] {status.reviewer_actor or '—'}",
-    ]
-    console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
+
+    # Display actors on separate lines for better readability
+    console.print("  [dim]actor[/]")
+    console.print(f"    [dim]latest:[/] {_actor}{_suffix}")
+    console.print(f"    [dim]plan:[/] {status.planner_actor or '—'}")
+    console.print(f"    [dim]run:[/] {status.executor_actor or '—'}")
+    console.print(f"    [dim]review:[/] {status.reviewer_actor or '—'}")
 
     if milestone_data:
         render_milestone(milestone_data, status.task_issue_number)

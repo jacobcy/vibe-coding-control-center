@@ -21,6 +21,7 @@ from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
+    from vibe3.orchestra.failed_gate import FailedGate
     from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
@@ -44,6 +45,7 @@ class OrchestrationFacade(ServiceBase):
         tick_count: int = 0,
         dispatch_services: list[StateLabelDispatchService] | None = None,
         capacity: CapacityService | None = None,
+        failed_gate: "FailedGate | None" = None,
     ) -> None:
         """Initialize facade with tick counter.
 
@@ -58,6 +60,9 @@ class OrchestrationFacade(ServiceBase):
                 When provided, GlobalDispatchCoordinator is used for unified
                 dispatch with capacity checks before emitting intents.
                 When None, legacy concurrent gather path is used (backward compat).
+            failed_gate: Optional FailedGate to check if dispatch is frozen.
+                When provided, on_tick() checks gate before dispatch but
+                always reconciles in-flight markers to prevent capacity deadlock.
         """
         self._tick_count = tick_count
         self._config = OrchestraConfig.from_settings()
@@ -66,6 +71,7 @@ class OrchestrationFacade(ServiceBase):
         self._dispatch_services = list(dispatch_services or [])
         self._capacity = capacity
         self._coordinator: GlobalDispatchCoordinator | None = None
+        self._failed_gate = failed_gate
 
         if self._dispatch_services and self._capacity is not None:
             from vibe3.orchestra.global_dispatch_coordinator import (
@@ -83,7 +89,8 @@ class OrchestrationFacade(ServiceBase):
         Called by runtime heartbeat periodically:
         1. Publishes GovernanceScanStarted (if interval gating passes)
         2. Publishes SupervisorIssueIdentified for matching issues
-        3. Polls issue labels for all dispatch services
+        3. Reconciles in-flight markers (always, even when frozen)
+        4. Polls issue labels and dispatches (only when not frozen)
         """
 
         self.on_heartbeat_tick()
@@ -100,6 +107,25 @@ class OrchestrationFacade(ServiceBase):
                 "OrchestrationFacade: GlobalDispatchCoordinator not initialized. "
                 "Both dispatch_services and capacity must be provided at init time."
             )
+
+        # ✅ Always reconcile in-flight markers to prevent capacity deadlock
+        # This must happen even when failed_gate is frozen
+        if self._capacity:
+            self._capacity.reconcile_in_flight()
+
+        # Check if dispatch is frozen by failed gate
+        if self._failed_gate:
+            gate_result = self._failed_gate.check()
+            if gate_result.blocked:
+                logger.bind(
+                    domain="orchestration_facade",
+                    action="dispatch_frozen",
+                    issue=gate_result.issue_number,
+                ).info(
+                    f"Dispatch frozen by state/failed issue "
+                    f"#{gate_result.issue_number}, skipping collection and dispatch"
+                )
+                return
 
         await self._coordinator.coordinate()
 

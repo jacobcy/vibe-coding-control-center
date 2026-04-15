@@ -353,6 +353,7 @@ class PRService:
         self.store.update_flow_state(
             pr.head_branch,
             latest_actor=actor,
+            pr_ref=pr.url,  # Write PR URL as proof of PR creation
         )
 
         # Update PR context cache with latest PR info

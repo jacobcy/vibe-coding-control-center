@@ -78,13 +78,20 @@ def _build_server_with_launch_cwd(
     shared_backend = CodeagentBackend()
     shared_registry = SessionRegistryService(store=shared_store, backend=shared_backend)
 
-    # Startup cleanup: mark sessions whose tmux window is dead as stopped.
-    # This ensures capacity starts from a clean slate after restarts.
-    shared_registry.cleanup_stale_sessions()
+    # Startup cleanup: unconditionally mark all active sessions as stopped.
+    # Design: server lifecycle owns session state. Any session from a previous
+    # run is considered ended on restart, regardless of tmux state. The tmux
+    # processes are NOT killed -- agents may continue writing results -- but
+    # capacity slots are fully released so dispatch starts from a clean slate.
+    shared_registry.clear_all_sessions()
 
     failed_gate = FailedGate(github=shared_github, repo=config.repo)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
+    # Shutdown cleanup: mark all sessions stopped when the server exits.
+    # Same clean-slate semantics as startup -- session lifecycle is owned by
+    # the server. Agents may still be running in tmux; they are not killed.
+    heartbeat.set_shutdown_callback(shared_registry.clear_all_sessions)
 
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
     shared_flow_manager = FlowManager(config, registry=shared_registry)
@@ -140,6 +147,7 @@ def _build_server_with_launch_cwd(
     facade = OrchestrationFacade(
         dispatch_services=dispatch_services,
         capacity=shared_capacity,
+        failed_gate=failed_gate,
     )
     heartbeat.register(facade)
 

@@ -111,6 +111,8 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
             domain="planner_handler",
             issue_number=event.issue_number,
         ).exception(f"Planner dispatch failed: {exc}")
+        # Propagate exception to event system for proper handling
+        raise
 
 
 def handle_executor_dispatched(event: ExecutorDispatched) -> None:
@@ -136,6 +138,8 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             domain="executor_handler",
             issue_number=event.issue_number,
         ).exception(f"Executor dispatch failed: {exc}")
+        # Propagate exception to event system for proper handling
+        raise
 
 
 def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
@@ -161,6 +165,8 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
             domain="reviewer_handler",
             issue_number=event.issue_number,
         ).exception(f"Reviewer dispatch failed: {exc}")
+        # Propagate exception to event system for proper handling
+        raise
 
 
 def register_dispatch_handlers() -> None:

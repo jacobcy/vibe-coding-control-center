@@ -82,10 +82,17 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     assert result == artifact
     kwargs = mock_persist.call_args.kwargs
     assert kwargs["event_type"] == "handoff_plan"
-    assert kwargs["flow_state_updates"]["planner_actor"] == "planner"
+    # Actor expands agent preset to full backend/model via format_agent_actor
+    assert kwargs["flow_state_updates"]["planner_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "planner_session_id" not in kwargs["flow_state_updates"]
     assert "plan_ref" not in kwargs["flow_state_updates"]
+    # Verify log_path is inferred from session_id
+    assert "log_path" in kwargs["refs"]
+    assert (
+        "issue-sess-plan" in kwargs["refs"]["log_path"]
+        or "plan.async.log" in kwargs["refs"]["log_path"]
+    )
 
 
 @patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
@@ -143,7 +150,8 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
     kwargs = mock_persist.call_args.kwargs
     assert kwargs["event_type"] == "handoff_review"
     assert kwargs["refs"]["verdict"] == "PASS"
-    assert kwargs["flow_state_updates"]["reviewer_actor"] == "reviewer"
+    # Actor expands agent preset to full backend/model via format_agent_actor
+    assert kwargs["flow_state_updates"]["reviewer_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "reviewer_session_id" not in kwargs["flow_state_updates"]
     assert "audit_ref" not in kwargs["flow_state_updates"]
@@ -167,7 +175,9 @@ def test_record_handoff_unified_ignores_reserved_metadata_keys(
     )
 
     refs = mock_persist.call_args.kwargs["refs"]
-    assert refs["backend"] == "executor"
+    # backend is resolved from AgentOptions by resolve_actor_backend_model
+    assert refs["backend"] == "opencode"
+    assert refs["model"] == "alibaba-coding-plan-cn/glm-5"
     assert refs["custom"] == "ok"
 
 

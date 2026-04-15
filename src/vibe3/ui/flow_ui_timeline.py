@@ -102,17 +102,31 @@ def render_flow_timeline(
     if state.next_step:
         console.print(f"  [dim]next[/]        {state.next_step}")
 
-    if state.initiated_by:
-        kv("initiated_by", state.initiated_by, 1)
+    # Filter orchestra placeholders from actor fields
+    def _filter_orchestra_actor(actor: str | None) -> str | None:
+        """Filter out orchestra: placeholder actors."""
+        if actor and actor.startswith("orchestra:"):
+            return None
+        return actor
+
+    filtered_initiated_by = _filter_orchestra_actor(state.initiated_by)
+    if filtered_initiated_by:
+        kv("initiated_by", filtered_initiated_by, 1)
 
     # Always show actor — fallback to worktree identity when flow has no signature
     _actor, _fallback = display_actor(state.latest_actor)
     _suffix = " [dim](worktree)[/]" if _fallback else ""
     console.print("  [dim]actor[/]")
     console.print(f"    [dim]latest:[/] {_actor}{_suffix}")
-    console.print(f"    [dim]plan:[/]    {state.planner_actor or '—'}")
-    console.print(f"    [dim]run:[/]     {state.executor_actor or '—'}")
-    console.print(f"    [dim]review:[/]  {state.reviewer_actor or '—'}")
+
+    # Display role actors, filtering orchestra placeholders
+    plan_actor = _filter_orchestra_actor(state.planner_actor) or "—"
+    run_actor = _filter_orchestra_actor(state.executor_actor) or "—"
+    review_actor = _filter_orchestra_actor(state.reviewer_actor) or "—"
+
+    console.print(f"    [dim]plan:[/]    {plan_actor}")
+    console.print(f"    [dim]run:[/]     {run_actor}")
+    console.print(f"    [dim]review:[/]  {review_actor}")
     console.print()
 
     if not events:
@@ -123,6 +137,10 @@ def render_flow_timeline(
     console.print()
 
     for event in reversed(events):
+        # Skip orchestra placeholder actors - only show actual backend/model
+        if event.actor.startswith("orchestra:"):
+            continue
+
         color = _EVENT_COLOR.get(event.event_type, "white")
         time_str = event.created_at[:16].replace("T", " ")
         actor_short = event.actor
@@ -136,8 +154,14 @@ def render_flow_timeline(
             if files and isinstance(files, list):
                 for f in files:
                     console.print(f"  [dim]- {f}[/]")
+            # Priority: log_path > ref for display
+            log_path = (
+                event.refs.get("log_path") if isinstance(event.refs, dict) else None
+            )
+            if log_path:
+                console.print(f"  [dim]- {log_path}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            if ref:
+            if ref and not log_path:
                 console.print(f"  [dim]- {ref}[/]")
         console.print()
 

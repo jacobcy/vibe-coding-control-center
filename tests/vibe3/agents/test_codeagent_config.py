@@ -36,7 +36,7 @@ class TestResolveEffectiveAgentOptions:
             json.dumps(
                 {
                     "agents": {
-                        "code-reviewer": {
+                        "vibe-reviewer": {
                             "backend": "claude",
                             "model": "claude-sonnet-4-6",
                         }
@@ -49,20 +49,55 @@ class TestResolveEffectiveAgentOptions:
             "vibe3.agents.backends.codeagent_config.repo_models_json_path",
             return_value=repo_models,
         ):
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             result = resolve_effective_agent_options(options)
 
         assert result.backend == "claude"
         assert result.model == "claude-sonnet-4-6"
         assert result.agent is None
 
-    def test_agent_preset_fallback_when_no_mapping(self) -> None:
-        """Agent preset without mapping should return unchanged."""
-        options = AgentOptions(agent="unknown-preset")
-        result = resolve_effective_agent_options(options)
-        assert result.agent == "unknown-preset"
-        assert result.backend is None
-        assert result.model is None
+    def test_agent_preset_fallback_to_default_when_no_mapping(
+        self, tmp_path: Path
+    ) -> None:
+        """Agent preset without mapping should fall back to default_backend/model."""
+        repo_models = tmp_path / "config" / "models.json"
+        repo_models.parent.mkdir(parents=True)
+        repo_models.write_text(
+            json.dumps(
+                {
+                    "default_backend": "claude",
+                    "default_model": "claude-sonnet-4-6",
+                    "agents": {},
+                }
+            )
+        )
+        with patch(
+            "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+            repo_models,
+        ):
+            options = AgentOptions(agent="unknown-preset")
+            result = resolve_effective_agent_options(options)
+        assert result.agent is None
+        assert result.backend == "claude"
+        assert result.model == "claude-sonnet-4-6"
+
+    def test_agent_preset_raises_when_no_mapping_and_no_default(
+        self, tmp_path: Path
+    ) -> None:
+        """Agent preset without mapping and no default should raise."""
+        repo_models = tmp_path / "config" / "models.json"
+        repo_models.parent.mkdir(parents=True)
+        repo_models.write_text(json.dumps({"agents": {}}))
+        with patch(
+            "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+            repo_models,
+        ):
+            import pytest
+
+            from vibe3.exceptions import AgentPresetNotFoundError
+
+            with pytest.raises(AgentPresetNotFoundError):
+                resolve_effective_agent_options(AgentOptions(agent="unknown-preset"))
 
     def test_agent_preset_model_override(self, tmp_path: Path) -> None:
         """Agent preset with explicit model override should use override."""
@@ -72,7 +107,7 @@ class TestResolveEffectiveAgentOptions:
             json.dumps(
                 {
                     "agents": {
-                        "code-reviewer": {
+                        "vibe-reviewer": {
                             "backend": "claude",
                             "model": "claude-sonnet-4-6",
                         }
@@ -85,7 +120,7 @@ class TestResolveEffectiveAgentOptions:
             "vibe3.agents.backends.codeagent_config.repo_models_json_path",
             return_value=repo_models,
         ):
-            options = AgentOptions(agent="code-reviewer", model="claude-opus-4-6")
+            options = AgentOptions(agent="vibe-reviewer", model="claude-opus-4-6")
             result = resolve_effective_agent_options(options)
 
         assert result.backend == "claude"
@@ -153,17 +188,31 @@ class TestSyncModelsJson:
         assert "default_model" not in data
 
     def test_sync_skips_when_no_backend(self, tmp_path: Path) -> None:
-        """sync_models_json should skip when backend is None."""
+        """sync_models_json should skip when neither preset nor default backend."""
         models_path = tmp_path / ".codeagent" / "models.json"
+        repo_models = tmp_path / "config" / "models.json"
+        repo_models.parent.mkdir(parents=True)
+        repo_models.write_text(json.dumps({"agents": {}}))  # no default_backend
 
-        with patch(
-            "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH",
-            models_path,
+        import pytest
+
+        from vibe3.exceptions import AgentPresetNotFoundError
+
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH",
+                models_path,
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
+            pytest.raises(AgentPresetNotFoundError),
         ):
             options = AgentOptions(agent="some-preset")
             sync_models_json(options)
 
-        # Should not create file
+        # Should not create file (exception raised before write)
         assert not models_path.exists()
 
     def test_sync_preserves_existing_fields(self, tmp_path: Path) -> None:

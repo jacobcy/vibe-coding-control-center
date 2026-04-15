@@ -75,7 +75,7 @@ class TestCodeagentBackend:
         mock_result.stderr = ""
         repo_models = tmp_path / "models.json"
         repo_models.write_text(
-            '{"agents":{"code-reviewer":{"backend":"claude","model":"claude-sonnet-4-6"}}}'
+            '{"agents":{"vibe-reviewer":{"backend":"claude","model":"claude-sonnet-4-6"}}}'
         )
 
         with (
@@ -87,7 +87,7 @@ class TestCodeagentBackend:
         ):
             mock_run.return_value = mock_result
             options = AgentOptions(
-                agent="code-reviewer",
+                agent="vibe-reviewer",
             )
             backend = CodeagentBackend()
             result = backend.run("prompt body", options)
@@ -104,16 +104,18 @@ class TestCodeagentBackend:
         assert "--model" in command
         assert "claude-sonnet-4-6" in command
 
-    def test_run_falls_back_to_agent_flag_when_repo_mapping_missing(
+    def test_run_falls_back_to_default_backend_when_preset_missing(
         self, tmp_path: Path
     ) -> None:
-        """Unknown repo-local preset mapping should fall back to raw --agent mode."""
+        """Unknown preset should fall back to default_backend from models.json."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
         repo_models = tmp_path / "models.json"
-        repo_models.write_text('{"agents":{"other":{"backend":"claude"}}}')
+        repo_models.write_text(
+            '{"default_backend":"claude","default_model":"claude-sonnet-4-6","agents":{"other":{"backend":"gemini"}}}'
+        )
 
         with (
             patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
@@ -124,21 +126,21 @@ class TestCodeagentBackend:
         ):
             mock_run.return_value = mock_result
             backend = CodeagentBackend()
-            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+            result = backend.run("prompt body", AgentOptions(agent="unknown-preset"))
 
         assert result.exit_code == 0
         command = mock_run.call_args[0][0]
-        assert "--agent" in command
-        assert "code-reviewer" in command
+        assert "--backend" in command
+        assert "claude" in command
 
     def test_run_without_model_when_repo_mapping_missing(self, tmp_path: Path) -> None:
-        """Fallback agent mode should omit --model when repo mapping is absent."""
+        """Fallback to default_backend with no default_model should omit --model."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
         repo_models = tmp_path / "models.json"
-        repo_models.write_text("{}")
+        repo_models.write_text('{"default_backend":"claude","agents":{}}')
 
         with (
             patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
@@ -148,13 +150,13 @@ class TestCodeagentBackend:
             ),
         ):
             mock_run.return_value = mock_result
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
             result = backend.run("prompt body", options)
 
         assert result.exit_code == 0
 
-        # Verify no --model flag when model is None
+        # Verify no --model flag when default_model is absent
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "--model" not in command
@@ -171,7 +173,7 @@ class TestCodeagentBackend:
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
-                AgentOptions(agent="code-reviewer"),
+                AgentOptions(agent="vibe-reviewer"),
                 cwd=Path("/tmp/worktree-430"),
             )
 
@@ -205,7 +207,7 @@ class TestCodeagentBackend:
             with patch.object(
                 backend, "_run_subprocess", side_effect=fake_run_subprocess
             ):
-                backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+                backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         assert captured_prompt["content"].startswith(
             "## Debug Stop Rule\nStop current task after two retries.\n\n---\n\n"
@@ -221,7 +223,7 @@ class TestCodeagentBackend:
 
         with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
             with pytest.raises(AgentExecutionError) as exc_info:
@@ -239,7 +241,7 @@ class TestCodeagentBackend:
 
         with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
             with pytest.raises(AgentExecutionError) as exc_info:
@@ -286,7 +288,7 @@ Traceback (most recent call last):
             backend = CodeagentBackend()
 
             with pytest.raises(AgentExecutionError) as exc_info:
-                backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+                backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         assert "TypeError: undefined is not an object" in str(exc_info.value)
         assert "at process" not in str(exc_info.value)
@@ -315,7 +317,7 @@ Traceback (most recent call last):
 
             result = backend.run(
                 "prompt body",
-                AgentOptions(agent="code-reviewer"),
+                AgentOptions(agent="vibe-reviewer"),
                 task="custom task",
                 session_id="11111111-1111-1111-1111-111111111111",
             )
@@ -345,7 +347,7 @@ Traceback (most recent call last):
             with pytest.raises(AgentExecutionError):
                 backend.run(
                     "prompt body",
-                    AgentOptions(agent="code-reviewer"),
+                    AgentOptions(agent="vibe-reviewer"),
                     session_id="11111111-1111-1111-1111-111111111111",
                 )
 
@@ -357,7 +359,7 @@ Traceback (most recent call last):
 
         with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError("codeagent-wrapper not found")
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
             with pytest.raises(AgentExecutionError) as exc_info:
@@ -376,7 +378,7 @@ Traceback (most recent call last):
                 cmd=["codeagent-wrapper"], timeout=300
             )
             options = AgentOptions(
-                agent="code-reviewer",
+                agent="vibe-reviewer",
                 timeout_seconds=300,
             )
             backend = CodeagentBackend()
@@ -395,7 +397,7 @@ Traceback (most recent call last):
 
         with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
-            options = AgentOptions(agent="code-reviewer")
+            options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
             backend.run("my prompt file content", options, task="custom task")
 
@@ -425,7 +427,7 @@ Traceback (most recent call last):
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
-                AgentOptions(agent="code-reviewer"),
+                AgentOptions(agent="vibe-reviewer"),
             )
 
         command = mock_run.call_args[0][0]
@@ -443,7 +445,7 @@ Traceback (most recent call last):
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
-                AgentOptions(agent="code-reviewer"),
+                AgentOptions(agent="vibe-reviewer"),
                 session_id="262f0fea-eacb-4223-b842-b5b5097f94e8",
             )
 

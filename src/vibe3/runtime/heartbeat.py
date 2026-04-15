@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -42,6 +43,7 @@ class HeartbeatServer:
         self._running = False
         self._pending_tasks: set[asyncio.Task[None]] = set()
         self._tick_count = 0
+        self._shutdown_callback: Callable[[], object] | None = None
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -53,6 +55,15 @@ class HeartbeatServer:
         logger.bind(domain="orchestra").info(
             f"Registered service: {service.service_name}"
         )
+
+    def set_shutdown_callback(self, callback: Callable[[], object]) -> None:
+        """Register a callback to run when the server stops.
+
+        Called exactly once during _cleanup(), after the event loop exits.
+        Used by the server assembly to hook in session lifecycle cleanup
+        (e.g. SessionRegistryService.clear_all_sessions).
+        """
+        self._shutdown_callback = callback
 
     @property
     def service_names(self) -> list[str]:
@@ -308,6 +319,13 @@ class HeartbeatServer:
         pid_file.write_text(str(os.getpid()))
 
     def _cleanup(self) -> None:
+        if self._shutdown_callback is not None:
+            try:
+                self._shutdown_callback()
+            except Exception as exc:
+                logger.bind(domain="orchestra").warning(
+                    f"shutdown callback raised: {exc}"
+                )
         append_orchestra_event("server", "stop")
         if self.config.pid_file.exists():
             self.config.pid_file.unlink(missing_ok=True)

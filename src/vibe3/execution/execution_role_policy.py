@@ -98,9 +98,9 @@ class ExecutionRolePolicyService:
 
         section = getattr(self._config, section_name, None)
         if not section:
-            return 1800
+            return 3600
 
-        return getattr(section, "timeout_seconds", 1800)
+        return getattr(section, "timeout_seconds", 3600)
 
     def resolve_agent_options(self, role: str) -> AgentOptions:
         agent = self.resolve_agent(role)

@@ -53,7 +53,19 @@ class ExecutionCoordinator:
                 f"Unsupported worktree requirement: {request.worktree_requirement}"
             )
 
-        repo_path = Path(request.repo_path) if request.repo_path else Path.cwd()
+        # Resolve repo_path: prefer explicit request, then git common dir (main repo)
+        # Using git common dir prevents creating worktrees inside current worktree
+        if request.repo_path:
+            repo_path = Path(request.repo_path)
+        else:
+            from vibe3.clients.git_client import GitClient
+
+            try:
+                git_common = GitClient().get_git_common_dir()
+                repo_path = Path(git_common).parent if git_common else Path.cwd()
+            except Exception:
+                repo_path = Path.cwd()
+
         worktree_manager = WorktreeManager(self.config, repo_path)
         manager_cwd, _ = worktree_manager.resolve_manager_cwd(
             request.target_id,
@@ -96,16 +108,38 @@ class ExecutionCoordinator:
             target_branch=request.target_branch,
         ).info(f"Received execution request for {request.role}")
 
-        # 1. Check capacity
-        if not self.capacity.can_dispatch(request.role, request.target_id):
+        # 1. Check capacity.
+        # If GlobalDispatchCoordinator already pre-reserved a slot for this
+        # exact target (is_in_flight=True), take over that reservation rather
+        # than treating it as "capacity full".  Without this check the
+        # coordinator's early-return skips the finally-block prune, leaving
+        # the pre-reserved marker permanently and deadlocking all future ticks.
+        pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
+        if not pre_authorized and not self.capacity.can_dispatch(
+            request.role, request.target_id
+        ):
             return ExecutionLaunchResult(
                 launched=False,
                 reason=f"Capacity full for {request.role}",
                 reason_code="capacity_full",
             )
 
-        # 2. Mark in-flight
-        self.capacity.mark_in_flight(request.role, request.target_id)
+        # 2. Mark in-flight (skip if pre-authorized — slot already reserved).
+        if not pre_authorized:
+            self.capacity.mark_in_flight(request.role, request.target_id)
+
+        # Whether to prune the in-flight marker at the end of this call.
+        # For a successful async launch we MUST keep the marker — the tmux
+        # session hasn't yet registered with the tmux server when start_async
+        # returns, so count_live_worker_sessions will not see it as live.
+        # Pruning here would create a capacity hole that lets the next tick
+        # over-dispatch. reconcile_in_flight() cleans the marker in the
+        # subsequent tick once the session is truly live in SQLite+tmux.
+        #
+        # For sync, launch failures, and exceptions we DO prune immediately:
+        # the session is either completed (no longer live) or was never
+        # registered, so reconcile_in_flight cannot recover it.
+        should_prune = True
 
         try:
             # 4. Launch
@@ -161,6 +195,10 @@ class ExecutionCoordinator:
                     tmux_session=tmux_session,
                 ).success(f"Execution launched for {request.role}")
 
+                # Async launch succeeded — keep in-flight marker so capacity
+                # stays reserved until the tmux session becomes observable.
+                # reconcile_in_flight() in the next tick will prune it.
+                should_prune = False
                 return ExecutionLaunchResult(
                     launched=True,
                     tmux_session=tmux_session,
@@ -278,5 +316,19 @@ class ExecutionCoordinator:
                 reason_code="launch_failed",
             )
         finally:
-            # 6. Prune in-flight
-            self.capacity.prune_in_flight(request.role, {request.target_id})
+            # 6. Prune in-flight ONLY when the caller is done with this slot.
+            # For successful async launches we keep the marker — see the
+            # should_prune comment above. reconcile_in_flight will clean up
+            # on the next tick once SQLite+tmux observe the live session.
+            if should_prune:
+                try:
+                    self.capacity.prune_in_flight(request.role, {request.target_id})
+                except Exception as prune_exc:
+                    logger.bind(
+                        domain="execution_coordinator",
+                        role=request.role,
+                        target_id=request.target_id,
+                    ).error(
+                        f"prune_in_flight failed (capacity leak possible): "
+                        f"{prune_exc}"
+                    )

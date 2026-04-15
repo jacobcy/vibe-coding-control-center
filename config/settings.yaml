@@ -33,6 +33,12 @@ ai:
 # 会置顶注入到所有 codeagent prompt 文件中
 agent_prompt:
   global_notice: |
+    ## Handoff 写入规则
+    不要直接访问或编辑主仓库的 `.git/vibe3/handoff/` 目录（该路径在 worktree 中会触发 external_directory 权限拒绝）。
+    所有 handoff 操作必须通过 CLI 命令完成：
+    - 追加记录：`uv run python src/vibe3/cli.py handoff append "<内容>"`
+    - 读取记录：`uv run python src/vibe3/cli.py handoff show`
+
     ## Debug Stop Rule
     当前项目处于调试过程中。
     如果任何工具重试两次后仍然报错，并且该错误会导致任务无法完成，必须停止当前任务。
@@ -125,10 +131,13 @@ code_limits:
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
       - path: "tests/vibe3/domain/test_orchestration_facade.py"
         limit: 450
-        reason: "单一测试类，刚超限，拆分收益低"       
+        reason: "单一测试类，刚超限，拆分收益低"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
+      - path: "tests/vibe3/agents/test_codeagent_config.py"
+        limit: 450
+        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
@@ -273,7 +282,7 @@ review:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
     # 典型用途：保留 preset 作为实际执行入口，同时把 backend/model 写出来用于显式说明或记录。
-    agent: "code-reviewer"
+    agent: "vibe-reviewer"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -281,7 +290,7 @@ review:
     # - model 只有在 backend 已配置时才有意义
     backend: "claude"  # e.g., "claude", "opencode", "gemini"
     model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
-    timeout_seconds: 1800
+    timeout_seconds: 3600
 
   # Static: Output format requirements (VERDICT contract)
   output_format: |
@@ -326,7 +335,7 @@ plan:
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
-    agent: "code-explorer"
+    agent: "vibe-planner"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -334,7 +343,7 @@ plan:
     # - model 只有在 backend 已配置时才有意义
     backend: "codex"  # e.g., "claude", "opencode", "gemini"
     model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
-    timeout_seconds: 1800
+    timeout_seconds: 3600
 
   # Static: Output format requirements
   output_format: |
@@ -387,7 +396,7 @@ run:
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
-    agent: "develop"
+    agent: "vibe-executor"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -478,7 +487,7 @@ orchestra:
     # - 配置 agent：走 preset 模式，preset 从 config/models.json 解析
     # - 只配置 backend/model：走 backend 直连模式
     # 如果同时配置 agent 和 backend/model，manager 执行时 agent 优先。
-    agent: "explore"
+    agent: "vibe-manager"
     # backend/model 仅在以下场景生效：
     # - 未配置 agent，显式走 backend 直连模式
     # - 同时配置 agent 时，agent 仍是主入口；但 manager resolver 会先把 agent
@@ -518,7 +527,7 @@ orchestra:
     dry_run: false
     # Governance agent configuration (independent from run/manager)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    agent: "vibe-governance"  # Maps in config/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：governance resolver 会先解析 preset，再允许 model
@@ -534,7 +543,7 @@ orchestra:
     prompt_template: "orchestra.supervisor.apply"
     # Supervisor handoff agent configuration (independent from run/manager/governance)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    agent: "vibe-supervisor"  # Maps in config/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：supervisor resolver 会先解析 preset，再允许 model

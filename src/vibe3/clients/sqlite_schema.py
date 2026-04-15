@@ -20,6 +20,7 @@ _CREATE_FLOW_STATE = """
         plan_ref TEXT,
         report_ref TEXT,
         audit_ref TEXT,
+        pr_ref TEXT,
         planner_actor TEXT,
         executor_actor TEXT,
         reviewer_actor TEXT,
@@ -153,6 +154,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
             logger.bind(external="sqlite", operation="migration").info(
                 f"Added {col} column to flow_state"
             )
+
+    # Migration: add pr_ref column if missing
+    if "pr_ref" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN pr_ref TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added pr_ref column to flow_state"
+        )
 
     cursor.execute(_CREATE_FLOW_ISSUE_LINKS)
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)

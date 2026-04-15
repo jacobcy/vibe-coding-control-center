@@ -64,6 +64,7 @@ Forbidden:
 | `state/claimed` | 产出 `plan_ref` | `state/handoff` |
 | `state/in-progress` | 产出 `report_ref` | `state/handoff` |
 | `state/review` | 产出 `audit_ref` | `state/handoff` |
+| `state/merge-ready` | 产出 `pr_ref` (PR 创建成功) | `state/blocked` (等待人类介入) |
 
 ## Truth Sources
 
@@ -331,6 +332,7 @@ Exit:
 - `state/claimed` -> plan agent
 - `state/in-progress` -> run agent
 - `state/review` -> review agent
+- `state/merge-ready` -> manager 调用 `vibe3 pr create` 完成 PR 创建（产出 `pr_ref`）；如果 PR 创建失败，进入 `state/blocked` 等待人类介入
 
 ### `handle_in_progress()`
 

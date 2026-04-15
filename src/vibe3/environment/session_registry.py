@@ -30,7 +30,7 @@ class SessionRegistryService:
 
     - **backend=CodeagentBackend()**: Full liveness verification.
       REQUIRED for capacity checks, dispatch gates, and state reconciliation.
-      Example: `ManagerExecutor`, `StateLabelDispatchService`.
+      Example: `ExecutionCoordinator`, `GlobalDispatchCoordinator`.
 
     **WARNING**: Using backend=None in capacity/dispatch logic will cause
     false positives (treating dead sessions as live), leading to queue starvation.
@@ -322,45 +322,40 @@ class SessionRegistryService:
                 truly_live.append(session)
         return truly_live
 
-    def cleanup_stale_sessions(self) -> int:
-        """Mark sessions with dead tmux as stopped. Called at server startup.
+    def clear_all_sessions(self) -> int:
+        """Mark ALL active sessions as stopped. Called on server start and stop.
 
-        Scans all sessions in starting/running status and confirms tmux
-        liveness. Sessions whose tmux window is gone are marked stopped so
-        they don't accumulate and inflate the capacity count across restarts.
+        Unconditionally marks every starting|running session as stopped.
+
+        Design: server lifecycle owns session state. When the server starts or
+        stops, all sessions from the previous run are considered ended. The tmux
+        processes are NOT killed -- agents may continue running and writing results
+        -- but from the capacity/dispatch perspective the slots are fully released.
 
         Returns:
-            Number of sessions pruned.
+            Number of sessions cleared.
         """
         from loguru import logger
 
         sessions = self._store.list_live_runtime_sessions()
-        pruned = 0
+        cleared = 0
         for session in sessions:
-            tmux = session.get("tmux_session")
-            if not tmux:
-                # Still in "starting" state with no tmux yet — leave it.
-                continue
-            if not self._has_tmux_session(tmux):
-                session_id = session.get("id")
-                if session_id is not None:
-                    self._store.update_runtime_session(
-                        int(session_id), status="stopped"
-                    )
-                    pruned += 1
-                    logger.bind(
-                        domain="session_registry",
-                        session_id=session_id,
-                        tmux=tmux,
-                    ).debug(
-                        f"cleanup_stale_sessions: marked session {session_id} "
-                        f"(tmux={tmux}) as stopped"
-                    )
-        if pruned:
-            logger.bind(domain="session_registry", pruned=pruned).info(
-                f"Startup cleanup: marked {pruned} stale sessions as stopped"
+            session_id = session.get("id")
+            if session_id is not None:
+                self._store.update_runtime_session(int(session_id), status="stopped")
+                cleared += 1
+                logger.bind(
+                    domain="session_registry",
+                    session_id=session_id,
+                    tmux=session.get("tmux_session"),
+                    role=session.get("role"),
+                ).debug(f"clear_all_sessions: marked session {session_id} as stopped")
+        if cleared:
+            logger.bind(domain="session_registry", cleared=cleared).info(
+                f"Server lifecycle cleanup: {cleared} sessions marked stopped "
+                f"(tmux may still be running)"
             )
-        return pruned
+        return cleared
 
 
 def _now_iso() -> str:

@@ -11,6 +11,7 @@ from typing import Any, Final
 
 from loguru import logger
 
+from vibe3.exceptions import AgentPresetNotFoundError
 from vibe3.models.review_runner import AgentOptions
 
 # Path to codeagent models config
@@ -47,6 +48,8 @@ def resolve_repo_agent_preset(
 ) -> tuple[str | None, str | None] | None:
     """Resolve agent preset from repo-local config/models.json.
 
+    Automatically tries with 'vibe-' prefix if direct lookup fails.
+
     Returns:
         (backend, model) when repo-local mapping exists, otherwise None.
     """
@@ -54,9 +57,16 @@ def resolve_repo_agent_preset(
     agents = data.get("agents")
     if not isinstance(agents, dict):
         return None
+
+    # Try direct lookup first
     raw = agents.get(agent_name)
     if not isinstance(raw, dict):
-        return None
+        # Try with 'vibe-' prefix if direct lookup fails
+        prefixed_name = f"vibe-{agent_name}"
+        raw = agents.get(prefixed_name)
+        if not isinstance(raw, dict):
+            return None
+
     backend = raw.get("backend")
     model = raw.get("model")
     if backend is not None and not isinstance(backend, str):
@@ -74,7 +84,10 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
     Priority:
     1. Explicit backend/model override in options
     2. Repo-local config/models.json mapping for agent preset
-    3. Fallback to raw agent mode
+    3. Fallback to default_backend/default_model from models.json
+    4. Raise error if no fallback available
+
+    Returns backend/model for database recording and sync operations.
     """
     if options.backend:
         return options
@@ -82,7 +95,21 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         return options
     resolved = resolve_repo_agent_preset(options.agent)
     if not resolved:
-        return options
+        data = _read_models_json(repo_models_json_path())
+        default_backend = data.get("default_backend")
+        default_model = data.get("default_model")
+        if default_backend and isinstance(default_backend, str):
+            logger.bind(domain="codeagent_config").warning(
+                f"Agent preset '{options.agent}' not found in config/models.json, "
+                f"falling back to default: {default_backend}/{default_model}"
+            )
+            return AgentOptions(
+                agent=None,
+                backend=default_backend,
+                model=str(default_model) if isinstance(default_model, str) else None,
+                timeout_seconds=options.timeout_seconds,
+            )
+        raise AgentPresetNotFoundError(options.agent)
     backend, mapped_model = resolved
     return AgentOptions(
         agent=None,

@@ -44,13 +44,27 @@ def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict
     return registry.get_truly_live_sessions_for_branch(branch)
 
 
-def _resolve_ref_path(val: str, worktree_root: str) -> str:
-    """Resolve a ref value to absolute path if it looks like a relative file path."""
+def _resolve_ref_path(val: str | None, _worktree_root: str | None = None) -> str:
+    """Resolve ref value to absolute path if needed, but prefer relative.
+
+    For file paths, returns the original relative path if it's already
+    relative. For absolute paths, keeps them absolute (e.g., URLs).
+
+    Args:
+        val: The reference value (could be relative path, absolute path,
+            URL, etc.)
+        _worktree_root: The worktree root path (unused, kept for
+            signature compatibility)
+
+    Returns:
+        Display-friendly path (relative preferred for file refs)
+    """
+    # Note: _worktree_root intentionally unused - display relative paths
+    _ = _worktree_root  # Mark as intentionally unused for type checker
+
     if not val or Path(val).is_absolute() or val.startswith("("):
-        return val
-    # Only resolve paths that look like file references
-    if "/" in val and not val.startswith("http"):
-        return str(Path(worktree_root) / val)
+        return val or ""
+    # For relative file paths, return as-is (cleaner display)
     return val
 
 
@@ -69,17 +83,16 @@ def _render_agent_chain(
         val = getattr(state, label, None)
         actor = getattr(state, actor_label, None) or ""
         actor_str = f"  [dim]{actor}[/]" if actor else ""
-        if val and worktree_root:
-            display_val: str = _resolve_ref_path(val, worktree_root)
-        else:
-            display_val = val or ""
+        # Display relative paths for cleaner output (absolute paths are too long)
+        display_val: str = _resolve_ref_path(val, worktree_root)
         if display_val:
             # Print label + actor on one line, then path on its own line.
             # This prevents terminal-width wrapping from mixing the actor
             # into the path continuation (e.g. "...executio\nn-report.md  develop").
+            # Use overflow='ellipsis' to show truncation explicitly if path is too long.
             label_line = f"  [dim]{label}[/]{actor_str}"
             console.print(label_line)
-            console.print(f"    {display_val}", no_wrap=True)
+            console.print(f"    {display_val}", no_wrap=True, overflow="ellipsis")
         else:
             console.print(f"  [dim]{label}[/]  [dim](pending)[/]")
     console.print()
@@ -154,8 +167,20 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
 
 
 def _preview_update_message(message: str, truncate: bool) -> str:
+    """Preview update message with intelligent truncation.
+
+    If message contains file paths (contains '/'), avoid truncating mid-path.
+    Otherwise, use standard character limit truncation.
+    """
     if not truncate or len(message) <= UPDATE_LOG_MESSAGE_PREVIEW_LIMIT:
         return message
+
+    # Check if message looks like it contains a file path
+    if "/" in message:
+        # For file path messages, don't truncate - let console handle overflow
+        return message
+
+    # For non-path messages, use standard truncation
     return message[:UPDATE_LOG_MESSAGE_PREVIEW_LIMIT] + "..."
 
 
@@ -176,7 +201,8 @@ def _render_updates_log(updates: list[dict[str, str]], truncate: bool = True) ->
         console.print(f"[dim]{time_str}[/]  [{kind_color}]{kind}[/]  [dim]{actor}[/]")
         if message:
             for msg_line in _preview_update_message(message, truncate).split("\n"):
-                console.print(f"  {msg_line}")
+                # Use overflow='ellipsis' for clean path truncation if needed
+                console.print(f"  {msg_line}", overflow="ellipsis")
         console.print()
 
 
@@ -300,10 +326,22 @@ def show(
         # Fetch live registry sessions (preferred over deprecated FlowState fields)
         live_sessions = _get_live_sessions_for_branch(service.store, target_branch)
 
-        worktree_root = service.git_client.get_worktree_root()
+        # Resolve worktree root for the target branch, not the current
+        # command execution context
+        worktree_path = service.git_client.find_worktree_path_for_branch(target_branch)
+        if worktree_path:
+            worktree_root = str(worktree_path)
+        else:
+            # Fallback: if branch has no dedicated worktree, use current
+            worktree_root = service.git_client.get_worktree_root()
 
         console.print(f"\n[bold cyan]flow[/]: {state.flow_slug}")
+
+        # Show worktree path for context (where files actually live)
+        if worktree_path:
+            console.print(f"[dim]worktree: {worktree_root}[/]")
         console.print()
+
         _render_agent_chain(
             state, live_sessions=live_sessions, worktree_root=worktree_root
         )
