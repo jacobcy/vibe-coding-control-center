@@ -50,6 +50,16 @@ class FlowManager:
         canonical_branch = self.issue_flow_service.canonical_branch_name(issue_number)
         if branch != canonical_branch:
             return False
+
+        # Guard against orphaned flow records: reject if git branch missing
+        if not self.git.branch_exists(branch):
+            logger.bind(
+                domain="flow_dispatch",
+                branch=branch,
+                issue_number=issue_number,
+            ).warning(f"Flow branch '{branch}' missing in git — rejecting as stale")
+            return False
+
         return str(flow.get("flow_status") or "active") not in {
             "done",
             "aborted",
