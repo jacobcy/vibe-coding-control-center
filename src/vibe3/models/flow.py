@@ -50,11 +50,18 @@ class FlowState(BaseModel):
     reviewer_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
-    blocked_by: str | None = None
-    next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"] = (
-        "active"
+    blocked_by: str | None = (
+        None  # Legacy field (deprecated, kept for backward compatibility)
     )
+    blocked_by_issue: int | None = (
+        None  # NEW: Dependency issue number (semantic clarity)
+    )
+    blocked_reason: str | None = None  # NEW: Block reason text (semantic clarity)
+    failed_reason: str | None = None  # NEW: Fail reason text
+    next_step: str | None = None
+    flow_status: Literal[
+        "active", "blocked", "failed", "done", "stale", "aborted", "merged"
+    ] = "active"
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -158,7 +165,9 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"]
+    flow_status: Literal[
+        "active", "blocked", "failed", "done", "stale", "aborted", "merged"
+    ]
     task_issue_number: int | None = None
     pr_number: int | None = None
     pr_ready_for_review: bool = False
@@ -171,7 +180,10 @@ class FlowStatusResponse(BaseModel):
     reviewer_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
-    blocked_by: str | None = None
+    blocked_by: str | None = None  # Legacy field (deprecated)
+    blocked_by_issue: int | None = None  # NEW: Dependency issue number
+    blocked_reason: str | None = None  # NEW: Block reason text
+    failed_reason: str | None = None  # NEW: Fail reason text
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
     planner_status: ExecutionStatus | None = None
@@ -223,6 +235,9 @@ class FlowStatusResponse(BaseModel):
             latest_actor=data.get("latest_actor"),
             initiated_by=data.get("initiated_by"),
             blocked_by=data.get("blocked_by"),
+            blocked_by_issue=data.get("blocked_by_issue"),
+            blocked_reason=data.get("blocked_reason"),
+            failed_reason=data.get("failed_reason"),
             next_step=data.get("next_step"),
             issues=issues,
             planner_status=data.get("planner_status"),

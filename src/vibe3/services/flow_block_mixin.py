@@ -63,6 +63,7 @@ class FlowLifecycleMixin:
             flow_actor=flow_data.get("latest_actor"),
         )
 
+        # Link dependency issue if provided
         if blocked_by_issue:
             from vibe3.services.task_service import TaskService
 
@@ -73,14 +74,14 @@ class FlowLifecycleMixin:
                 actor=effective_actor,
             )
 
-        blocked_by = reason or (
-            f"Blocked by issue #{blocked_by_issue}" if blocked_by_issue else None
-        )
-
+        # Update flow state with new field structure (semantic clarity)
+        # blocked_by_issue: dependency issue number (INT)
+        # blocked_reason: block reason text (TEXT)
         self.store.update_flow_state(
             branch,
             flow_status="blocked",
-            blocked_by=blocked_by,
+            blocked_by_issue=blocked_by_issue,
+            blocked_reason=reason,
             latest_actor=effective_actor,
         )
 
@@ -91,6 +92,60 @@ class FlowLifecycleMixin:
             f"Flow blocked{': ' + reason if reason else ''}",
         )
         sync_flow_blocked_task_label(self.store, branch)
+
+    def fail_flow(
+        self: Self,
+        branch: str,
+        reason: str,
+        actor: str | None = None,
+    ) -> None:
+        """Mark flow as failed (execution error, system fault).
+
+        Args:
+            branch: Branch name for the flow
+            reason: Failure reason (required)
+            actor: Actor performing the fail (defaults to system)
+
+        Note:
+            Failed flows indicate execution errors or system faults requiring
+            human intervention before they can continue. Recovery path: Ready.
+        """
+        logger.bind(
+            domain="flow",
+            action="fail",
+            branch=branch,
+            reason=reason,
+        ).info("Failing flow")
+
+        flow_data = self.store.get_flow_state(branch)
+        if not flow_data:
+            raise UserError(
+                f"当前分支 '{branch}' 没有 flow\n"
+                f"先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支"
+            )
+
+        effective_actor = SignatureService.resolve_actor(
+            explicit_actor=actor,
+            flow_actor=flow_data.get("latest_actor"),
+        )
+
+        # Update flow state to failed with failure reason
+        self.store.update_flow_state(
+            branch,
+            flow_status="failed",
+            failed_reason=reason,
+            latest_actor=effective_actor,
+        )
+
+        # Record fail event
+        self.store.add_event(
+            branch,
+            "flow_failed",
+            effective_actor,
+            f"Flow failed: {reason}",
+        )
+
+        logger.bind(branch=branch).success("Flow marked as failed")
 
     def abort_flow(
         self: Self,
