@@ -14,6 +14,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_failure_service import block_manager_noop_issue
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.task_service import TaskService
@@ -98,10 +99,6 @@ class FlowManager:
             if pr and (pr.state == PRState.MERGED or pr.merged_at):
                 # Block issue instead of throwing exception
                 # This is a tolerable issue that requires human intervention
-                from vibe3.services.issue_failure_service import (
-                    block_manager_noop_issue,
-                )
-
                 logger.bind(
                     domain="flow_dispatch",
                     issue=issue.number,
