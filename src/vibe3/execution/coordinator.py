@@ -119,9 +119,10 @@ class ExecutionCoordinator:
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
-            ).info(f"Execution already running for {request.role}, skipping duplicate")
+            ).info(f"Already running for {request.role}, skipping duplicate")
             return ExecutionLaunchResult(
                 launched=False,
+                skipped=True,
                 reason=f"Execution already running for {request.role}",
                 reason_code="already_running",
             )
@@ -139,9 +140,10 @@ class ExecutionCoordinator:
                     domain="execution_coordinator",
                     role=request.role,
                     target_id=request.target_id,
-                ).info(f"Execution already launching for {request.role}, skipping")
+                ).info(f"Already launching for {request.role}, skipping duplicate")
                 return ExecutionLaunchResult(
                     launched=False,
+                    skipped=True,
                     reason=f"Execution already launching for {request.role}",
                     reason_code="already_launching",
                 )

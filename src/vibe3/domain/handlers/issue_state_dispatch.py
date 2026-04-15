@@ -131,6 +131,12 @@ def handle_issue_state_changed_for_roles(event: IssueStateChanged) -> None:
                     role=role.registry_role,
                     issue_number=event.issue_number,
                 ).success("Role execution launched via ExecutionCoordinator")
+            elif result.skipped:
+                logger.bind(
+                    domain="issue_state_dispatch_handler",
+                    role=role.registry_role,
+                    issue_number=event.issue_number,
+                ).info(f"Role dispatch skipped: {result.reason}")
             else:
                 logger.bind(
                     domain="issue_state_dispatch_handler",

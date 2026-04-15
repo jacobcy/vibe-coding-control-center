@@ -143,7 +143,7 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
         execution_name: Execution name (e.g., vibe3-manager-issue-123)
 
     Returns:
-        Resolved log path
+        Resolved log path (not guaranteed to be unique)
     """
     issue_match = re.match(
         r"^vibe3-(manager|planner|executor|reviewer|supervisor|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
@@ -177,6 +177,39 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
         )
 
     return log_dir / f"{execution_name}.async.log"
+
+
+def allocate_log_path(log_dir: Path, execution_name: str) -> Path:
+    """Resolve and allocate a non-colliding log path.
+
+    Checks disk for existence to ensure we don't overwrite previous logs,
+    even if the execution name (session id) doesn't have an incremented suffix.
+
+    Args:
+        log_dir: Base log directory
+        execution_name: Execution name (session id)
+
+    Returns:
+        Unique log path
+    """
+    base_path = resolve_async_log_path(log_dir, execution_name)
+    if not base_path.exists():
+        return base_path
+
+    # If file exists, find the next suffix
+    # e.g. manager.async.log -> manager-2.async.log
+    parent = base_path.parent
+    name = base_path.name
+    if not name.endswith(".async.log"):
+        return base_path
+
+    base_name = name[: -len(".async.log")]
+    counter = 2
+    while True:
+        candidate = parent / f"{base_name}-{counter}.async.log"
+        if not candidate.exists():
+            return candidate
+        counter += 1
 
 
 def build_async_log_filter() -> list[str]:
@@ -347,11 +380,10 @@ def spawn_tmux_command(
         raise RuntimeError(f"Tmux session '{session_id}' already exists")
 
     # Use codeagent's specialized log path resolution (includes issue number)
-    # Use actual session_id (may include counter suffix like -2, -3)
-    log_path = resolve_async_log_path(log_dir, session_id)
+    # Use allocate_log_path to ensure logs are never overwritten, even if
+    # tmux session id is fixed.
+    log_path = allocate_log_path(log_dir, session_id)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    if log_path.exists():
-        log_path.unlink()
 
     shell_command = build_async_shell_command(
         command,
