@@ -11,6 +11,7 @@ from typing import Any, Final
 
 from loguru import logger
 
+from vibe3.exceptions import AgentPresetNotFoundError
 from vibe3.models.review_runner import AgentOptions
 
 # Path to codeagent models config
@@ -74,7 +75,10 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
     Priority:
     1. Explicit backend/model override in options
     2. Repo-local config/models.json mapping for agent preset
-    3. Fallback to raw agent mode
+    3. Raise error if agent preset cannot be resolved
+
+    Raises:
+        AgentPresetNotFoundError: If agent preset not found in config/models.json
     """
     if options.backend:
         return options
@@ -82,7 +86,9 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         return options
     resolved = resolve_repo_agent_preset(options.agent)
     if not resolved:
-        return options
+        raise AgentPresetNotFoundError(
+            f"Agent preset '{options.agent}' not found in config/models.json"
+        )
     backend, mapped_model = resolved
     return AgentOptions(
         agent=None,

@@ -235,8 +235,13 @@ class StateLabelDispatchService(ServiceBase):
     ) -> bool:
         """Use role definition's status_field + dispatch_predicate."""
         status_field = self.role_def.status_field
-        is_running = bool(status_field and flow_state.get(status_field) == "running")
-        has_live_session = is_running and self._has_live_dispatch(issue_number)
+        if status_field is None:
+            has_live_session = self._has_live_dispatch(issue_number)
+        else:
+            is_running = flow_state.get(status_field) == "running"
+            has_live_session = bool(
+                is_running and self._has_live_dispatch(issue_number)
+            )
         return self.role_def.dispatch_predicate(flow_state, has_live_session)
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
