@@ -33,6 +33,12 @@ ai:
 # 会置顶注入到所有 codeagent prompt 文件中
 agent_prompt:
   global_notice: |
+    ## Handoff 写入规则
+    不要直接访问或编辑主仓库的 `.git/vibe3/handoff/` 目录（该路径在 worktree 中会触发 external_directory 权限拒绝）。
+    所有 handoff 操作必须通过 CLI 命令完成：
+    - 追加记录：`uv run python src/vibe3/cli.py handoff append "<内容>"`
+    - 读取记录：`uv run python src/vibe3/cli.py handoff show`
+
     ## Debug Stop Rule
     当前项目处于调试过程中。
     如果任何工具重试两次后仍然报错，并且该错误会导致任务无法完成，必须停止当前任务。
