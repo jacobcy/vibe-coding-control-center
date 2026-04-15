@@ -10,7 +10,6 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
 
@@ -21,21 +20,17 @@ def _ensure_flow_state_for_issue(
     reason: str,
     actor: str,
 ) -> None:
-    """Find flow for issue and write block/fail state.
+    """Record block/fail reason on the flow for observability.
 
-    This helper ensures flow is the source of truth before GitHub sync.
+    GitHub labels/comments are the source of truth for issue state.
+    This helper only writes supplementary reason fields to the flow record
+    for display purposes — it does NOT change flow_status.
 
     Args:
         issue_number: GitHub issue number
         action: "block" or "fail"
-        reason: Block/fail reason text
+        reason: Block/fail reason text (recorded as blocked_reason/failed_reason)
         actor: Actor performing the action
-
-    Behavior:
-        - Find active flow for issue using IssueFlowService
-        - If no flow found: create minimal flow (per Eng Review decision)
-        - Call FlowService.block_flow() or fail_flow()
-        - On flow write error: log and continue (Fallback strategy)
 
     Note:
         Flow write failures do not block GitHub sync. This ensures user
@@ -43,32 +38,23 @@ def _ensure_flow_state_for_issue(
     """
     try:
         issue_flow_service = IssueFlowService()
-        flow_service = FlowService()
+        store = issue_flow_service.store
 
-        # Find active flow for issue
-        flow = issue_flow_service.find_active_flow(issue_number)
+        # Find any flow for this issue (active or otherwise)
+        flows = store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return
 
-        if not flow:
-            # Eng Review decision: create minimal flow if missing
-            branch = issue_flow_service.canonical_branch_name(issue_number)
-            logger.bind(
-                domain="flow",
-                action="create_minimal",
-                issue_number=issue_number,
-            ).info("Creating minimal flow for block/fail operation")
-            flow_service.create_flow(
-                slug=f"issue-{issue_number}",
-                branch=branch,
-                actor=actor,
-            )
-        else:
-            branch = str(flow.get("branch") or "").strip()
+        branch = str(flows[0].get("branch") or "").strip()
+        if not branch:
+            return
 
-        # Write flow state (source of truth)
+        # Record reason as display-only field; do NOT change flow_status.
+        # GitHub labels are the SSOT for issue state.
         if action == "block":
-            flow_service.block_flow(branch, reason=reason, actor=actor)
+            store.update_flow_state(branch, blocked_reason=reason, latest_actor=actor)
         elif action == "fail":
-            flow_service.fail_flow(branch, reason=reason, actor=actor)
+            store.update_flow_state(branch, failed_reason=reason, latest_actor=actor)
         else:
             logger.bind(
                 domain="flow",
@@ -77,15 +63,15 @@ def _ensure_flow_state_for_issue(
             ).warning(f"Unknown action: {action}")
 
     except Exception as e:
-        # Fallback strategy: log error, continue with GitHub sync
+        # Non-blocking: reason recording failure should not affect GitHub sync
         logger.bind(
             domain="flow",
             action="ensure_flow_state",
             issue_number=issue_number,
             error=str(e),
-        ).error(
-            f"Flow write failed for issue #{issue_number}, "
-            f"continuing with GitHub sync (Fallback strategy)"
+        ).warning(
+            f"Flow reason recording failed for issue #{issue_number} "
+            f"(non-blocking, GitHub sync continues)"
         )
 
 

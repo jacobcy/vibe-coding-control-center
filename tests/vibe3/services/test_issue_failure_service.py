@@ -14,7 +14,8 @@ from vibe3.services.issue_failure_service import (
 
 
 def test_ensure_flow_state_for_issue_existing_flow_block():
-    """Test helper finds existing flow and writes blocked state."""
+    """Test helper finds existing flow and records blocked_reason
+    (no flow_status change)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -24,36 +25,30 @@ def test_ensure_flow_state_for_issue_existing_flow_block():
         flow_service = FlowService(store=store)
         flow_service.create_flow(slug="issue-123", branch=branch, actor="test-user")
 
-        # Mock IssueFlowService to return the flow
+        # Link issue so get_flows_by_issue returns it
+        store.add_issue_link(branch, 123, "task")
+
+        # Mock IssueFlowService to expose the real store
         with patch(
             "vibe3.services.issue_failure_service.IssueFlowService"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
-            mock_issue_flow_service.find_active_flow.return_value = {
-                "branch": branch,
-                "flow_slug": "issue-123",
-            }
-            mock_issue_flow_service.canonical_branch_name.return_value = branch
+            mock_issue_flow_service.store = store
 
-            # Mock FlowService
-            with patch(
-                "vibe3.services.issue_failure_service.FlowService"
-            ) as mock_flow_service_class:
-                mock_flow_service = MagicMock()
-                mock_flow_service_class.return_value = mock_flow_service
+            _ensure_flow_state_for_issue(123, "block", "Test reason", "test-actor")
 
-                # Call helper
-                _ensure_flow_state_for_issue(123, "block", "Test reason", "test-actor")
-
-                # Verify block_flow was called
-                mock_flow_service.block_flow.assert_called_once_with(
-                    branch, reason="Test reason", actor="test-actor"
-                )
+        # Verify blocked_reason was recorded
+        flow_state = store.get_flow_state(branch)
+        assert flow_state is not None
+        assert flow_state["blocked_reason"] == "Test reason"
+        # flow_status must NOT be changed — GitHub labels are the SSOT
+        assert flow_state["flow_status"] == "active"
 
 
 def test_ensure_flow_state_for_issue_existing_flow_fail():
-    """Test helper finds existing flow and writes failed state."""
+    """Test helper finds existing flow and records failed_reason
+    (no flow_status change)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -61,210 +56,160 @@ def test_ensure_flow_state_for_issue_existing_flow_fail():
         branch = "task/issue-456"
         flow_service = FlowService(store=store)
         flow_service.create_flow(slug="issue-456", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 456, "task")
 
         with patch(
             "vibe3.services.issue_failure_service.IssueFlowService"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
-            mock_issue_flow_service.find_active_flow.return_value = {
-                "branch": branch,
-                "flow_slug": "issue-456",
-            }
-            mock_issue_flow_service.canonical_branch_name.return_value = branch
+            mock_issue_flow_service.store = store
 
-            with patch(
-                "vibe3.services.issue_failure_service.FlowService"
-            ) as mock_flow_service_class:
-                mock_flow_service = MagicMock()
-                mock_flow_service_class.return_value = mock_flow_service
+            _ensure_flow_state_for_issue(456, "fail", "Test failure", "test-actor")
 
-                _ensure_flow_state_for_issue(456, "fail", "Test failure", "test-actor")
-
-                # Verify fail_flow was called
-                mock_flow_service.fail_flow.assert_called_once_with(
-                    branch, reason="Test failure", actor="test-actor"
-                )
+        # Verify failed_reason was recorded
+        flow_state = store.get_flow_state(branch)
+        assert flow_state is not None
+        assert flow_state["failed_reason"] == "Test failure"
+        # flow_status must NOT be changed — GitHub labels are the SSOT
+        assert flow_state["flow_status"] == "active"
 
 
-def test_ensure_flow_state_for_issue_creates_minimal_flow():
-    """Test helper creates minimal flow when no flow exists."""
-    with tempfile.TemporaryDirectory():
-        # Store not needed for this test - mocking FlowService
-
-        branch = "task/issue-789"
+def test_ensure_flow_state_for_issue_no_flow_is_noop():
+    """Test helper silently returns when no flow exists (no minimal flow creation)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
 
         with patch(
             "vibe3.services.issue_failure_service.IssueFlowService"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
-            mock_issue_flow_service.find_active_flow.return_value = (
-                None  # No existing flow
-            )
-            mock_issue_flow_service.canonical_branch_name.return_value = branch
+            mock_issue_flow_service.store = store
 
-            with patch(
-                "vibe3.services.issue_failure_service.FlowService"
-            ) as mock_flow_service_class:
-                mock_flow_service = MagicMock()
-                mock_flow_service_class.return_value = mock_flow_service
+            # No flows exist for issue 789 — should return silently
+            _ensure_flow_state_for_issue(789, "block", "No flow test", "test-actor")
 
-                _ensure_flow_state_for_issue(789, "block", "No flow test", "test-actor")
-
-                # Verify create_flow was called (minimal flow creation)
-                mock_flow_service.create_flow.assert_called_once_with(
-                    slug="issue-789", branch=branch, actor="test-actor"
-                )
-
-                # Verify block_flow was called after creation
-                mock_flow_service.block_flow.assert_called_once_with(
-                    branch, reason="No flow test", actor="test-actor"
-                )
+        # Nothing should have been written
+        store2 = SQLiteClient(db_path=str(db_path))
+        flows = store2.get_flows_by_issue(789, role="task")
+        assert flows == [], "Should not create minimal flows"
 
 
 def test_ensure_flow_state_for_issue_fallback_on_error():
-    """Test Fallback strategy: continue even if flow write fails."""
-    with tempfile.TemporaryDirectory():
-        # Store not needed for this test - mocking FlowService
+    """Test non-blocking: store write failure should not raise."""
+    with patch(
+        "vibe3.services.issue_failure_service.IssueFlowService"
+    ) as mock_issue_flow_service_class:
+        mock_issue_flow_service = MagicMock()
+        mock_issue_flow_service_class.return_value = mock_issue_flow_service
+        mock_store = MagicMock()
+        mock_issue_flow_service.store = mock_store
+        mock_store.get_flows_by_issue.return_value = [
+            {"branch": "task/issue-999", "flow_slug": "issue-999"}
+        ]
+        # Simulate store write failure
+        mock_store.update_flow_state.side_effect = Exception("DB write failed")
 
-        branch = "task/issue-999"
+        # Call helper - should not raise, should log warning and continue
+        _ensure_flow_state_for_issue(999, "block", "Fallback test", "test-actor")
 
-        with patch(
-            "vibe3.services.issue_failure_service.IssueFlowService"
-        ) as mock_issue_flow_service_class:
-            mock_issue_flow_service = MagicMock()
-            mock_issue_flow_service_class.return_value = mock_issue_flow_service
-            mock_issue_flow_service.find_active_flow.return_value = {
-                "branch": branch,
-                "flow_slug": "issue-999",
-            }
-
-            with patch(
-                "vibe3.services.issue_failure_service.FlowService"
-            ) as mock_flow_service_class:
-                mock_flow_service = MagicMock()
-                mock_flow_service_class.return_value = mock_flow_service
-                # Simulate flow write failure
-                mock_flow_service.block_flow.side_effect = Exception("DB write failed")
-
-                # Call helper - should not raise, should log and continue
-                _ensure_flow_state_for_issue(
-                    999, "block", "Fallback test", "test-actor"
-                )
-
-                # Verify block_flow was attempted
-                mock_flow_service.block_flow.assert_called_once()
+        # Verify update was attempted
+        mock_store.update_flow_state.assert_called_once()
 
 
-def test_fail_manager_issue_calls_ensure_flow_state():
-    """Test fail_manager_issue calls helper before GitHub sync."""
+def test_fail_manager_issue_records_reason_and_syncs_github():
+    """Test fail_manager_issue records reason on flow AND applies GitHub state."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
 
         branch = "task/issue-100"
-
-        # Create flow manually
         flow_service = FlowService(store=store)
         flow_service.create_flow(slug="issue-100", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 100, "task")
 
         with patch(
             "vibe3.services.issue_failure_service.IssueFlowService"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
-            mock_issue_flow_service.find_active_flow.return_value = {
-                "branch": branch,
-                "flow_slug": "issue-100",
-            }
-            mock_issue_flow_service.canonical_branch_name.return_value = branch
+            mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.issue_failure_service.FlowService"
-            ) as mock_flow_service_class:
-                mock_flow_service = MagicMock()
-                mock_flow_service_class.return_value = mock_flow_service
+                "vibe3.services.issue_failure_service.GitHubClient"
+            ) as mock_github_class:
+                mock_github = MagicMock()
+                mock_github_class.return_value = mock_github
 
                 with patch(
-                    "vibe3.services.issue_failure_service.GitHubClient"
-                ) as mock_github_class:
-                    mock_github = MagicMock()
-                    mock_github_class.return_value = mock_github
+                    "vibe3.services.issue_failure_service.LabelService"
+                ) as mock_label_service_class:
+                    mock_label_service = MagicMock()
+                    mock_label_service_class.return_value = mock_label_service
 
-                    with patch(
-                        "vibe3.services.issue_failure_service.LabelService"
-                    ) as mock_label_service_class:
-                        mock_label_service = MagicMock()
-                        mock_label_service_class.return_value = mock_label_service
+                    fail_manager_issue(
+                        issue_number=100,
+                        reason="Test manager failure",
+                        actor="agent:manager",
+                    )
 
-                        # Call fail_manager_issue
-                        fail_manager_issue(
-                            issue_number=100,
-                            reason="Test manager failure",
-                            actor="agent:manager",
-                        )
+                    # Verify GitHub sync happened
+                    mock_label_service.confirm_issue_state.assert_called_once()
 
-                        # Verify flow write happened before GitHub sync
-                        mock_flow_service.fail_flow.assert_called_once()
-
-                        # Verify GitHub sync happened after
-                        mock_label_service.confirm_issue_state.assert_called_once()
+        # Verify reason recorded in flow (not changing flow_status)
+        flow_state = store.get_flow_state(branch)
+        assert flow_state is not None
+        assert flow_state["failed_reason"] == "Test manager failure"
+        assert flow_state["flow_status"] == "active"
 
 
-def test_block_manager_noop_issue_calls_ensure_flow_state():
-    """Test block_manager_noop_issue calls helper before GitHub sync."""
+def test_block_manager_noop_issue_records_reason_and_syncs_github():
+    """Test block_manager_noop_issue records reason on flow AND applies GitHub state."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
 
         branch = "task/issue-200"
-
         flow_service = FlowService(store=store)
         flow_service.create_flow(slug="issue-200", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 200, "task")
 
         with patch(
             "vibe3.services.issue_failure_service.IssueFlowService"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
-            mock_issue_flow_service.find_active_flow.return_value = {
-                "branch": branch,
-                "flow_slug": "issue-200",
-            }
-            mock_issue_flow_service.canonical_branch_name.return_value = branch
+            mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.issue_failure_service.FlowService"
-            ) as mock_flow_service_class:
-                mock_flow_service = MagicMock()
-                mock_flow_service_class.return_value = mock_flow_service
+                "vibe3.services.issue_failure_service.GitHubClient"
+            ) as mock_github_class:
+                mock_github = MagicMock()
+                mock_github_class.return_value = mock_github
 
                 with patch(
-                    "vibe3.services.issue_failure_service.GitHubClient"
-                ) as mock_github_class:
-                    mock_github = MagicMock()
-                    mock_github_class.return_value = mock_github
+                    "vibe3.services.issue_failure_service.LabelService"
+                ) as mock_label_service_class:
+                    mock_label_service = MagicMock()
+                    mock_label_service_class.return_value = mock_label_service
 
-                    with patch(
-                        "vibe3.services.issue_failure_service.LabelService"
-                    ) as mock_label_service_class:
-                        mock_label_service = MagicMock()
-                        mock_label_service_class.return_value = mock_label_service
+                    block_manager_noop_issue(
+                        issue_number=200,
+                        repo=None,
+                        reason="No progress made",
+                        actor="agent:manager",
+                    )
 
-                        # Call block_manager_noop_issue
-                        block_manager_noop_issue(
-                            issue_number=200,
-                            repo=None,
-                            reason="No progress made",
-                            actor="agent:manager",
-                        )
+                    # Verify GitHub sync happened
+                    mock_label_service.confirm_issue_state.assert_called_once()
 
-                        # Verify flow write happened before GitHub sync
-                        mock_flow_service.block_flow.assert_called_once()
-
-                        # Verify GitHub sync happened after
-                        mock_label_service.confirm_issue_state.assert_called_once()
+        # Verify reason recorded in flow (not changing flow_status)
+        flow_state = store.get_flow_state(branch)
+        assert flow_state is not None
+        assert flow_state["blocked_reason"] == "No progress made"
+        assert flow_state["flow_status"] == "active"
 
 
 def test_block_flow_uses_new_fields():

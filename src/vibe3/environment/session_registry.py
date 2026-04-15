@@ -114,7 +114,8 @@ class SessionRegistryService:
         - Only considers sessions in starting|running status.
         - Excludes governance role (governance uses separate capacity pool).
         - For sessions with a tmux_session, confirms liveness via backend.
-        - Sessions still in starting with no tmux_session are counted as live.
+        - Sessions still in starting with no tmux_session are counted as live
+          only if recently created (< 60s); stale sessions are marked orphaned.
         """
         if self._backend is None:
             from loguru import logger
@@ -129,6 +130,9 @@ class SessionRegistryService:
             )
         sessions = self._store.list_live_runtime_sessions(role=role)
         count = 0
+        now = datetime.datetime.now()
+        starting_timeout_seconds = 60
+
         for session in sessions:
             session_role = session.get("role", "")
             # Exclude governance (has separate capacity pool)
@@ -141,7 +145,41 @@ class SessionRegistryService:
                 if self._has_tmux_session(tmux):
                     count += 1
             else:
-                # Still starting, no tmux yet - count as live
+                # No tmux_session - check if it's a stale session
+                created_at_str = session.get("created_at")
+                if created_at_str:
+                    try:
+                        created_at = datetime.datetime.fromisoformat(created_at_str)
+                        age_seconds = (now - created_at).total_seconds()
+                        if age_seconds > starting_timeout_seconds:
+                            # Mark stale session as orphaned
+                            session_id = session.get("id")
+                            if session_id:
+                                self._store.update_runtime_session(
+                                    session_id,
+                                    status="orphaned",
+                                    ended_at=now.isoformat(),
+                                )
+                                from loguru import logger
+
+                                logger.bind(
+                                    domain="session_registry",
+                                    session_id=session_id,
+                                    age_seconds=age_seconds,
+                                ).warning(
+                                    f"Session {session_id} marked orphaned: "
+                                    f"no tmux after {age_seconds:.0f}s"
+                                )
+                            # Don't count - it's failed, not starting
+                            continue
+                    except Exception as exc:
+                        from loguru import logger
+
+                        logger.bind(
+                            domain="session_registry",
+                            session=session,
+                        ).warning(f"Failed to parse created_at timestamp: {exc}")
+                # Recently created, no tmux yet - count as live
                 count += 1
         return count
 
@@ -268,7 +306,7 @@ class SessionRegistryService:
         this method confirms tmux liveness for each session.
 
         Sessions in starting status with no tmux_session are included
-        (assuming they are still launching).
+        only if recently created (< 60s); stale sessions are marked orphaned.
 
         Args:
             branch: The branch to filter sessions by.
@@ -277,7 +315,12 @@ class SessionRegistryService:
             List of session dicts that are truly live.
         """
         sessions = self._store.list_live_runtime_sessions()
+        from loguru import logger
+
         truly_live: list[dict[str, Any]] = []
+        now = datetime.datetime.now()
+        starting_timeout_seconds = 60
+
         for session in sessions:
             if session.get("branch") != branch:
                 continue
@@ -286,7 +329,36 @@ class SessionRegistryService:
                 if self._has_tmux_session(tmux):
                     truly_live.append(session)
             else:
-                # Still starting, no tmux yet - count as live
+                # No tmux_session field - check if it's truly still starting
+                created_at_str = session.get("created_at")
+                if created_at_str:
+                    try:
+                        created_at = datetime.datetime.fromisoformat(created_at_str)
+                        age_seconds = (now - created_at).total_seconds()
+                        if age_seconds > starting_timeout_seconds:
+                            # Mark stale session as orphaned
+                            session_id = session.get("id")
+                            if session_id:
+                                self._store.update_runtime_session(
+                                    session_id,
+                                    status="orphaned",
+                                    ended_at=now.isoformat(),
+                                )
+                                logger.bind(
+                                    domain="session_registry",
+                                    session_id=session_id,
+                                    age_seconds=age_seconds,
+                                ).warning(
+                                    f"Session {session_id} marked orphaned: "
+                                    f"no tmux after {age_seconds:.0f}s"
+                                )
+                            continue
+                    except Exception as exc:
+                        logger.bind(
+                            domain="session_registry",
+                            session=session,
+                        ).warning(f"Failed to parse created_at timestamp: {exc}")
+                # Recently created, no tmux yet - count as live
                 truly_live.append(session)
         return truly_live
 
@@ -307,7 +379,14 @@ class SessionRegistryService:
             List of session dicts that are truly live and match all criteria.
         """
         sessions = self._store.list_live_runtime_sessions(role=role)
+        from loguru import logger
+
         truly_live: list[dict[str, Any]] = []
+        now = datetime.datetime.now()
+        # Timeout threshold: sessions without tmux for longer than this are
+        # considered failed launches, not "still starting"
+        starting_timeout_seconds = 60
+
         for session in sessions:
             if session.get("branch") != branch:
                 continue
@@ -318,7 +397,41 @@ class SessionRegistryService:
                 if self._has_tmux_session(tmux):
                     truly_live.append(session)
             else:
-                # Still starting, no tmux yet - count as live
+                # No tmux_session field - check if it's truly still starting
+                # or if it's a stale session from a failed launch
+                created_at_str = session.get("created_at")
+                if created_at_str:
+                    try:
+                        created_at = datetime.datetime.fromisoformat(created_at_str)
+                        age_seconds = (now - created_at).total_seconds()
+                        if age_seconds > starting_timeout_seconds:
+                            # Session created too long ago without tmux - failed launch
+                            # Mark as orphaned to prevent future false positives
+                            session_id = session.get("id")
+                            if session_id:
+                                self._store.update_runtime_session(
+                                    session_id,
+                                    status="orphaned",
+                                    ended_at=now.isoformat(),
+                                )
+                                logger.bind(
+                                    domain="session_registry",
+                                    session_id=session_id,
+                                    role=role,
+                                    target_id=target_id,
+                                    age_seconds=age_seconds,
+                                ).warning(
+                                    f"Session {session_id} marked orphaned: "
+                                    f"no tmux after {age_seconds:.0f}s"
+                                )
+                            # Don't add to truly_live - it's failed, not starting
+                            continue
+                    except Exception as exc:
+                        logger.bind(
+                            domain="session_registry",
+                            session=session,
+                        ).warning(f"Failed to parse created_at timestamp: {exc}")
+                # Recently created, no tmux yet - count as live (still starting)
                 truly_live.append(session)
         return truly_live
 

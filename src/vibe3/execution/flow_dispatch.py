@@ -43,7 +43,18 @@ class FlowManager:
         self._registry = registry
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
-        return self.issue_flow_service.find_active_flow(issue_number)
+        """Find the latest flow for an issue, regardless of active status.
+
+        This supports using the GitHub Issue as the source of truth (SSOT).
+        If an issue has a label that triggers dispatch, we need the branch
+        context even if the flow was previously marked as aborted or done.
+        """
+        flows = self.store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return None
+
+        # Return the first one (IssueFlowService already sorts them by priority/recency)
+        return flows[0]
 
     def _is_reusable_auto_flow(
         self, flow: dict[str, object], issue_number: int

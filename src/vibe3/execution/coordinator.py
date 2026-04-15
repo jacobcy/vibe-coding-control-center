@@ -110,22 +110,32 @@ class ExecutionCoordinator:
 
         # 0. Check for existing truly live session (starting or running with live tmux)
         # to prevent duplicate launches if multiple dispatchers fire concurrently.
-        if self.registry.get_truly_live_sessions_for_target(
-            role=request.role,
-            branch=request.target_branch,
-            target_id=str(request.target_id),
-        ):
-            logger.bind(
-                domain="execution_coordinator",
+        if request.target_branch:
+            live_sessions = self.registry.get_truly_live_sessions_for_target(
                 role=request.role,
-                target_id=request.target_id,
-            ).info(f"Already running for {request.role}, skipping duplicate")
-            return ExecutionLaunchResult(
-                launched=False,
-                skipped=True,
-                reason=f"Execution already running for {request.role}",
-                reason_code="already_running",
+                branch=request.target_branch,
+                target_id=str(request.target_id),
             )
+            if live_sessions:
+                # If it's a manager role and we are in async mode (standard dispatch),
+                # we are more strict unless all sessions are in 'starting' state
+                # for too long, but for now we just block to prevent double-manager.
+                #
+                # Exception: if all live sessions found are NOT actually running
+                # in tmux (get_truly_live already checks this, but we double-verify),
+                # we could theoretically allow it.
+                logger.bind(
+                    domain="execution_coordinator",
+                    role=request.role,
+                    target_id=request.target_id,
+                    branch=request.target_branch,
+                ).info(f"Already running for {request.role}, skipping duplicate")
+                return ExecutionLaunchResult(
+                    launched=False,
+                    skipped=True,
+                    reason=f"Execution already running for {request.role}",
+                    reason_code="already_running",
+                )
 
         # 1. Check capacity and claim the slot.
         # We use mark_launching() to atomically claim the slot. If it was
