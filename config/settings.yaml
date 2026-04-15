@@ -131,10 +131,13 @@ code_limits:
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
       - path: "tests/vibe3/domain/test_orchestration_facade.py"
         limit: 450
-        reason: "单一测试类，刚超限，拆分收益低"       
+        reason: "单一测试类，刚超限，拆分收益低"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
+      - path: "tests/vibe3/agents/test_codeagent_config.py"
+        limit: 450
+        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
