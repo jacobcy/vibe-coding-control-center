@@ -159,7 +159,13 @@ class GlobalDispatchCoordinator:
             return False
 
         # 先标记 in_flight，再 emit（保证 coordinator 后续检查也会看到）
-        self._capacity.mark_in_flight(role, issue_id)
+        try:
+            self._capacity.mark_in_flight(role, issue_id)
+        except Exception as exc:
+            logger.bind(domain="global_dispatch", role=role, issue=issue_id).error(
+                f"mark_in_flight failed for #{issue_id}: {exc}"
+            )
+            return False
 
         try:
             item.service._emit_dispatch_intent(item.issue)

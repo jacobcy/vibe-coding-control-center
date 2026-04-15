@@ -287,5 +287,12 @@ class ExecutionCoordinator:
                 reason_code="launch_failed",
             )
         finally:
-            # 6. Prune in-flight
-            self.capacity.prune_in_flight(request.role, {request.target_id})
+            # 6. Prune in-flight (best-effort: must not mask the primary exception)
+            try:
+                self.capacity.prune_in_flight(request.role, {request.target_id})
+            except Exception as prune_exc:
+                logger.bind(
+                    domain="execution_coordinator",
+                    role=request.role,
+                    target_id=request.target_id,
+                ).error(f"prune_in_flight failed (capacity leak possible): {prune_exc}")
