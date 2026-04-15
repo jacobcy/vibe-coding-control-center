@@ -108,9 +108,18 @@ class ExecutionCoordinator:
             target_branch=request.target_branch,
         ).info(f"Received execution request for {request.role}")
 
+        # Async self-invocation launches a tmux wrapper first, then executes the
+        # real sync workload inside that child process. The wrapper already owns
+        # the runtime_session row, so the child must not short-circuit on the
+        # parent's live-session entry or it will exit immediately without doing
+        # any work.
+        is_async_child_sync = request.mode == "sync" and (
+            os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+        )
+
         # 0. Check for existing truly live session (starting or running with live tmux)
         # to prevent duplicate launches if multiple dispatchers fire concurrently.
-        if request.target_branch:
+        if request.target_branch and not is_async_child_sync:
             live_sessions = self.registry.get_truly_live_sessions_for_target(
                 role=request.role,
                 branch=request.target_branch,

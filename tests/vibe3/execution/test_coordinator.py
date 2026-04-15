@@ -63,7 +63,7 @@ def test_coordinator_dispatch_success(mock_dependencies):
 
         # Verify capacity checked and in-flight managed
         capacity.can_dispatch.assert_called_once_with("planner", 42)
-        capacity.mark_in_flight.assert_called_once_with("planner", 42)
+        capacity.mark_launching.assert_called_once_with("planner", 42)
         # Async success keeps in-flight marker (reconcile_in_flight cleans later)
         capacity.prune_in_flight.assert_not_called()
 
@@ -120,7 +120,78 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
 
     # Verify lifecycle not called
     lifecycle.record_started.assert_not_called()
-    capacity.mark_in_flight.assert_not_called()
+    capacity.mark_launching.assert_not_called()
+
+
+def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkeypatch):
+    """Sync child process should not short-circuit on its async wrapper session."""
+    config, store, backend, capacity, lifecycle = mock_dependencies
+    capacity.can_dispatch.return_value = True
+    backend.run.return_value.is_success.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+        lifecycle=lifecycle,
+    )
+    coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
+        return_value=[{"id": 1, "branch": "task/issue-42"}]
+    )
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    request = ExecutionRequest(
+        role="manager",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-manager-issue-42",
+        prompt="do work",
+        options=MagicMock(),
+        mode="sync",
+        refs={"task": "Manage issue #42"},
+    )
+
+    result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    coordinator.registry.get_truly_live_sessions_for_target.assert_not_called()
+    backend.run.assert_called_once()
+    lifecycle.record_started.assert_called_once()
+    lifecycle.record_completed.assert_called_once()
+
+
+def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
+    """Regular sync launches should still respect live-session dedupe."""
+    config, store, backend, capacity, lifecycle = mock_dependencies
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+        lifecycle=lifecycle,
+    )
+    coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
+        return_value=[{"id": 1, "branch": "task/issue-42"}]
+    )
+
+    request = ExecutionRequest(
+        role="manager",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-manager-issue-42",
+        prompt="do work",
+        options=MagicMock(),
+        mode="sync",
+    )
+
+    result = coordinator.dispatch_execution(request)
+
+    assert result.launched is False
+    assert result.skipped is True
+    assert result.reason_code == "already_running"
+    backend.run.assert_not_called()
 
 
 def test_coordinator_dispatch_launch_fails(mock_dependencies):
