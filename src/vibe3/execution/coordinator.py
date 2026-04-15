@@ -53,7 +53,19 @@ class ExecutionCoordinator:
                 f"Unsupported worktree requirement: {request.worktree_requirement}"
             )
 
-        repo_path = Path(request.repo_path) if request.repo_path else Path.cwd()
+        # Resolve repo_path: prefer explicit request, then git common dir (main repo)
+        # Using git common dir prevents creating worktrees inside current worktree
+        if request.repo_path:
+            repo_path = Path(request.repo_path)
+        else:
+            from vibe3.clients.git_client import GitClient
+
+            try:
+                git_common = GitClient().get_git_common_dir()
+                repo_path = Path(git_common).parent if git_common else Path.cwd()
+            except Exception:
+                repo_path = Path.cwd()
+
         worktree_manager = WorktreeManager(self.config, repo_path)
         manager_cwd, _ = worktree_manager.resolve_manager_cwd(
             request.target_id,
