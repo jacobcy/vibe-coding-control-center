@@ -86,9 +86,7 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         return options
     resolved = resolve_repo_agent_preset(options.agent)
     if not resolved:
-        raise AgentPresetNotFoundError(
-            f"Agent preset '{options.agent}' not found in config/models.json"
-        )
+        raise AgentPresetNotFoundError(options.agent)
     backend, mapped_model = resolved
     return AgentOptions(
         agent=None,

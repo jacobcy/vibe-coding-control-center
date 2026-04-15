@@ -86,6 +86,13 @@ def run_issue_role_mode(
                     f"{spec.role_name} async request preparation failed",
                 )
             raise typer.Exit(1)
+        if request is None:
+            if spec.failure_handler is not None:
+                spec.failure_handler(
+                    issue_number,
+                    f"{spec.role_name} async request preparation failed",
+                )
+            raise typer.Exit(1)
 
         try:
             result = coordinator.dispatch_execution(request)
