@@ -16,6 +16,7 @@ def mock_dependencies():
     store = MagicMock()
     backend = MagicMock()
     capacity = MagicMock()
+    capacity.is_in_flight.return_value = False  # not pre-authorized by default
     lifecycle = MagicMock()
     return config, store, backend, capacity, lifecycle
 

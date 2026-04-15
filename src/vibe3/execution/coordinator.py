@@ -96,16 +96,25 @@ class ExecutionCoordinator:
             target_branch=request.target_branch,
         ).info(f"Received execution request for {request.role}")
 
-        # 1. Check capacity
-        if not self.capacity.can_dispatch(request.role, request.target_id):
+        # 1. Check capacity.
+        # If GlobalDispatchCoordinator already pre-reserved a slot for this
+        # exact target (is_in_flight=True), take over that reservation rather
+        # than treating it as "capacity full".  Without this check the
+        # coordinator's early-return skips the finally-block prune, leaving
+        # the pre-reserved marker permanently and deadlocking all future ticks.
+        pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
+        if not pre_authorized and not self.capacity.can_dispatch(
+            request.role, request.target_id
+        ):
             return ExecutionLaunchResult(
                 launched=False,
                 reason=f"Capacity full for {request.role}",
                 reason_code="capacity_full",
             )
 
-        # 2. Mark in-flight
-        self.capacity.mark_in_flight(request.role, request.target_id)
+        # 2. Mark in-flight (skip if pre-authorized — slot already reserved).
+        if not pre_authorized:
+            self.capacity.mark_in_flight(request.role, request.target_id)
 
         try:
             # 4. Launch

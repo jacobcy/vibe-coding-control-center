@@ -149,6 +149,22 @@ class CapacityService:
                 remaining_in_flight=after,
             ).debug(f"Pruned {before - after} in-flight dispatches for {role}")
 
+    def is_in_flight(self, role: str, target_id: int) -> bool:
+        """Check if a specific target is already marked as in-flight.
+
+        Used by ExecutionCoordinator to detect GlobalDispatchCoordinator
+        pre-reservations so it can take over the slot rather than treating
+        it as capacity-full.
+
+        Args:
+            role: Execution role
+            target_id: Target ID to check
+
+        Returns:
+            True if the target is already in-flight for this role
+        """
+        return target_id in self._in_flight_dispatches.get(role, set())
+
     def reconcile_in_flight(self) -> None:
         """Prune in-flight markers that are now live SQLite sessions.
 
