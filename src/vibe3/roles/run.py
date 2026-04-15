@@ -77,9 +77,10 @@ def build_run_request(
     refs: dict[str, str] = {"issue_number": str(issue.number)}
     if plan_ref:
         refs["plan_ref"] = plan_ref
-    command_args = ["run", "--issue", str(issue.number), "--no-async"]
-    if plan_ref:
-        command_args.extend(["--plan-ref", plan_ref])
+    # Correct command: use --plan instead of non-existent --issue and --plan-ref
+    command_args = (
+        ["run", "--plan", plan_ref, "--no-async"] if plan_ref else ["run", "--no-async"]
+    )
     return build_issue_async_cli_request(
         role="executor",
         issue=issue,

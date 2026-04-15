@@ -248,13 +248,9 @@ def build_async_shell_command(
     cmd_str = shlex.join(command_with_env)
     log_str = shlex.quote(str(log_path))
 
-    # Save complete wrapper logs for diagnostics (before filtering)
-    wrapper_log_path = log_path.parent / "wrapper.full.log"
-    wrapper_log_str = shlex.quote(str(wrapper_log_path))
-
+    # Single filtered log file (removed wrapper.full.log to avoid duplication)
     shell = (
-        f"{cmd_str} 2>&1 | tee {wrapper_log_str} | "
-        f"{filter_command} | tee {log_str}; "
+        f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
         "cmd_status=${PIPESTATUS[0]:-$?}; "
         "echo; "
         'echo "[vibe3 async] command exited with status: ${cmd_status}"; '
