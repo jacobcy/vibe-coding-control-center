@@ -27,8 +27,8 @@ class CapacityService:
     """Unified capacity control for all execution roles.
 
     Combines live session count and in-flight dispatch tracking to prevent
-    dual-layer throttling issues between StateLabelDispatchService and
-    ManagerExecutor.
+    double-check deadlocks between GlobalDispatchCoordinator (pre-reserve) and
+    ExecutionCoordinator (launch).
 
     Capacity Formula:
         remaining = max_capacity(role) - active_count(role) - in_flight_count(role)

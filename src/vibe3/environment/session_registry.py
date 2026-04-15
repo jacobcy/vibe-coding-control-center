@@ -30,7 +30,7 @@ class SessionRegistryService:
 
     - **backend=CodeagentBackend()**: Full liveness verification.
       REQUIRED for capacity checks, dispatch gates, and state reconciliation.
-      Example: `ManagerExecutor`, `StateLabelDispatchService`.
+      Example: `ExecutionCoordinator`, `GlobalDispatchCoordinator`.
 
     **WARNING**: Using backend=None in capacity/dispatch logic will cause
     false positives (treating dead sessions as live), leading to queue starvation.
@@ -322,89 +322,10 @@ class SessionRegistryService:
                 truly_live.append(session)
         return truly_live
 
-    def cleanup_stale_sessions(self, starting_timeout_seconds: int = 300) -> int:
-        """Mark sessions with dead tmux as stopped. Called at server startup.
-
-        Scans all sessions in starting/running status and confirms tmux
-        liveness. Sessions whose tmux window is gone are marked stopped so
-        they don't accumulate and inflate the capacity count across restarts.
-
-        Sessions stuck in "starting" with no tmux_session are treated as
-        orphaned if they were created more than *starting_timeout_seconds*
-        ago (default 5 min).  These arise when the server crashed before the
-        backend assigned a tmux session; without this timeout they would
-        survive every restart and permanently consume a capacity slot.
-
-        Args:
-            starting_timeout_seconds: Age threshold for orphaned starting
-                sessions (seconds).  Sessions younger than this are left alone
-                because they may still be booting.
-
-        Returns:
-            Number of sessions pruned.
-        """
-        import datetime
-
-        from loguru import logger
-
-        now = datetime.datetime.now()
-        sessions = self._store.list_live_runtime_sessions()
-        pruned = 0
-        for session in sessions:
-            tmux = session.get("tmux_session")
-            if not tmux:
-                # "starting" session with no tmux yet — orphan if old enough.
-                created_raw = session.get("created_at")
-                if created_raw:
-                    try:
-                        created = datetime.datetime.fromisoformat(str(created_raw))
-                        age_seconds = (now - created).total_seconds()
-                    except (ValueError, TypeError):
-                        age_seconds = 0
-                else:
-                    age_seconds = 0
-                if age_seconds < starting_timeout_seconds:
-                    continue  # still within boot window — leave it
-                session_id = session.get("id")
-                if session_id is not None:
-                    self._store.update_runtime_session(int(session_id), status="failed")
-                    pruned += 1
-                    logger.bind(
-                        domain="session_registry",
-                        session_id=session_id,
-                        age_seconds=int(age_seconds),
-                    ).warning(
-                        f"cleanup_stale_sessions: orphaned starting session "
-                        f"{session_id} (no tmux, age={int(age_seconds)}s) "
-                        f"marked failed"
-                    )
-                continue
-            if not self._has_tmux_session(tmux):
-                session_id = session.get("id")
-                if session_id is not None:
-                    self._store.update_runtime_session(
-                        int(session_id), status="stopped"
-                    )
-                    pruned += 1
-                    logger.bind(
-                        domain="session_registry",
-                        session_id=session_id,
-                        tmux=tmux,
-                    ).debug(
-                        f"cleanup_stale_sessions: marked session {session_id} "
-                        f"(tmux={tmux}) as stopped"
-                    )
-        if pruned:
-            logger.bind(domain="session_registry", pruned=pruned).info(
-                f"Startup cleanup: marked {pruned} stale sessions as stopped"
-            )
-        return pruned
-
     def clear_all_sessions(self) -> int:
         """Mark ALL active sessions as stopped. Called on server start and stop.
 
-        Unlike cleanup_stale_sessions() which checks tmux liveness,
-        this unconditionally marks every starting|running session as stopped.
+        Unconditionally marks every starting|running session as stopped.
 
         Design: server lifecycle owns session state. When the server starts or
         stops, all sessions from the previous run are considered ended. The tmux
