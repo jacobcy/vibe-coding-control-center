@@ -22,7 +22,7 @@ class TestResolveAgentOptions:
         config.run.agent_config.agent = "config-agent"
         config.run.agent_config.backend = "config-backend"
         config.run.agent_config.model = "config-model"
-        config.run.agent_config.timeout_seconds = 1800
+        config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(
             config=config, section="run", agent="cli-agent"
@@ -31,7 +31,7 @@ class TestResolveAgentOptions:
         assert result.agent == "cli-agent"
         assert result.backend is None
         assert result.model is None
-        assert result.timeout_seconds == 1800
+        assert result.timeout_seconds == 3600
 
     def test_cli_backend_overrides_config_backend(self) -> None:
         """CLI --backend should override config backend (no config model fallback)."""
@@ -41,7 +41,7 @@ class TestResolveAgentOptions:
         config.run.agent_config.agent = None
         config.run.agent_config.backend = "config-backend"
         config.run.agent_config.model = "config-model"
-        config.run.agent_config.timeout_seconds = 1800
+        config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(
             config=config,
@@ -53,7 +53,7 @@ class TestResolveAgentOptions:
         assert result.backend == "cli-backend"
         assert result.model == "cli-model"  # CLI model, not config model
         assert result.agent is None
-        assert result.timeout_seconds == 1800
+        assert result.timeout_seconds == 3600
 
     def test_config_agent_takes_precedence_over_config_backend(self) -> None:
         """When config has both agent and backend, agent wins."""
@@ -63,14 +63,14 @@ class TestResolveAgentOptions:
         config.run.agent_config.agent = "config-agent"
         config.run.agent_config.backend = "config-backend"
         config.run.agent_config.model = "config-model"
-        config.run.agent_config.timeout_seconds = 1800
+        config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(config=config, section="run")
 
         assert result.agent == "config-agent"
         assert result.backend is None
         assert result.model is None
-        assert result.timeout_seconds == 1800
+        assert result.timeout_seconds == 3600
 
     def test_config_backend_used_when_no_agent(self) -> None:
         """Config backend/model should be used when agent is absent."""
@@ -80,14 +80,14 @@ class TestResolveAgentOptions:
         config.run.agent_config.agent = None
         config.run.agent_config.backend = "config-backend"
         config.run.agent_config.model = "config-model"
-        config.run.agent_config.timeout_seconds = 1800
+        config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(config=config, section="run")
 
         assert result.backend == "config-backend"
         assert result.model == "config-model"
         assert result.agent is None
-        assert result.timeout_seconds == 1800
+        assert result.timeout_seconds == 3600
 
     def test_cli_backend_ignores_config_model(self) -> None:
         """CLI --backend should not inherit config model (user must be explicit)."""
@@ -97,7 +97,7 @@ class TestResolveAgentOptions:
         config.run.agent_config.agent = None
         config.run.agent_config.backend = "config-backend"
         config.run.agent_config.model = "config-model"
-        config.run.agent_config.timeout_seconds = 1800
+        config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(
             config=config, section="run", backend="cli-backend"
@@ -106,7 +106,7 @@ class TestResolveAgentOptions:
         assert result.backend == "cli-backend"
         assert result.model is None  # No model from config
         assert result.agent is None
-        assert result.timeout_seconds == 1800
+        assert result.timeout_seconds == 3600
 
     def test_no_config_raises_error(self) -> None:
         """Missing config should raise ValueError."""
@@ -143,7 +143,7 @@ class TestResolveAgentOptions:
         assert result.timeout_seconds == 3600
 
     def test_default_timeout_when_not_configured(self) -> None:
-        """Default timeout (1800s) should be used when not configured."""
+        """Default timeout (3600s) should be used when not configured."""
         config = MagicMock(spec=VibeConfig)
         config.run = MagicMock()
         config.run.agent_config = MagicMock()
@@ -156,7 +156,7 @@ class TestResolveAgentOptions:
         result = resolve_command_agent_options(config=config, section="run")
 
         # Should use default timeout
-        assert result.timeout_seconds == 1800
+        assert result.timeout_seconds == 3600
 
     def test_plan_section_uses_plan_config(self) -> None:
         """Plan section should use plan.agent_config."""
@@ -194,7 +194,7 @@ class TestResolveAgentOptions:
         config = MagicMock(spec=VibeConfig)
         config.run = MagicMock()
         config.run.agent_config = MagicMock()
-        config.run.agent_config.timeout_seconds = 1800
+        config.run.agent_config.timeout_seconds = 3600
 
         result = resolve_command_agent_options(
             config=config,

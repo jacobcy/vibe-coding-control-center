@@ -31,7 +31,7 @@ def sample_config() -> OrchestraConfig:
             prompt_template="orchestra.assignee_dispatch.manager",
             supervisor_file="supervisor/manager.md",
             include_supervisor_content=True,
-            timeout_seconds=1800,
+            timeout_seconds=3600,
         ),
         governance=GovernanceConfig(
             enabled=True,
@@ -99,7 +99,7 @@ def test_resolve_session_strategy_manager(sample_config: OrchestraConfig) -> Non
     assert isinstance(strategy, SessionStrategy)
     # Manager with use_worktree=True and async_mode=True should use tmux
     assert strategy.mode == "tmux"
-    assert strategy.timeout == 1800
+    assert strategy.timeout == 3600
 
 
 def test_resolve_session_strategy_unknown_role(sample_config: OrchestraConfig) -> None:
