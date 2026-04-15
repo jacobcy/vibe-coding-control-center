@@ -191,6 +191,10 @@ class CodeagentBackend:
         else:
             command.extend(["--agent", "code-reviewer"])
 
+        # Skip interactive permission prompts so worktree agents can access
+        # shared paths (e.g. main/.git/vibe3/handoff/) without being blocked.
+        command.append("--skip-permissions")
+
         command.extend(["--prompt-file", prompt_file_path])
 
         if session_id:
