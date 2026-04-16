@@ -133,6 +133,7 @@ openspec/
 .claude/commands/
 .claude/skills/
 .claude/do-tasks/
+.claude/worktrees/
 .aider*
 MagicMock/
 

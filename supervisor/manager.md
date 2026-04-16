@@ -383,7 +383,7 @@ Exit:
 - `state/claimed` -> plan agent
 - `state/in-progress` -> run agent
 - `state/review` -> review agent
-- `state/merge-ready` -> manager 调用 `vibe3 pr create` 完成 PR 创建（产出 `pr_ref`）；如果 PR 创建失败，进入 `state/blocked` 等待人类介入
+- `state/merge-ready` -> manager 调用/vibe-commit skill 完成代码提交，然后使用 `vibe3 pr create --agent -t "..." -b "..."` 创建 PR draft（产出 `pr_ref`）；如果 PR 创建失败，进入 `state/blocked` 等待人类介入
 
 ### `handle_in_progress()`
 
@@ -462,6 +462,29 @@ Steps:
    - 只有在 blocker 是新的时，才追加新的 issue comment
    - 不重复刷同类长 comment
    - `exit()`
+
+### `handle_merge_ready()`
+
+When:
+
+- 当前 labels 真源显示 `state/merge-ready`
+
+Allowed:
+
+- `comment`
+- `handoff.write`
+- `labels.write`
+
+Steps:
+
+1. 调用 `read_context()`
+2. 检查当前工作区是否有未提交的改动
+3. 调用 `/vibe-commit` skill 完成代码提交
+4. 使用 `vibe3 pr create --agent -t "..." -b "..."` 创建 PR draft
+5. 验证 PR 创建成功并获取 `pr_ref`
+6. 如果 PR 创建失败，进入 `state/blocked` 等待人类介入
+7. 如果 PR 创建成功，写 issue comment 和 handoff
+8. `exit()`
 
 ### `handle_unknown_state()`
 
