@@ -157,7 +157,8 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
     assert result.launched is True
     coordinator.registry.get_truly_live_sessions_for_target.assert_not_called()
     backend.run.assert_called_once()
-    lifecycle.record_started.assert_called_once()
+    # Async child sync should NOT call record_started (outer wrapper already registered)
+    lifecycle.record_started.assert_not_called()
     lifecycle.record_completed.assert_called_once()
 
 

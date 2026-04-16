@@ -32,8 +32,10 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
 def make_capacity(can_dispatch_results: list[bool]) -> MagicMock:
     capacity = MagicMock()
     capacity.can_dispatch = MagicMock(side_effect=can_dispatch_results)
+    capacity.is_in_flight = MagicMock(return_value=False)  # Not in-flight by default
     capacity.mark_in_flight = MagicMock()
     capacity.prune_in_flight = MagicMock()
+    capacity.reconcile_in_flight = MagicMock()
     return capacity
 
 
@@ -131,6 +133,8 @@ class TestGlobalDispatchCoordinator:
 
         capacity = MagicMock()
         capacity.can_dispatch = MagicMock(return_value=True)
+        capacity.is_in_flight = MagicMock(return_value=False)  # Not in-flight
+        capacity.reconcile_in_flight = MagicMock()  # Required by coordinate()
         capacity.mark_in_flight = MagicMock(
             side_effect=lambda *_: call_order.append("mark")
         )
