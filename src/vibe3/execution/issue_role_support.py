@@ -293,6 +293,7 @@ def build_required_ref_sync_spec(
     missing_ref_handler: Callable[..., None],
     failure_handler: Callable[..., None],
     success_handler: Callable[..., None] | None = None,
+    process_sync_result: Callable[..., None] | None = None,
 ) -> IssueRoleSyncSpec:
     """Build the standard sync spec shared by plan/run/review-style roles.
 
@@ -302,6 +303,10 @@ def build_required_ref_sync_spec(
             success_handler(issue_number=..., actor=...).
             Use this instead of domain events for async tmux paths where the
             subprocess event bus is separate from the orchestra process.
+        process_sync_result: Optional callback to process sync execution output
+            before taking the after snapshot. Called as
+            process_sync_result(issue_number=..., branch=..., actor=..., stdout=...).
+            Use this to write refs (e.g., audit_ref) from stdout before snapshot.
     """
     from vibe3.roles.definitions import IssueRoleSyncSpec
 
@@ -327,4 +332,5 @@ def build_required_ref_sync_spec(
             success_handler=success_handler,
         ),
         failure_handler=failure_handler,
+        process_sync_result=process_sync_result,
     )

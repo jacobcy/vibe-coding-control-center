@@ -163,6 +163,15 @@ def run_issue_role_mode(
             )
         raise typer.Exit(1)
 
+    # Process sync result before snapshot (e.g., write audit_ref from stdout)
+    if spec.process_sync_result is not None and sync_result.stdout:
+        spec.process_sync_result(
+            issue_number=issue_number,
+            branch=branch,
+            actor=actor,
+            stdout=sync_result.stdout,
+        )
+
     if (
         spec.post_sync_hook is not None
         and spec.snapshot_progress is not None

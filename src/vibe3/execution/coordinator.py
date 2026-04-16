@@ -301,7 +301,10 @@ class ExecutionCoordinator:
                             target_id=request.target_id,
                         ).success(f"Execution completed for {request.role} (sync)")
 
-                        return ExecutionLaunchResult(launched=True)
+                        return ExecutionLaunchResult(
+                            launched=True,
+                            stdout=result.stdout,  # Pass stdout for sync mode
+                        )
                     else:
                         error_msg = getattr(result, "stderr", "") or "Execution failed"
                         self.lifecycle.record_failed(

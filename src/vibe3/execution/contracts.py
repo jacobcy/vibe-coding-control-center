@@ -37,5 +37,6 @@ class ExecutionLaunchResult:
     session_id: Optional[str] = None
     tmux_session: Optional[str] = None
     log_path: Optional[str] = None
+    stdout: Optional[str] = None  # Only populated for sync mode
     reason: Optional[str] = None
     reason_code: Optional[str] = None

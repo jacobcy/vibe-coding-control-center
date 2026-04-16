@@ -192,6 +192,35 @@ def _confirm_review_handoff_wrapper(*, issue_number: int, actor: str) -> None:
     confirm_review_handoff(issue_number=issue_number, actor=actor)
 
 
+def _process_review_sync_result(
+    *, issue_number: int, branch: str, actor: str, stdout: str
+) -> None:
+    """Process sync review output and write audit_ref to flow_state.
+
+    This callback is invoked after sync execution completes but before
+    the after snapshot is taken, allowing the review output to be parsed
+    and audit_ref written before the required_ref gate check.
+    """
+    # Parse verdict from stdout (fallback to UNKNOWN if parse fails)
+    try:
+        review = parse_codex_review(stdout)
+        verdict = review.verdict
+    except ReviewParserError:
+        verdict = "UNKNOWN"
+
+    # Create audit artifact and write audit_ref
+    audit_ref = _resolve_authoritative_audit_ref(
+        None,  # No handoff_file in sync mode
+        stdout,
+        verdict,
+        branch,
+    )
+    _build_handoff_service(branch).record_audit(
+        audit_ref=audit_ref,
+        actor=actor,
+    )
+
+
 REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
@@ -211,6 +240,8 @@ REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
     ),
     # Advance state: REVIEW → HANDOFF after audit_ref produced.
     success_handler=_confirm_review_handoff_wrapper,
+    # Write audit_ref from stdout before snapshot.
+    process_sync_result=_process_review_sync_result,
 )
 
 

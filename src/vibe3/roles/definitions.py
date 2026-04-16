@@ -83,3 +83,6 @@ class IssueRoleSyncSpec:
         | None
     ) = None
     failure_handler: Callable[..., None] | None = None
+    process_sync_result: Callable[..., None] | None = (
+        None  # Process sync output before snapshot
+    )
