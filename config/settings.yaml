@@ -47,6 +47,9 @@ agent_prompt:
     1. 通过 issue 或 handoff 明确记录失败现象、已尝试步骤和阻塞原因。
     2. 结束当前任务，等待人工或后续任务接手。
 
+    ## Time out Rule
+    你有一个小时的时间来完成任务，如果你无法完成，请在时间窗口内通过issue或handoff记录你已完成的工作或findings，并在deadline前exit()，等待人工或后续任务接手。时间耗尽，你的工作空间会被Cancel，可能导致系统中断。
+
 # 文本量控制
 doc_limits:
   single_file_loc:
