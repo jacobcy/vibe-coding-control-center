@@ -31,7 +31,11 @@ TaskTailArg = Annotated[
     typer.Argument(hidden=True),
 ]
 SpecOption = Annotated[
-    str | None, typer.Option("--spec", help="Spec file path or issue reference")
+    str | None,
+    typer.Option(
+        "--spec",
+        help="Spec file path or issue reference. Use empty string '' to clear spec_ref",
+    ),
 ]
 TraceOption = Annotated[
     bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -153,15 +157,27 @@ def update(
             if updated:
                 flow = updated
 
-        if spec:
-            from vibe3.services.spec_ref_service import SpecRefService
+        if spec is not None:
+            # spec provided (may be empty string to clear)
+            if spec == "":
+                # Clear spec_ref
+                flow_service.store.update_flow_state(flow.branch, spec_ref=None)
+            else:
+                # Validate and bind spec
+                from vibe3.services.spec_ref_service import SpecRefService
 
-            spec_service = SpecRefService()
-            is_valid, error = spec_service.validate_spec_ref(spec)
-            if not is_valid:
-                typer.echo(f"Error: {error}", err=True)
-                raise typer.Exit(1)
-            flow_service.bind_spec(flow.branch, spec, actor)
+                spec_service = SpecRefService()
+                is_valid, error = spec_service.validate_spec_ref(spec)
+                if not is_valid:
+                    typer.echo(f"Error: {error}", err=True)
+                    typer.echo(
+                        "Use issue number (e.g., 123) or "
+                        "file path (e.g., docs/spec.md)",
+                        err=True,
+                    )
+                    raise typer.Exit(1)
+                resolved_spec = spec_service.resolve_spec_ref(spec)
+                flow_service.bind_spec(flow.branch, resolved_spec, actor)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
