@@ -22,8 +22,21 @@ def make_issue(number: int, priority: int = 5) -> MagicMock:
 def make_service(role: str, ready_issues: list) -> MagicMock:
     service = MagicMock()
     service.service_name = f"mock-{role}"
-    service.role_def.trigger_name = role
-    service.role_def.registry_role = role
+    role_map = {
+        "manager": ("manager", "manager", "ready"),
+        "planner": ("plan", "planner", "claimed"),
+        "plan": ("plan", "planner", "claimed"),
+        "executor": ("run", "executor", "in-progress"),
+        "run": ("run", "executor", "in-progress"),
+        "reviewer": ("review", "reviewer", "review"),
+        "review": ("review", "reviewer", "review"),
+    }
+    trigger_name, registry_role, trigger_state = role_map.get(
+        role, ("manager", role, "ready")
+    )
+    service.role_def.trigger_name = trigger_name
+    service.role_def.registry_role = registry_role
+    service.role_def.trigger_state.value = trigger_state
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
     return service
@@ -110,19 +123,60 @@ class TestGlobalDispatchCoordinator:
         capacity.can_dispatch.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_cross_role_issues_both_dispatched(self) -> None:
-        """manager 和 planner 各有 issues，各自独立 dispatch。"""
+    async def test_deeper_pipeline_stage_dispatches_before_manager_ready(self) -> None:
+        """有 planner backlog 时，不再继续放行 manager:ready 新入口。"""
         manager_issue = make_issue(1)
         planner_issue = make_issue(2)
         manager_svc = make_service("manager", [manager_issue])
         planner_svc = make_service("planner", [planner_issue])
-        capacity = make_capacity([True, True])
+        capacity = make_capacity([True])
 
         coordinator = GlobalDispatchCoordinator(capacity, [manager_svc, planner_svc])
         await coordinator.coordinate()
 
-        manager_svc._emit_dispatch_intent.assert_called_once()
         planner_svc._emit_dispatch_intent.assert_called_once()
+        manager_svc._emit_dispatch_intent.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_review_backlog_blocks_upstream_dispatch(self) -> None:
+        """存在 review backlog 时，不应继续派发 planner/manager 新工作。"""
+        review_issue = make_issue(304)
+        planner_issue = make_issue(303)
+        manager_issue = make_issue(372)
+        review_svc = make_service("review", [review_issue])
+        planner_svc = make_service("plan", [planner_issue])
+        manager_svc = make_service("manager", [manager_issue])
+        capacity = make_capacity([True])
+
+        coordinator = GlobalDispatchCoordinator(
+            capacity, [manager_svc, planner_svc, review_svc]
+        )
+        await coordinator.coordinate()
+
+        review_svc._emit_dispatch_intent.assert_called_once_with(review_issue)
+        planner_svc._emit_dispatch_intent.assert_not_called()
+        manager_svc._emit_dispatch_intent.assert_not_called()
+        capacity.mark_in_flight.assert_called_once_with("reviewer", 304)
+
+    @pytest.mark.asyncio
+    async def test_run_backlog_blocks_plan_and_manager_dispatch(self) -> None:
+        """当 run backlog 存在时，只允许 run 继续推进。"""
+        run_issue = make_issue(323)
+        planner_issue = make_issue(320)
+        manager_issue = make_issue(372)
+        run_svc = make_service("run", [run_issue])
+        planner_svc = make_service("plan", [planner_issue])
+        manager_svc = make_service("manager", [manager_issue])
+        capacity = make_capacity([True])
+
+        coordinator = GlobalDispatchCoordinator(
+            capacity, [manager_svc, planner_svc, run_svc]
+        )
+        await coordinator.coordinate()
+
+        run_svc._emit_dispatch_intent.assert_called_once_with(run_issue)
+        planner_svc._emit_dispatch_intent.assert_not_called()
+        manager_svc._emit_dispatch_intent.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_mark_in_flight_before_emit(self) -> None:
