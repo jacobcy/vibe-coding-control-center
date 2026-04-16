@@ -364,8 +364,9 @@ When:
 Allowed:
 
 - `comment`
-- `handoff.read`
+- `handoff.read`, `handoff.write`
 - `labels.write`
+- `plan_ref.write`（可修改 plan 内容）
 
 Read:
 
@@ -373,6 +374,7 @@ Read:
 - `plan_ref`
 - `report_ref`
 - `audit_ref`
+- `pr_ref`
 
 Steps:
 
@@ -591,15 +593,16 @@ Steps:
 1. 调用 `read_context()`
 2. 检查最新评论是否已经解除 blocker
 3. 检查依赖或同类 issue
-4. 若 blocker 已解除：
-   - 恢复到合适状态
-   - comment 当前 issue
+4. 若 blocker 已解除（人类已通过 `vibe3 task resume` 恢复）：
+   - 不需要操作，状态已由 human resume 处理
    - `exit()`
 5. 若 blocker 未解除：
    - 调用 `check_blocker_explained()` 检查是否需要写新 comment
    - 如果需要写新 comment，则追加新的 issue comment
    - 不重复刷同类长 comment
    - `exit()`
+
+注意：`state/blocked` 不能由 manager 自动转出。只有人类通过 `vibe3 task resume --blocked` 才能解除 blocked 状态。
 
 ### `handle_merge_ready()`
 
@@ -674,8 +677,8 @@ Steps:
 
 - 若无新增事实，不重复发布几乎相同的长 comment
 - 若最新评论已给出明确方向，不再输出 `Option A/B/C`
-- 若当前 state 是 `ready` 且无明确阻止推进的指示，本轮 comment 应写“已认领、当前风险、下一阶段 handoff”
-**
+- 若当前 state 是 `ready` 且无明确阻止推进的指示，本轮 comment 应写”已认领、当前风险、下一阶段 handoff”
+
 ## Handoff Contract
 
 **每次状态转换前必须写 handoff。** handoff 是 agent 之间沟通的唯一通道。后续 agent（planner/executor/reviewer）会在工作前读取你的 handoff 来了解上下文。

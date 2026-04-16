@@ -190,6 +190,8 @@ def build_governance_request(
 
     if snapshot.circuit_breaker_state == "open":
         log.warning("Skipping governance: circuit breaker is OPEN")
+        root = repo_path or resolve_orchestra_repo_root()
+        append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
         return None
 
     snapshot_context = build_governance_snapshot_context(snapshot)
@@ -208,6 +210,12 @@ def build_governance_request(
         return None
 
     options = resolve_governance_options(config)
+
+    root = repo_path or resolve_orchestra_repo_root()
+    append_governance_event(
+        f"dispatching governance scan tick={tick_count}",
+        repo_root=root,
+    )
 
     return ExecutionRequest(
         role="governance",
