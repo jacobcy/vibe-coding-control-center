@@ -86,8 +86,13 @@ class TestTransitionRules:
     """Tests for state transition rules."""
 
     def test_allowed_transitions_count(self):
-        """Test that we have expected number of allowed transitions."""
-        assert len(ALLOWED_TRANSITIONS) == 23
+        """Test that we have expected number of allowed transitions.
+
+        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF (2 transitions)
+        Previous: 23 transitions
+        Current: 21 transitions
+        """
+        assert len(ALLOWED_TRANSITIONS) == 21
 
     def test_main_chain_transitions_allowed(self):
         """Test that main chain transitions are allowed."""
@@ -101,15 +106,24 @@ class TestTransitionRules:
         assert (IssueState.MERGE_READY, IssueState.DONE) in ALLOWED_TRANSITIONS
 
     def test_side_path_transitions_allowed(self):
-        """Test that side path transitions are allowed."""
+        """Test that side path transitions are allowed.
+
+        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF
+        Blocked state requires manual intervention (force=True for resume)
+        """
+        # → blocked transitions (allowed)
         assert (IssueState.READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.CLAIMED, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.IN_PROGRESS, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.MERGE_READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
-        assert (IssueState.BLOCKED, IssueState.CLAIMED) in ALLOWED_TRANSITIONS
-        assert (IssueState.BLOCKED, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
+
+        # blocked → other transitions (NOT allowed, removed)
+        assert (IssueState.BLOCKED, IssueState.CLAIMED) not in ALLOWED_TRANSITIONS
+        assert (IssueState.BLOCKED, IssueState.HANDOFF) not in ALLOWED_TRANSITIONS
+
+        # failed transitions (allowed)
         assert (IssueState.CLAIMED, IssueState.FAILED) in ALLOWED_TRANSITIONS
         assert (IssueState.IN_PROGRESS, IssueState.FAILED) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.FAILED) in ALLOWED_TRANSITIONS

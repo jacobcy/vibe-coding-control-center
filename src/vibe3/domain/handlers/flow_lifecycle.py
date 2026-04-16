@@ -64,16 +64,14 @@ def _handle_completion_with_ref_gate(
     )
 
     if has_ref:
+        # No ops gate: required_ref exists, nothing to do
+        # System should NOT decide state transition (修复 Issue #303)
         logger.bind(
             domain="events",
             event=event_name,
             issue=issue_number,
-        ).info(f"{ref_name} found, transitioning to handoff")
-        LabelService().confirm_issue_state(
-            issue_number,
-            IssueState.HANDOFF,
-            actor=actor,
-        )
+        ).info(f"{ref_name} found, no automatic state transition")
+        # ← 删除强制 HANDOFF 逻辑
     else:
         logger.bind(
             domain="events",

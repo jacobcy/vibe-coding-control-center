@@ -424,23 +424,27 @@ def confirm_role_handoff(
     issue_number: int,
     actor: str,
 ) -> str:
-    """Transition issue to handoff after successful role execution.
+    """After plan/run/review success, no automatic state transition.
 
-    Called from success_handler in SYNC_SPEC to advance state → HANDOFF
-    so the next stage can be dispatched.
+    Fixed Issue #303: Removed forced HANDOFF transition (no ops gate).
+    Agent has produced required_ref, system should NOT decide state.
 
     Args:
         issue_number: GitHub issue number
-        actor: Actor performing the transition (e.g., "agent:plan")
+        actor: Actor who completed the role (e.g., "agent:plan")
 
     Returns:
-        Transition result string (e.g., "advanced" or "blocked")
+        "confirmed" to indicate success without state transition
     """
-    return LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.HANDOFF,
+    # No ops gate: agent has produced required_ref, nothing to do
+    # System should NOT decide state transition
+    logger.bind(
+        domain="issue_failure_service",
+        action="confirm_role_handoff",
+        issue_number=issue_number,
         actor=actor,
-    )
+    ).info(f"Agent success for issue #{issue_number}, no automatic HANDOFF transition")
+    return "confirmed"  # ← 不改状态，只确认完成
 
 
 # Role-specific aliases for backward compatibility

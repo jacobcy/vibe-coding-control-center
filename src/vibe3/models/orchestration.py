@@ -63,15 +63,16 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.REVIEW, IssueState.HANDOFF),
     (IssueState.HANDOFF, IssueState.MERGE_READY),
     (IssueState.MERGE_READY, IssueState.DONE),
-    # Side paths
+    # Side paths (→ blocked)
     (IssueState.READY, IssueState.BLOCKED),
     (IssueState.CLAIMED, IssueState.BLOCKED),
     (IssueState.HANDOFF, IssueState.BLOCKED),
     (IssueState.IN_PROGRESS, IssueState.BLOCKED),
     (IssueState.REVIEW, IssueState.BLOCKED),
     (IssueState.MERGE_READY, IssueState.BLOCKED),
-    (IssueState.BLOCKED, IssueState.CLAIMED),
-    (IssueState.BLOCKED, IssueState.HANDOFF),
+    # NOTE: blocked → other states removed (修复 Issue #303)
+    # blocked 状态不允许自动转换，必须等人类核查
+    # 手动 resume 命令可以用 force=True 绕过
     # Execution failures
     (IssueState.CLAIMED, IssueState.FAILED),
     (IssueState.IN_PROGRESS, IssueState.FAILED),

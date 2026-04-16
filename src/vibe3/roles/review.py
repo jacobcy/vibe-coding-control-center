@@ -380,44 +380,38 @@ def execute_manual_review(
     if dry_run:
         return ReviewRunResult("DRY_RUN", None, issue_number)
 
+    # 增加容错性：即使 parser 失败也写入 audit_ref
     try:
         review = review_parser(result.stdout)
-        audit_ref = _resolve_authoritative_audit_ref(
-            str(result.handoff_file) if result.handoff_file else None,
-            result.stdout,
-            review.verdict,
-            branch,
-        )
-        flow = service.get_flow_status(branch) if branch else None
-        if flow is not None and branch is not None:
-            _build_handoff_service(branch).record_audit(
-                audit_ref=audit_ref,
-                actor="agent:review",
-            )
-            publish_review_command_success(
-                issue_number=issue_number,
-                branch=branch,
-                verdict=review.verdict,
-            )
-        return ReviewRunResult(review.verdict, audit_ref, issue_number)
+        verdict = review.verdict
     except ReviewParserError as err:
-        logger.bind(domain="review").error(f"Failed to parse review output: {err}")
-        error_audit_ref = _resolve_error_audit_ref(
-            str(result.handoff_file) if result.handoff_file else None,
-            result.stdout,
-            branch,
+        # Parser 失败时，verdict 为空，交给 manager 判断
+        logger.bind(domain="review").warning(
+            f"Failed to parse review output, using verdict=UNKNOWN: {err}"
         )
-        flow = service.get_flow_status(branch) if branch else None
-        if flow is not None and branch is not None:
-            _build_handoff_service(branch).record_audit(
-                audit_ref=error_audit_ref,
-                actor="agent:review",
-            )
-        publish_review_command_failure(
+        verdict = "UNKNOWN"  # ← 不抛异常，继续写 audit_ref
+
+    # 无论 parser 是否成功，只要有输出就写入 audit_ref
+    audit_ref = _resolve_authoritative_audit_ref(
+        str(result.handoff_file) if result.handoff_file else None,
+        result.stdout,  # ← 直接使用原始输出
+        verdict,  # ← verdict 为 "UNKNOWN" 或实际值
+        branch,
+    )
+
+    flow = service.get_flow_status(branch) if branch else None
+    if flow is not None and branch is not None:
+        _build_handoff_service(branch).record_audit(
+            audit_ref=audit_ref,
+            actor="agent:review",
+        )
+        publish_review_command_success(
             issue_number=issue_number,
-            reason=f"review parse failed: {err}",
+            branch=branch,
+            verdict=verdict,  # ← 使用实际或 UNKNOWN verdict
         )
-        return ReviewRunResult("ERROR", error_audit_ref, issue_number)
+
+    return ReviewRunResult(verdict, audit_ref, issue_number)
 
 
 def _dispatch_async_manual_review(
