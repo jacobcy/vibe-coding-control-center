@@ -76,6 +76,7 @@ class TaskResumeUsecase:
         stale_flows: list[FlowStatusResponse] | None = None,
         repo: str | None = None,
         candidate_mode: str = "resumable",
+        label_state: str | None = None,  # ← 新增参数
     ) -> dict[str, Any]:
         """Resume failed or blocked issues.
 
@@ -86,6 +87,9 @@ class TaskResumeUsecase:
             flows: Active flow status responses
             stale_flows: Stale flow status responses
             repo: Repository (owner/repo format, optional)
+            candidate_mode: Candidate selection mode ("resumable" or "all_task")
+            label_state: Optional state to restore (None=delete worktree,
+                "handoff"/"ready"=keep worktree)
 
         Returns:
             Dict with:
@@ -212,6 +216,7 @@ class TaskResumeUsecase:
                         repo=repo,
                         reason=reason,
                         worktree_path=worktree_path,
+                        label_state=label_state,
                     )
 
                     # Publish event to notify EDA handlers of the state change

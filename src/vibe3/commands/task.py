@@ -208,6 +208,15 @@ def resume(
             help="Reset all auto-created task/issue-* scenes and resume from ready",
         ),
     ] = False,
+    label: Annotated[
+        str | None,
+        typer.Option(
+            "--label",
+            help="Clear blocked_reason/failed_reason and restore state "
+            "(no worktree deletion). Use --label for handoff, "
+            "--label ready for ready state",
+        ),
+    ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Execute the resume (default dry-run)")
@@ -220,6 +229,15 @@ def resume(
     Use --failed to resume all failed issues, --blocked to resume all
     stale blocked issues, or --all to reset every auto-created task/issue-*
     scene back to ready. Or specify issue numbers directly.
+
+    **New: --label option**
+    Use --label to clear blocked_reason/failed_reason and restore the issue
+    state WITHOUT deleting worktree/branch.
+
+    Examples:
+        vibe3 task resume 303 --label -y         # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label ready -y   # Restore to ready, keep worktree
+        vibe3 task resume 303 -y                 # Delete worktree/branch (original)
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -301,6 +319,7 @@ def resume(
         flows=resume_flows,
         stale_flows=stale_flows,
         candidate_mode=candidate_mode,
+        label_state=label,  # ← 传递 label 参数
     )
 
     if not yes and has_flag and not result.get("candidates"):

@@ -54,42 +54,85 @@ class TaskResumeOperations:
         repo: str | None,
         reason: str,
         worktree_path: str | None = None,
+        label_state: str | None = None,
     ) -> None:
-        """Reset an issue to ready after clearing stale task scene state."""
+        """Reset an issue to ready after clearing stale task scene state.
+
+        Args:
+            issue_number: GitHub issue number
+            resume_kind: Resume kind (failed, blocked, all)
+            flow: Flow status response
+            repo: Repository (owner/repo format, optional)
+            reason: Resume reason to include in comments
+            worktree_path: Optional worktree path (for optimization)
+            label_state: Optional state to restore (None=delete worktree,
+                empty/"handoff"=restore to handoff, "ready"=restore to ready)
+        """
         branch = getattr(flow, "branch", None) if flow else None
         previous_state = self.label_service.get_state(issue_number)
 
-        if resume_kind == "failed":
-            resume_failed_issue_to_ready(
-                issue_number=issue_number,
-                repo=repo,
-                reason=reason,
+        # Determine target state based on label_state parameter
+        if label_state is not None:
+            # --label provided: restore to specified state without deleting worktree
+            target_state = (
+                IssueState.READY if label_state == "ready" else IssueState.HANDOFF
             )
-        elif resume_kind == "blocked":
-            resume_blocked_issue_to_ready(
-                issue_number=issue_number,
-                repo=repo,
-                reason=reason,
-            )
-        else:
+
+            # Clear blocked_reason/failed_reason from FlowState
+            if isinstance(branch, str):
+                self._clear_flow_reasons(branch, resume_kind)
+
+            # Restore issue to target state
             self.label_service.confirm_issue_state(
                 issue_number,
-                IssueState.READY,
+                target_state,
                 actor="human:resume",
                 force=True,
             )
 
-        if isinstance(branch, str):
-            try:
-                self.reset_task_scene(branch, worktree_path=worktree_path)
-            except Exception as exc:
-                self.restore_issue_state(
+            # Add comment about label-based resume
+            self._add_label_resume_comment(
+                issue_number=issue_number,
+                resume_kind=resume_kind,
+                target_state=target_state,
+                repo=repo,
+                reason=reason,
+            )
+
+            # DO NOT call reset_task_scene (keep worktree)
+        else:
+            # Original logic: delete worktree/branch for full rebuild
+            if resume_kind == "failed":
+                resume_failed_issue_to_ready(
                     issue_number=issue_number,
-                    previous_state=previous_state,
                     repo=repo,
-                    failure_reason=str(exc),
+                    reason=reason,
                 )
-                raise
+            elif resume_kind == "blocked":
+                resume_blocked_issue_to_ready(
+                    issue_number=issue_number,
+                    repo=repo,
+                    reason=reason,
+                )
+            else:
+                self.label_service.confirm_issue_state(
+                    issue_number,
+                    IssueState.READY,
+                    actor="human:resume",
+                    force=True,
+                )
+
+            if isinstance(branch, str):
+                try:
+                    self.reset_task_scene(branch, worktree_path=worktree_path)
+                except Exception as exc:
+                    self.restore_issue_state(
+                        issue_number=issue_number,
+                        previous_state=previous_state,
+                        repo=repo,
+                        failure_reason=str(exc),
+                    )
+                    raise
 
     def reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
         """Delete the stale task scene so the next run starts from scratch."""
@@ -252,3 +295,106 @@ class TaskResumeOperations:
                 branch=branch,
             ).warning(f"Failed to reactivate aborted flow: {exc}")
             raise
+
+    def _clear_flow_reasons(self, branch: str, resume_kind: str) -> None:
+        """Clear blocked_reason/failed_reason from FlowState.
+
+        Args:
+            branch: Branch name
+            resume_kind: Resume kind (failed, blocked, all)
+        """
+        try:
+            logger.bind(
+                domain="resume",
+                action="clear_flow_reasons",
+                branch=branch,
+                resume_kind=resume_kind,
+            ).info("Clearing flow reason fields")
+
+            # Clear both blocked_reason and failed_reason
+            # (issue may have been in multiple blocked/failed states)
+            self.flow_service.store.update_flow_state(
+                branch,
+                blocked_reason=None,
+                failed_reason=None,
+                latest_actor="human:resume",
+            )
+        except Exception as exc:
+            # Non-blocking: reason clearing failure should not affect resume
+            logger.bind(
+                domain="resume",
+                action="clear_flow_reasons",
+                branch=branch,
+            ).warning(f"Failed to clear flow reasons: {exc}")
+
+    def _add_label_resume_comment(
+        self,
+        *,
+        issue_number: int,
+        resume_kind: str,
+        target_state: IssueState,
+        repo: str | None,
+        reason: str,
+    ) -> None:
+        """Add comment about label-based resume.
+
+        Args:
+            issue_number: GitHub issue number
+            resume_kind: Resume kind (failed, blocked, all)
+            target_state: Target state (HANDOFF or READY)
+            repo: Repository (owner/repo format, optional)
+            reason: Resume reason
+        """
+        try:
+            kind_label = {
+                "failed": "state/failed",
+                "blocked": "state/blocked",
+                "all": "task scene",
+            }.get(resume_kind, resume_kind)
+
+            comment_body = (
+                f"[resume] 已从 {kind_label} 恢复到 state/{target_state.value}。\n\n"
+                f"已清除 blocked_reason/failed_reason，保留 worktree现场。\n"
+                f"后续可在当前 worktree 继续推进。"
+            )
+
+            normalized_reason = reason.strip()
+            if normalized_reason:
+                comment_body += f"\n\n原因:{normalized_reason}"
+
+            # Deduplicate: skip if latest comment matches
+            issue_payload = self.github_client.view_issue(issue_number, repo=repo)
+            if isinstance(issue_payload, dict) and self._latest_comment_matches(
+                issue_payload, comment_body
+            ):
+                return
+
+            self.github_client.add_comment(
+                issue_number,
+                comment_body,
+                repo=repo,
+            )
+        except Exception as exc:
+            # Non-blocking: comment failure should not affect resume
+            logger.bind(
+                domain="resume",
+                action="add_label_resume_comment",
+                issue_number=issue_number,
+            ).warning(f"Failed to add label resume comment: {exc}")
+
+    def _latest_comment_matches(
+        self,
+        issue_payload: dict[str, object],
+        comment_body: str,
+    ) -> bool:
+        """Return True when the latest issue comment is the same comment."""
+        comments = issue_payload.get("comments")
+        if not isinstance(comments, list):
+            return False
+        normalized_comment = comment_body.strip()
+        for comment in reversed(comments):
+            if not isinstance(comment, dict):
+                continue
+            body = comment.get("body")
+            return isinstance(body, str) and body.strip() == normalized_comment
+        return False
