@@ -87,8 +87,14 @@ class StateTransition(BaseModel):
 #     │  │  → BLOCKED      │  │  → BLOCKED    │     → IN_PROGRESS (commit mode)
 #     │  │                 │  │               │
 #     │  └─────────────────┘  └──── HANDOFF   │
-#     │                                      ▼
-#     └─────────────────────────────────── DONE
+#     │                         ▲             │
+#     │                         │ pr_ref      │
+#     │                         │             ▼
+#     └──── HANDOFF ◄──── IN_PROGRESS (commit: PR created)
+#              │
+#              │ [M] review pr_ref → DONE
+#              ▼
+#             DONE
 #
 #   BLOCKED ◄──── any state (via [C] no-op gate or [M] business decision)
 #     │
@@ -117,7 +123,8 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.HANDOFF, IssueState.REVIEW),
     (IssueState.REVIEW, IssueState.HANDOFF),
     (IssueState.HANDOFF, IssueState.MERGE_READY),
-    (IssueState.MERGE_READY, IssueState.DONE),
+    (IssueState.MERGE_READY, IssueState.IN_PROGRESS),  # executor commits + PR
+    (IssueState.HANDOFF, IssueState.DONE),  # manager concludes after PR review
     # Side paths (→ blocked)
     (IssueState.READY, IssueState.BLOCKED),
     (IssueState.CLAIMED, IssueState.BLOCKED),
@@ -145,7 +152,7 @@ STATE_PROGRESS_CONTRACT: dict[IssueState, str | None] = {
     IssueState.READY: None,  # System enforces MUST transition (claimed/blocked only)
     IssueState.HANDOFF: None,  # System enforces MUST transition
     IssueState.CLAIMED: "plan_ref",
-    IssueState.IN_PROGRESS: "report_ref",
+    IssueState.IN_PROGRESS: "report_ref",  # also accepts pr_ref (commit mode)
     IssueState.REVIEW: "audit_ref",
 }
 
@@ -164,7 +171,7 @@ FORBIDDEN_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.CLAIMED, IssueState.DONE),
     (IssueState.BLOCKED, IssueState.DONE),
     (IssueState.FAILED, IssueState.DONE),
-    (IssueState.HANDOFF, IssueState.DONE),
+    (IssueState.MERGE_READY, IssueState.DONE),
 }
 
 

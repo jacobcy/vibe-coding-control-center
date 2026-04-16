@@ -51,7 +51,10 @@
 
 1. 查看当前 running issues 与 queue / flow 现场
 2. 补捞已满足 assignee 条件但尚未进入调度的候选 issue
-3. 先过滤不能进入 ready queue 的 issue：依赖未解除、已有有效 flow / live dispatch、或被硬规则阻塞
+3. 先过滤不能进入 ready queue 的 issue：
+   - **依赖未解除**：检查 issue body 和 comments 中的依赖引用（如 "Depends on #123"）、`dependency/*` labels；若被依赖的 issue 未关闭或未处于 `state/done`，不得进入 ready
+   - 已有有效 flow / live dispatch
+   - 或被硬规则阻塞
 4. 对 ready candidates 按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 理解当前顺序
 5. 对未运行 issue 给出建议顺序
 6. 如有必要，提出最小 non-state label 调整建议

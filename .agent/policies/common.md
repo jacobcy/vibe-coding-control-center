@@ -27,51 +27,12 @@ Manager 可能已写入质量审查意见、具体修复要求、重点关注区
 
 ## 项目记忆系统（claude-memory）
 
-Vibe Center 使用 **claude-memory MCP** 作为跨对话的项目记忆系统，用于保存和检索长期上下文。
+跨对话长期记忆，用于保存和检索架构共识、重要决策、最佳实践。
 
-### 核心功能
-
-- **跨对话持久化**：保存项目架构共识、重要决策、最佳实践等长期记忆
-- **智能搜索**：通过 `claude-memory smart search` 检索相关记忆片段
-- **时间线追踪**：记录关键发现、决策和变更的历史
-- **节省 Token**：避免重复解释相同的上下文
-
-### 使用场景
-
-**优先使用 claude-memory smart search 的场景**：
-- 需要回顾过去的架构决策或设计思路
-- 寻找类似问题的解决方案或最佳实践
-- 了解某个模块的演进历史和变更原因
-- 检查是否已有相关的分析或结论
-
-**推荐命令**：
-- **smart_search**  # 智能搜索项目记忆
-- **timeline**      # 查看时间线
-- **get_observations**  # 获取特定记录详情
-
-
-### 记忆类型
-
-- **observations**：关键发现、分析结论、重要决策
-- **plans**：实施计划、架构设计
-- **sessions**：会话总结、工作记录
-
-### 与其他工具的关系
-
-- **claude-memory** vs **handoff**：
-  - claude-memory：跨对话长期记忆（架构共识、最佳实践）
-  - handoff：当前 flow 的临时交接记录（执行状态、中间发现）
-
-- **claude-memory** vs **auggie retrieval**：
-  - claude-memory：检索历史记忆片段（需要关键词或语义匹配）
-  - auggie retrieval：理解当前代码实现（需要自然语言描述意图）
-
-### 最佳实践
-
-1. **重要发现应记录到 claude-memory**：架构分析、关键决策、最佳实践发现等应通过 MCP 工具保存
-2. **搜索优先**：遇到问题时先搜索记忆，可能已有相关分析或解决方案
-3. **避免重复**：不要在不同对话中重复分析相同的上下文，优先检索记忆
-4. **定期更新**：重要变更后及时更新记忆，保持信息的时效性
+- **何时用**：需要回顾架构决策、寻找类似问题的解法、了解模块演进历史
+- **推荐命令**：`smart_search`（智能搜索）、`timeline`（时间线）、`get_observations`（获取详情）
+- **与 handoff 的区别**：claude-memory 是跨对话长期记忆；handoff 是当前 flow 的临时交接记录
+- **与 auggie 的区别**：claude-memory 检索历史记忆片段；auggie retrieval 理解当前代码实现
 
 ## 工具选择顺序
 
@@ -131,20 +92,15 @@ uv run python src/vibe3/cli.py inspect base --json
 - 判断某函数真实影响面
 - 替代 AST 分析
 
-### 4. Handoff 现场读取与记录
+### 4. Handoff 记录
 
-涉及当前 flow 的现场、交接、执行中发现的问题时，优先使用仓库内的 handoff CLI 入口。
-
-首选命令：
+执行过程中出现 finding、bug、blocker、next step 等需要留痕的事项，用 `handoff append` 记录：
 
 ```bash
-uv run python src/vibe3/cli.py handoff show
 uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor "<actor>"
 ```
 
 使用规则：
-- 查看当前 flow 结构化 handoff，优先使用 `handoff show`，不要自己猜底层存储位置。
-- 执行过程中出现 finding、bug、blocker、next step 等需要留痕的事项，用 `handoff append` 单独记录。
 - 这类记录不要混进 plan、review、run 的主体输出里，更不要塞进最终交付摘要里冒充正式结论。
 
 ## 高价值场景
@@ -180,18 +136,7 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 plan 必须建立在真实影响面上，而不是凭直觉列步骤。
 
-至少确认：
-- 受影响文件
-- 关键依赖
-- 公开入口或高风险路径
-- 对应验证方式
-- 当前 flow handoff 现场
-
-推荐先看：
-
-```bash
-uv run python src/vibe3/cli.py handoff show
-```
+至少确认：受影响文件、关键依赖、公开入口或高风险路径、对应验证方式。
 
 ## 常用验证命令
 
