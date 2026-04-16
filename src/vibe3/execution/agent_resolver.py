@@ -52,24 +52,64 @@ def resolve_planner_agent_options(
     config: OrchestraConfig,
     runtime_config: VibeConfig,
 ) -> AgentOptions:
-    """Resolve planner agent options."""
-    return resolve_assignee_dispatch_agent_options(config, runtime_config)
+    """Resolve planner agent options from plan.agent_config."""
+    plan_config = runtime_config.plan
+    return AgentOptions(
+        agent=plan_config.agent_config.agent,
+        backend=(
+            plan_config.agent_config.backend
+            if not plan_config.agent_config.agent
+            else None
+        ),
+        model=(
+            plan_config.agent_config.model
+            if not plan_config.agent_config.agent
+            else None
+        ),
+        timeout_seconds=plan_config.agent_config.timeout_seconds,
+    )
 
 
 def resolve_executor_agent_options(
     config: OrchestraConfig,
     runtime_config: VibeConfig,
 ) -> AgentOptions:
-    """Resolve executor agent options."""
-    return resolve_assignee_dispatch_agent_options(config, runtime_config)
+    """Resolve executor agent options from run.agent_config."""
+    run_config = runtime_config.run
+    return AgentOptions(
+        agent=run_config.agent_config.agent,
+        backend=(
+            run_config.agent_config.backend
+            if not run_config.agent_config.agent
+            else None
+        ),
+        model=(
+            run_config.agent_config.model if not run_config.agent_config.agent else None
+        ),
+        timeout_seconds=run_config.agent_config.timeout_seconds,
+    )
 
 
 def resolve_reviewer_agent_options(
     config: OrchestraConfig,
     runtime_config: VibeConfig,
 ) -> AgentOptions:
-    """Resolve reviewer agent options."""
-    return resolve_assignee_dispatch_agent_options(config, runtime_config)
+    """Resolve reviewer agent options from review.agent_config."""
+    review_config = runtime_config.review
+    return AgentOptions(
+        agent=review_config.agent_config.agent,
+        backend=(
+            review_config.agent_config.backend
+            if not review_config.agent_config.agent
+            else None
+        ),
+        model=(
+            review_config.agent_config.model
+            if not review_config.agent_config.agent
+            else None
+        ),
+        timeout_seconds=review_config.agent_config.timeout_seconds,
+    )
 
 
 def resolve_manager_agent_options(

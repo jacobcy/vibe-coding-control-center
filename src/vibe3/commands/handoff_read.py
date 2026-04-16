@@ -70,10 +70,21 @@ def _resolve_ref_path(val: str | None, _worktree_root: str | None = None) -> str
 
 def _render_agent_chain(
     state: FlowState,
+    store: SQLiteClient,
     live_sessions: list[dict] | None = None,
     worktree_root: str | None = None,
 ) -> None:
+    """Render agent chain with issue URL fallback for spec_ref."""
     console.print("[bold]Agent Chain[/]")
+
+    # Check if this is an issue-based flow
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.config.settings import VibeConfig
+    from vibe3.services.issue_flow_service import IssueFlowService
+
+    issue_service = IssueFlowService(store=store)
+    issue_number = issue_service.parse_issue_number_any(state.branch)
+
     for label, actor_label in [
         ("spec_ref", "planner_actor"),
         ("plan_ref", "planner_actor"),
@@ -83,18 +94,78 @@ def _render_agent_chain(
         val = getattr(state, label, None)
         actor = getattr(state, actor_label, None) or ""
         actor_str = f"  [dim]{actor}[/]" if actor else ""
-        # Display relative paths for cleaner output (absolute paths are too long)
-        display_val: str = _resolve_ref_path(val, worktree_root)
-        if display_val:
-            # Print label + actor on one line, then path on its own line.
-            # This prevents terminal-width wrapping from mixing the actor
-            # into the path continuation (e.g. "...executio\nn-report.md  develop").
-            # Use overflow='ellipsis' to show truncation explicitly if path is too long.
-            label_line = f"  [dim]{label}[/]{actor_str}"
-            console.print(label_line)
-            console.print(f"    {display_val}", no_wrap=True, overflow="ellipsis")
-        else:
+
+        # Special handling for spec_ref: show issue URL if None but issue flow
+        if label == "spec_ref" and not val and issue_number is not None:
+            # Try to get issue URL from cache or GitHub API
+            cache = store.get_flow_context_cache(state.branch)
+            issue_url = None
+            effective_issue_number = issue_number
+
+            # Try cache first for issue number
+            if cache and cache.get("task_issue_number"):
+                effective_issue_number = cache["task_issue_number"]
+
+            # Build GitHub issue URL
+            config = VibeConfig.get_defaults()
+            repo = config.orchestra.repo if config.orchestra.repo else None
+
+            if not repo:
+                # Fallback: try to get repo from gh CLI (current repo)
+                try:
+                    import subprocess
+
+                    result = subprocess.run(
+                        ["gh", "repo", "view", "--json", "nameWithOwner"],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                    import json
+
+                    data = json.loads(result.stdout)
+                    repo = data.get("nameWithOwner")
+                except Exception:
+                    pass
+
+            if repo:
+                # repo format: "owner/repo"
+                issue_url = f"https://github.com/{repo}/issues/{effective_issue_number}"
+            else:
+                # Last fallback: try to get from GitHub API
+                try:
+                    gh = GitHubClient()
+                    issue_data = gh.view_issue(effective_issue_number)
+                    if isinstance(issue_data, dict):
+                        issue_url = issue_data.get("html_url")
+                except Exception:
+                    pass
+
+            if issue_url:
+                console.print(f"  [dim]{label}[/]{actor_str}")
+                console.print(
+                    f"    [link={issue_url}]{issue_url}[/]",
+                    no_wrap=True,
+                    overflow="ellipsis",
+                )
+            else:
+                # Fallback: show issue number with pending status
+                console.print(f"  [dim]{label}[/]{actor_str}")
+                console.print(
+                    f"    [dim]#{effective_issue_number} (issue flow, pending spec)[/]"
+                )
+        elif label == "spec_ref" and not val and issue_number is None:
+            # Non-issue flow with no spec_ref
             console.print(f"  [dim]{label}[/]  [dim](pending)[/]")
+        else:
+            # Normal ref display (plan_ref, report_ref, audit_ref)
+            display_val: str = _resolve_ref_path(val, worktree_root)
+            if display_val:
+                label_line = f"  [dim]{label}[/]{actor_str}"
+                console.print(label_line)
+                console.print(f"    {display_val}", no_wrap=True, overflow="ellipsis")
+            else:
+                console.print(f"  [dim]{label}[/]  [dim](pending)[/]")
     console.print()
 
     # Show live registry sessions (registry is the source of truth)
@@ -343,7 +414,10 @@ def show(
         console.print()
 
         _render_agent_chain(
-            state, live_sessions=live_sessions, worktree_root=worktree_root
+            state,
+            store=service.store,
+            live_sessions=live_sessions,
+            worktree_root=worktree_root,
         )
 
         # Show resume hints from registry only (registry is source of truth)

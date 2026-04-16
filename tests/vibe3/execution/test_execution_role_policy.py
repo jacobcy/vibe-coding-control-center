@@ -132,21 +132,25 @@ def test_resolve_concurrency_class_other_role(sample_config: OrchestraConfig) ->
 
 
 def test_all_roles_resolve_backend(sample_config: OrchestraConfig) -> None:
-    """Test that all valid roles can resolve backend."""
+    """Test that all valid orchestra roles can resolve backend."""
     service = ExecutionRolePolicyService(config=sample_config)
 
-    roles = ["manager", "planner", "executor", "reviewer", "supervisor", "governance"]
+    # Only orchestra roles are handled by ExecutionRolePolicyService
+    # Command roles (planner/executor/reviewer) are handled by agent_resolver.py
+    roles = ["manager", "supervisor", "governance"]
     for role in roles:
         backend = service.resolve_backend(role)
+        assert isinstance(backend, str)
         assert isinstance(backend, str)
         assert backend in ["claude", "openai"]
 
 
 def test_all_roles_resolve_prompt_contract(sample_config: OrchestraConfig) -> None:
-    """Test that all valid roles can resolve prompt contract."""
+    """Test that all valid orchestra roles can resolve prompt contract."""
     service = ExecutionRolePolicyService(config=sample_config)
 
-    roles = ["manager", "planner", "executor", "reviewer", "supervisor", "governance"]
+    # Only orchestra roles are handled by ExecutionRolePolicyService
+    roles = ["manager", "supervisor", "governance"]
     for role in roles:
         contract = service.resolve_prompt_contract(role)
         assert isinstance(contract, PromptContract)

@@ -147,33 +147,33 @@ class ExecutionCoordinator:
                 )
 
         # 1. Check capacity and claim the slot.
-        # We use mark_launching() to atomically claim the slot. If it was
-        # already in-flight (pre-authorized by coordinator), mark_launching
-        # still succeeds if it wasn't already 'launching'. If multiple
-        # handlers for the same target fire concurrently, only one will
-        # succeed in mark_launching().
-        pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
-        if pre_authorized:
-            if not self.capacity.mark_launching(request.role, request.target_id):
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                ).info(f"Already launching for {request.role}, skipping duplicate")
-                return ExecutionLaunchResult(
-                    launched=False,
-                    skipped=True,
-                    reason=f"Execution already launching for {request.role}",
-                    reason_code="already_launching",
-                )
+        # Async child sync: outer wrapper already reserved capacity and registered
+        # the runtime_session; child must not re-check or it double-counts itself.
+        if is_async_child_sync:
+            pre_authorized = True
         else:
-            if not self.capacity.can_dispatch(request.role, request.target_id):
-                return ExecutionLaunchResult(
-                    launched=False,
-                    reason=f"Capacity full for {request.role}",
-                    reason_code="capacity_full",
-                )
-            self.capacity.mark_launching(request.role, request.target_id)
+            pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
+            if pre_authorized:
+                if not self.capacity.mark_launching(request.role, request.target_id):
+                    logger.bind(
+                        domain="execution_coordinator",
+                        role=request.role,
+                        target_id=request.target_id,
+                    ).info(f"Already launching for {request.role}, skipping duplicate")
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        skipped=True,
+                        reason=f"Execution already launching for {request.role}",
+                        reason_code="already_launching",
+                    )
+            else:
+                if not self.capacity.can_dispatch(request.role, request.target_id):
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        reason=f"Capacity full for {request.role}",
+                        reason_code="capacity_full",
+                    )
+                self.capacity.mark_launching(request.role, request.target_id)
 
         # 2. Slot is now claimed as 'launching'.
         # Whether to prune the in-flight marker at the end of this call.
@@ -260,12 +260,15 @@ class ExecutionCoordinator:
                 task = request.refs.get("task")
 
                 # 5. Record started
-                self.lifecycle.record_started(
-                    role=request.role,  # type: ignore[arg-type]
-                    target=request.target_branch,
-                    actor=request.actor,
-                    refs=request.refs,
-                )
+                # For async child sync, the outer wrapper already registered
+                # the runtime_session, so the child should not create a duplicate.
+                if not is_async_child_sync:
+                    self.lifecycle.record_started(
+                        role=request.role,  # type: ignore[arg-type]
+                        target=request.target_branch,
+                        actor=request.actor,
+                        refs=request.refs,
+                    )
 
                 logger.bind(
                     domain="execution_coordinator",
@@ -368,7 +371,10 @@ class ExecutionCoordinator:
             # For successful async launches we keep the marker — see the
             # should_prune comment above. reconcile_in_flight will clean up
             # on the next tick once SQLite+tmux observe the live session.
-            if should_prune:
+            #
+            # For async child sync, the outer wrapper owns the in-flight marker,
+            # so the child must not prune it (would remove the outer's reservation).
+            if should_prune and not is_async_child_sync:
                 try:
                     self.capacity.prune_in_flight(request.role, {request.target_id})
                 except Exception as prune_exc:

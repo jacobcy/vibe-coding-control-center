@@ -314,7 +314,9 @@ class CodeagentBackend:
                 print(" ".join(command))
                 if prompt_file_path:
                     print(f"\n=== Prompt File: {prompt_file_path} ===")
-                    print(prompt)
+                    # Show complete prompt content (including global_notice)
+                    complete_prompt = self._build_prompt_file_content(prompt)
+                    print(complete_prompt)
                 if task:
                     print(f"\n=== Task ===\n{task}")
                 print("\n=== End ===")
