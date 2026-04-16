@@ -52,6 +52,61 @@ class StateTransition(BaseModel):
     forced: bool = False
 
 
+# ============================================================================
+# State Machine Diagram
+# ============================================================================
+#
+# Decision makers: [M]anager AI agent  [C]ode layer (auto)  [H]uman (resume)
+#
+#   READY ───────────────────────────────────────────────────────────────
+#     │
+#     │ [M] handle_ready: claim or block
+#     ▼
+#   CLAIMED ─────────────────────────────────────────────────────────────
+#     │  │
+#     │  │ [C] planner fails → FAILED
+#     │  │ [C] no plan_ref   → BLOCKED (no-op gate)
+#     │  │ [M] plan_ref exists, AI advances → HANDOFF
+#     │  │
+#     ▼  ▼
+#   HANDOFF ◄───────────────────────────────────────────────────────────
+#     │  ▲       ▲
+#     │  │       │  [C] executor/reviewer completes, no auto-transition
+#     │  │       │  [M] reads refs, decides next action
+#     │  │       │
+#     │  ├───────┘  [M] handle_handoff: dispatch next role
+#     │  │
+#     │  │ [M] plan_ref exists → IN_PROGRESS
+#     │  │ [M] report_ref exists → REVIEW
+#     │  │ [M] audit_ref + verdict=PASS → MERGE_READY
+#     │  │ [M] cannot proceed → BLOCKED
+#     ▼  ▼
+#   IN_PROGRESS          REVIEW            MERGE_READY
+#     │  ▲                 │  ▲               │
+#     │  │ [C] no report   │  │ [C] no audit  │ [M] write MERGE_READY_COMMIT
+#     │  │  → BLOCKED      │  │  → BLOCKED    │     → IN_PROGRESS (commit mode)
+#     │  │                 │  │               │
+#     │  └─────────────────┘  └──── HANDOFF   │
+#     │                                      ▼
+#     └─────────────────────────────────── DONE
+#
+#   BLOCKED ◄──── any state (via [C] no-op gate or [M] business decision)
+#     │
+#     │ [H] vibe3 task resume --blocked / --label (force=True)
+#     └──→ READY or HANDOFF (human decides)
+#
+#   FAILED ◄──── CLAIMED / IN_PROGRESS / REVIEW (via [C] execution error)
+#     │
+#     │ [C] auto-retry paths (FAILED → CLAIMED/HANDOFF/IN_PROGRESS/REVIEW)
+#     │ [H] vibe3 task resume --failed (force=True → READY)
+#     └──→ READY (human decides)
+#
+# Key invariants (Issue #303):
+#   1. Code layer NEVER auto-transitions to HANDOFF (no-op gate)
+#   2. BLOCKED has NO automatic exit (requires human resume with force=True)
+#   3. State decisions belong to: manager AI (normal) or human (override)
+# ============================================================================
+
 # Allowed state transitions
 ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     # Main chain
@@ -81,8 +136,6 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.FAILED, IssueState.HANDOFF),
     (IssueState.FAILED, IssueState.IN_PROGRESS),
     (IssueState.FAILED, IssueState.REVIEW),
-    # Closure paths
-    (IssueState.MERGE_READY, IssueState.DONE),
 }
 
 # Progress expectations for each state

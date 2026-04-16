@@ -467,40 +467,6 @@ def block_reviewer_noop_issue(
     )
 
 
-def confirm_role_handoff(
-    *,
-    issue_number: int,
-    actor: str,
-) -> str:
-    """After plan/run/review success, no automatic state transition.
-
-    Fixed Issue #303: Removed forced HANDOFF transition (no ops gate).
-    Agent has produced required_ref, system should NOT decide state.
-
-    Args:
-        issue_number: GitHub issue number
-        actor: Actor who completed the role (e.g., "agent:plan")
-
-    Returns:
-        "confirmed" to indicate success without state transition
-    """
-    # No ops gate: agent has produced required_ref, nothing to do
-    # System should NOT decide state transition
-    logger.bind(
-        domain="issue_failure_service",
-        action="confirm_role_handoff",
-        issue_number=issue_number,
-        actor=actor,
-    ).info(f"Agent success for issue #{issue_number}, no automatic HANDOFF transition")
-    return "confirmed"  # ← 不改状态，只确认完成
-
-
-# Role-specific aliases for backward compatibility
-confirm_plan_handoff = confirm_role_handoff
-confirm_run_handoff = confirm_role_handoff
-confirm_review_handoff = confirm_role_handoff
-
-
 def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -> bool:
     """Check if issue already has a block comment with this reason.
 

@@ -132,6 +132,7 @@ def build_review_task_section(task_text: str | None) -> str:
 
     # Default task guidance
     return """## Review Task
+
 - Run `git diff <base>...HEAD` to see file changes
 - Review only changed code, not the entire codebase
 - Use AST analysis to understand function-level impact

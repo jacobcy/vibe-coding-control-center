@@ -66,6 +66,7 @@ def build_plan_task_section(
 {request.scope.description}
 
 ## Planning Task
+
 - Create a step-by-step implementation plan based on the specification
 - Identify dependencies between steps
 - Estimate effort for each step
@@ -76,6 +77,7 @@ def build_plan_task_section(
         return section
 
     section = f"""## Planning Task
+
 - Create a step-by-step implementation plan
 - Identify dependencies between steps
 - Estimate effort for each step

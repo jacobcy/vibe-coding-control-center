@@ -28,7 +28,6 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.issue_failure_service import (
     block_executor_noop_issue,
-    confirm_run_handoff,
     fail_executor_issue,
 )
 
@@ -192,11 +191,6 @@ def publish_run_command_failure(
     )
 
 
-def _confirm_run_handoff_wrapper(*, issue_number: int, actor: str) -> None:
-    """Wrapper for confirm_run_handoff that discards the return value."""
-    confirm_run_handoff(issue_number=issue_number, actor=actor)
-
-
 RUN_SYNC_SPEC = build_required_ref_sync_spec(
     role_name="executor",
     resolve_options=resolve_run_options,
@@ -215,8 +209,8 @@ RUN_SYNC_SPEC = build_required_ref_sync_spec(
         reason=reason,
         actor="agent:run",
     ),
-    # Advance state: IN_PROGRESS → HANDOFF after report_ref produced.
-    success_handler=_confirm_run_handoff_wrapper,
+    # No success_handler: state transitions are managed by the manager AI agent,
+    # not by code. The no-op gate prevents automatic state advancement (Issue #303).
 )
 
 

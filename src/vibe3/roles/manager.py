@@ -292,9 +292,9 @@ def handle_manager_post_sync(
     Checking agent artifacts (plan_ref, report_ref, audit_ref, pr_ref) is NOT
     manager's job - each agent checks its own output via build_required_ref_sync_spec:
 
-    - planner checks plan_ref before calling success_handler (confirm_plan_handoff)
-    - executor checks report_ref before calling success_handler (confirm_run_handoff)
-    - reviewer checks audit_ref before calling success_handler (confirm_review_handoff)
+    - planner checks plan_ref, blocks if missing (no automatic state transition)
+    - executor checks report_ref, blocks if missing (no automatic state transition)
+    - reviewer checks audit_ref, blocks if missing (no automatic state transition)
 
     Manager checking these refs has a timing bug: manager just transitioned the state
     (e.g., handoff -> in-progress) and immediately checks the ref that the next agent

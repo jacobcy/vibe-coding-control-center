@@ -15,6 +15,16 @@
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
 
+## 工作前必读 Manager 指令
+
+开始任何工作（plan/run/review）前，必须先读取当前 flow 的 manager 交接指令：
+
+```bash
+uv run python src/vibe3/cli.py handoff show $(git branch --show-current)
+```
+
+Manager 可能已写入质量审查意见、具体修复要求、重点关注区域等指令。
+
 ## 项目记忆系统（claude-memory）
 
 Vibe Center 使用 **claude-memory MCP** 作为跨对话的项目记忆系统，用于保存和检索长期上下文。

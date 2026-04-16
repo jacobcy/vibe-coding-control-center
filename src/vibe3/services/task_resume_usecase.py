@@ -225,11 +225,19 @@ class TaskResumeUsecase:
                         from vibe3.domain.publisher import publish
                         from vibe3.models.orchestration import IssueState
 
+                        # Match the target state used in reset_issue_to_ready
+                        if label_state == "ready":
+                            event_target = IssueState.READY
+                        elif label_state is not None:
+                            event_target = IssueState.HANDOFF
+                        else:
+                            event_target = IssueState.READY
+
                         publish(
                             IssueStateChanged(
                                 issue_number,
                                 None,
-                                IssueState.READY.value,
+                                event_target.value,
                                 actor="human:resume",
                             )
                         )

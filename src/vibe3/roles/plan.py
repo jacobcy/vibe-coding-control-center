@@ -29,7 +29,6 @@ from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.issue_failure_service import (
     block_planner_noop_issue,
-    confirm_plan_handoff,
     fail_planner_issue,
 )
 
@@ -171,11 +170,6 @@ def build_plan_sync_request(
     )
 
 
-def _confirm_plan_handoff_wrapper(*, issue_number: int, actor: str) -> None:
-    """Wrapper for confirm_plan_handoff that discards the return value."""
-    confirm_plan_handoff(issue_number=issue_number, actor=actor)
-
-
 PLAN_SYNC_SPEC = build_required_ref_sync_spec(
     role_name="planner",
     resolve_options=resolve_plan_options,
@@ -192,10 +186,8 @@ PLAN_SYNC_SPEC = build_required_ref_sync_spec(
     failure_handler=lambda issue_number, reason: fail_planner_issue(
         issue_number=issue_number, reason=reason
     ),
-    # Advance state: CLAIMED → HANDOFF after plan_ref produced.
-    # Direct call instead of domain event because async tmux subprocess has
-    # a separate in-process event bus that orchestra server cannot observe.
-    success_handler=_confirm_plan_handoff_wrapper,
+    # No success_handler: state transitions are managed by the manager AI agent,
+    # not by code. The no-op gate prevents automatic state advancement (Issue #303).
 )
 
 

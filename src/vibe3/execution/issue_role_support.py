@@ -244,9 +244,9 @@ def apply_required_ref_post_sync(
             intentional unused parameter.
         success_handler: Optional callback invoked when required_ref is present
             after execution. Called as success_handler(issue_number, actor).
-            Use this to trigger state transitions (e.g. confirm_plan_handoff)
-            directly from the sync completion path, bypassing the domain event
-            bus (which is in-process only and not accessible from async tmux
+            Note: State transitions are managed by the manager AI agent, not
+            by code (Issue #303). This callback is reserved for future use
+            but currently None for all roles.
             subprocess executions).
     """
     before_refs = before_snapshot.get("refs")
