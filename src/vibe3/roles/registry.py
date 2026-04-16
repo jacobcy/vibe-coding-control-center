@@ -39,6 +39,26 @@ LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
     REVIEWER_ROLE,
 )
 
+_MERGE_READY_MARKER = "MERGE_READY_COMMIT"
+
+
+def _check_merge_ready_commit(branch: str) -> bool:
+    """Check if handoff current.md contains merge-ready commit marker."""
+    try:
+        from vibe3.clients.git_client import GitClient
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        git_common = GitClient().get_git_common_dir()
+        if not git_common:
+            return False
+        handoff_dir = get_branch_handoff_dir(git_common, branch)
+        current_md = handoff_dir / "current.md"
+        if not current_md.exists():
+            return False
+        return _MERGE_READY_MARKER in current_md.read_text(encoding="utf-8")
+    except Exception:
+        return False
+
 
 def resolve_issue_state_role(to_state: str) -> TriggerableRoleDefinition | None:
     """Resolve the triggerable role definition for an IssueStateChanged event."""
@@ -96,12 +116,14 @@ def build_label_dispatch_event(
     if trigger == "run":
         plan_ref = flow_state.get("plan_ref") if flow_state else None
         audit_ref = flow_state.get("audit_ref") if flow_state else None
+        commit_mode = _check_merge_ready_commit(branch)
         return ExecutorDispatched(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.IN_PROGRESS.value,
             plan_ref=str(plan_ref) if plan_ref else None,
             audit_ref=str(audit_ref) if audit_ref else None,
+            commit_mode=commit_mode,
         )
     if trigger == "review":
         report_ref = flow_state.get("report_ref") if flow_state else None

@@ -71,6 +71,7 @@ def build_run_request(
     repo_path: Path | None = None,
     plan_ref: str | None = None,
     audit_ref: str | None = None,
+    commit_mode: bool = False,
     actor: str = "orchestra:executor",
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
@@ -80,10 +81,13 @@ def build_run_request(
         refs["plan_ref"] = plan_ref
     if audit_ref:
         refs["audit_ref"] = audit_ref
-    # Correct command: use --plan instead of non-existent --issue and --plan-ref
-    command_args = (
-        ["run", "--plan", plan_ref, "--no-async"] if plan_ref else ["run", "--no-async"]
-    )
+    if commit_mode:
+        command_args = ["run", "--skill", "vibe-commit", "--no-async"]
+        refs["commit_mode"] = "true"
+    elif plan_ref:
+        command_args = ["run", "--plan", plan_ref, "--no-async"]
+    else:
+        command_args = ["run", "--no-async"]
     return build_issue_async_cli_request(
         role="executor",
         issue=issue,

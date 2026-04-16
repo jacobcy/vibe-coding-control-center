@@ -140,6 +140,7 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             branch=event.branch,
             plan_ref=event.plan_ref,
             audit_ref=event.audit_ref,
+            commit_mode=event.commit_mode,
         )
     except Exception as exc:
         logger.bind(

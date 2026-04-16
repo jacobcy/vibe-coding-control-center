@@ -2,11 +2,8 @@
 
 Public API:
 - ``build_run_prompt_body(plan_file, config, audit_file)``
-  assemble the full prompt string
 - ``make_run_context_builder(plan_file, config, prompts_path, audit_file)``
-  returns a PromptContextBuilder
 - ``make_skill_context_builder(skill_content)``
-  PromptContextBuilder for skill mode
 """
 
 from __future__ import annotations

@@ -64,7 +64,7 @@ Forbidden:
 | `state/claimed` | 产出 `plan_ref` | `state/handoff` |
 | `state/in-progress` | 产出 `report_ref` | `state/handoff` |
 | `state/review` | 产出 `audit_ref` | `state/handoff` |
-| `state/merge-ready` | 产出 `pr_ref` (PR 创建成功) | `state/blocked` (等待人类介入) |
+| `state/merge-ready` | 转入 `state/in-progress`（executor 执行 commit + PR） | `state/blocked` (等待人类介入) |
 
 ## Truth Sources
 
@@ -400,7 +400,7 @@ Exit:
 - `state/claimed` -> plan agent
 - `state/in-progress` -> run agent
 - `state/review` -> review agent
-- `state/merge-ready` -> manager 调用/vibe-commit skill 完成代码提交，然后使用 `vibe3 pr create --agent -t "..." -b "..."` 创建 PR draft（产出 `pr_ref`）；如果 PR 创建失败，进入 `state/blocked` 等待人类介入
+- `state/merge-ready` -> manager 写 handoff（含 `MERGE_READY_COMMIT` 标记），转 `state/in-progress`，由 executor 注入 vibe-commit skill 执行 commit + PR 创建（产出 `pr_ref`）
 
 ### `handle_in_progress()`
 
@@ -492,16 +492,22 @@ Allowed:
 - `handoff.write`
 - `labels.write`
 
+Forbidden:
+
+- 直接执行代码提交
+- 直接创建 PR
+- 直接调用 `/vibe-commit` skill
+
 Steps:
 
 1. 调用 `read_context()`
-2. 检查当前工作区是否有未提交的改动
-3. 调用 `/vibe-commit` skill 完成代码提交
-4. 使用 `vibe3 pr create --agent -t "..." -b "..."` 创建 PR draft
-5. 验证 PR 创建成功并获取 `pr_ref`
-6. 如果 PR 创建失败，进入 `state/blocked` 等待人类介入
-7. 如果 PR 创建成功，写 issue comment 和 handoff
-8. `exit()`
+2. 确认 scene 健康（worktree 存在、分支存在）
+3. 写 handoff，内容必须包含 `MERGE_READY_COMMIT` 标记，说明当前进入 commit + PR 阶段
+4. 写 issue comment：Review passed, entering commit and PR creation phase
+5. 将 issue 调整为 `state/in-progress`
+6. `exit()`
+
+说明：`state/in-progress` 会触发 executor dispatch，executor 读取 handoff 中的 `MERGE_READY_COMMIT` 标记后，自动注入 vibe-commit skill 执行 commit + PR 创建
 
 ### `handle_unknown_state()`
 
