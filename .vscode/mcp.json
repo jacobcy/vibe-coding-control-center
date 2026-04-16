@@ -1,0 +1,18 @@
+{
+	"servers": {
+		  "mcp-search": {
+    "command": "node",
+    "args": [
+      "/Users/jacobcy/.claude/plugins/marketplaces/thedotmack/plugin/scripts/mcp-server.cjs"
+    ]
+  },
+		"auggie": {
+			"type": "stdio",
+			"command": "auggie",
+			"args": [
+                "--mcp",
+                "--mcp-auto-workspace"
+            ]
+		}
+	}
+}
