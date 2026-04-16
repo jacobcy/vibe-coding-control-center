@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.commands.handoff_read import (
+from vibe3.commands.handoff_render import (
     UPDATE_LOG_MESSAGE_PREVIEW_LIMIT,
     _preview_update_message,
     _render_updates_log,
