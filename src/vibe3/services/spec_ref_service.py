@@ -218,14 +218,29 @@ class SpecRefService:
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=10,
             )
             url = result.stdout.strip()
+
+            # Handle SSH format: git@github.com:user/repo.git
+            if url.startswith("git@github.com:"):
+                repo_part = url.split(":")[-1]
+                parts = repo_part.split("/")
+                if len(parts) >= 2:
+                    return parts[0]
+
+            # Handle HTTPS format: https://github.com/user/repo.git
             if "github.com" in url:
                 parts = url.split("/")
                 if len(parts) >= 2:
                     return parts[-2].rstrip(".git")
-        except Exception:
-            pass
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.bind(
+                external="git",
+                operation="get_repo_owner",
+                error=str(e),
+            ).warning("Failed to get repo owner from git config")
         return "owner"
 
     def _get_repo_name(self) -> str:
@@ -236,12 +251,27 @@ class SpecRefService:
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=10,
             )
             url = result.stdout.strip()
+
+            # Handle SSH format: git@github.com:user/repo.git
+            if url.startswith("git@github.com:"):
+                repo_part = url.split(":")[-1]
+                parts = repo_part.split("/")
+                if len(parts) >= 2:
+                    return parts[-1].rstrip(".git")
+
+            # Handle HTTPS format: https://github.com/user/repo.git
             if "github.com" in url:
                 parts = url.split("/")
                 if len(parts) >= 1:
                     return parts[-1].rstrip(".git")
-        except Exception:
-            pass
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.bind(
+                external="git",
+                operation="get_repo_name",
+                error=str(e),
+            ).warning("Failed to get repo name from git config")
         return "repo"

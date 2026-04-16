@@ -172,12 +172,14 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `commands/` - CLI 子命令实现
 - `config/` - 配置加载与 Pydantic schema 验证
 - `environment/` - 环境资源管理（Session 和 Worktree 统一抽象层）
+- `execution/` - 执行控制平面（统一协调层：coordinator, capacity, lifecycle, gates）
 - `exceptions/` - 统一异常层级
-- `manager/` - Orchestra 执行代理（flow 映射、命令构建、worktree）
+- `domain/` - 领域事件与 handlers（events, handlers, orchestration_facade）
 - `models/` - Pydantic 领域数据模型
 - `observability/` - 日志、链路追踪、审计
 - `orchestra/` - 编排中枢（issue 分诊、事件调度）
 - `prompts/` - Prompt 模板组装与变量解析
+- `roles/` - 角色定义和执行模块（manager, plan, run, review, supervisor, governance）
 - `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
 - `server/` - HTTP 服务层（webhook, MCP, health check）
 - `services/` - 核心业务逻辑（flow/PR/task/handoff/check）
