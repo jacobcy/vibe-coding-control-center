@@ -95,11 +95,13 @@ def build_label_dispatch_event(
         )
     if trigger == "run":
         plan_ref = flow_state.get("plan_ref") if flow_state else None
+        audit_ref = flow_state.get("audit_ref") if flow_state else None
         return ExecutorDispatched(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.IN_PROGRESS.value,
             plan_ref=str(plan_ref) if plan_ref else None,
+            audit_ref=str(audit_ref) if audit_ref else None,
         )
     if trigger == "review":
         report_ref = flow_state.get("report_ref") if flow_state else None

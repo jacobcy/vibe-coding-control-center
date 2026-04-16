@@ -60,7 +60,7 @@ Forbidden:
 | 当前状态 | 预期进展 | Fallback 目标 (若无进展) |
 | :--- | :--- | :--- |
 | `state/ready` | 离开 `ready` (to `claimed` or `blocked`) | `state/blocked` |
-| `state/handoff` | 离开 `handoff` (to `in-progress` or `review`) | `state/blocked` |
+| `state/handoff` | 离开 `handoff` (to `claimed`, `in-progress`, `review` or `merge-ready`) | `state/blocked` |
 | `state/claimed` | 产出 `plan_ref` | `state/handoff` |
 | `state/in-progress` | 产出 `report_ref` | `state/handoff` |
 | `state/review` | 产出 `audit_ref` | `state/handoff` |
@@ -351,16 +351,33 @@ Decision sketch:
   - `exit()`
 - 已有 `report_ref`，无 `audit_ref`：
   - 进入 `state/review`
-- 已有 `audit_ref` 且结论通过：
-  - 进入 `state/merge-ready`
+- 已有 `audit_ref`：
+  - 读取 audit_ref 文件内容，识别 VERDICT 值
+  - **VERDICT = PASS 或 APPROVED**：
+    - 进入 `state/merge-ready`
+    - comment：Review passed, moving to merge-ready
+    - `exit()`
+  - **VERDICT = MAJOR 或 BLOCK**：
+    - 写 handoff：说明需要修复的问题，附上 audit_ref 路径
+    - 将 issue 调整为 `state/in-progress`（新的 run agent 会读取 audit_ref 进入 retry 模式）
+    - comment：说明具体问题和修复要求
+    - `exit()`
+  - **VERDICT = UNKNOWN 或无法解析**：
+    - 你必须阅读 audit_ref 的完整内容，自行判断是否实质通过
+    - 如果 audit 内容实质上认可实现（无重大问题、仅建议性反馈）：
+      - 视同 PASS，进入 `state/merge-ready`
+    - 如果 audit 内容指出需要修复的实际问题：
+      - 视同 MAJOR，按 MAJOR 流程处理（进入 `state/in-progress`）
+    - comment 你的判断依据
+    - `exit()`
 - refs 缺失、冲突或证据不足：
-  - 若最新评论未解释原因，comment 当前 issue
-  - 保持 `state/handoff`
+  - comment 当前 issue，说明哪些 refs 缺失或冲突
+  - 进入 `state/blocked`
   - `exit()`
 
 Exit:
 
-- 任何 refs 冲突、证据不足、handoff 不可信时，`exit()`
+- 任何 refs 冲突、证据不足、handoff 不可信时，进入 `state/blocked`
 
 ## Launch Boundary
 

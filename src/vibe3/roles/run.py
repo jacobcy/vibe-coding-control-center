@@ -70,6 +70,7 @@ def build_run_request(
     branch: str | None = None,
     repo_path: Path | None = None,
     plan_ref: str | None = None,
+    audit_ref: str | None = None,
     actor: str = "orchestra:executor",
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
@@ -77,6 +78,8 @@ def build_run_request(
     refs: dict[str, str] = {"issue_number": str(issue.number)}
     if plan_ref:
         refs["plan_ref"] = plan_ref
+    if audit_ref:
+        refs["audit_ref"] = audit_ref
     # Correct command: use --plan instead of non-existent --issue and --plan-ref
     command_args = (
         ["run", "--plan", plan_ref, "--no-async"] if plan_ref else ["run", "--no-async"]
@@ -364,13 +367,30 @@ def execute_manual_run(
         return CodeagentExecutionService(config).execute_sync(command)
 
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
+
+    # Read audit_ref from flow_state for retry mode (review feedback injection)
+    audit_file: str | None = None
+    if branch:
+        try:
+            flow_state = SQLiteClient().get_flow_state(branch)
+            if flow_state and flow_state.get("audit_ref"):
+                audit_file = str(flow_state["audit_ref"])
+        except Exception:
+            pass
+
     command = create_codeagent_command(
         role="executor",
-        context_builder=make_run_context_builder(plan_file, config),
+        context_builder=make_run_context_builder(
+            plan_file, config, audit_file=audit_file
+        ),
         task=instructions or run_prompt,
         dry_run=dry_run,
         handoff_kind="run",
-        handoff_metadata={"plan_ref": plan_file} if plan_file else None,
+        handoff_metadata=(
+            {"plan_ref": plan_file, "audit_ref": audit_file}
+            if plan_file or audit_file
+            else None
+        ),
         agent=agent,
         backend=backend,
         model=model,

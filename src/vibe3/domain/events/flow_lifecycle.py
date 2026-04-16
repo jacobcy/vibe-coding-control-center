@@ -169,6 +169,7 @@ class ExecutorDispatched(DomainEvent):
     branch: str
     trigger_state: str  # "in-progress"
     plan_ref: str | None = None
+    audit_ref: str | None = None
     actor: str = "system:dispatcher"
     timestamp: str | None = None
 

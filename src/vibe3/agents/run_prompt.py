@@ -1,9 +1,12 @@
 """Run context builder - assemble prompt body for execution agent.
 
 Public API:
-- ``build_run_prompt_body(plan_file, config)`` - assemble the full prompt string
-- ``make_run_context_builder(plan_file, config)`` - PromptContextBuilder (via assembler)
-- ``make_skill_context_builder(skill_content)`` - PromptContextBuilder for skill mode
+- ``build_run_prompt_body(plan_file, config, audit_file)``
+  assemble the full prompt string
+- ``make_run_context_builder(plan_file, config, prompts_path, audit_file)``
+  returns a PromptContextBuilder
+- ``make_skill_context_builder(skill_content)``
+  PromptContextBuilder for skill mode
 """
 
 from __future__ import annotations
@@ -66,12 +69,16 @@ no matter what. Do not include this section in your response until the very end.
 def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
+    audit_file: str | None = None,
 ) -> str:
     """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
     Args:
         plan_file: Path to plan file (markdown), or None for lightweight mode.
         config: VibeConfig instance.
+        audit_file: Path to previous review audit file. When provided, the run
+            is a retry — review feedback is injected into the prompt so the
+            executor addresses the issues found by the reviewer.
 
     Returns:
         Assembled prompt body string.
@@ -80,13 +87,22 @@ def build_run_prompt_body(
         config = VibeConfig.get_defaults()
 
     log = logger.bind(domain="run_context_builder", action="build_run_prompt_body")
-    log.info("Building run prompt body")
+    retry = bool(audit_file)
+    log.info(f"Building run prompt body (retry={retry})")
 
     plan_content = None
     if plan_file:
         if not Path(plan_file).exists():
             raise FileNotFoundError(f"Plan file not found: {plan_file}")
         plan_content = Path(plan_file).read_text(encoding="utf-8")
+
+    audit_content: str | None = None
+    if audit_file:
+        audit_path = Path(audit_file)
+        if audit_path.exists():
+            audit_content = audit_path.read_text(encoding="utf-8")
+        else:
+            log.warning(f"Audit file not found: {audit_file}")
 
     sections: list[str] = []
 
@@ -105,6 +121,15 @@ def build_run_prompt_body(
     if plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
 
+    # Retry mode: inject review feedback so executor addresses prior issues
+    if audit_content:
+        sections.append(
+            "## Previous Review Feedback (RETRY)\n\n"
+            "The previous implementation was reviewed and issues were found. "
+            "You MUST address the feedback below before producing new output.\n\n"
+            f"{audit_content}"
+        )
+
     run_task = getattr(run_config, "run_task", None) if run_config else None
     sections.append(build_run_task_section(run_task))
 
@@ -112,7 +137,7 @@ def build_run_prompt_body(
     sections.append(build_run_output_contract_section(output_format))
 
     body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body)).success("Run prompt body built")
+    log.bind(body_len=len(body), retry=retry).success("Run prompt body built")
     return body
 
 
@@ -120,6 +145,7 @@ def make_run_context_builder(
     plan_file: str | None,
     config: VibeConfig | None = None,
     prompts_path: Path | None = None,
+    audit_file: str | None = None,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for plan/flow_plan/lightweight run mode.
 
@@ -130,7 +156,7 @@ def make_run_context_builder(
     return make_context_builder(
         template_key="run.plan",
         body_provider_key="run.context",
-        body_fn=lambda: build_run_prompt_body(plan_file, cfg),
+        body_fn=lambda: build_run_prompt_body(plan_file, cfg, audit_file),
         prompts_path=prompts_path,
     )
 
