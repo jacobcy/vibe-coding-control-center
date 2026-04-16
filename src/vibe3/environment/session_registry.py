@@ -2,14 +2,13 @@
 
 import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+from loguru import logger
 
 from vibe3.clients.protocols import BackendProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_naming import build_session_name
-
-if TYPE_CHECKING:
-    pass
 
 # All supported execution roles (L1/L2/L3 chains)
 WORKER_ROLES = frozenset(
@@ -118,8 +117,6 @@ class SessionRegistryService:
           only if recently created (< 60s); stale sessions are marked orphaned.
         """
         if self._backend is None:
-            from loguru import logger
-
             logger.bind(
                 domain="session_registry",
                 mode="read_only",
@@ -160,8 +157,6 @@ class SessionRegistryService:
                                     status="orphaned",
                                     ended_at=now.isoformat(),
                                 )
-                                from loguru import logger
-
                                 logger.bind(
                                     domain="session_registry",
                                     session_id=session_id,
@@ -173,8 +168,6 @@ class SessionRegistryService:
                             # Don't count - it's failed, not starting
                             continue
                     except Exception as exc:
-                        from loguru import logger
-
                         logger.bind(
                             domain="session_registry",
                             session=session,
@@ -315,8 +308,6 @@ class SessionRegistryService:
             List of session dicts that are truly live.
         """
         sessions = self._store.list_live_runtime_sessions()
-        from loguru import logger
-
         truly_live: list[dict[str, Any]] = []
         now = datetime.datetime.now()
         starting_timeout_seconds = 60
@@ -448,8 +439,6 @@ class SessionRegistryService:
         Returns:
             Number of sessions cleared.
         """
-        from loguru import logger
-
         sessions = self._store.list_live_runtime_sessions()
         cleared = 0
         for session in sessions:

@@ -13,10 +13,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
-
-if TYPE_CHECKING:
-    pass
+from typing import Final
 
 # Known Codex runtime warnings to filter from async logs
 KNOWN_CODEX_STATE_DB_WARNINGS: Final[tuple[str, ...]] = (
@@ -182,34 +179,60 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
 def allocate_log_path(log_dir: Path, execution_name: str) -> Path:
     """Resolve and allocate a non-colliding log path.
 
-    Checks disk for existence to ensure we don't overwrite previous logs,
-    even if the execution name (session id) doesn't have an incremented suffix.
+    Uses atomic file creation to prevent TOCTOU race conditions in concurrent scenarios.
+    Ensures we don't overwrite previous logs, even if the execution name (session id)
+    doesn't have an incremented suffix.
 
     Args:
         log_dir: Base log directory
         execution_name: Execution name (session id)
 
     Returns:
-        Unique log path
+        Unique log path (file is atomically created to reserve the path)
     """
     base_path = resolve_async_log_path(log_dir, execution_name)
-    if not base_path.exists():
-        return base_path
 
-    # If file exists, find the next suffix
+    # Ensure parent directory exists before attempting atomic creation
+    base_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Try atomic creation with O_EXCL to prevent race conditions
+    # This atomically checks "does not exist" and creates the file
+    try:
+        fd = os.open(
+            str(base_path),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o644,
+        )
+        os.close(fd)
+        return base_path
+    except FileExistsError:
+        # File exists, need to find next available suffix
+        pass
+
+    # If file exists, find the next suffix using atomic creation
     # e.g. manager.async.log -> manager-2.async.log
-    parent = base_path.parent
     name = base_path.name
     if not name.endswith(".async.log"):
+        # Fallback: just return the base path even though it exists
+        # This shouldn't happen but provides graceful degradation
         return base_path
 
     base_name = name[: -len(".async.log")]
     counter = 2
     while True:
-        candidate = parent / f"{base_name}-{counter}.async.log"
-        if not candidate.exists():
+        candidate = base_path.parent / f"{base_name}-{counter}.async.log"
+        try:
+            # Atomic creation attempt for each candidate
+            fd = os.open(
+                str(candidate),
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o644,
+            )
+            os.close(fd)
             return candidate
-        counter += 1
+        except FileExistsError:
+            # Try next counter
+            counter += 1
 
 
 def build_async_log_filter() -> list[str]:
