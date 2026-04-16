@@ -9,9 +9,11 @@ from loguru import logger
 from vibe3.clients.protocols import BackendProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_naming import build_session_name
+from vibe3.utils.constants import STARTING_TIMEOUT_SECONDS
 
 # All supported execution roles (L1/L2/L3 chains)
-WORKER_ROLES = frozenset(
+# Exported from here to avoid circular imports with constants module
+WORKER_ROLES: frozenset[str] = frozenset(
     {"manager", "planner", "executor", "reviewer", "supervisor", "governance"}
 )
 
@@ -128,7 +130,7 @@ class SessionRegistryService:
         sessions = self._store.list_live_runtime_sessions(role=role)
         count = 0
         now = datetime.datetime.now()
-        starting_timeout_seconds = 60
+        starting_timeout_seconds = STARTING_TIMEOUT_SECONDS
 
         for session in sessions:
             session_role = session.get("role", "")
@@ -167,7 +169,7 @@ class SessionRegistryService:
                                 )
                             # Don't count - it's failed, not starting
                             continue
-                    except Exception as exc:
+                    except (ValueError, TypeError) as exc:
                         logger.bind(
                             domain="session_registry",
                             session=session,
@@ -310,7 +312,7 @@ class SessionRegistryService:
         sessions = self._store.list_live_runtime_sessions()
         truly_live: list[dict[str, Any]] = []
         now = datetime.datetime.now()
-        starting_timeout_seconds = 60
+        starting_timeout_seconds = STARTING_TIMEOUT_SECONDS
 
         for session in sessions:
             if session.get("branch") != branch:
@@ -344,7 +346,7 @@ class SessionRegistryService:
                                     f"no tmux after {age_seconds:.0f}s"
                                 )
                             continue
-                    except Exception as exc:
+                    except (ValueError, TypeError) as exc:
                         logger.bind(
                             domain="session_registry",
                             session=session,
@@ -376,7 +378,7 @@ class SessionRegistryService:
         now = datetime.datetime.now()
         # Timeout threshold: sessions without tmux for longer than this are
         # considered failed launches, not "still starting"
-        starting_timeout_seconds = 60
+        starting_timeout_seconds = STARTING_TIMEOUT_SECONDS
 
         for session in sessions:
             if session.get("branch") != branch:
@@ -417,7 +419,7 @@ class SessionRegistryService:
                                 )
                             # Don't add to truly_live - it's failed, not starting
                             continue
-                    except Exception as exc:
+                    except (ValueError, TypeError) as exc:
                         logger.bind(
                             domain="session_registry",
                             session=session,
