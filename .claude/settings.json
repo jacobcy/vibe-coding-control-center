@@ -1,8 +1,5 @@
 {
   "permissions": {
-    "additionalDirectories": [
-      "~/"
-    ],
     "allow": [
       "Bash(git *)",
       "Bash(gh *)",
@@ -62,7 +59,11 @@
       "Bash(uv *)",
       "Bash(npx *)",
       "Agent( *)",
-      "Skill( *)"
+      "Skill( *)",
+      "Bash(rtk *)"
+    ],
+    "additionalDirectories": [
+      "~/"
     ]
   },
   "enabledPlugins": {

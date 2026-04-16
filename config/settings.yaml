@@ -327,6 +327,7 @@ review:
     The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
     If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
     and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
+    <important> you must change the issue label to state/handoff before exit(), or this flow will be blocked.
 
   # Static: Custom review prompt (optional prefix)
   # Added to beginning of review context if provided
@@ -387,7 +388,8 @@ plan:
     You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
     Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
-    If you do not register `plan_ref`, the planner run is treated as no-op and the issue is moved to `state/blocked`.
+    <important> you must change the issue label to state/handoff before exit()
+    If you do not register `plan_ref` and change issue label, the planner run is treated as no-op and the issue is moved to `state/blocked`.
 
   # Static: Optional plain-text default task guidance.
   # Slash-prefixed external skill triggers are ignored by vibe3 plan.
@@ -449,7 +451,9 @@ run:
     You must write a canonical execution report under `docs/reports/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
     Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
-    If you do not register `report_ref`, the executor run is treated as no-op and the issue is moved to `state/blocked`.
+    <important> you must change the issue label to state/handoff before exit()
+    If you do not register `report_ref` and change label, the executor run is treated as no-op and the issue is moved to `state/blocked`.
+
 
   # Static: Custom run prompt (optional prefix)
   run_prompt: "/executing-plan"
