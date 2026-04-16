@@ -39,6 +39,9 @@ class PRMetadata(BaseModel):
         and ``claude/sonnet-4.6`` merge into a single entry.  When the
         same backend appears multiple times, the most specific form
         (the one containing a model) wins.
+
+        Fallback: If all actors are placeholders, use git worktree user.name
+        to ensure the Contributors block always exists (per authorship standard).
         """
         backend_map: dict[str, str] = {}
         field_order: list[str] = []
@@ -53,6 +56,21 @@ class PRMetadata(BaseModel):
                 backend_map[backend] = normalized
             elif "/" in normalized and "/" not in backend_map[backend]:
                 backend_map[backend] = normalized
+
+        # Fallback to worktree user.name if all actors are placeholders
+        if not backend_map:
+            from vibe3.clients.git_client import GitClient
+
+            try:
+                worktree_actor = GitClient().get_config("user.name")
+                if worktree_actor:
+                    normalized = SignatureService.normalize_actor(worktree_actor)
+                    if normalized:
+                        return [normalized]
+            except Exception:
+                pass
+            # Ultimate fallback if git config unavailable
+            return ["human"]
 
         return [backend_map[b] for b in field_order]
 
