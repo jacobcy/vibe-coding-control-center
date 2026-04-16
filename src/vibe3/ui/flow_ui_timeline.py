@@ -33,6 +33,10 @@ _EVENT_COLOR: dict[str, str] = {
     "reviewer_started": "yellow",
     "reviewer_completed": "green",
     "reviewer_aborted": "red",
+    "state_transitioned": "cyan bold",
+    "blocked": "red bold",
+    "failed": "red bold",
+    "resumed": "green bold",
     "handoff_plan": "blue",
     "handoff_run": "blue",
     "handoff_review": "magenta",
@@ -127,6 +131,15 @@ def render_flow_timeline(
     console.print(f"    [dim]plan:[/]    {plan_actor}")
     console.print(f"    [dim]run:[/]     {run_actor}")
     console.print(f"    [dim]review:[/]  {review_actor}")
+
+    # Show blocked/failed reasons if present
+    if state.blocked_reason:
+        console.print()
+        console.print(f"  [red bold]blocked_reason:[/] [red]{state.blocked_reason}[/]")
+    if state.failed_reason:
+        console.print()
+        console.print(f"  [red bold]failed_reason:[/] [red]{state.failed_reason}[/]")
+
     console.print()
 
     if not events:

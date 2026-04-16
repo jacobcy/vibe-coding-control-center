@@ -263,6 +263,22 @@ def apply_required_ref_post_sync(
             )
             return True
 
+    # Record state transition if it occurred
+    before_state = before_snapshot.get("state_label")
+    after_state = after_snapshot.get("state_label")
+    if before_state != after_state:
+        store.add_event(
+            _branch,
+            "state_transitioned",
+            actor,
+            detail=f"State changed: {before_state} → {after_state}",
+            refs={
+                "before_state": str(before_state or ""),
+                "after_state": str(after_state or ""),
+                "issue": str(issue_number),
+            },
+        )
+
     # required_ref is present — call success_handler to advance state.
     # This is the correct place for state transitions in the async tmux path:
     # domain events published here would be in the subprocess event bus, not

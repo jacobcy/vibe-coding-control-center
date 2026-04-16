@@ -304,6 +304,22 @@ def handle_manager_post_sync(
     right after that agent completes and has the ref available.
     """
 
+    # Record state transition if it occurred
+    before_state = before_snapshot.get("state_label")
+    after_state = after_snapshot.get("state_label")
+    if before_state != after_state:
+        store.add_event(
+            branch,
+            "state_transitioned",
+            actor,
+            detail=f"State changed: {before_state} → {after_state}",
+            refs={
+                "before_state": str(before_state or ""),
+                "after_state": str(after_state or ""),
+                "issue": str(issue_number),
+            },
+        )
+
     # Check if issue was closed during execution
     if handle_closed_issue_post_run(
         store=store,

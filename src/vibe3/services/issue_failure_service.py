@@ -49,6 +49,16 @@ def _ensure_flow_state_for_issue(
         if not branch:
             return
 
+        # Write flow event for observability (smart search can query this)
+        event_type = f"{action}ed"  # "blocked" or "failed"
+        store.add_event(
+            branch,
+            event_type,
+            actor,
+            detail=reason,
+            refs={"issue": str(issue_number), "action": action},
+        )
+
         # Record reason as display-only field; do NOT change flow_status.
         # GitHub labels are the SSOT for issue state.
         if action == "block":
@@ -255,6 +265,25 @@ def resume_failed_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
+    # Write to flow (source of truth) before GitHub sync
+    issue_flow_service = IssueFlowService()
+    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
+    if flows:
+        branch = str(flows[0].get("branch") or "").strip()
+        if branch:
+            # Record resume event
+            issue_flow_service.store.add_event(
+                branch,
+                "resumed",
+                actor,
+                detail=f"Resumed from failed to ready: {reason}",
+                refs={
+                    "issue": str(issue_number),
+                    "from_state": "failed",
+                    "to_state": "ready",
+                },
+            )
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.READY,
@@ -285,6 +314,25 @@ def resume_blocked_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
+    # Write to flow (source of truth) before GitHub sync
+    issue_flow_service = IssueFlowService()
+    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
+    if flows:
+        branch = str(flows[0].get("branch") or "").strip()
+        if branch:
+            # Record resume event
+            issue_flow_service.store.add_event(
+                branch,
+                "resumed",
+                actor,
+                detail=f"Resumed from blocked to ready: {reason}",
+                refs={
+                    "issue": str(issue_number),
+                    "from_state": "blocked",
+                    "to_state": "ready",
+                },
+            )
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.READY,
