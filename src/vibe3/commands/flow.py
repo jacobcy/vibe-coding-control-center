@@ -154,6 +154,13 @@ def update(
                 flow = updated
 
         if spec:
+            from vibe3.services.spec_ref_service import SpecRefService
+
+            spec_service = SpecRefService()
+            is_valid, error = spec_service.validate_spec_ref(spec)
+            if not is_valid:
+                typer.echo(f"Error: {error}", err=True)
+                raise typer.Exit(1)
             flow_service.bind_spec(flow.branch, spec, actor)
 
         if json_output:

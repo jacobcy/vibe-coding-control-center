@@ -13,10 +13,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
-
-if TYPE_CHECKING:
-    pass
+from typing import Final
 
 # Known Codex runtime warnings to filter from async logs
 KNOWN_CODEX_STATE_DB_WARNINGS: Final[tuple[str, ...]] = (
@@ -94,15 +91,20 @@ def has_tmux_session(session_name: str) -> bool:
     return session_name in list_tmux_sessions()
 
 
-def allocate_tmux_session_name(base_name: str) -> str:
+def allocate_tmux_session_name(base_name: str, *, auto_increment: bool = True) -> str:
     """Return a non-colliding tmux session name.
 
     Args:
         base_name: Desired base session name
+        auto_increment: If False, returns base_name immediately even if it exists.
+            If True, returns unique session name (may have counter suffix like -2, -3).
 
     Returns:
-        Unique session name (may have counter suffix like -2, -3)
+        Session name
     """
+    if not auto_increment:
+        return base_name
+
     candidate = base_name
     counter = 2
     while True:
@@ -138,7 +140,7 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
         execution_name: Execution name (e.g., vibe3-manager-issue-123)
 
     Returns:
-        Resolved log path
+        Resolved log path (not guaranteed to be unique)
     """
     issue_match = re.match(
         r"^vibe3-(manager|planner|executor|reviewer|supervisor|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
@@ -172,6 +174,65 @@ def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:
         )
 
     return log_dir / f"{execution_name}.async.log"
+
+
+def allocate_log_path(log_dir: Path, execution_name: str) -> Path:
+    """Resolve and allocate a non-colliding log path.
+
+    Uses atomic file creation to prevent TOCTOU race conditions in concurrent scenarios.
+    Ensures we don't overwrite previous logs, even if the execution name (session id)
+    doesn't have an incremented suffix.
+
+    Args:
+        log_dir: Base log directory
+        execution_name: Execution name (session id)
+
+    Returns:
+        Unique log path (file is atomically created to reserve the path)
+    """
+    base_path = resolve_async_log_path(log_dir, execution_name)
+
+    # Ensure parent directory exists before attempting atomic creation
+    base_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Try atomic creation with O_EXCL to prevent race conditions
+    # This atomically checks "does not exist" and creates the file
+    try:
+        fd = os.open(
+            str(base_path),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o644,
+        )
+        os.close(fd)
+        return base_path
+    except FileExistsError:
+        # File exists, need to find next available suffix
+        pass
+
+    # If file exists, find the next suffix using atomic creation
+    # e.g. manager.async.log -> manager-2.async.log
+    name = base_path.name
+    if not name.endswith(".async.log"):
+        # Fallback: just return the base path even though it exists
+        # This shouldn't happen but provides graceful degradation
+        return base_path
+
+    base_name = name[: -len(".async.log")]
+    counter = 2
+    while True:
+        candidate = base_path.parent / f"{base_name}-{counter}.async.log"
+        try:
+            # Atomic creation attempt for each candidate
+            fd = os.open(
+                str(candidate),
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o644,
+            )
+            os.close(fd)
+            return candidate
+        except FileExistsError:
+            # Try next counter
+            counter += 1
 
 
 def build_async_log_filter() -> list[str]:
@@ -313,18 +374,39 @@ def spawn_tmux_command(
     Returns:
         AsyncExecutionHandle with session and log info
     """
+    from loguru import logger
+
     project_root = cwd or Path.cwd()
 
     log_dir = default_log_dir()
     prefix = execution_name.replace("/", "-")[:50]
-    session_id = allocate_tmux_session_name(prefix)
+
+    # Rule: L3 agent roles (manager/plan/run/review) MUST NOT auto-increment
+    # to prevent multiple physical sessions running for the same task.
+    # Supervisor/Governance can auto-increment as they are often parallel or transient.
+    auto_inc = True
+    if any(
+        f"vibe3-{role}" in execution_name
+        for role in ["manager", "plan", "run", "review"]
+    ):
+        auto_inc = False
+
+    session_id = allocate_tmux_session_name(prefix, auto_increment=auto_inc)
+
+    # Intercept duplicate session if auto-increment is disabled
+    if not auto_inc and has_tmux_session(session_id):
+        logger.bind(
+            domain="async_launcher",
+            session=session_id,
+            execution_name=execution_name,
+        ).warning("Intercepted duplicate physical tmux session, aborting spawn")
+        raise RuntimeError(f"Tmux session '{session_id}' already exists")
 
     # Use codeagent's specialized log path resolution (includes issue number)
-    # Use actual session_id (may include counter suffix like -2, -3)
-    log_path = resolve_async_log_path(log_dir, session_id)
+    # Use allocate_log_path to ensure logs are never overwritten, even if
+    # tmux session id is fixed.
+    log_path = allocate_log_path(log_dir, session_id)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    if log_path.exists():
-        log_path.unlink()
 
     shell_command = build_async_shell_command(
         command,

@@ -25,7 +25,10 @@ class SQLiteFlowStateRepo:
         "reviewer_actor",
         "latest_actor",
         "initiated_by",
-        "blocked_by",
+        "blocked_by",  # Legacy field (deprecated, kept for backward compatibility)
+        "blocked_by_issue",  # NEW: Dependency issue number (INT)
+        "blocked_reason",  # NEW: Block reason text (TEXT)
+        "failed_reason",  # NEW: Fail reason text (TEXT)
         "next_step",
         "flow_status",
         "updated_at",

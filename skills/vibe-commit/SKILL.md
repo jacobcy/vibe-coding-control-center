@@ -308,10 +308,11 @@ vibe3 pr create --agent -t "..." -b "..."
 ```
 
 **说明**：
-- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
-- `vibe3 pr create --yes` 是人类专用入口，需要明确确认
+- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块，创建 draft PR
+- `vibe3 pr create --yes` 是人类专用入口，需要明确确认，创建 draft PR
 - Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
 - Agent 模式必须提供完整的 `-t` (title) 和 `-b` (body)，否则报错
+- 所有 PR 创建默认都是 draft 状态，需要手动转换为正式 PR
 
 **Contributors 块自动生成**：
 
@@ -369,7 +370,7 @@ PR 创建成功后，根据以下规则自动应用标签（详见 `docs/standar
 
 **状态标签**：
 
-- PR 创建后 → 自动添加 `status/ready-for-review`
+- PR 创建后（draft 状态）→ 自动添加类型和范围标签，不添加 `status/ready-for-review`（draft PR 不需要此标签）
 
 **执行方式**：
 

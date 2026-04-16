@@ -149,6 +149,7 @@ Inputs:
 
 - target issue
 - latest human comment
+- latest orchestra suggest (if exists)
 - current labels/state
 - current scene
 - current handoff
@@ -156,10 +157,11 @@ Inputs:
 Steps:
 
 1. 读取当前 issue comments
-2. 识别最新人类指示
-3. 读取当前 labels/state
-4. 核查当前 issue / flow / task / branch / worktree / session
-5. 读取 handoff 与 refs
+2. 识别最新人类指示（署名为人类用户，不含 `[orchestra suggest]` 标记）
+3. 识别最新 orchestra 建议（署名为 `[orchestra suggest]`）
+4. 读取当前 labels/state
+5. 核查当前 issue / flow / task / branch / worktree / session
+6. 读取 handoff 与 refs
 
 Exit:
 
@@ -176,6 +178,7 @@ Allowed:
 - `comment`
 - `labels.write`
 - `handoff.write`
+- `issue.close` (仅当判断任务不需要执行时)
 
 Forbidden:
 
@@ -185,31 +188,79 @@ Forbidden:
 Steps:
 
 1. 调用 `read_context()`
-2. 确认 scene 是否健康
-3. 确认最新评论中没有明确的暂停/阻止指示
-4. 如果 scene 不健康：
+2. **过时判断（预审阶段）**：检查 Issue 是否已过时或实质不需要执行：
+   - **Orchestra 建议判断**：检查最新评论中是否有 `[orchestra suggest] 建议关闭此 Issue`
+     - 若存在 orchestra 建议，直接采纳并执行关闭流程（步骤 3）
+     - Orchestra 建议优先级高于 manager 自主判断
+   - **自主判断**（仅当无 orchestra 建议时执行）：
+     - **重复判断**：检查是否存在另一个 Issue 目标相同或高度重叠
+       - 搜索同类 Issue（相似标题、相同 `roadmap/*` 或 `component/*` 标签）
+       - 若发现重复，记录重复 Issue 编号
+     - **已解决判断**：检查相关功能是否已通过其他 PR/commit 实现但 Issue 未关闭
+       - 搜索相关提交（`git log --oneline --all --grep="<关键词>"`）
+       - 检查相关文件当前状态（是否已包含预期改动）
+       - 若已解决，记录解决 PR/commit 编号
+     - **低优先级无意义判断**：检查是否为长期无进展的代码清洁度任务
+       - 优先级为 Low 且标签包含 `type/refactor`、`type/chore`
+       - 创建时间超过 2 周且无任何实质进展（无 spec_ref、plan_ref）
+       - 标题或 body 中明确标注"Low priority"、"纯清洁度"、"不影响行为"
+     - **测试失败无计划判断**：检查是否为测试 Issue 失败多次且无修复计划
+       - 标签包含 `vibe-task` 且标题包含 "test"
+       - Comments 中有 3 次以上失败记录（`state/failed` 或执行错误）
+       - 最新评论无明确修复计划或后续步骤
+
+3. 如果判定 Issue 已过时或不需要执行：
+   - 写 issue comment，说明关闭理由（重复/已解决/低优先级无意义/测试失败无计划）
+   - **署名规则**：
+     - 若采纳 orchestra 建议：署名 `[manager] 执行 orchestra 建议：<理由>`
+     - 若 manager 自主判断：署名 `[manager] 自主判断关闭：<理由>`
+   - 若为重复，引用重复 Issue 编号
+   - 若为已解决，引用解决 PR/commit 编号
+   - 执行关闭：
+     ```bash
+     gh issue close <issue-number> --comment "关闭理由：<具体理由>"
+     ```
+   - 验证 Issue 已关闭：
+     ```bash
+     gh issue view <issue-number> --json state --jq '.state'
+     ```
+   - 若关闭失败，comment 失败原因后 `exit()`
+   - 若关闭成功，`exit()`（不再执行后续状态转换）
+
+4. 如果 Issue 未过时，继续执行标准流程：
+   - 确认 scene 是否健康
+   - 确认最新评论中没有明确的暂停/阻止指示
+
+5. 如果 scene 不健康：
    - 先检查已有 comments 是否已经覆盖同一 blocker
    - 将当前 issue 调整为 `state/blocked`
    - 只有当 blocker 是新的、comments 尚未解释时，才追加 comment
    - `exit()`
-5. 如果最新评论明确要求暂停、等待或阻止推进：
+
+6. 如果最新人类评论（不含 `[orchestra suggest]`）明确要求暂停、等待或阻止推进：
    - 将当前 issue 调整为 `state/blocked`
    - 如最新评论已经说明原因，不重复 comment
    - 只有当 blocker 是新的、comments 尚未解释时，才追加 comment
    - `exit()`
-6. 如果 scene 健康且最新评论中没有明确阻止推进的指示：
+
+**注意**：
+- `[orchestra suggest]` 是自动化建议，manager 应优先采纳
+- 最新人类评论（不含 `[orchestra suggest]`）是最高优先级的人类指示
+- 如果 orchestra 建议与最新人类评论冲突，优先遵循人类指示
+
+7. 如果 scene 健康且最新评论中没有明确阻止推进的指示：
    - 执行：
 
    ```bash
    gh issue edit <issue-number> --add-label "state/claimed" --remove-label "state/ready"
    ```
 
-7. 再次读取当前 labels/state
-8. 如果 `state/claimed` 未生效：
+8. 再次读取当前 labels/state
+9. 如果 `state/claimed` 未生效：
    - 将当前 issue 调整为 `state/blocked`
    - comment 当前 issue说明 claim 迁移失败
    - `exit()`
-9. 如果 `state/claimed` 已生效：
+10. 如果 `state/claimed` 已生效：
    - 写 issue comment：已认领、当前风险、下一阶段为 plan
    - 写 handoff，明确当前已进入 claimed，等待 plan agent
    - `exit()`
@@ -332,7 +383,7 @@ Exit:
 - `state/claimed` -> plan agent
 - `state/in-progress` -> run agent
 - `state/review` -> review agent
-- `state/merge-ready` -> manager 调用 `vibe3 pr create` 完成 PR 创建（产出 `pr_ref`）；如果 PR 创建失败，进入 `state/blocked` 等待人类介入
+- `state/merge-ready` -> manager 调用/vibe-commit skill 完成代码提交，然后使用 `vibe3 pr create --agent -t "..." -b "..."` 创建 PR draft（产出 `pr_ref`）；如果 PR 创建失败，进入 `state/blocked` 等待人类介入
 
 ### `handle_in_progress()`
 
@@ -411,6 +462,29 @@ Steps:
    - 只有在 blocker 是新的时，才追加新的 issue comment
    - 不重复刷同类长 comment
    - `exit()`
+
+### `handle_merge_ready()`
+
+When:
+
+- 当前 labels 真源显示 `state/merge-ready`
+
+Allowed:
+
+- `comment`
+- `handoff.write`
+- `labels.write`
+
+Steps:
+
+1. 调用 `read_context()`
+2. 检查当前工作区是否有未提交的改动
+3. 调用 `/vibe-commit` skill 完成代码提交
+4. 使用 `vibe3 pr create --agent -t "..." -b "..."` 创建 PR draft
+5. 验证 PR 创建成功并获取 `pr_ref`
+6. 如果 PR 创建失败，进入 `state/blocked` 等待人类介入
+7. 如果 PR 创建成功，写 issue comment 和 handoff
+8. `exit()`
 
 ### `handle_unknown_state()`
 

@@ -12,7 +12,9 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.pr import PRState
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_failure_service import block_manager_noop_issue
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.task_service import TaskService
@@ -41,7 +43,18 @@ class FlowManager:
         self._registry = registry
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
-        return self.issue_flow_service.find_active_flow(issue_number)
+        """Find the latest flow for an issue, regardless of active status.
+
+        This supports using the GitHub Issue as the source of truth (SSOT).
+        If an issue has a label that triggers dispatch, we need the branch
+        context even if the flow was previously marked as aborted or done.
+        """
+        flows = self.store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return None
+
+        # Return the first one (IssueFlowService already sorts them by priority/recency)
+        return flows[0]
 
     def _is_reusable_auto_flow(
         self, flow: dict[str, object], issue_number: int
@@ -89,7 +102,39 @@ class FlowManager:
 
     def _rebuild_stale_canonical_flow(
         self, issue: IssueInfo, branch: str, slug: str
-    ) -> dict:
+    ) -> dict | None:
+        # Guard: Check if PR was already merged - should not rebuild
+        pr_number = self.get_pr_for_issue(issue.number)
+        if pr_number:
+            pr = self.github.get_pr(pr_number=pr_number)
+            if pr and (pr.state == PRState.MERGED or pr.merged_at):
+                # Block issue instead of throwing exception
+                # This is a tolerable issue that requires human intervention
+                logger.bind(
+                    domain="flow_dispatch",
+                    issue=issue.number,
+                    pr=pr_number,
+                    state=pr.state.value,
+                ).warning(
+                    "Cannot rebuild flow #{issue.number}: "
+                    f"PR #{pr_number} already merged. "
+                    "Blocking issue for human intervention."
+                )
+
+                block_manager_noop_issue(
+                    issue_number=issue.number,
+                    repo=self.config.repo,
+                    reason=(
+                        f"尝试重建 flow 但 PR #{pr_number} 已 merge。"
+                        f"Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
+                    ),
+                    actor="orchestra:flow_dispatch",
+                )
+
+                # Return None to signal dispatch should stop (issue now blocked)
+                # This allows server to continue running
+                return None
+
         worktree_path = self.git.find_worktree_path_for_branch(branch)
         if worktree_path is not None:
             self.git.remove_worktree(worktree_path, force=True)
@@ -145,7 +190,7 @@ class FlowManager:
                 return int(link["issue_number"])
         return self.issue_flow_service.parse_issue_number(branch)
 
-    def create_flow_for_issue(self, issue: IssueInfo) -> dict:
+    def create_flow_for_issue(self, issue: IssueInfo) -> dict | None:
         log = logger.bind(
             domain="orchestra",
             action="create_flow",
@@ -171,6 +216,13 @@ class FlowManager:
         if existing_canonical:
             if str(existing_canonical.get("flow_status") or "") == "stale":
                 log.info(f"Rebuilding stale canonical flow for issue #{issue.number}")
+                return self._rebuild_stale_canonical_flow(issue, branch, slug)
+            # Guard: branch missing for aborted flow → rebuild to avoid dispatch failure
+            if not self.git.branch_exists(branch):
+                log.warning(
+                    f"Branch '{branch}' missing for aborted flow "
+                    f"#{issue.number}, rebuilding"
+                )
                 return self._rebuild_stale_canonical_flow(issue, branch, slug)
             log.info(f"Reactivating canonical flow for issue #{issue.number}")
             return self._reactivate_canonical_flow(issue, branch, slug)

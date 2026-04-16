@@ -8,6 +8,7 @@ Usage Guide: docs/v3/architecture/infrastructure-guide.md#capacityservice
 
 from __future__ import annotations
 
+import threading
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -48,6 +49,8 @@ class CapacityService:
     """
 
     _shared_in_flight_dispatches: dict[str, dict[str, set[int]]] = {}
+    _shared_launching_targets: dict[str, dict[str, set[int]]] = {}
+    _lock = threading.Lock()
 
     def __init__(
         self,
@@ -69,101 +72,98 @@ class CapacityService:
         # Track in-flight dispatches per role, shared by the underlying handoff DB
         # so separate handlers/ticks see the same dispatch truth.
         shared_key = str(Path(store.db_path).resolve())
-        shared = self._shared_in_flight_dispatches.get(shared_key)
-        if shared is None:
-            shared = defaultdict(set)
-            self._shared_in_flight_dispatches[shared_key] = shared
-        self._in_flight_dispatches = shared
+
+        with self._lock:
+            shared = self._shared_in_flight_dispatches.get(shared_key)
+            if shared is None:
+                shared = defaultdict(set)
+                self._shared_in_flight_dispatches[shared_key] = shared
+            self._in_flight_dispatches = shared
+
+            launching = self._shared_launching_targets.get(shared_key)
+            if launching is None:
+                launching = defaultdict(set)
+                self._shared_launching_targets[shared_key] = launching
+            self._launching_targets = launching
 
     def can_dispatch(self, role: str, target_id: int) -> bool:
-        """Check if global capacity allows another dispatch.
+        """Check if global capacity allows another dispatch."""
+        with self._lock:
+            # Count ALL live worker sessions, not just this role's.
+            active_count = self._registry.count_live_worker_sessions()
+            # Count ALL in-flight dispatches across every role.
+            in_flight_count = sum(len(v) for v in self._in_flight_dispatches.values())
+            max_capacity = self.config.max_concurrent_flows
+            remaining = max(0, max_capacity - active_count - in_flight_count)
 
-        Uses a GLOBAL pool shared across all worker roles, so the total
-        number of concurrently active agents (any role) is capped at
-        max_concurrent_flows. This prevents role-local pools from
-        individually filling up to 3× or 4× the intended concurrency.
+            can_dispatch = remaining > 0
 
-        Args:
-            role: Execution role (manager, planner, executor, reviewer, supervisor)
-            target_id: Target ID (e.g., issue number)
+            if not can_dispatch:
+                logger.bind(
+                    domain="capacity",
+                    role=role,
+                    target=target_id,
+                    active=active_count,
+                    in_flight=in_flight_count,
+                    max=max_capacity,
+                ).info(
+                    f"Global capacity full, skipping {role} #{target_id} "
+                    f"(live={active_count}, in_flight={in_flight_count}, "
+                    f"max={max_capacity})"
+                )
 
-        Returns:
-            True if capacity available, False if should throttle/queue
-        """
-        # Count ALL live worker sessions, not just this role's.
-        active_count = self._registry.count_live_worker_sessions()
-        # Count ALL in-flight dispatches across every role.
-        in_flight_count = sum(len(v) for v in self._in_flight_dispatches.values())
-        max_capacity = self.config.max_concurrent_flows
-        remaining = max(0, max_capacity - active_count - in_flight_count)
+            return can_dispatch
 
-        can_dispatch = remaining > 0
-
-        if not can_dispatch:
+    def mark_in_flight(self, role: str, target_id: int) -> None:
+        """Mark target as in-flight (being dispatched) for role."""
+        with self._lock:
+            self._in_flight_dispatches[role].add(target_id)
             logger.bind(
                 domain="capacity",
                 role=role,
                 target=target_id,
-                active=active_count,
-                in_flight=in_flight_count,
-                max=max_capacity,
-            ).info(
-                f"Global capacity full, skipping {role} #{target_id} "
-                f"(live={active_count}, in_flight={in_flight_count}, "
-                f"max={max_capacity})"
-            )
+                in_flight_count=len(self._in_flight_dispatches[role]),
+            ).debug(f"Marked {role} #{target_id} as in-flight")
 
-        return can_dispatch
-
-    def mark_in_flight(self, role: str, target_id: int) -> None:
-        """Mark target as in-flight (being dispatched) for role.
-
-        Args:
-            role: Execution role
-            target_id: Target ID to track
-        """
-        self._in_flight_dispatches[role].add(target_id)
-        logger.bind(
-            domain="capacity",
-            role=role,
-            target=target_id,
-            in_flight_count=len(self._in_flight_dispatches[role]),
-        ).debug(f"Marked {role} #{target_id} as in-flight")
-
-    def prune_in_flight(self, role: str, target_ids: set[int]) -> None:
-        """Remove in-flight markers for completed/failed dispatches.
-
-        Args:
-            role: Execution role
-            target_ids: Targets to prune
-        """
-        before = len(self._in_flight_dispatches.get(role, set()))
-        self._in_flight_dispatches[role].difference_update(target_ids)
-        after = len(self._in_flight_dispatches.get(role, set()))
-
-        if before != after:
-            logger.bind(
-                domain="capacity",
-                role=role,
-                pruned=before - after,
-                remaining_in_flight=after,
-            ).debug(f"Pruned {before - after} in-flight dispatches for {role}")
-
-    def is_in_flight(self, role: str, target_id: int) -> bool:
-        """Check if a specific target is already marked as in-flight.
-
-        Used by ExecutionCoordinator to detect GlobalDispatchCoordinator
-        pre-reservations so it can take over the slot rather than treating
-        it as capacity-full.
-
-        Args:
-            role: Execution role
-            target_id: Target ID to check
+    def mark_launching(self, role: str, target_id: int) -> bool:
+        """Atomically mark a target as 'launching' to prevent double-dispatch.
 
         Returns:
-            True if the target is already in-flight for this role
+            True if newly marked, False if already launching.
         """
-        return target_id in self._in_flight_dispatches.get(role, set())
+        with self._lock:
+            if target_id in self._launching_targets[role]:
+                return False
+            self._launching_targets[role].add(target_id)
+            # Ensure it is also in in_flight for capacity tracking
+            self._in_flight_dispatches[role].add(target_id)
+            return True
+
+    def is_launching(self, role: str, target_id: int) -> bool:
+        """Check if target is currently in the 'launching' phase."""
+        with self._lock:
+            return target_id in self._launching_targets.get(role, set())
+
+    def prune_in_flight(self, role: str, target_ids: set[int]) -> None:
+        """Remove in-flight markers for completed/failed dispatches."""
+        with self._lock:
+            before = len(self._in_flight_dispatches.get(role, set()))
+            self._in_flight_dispatches[role].difference_update(target_ids)
+            self._launching_targets[role].difference_update(target_ids)
+            after = len(self._in_flight_dispatches.get(role, set()))
+
+            if before != after:
+                logger.bind(
+                    domain="capacity",
+                    role=role,
+                    pruned=before - after,
+                    remaining_in_flight=after,
+                ).debug(f"Pruned {before - after} in-flight dispatches for {role}")
+
+    def is_in_flight(self, role: str, target_id: int) -> bool:
+        """Check if a specific target is already marked as in-flight."""
+        with self._lock:
+            return target_id in self._in_flight_dispatches.get(role, set())
 
     def reconcile_in_flight(self) -> None:
         """Prune in-flight markers that are now live SQLite sessions.
@@ -173,32 +173,70 @@ class CapacityService:
         SQLite, its in-flight marker is no longer needed and must be removed,
         otherwise it double-counts against capacity forever.
         """
-        for role in list(self._in_flight_dispatches.keys()):
-            pending = self._in_flight_dispatches.get(role)
-            if not pending:
-                continue
-            # Get live sessions for this role from SQLite
-            live_sessions = self._store.list_live_runtime_sessions(role=role)
-            live_target_ids: set[int] = set()
-            for session in live_sessions:
-                raw = session.get("target_id")
-                if raw is not None:
-                    try:
-                        live_target_ids.add(int(raw))
-                    except (ValueError, TypeError):
-                        pass
-            # Prune in_flight for any target now registered as a live session
-            now_live = pending & live_target_ids
-            if now_live:
-                self.prune_in_flight(role, now_live)
-                logger.bind(
-                    domain="capacity",
-                    role=role,
-                    reconciled=sorted(now_live),
-                ).debug(
-                    f"reconcile_in_flight: pruned {len(now_live)} stale "
-                    f"in-flight entries for {role} (now live in SQLite)"
-                )
+        with self._lock:
+            for role in list(self._in_flight_dispatches.keys()):
+                pending = self._in_flight_dispatches.get(role)
+                if not pending:
+                    continue
+                # Get live sessions for this role from SQLite
+                live_sessions = self._store.list_live_runtime_sessions(role=role)
+                live_target_ids: set[int] = set()
+                for session in live_sessions:
+                    raw = session.get("target_id")
+                    if raw is None:
+                        continue
+                    tmux = session.get("tmux_session")
+                    # Fix: must have live tmux session (or be in starting
+                    # state without tmux) to count as truly live and prune
+                    # the in-flight marker
+                    if tmux:
+                        if self._registry._has_tmux_session(tmux):
+                            try:
+                                live_target_ids.add(int(raw))
+                            except (ValueError, TypeError):
+                                pass
+                    else:
+                        # Still in starting phase (no tmux yet), count as live
+                        try:
+                            live_target_ids.add(int(raw))
+                        except (ValueError, TypeError):
+                            pass
+                # Prune in_flight for any target now registered as a live session
+                now_live = pending & live_target_ids
+                if now_live:
+                    self._in_flight_dispatches[role].difference_update(now_live)
+                    self._launching_targets[role].difference_update(now_live)
+                    logger.bind(
+                        domain="capacity",
+                        role=role,
+                        reconciled=sorted(now_live),
+                    ).debug(
+                        f"reconcile_in_flight: pruned {len(now_live)} stale "
+                        f"in-flight entries for {role} (now live in SQLite)"
+                    )
+
+                # Also prune in-flight for targets whose sessions are now
+                # in a terminal state (orphaned/done/failed/stopped).
+                # This handles the case where reconcile_live_state() marks
+                # sessions orphaned BEFORE reconcile_in_flight() runs —
+                # those targets never appear in live_target_ids, so the
+                # in-flight marker would otherwise leak indefinitely.
+                not_yet_live = pending - live_target_ids
+                if not_yet_live:
+                    terminated = self._store.get_terminated_target_ids_for_role(
+                        role, not_yet_live
+                    )
+                    if terminated:
+                        self._in_flight_dispatches[role].difference_update(terminated)
+                        self._launching_targets[role].difference_update(terminated)
+                        logger.bind(
+                            domain="capacity",
+                            role=role,
+                            terminated=sorted(terminated),
+                        ).debug(
+                            f"reconcile_in_flight: pruned {len(terminated)} "
+                            f"in-flight entries for {role} (session terminated)"
+                        )
 
     @property
     def in_flight_dispatches(self) -> dict[str, set[int]]:
@@ -228,24 +266,3 @@ class CapacityService:
             "max_capacity": max_capacity,
             "remaining": remaining,
         }
-
-    def _get_max_capacity(self, role: str) -> int:
-        """Get max capacity for role.
-
-        Args:
-            role: Execution role
-
-        Returns:
-            Maximum concurrent dispatches for the role
-        """
-        # Per-role capacity configuration
-        role_capacity_map = {
-            "manager": self.config.max_concurrent_flows,
-            "governance": self.config.governance_max_concurrent,
-            "supervisor": self.config.supervisor_max_concurrent,
-            "planner": self.config.max_concurrent_flows,  # Uses default
-            "executor": self.config.max_concurrent_flows,  # Uses default
-            "reviewer": self.config.max_concurrent_flows,  # Uses default
-        }
-
-        return role_capacity_map.get(role, self.config.max_concurrent_flows)

@@ -113,8 +113,13 @@ def render_flow_status(
         console.print(f"  [dim]{stage}:[/]")
         kv("actor", actor or "—", 2)
         kv("ref", ref or "—", 2)
-    if status.spec_ref:
-        kv("spec", status.spec_ref, 1)
+    from vibe3.services.spec_ref_service import SpecRefService
+
+    spec_service = SpecRefService()
+    spec_display = spec_service.get_spec_display(
+        status.spec_ref, status.task_issue_number
+    )
+    kv("spec", spec_display, 1)
     if status.blocked_by:
         kv("blocked_by", status.blocked_by, 1)
     if status.next_step:

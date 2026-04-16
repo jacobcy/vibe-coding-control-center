@@ -34,7 +34,7 @@ Vibe 3.0 提供了以下核心基础设施服务：
 ### API
 
 ```python
-from vibe3.agents.execution_role_policy import ExecutionRolePolicyService
+from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.models.orchestra_config import OrchestraConfig
 
 # 初始化
@@ -257,7 +257,7 @@ async def on_tick(self):
 ### API
 
 ```python
-from vibe3.agents.execution_lifecycle import persist_execution_lifecycle_event
+from vibe3.execution.execution_lifecycle import persist_execution_lifecycle_event
 
 # 记录 started 事件
 persist_execution_lifecycle_event(

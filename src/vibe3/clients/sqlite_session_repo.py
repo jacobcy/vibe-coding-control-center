@@ -135,3 +135,44 @@ class SQLiteSessionRepo:
             count=len(rows),
         ).debug("Listed live runtime sessions")
         return rows
+
+    def get_terminated_target_ids_for_role(
+        self, role: str, target_ids: set[int]
+    ) -> set[int]:
+        """Return subset of target_ids that have terminal-state sessions for role.
+
+        Terminal states: orphaned, done, failed, stopped, aborted.
+        Used by reconcile_in_flight() to prune in-flight markers for targets
+        whose sessions completed or died without being observed as live.
+
+        Args:
+            role: The execution role to query.
+            target_ids: Candidate target IDs (integers) to check.
+
+        Returns:
+            Subset of target_ids that have at least one terminal session.
+        """
+        if not target_ids:
+            return set()
+        terminal_statuses = ("orphaned", "done", "failed", "stopped", "aborted")
+        target_strs = [str(t) for t in target_ids]
+        target_placeholders = ",".join("?" * len(target_strs))
+        status_placeholders = ",".join("?" * len(terminal_statuses))
+        query = (
+            f"SELECT DISTINCT target_id FROM runtime_session "
+            f"WHERE role = ? AND target_id IN ({target_placeholders}) "
+            f"AND status IN ({status_placeholders})"
+        )
+        params: list[Any] = [role] + target_strs + list(terminal_statuses)
+        result: set[int] = set()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            for row in cursor.fetchall():
+                raw = row[0]
+                if raw is not None:
+                    try:
+                        result.add(int(raw))
+                    except (ValueError, TypeError):
+                        pass
+        return result

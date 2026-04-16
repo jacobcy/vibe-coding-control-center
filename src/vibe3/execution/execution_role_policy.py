@@ -35,11 +35,11 @@ class ConcurrencyClass:
 class ExecutionRolePolicyService:
     """Resolve execution policy by role."""
 
+    # Orchestra roles configuration mapping
+    # Command roles (planner/executor/reviewer)
+    # are handled separately in agent_resolver.py
     _ROLE_CONFIG_MAP: dict[str, str] = {
         "manager": "assignee_dispatch",
-        "planner": "assignee_dispatch",
-        "executor": "assignee_dispatch",
-        "reviewer": "assignee_dispatch",
         "supervisor": "supervisor_handoff",
         "governance": "governance",
     }

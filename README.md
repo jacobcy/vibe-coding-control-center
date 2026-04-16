@@ -1,4 +1,4 @@
-# Vibe Center 2.0
+# Vibe Center 3.0
 
 Vibe Center 是一个面向 AI 协作开发的编排工具箱。它保留 V2 Shell 能力层，也提供 V3 Python 运行时，目标不是替代 `git` 和 `gh`，而是把本地 execution scene、agent handoff、runtime observation 和 skill governance 收敛到一套清晰边界里。
 

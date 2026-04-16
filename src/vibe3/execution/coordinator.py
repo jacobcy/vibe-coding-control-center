@@ -108,26 +108,74 @@ class ExecutionCoordinator:
             target_branch=request.target_branch,
         ).info(f"Received execution request for {request.role}")
 
-        # 1. Check capacity.
-        # If GlobalDispatchCoordinator already pre-reserved a slot for this
-        # exact target (is_in_flight=True), take over that reservation rather
-        # than treating it as "capacity full".  Without this check the
-        # coordinator's early-return skips the finally-block prune, leaving
-        # the pre-reserved marker permanently and deadlocking all future ticks.
-        pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
-        if not pre_authorized and not self.capacity.can_dispatch(
-            request.role, request.target_id
-        ):
-            return ExecutionLaunchResult(
-                launched=False,
-                reason=f"Capacity full for {request.role}",
-                reason_code="capacity_full",
+        # Async self-invocation launches a tmux wrapper first, then executes the
+        # real sync workload inside that child process. The wrapper already owns
+        # the runtime_session row, so the child must not short-circuit on the
+        # parent's live-session entry or it will exit immediately without doing
+        # any work.
+        is_async_child_sync = request.mode == "sync" and (
+            os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+        )
+
+        # 0. Check for existing truly live session (starting or running with live tmux)
+        # to prevent duplicate launches if multiple dispatchers fire concurrently.
+        if request.target_branch and not is_async_child_sync:
+            live_sessions = self.registry.get_truly_live_sessions_for_target(
+                role=request.role,
+                branch=request.target_branch,
+                target_id=str(request.target_id),
             )
+            if live_sessions:
+                # If it's a manager role and we are in async mode (standard dispatch),
+                # we are more strict unless all sessions are in 'starting' state
+                # for too long, but for now we just block to prevent double-manager.
+                #
+                # Exception: if all live sessions found are NOT actually running
+                # in tmux (get_truly_live already checks this, but we double-verify),
+                # we could theoretically allow it.
+                logger.bind(
+                    domain="execution_coordinator",
+                    role=request.role,
+                    target_id=request.target_id,
+                    branch=request.target_branch,
+                ).info(f"Already running for {request.role}, skipping duplicate")
+                return ExecutionLaunchResult(
+                    launched=False,
+                    skipped=True,
+                    reason=f"Execution already running for {request.role}",
+                    reason_code="already_running",
+                )
 
-        # 2. Mark in-flight (skip if pre-authorized — slot already reserved).
-        if not pre_authorized:
-            self.capacity.mark_in_flight(request.role, request.target_id)
+        # 1. Check capacity and claim the slot.
+        # Async child sync: outer wrapper already reserved capacity and registered
+        # the runtime_session; child must not re-check or it double-counts itself.
+        if is_async_child_sync:
+            pre_authorized = True
+        else:
+            pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
+            if pre_authorized:
+                if not self.capacity.mark_launching(request.role, request.target_id):
+                    logger.bind(
+                        domain="execution_coordinator",
+                        role=request.role,
+                        target_id=request.target_id,
+                    ).info(f"Already launching for {request.role}, skipping duplicate")
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        skipped=True,
+                        reason=f"Execution already launching for {request.role}",
+                        reason_code="already_launching",
+                    )
+            else:
+                if not self.capacity.can_dispatch(request.role, request.target_id):
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        reason=f"Capacity full for {request.role}",
+                        reason_code="capacity_full",
+                    )
+                self.capacity.mark_launching(request.role, request.target_id)
 
+        # 2. Slot is now claimed as 'launching'.
         # Whether to prune the in-flight marker at the end of this call.
         # For a successful async launch we MUST keep the marker — the tmux
         # session hasn't yet registered with the tmux server when start_async
@@ -212,12 +260,15 @@ class ExecutionCoordinator:
                 task = request.refs.get("task")
 
                 # 5. Record started
-                self.lifecycle.record_started(
-                    role=request.role,  # type: ignore[arg-type]
-                    target=request.target_branch,
-                    actor=request.actor,
-                    refs=request.refs,
-                )
+                # For async child sync, the outer wrapper already registered
+                # the runtime_session, so the child should not create a duplicate.
+                if not is_async_child_sync:
+                    self.lifecycle.record_started(
+                        role=request.role,  # type: ignore[arg-type]
+                        target=request.target_branch,
+                        actor=request.actor,
+                        refs=request.refs,
+                    )
 
                 logger.bind(
                     domain="execution_coordinator",
@@ -320,7 +371,10 @@ class ExecutionCoordinator:
             # For successful async launches we keep the marker — see the
             # should_prune comment above. reconcile_in_flight will clean up
             # on the next tick once SQLite+tmux observe the live session.
-            if should_prune:
+            #
+            # For async child sync, the outer wrapper owns the in-flight marker,
+            # so the child must not prune it (would remove the outer's reservation).
+            if should_prune and not is_async_child_sync:
                 try:
                     self.capacity.prune_in_flight(request.role, {request.target_id})
                 except Exception as prune_exc:

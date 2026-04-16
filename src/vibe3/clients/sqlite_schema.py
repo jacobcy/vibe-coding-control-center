@@ -162,6 +162,52 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added pr_ref column to flow_state"
         )
 
+    # Migration: split blocked_by into blocked_by_issue (INT) +
+    # blocked_reason (TEXT). This resolves semantic confusion:
+    # blocked_by currently mixes issue numbers and reason text.
+    if "blocked_by_issue" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN blocked_by_issue INTEGER")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added blocked_by_issue column to flow_state"
+        )
+
+    if "blocked_reason" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN blocked_reason TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added blocked_reason column to flow_state"
+        )
+
+    # Migration: add failed_reason field for fail_flow() support
+    if "failed_reason" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN failed_reason TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added failed_reason column to flow_state"
+        )
+
+    # Migration: migrate existing blocked_by data to new fields
+    # Pattern: "#218" → blocked_by_issue=218, other text → blocked_reason
+    if "blocked_by" in existing and (
+        "blocked_by_issue" not in existing or "blocked_reason" not in existing
+    ):
+        # Parse blocked_by values and migrate
+        cursor.execute("""
+            UPDATE flow_state
+            SET
+                blocked_by_issue = CASE
+                    WHEN blocked_by LIKE '#%' THEN
+                        CAST(substr(blocked_by, 2) AS INTEGER)
+                    ELSE NULL
+                END,
+                blocked_reason = CASE
+                    WHEN blocked_by LIKE '#%' THEN NULL
+                    ELSE blocked_by
+                END
+            WHERE blocked_by IS NOT NULL
+        """)
+        logger.bind(external="sqlite", operation="migration").info(
+            "Migrated blocked_by data to blocked_by_issue and blocked_reason fields"
+        )
+
     cursor.execute(_CREATE_FLOW_ISSUE_LINKS)
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)

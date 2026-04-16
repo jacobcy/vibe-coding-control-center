@@ -6,9 +6,73 @@ executor or manager runs fail or make no progress.
 
 from __future__ import annotations
 
+from loguru import logger
+
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
+from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
+
+
+def _ensure_flow_state_for_issue(
+    issue_number: int,
+    action: str,  # "block" or "fail"
+    reason: str,
+    actor: str,
+) -> None:
+    """Record block/fail reason on the flow for observability.
+
+    GitHub labels/comments are the source of truth for issue state.
+    This helper only writes supplementary reason fields to the flow record
+    for display purposes — it does NOT change flow_status.
+
+    Args:
+        issue_number: GitHub issue number
+        action: "block" or "fail"
+        reason: Block/fail reason text (recorded as blocked_reason/failed_reason)
+        actor: Actor performing the action
+
+    Note:
+        Flow write failures do not block GitHub sync. This ensures user
+        visibility even when flow persistence fails.
+    """
+    try:
+        issue_flow_service = IssueFlowService()
+        store = issue_flow_service.store
+
+        # Find any flow for this issue (active or otherwise)
+        flows = store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return
+
+        branch = str(flows[0].get("branch") or "").strip()
+        if not branch:
+            return
+
+        # Record reason as display-only field; do NOT change flow_status.
+        # GitHub labels are the SSOT for issue state.
+        if action == "block":
+            store.update_flow_state(branch, blocked_reason=reason, latest_actor=actor)
+        elif action == "fail":
+            store.update_flow_state(branch, failed_reason=reason, latest_actor=actor)
+        else:
+            logger.bind(
+                domain="flow",
+                action=action,
+                issue_number=issue_number,
+            ).warning(f"Unknown action: {action}")
+
+    except Exception as e:
+        # Non-blocking: reason recording failure should not affect GitHub sync
+        logger.bind(
+            domain="flow",
+            action="ensure_flow_state",
+            issue_number=issue_number,
+            error=str(e),
+        ).warning(
+            f"Flow reason recording failed for issue #{issue_number} "
+            f"(non-blocking, GitHub sync continues)"
+        )
 
 
 def _transition_issue_state(
@@ -89,6 +153,9 @@ def fail_reviewer_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (defaults to "agent:review")
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.FAILED,
@@ -111,6 +178,9 @@ def fail_planner_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (defaults to "agent:plan")
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.FAILED,
@@ -133,6 +203,9 @@ def fail_executor_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (e.g., "agent:executor")
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.FAILED,
@@ -155,42 +228,15 @@ def fail_manager_issue(
         reason: Failure reason to include in comment
         actor: Actor performing the transition (defaults to "agent:manager")
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.FAILED,
         actor=actor,
         force=True,
         comment=_build_failure_comment("manager", reason),
-    )
-
-
-def resume_failed_issue_to_handoff(
-    *,
-    issue_number: int,
-    repo: str | None,
-    reason: str,
-    actor: str = "human:resume",
-) -> None:
-    """Resume a failed issue back to handoff for manager triage.
-
-    Args:
-        issue_number: GitHub issue number
-        repo: Repository (owner/repo format, optional)
-        reason: Resume reason to include in comment
-        actor: Actor performing the resume
-    """
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.HANDOFF,
-        actor=actor,
-        force=False,
-        repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_resume_comment(
-            header="[resume] 已从 state/failed 继续到 state/handoff。",
-            detail="manager 将重新判断现场并决定下一步。",
-            reason=reason,
-        ),
     )
 
 
@@ -272,6 +318,9 @@ def block_manager_noop_issue(
         reason: Block reason to include in comment
         actor: Actor performing the transition
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.BLOCKED,
@@ -298,6 +347,9 @@ def block_planner_noop_issue(
         actor: Actor performing the block
         repo: Repository (owner/repo format, optional)
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.BLOCKED,
@@ -324,6 +376,9 @@ def block_executor_noop_issue(
         actor: Actor performing the block
         repo: Repository (owner/repo format, optional)
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.BLOCKED,
@@ -350,6 +405,9 @@ def block_reviewer_noop_issue(
         actor: Actor performing the block
         repo: Repository (owner/repo format, optional)
     """
+    # Write to flow (source of truth) before GitHub sync
+    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.BLOCKED,

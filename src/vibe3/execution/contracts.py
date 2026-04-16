@@ -33,6 +33,7 @@ class ExecutionLaunchResult:
     """Result of an execution launch attempt."""
 
     launched: bool
+    skipped: bool = False
     session_id: Optional[str] = None
     tmux_session: Optional[str] = None
     log_path: Optional[str] = None

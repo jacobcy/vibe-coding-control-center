@@ -153,3 +153,125 @@ class SpecRefService:
                 except OSError:
                     return None
         return None
+
+    def validate_spec_ref(self, spec_ref: str) -> tuple[bool, str]:
+        """Validate a spec reference.
+
+        Args:
+            spec_ref: Spec reference to validate
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        issue_number = self._try_parse_issue_number(spec_ref)
+        if issue_number is not None:
+            return True, ""
+
+        path = Path(spec_ref)
+        if path.exists() and path.is_file():
+            return True, ""
+
+        return False, f"Spec reference not found: {spec_ref}"
+
+    def resolve_spec_ref(self, spec_ref: str) -> str:
+        """Resolve a spec reference to its canonical form.
+
+        Args:
+            spec_ref: Spec reference to resolve
+
+        Returns:
+            Resolved spec reference
+        """
+        issue_number = self._try_parse_issue_number(spec_ref)
+        if issue_number is not None:
+            # If it's an issue number, return as issue URL or number
+            return f"#{issue_number}"
+
+        # Otherwise, return as file path
+        return spec_ref
+
+    def get_spec_display(
+        self, spec_ref: str | None, issue_number: int | None = None
+    ) -> str:
+        """Get display string for spec reference.
+
+        Args:
+            spec_ref: Spec reference
+            issue_number: Task issue number (for fallback when spec_ref is None)
+
+        Returns:
+            Display string
+        """
+        if spec_ref:
+            info = self.parse_spec_ref(spec_ref)
+            return info.display or spec_ref
+        elif issue_number:
+            # Fallback to issue URL when spec_ref is None
+            return f"https://github.com/{self._get_repo_owner()}/{self._get_repo_name()}/issues/{issue_number}"
+        return "None"
+
+    def _get_repo_owner(self) -> str:
+        """Get GitHub repo owner from git config."""
+        try:
+            result = subprocess.run(
+                ["git", "config", "remote.origin.url"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+            url = result.stdout.strip()
+
+            # Handle SSH format: git@github.com:user/repo.git
+            if url.startswith("git@github.com:"):
+                repo_part = url.split(":")[-1]
+                parts = repo_part.split("/")
+                if len(parts) >= 2:
+                    return parts[0]
+
+            # Handle HTTPS format: https://github.com/user/repo.git
+            if "github.com" in url:
+                parts = url.split("/")
+                if len(parts) >= 2:
+                    return parts[-2].rstrip(".git")
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.bind(
+                external="git",
+                operation="get_repo_owner",
+                error=str(e),
+            ).warning("Failed to get repo owner from git config")
+        return "owner"
+
+    def _get_repo_name(self) -> str:
+        """Get GitHub repo name from git config."""
+        try:
+            result = subprocess.run(
+                ["git", "config", "remote.origin.url"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+            url = result.stdout.strip()
+
+            # Handle SSH format: git@github.com:user/repo.git
+            if url.startswith("git@github.com:"):
+                repo_part = url.split(":")[-1]
+                parts = repo_part.split("/")
+                if len(parts) >= 2:
+                    return parts[-1].rstrip(".git")
+
+            # Handle HTTPS format: https://github.com/user/repo.git
+            if "github.com" in url:
+                parts = url.split("/")
+                if len(parts) >= 1:
+                    return parts[-1].rstrip(".git")
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.bind(
+                external="git",
+                operation="get_repo_name",
+                error=str(e),
+            ).warning("Failed to get repo name from git config")
+        return "repo"

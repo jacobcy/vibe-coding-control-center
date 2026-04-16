@@ -84,6 +84,13 @@ def _dispatch_role_intent(
         ).success(f"{role.capitalize()} dispatch completed")
         return
 
+    if result.skipped:
+        logger.bind(
+            domain=handler_domain,
+            issue_number=issue_number,
+        ).info(f"{role.capitalize()} dispatch skipped: {result.reason}")
+        return
+
     logger.bind(
         domain=handler_domain,
         issue_number=issue_number,

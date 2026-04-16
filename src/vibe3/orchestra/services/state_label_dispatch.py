@@ -23,6 +23,7 @@ from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.execution.capacity_service import CapacityService
 
 
 def _normalize_labels(raw_labels: object) -> list[str]:
@@ -66,6 +67,7 @@ class StateLabelDispatchService(ServiceBase):
         executor: ThreadPoolExecutor | None = None,
         flow_manager: FlowManager | None = None,
         registry: "SessionRegistryService | None" = None,
+        capacity: "CapacityService | None" = None,
         role_def: TriggerableRoleDefinition,
     ) -> None:
         self.config = config
@@ -76,6 +78,7 @@ class StateLabelDispatchService(ServiceBase):
         self._flow_manager = flow_manager or FlowManager(config, registry=registry)
         self._store = SQLiteClient()
         self._registry = registry
+        self._capacity = capacity
         self._dispatch_guard = asyncio.Lock()
         self.role_def = role_def
 
@@ -206,43 +209,55 @@ class StateLabelDispatchService(ServiceBase):
             if issue is None:
                 continue
             if self.role_def.trigger_name == "manager":
+                # Manager is the entry point. Always dispatch if the label is present,
+                # unless there's already a live session (handled in _should_dispatch).
+                # We don't skip if branch/flow_state is missing because Manager
+                # is responsible for creating them.
                 branch, flow_state = self._flow_context(issue.number)
-                if self.role_def.trigger_state == IssueState.HANDOFF:
-                    if (
-                        not branch
-                        or not _is_auto_task_branch(branch)
-                        or not flow_state
-                        or not self._should_dispatch(issue.number, flow_state)
-                    ):
-                        continue
+                if not self._should_dispatch(issue.number, flow_state):
+                    continue
                 selected.append(issue)
                 continue
+
+            # For downstream roles (plan/run/review), we need a branch to exist.
             branch, flow_state = self._flow_context(issue.number)
-            if (
-                not branch
-                or not _is_auto_task_branch(branch)
-                or not flow_state
-                or not self._should_dispatch(issue.number, flow_state)
-            ):
+            if not branch or not _is_auto_task_branch(branch):
+                # If no branch exists yet, we can't dispatch downstream agents.
+                # This usually means manager hasn't run yet.
                 continue
+
+            if not self._should_dispatch(issue.number, flow_state):
+                continue
+
             selected.append(issue)
         return sort_ready_issues(selected)
 
     def _should_dispatch(
         self,
         issue_number: int,
-        flow_state: dict[str, object],
+        flow_state: dict[str, object] | None,
     ) -> bool:
-        """Use role definition's status_field + dispatch_predicate."""
+        """Use role definition's status_field + dispatch_predicate.
+
+        Also checks if a session is already in-flight for this target to
+        prevent duplicate dispatches before SQLite is updated.
+        """
+        if self._capacity and self._capacity.is_in_flight(
+            self.role_def.registry_role, issue_number
+        ):
+            return False
+
         status_field = self.role_def.status_field
-        if status_field is None:
+        if status_field is None or flow_state is None:
             has_live_session = self._has_live_dispatch(issue_number)
         else:
             is_running = flow_state.get(status_field) == "running"
             has_live_session = bool(
                 is_running and self._has_live_dispatch(issue_number)
             )
-        return self.role_def.dispatch_predicate(flow_state, has_live_session)
+
+        # Fallback to empty dict if flow_state is missing
+        return self.role_def.dispatch_predicate(flow_state or {}, has_live_session)
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         if self._registry is None:

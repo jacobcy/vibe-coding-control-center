@@ -47,6 +47,9 @@ agent_prompt:
     1. 通过 issue 或 handoff 明确记录失败现象、已尝试步骤和阻塞原因。
     2. 结束当前任务，等待人工或后续任务接手。
 
+    ## Time out Rule
+    你有一个小时的时间来完成任务，如果你无法完成，请在时间窗口内通过issue或handoff记录你已完成的工作或findings，并在deadline前exit()，等待人工或后续任务接手。时间耗尽，你的工作空间会被Cancel，可能导致系统中断。
+
 # 文本量控制
 doc_limits:
   single_file_loc:
@@ -73,8 +76,8 @@ code_limits:
         limit: 600
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
       - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 500
-        reason: "Issue 状态异常转换聚合，职责单一，去重辅助函数共享，与测试对称"
+        limit: 550
+        reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
       - path: "src/vibe3/services/handoff_service.py"
         limit: 500
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"
@@ -102,6 +105,9 @@ code_limits:
       - path: "src/vibe3/server/app.py"
         limit: 470
         reason: "Orchestra CLI 入口聚合，职责单一"
+      - path: "src/vibe3/server/registry.py"
+        limit: 420
+        reason: "Orchestra PID/tmux 管理，多进程协调辅助函数共生"
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
@@ -118,9 +124,15 @@ code_limits:
       - path: "src/vibe3/environment/worktree.py"
         limit: 600
         reason: "Worktree lifecycle management"
+      - path: "src/vibe3/environment/session_registry.py"
+        limit: 470
+        reason: "Session 生命周期聚合，包含状态对账、容量统计、活跃检查等紧密耦合逻辑"
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 610
         reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
+      - path: "src/vibe3/agents/backends/async_launcher.py"
+        limit: 470
+        reason: "Async launcher 工具类，包含 tmux 会话管理、日志路径分配、Codex 噪声过滤、wrapper 脚本启动四个高内聚模块"
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 450
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
@@ -141,7 +153,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
-    v3_python: 38000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
+    v3_python: 40000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）
   code_paths:

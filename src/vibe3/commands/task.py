@@ -47,7 +47,7 @@ def _is_human_comment(comment: dict[str, Any]) -> bool:
     return True
 
 
-def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict:
+def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict[str, Any]:
     comments = issue.get("comments") or []
     latest_comment = comments[-1] if comments else None
     latest_human = next(
@@ -59,25 +59,42 @@ def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict:
         return {
             "issue": issue.get("number"),
             "title": issue.get("title"),
+            "body": issue.get("body"),
             "state": issue.get("state"),
             "labels": [label.get("name") for label in issue.get("labels", [])],
             "latest_comment": latest_comment,
             "latest_human_comment": latest_human,
         }
 
+    # Render issue body first
+    typer.echo("\nIssue Body:")
+    body = str(issue.get("body") or "").strip()
+    if body:
+        # Indent body lines for better readability
+        for line in body.split("\n"):
+            typer.echo(f"  {line}")
+    else:
+        typer.echo("  (no description)")
+
+    # Render latest comment
     typer.echo("\nLatest Comment:")
     if latest_comment:
         author = (latest_comment.get("author") or {}).get("login") or "unknown"
         typer.echo(f"  author  {author}")
-        typer.echo(f"  body    {str(latest_comment.get('body') or '').strip()}")
+        comment_body = str(latest_comment.get("body") or "").strip()
+        for line in comment_body.split("\n"):
+            typer.echo(f"  {line}")
     else:
         typer.echo("  (no comments)")
 
+    # Render latest human instruction
     typer.echo("\nLatest Human Instruction:")
     if latest_human:
         author = (latest_human.get("author") or {}).get("login") or "unknown"
         typer.echo(f"  author  {author}")
-        typer.echo(f"  body    {str(latest_human.get('body') or '').strip()}")
+        human_body = str(latest_human.get("body") or "").strip()
+        for line in human_body.split("\n"):
+            typer.echo(f"  {line}")
     else:
         typer.echo("  (no human comments)")
 

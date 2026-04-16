@@ -9,6 +9,7 @@ from loguru import logger
 
 from vibe3.domain.events.flow_lifecycle import (
     DomainEvent,
+    ExecutionCompleted,
     IssueBlocked,
     IssueFailed,
     IssueStateChanged,
@@ -23,10 +24,64 @@ from vibe3.services.issue_failure_service import (
     block_executor_noop_issue,
     block_planner_noop_issue,
     block_reviewer_noop_issue,
-    confirm_plan_handoff,
     fail_executor_issue,
 )
 from vibe3.services.label_service import LabelService
+
+
+def _handle_completion_with_ref_gate(
+    event_name: str,
+    issue_number: int,
+    branch: str,
+    ref_name: str,
+    reason: str,
+    actor: str,
+    block_issue_func: Callable[..., None],  # Accept callable with keyword args
+) -> bool:
+    """Helper function to handle completion events with authoritative ref gate.
+
+    Args:
+        event_name: Event name for logging
+        issue_number: Issue number
+        branch: Branch name
+        ref_name: Reference name to validate (plan_ref, report_ref, audit_ref)
+        reason: Reason message if ref is missing
+        actor: Actor name
+        block_issue_func: Function to call if ref is missing (accepts keyword args)
+
+    Returns:
+        True if ref exists, False if blocked
+    """
+    flow_service = FlowService()
+    has_ref = require_authoritative_ref(
+        flow_service=flow_service,
+        branch=branch,
+        ref_name=ref_name,
+        issue_number=issue_number,
+        reason=reason,
+        actor=actor,
+        block_issue=block_issue_func,
+    )
+
+    if has_ref:
+        logger.bind(
+            domain="events",
+            event=event_name,
+            issue=issue_number,
+        ).info(f"{ref_name} found, transitioning to handoff")
+        LabelService().confirm_issue_state(
+            issue_number,
+            IssueState.HANDOFF,
+            actor=actor,
+        )
+    else:
+        logger.bind(
+            domain="events",
+            event=event_name,
+            issue=issue_number,
+        ).warning(f"{ref_name} missing, issue blocked")
+
+    return has_ref
 
 
 def handle_issue_state_changed(event: IssueStateChanged) -> None:
@@ -126,33 +181,15 @@ def handle_plan_completed(event: PlanCompleted) -> None:
         branch=event.branch,
     ).info("Handling PlanCompleted")
 
-    flow_service = FlowService()
-    has_plan_ref = require_authoritative_ref(
-        flow_service=flow_service,
+    _handle_completion_with_ref_gate(
+        event_name="plan_completed",
+        issue_number=event.issue_number,
         branch=event.branch,
         ref_name="plan_ref",
-        issue_number=event.issue_number,
         reason="Missing authoritative plan_ref",
         actor=event.actor,
-        block_issue=block_planner_noop_issue,
+        block_issue_func=block_planner_noop_issue,
     )
-
-    if has_plan_ref:
-        logger.bind(
-            domain="events",
-            event="plan_completed",
-            issue=event.issue_number,
-        ).info("plan_ref found, transitioning to handoff")
-        confirm_plan_handoff(
-            issue_number=event.issue_number,
-            actor=event.actor,
-        )
-    else:
-        logger.bind(
-            domain="events",
-            event="plan_completed",
-            issue=event.issue_number,
-        ).warning("plan_ref missing, issue blocked")
 
 
 def handle_review_completed(event: ReviewCompleted) -> None:
@@ -168,38 +205,45 @@ def handle_review_completed(event: ReviewCompleted) -> None:
         verdict=event.verdict,
     ).info("Handling ReviewCompleted")
 
-    flow_service = FlowService()
-    has_audit_ref = require_authoritative_ref(
-        flow_service=flow_service,
+    _handle_completion_with_ref_gate(
+        event_name="review_completed",
+        issue_number=event.issue_number,
         branch=event.branch,
         ref_name="audit_ref",
-        issue_number=event.issue_number,
         reason=(
             "review output was saved, but no authoritative audit_ref "
             "was registered. Write or regenerate a canonical audit "
             "note and run handoff audit."
         ),
         actor=event.actor,
-        block_issue=block_reviewer_noop_issue,
+        block_issue_func=block_reviewer_noop_issue,
     )
 
-    if has_audit_ref:
-        logger.bind(
-            domain="events",
-            event="review_completed",
-            issue=event.issue_number,
-        ).info("audit_ref found, transitioning to handoff")
-        LabelService().confirm_issue_state(
-            event.issue_number,
-            IssueState.HANDOFF,
-            actor=event.actor,
-        )
-    else:
-        logger.bind(
-            domain="events",
-            event="review_completed",
-            issue=event.issue_number,
-        ).warning("audit_ref missing, issue blocked")
+
+def handle_execution_completed(event: ExecutionCompleted) -> None:
+    """Handle ExecutionCompleted event.
+
+    Validates report_ref and transitions issue to handoff state.
+    """
+    logger.bind(
+        domain="events",
+        event="execution_completed",
+        issue=event.issue_number,
+        branch=event.branch,
+    ).info("Handling ExecutionCompleted")
+
+    _handle_completion_with_ref_gate(
+        event_name="execution_completed",
+        issue_number=event.issue_number,
+        branch=event.branch,
+        ref_name="report_ref",
+        reason=(
+            "executor output was saved, but no authoritative report_ref "
+            "was registered. Write a canonical report document and run handoff report."
+        ),
+        actor=event.actor,
+        block_issue_func=block_executor_noop_issue,
+    )
 
 
 def register_flow_lifecycle_handlers() -> None:
@@ -220,6 +264,10 @@ def register_flow_lifecycle_handlers() -> None:
     )
     subscribe(
         "PlanCompleted", cast(Callable[[DomainEvent], None], handle_plan_completed)
+    )
+    subscribe(
+        "ExecutionCompleted",
+        cast(Callable[[DomainEvent], None], handle_execution_completed),
     )
     subscribe(
         "ReviewCompleted", cast(Callable[[DomainEvent], None], handle_review_completed)

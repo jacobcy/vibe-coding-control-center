@@ -89,10 +89,24 @@
 2. **标记阻塞**：如果一个 Issue 因为依赖或其他原因无法推进，请设置 `state/blocked` 标签，并发表评论说明原因。
 3. **标记完成**：如果一个 Issue 对应的 PR 已合并或任务已确认完成，请设置 `state/done` 标签。
 4. **无需操作**：对于已经在 `state/in-progress` 或 `state/review` 状态且运行正常的 Issue，保持现状。
-5. **同步执行状态**：如果 Issue 有活跃的手动场景（manual scene）或 flow，但缺少 `state/in-progress` 标签，需先通过 `handoff show` 确认该分支存在明确的 `plan_ref`，再添加 `state/in-progress` 标签以同步现场事实；若无 `plan_ref` 则不允许打标签。
+5. **同步执行状态**：如果 Issue 有活跃的手动场景（manual scene）或 flow，但缺少 `state/in-progress` 标签，需先通过 `handoff show` 认该分支存在明确的 `plan_ref`，再添加 `state/in-progress` 标签以同步现场事实；若无 `plan_ref` 则不允许打标签。
 6. **排序调整**：如需调整 ready queue，只允许建议 `milestone`、`roadmap/*`、`priority/[0-9]` 这类非 state 现场语义；不要用 `state/*` 做抢占排序。
+7. **建议关闭（预审过时）**：如果发现 Issue 已过时或实质不需要执行，在治理结论中明确建议关闭，并提供关闭理由：
+   - **重复**：与另一个 Issue 目标相同或高度重叠
+   - **已解决**：相关功能已通过其他 PR/commit 实现但 Issue 未关闭
+   - **低优先级无意义**：长期无进展的代码清洁度任务（如 Low priority refactor）
+   - **测试失败无计划**：测试 Issue 失败多次且无后续修复计划
+   - **建议方式**：在 Issue 上发表评论，格式为：
+     ```
+     [orchestra suggest] 建议关闭此 Issue
+
+     关闭理由：<具体理由>
+     <若为重复，引用重复 Issue 编号>
+     <若为已解决，引用解决 PR/commit 编号>
+     ```
 
 **注意**：
 - 不要直接修改 Assignee。
 - 不要尝试直接调用执行命令或创建 Flow。
+- 不要直接关闭 Issue（只建议关闭，由 Manager 执行实际关闭）。
 - milestone 调整与 label 调整都属于允许的治理输出；除此之外不要写入其他内部状态。

@@ -66,6 +66,7 @@ class TestStartAsyncCommand:
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:
+        """When a log file exists, allocate_log_path returns a new unique path."""
         log_dir = tmp_path / "temp" / "logs"
         stale_log = log_dir / "issues" / "issue-372" / "manager.async.log"
         stale_log.parent.mkdir(parents=True)
@@ -111,12 +112,18 @@ class TestStartAsyncCommand:
             with patch(
                 "vibe3.environment.session.subprocess.run", side_effect=fake_run
             ):
-                start_async_command(
+                handle = start_async_command(
                     ["echo", "hello"],
                     execution_name="vibe3-manager-issue-372",
                 )
 
-        assert not stale_log.exists()
+        # The stale log should still exist (we don't delete old logs)
+        # Instead, allocate_log_path returns a new unique path
+        assert stale_log.exists()
+        # The new log should have a -2 suffix
+        assert (
+            handle.log_path == log_dir / "issues" / "issue-372" / "manager-2.async.log"
+        )
 
     def test_start_async_command_embeds_env_overrides_in_wrapper_script(
         self, monkeypatch, tmp_path
@@ -182,9 +189,10 @@ class TestStartAsyncCommand:
         assert "VIBE3_MANAGER_BACKEND=opencode" in wrapper_text
         assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in wrapper_text
 
-    def test_start_async_command_uses_unique_tmux_session_when_name_exists(
+    def test_start_async_command_rejects_duplicate_l3_session(
         self, monkeypatch, tmp_path
     ) -> None:
+        """L3 roles (manager/plan/run/review) should reject duplicate sessions."""
         log_dir = tmp_path / "temp" / "logs"
         log_dir.mkdir(parents=True)
 
@@ -193,13 +201,21 @@ class TestStartAsyncCommand:
             lambda: log_dir,
         )
 
-        # Mock subprocess.run to simulate session name collision
+        # Mock subprocess.run to simulate session exists
         def fake_run(cmd, *args, **kwargs):
-            if cmd[:3] == ["tmux", "has-session", "-t"]:
-                target = cmd[3]
+            # tmux ls returns session list (session exists)
+            if cmd[:2] == ["tmux", "ls"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="vibe3-manager-issue-372: 1 windows\n",
+                    stderr="",
+                )
+            # tmux has-session checks for specific session
+            elif cmd[:3] == ["tmux", "has-session", "-t"]:
                 result = MagicMock()
-                # 1st call: exists (0), 2nd call: doesn't exist (1)
-                result.returncode = 0 if target == "vibe3-manager-issue-372" else 1
+                # Session exists (returncode 0)
+                result.returncode = 0
                 return result
             # For tmux new-session, return success
             result = MagicMock()
@@ -209,15 +225,12 @@ class TestStartAsyncCommand:
         with patch(
             "vibe3.agents.backends.async_launcher.subprocess.run", side_effect=fake_run
         ):
-            handle = start_async_command(
-                ["echo", "hello"],
-                execution_name="vibe3-manager-issue-372",
-            )
-
-        assert handle.tmux_session == "vibe3-manager-issue-372-2"
-        assert (
-            handle.log_path == log_dir / "issues" / "issue-372" / "manager-2.async.log"
-        )
+            # Should raise RuntimeError because L3 roles reject duplicate sessions
+            with pytest.raises(RuntimeError, match="already exists"):
+                start_async_command(
+                    ["echo", "hello"],
+                    execution_name="vibe3-manager-issue-372",
+                )
 
     def test_start_async_command_places_governance_logs_under_governance_dir(
         self, monkeypatch, tmp_path

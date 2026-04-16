@@ -96,6 +96,10 @@ def _build_server_with_launch_cwd(
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
     shared_flow_manager = FlowManager(config, registry=shared_registry)
     shared_circuit_breaker = None
+
+    # Create shared CapacityService for capacity-aware dispatch
+    shared_capacity = CapacityService(config, shared_store, shared_backend)
+
     if config.circuit_breaker.enabled:
         shared_circuit_breaker = CircuitBreaker(
             failure_threshold=config.circuit_breaker.failure_threshold,
@@ -134,12 +138,10 @@ def _build_server_with_launch_cwd(
                     executor=shared_executor,
                     flow_manager=shared_flow_manager,
                     registry=shared_registry,
+                    capacity=shared_capacity,
                     role_def=role_service,
                 )
             )
-
-    # Create shared CapacityService for capacity-aware dispatch
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
 
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
