@@ -1,4 +1,4 @@
-# Project Context: Vibe Center 2.0
+# Project Context: Vibe Center 3.0
 
 > **文档定位**：本文件提供项目上下文、技术栈和硬规则（详见 [SOUL.md](SOUL.md) §0 文档职责分工）
 > **AI 入口**：AI Agent 请先阅读 [AGENTS.md](AGENTS.md)

@@ -68,6 +68,13 @@ This project uses community skills:
 
 Install via respective tools, then create symlinks in `.agent/skills/`. See [DEVELOPER.md](DEVELOPER.md) for setup.
 
+## 代码分析工具
+
+- `vibe3 inspect symbols/files/base/pr/commit` — 代码结构与影响分析
+- `mcp_auggie_codebase-retrieval` — 语义理解与跨文件探索
+- `claude-memory smart search` — 项目记忆搜索（跨对话上下文）
+- 详细用法见 [.agent/policies/common.md](.agent/policies/common.md)
+
 ## 🔗 Kiro Integration
 
 When using Kiro (AI IDE with spec workflow), follow rules in [.agent/policies/kiro-integration.md](.agent/policies/kiro-integration.md).
