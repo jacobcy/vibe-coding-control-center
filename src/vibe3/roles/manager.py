@@ -11,7 +11,6 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.execution.actor_support import format_agent_actor
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.execution.gates import apply_request_completion_gate, source_state_from_label
@@ -324,12 +323,6 @@ def handle_manager_post_sync(
         before_snapshot=before_snapshot,
         after_snapshot=after_snapshot,
     )
-
-
-def build_manager_actor(config: OrchestraConfig) -> tuple[object, str]:
-    """Resolve manager options and actor string together."""
-    options = resolve_manager_options(config)
-    return options, format_agent_actor(options)
 
 
 def snapshot_manager_progress(

@@ -266,24 +266,3 @@ class CapacityService:
             "max_capacity": max_capacity,
             "remaining": remaining,
         }
-
-    def _get_max_capacity(self, role: str) -> int:
-        """Get max capacity for role.
-
-        Args:
-            role: Execution role
-
-        Returns:
-            Maximum concurrent dispatches for the role
-        """
-        # Per-role capacity configuration
-        role_capacity_map = {
-            "manager": self.config.max_concurrent_flows,
-            "governance": self.config.governance_max_concurrent,
-            "supervisor": self.config.supervisor_max_concurrent,
-            "planner": self.config.max_concurrent_flows,  # Uses default
-            "executor": self.config.max_concurrent_flows,  # Uses default
-            "reviewer": self.config.max_concurrent_flows,  # Uses default
-        }
-
-        return role_capacity_map.get(role, self.config.max_concurrent_flows)

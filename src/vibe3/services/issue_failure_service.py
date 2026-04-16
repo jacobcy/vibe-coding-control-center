@@ -240,36 +240,6 @@ def fail_manager_issue(
     )
 
 
-def resume_failed_issue_to_handoff(
-    *,
-    issue_number: int,
-    repo: str | None,
-    reason: str,
-    actor: str = "human:resume",
-) -> None:
-    """Resume a failed issue back to handoff for manager triage.
-
-    Args:
-        issue_number: GitHub issue number
-        repo: Repository (owner/repo format, optional)
-        reason: Resume reason to include in comment
-        actor: Actor performing the resume
-    """
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.HANDOFF,
-        actor=actor,
-        force=False,
-        repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_resume_comment(
-            header="[resume] 已从 state/failed 继续到 state/handoff。",
-            detail="manager 将重新判断现场并决定下一步。",
-            reason=reason,
-        ),
-    )
-
-
 def resume_failed_issue_to_ready(
     *,
     issue_number: int,
