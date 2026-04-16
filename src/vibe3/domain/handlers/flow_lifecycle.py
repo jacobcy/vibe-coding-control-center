@@ -9,6 +9,7 @@ from loguru import logger
 
 from vibe3.domain.events.flow_lifecycle import (
     DomainEvent,
+    ExecutionCompleted,
     IssueBlocked,
     IssueFailed,
     IssueStateChanged,
@@ -202,6 +203,51 @@ def handle_review_completed(event: ReviewCompleted) -> None:
         ).warning("audit_ref missing, issue blocked")
 
 
+def handle_execution_completed(event: ExecutionCompleted) -> None:
+    """Handle ExecutionCompleted event.
+
+    Validates report_ref and transitions issue to handoff state.
+    """
+    logger.bind(
+        domain="events",
+        event="execution_completed",
+        issue=event.issue_number,
+        branch=event.branch,
+    ).info("Handling ExecutionCompleted")
+
+    flow_service = FlowService()
+    has_report_ref = require_authoritative_ref(
+        flow_service=flow_service,
+        branch=event.branch,
+        ref_name="report_ref",
+        issue_number=event.issue_number,
+        reason=(
+            "executor output was saved, but no authoritative report_ref "
+            "was registered. Write a canonical report document and run handoff report."
+        ),
+        actor=event.actor,
+        block_issue=block_executor_noop_issue,
+    )
+
+    if has_report_ref:
+        logger.bind(
+            domain="events",
+            event="execution_completed",
+            issue=event.issue_number,
+        ).info("report_ref found, transitioning to handoff")
+        LabelService().confirm_issue_state(
+            event.issue_number,
+            IssueState.HANDOFF,
+            actor=event.actor,
+        )
+    else:
+        logger.bind(
+            domain="events",
+            event="execution_completed",
+            issue=event.issue_number,
+        ).warning("report_ref missing, issue blocked")
+
+
 def register_flow_lifecycle_handlers() -> None:
     """Register all flow lifecycle event handlers."""
     from typing import cast
@@ -220,6 +266,10 @@ def register_flow_lifecycle_handlers() -> None:
     )
     subscribe(
         "PlanCompleted", cast(Callable[[DomainEvent], None], handle_plan_completed)
+    )
+    subscribe(
+        "ExecutionCompleted",
+        cast(Callable[[DomainEvent], None], handle_execution_completed),
     )
     subscribe(
         "ReviewCompleted", cast(Callable[[DomainEvent], None], handle_review_completed)
