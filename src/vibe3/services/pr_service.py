@@ -88,8 +88,12 @@ class PRService:
             raise UserError(
                 f"Failed to push branch '{head_branch}' before PR creation: {exc}\n"
                 f"Tips:\n"
-                f"  1. Resolve local/remote divergence if any\n"
-                f"  2. Ensure you have push permission to origin"
+                f"  1. Run 'git branch -vv' and check whether '{head_branch}' is "
+                f"incorrectly tracking origin/main\n"
+                f"  2. Resolve local/remote divergence or upstream misconfiguration\n"
+                f"  3. Ensure you have push permission to origin\n"
+                f"  4. If automation is still blocked, use 'gh pr create' manually "
+                f"after fixing the branch/upstream state"
             ) from exc
 
         metadata = get_metadata_from_flow(self.store, head_branch)

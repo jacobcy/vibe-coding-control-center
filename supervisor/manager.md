@@ -621,17 +621,25 @@ Forbidden:
 - 直接执行代码提交
 - 直接创建 PR
 - 直接调用 `/vibe-commit` skill
+- 直接执行 `vibe3 pr create`
+- 直接执行 `gh pr create`
+- 直接执行 `git push`
 
 Steps:
 
 1. 调用 `read_context()`
 2. 调用 `check_scene_health()` 确认 scene 健康
 3. 写 handoff，内容必须包含 `MERGE_READY_COMMIT` 标记，说明当前进入 commit + PR 阶段
-4. 写 issue comment：Review passed, entering commit and PR creation phase
+4. 写 issue comment：Review passed, handing off commit/PR work to executor
 5. 将 issue 调整为 `state/in-progress`
 6. `exit()`
 
-说明：`state/in-progress` 会触发 executor dispatch，executor 读取 handoff 中的 `MERGE_READY_COMMIT` 标记后，自动注入 vibe-commit skill 执行 commit + PR 创建
+说明：`state/in-progress` 会触发 executor dispatch，executor 读取 handoff 中的 `MERGE_READY_COMMIT` 标记后，自动注入 vibe-commit skill 执行 commit + PR 创建。
+
+强制边界：
+
+- 你在 `state/merge-ready` 的本轮唯一出口是：写 handoff → 改成 `state/in-progress` → `exit()`
+- 如果你发现自己开始检查 remote、push、PR 创建命令，说明你已经越界；必须立即停止，回到上述唯一出口
 
 ### `handle_done()`
 
@@ -735,5 +743,4 @@ handoff 不应用来：
 - 不能推进时，不允许静默退出
 - 要么最新评论里已经存在明确原因
 - 要么你必须补一条 issue comment 说明当前为什么停止
-
 

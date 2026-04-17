@@ -290,6 +290,7 @@ git log --oneline <base>..HEAD
 - 当前 commit 只服务一个交付目标
 - 当前分支语义仍匹配这个目标
 - 当前 flow 没有被错误复用
+- 当前分支 upstream 正常；如果 `git branch -vv` 显示任务分支 tracking 到 `origin/main`，先修 upstream，再继续发 PR
 
 发布入口只用：
 
@@ -313,6 +314,27 @@ vibe3 pr create --agent -t "..." -b "..."
 - Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
 - Agent 模式必须提供完整的 `-t` (title) 和 `-b` (body)，否则报错
 - 所有 PR 创建默认都是 draft 状态，需要手动转换为正式 PR
+- `vibe3 pr create --agent` 仍然依赖当前 git 现场正确；若任务分支被错误 tracking 到 `origin/main`，请先修正 branch/upstream，再重试
+
+**发 PR 前的最小 upstream 检查**：
+
+```bash
+git branch -vv
+```
+
+如果当前任务分支显示类似：
+
+```bash
+task/issue-337 [origin/main: ahead 1, behind 1]
+```
+
+说明 upstream 错绑到了 `origin/main`。此时不要继续运行 `vibe3 pr create --agent`；先修正 git 现场，必要时直接改用 `gh pr create` 完成人工收口。
+
+**失败时的收口**：
+
+- 把失败命令、关键 stderr、当前 `git branch -vv` 摘要写进 issue comment
+- 把同样的错误摘要写进 handoff，便于 manager / human 接手
+- 明确说明是 branch/upstream 现场问题、权限问题，还是普通 push 失败
 
 **Contributors 块自动生成**：
 
