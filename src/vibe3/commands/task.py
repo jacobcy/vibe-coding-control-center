@@ -210,14 +210,21 @@ def resume(
         ),
     ] = False,
     label: Annotated[
-        str | None,
+        bool,
         typer.Option(
             "--label",
-            help="Clear blocked_reason/failed_reason and restore state "
-            "(no worktree deletion). Use --label for handoff, "
-            "--label ready for ready state",
+            help="Clear blocked_reason/failed_reason and restore to handoff "
+            "state (no worktree deletion)",
         ),
-    ] = None,
+    ] = False,
+    label_ready: Annotated[
+        bool,
+        typer.Option(
+            "--label-ready",
+            help="Clear blocked_reason/failed_reason and restore to ready "
+            "state (no worktree deletion)",
+        ),
+    ] = False,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Execute the resume (default dry-run)")
@@ -231,13 +238,15 @@ def resume(
     blocked issues, or --all to reset every auto-created task/issue-*
     scene back to ready. Or specify issue numbers directly.
 
-    **New: --label option**
-    Use --label to clear blocked_reason/failed_reason and restore the issue
-    state WITHOUT deleting worktree/branch.
+    **Label-only mode (no worktree deletion)**:
+    Use --label to clear blocked_reason/failed_reason and restore to
+    handoff state WITHOUT deleting worktree/branch.
+    Use --label-ready to restore to ready state WITHOUT deletion.
+    Without these flags, the original behavior deletes worktree/branch.
 
     Examples:
         vibe3 task resume 303 --label -y         # Restore to handoff, keep worktree
-        vibe3 task resume 303 --label ready -y   # Restore to ready, keep worktree
+        vibe3 task resume 303 --label-ready -y   # Restore to ready, keep worktree
         vibe3 task resume 303 -y                 # Delete worktree/branch (original)
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
@@ -268,6 +277,19 @@ def resume(
             err=True,
         )
         raise typer.Exit(1)
+
+    # Resolve label state from bool flags
+    if label and label_ready:
+        typer.echo(
+            "Error: Cannot specify both --label and --label-ready",
+            err=True,
+        )
+        raise typer.Exit(1)
+    effective_label: str | None = None
+    if label_ready:
+        effective_label = "ready"
+    elif label:
+        effective_label = "handoff"
 
     target_issues: list[int] | None
     candidate_mode = "resumable"
@@ -324,7 +346,7 @@ def resume(
             flows=resume_flows,
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
-            label_state=label,
+            label_state=effective_label,
         )
     else:
         # Original logic for --all or explicit issue numbers
@@ -335,7 +357,7 @@ def resume(
             flows=resume_flows,
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
-            label_state=label,
+            label_state=effective_label,
         )
 
     if not yes and has_flag and not result.get("candidates"):
