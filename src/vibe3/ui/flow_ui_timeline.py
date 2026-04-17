@@ -33,6 +33,9 @@ _EVENT_COLOR: dict[str, str] = {
     "reviewer_started": "yellow",
     "reviewer_completed": "green",
     "reviewer_aborted": "red",
+    "planner_dispatched": "green bold",
+    "executor_dispatched": "green bold",
+    "reviewer_dispatched": "green bold",
     "state_transitioned": "cyan bold",
     "state_unchanged": "yellow",
     "blocked": "red bold",
@@ -41,6 +44,7 @@ _EVENT_COLOR: dict[str, str] = {
     "handoff_plan": "blue",
     "handoff_run": "blue",
     "handoff_review": "magenta",
+    "manager_completed": "green bold",
 }
 
 

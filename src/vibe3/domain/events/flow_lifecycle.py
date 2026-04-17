@@ -155,7 +155,7 @@ class PlannerDispatched(DomainEvent):
     issue_number: int
     branch: str
     trigger_state: str  # "claimed"
-    actor: str = "system:dispatcher"
+    actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
 
 
@@ -173,7 +173,7 @@ class ExecutorDispatched(DomainEvent):
     plan_ref: str | None = None
     audit_ref: str | None = None
     commit_mode: bool = False
-    actor: str = "system:dispatcher"
+    actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
 
 
@@ -189,5 +189,5 @@ class ReviewerDispatched(DomainEvent):
     branch: str
     trigger_state: str  # "review"
     report_ref: str | None = None
-    actor: str = "system:dispatcher"
+    actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
