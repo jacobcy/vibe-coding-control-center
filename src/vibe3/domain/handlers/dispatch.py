@@ -75,25 +75,25 @@ def _dispatch_role_intent(
     request = request_builder(config, issue, **builder_kwargs)
 
     coordinator = ExecutionCoordinator(config, store)
+
+    # Record dispatch intent BEFORE execution (correct chronological order)
+    branch_arg = builder_kwargs.get("branch")
+    branch = str(branch_arg) if branch_arg else ""
+    if branch:
+        store.add_event(
+            branch,
+            f"{role}_dispatched",
+            actor,
+            detail=f"{role.capitalize()} dispatched",
+            refs={
+                "issue": str(issue_number),
+                "role": role,
+            },
+        )
+
     result = coordinator.dispatch_execution(request)
 
     if result.launched:
-        # Record flow dispatch event for observability
-        branch_arg = builder_kwargs.get("branch")
-        branch = str(branch_arg) if branch_arg else ""
-        if branch:
-            store.add_event(
-                branch,
-                f"{role}_dispatched",
-                actor,
-                detail=f"{role.capitalize()} dispatched",
-                refs={
-                    "issue": str(issue_number),
-                    "role": role,
-                    "tmux_session": result.tmux_session or "",
-                    "log_path": result.log_path or "",
-                },
-            )
 
         logger.bind(
             domain=handler_domain,

@@ -141,6 +141,38 @@ class CodeagentExecutionService:
                     refs={"status": "completed"},
                 )
 
+                # Record current state for completion gate observability.
+                # Full three-branch no-op gate requires before/after snapshot
+                # which is only available in issue_role_sync_runner path.
+                # This minimal wiring records current state so dispatcher
+                # can observe state changes across agent executions.
+                from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
+
+                flow_state = store.get_flow_state(branch)
+                current_state = ""
+                if isinstance(flow_state, dict):
+                    current_state = str(flow_state.get("state_label", ""))
+                required_ref = (
+                    "report_ref"
+                    if command.role == "executor"
+                    else "plan_ref" if command.role == "planner" else "audit_ref"
+                )
+                ref_value = ""
+                if isinstance(flow_state, dict):
+                    ref_value = str(flow_state.get(required_ref, "") or "")
+                store.add_event(
+                    branch,
+                    EVENT_STATE_TRANSITIONED,
+                    actor,
+                    detail=f"{command.role} completed, state: {current_state}",
+                    refs={
+                        "state": current_state,
+                        "required_ref": required_ref,
+                        "ref_present": "yes" if ref_value else "no",
+                        "issue": "",
+                    },
+                )
+
             return CodeagentResult(
                 success=agent_result.is_success(),
                 exit_code=agent_result.exit_code,
