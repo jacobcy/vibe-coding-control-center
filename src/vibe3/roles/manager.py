@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
@@ -142,7 +144,11 @@ def build_manager_request(
     flow_manager = FlowManager(config, registry=registry)
     try:
         flow = flow_manager.create_flow_for_issue(issue)
-    except Exception:
+    except Exception as exc:
+        logger.bind(
+            domain="manager",
+            issue_number=issue.number,
+        ).warning(f"create_flow_for_issue failed: {exc}")
         return None
 
     if not flow:

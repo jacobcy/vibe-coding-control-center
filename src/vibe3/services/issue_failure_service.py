@@ -172,6 +172,7 @@ def fail_reviewer_issue(
         actor=actor,
         force=True,
         comment=_build_failure_comment("review", reason),
+        dedupe_latest_comment=True,
     )
 
 
@@ -197,6 +198,7 @@ def fail_planner_issue(
         actor=actor,
         force=True,
         comment=_build_failure_comment("plan", reason),
+        dedupe_latest_comment=True,
     )
 
 
@@ -222,6 +224,7 @@ def fail_executor_issue(
         actor=actor,
         force=True,
         comment=_build_failure_comment("run", reason),
+        dedupe_latest_comment=True,
     )
 
 
@@ -247,6 +250,7 @@ def fail_manager_issue(
         actor=actor,
         force=True,
         comment=_build_failure_comment("manager", reason),
+        dedupe_latest_comment=True,
     )
 
 

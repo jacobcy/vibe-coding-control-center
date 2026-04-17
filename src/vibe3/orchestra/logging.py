@@ -57,6 +57,13 @@ def append_orchestra_event(
     if os.environ.get("VIBE3_ORCHESTRA_EVENT_LOG") != "1":
         return orchestra_events_log_path(repo_root)
 
+    # Blank line for visual separation (no timestamp)
+    if not message:
+        path = orchestra_events_log_path(repo_root)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write("\n")
+        return path
+
     # Check log level filter
     current_level = os.environ.get("VIBE3_ORCHESTRA_LOG_LEVEL", "INFO").upper()
     levels = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3}

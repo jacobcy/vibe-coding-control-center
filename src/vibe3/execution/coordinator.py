@@ -13,7 +13,10 @@ from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.execution_lifecycle import ExecutionLifecycleService
+from vibe3.execution.execution_lifecycle import (
+    ExecutionLifecycleService,
+    execution_prefix,
+)
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 
@@ -205,6 +208,7 @@ class ExecutionCoordinator:
                     target=request.target_branch,
                     actor=request.actor,
                     refs=refs,
+                    event_type=f"tmux_{execution_prefix(request.role)}_started",  # type: ignore[arg-type]
                 )
 
                 logger.bind(

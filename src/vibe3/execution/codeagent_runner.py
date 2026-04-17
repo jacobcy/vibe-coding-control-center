@@ -81,19 +81,22 @@ class CodeagentExecutionService:
             except Exception as exc:  # pragma: no cover
                 log.warning(f"Failed to initialize lifecycle store: {exc}")
 
-        if branch and store and not is_async_child:
-            persist_execution_lifecycle_event(
-                store,
-                branch,
-                command.role,
-                "started",
-                actor,
-                f"{command.role.capitalize()} started (status: running)",
-                session_id=session_id,
-            )
+        if branch and store:
+            if not is_async_child:
+                persist_execution_lifecycle_event(
+                    store,
+                    branch,
+                    command.role,
+                    "started",
+                    actor,
+                    f"{command.role.capitalize()} started (status: running)",
+                    session_id=session_id,
+                )
             # Write latest_actor immediately so subsequent handoff
             # commands (e.g. `vibe3 handoff report`) resolve the
             # correct actor instead of a stale one.
+            # Must execute in both sync and async child paths
+            # because the inner child has the real agent actor.
             store.update_flow_state(branch, latest_actor=actor)
 
         log.info("Starting sync execution")
@@ -133,23 +136,24 @@ class CodeagentExecutionService:
             if handoff_file:
                 echo(f"-> {command.handoff_kind.capitalize()} saved: {handoff_file}")
 
-            if branch and store and not is_async_child:
-                persist_execution_lifecycle_event(
-                    store,
-                    branch,
-                    command.role,
-                    "completed",
-                    actor,
-                    f"{command.role.capitalize()} completed (status: done)",
-                    session_id=effective_session_id,
-                    refs={"status": "completed"},
-                )
+            if branch and store:
+                if not is_async_child:
+                    persist_execution_lifecycle_event(
+                        store,
+                        branch,
+                        command.role,
+                        "completed",
+                        actor,
+                        f"{command.role.capitalize()} completed (status: done)",
+                        session_id=effective_session_id,
+                        refs={"status": "completed"},
+                    )
 
                 # Record current state for completion gate observability.
-                # Full three-branch no-op gate requires before/after snapshot
-                # which is only available in issue_role_sync_runner path.
-                # This minimal wiring records current state so dispatcher
-                # can observe state changes across agent executions.
+                # Must execute in both sync and async child paths.
+                # Full three-branch no-op gate requires before/after
+                # snapshot which is only available in
+                # issue_role_sync_runner path.
                 from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
 
                 flow_state = store.get_flow_state(branch)

@@ -82,6 +82,7 @@ def test_coordinator_dispatch_success(mock_dependencies):
             target="task/issue-42",
             actor="orchestra:system",
             refs=expected_refs,
+            event_type="tmux_plan_started",
         )
 
 
