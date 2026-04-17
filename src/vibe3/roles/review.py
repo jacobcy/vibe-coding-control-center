@@ -288,10 +288,10 @@ def _create_minimal_audit_artifact(
     verdict: str,
     branch: str | None,
 ) -> Path:
-    handoff_service = _build_handoff_service(branch)
-    handoff_dir = handoff_service.ensure_handoff_dir()
+    artifact_dir = _resolve_minimal_audit_dir(branch)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    artifact_path = handoff_dir / f"audit-auto-{timestamp}.md"
+    branch_slug = (branch or "detached").replace("/", "-")
+    artifact_path = artifact_dir / f"{branch_slug}-audit-auto-{timestamp}.md"
     sanitized_content = sanitize_handoff_content(content)
     artifact_path.write_text(
         "# Minimal Review Audit\n\n"
@@ -301,6 +301,28 @@ def _create_minimal_audit_artifact(
         encoding="utf-8",
     )
     return artifact_path
+
+
+def _resolve_minimal_audit_dir(branch: str | None) -> Path:
+    """Prefer a readable worktree-local docs/reports directory for audit output."""
+    git = GitClient()
+    worktree_root: Path | None = None
+
+    if branch:
+        worktree_root = git.find_worktree_path_for_branch(branch)
+
+    if worktree_root is None:
+        current_root = git.get_worktree_root()
+        if current_root:
+            worktree_root = Path(current_root)
+
+    if worktree_root is not None:
+        reports_dir = worktree_root / "docs" / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        return reports_dir
+
+    handoff_service = _build_handoff_service(branch)
+    return handoff_service.ensure_handoff_dir()
 
 
 def _resolve_authoritative_audit_ref(

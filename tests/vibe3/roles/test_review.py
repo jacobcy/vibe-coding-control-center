@@ -8,6 +8,7 @@ import pytest
 from vibe3.domain.events import IssueFailed, ReviewCompleted
 from vibe3.domain.publisher import EventPublisher
 from vibe3.roles.review import (
+    _create_minimal_audit_artifact,
     _resolve_authoritative_audit_ref,
     publish_review_command_failure,
     publish_review_command_success,
@@ -323,6 +324,25 @@ class TestReviewerParserErrorTolerance:
         #     verdict = review.verdict
         # except ReviewParserError:
         #     verdict = None  # ← 不抛异常，继续写 audit_ref
+
+
+def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
+    tmp_path: Path,
+) -> None:
+    with patch("vibe3.roles.review.GitClient") as mock_git_cls:
+        mock_git = mock_git_cls.return_value
+        mock_git.find_worktree_path_for_branch.return_value = tmp_path
+        artifact_path = _create_minimal_audit_artifact(
+            "LGTM - The implementation looks good",
+            "UNKNOWN",
+            "task/issue-340",
+        )
+
+    assert artifact_path.parent == tmp_path / "docs" / "reports"
+    assert artifact_path.name.startswith("task-issue-340-audit-auto-")
+    assert artifact_path.read_text(encoding="utf-8").startswith(
+        "# Minimal Review Audit"
+    )
 
 
 class TestReviewerNoProgressPolicy:

@@ -168,6 +168,11 @@ def render_flow_timeline(
             if files and isinstance(files, list):
                 for f in files:
                     console.print(f"  [dim]- {f}[/]")
+            verdict = (
+                event.refs.get("verdict") if isinstance(event.refs, dict) else None
+            )
+            if verdict:
+                console.print(f"  [dim]- verdict: {verdict}[/]")
             # Priority: log_path > ref for display
             log_path = (
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
@@ -175,7 +180,12 @@ def render_flow_timeline(
             if log_path:
                 console.print(f"  [dim]- {log_path}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            if ref and not log_path:
+            detail_contains_ref = bool(
+                isinstance(ref, str)
+                and isinstance(event.detail, str)
+                and ref in event.detail
+            )
+            if ref and not log_path and not detail_contains_ref:
                 console.print(f"  [dim]- {ref}[/]")
         console.print()
 
