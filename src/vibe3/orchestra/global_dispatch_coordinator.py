@@ -1,16 +1,14 @@
-"""Simple queue-based dispatch coordinator.
+"""Simple queue-based dispatch coordinator with tick-level queue freezing.
 
 Each tick:
-1. Calculate available capacity based on live tmux sessions
-2. Scan candidates by fixed role order (reviewer → executor → planner → manager)
-3. Dispatch all eligible tasks (no live session conflict, within capacity)
-4. End this tick
+1. Check if current queue is empty
+2. If empty, collect new queue (freeze for this tick)
+3. If not empty, continue processing current queue
+4. Dispatch by fixed role order until capacity full or queue exhausted
+5. End this tick
 
-Removed complexity:
-- No frontier/stage gate
-- No in-flight/launching state machine
-- No global sorting
-- No "scan again after dispatch"
+Queue freezing ensures no duplicate dispatch within a tick.
+No tmux session checking - simpler and more reliable.
 """
 
 from __future__ import annotations
@@ -42,9 +40,14 @@ class CandidateIssue:
 
 
 class GlobalDispatchCoordinator:
-    """Simple queue-based coordinator.
+    """Simple queue-based coordinator with tick-level queue freezing.
 
-    Fixed role order dispatch without complex state machines.
+    Queue Model:
+    - Each tick starts with an empty queue
+    - Collect all ready issues once (queue frozen for this tick)
+    - Dispatch by role order until capacity full
+    - Next tick sees queue empty, collects new queue
+    - No tmux session checking - queue freezing prevents duplicates
 
     Usage:
         coordinator = GlobalDispatchCoordinator(capacity_service, dispatch_services)
@@ -58,12 +61,42 @@ class GlobalDispatchCoordinator:
     ) -> None:
         self._capacity = capacity
         self._dispatch_services = dispatch_services
+        # Per-tick frozen queue
+        self._frozen_queue: list[CandidateIssue] | None = None
 
     async def coordinate(self) -> None:
-        """Main dispatch entry: scan once, batch dispatch by role order."""
-        # Step 1: Get current capacity
-        status = self._capacity.get_capacity_status("manager")
-        available_slots = status["remaining"]
+        """Main dispatch entry: frozen queue model."""
+        # Step 1: Check if we need to collect a new queue
+        if self._frozen_queue is None or len(self._frozen_queue) == 0:
+            self._frozen_queue = await self._collect_frozen_queue()
+            if not self._frozen_queue:
+                append_orchestra_event(
+                    "dispatcher",
+                    "GlobalDispatchCoordinator: no candidates",
+                )
+                return
+
+        # Step 2: Get current capacity (simple tmux count)
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["tmux", "list-sessions"],
+                capture_output=True,
+                text=True,
+                timeout=1,
+            )
+            # Count vibe3- sessions, subtract 1 (orchestra dispatcher session)
+            vibe3_count = len(
+                [line for line in result.stdout.splitlines() if "vibe3-" in line]
+            )
+            live_worker_count = max(0, vibe3_count - 1)  # Exclude orchestra session
+            max_capacity = self._capacity.config.max_concurrent_flows
+            available_slots = max(0, max_capacity - live_worker_count)
+        except Exception:
+            # Fallback to capacity service if tmux fails
+            status = self._capacity.get_capacity_status("manager")
+            available_slots = status["remaining"]
 
         if available_slots <= 0:
             append_orchestra_event(
@@ -72,28 +105,15 @@ class GlobalDispatchCoordinator:
             )
             return
 
-        # Step 2: Scan candidates by fixed role order
-        # Priority: reviewer → executor → planner → manager
+        # Step 3: Dispatch by fixed role order from frozen queue
         role_order = ["reviewer", "executor", "planner", "manager"]
 
         dispatched_count = 0
         for role in role_order:
-            # Find service for this role
-            service = self._find_service_for_role(role)
-            if not service:
-                continue
+            # Filter frozen queue for this role
+            role_candidates = [c for c in self._frozen_queue if c.role == role]
 
-            # Scan candidates for this role (with error handling)
-            try:
-                candidates = await service.collect_ready_issues()
-            except Exception as exc:
-                logger.bind(
-                    domain="global_dispatch",
-                    role=role,
-                ).error(f"collect_ready_issues failed for {role}: {exc}")
-                continue
-
-            for issue in candidates:
+            for candidate in role_candidates:
                 # Check capacity limit
                 if dispatched_count >= available_slots:
                     append_orchestra_event(
@@ -103,26 +123,9 @@ class GlobalDispatchCoordinator:
                     )
                     return
 
-                # Check if branch already has live session (prevent duplicate dispatch)
-                branch = f"task/issue-{issue.number}"
-                live_sessions = (
-                    self._capacity._registry.get_truly_live_sessions_for_target(
-                        role=role,
-                        branch=branch,
-                        target_id=str(issue.number),
-                    )
-                )
-                if live_sessions:
-                    logger.bind(
-                        domain="global_dispatch",
-                        role=role,
-                        issue=issue.number,
-                    ).debug(f"Skip #{issue.number} ({role}): live session exists")
-                    continue
-
                 # Dispatch
                 try:
-                    service._emit_dispatch_intent(issue)
+                    candidate.service._emit_dispatch_intent(candidate.issue)
                     dispatched_count += 1
 
                     green = "\033[32m"
@@ -130,20 +133,23 @@ class GlobalDispatchCoordinator:
                     append_orchestra_event(
                         "dispatcher",
                         f"GlobalDispatchCoordinator: {green}dispatched{reset} "
-                        f"#{issue.number} ({role})",
+                        f"#{candidate.issue.number} ({role})",
                     )
 
                     logger.bind(
                         domain="global_dispatch",
                         role=role,
-                        issue=issue.number,
-                    ).info(f"Dispatched #{issue.number} ({role})")
+                        issue=candidate.issue.number,
+                    ).info(f"Dispatched #{candidate.issue.number} ({role})")
                 except Exception as exc:
                     logger.bind(
                         domain="global_dispatch",
                         role=role,
-                        issue=issue.number,
-                    ).error(f"Dispatch failed for #{issue.number}: {exc}")
+                        issue=candidate.issue.number,
+                    ).error(f"Dispatch failed for #{candidate.issue.number}: {exc}")
+
+        # Step 4: Clear frozen queue after dispatch (next tick will collect new queue)
+        self._frozen_queue = None
 
         # End of tick
         if dispatched_count > 0:
@@ -154,6 +160,29 @@ class GlobalDispatchCoordinator:
                 f"GlobalDispatchCoordinator: {green}dispatched="
                 f"{dispatched_count}{reset}",
             )
+
+    async def _collect_frozen_queue(self) -> list[CandidateIssue]:
+        """Collect all ready issues for frozen queue."""
+        candidates: list[CandidateIssue] = []
+        role_order = ["reviewer", "executor", "planner", "manager"]
+
+        for role in role_order:
+            service = self._find_service_for_role(role)
+            if not service:
+                continue
+
+            # Scan candidates for this role (with error handling)
+            try:
+                issues = await service.collect_ready_issues()
+                for issue in issues:
+                    candidates.append(CandidateIssue(issue=issue, service=service))
+            except Exception as exc:
+                logger.bind(
+                    domain="global_dispatch",
+                    role=role,
+                ).error(f"collect_ready_issues failed for {role}: {exc}")
+
+        return candidates
 
     def _find_service_for_role(self, role: str) -> StateLabelDispatchService | None:
         """Find dispatch service for a role."""

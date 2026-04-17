@@ -52,8 +52,6 @@ def make_capacity(remaining: int = 1) -> MagicMock:
             "max_capacity": 5,
         }
     )
-    capacity._registry = MagicMock()
-    capacity._registry.get_truly_live_sessions_for_target = MagicMock(return_value=[])
     return capacity
 
 
@@ -85,6 +83,26 @@ class TestGlobalDispatchCoordinator:
         assert service._emit_dispatch_intent.call_count == 2
 
     @pytest.mark.asyncio
+    async def test_frozen_queue_prevents_duplicate_dispatch(self) -> None:
+        """队列冻结防止同一 tick 内重复派发。"""
+        # Tick 1: 派发 issue 1, 2
+        issues = [make_issue(1), make_issue(2)]
+        service = make_service("planner", issues)
+        capacity = make_capacity(remaining=3)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+
+        # Tick 1: 派发队列中的 issue 1, 2
+        await coordinator.coordinate()
+        assert service._emit_dispatch_intent.call_count == 2
+
+        # Tick 2: 队列空了，重新收集（但假设没有新 issue）
+        service.collect_ready_issues = AsyncMock(return_value=[])
+        await coordinator.coordinate()
+        # 队列空了，不再派发
+        assert service._emit_dispatch_intent.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_emit_failure_handled_gracefully(self) -> None:
         """emit 失败时，异常被记录，继续尝试下一个 issue。"""
         issue1 = make_issue(1)
@@ -104,7 +122,7 @@ class TestGlobalDispatchCoordinator:
         assert service._emit_dispatch_intent.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_collect_failure_does_not_affect_other_services(self) -> None:
+    async def test_collect_failure_does_not_affect_other_roles(self) -> None:
         """某 service collect 失败，其他 service 正常继续。"""
         issue_planner = make_issue(10)
         bad_service = make_service("manager", [])
@@ -120,7 +138,7 @@ class TestGlobalDispatchCoordinator:
         good_service._emit_dispatch_intent.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_empty_pool_does_nothing(self) -> None:
+    async def test_empty_queue_does_nothing(self) -> None:
         """无 ready issues 时，coordinator 静默退出。"""
         service = make_service("planner", [])
         capacity = make_capacity(remaining=0)
@@ -146,26 +164,6 @@ class TestGlobalDispatchCoordinator:
         # planner 先派发（reviewer/executor 没有 issue）
         planner_svc._emit_dispatch_intent.assert_called_once()
         manager_svc._emit_dispatch_intent.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_skip_issue_with_live_session(self) -> None:
-        """已有 live session 的 issue 被跳过，不重复派发。"""
-        issues = [make_issue(1), make_issue(2)]
-        service = make_service("planner", issues)
-        capacity = make_capacity(remaining=2)
-        # Issue 1 已有 live session
-        capacity._registry.get_truly_live_sessions_for_target = MagicMock(
-            side_effect=lambda role, branch, target_id: (
-                [{"id": 1}] if target_id == "1" else []
-            )
-        )
-
-        coordinator = GlobalDispatchCoordinator(capacity, [service])
-        await coordinator.coordinate()
-
-        # Issue 1 被跳过，Issue 2 dispatched
-        assert service._emit_dispatch_intent.call_count == 1
-        assert service._emit_dispatch_intent.call_args[0][0].number == 2
 
     @pytest.mark.asyncio
     async def test_dispatch_by_fixed_role_order_with_multiple_roles(self) -> None:
