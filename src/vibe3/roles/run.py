@@ -136,40 +136,25 @@ def build_run_sync_request(
 def publish_run_command_success(
     *,
     issue_number: int,
-    branch: str,
-    result: object,
+    _branch: str,
+    _result: object,
 ) -> None:
-    """Publish run success lifecycle for command-mode execution."""
-    from vibe3.domain.events import IssueStateChanged, ReportRefRequired
-    from vibe3.domain.publisher import publish
+    """Record run command success. State transitions are the agent's responsibility.
 
-    handoff_file = None
-    if isinstance(result, CodeagentResult):
-        handoff_file = result.handoff_file
+    The agent receives run_task / output_format from settings.yaml (via
+    build_run_standard_sections), which includes the instruction to change
+    issue label to state/handoff. Code layer MUST NOT auto-transition state
+    (noop-gate-boundary-standard).
+    """
+    from loguru import logger as _logger
 
-    if handoff_file:
-        publish(
-            IssueStateChanged(
-                issue_number=issue_number,
-                from_state=None,
-                to_state=IssueState.HANDOFF.value,
-                actor="agent:run",
-            )
-        )
-        return
-
-    publish(
-        ReportRefRequired(
-            issue_number=issue_number,
-            branch=branch,
-            ref_name="report_ref",
-            reason=(
-                "executor output artifact was saved, but no authoritative "
-                "report_ref was registered. Write a canonical report "
-                "document and run handoff report."
-            ),
-            actor="agent:run",
-        )
+    _logger.bind(
+        domain="run",
+        event="run_command_success",
+        issue=issue_number,
+    ).info(
+        "Run command completed successfully. "
+        "Agent should handle state transition via run_task instructions."
     )
 
 
@@ -427,8 +412,8 @@ def execute_manual_run(
         if result.success:
             publish_run_command_success(
                 issue_number=issue_number,
-                branch=branch,
-                result=result,
+                _branch=branch,
+                _result=result,
             )
         else:
             publish_run_command_failure(

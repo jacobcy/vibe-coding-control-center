@@ -22,9 +22,13 @@ from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import (
     block_executor_noop_issue,
+    block_manager_noop_issue,
     block_planner_noop_issue,
     block_reviewer_noop_issue,
     fail_executor_issue,
+    fail_manager_issue,
+    fail_planner_issue,
+    fail_reviewer_issue,
 )
 from vibe3.services.label_service import LabelService
 
@@ -102,19 +106,38 @@ def handle_issue_state_changed(event: IssueStateChanged) -> None:
     )
 
 
+_ROLE_FAIL_DISPATCH: dict[str, Callable[..., None]] = {
+    "planner": fail_planner_issue,
+    "executor": fail_executor_issue,
+    "reviewer": fail_reviewer_issue,
+    "manager": fail_manager_issue,
+}
+
+_ROLE_BLOCK_DISPATCH: dict[str, Callable[..., None]] = {
+    "planner": block_planner_noop_issue,
+    "executor": block_executor_noop_issue,
+    "reviewer": block_reviewer_noop_issue,
+    "manager": block_manager_noop_issue,
+}
+
+
 def handle_issue_failed(event: IssueFailed) -> None:
     """Handle IssueFailed event.
 
-    Marks the issue as failed via IssueFailureService.
+    Routes to role-specific failure handler based on event.role field.
+    Falls back to executor for backward compatibility.
     """
+    role = event.role or "executor"
     logger.bind(
         domain="events",
         event="issue_failed",
         issue=event.issue_number,
+        role=role,
         reason=event.reason,
     ).info("Handling IssueFailed")
 
-    fail_executor_issue(
+    fail_func = _ROLE_FAIL_DISPATCH.get(role, fail_executor_issue)
+    fail_func(
         issue_number=event.issue_number,
         reason=event.reason,
         actor=event.actor,
@@ -124,19 +147,24 @@ def handle_issue_failed(event: IssueFailed) -> None:
 def handle_issue_blocked(event: IssueBlocked) -> None:
     """Handle IssueBlocked event.
 
-    Blocks the issue via IssueFailureService.
+    Routes to role-specific block handler based on event.role field.
+    Falls back to executor for backward compatibility.
     """
+    role = event.role or "executor"
     logger.bind(
         domain="events",
         event="issue_blocked",
         issue=event.issue_number,
+        role=role,
         reason=event.reason,
     ).info("Handling IssueBlocked")
 
-    block_executor_noop_issue(
+    block_func = _ROLE_BLOCK_DISPATCH.get(role, block_executor_noop_issue)
+    block_func(
         issue_number=event.issue_number,
         reason=event.reason,
         actor=event.actor,
+        repo=None,
     )
 
 

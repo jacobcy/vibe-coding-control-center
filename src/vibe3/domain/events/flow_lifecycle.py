@@ -35,12 +35,13 @@ class IssueStateChanged(DomainEvent):
 class IssueFailed(DomainEvent):
     """Issue failure event.
 
-    Published when an executor/supervisor fails.
+    Published when a role (executor/planner/reviewer/manager) fails.
     """
 
     issue_number: int
     reason: str
     actor: str = "system"
+    role: str | None = None
     timestamp: str | None = None
 
 
@@ -54,6 +55,7 @@ class IssueBlocked(DomainEvent):
     issue_number: int
     reason: str
     actor: str = "system"
+    role: str | None = None
     timestamp: str | None = None
 
 

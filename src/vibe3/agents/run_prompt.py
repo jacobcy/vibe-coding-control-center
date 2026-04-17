@@ -13,14 +13,7 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
-from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
-from vibe3.prompts.models import (
-    PromptRecipe,
-    PromptVariableSource,
-    VariableSourceKind,
-)
-from vibe3.prompts.provider_registry import ProviderRegistry
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -63,6 +56,39 @@ no matter what. Do not include this section in your response until the very end.
 """
 
 
+def build_run_standard_sections(config: VibeConfig) -> list[str]:
+    """Run role-level hard-standard sections. All run paths must include these.
+
+    Includes: policy_file, common_rules, run_task, output_format.
+    Does NOT include path-specific content (plan, audit, skill).
+    """
+    from vibe3.agents.review_prompt import build_tools_guide_section
+
+    sections: list[str] = []
+    run_config = getattr(config, "run", None)
+
+    # Policy file
+    if run_config and hasattr(run_config, "policy_file"):
+        policy_path = run_config.policy_file
+        if policy_path and Path(policy_path).exists():
+            sections.append(Path(policy_path).read_text(encoding="utf-8"))
+
+    # Common rules (shared conventions)
+    tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
+    if tools_guide:
+        sections.append(tools_guide)
+
+    # Run task (hard standard: includes label-writing instruction)
+    run_task = getattr(run_config, "run_task", None) if run_config else None
+    sections.append(build_run_task_section(run_task))
+
+    # Output format (hard standard)
+    output_format = getattr(run_config, "output_format", None) if run_config else None
+    sections.append(build_run_output_contract_section(output_format))
+
+    return sections
+
+
 def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
@@ -103,18 +129,6 @@ def build_run_prompt_body(
 
     sections: list[str] = []
 
-    run_config = getattr(config, "run", None)
-    if run_config and hasattr(run_config, "policy_file"):
-        policy_path = run_config.policy_file
-        if policy_path and Path(policy_path).exists():
-            sections.append(Path(policy_path).read_text(encoding="utf-8"))
-
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
-    tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
-    if tools_guide:
-        sections.append(tools_guide)
-
     if plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
 
@@ -127,11 +141,8 @@ def build_run_prompt_body(
             f"{audit_content}"
         )
 
-    run_task = getattr(run_config, "run_task", None) if run_config else None
-    sections.append(build_run_task_section(run_task))
-
-    output_format = getattr(run_config, "output_format", None) if run_config else None
-    sections.append(build_run_output_contract_section(output_format))
+    # Run role hard-standard sections (shared with all run paths)
+    sections.extend(build_run_standard_sections(config))
 
     body = "\n\n---\n\n".join(sections)
     log.bind(body_len=len(body), retry=retry).success("Run prompt body built")
@@ -160,22 +171,24 @@ def make_run_context_builder(
 
 def make_skill_context_builder(
     skill_content: str,
+    config: VibeConfig | None = None,
     prompts_path: Path | None = None,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for skill execution mode.
 
-    The returned callable routes through PromptAssembler with template key
-    ``run.skill`` and a LITERAL source for ``skill_content``.
+    Uses build_run_standard_sections() so the skill agent receives the same
+    role-level hard standards (run_task, output_format, policy, common_rules)
+    as the normal run path.
     """
-    recipe = PromptRecipe(
+    cfg = config or VibeConfig.get_defaults()
+
+    def build() -> str:
+        all_sections = [skill_content] + build_run_standard_sections(cfg)
+        return "\n\n---\n\n".join(s for s in all_sections if s)
+
+    return make_context_builder(
         template_key="run.skill",
-        variables={
-            "skill_content": PromptVariableSource(
-                kind=VariableSourceKind.LITERAL,
-                value=skill_content,
-            )
-        },
+        body_provider_key="run.context",
+        body_fn=build,
+        prompts_path=prompts_path,
     )
-    registry = ProviderRegistry()
-    assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
-    return PromptContextBuilder(assembler, recipe)
