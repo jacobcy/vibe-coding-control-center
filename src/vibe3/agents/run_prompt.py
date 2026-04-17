@@ -1,9 +1,9 @@
 """Run context builder - assemble prompt body for execution agent.
 
 Public API:
-- ``build_run_prompt_body(plan_file, config)`` - assemble the full prompt string
-- ``make_run_context_builder(plan_file, config)`` - PromptContextBuilder (via assembler)
-- ``make_skill_context_builder(skill_content)`` - PromptContextBuilder for skill mode
+- ``build_run_prompt_body(plan_file, config, audit_file)``
+- ``make_run_context_builder(plan_file, config, prompts_path, audit_file)``
+- ``make_skill_context_builder(skill_content)``
 """
 
 from __future__ import annotations
@@ -13,14 +13,7 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
-from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
-from vibe3.prompts.models import (
-    PromptRecipe,
-    PromptVariableSource,
-    VariableSourceKind,
-)
-from vibe3.prompts.provider_registry import ProviderRegistry
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -63,15 +56,52 @@ no matter what. Do not include this section in your response until the very end.
 """
 
 
+def build_run_standard_sections(config: VibeConfig) -> list[str]:
+    """Run role-level hard-standard sections. All run paths must include these.
+
+    Includes: policy_file, common_rules, run_task, output_format.
+    Does NOT include path-specific content (plan, audit, skill).
+    """
+    from vibe3.agents.review_prompt import build_tools_guide_section
+
+    sections: list[str] = []
+    run_config = getattr(config, "run", None)
+
+    # Policy file
+    if run_config and hasattr(run_config, "policy_file"):
+        policy_path = run_config.policy_file
+        if policy_path and Path(policy_path).exists():
+            sections.append(Path(policy_path).read_text(encoding="utf-8"))
+
+    # Common rules (shared conventions)
+    tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
+    if tools_guide:
+        sections.append(tools_guide)
+
+    # Run task (hard standard: includes label-writing instruction)
+    run_task = getattr(run_config, "run_task", None) if run_config else None
+    sections.append(build_run_task_section(run_task))
+
+    # Output format (hard standard)
+    output_format = getattr(run_config, "output_format", None) if run_config else None
+    sections.append(build_run_output_contract_section(output_format))
+
+    return sections
+
+
 def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
+    audit_file: str | None = None,
 ) -> str:
     """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
     Args:
         plan_file: Path to plan file (markdown), or None for lightweight mode.
         config: VibeConfig instance.
+        audit_file: Path to previous review audit file. When provided, the run
+            is a retry — review feedback is injected into the prompt so the
+            executor addresses the issues found by the reviewer.
 
     Returns:
         Assembled prompt body string.
@@ -80,7 +110,8 @@ def build_run_prompt_body(
         config = VibeConfig.get_defaults()
 
     log = logger.bind(domain="run_context_builder", action="build_run_prompt_body")
-    log.info("Building run prompt body")
+    retry = bool(audit_file)
+    log.info(f"Building run prompt body (retry={retry})")
 
     plan_content = None
     if plan_file:
@@ -88,31 +119,33 @@ def build_run_prompt_body(
             raise FileNotFoundError(f"Plan file not found: {plan_file}")
         plan_content = Path(plan_file).read_text(encoding="utf-8")
 
+    audit_content: str | None = None
+    if audit_file:
+        audit_path = Path(audit_file)
+        if audit_path.exists():
+            audit_content = audit_path.read_text(encoding="utf-8")
+        else:
+            log.warning(f"Audit file not found: {audit_file}")
+
     sections: list[str] = []
-
-    run_config = getattr(config, "run", None)
-    if run_config and hasattr(run_config, "policy_file"):
-        policy_path = run_config.policy_file
-        if policy_path and Path(policy_path).exists():
-            sections.append(Path(policy_path).read_text(encoding="utf-8"))
-
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
-    tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
-    if tools_guide:
-        sections.append(tools_guide)
 
     if plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
 
-    run_task = getattr(run_config, "run_task", None) if run_config else None
-    sections.append(build_run_task_section(run_task))
+    # Retry mode: inject review feedback so executor addresses prior issues
+    if audit_content:
+        sections.append(
+            "## Previous Review Feedback (RETRY)\n\n"
+            "The previous implementation was reviewed and issues were found. "
+            "You MUST address the feedback below before producing new output.\n\n"
+            f"{audit_content}"
+        )
 
-    output_format = getattr(run_config, "output_format", None) if run_config else None
-    sections.append(build_run_output_contract_section(output_format))
+    # Run role hard-standard sections (shared with all run paths)
+    sections.extend(build_run_standard_sections(config))
 
     body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body)).success("Run prompt body built")
+    log.bind(body_len=len(body), retry=retry).success("Run prompt body built")
     return body
 
 
@@ -120,6 +153,7 @@ def make_run_context_builder(
     plan_file: str | None,
     config: VibeConfig | None = None,
     prompts_path: Path | None = None,
+    audit_file: str | None = None,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for plan/flow_plan/lightweight run mode.
 
@@ -130,29 +164,31 @@ def make_run_context_builder(
     return make_context_builder(
         template_key="run.plan",
         body_provider_key="run.context",
-        body_fn=lambda: build_run_prompt_body(plan_file, cfg),
+        body_fn=lambda: build_run_prompt_body(plan_file, cfg, audit_file),
         prompts_path=prompts_path,
     )
 
 
 def make_skill_context_builder(
     skill_content: str,
+    config: VibeConfig | None = None,
     prompts_path: Path | None = None,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for skill execution mode.
 
-    The returned callable routes through PromptAssembler with template key
-    ``run.skill`` and a LITERAL source for ``skill_content``.
+    Uses build_run_standard_sections() so the skill agent receives the same
+    role-level hard standards (run_task, output_format, policy, common_rules)
+    as the normal run path.
     """
-    recipe = PromptRecipe(
+    cfg = config or VibeConfig.get_defaults()
+
+    def build() -> str:
+        all_sections = [skill_content] + build_run_standard_sections(cfg)
+        return "\n\n---\n\n".join(s for s in all_sections if s)
+
+    return make_context_builder(
         template_key="run.skill",
-        variables={
-            "skill_content": PromptVariableSource(
-                kind=VariableSourceKind.LITERAL,
-                value=skill_content,
-            )
-        },
+        body_provider_key="run.context",
+        body_fn=build,
+        prompts_path=prompts_path,
     )
-    registry = ProviderRegistry()
-    assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
-    return PromptContextBuilder(assembler, recipe)

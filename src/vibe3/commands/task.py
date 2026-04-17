@@ -8,6 +8,7 @@ from typing import Annotated, Any, Iterator
 import typer
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
@@ -199,13 +200,29 @@ def resume(
         bool, typer.Option("--failed", help="Resume all failed issues")
     ] = False,
     blocked: Annotated[
-        bool, typer.Option("--blocked", help="Resume all stale blocked issues")
+        bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
     all_tasks: Annotated[
         bool,
         typer.Option(
             "--all",
             help="Reset all auto-created task/issue-* scenes and resume from ready",
+        ),
+    ] = False,
+    label: Annotated[
+        bool,
+        typer.Option(
+            "--label",
+            help="Clear blocked_reason/failed_reason and restore to handoff "
+            "state (no worktree deletion)",
+        ),
+    ] = False,
+    label_ready: Annotated[
+        bool,
+        typer.Option(
+            "--label-ready",
+            help="Clear blocked_reason/failed_reason and restore to ready "
+            "state (no worktree deletion)",
         ),
     ] = False,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
@@ -218,8 +235,19 @@ def resume(
     """Resume failed or blocked issues to ready.
 
     Use --failed to resume all failed issues, --blocked to resume all
-    stale blocked issues, or --all to reset every auto-created task/issue-*
+    blocked issues, or --all to reset every auto-created task/issue-*
     scene back to ready. Or specify issue numbers directly.
+
+    **Label-only mode (no worktree deletion)**:
+    Use --label to clear blocked_reason/failed_reason and restore to
+    handoff state WITHOUT deleting worktree/branch.
+    Use --label-ready to restore to ready state WITHOUT deletion.
+    Without these flags, the original behavior deletes worktree/branch.
+
+    Examples:
+        vibe3 task resume 303 --label -y         # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label-ready -y   # Restore to ready, keep worktree
+        vibe3 task resume 303 -y                 # Delete worktree/branch (original)
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -250,6 +278,19 @@ def resume(
         )
         raise typer.Exit(1)
 
+    # Resolve label state from bool flags
+    if label and label_ready:
+        typer.echo(
+            "Error: Cannot specify both --label and --label-ready",
+            err=True,
+        )
+        raise typer.Exit(1)
+    effective_label: str | None = None
+    if label_ready:
+        effective_label = "ready"
+    elif label:
+        effective_label = "handoff"
+
     target_issues: list[int] | None
     candidate_mode = "resumable"
     if has_flag:
@@ -262,6 +303,8 @@ def resume(
 
     usecase = _build_resume_usecase()
     flow_service = FlowService()
+
+    # Fetch all flows for candidate building
     resume_flows = (
         flow_service.list_flows(status=None)
         if candidate_mode == "all_task"
@@ -271,37 +314,51 @@ def resume(
     if candidate_mode != "all_task":
         stale_flows = flow_service.list_flows(status="stale")
 
-        if has_flag and candidate_mode == "resumable":
-            candidates = usecase.status_service.fetch_resume_candidates(
-                flows=resume_flows,
-                stale_flows=stale_flows,
-            )
-            if failed:
-                candidates = [c for c in candidates if c.get("resume_kind") == "failed"]
-            else:
-                candidates = [
-                    c for c in candidates if c.get("resume_kind") == "blocked"
-                ]
-            target_issues = [
-                num
-                for candidate in candidates
-                if isinstance((num := candidate.get("number")), int)
-            ]
-            if not target_issues:
-                if failed:
-                    typer.echo("No failed issues found.")
-                else:
-                    typer.echo("No stale blocked issues found.")
-                return
+    # Handle --failed/--blocked filtering by state label
+    if has_flag and candidate_mode == "resumable":
+        # Fetch all orchestrated issues (not just stale)
+        all_issues = usecase.status_service.fetch_orchestrated_issues(
+            flows=resume_flows,
+            queued_set=set(),
+            stale_flows=stale_flows,
+        )
 
-    result = usecase.resume_issues(
-        issue_numbers=target_issues,
-        reason=reason,
-        dry_run=not yes,
-        flows=resume_flows,
-        stale_flows=stale_flows,
-        candidate_mode=candidate_mode,
-    )
+        # Filter by state label
+        target_state = IssueState.FAILED if failed else IssueState.BLOCKED
+
+        # Extract issue numbers matching target state
+        issue_numbers = [
+            num
+            for issue in all_issues
+            if issue.get("state") == target_state
+            and isinstance((num := issue.get("number")), int)
+        ]
+
+        if not issue_numbers:
+            state_name = "failed" if failed else "blocked"
+            typer.echo(f"No {state_name} issues found.")
+            return
+
+        result = usecase.resume_issues(
+            issue_numbers=issue_numbers,
+            reason=reason,
+            dry_run=not yes,
+            flows=resume_flows,
+            stale_flows=stale_flows,
+            candidate_mode=candidate_mode,
+            label_state=effective_label,
+        )
+    else:
+        # Original logic for --all or explicit issue numbers
+        result = usecase.resume_issues(
+            issue_numbers=target_issues,
+            reason=reason,
+            dry_run=not yes,
+            flows=resume_flows,
+            stale_flows=stale_flows,
+            candidate_mode=candidate_mode,
+            label_state=effective_label,
+        )
 
     if not yes and has_flag and not result.get("candidates"):
         if all_tasks:
@@ -309,7 +366,7 @@ def resume(
         elif failed:
             typer.echo("No failed issues found.")
         else:
-            typer.echo("No stale blocked issues found.")
+            typer.echo("No blocked issues found.")
         return
 
     if json_output:
@@ -324,8 +381,8 @@ def resume(
                 elif failed:
                     typer.echo(f"Found {candidate_count} failed issue(s)")
                 else:
-                    typer.echo(f"Found {candidate_count} stale blocked issue(s)")
-            typer.echo("\n[dry-run mode] Would resume the following issues:")
+                    typer.echo(f"Found {candidate_count} blocked issue(s)")
+                typer.echo("\n[dry-run mode] Would resume the following issues:")
             if "candidates" in result:
                 for candidate in result["candidates"]:
                     num = candidate.get("number")

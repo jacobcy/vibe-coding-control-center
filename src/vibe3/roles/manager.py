@@ -292,9 +292,9 @@ def handle_manager_post_sync(
     Checking agent artifacts (plan_ref, report_ref, audit_ref, pr_ref) is NOT
     manager's job - each agent checks its own output via build_required_ref_sync_spec:
 
-    - planner checks plan_ref before calling success_handler (confirm_plan_handoff)
-    - executor checks report_ref before calling success_handler (confirm_run_handoff)
-    - reviewer checks audit_ref before calling success_handler (confirm_review_handoff)
+    - planner checks plan_ref, blocks if missing (no automatic state transition)
+    - executor checks report_ref, blocks if missing (no automatic state transition)
+    - reviewer checks audit_ref, blocks if missing (no automatic state transition)
 
     Manager checking these refs has a timing bug: manager just transitioned the state
     (e.g., handoff -> in-progress) and immediately checks the ref that the next agent
@@ -303,6 +303,38 @@ def handle_manager_post_sync(
     The correct check happens in each agent's apply_required_ref_post_sync, which runs
     right after that agent completes and has the ref available.
     """
+
+    # Record state transition if it occurred
+    from vibe3.utils.constants import (
+        EVENT_STATE_TRANSITIONED,
+        EVENT_STATE_UNCHANGED,
+    )
+
+    before_state = before_snapshot.get("state_label")
+    after_state = after_snapshot.get("state_label")
+    if before_state != after_state:
+        store.add_event(
+            branch,
+            EVENT_STATE_TRANSITIONED,
+            actor,
+            detail=f"State changed: {before_state} → {after_state}",
+            refs={
+                "before_state": str(before_state or ""),
+                "after_state": str(after_state or ""),
+                "issue": str(issue_number),
+            },
+        )
+    else:
+        store.add_event(
+            branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=f"State unchanged after manager: still {before_state}",
+            refs={
+                "state": str(before_state or ""),
+                "issue": str(issue_number),
+            },
+        )
 
     # Check if issue was closed during execution
     if handle_closed_issue_post_run(

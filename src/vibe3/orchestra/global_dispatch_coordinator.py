@@ -81,21 +81,26 @@ class GlobalDispatchCoordinator:
         # 注意：不同角色的 issue 在 pipeline 不同阶段，不直接竞争
         # 排序目的是：同一角色内按优先级选出最重要的先 dispatch
         sorted_ready = self._sort_with_role(all_ready)
+        gated_ready = self._gate_to_frontier_stage(sorted_ready)
 
         # Step 3: 顺序尝试 dispatch（asyncio 单线程，check-mark-emit 天然原子）
         dispatched_count = 0
         skipped_count = 0
-        for item in sorted_ready:
+        for item in gated_ready:
             dispatched = self._try_dispatch(item)
             if dispatched:
                 dispatched_count += 1
             else:
                 skipped_count += 1
 
+        # ANSI colors: green for dispatched, yellow for skipped
+        green = "\033[32m"
+        yellow = "\033[33m"
+        reset = "\033[0m"
         append_orchestra_event(
             "dispatcher",
-            f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
-            f"skipped={skipped_count} (capacity full)",
+            f"GlobalDispatchCoordinator: {green}dispatched={dispatched_count}{reset} "
+            f"{yellow}skipped={skipped_count}{reset} (capacity full)",
         )
 
     async def _collect_all(
@@ -136,10 +141,7 @@ class GlobalDispatchCoordinator:
 
         def sort_key(item: ReadyIssueWithRole) -> tuple[int, int, int, int, int]:
             # Pipeline stage: lower = higher dispatch priority
-            trigger_name = item.service.role_def.trigger_name
-            trigger_state = item.service.role_def.trigger_state.value
-            stage_tag = f"{trigger_name}:{trigger_state}"
-            stage = PIPELINE_STAGE_ORDER.get(stage_tag, PIPELINE_STAGE_DEFAULT)
+            stage = self._stage_order(item)
 
             # Within the same stage, reuse existing issue-level ordering
             issue = item.issue
@@ -153,6 +155,33 @@ class GlobalDispatchCoordinator:
             return (stage, milestone_rank, roadmap_rank, -priority, issue.number)
 
         return sorted(items, key=sort_key)
+
+    def _gate_to_frontier_stage(
+        self, items: list[ReadyIssueWithRole]
+    ) -> list[ReadyIssueWithRole]:
+        """Keep only the deepest pipeline stage in the current ready queue."""
+        if not items:
+            return items
+
+        frontier_stage = min(self._stage_order(item) for item in items)
+        gated = [item for item in items if self._stage_order(item) == frontier_stage]
+
+        if len(gated) != len(items):
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: stage gate active "
+                f"(frontier={frontier_stage}, admitted={len(gated)}, "
+                f"deferred={len(items) - len(gated)})",
+                level="DEBUG",
+            )
+        return gated
+
+    def _stage_order(self, item: ReadyIssueWithRole) -> int:
+        """Resolve pipeline stage order for a ready item."""
+        trigger_name = item.service.role_def.trigger_name
+        trigger_state = item.service.role_def.trigger_state.value
+        stage_tag = f"{trigger_name}:{trigger_state}"
+        return PIPELINE_STAGE_ORDER.get(stage_tag, PIPELINE_STAGE_DEFAULT)
 
     def _try_dispatch(self, item: ReadyIssueWithRole) -> bool:
         """容量检查 → 标记 in_flight → emit dispatch_intent。
@@ -201,9 +230,15 @@ class GlobalDispatchCoordinator:
 
         try:
             item.service._emit_dispatch_intent(item.issue)
+            # ANSI colors: green for dispatched success
+            green = "\033[32m"
+            reset = "\033[0m"
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: dispatched #{issue_id} ({role})",
+                (
+                    f"GlobalDispatchCoordinator: "
+                    f"{green}dispatched{reset} #{issue_id} ({role})"
+                ),
             )
             logger.bind(
                 domain="global_dispatch",

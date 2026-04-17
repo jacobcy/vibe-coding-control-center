@@ -89,8 +89,6 @@ def append_orchestra_run_separator(
 
 
 def append_governance_event(message: str, *, repo_root: Path | None = None) -> Path:
-    if os.environ.get("VIBE3_ORCHESTRA_EVENT_LOG") != "1":
-        return governance_events_log_path(repo_root)
     path = governance_events_log_path(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
     with path.open("a", encoding="utf-8") as handle:

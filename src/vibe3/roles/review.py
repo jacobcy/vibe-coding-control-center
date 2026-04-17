@@ -46,7 +46,6 @@ from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import (
     block_reviewer_noop_issue,
-    confirm_review_handoff,
     fail_reviewer_issue,
 )
 
@@ -187,9 +186,36 @@ def publish_review_command_failure(
     )
 
 
-def _confirm_review_handoff_wrapper(*, issue_number: int, actor: str) -> None:
-    """Wrapper for confirm_review_handoff that discards the return value."""
-    confirm_review_handoff(issue_number=issue_number, actor=actor)
+def _process_review_sync_result(
+    *, issue_number: int, branch: str, actor: str, stdout: str
+) -> None:
+    """Process sync review output and write audit_ref to flow_state.
+
+    This callback is invoked after sync execution completes but before
+    the after snapshot is taken, allowing the review output to be parsed
+    and audit_ref written before the required_ref gate check.
+    """
+    from vibe3.utils.constants import VERDICT_UNKNOWN
+
+    # Parse verdict from stdout (fallback to UNKNOWN if parse fails)
+    try:
+        review = parse_codex_review(stdout)
+        verdict = review.verdict
+    except ReviewParserError:
+        verdict = VERDICT_UNKNOWN
+
+    # Create audit artifact and write audit_ref
+    audit_ref = _resolve_authoritative_audit_ref(
+        None,  # No handoff_file in sync mode
+        stdout,
+        verdict,
+        branch,
+    )
+    _build_handoff_service(branch).record_audit(
+        audit_ref=audit_ref,
+        actor=actor,
+        verdict=verdict,
+    )
 
 
 REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
@@ -209,8 +235,10 @@ REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
         issue_number=issue_number,
         reason=reason,
     ),
-    # Advance state: REVIEW → HANDOFF after audit_ref produced.
-    success_handler=_confirm_review_handoff_wrapper,
+    # No success_handler: state transitions are managed by the agent.
+    # The no-op gate blocks if audit_ref exists but state unchanged.
+    # Write audit_ref from stdout before snapshot.
+    process_sync_result=_process_review_sync_result,
 )
 
 
@@ -245,10 +273,10 @@ def _create_minimal_audit_artifact(
     verdict: str,
     branch: str | None,
 ) -> Path:
-    handoff_service = _build_handoff_service(branch)
-    handoff_dir = handoff_service.ensure_handoff_dir()
+    artifact_dir = _resolve_minimal_audit_dir(branch)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    artifact_path = handoff_dir / f"audit-auto-{timestamp}.md"
+    branch_slug = (branch or "detached").replace("/", "-")
+    artifact_path = artifact_dir / f"{branch_slug}-audit-auto-{timestamp}.md"
     sanitized_content = sanitize_handoff_content(content)
     artifact_path.write_text(
         "# Minimal Review Audit\n\n"
@@ -258,6 +286,28 @@ def _create_minimal_audit_artifact(
         encoding="utf-8",
     )
     return artifact_path
+
+
+def _resolve_minimal_audit_dir(branch: str | None) -> Path:
+    """Prefer a readable worktree-local docs/reports directory for audit output."""
+    git = GitClient()
+    worktree_root: Path | None = None
+
+    if branch:
+        worktree_root = git.find_worktree_path_for_branch(branch)
+
+    if worktree_root is None:
+        current_root = git.get_worktree_root()
+        if current_root:
+            worktree_root = Path(current_root)
+
+    if worktree_root is not None:
+        reports_dir = worktree_root / "docs" / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        return reports_dir
+
+    handoff_service = _build_handoff_service(branch)
+    return handoff_service.ensure_handoff_dir()
 
 
 def _resolve_authoritative_audit_ref(
@@ -380,44 +430,41 @@ def execute_manual_review(
     if dry_run:
         return ReviewRunResult("DRY_RUN", None, issue_number)
 
+    # 增加容错性：即使 parser 失败也写入 audit_ref
+    from vibe3.utils.constants import VERDICT_UNKNOWN
+
     try:
         review = review_parser(result.stdout)
-        audit_ref = _resolve_authoritative_audit_ref(
-            str(result.handoff_file) if result.handoff_file else None,
-            result.stdout,
-            review.verdict,
-            branch,
-        )
-        flow = service.get_flow_status(branch) if branch else None
-        if flow is not None and branch is not None:
-            _build_handoff_service(branch).record_audit(
-                audit_ref=audit_ref,
-                actor="agent:review",
-            )
-            publish_review_command_success(
-                issue_number=issue_number,
-                branch=branch,
-                verdict=review.verdict,
-            )
-        return ReviewRunResult(review.verdict, audit_ref, issue_number)
+        verdict = review.verdict
     except ReviewParserError as err:
-        logger.bind(domain="review").error(f"Failed to parse review output: {err}")
-        error_audit_ref = _resolve_error_audit_ref(
-            str(result.handoff_file) if result.handoff_file else None,
-            result.stdout,
-            branch,
+        # Parser 失败时，verdict 为空，交给 manager 判断
+        logger.bind(domain="review").warning(
+            f"Failed to parse review output, using verdict=UNKNOWN: {err}"
         )
-        flow = service.get_flow_status(branch) if branch else None
-        if flow is not None and branch is not None:
-            _build_handoff_service(branch).record_audit(
-                audit_ref=error_audit_ref,
-                actor="agent:review",
-            )
-        publish_review_command_failure(
+        verdict = VERDICT_UNKNOWN
+
+    # 无论 parser 是否成功，只要有输出就写入 audit_ref
+    audit_ref = _resolve_authoritative_audit_ref(
+        str(result.handoff_file) if result.handoff_file else None,
+        result.stdout,  # ← 直接使用原始输出
+        verdict,
+        branch,
+    )
+
+    flow = service.get_flow_status(branch) if branch else None
+    if flow is not None and branch is not None:
+        _build_handoff_service(branch).record_audit(
+            audit_ref=audit_ref,
+            actor="agent:review",
+            verdict=verdict,
+        )
+        publish_review_command_success(
             issue_number=issue_number,
-            reason=f"review parse failed: {err}",
+            branch=branch,
+            verdict=verdict,  # ← 使用实际或 UNKNOWN verdict
         )
-        return ReviewRunResult("ERROR", error_audit_ref, issue_number)
+
+    return ReviewRunResult(verdict, audit_ref, issue_number)
 
 
 def _dispatch_async_manual_review(

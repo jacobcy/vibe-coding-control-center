@@ -296,6 +296,7 @@ class HandoffService:
         next_step: str | None,
         blocked_by: str | None,
         actor: str | None,
+        verdict: str | None = None,
     ) -> Path:
         """Internal helper to record a handoff reference.
 
@@ -305,6 +306,7 @@ class HandoffService:
             next_step: Optional next step suggestion
             blocked_by: Optional blocker description
             actor: Optional explicit actor identifier
+            verdict: Optional review verdict (observational, e.g. PASS/FAIL/UNKNOWN)
 
         Returns:
             Path to the current.md file
@@ -335,6 +337,8 @@ class HandoffService:
             flow_updates["next_step"] = next_step
         if blocked_by:
             flow_updates["blocked_by"] = blocked_by
+        if verdict:
+            flow_updates["verdict"] = verdict
 
         # 3. Build the update block content.
         message = f"Recorded {ref_kind} reference: {ref_value}"
@@ -344,17 +348,20 @@ class HandoffService:
             message += f"\nBlocked By: {blocked_by}"
 
         # 4. Record event in SQLite
+        event_refs: dict[str, str | None] = {
+            "ref": ref_value,
+            "kind": ref_kind.lower(),
+            "next_step": next_step,
+            "blocked_by": blocked_by,
+        }
+        if verdict:
+            event_refs["verdict"] = verdict
         self.store.add_event(
             branch=branch,
             event_type=f"handoff_{ref_kind.lower()}",
             actor=effective_actor,
             detail=message,
-            refs={
-                "ref": ref_value,
-                "kind": ref_kind.lower(),
-                "next_step": next_step,
-                "blocked_by": blocked_by,
-            },
+            refs=event_refs,
         )
 
         # 5. Persist flow state after event persistence succeeds.
@@ -405,9 +412,12 @@ class HandoffService:
         next_step: str | None = None,
         blocked_by: str | None = None,
         actor: str | None = None,
+        verdict: str | None = None,
     ) -> Path:
         """Record audit handoff reference."""
-        return self._record_ref("audit", audit_ref, next_step, blocked_by, actor)
+        return self._record_ref(
+            "audit", audit_ref, next_step, blocked_by, actor, verdict=verdict
+        )
 
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.

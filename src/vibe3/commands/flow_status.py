@@ -227,14 +227,39 @@ def status(
             typer.echo("No active flows")
             raise typer.Exit(0)
 
-        # Use projection service to fetch issue titles
+        # Try to fetch cached issue titles from orchestra server first
+        from vibe3.models.orchestra_config import OrchestraConfig
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        config = OrchestraConfig.from_settings()
+        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+
+        # Use projection service to fetch issue titles (fallback if server not running)
         projection_service = FlowProjectionService()
         issue_numbers = set()
         for flow in flows:
             if flow.task_issue_number:
                 issue_numbers.add(flow.task_issue_number)
 
-        titles, net_err = projection_service.get_issue_titles(list(issue_numbers))
+        # Prefer cached titles from orchestra server
+        titles: dict[int, str] = {}
+        net_err = False
+        if orch_snapshot and orch_snapshot.server_running:
+            # Extract cached titles from server snapshot
+            for entry in orch_snapshot.active_issues:
+                if entry.number in issue_numbers:
+                    titles[entry.number] = entry.title
+            # Check if we got all titles
+            missing = issue_numbers - set(titles.keys())
+            if missing:
+                # Fetch missing titles from GitHub API
+                extra_titles, net_err = projection_service.get_issue_titles(
+                    list(missing)
+                )
+                titles.update(extra_titles)
+        else:
+            # Server not running, fetch from GitHub API
+            titles, net_err = projection_service.get_issue_titles(list(issue_numbers))
 
         # Build PR and worktree maps via projection service
         pr_map: dict[str, dict[str, object]] = {}

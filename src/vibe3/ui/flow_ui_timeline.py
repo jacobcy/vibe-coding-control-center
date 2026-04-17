@@ -33,6 +33,11 @@ _EVENT_COLOR: dict[str, str] = {
     "reviewer_started": "yellow",
     "reviewer_completed": "green",
     "reviewer_aborted": "red",
+    "state_transitioned": "cyan bold",
+    "state_unchanged": "yellow",
+    "blocked": "red bold",
+    "failed": "red bold",
+    "resumed": "green bold",
     "handoff_plan": "blue",
     "handoff_run": "blue",
     "handoff_review": "magenta",
@@ -127,6 +132,15 @@ def render_flow_timeline(
     console.print(f"    [dim]plan:[/]    {plan_actor}")
     console.print(f"    [dim]run:[/]     {run_actor}")
     console.print(f"    [dim]review:[/]  {review_actor}")
+
+    # Show blocked/failed reasons if present
+    if state.blocked_reason:
+        console.print()
+        console.print(f"  [red bold]blocked_reason:[/] [red]{state.blocked_reason}[/]")
+    if state.failed_reason:
+        console.print()
+        console.print(f"  [red bold]failed_reason:[/] [red]{state.failed_reason}[/]")
+
     console.print()
 
     if not events:
@@ -154,6 +168,11 @@ def render_flow_timeline(
             if files and isinstance(files, list):
                 for f in files:
                     console.print(f"  [dim]- {f}[/]")
+            verdict = (
+                event.refs.get("verdict") if isinstance(event.refs, dict) else None
+            )
+            if verdict:
+                console.print(f"  [dim]- verdict: {verdict}[/]")
             # Priority: log_path > ref for display
             log_path = (
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
@@ -161,7 +180,12 @@ def render_flow_timeline(
             if log_path:
                 console.print(f"  [dim]- {log_path}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            if ref and not log_path:
+            detail_contains_ref = bool(
+                isinstance(ref, str)
+                and isinstance(event.detail, str)
+                and ref in event.detail
+            )
+            if ref and not log_path and not detail_contains_ref:
                 console.print(f"  [dim]- {ref}[/]")
         console.print()
 

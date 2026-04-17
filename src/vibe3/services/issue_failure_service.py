@@ -49,6 +49,16 @@ def _ensure_flow_state_for_issue(
         if not branch:
             return
 
+        # Write flow event for observability (smart search can query this)
+        event_type = f"{action}ed"  # "blocked" or "failed"
+        store.add_event(
+            branch,
+            event_type,
+            actor,
+            detail=reason,
+            refs={"issue": str(issue_number), "action": action},
+        )
+
         # Record reason as display-only field; do NOT change flow_status.
         # GitHub labels are the SSOT for issue state.
         if action == "block":
@@ -136,7 +146,7 @@ _ROLE_FAILURE_COPY = {
 _ROLE_MISSING_REF_COPY = {
     "plan": "规划执行完成，但未登记 authoritative",
     "run": "执行完成，但未登记 authoritative",
-    "review": "审查完成，但未登记 authoritative",
+    "review": "审查未产出可交接的 audit 结果，缺失 authoritative",
 }
 
 
@@ -255,6 +265,25 @@ def resume_failed_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
+    # Write to flow (source of truth) before GitHub sync
+    issue_flow_service = IssueFlowService()
+    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
+    if flows:
+        branch = str(flows[0].get("branch") or "").strip()
+        if branch:
+            # Record resume event
+            issue_flow_service.store.add_event(
+                branch,
+                "resumed",
+                actor,
+                detail=f"Resumed from failed to ready: {reason}",
+                refs={
+                    "issue": str(issue_number),
+                    "from_state": "failed",
+                    "to_state": "ready",
+                },
+            )
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.READY,
@@ -285,6 +314,25 @@ def resume_blocked_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
+    # Write to flow (source of truth) before GitHub sync
+    issue_flow_service = IssueFlowService()
+    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
+    if flows:
+        branch = str(flows[0].get("branch") or "").strip()
+        if branch:
+            # Record resume event
+            issue_flow_service.store.add_event(
+                branch,
+                "resumed",
+                actor,
+                detail=f"Resumed from blocked to ready: {reason}",
+                refs={
+                    "issue": str(issue_number),
+                    "from_state": "blocked",
+                    "to_state": "ready",
+                },
+            )
+
     _transition_issue_state(
         issue_number=issue_number,
         to_state=IssueState.READY,
@@ -417,36 +465,6 @@ def block_reviewer_noop_issue(
         dedupe_latest_comment=True,
         comment=_build_missing_ref_comment("review", "audit_ref", reason),
     )
-
-
-def confirm_role_handoff(
-    *,
-    issue_number: int,
-    actor: str,
-) -> str:
-    """Transition issue to handoff after successful role execution.
-
-    Called from success_handler in SYNC_SPEC to advance state → HANDOFF
-    so the next stage can be dispatched.
-
-    Args:
-        issue_number: GitHub issue number
-        actor: Actor performing the transition (e.g., "agent:plan")
-
-    Returns:
-        Transition result string (e.g., "advanced" or "blocked")
-    """
-    return LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.HANDOFF,
-        actor=actor,
-    )
-
-
-# Role-specific aliases for backward compatibility
-confirm_plan_handoff = confirm_role_handoff
-confirm_run_handoff = confirm_role_handoff
-confirm_review_handoff = confirm_role_handoff
 
 
 def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -> bool:

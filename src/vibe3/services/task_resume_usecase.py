@@ -76,6 +76,7 @@ class TaskResumeUsecase:
         stale_flows: list[FlowStatusResponse] | None = None,
         repo: str | None = None,
         candidate_mode: str = "resumable",
+        label_state: str | None = None,  # ← 新增参数
     ) -> dict[str, Any]:
         """Resume failed or blocked issues.
 
@@ -86,6 +87,9 @@ class TaskResumeUsecase:
             flows: Active flow status responses
             stale_flows: Stale flow status responses
             repo: Repository (owner/repo format, optional)
+            candidate_mode: Candidate selection mode ("resumable" or "all_task")
+            label_state: Optional state to restore (None=delete worktree,
+                "handoff"/"ready"=keep worktree)
 
         Returns:
             Dict with:
@@ -212,6 +216,7 @@ class TaskResumeUsecase:
                         repo=repo,
                         reason=reason,
                         worktree_path=worktree_path,
+                        label_state=label_state,
                     )
 
                     # Publish event to notify EDA handlers of the state change
@@ -220,11 +225,19 @@ class TaskResumeUsecase:
                         from vibe3.domain.publisher import publish
                         from vibe3.models.orchestration import IssueState
 
+                        # Match the target state used in reset_issue_to_ready
+                        if label_state == "ready":
+                            event_target = IssueState.READY
+                        elif label_state is not None:
+                            event_target = IssueState.HANDOFF
+                        else:
+                            event_target = IssueState.READY
+
                         publish(
                             IssueStateChanged(
                                 issue_number,
                                 None,
-                                IssueState.READY.value,
+                                event_target.value,
                                 actor="human:resume",
                             )
                         )

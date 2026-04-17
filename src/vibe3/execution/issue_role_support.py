@@ -236,25 +236,49 @@ def apply_required_ref_post_sync(
     missing_ref_handler: Callable[..., None],
     success_handler: Callable[..., None] | None = None,
 ) -> bool:
-    """Apply standard completion gate with required-ref protection.
+    """Apply standard completion gate with required-ref and no-op protection.
+
+    Three-branch logic:
+    1. Missing ref → block (missing_ref_handler)
+    2. Ref present + state unchanged → block (no-op gate)
+    3. Ref present + state changed → pass (apply_request_completion_gate)
 
     Args:
         _branch: Required to match IssueRoleSyncSpec.post_sync_hook signature,
             but not used in this implementation. Prefix underscore indicates
             intentional unused parameter.
-        success_handler: Optional callback invoked when required_ref is present
-            after execution. Called as success_handler(issue_number, actor).
-            Use this to trigger state transitions (e.g. confirm_plan_handoff)
-            directly from the sync completion path, bypassing the domain event
-            bus (which is in-process only and not accessible from async tmux
-            subprocess executions).
+        success_handler: Deprecated. State transitions are managed by the agent,
+            not by code. The no-op gate blocks if ref exists but state unchanged.
+            This parameter is kept for signature compatibility but should not be
+            used (will be removed in future refactor).
     """
     before_refs = before_snapshot.get("refs")
     after_refs = after_snapshot.get("refs")
+    before_state = before_snapshot.get("state_label")
+    after_state = after_snapshot.get("state_label")
+
+    # Import constants for flow event recording
+    from vibe3.utils.constants import (
+        EVENT_STATE_TRANSITIONED,
+        EVENT_STATE_UNCHANGED,
+    )
+
+    # Branch 1: Missing ref → block
     if isinstance(before_refs, dict) and isinstance(after_refs, dict):
         before_value = before_refs.get(required_ref)
         after_value = after_refs.get(required_ref)
         if not before_value and not after_value:
+            store.add_event(
+                _branch,
+                EVENT_STATE_UNCHANGED,
+                actor,
+                detail=f"Missing {required_ref} → blocked",
+                refs={
+                    "state": str(before_state or ""),
+                    "required_ref": required_ref,
+                    "issue": str(issue_number),
+                },
+            )
             missing_ref_handler(
                 issue_number=issue_number,
                 reason=missing_reason,
@@ -263,10 +287,46 @@ def apply_required_ref_post_sync(
             )
             return True
 
-    # required_ref is present — call success_handler to advance state.
-    # This is the correct place for state transitions in the async tmux path:
-    # domain events published here would be in the subprocess event bus, not
-    # in the orchestra process, so direct calls are used instead.
+    # Branch 2: Ref present + state unchanged → block (no-op gate)
+    if before_state == after_state:
+        store.add_event(
+            _branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=(
+                f"State unchanged after {required_ref} gate: " f"still {before_state}"
+            ),
+            refs={
+                "state": str(before_state or ""),
+                "required_ref": required_ref,
+                "issue": str(issue_number),
+            },
+        )
+        # Block with same handler (or could use dedicated no-op handler)
+        missing_ref_handler(
+            issue_number=issue_number,
+            reason=f"{required_ref} present but state unchanged",
+            actor=actor,
+            repo=config.repo,
+        )
+        return True
+
+    # Branch 3: Ref present + state changed → pass
+    store.add_event(
+        _branch,
+        EVENT_STATE_TRANSITIONED,
+        actor,
+        detail=f"State changed: {before_state} → {after_state}",
+        refs={
+            "before_state": str(before_state or ""),
+            "after_state": str(after_state or ""),
+            "required_ref": required_ref,
+            "issue": str(issue_number),
+        },
+    )
+
+    # Note: success_handler is deprecated. State transitions are managed by agent.
+    # This call is kept for backward compatibility but should not be used.
     if success_handler is not None:
         success_handler(issue_number=issue_number, actor=actor)
 
@@ -293,6 +353,7 @@ def build_required_ref_sync_spec(
     missing_ref_handler: Callable[..., None],
     failure_handler: Callable[..., None],
     success_handler: Callable[..., None] | None = None,
+    process_sync_result: Callable[..., None] | None = None,
 ) -> IssueRoleSyncSpec:
     """Build the standard sync spec shared by plan/run/review-style roles.
 
@@ -302,6 +363,10 @@ def build_required_ref_sync_spec(
             success_handler(issue_number=..., actor=...).
             Use this instead of domain events for async tmux paths where the
             subprocess event bus is separate from the orchestra process.
+        process_sync_result: Optional callback to process sync execution output
+            before taking the after snapshot. Called as
+            process_sync_result(issue_number=..., branch=..., actor=..., stdout=...).
+            Use this to write refs (e.g., audit_ref) from stdout before snapshot.
     """
     from vibe3.roles.definitions import IssueRoleSyncSpec
 
@@ -327,4 +392,5 @@ def build_required_ref_sync_spec(
             success_handler=success_handler,
         ),
         failure_handler=failure_handler,
+        process_sync_result=process_sync_result,
     )

@@ -86,8 +86,13 @@ class TestTransitionRules:
     """Tests for state transition rules."""
 
     def test_allowed_transitions_count(self):
-        """Test that we have expected number of allowed transitions."""
-        assert len(ALLOWED_TRANSITIONS) == 23
+        """Test that we have expected number of allowed transitions.
+
+        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF (2 transitions)
+        Added: MERGE_READY→IN_PROGRESS (commit+PR), HANDOFF→DONE (manager concludes)
+        Replaced: MERGE_READY→DONE (now goes through commit+PR flow)
+        """
+        assert len(ALLOWED_TRANSITIONS) == 22
 
     def test_main_chain_transitions_allowed(self):
         """Test that main chain transitions are allowed."""
@@ -98,18 +103,28 @@ class TestTransitionRules:
         assert (IssueState.HANDOFF, IssueState.REVIEW) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.MERGE_READY) in ALLOWED_TRANSITIONS
-        assert (IssueState.MERGE_READY, IssueState.DONE) in ALLOWED_TRANSITIONS
+        assert (IssueState.MERGE_READY, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
+        assert (IssueState.HANDOFF, IssueState.DONE) in ALLOWED_TRANSITIONS
 
     def test_side_path_transitions_allowed(self):
-        """Test that side path transitions are allowed."""
+        """Test that side path transitions are allowed.
+
+        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF
+        Blocked state requires manual intervention (force=True for resume)
+        """
+        # → blocked transitions (allowed)
         assert (IssueState.READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.CLAIMED, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.IN_PROGRESS, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.MERGE_READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
-        assert (IssueState.BLOCKED, IssueState.CLAIMED) in ALLOWED_TRANSITIONS
-        assert (IssueState.BLOCKED, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
+
+        # blocked → other transitions (NOT allowed, removed)
+        assert (IssueState.BLOCKED, IssueState.CLAIMED) not in ALLOWED_TRANSITIONS
+        assert (IssueState.BLOCKED, IssueState.HANDOFF) not in ALLOWED_TRANSITIONS
+
+        # failed transitions (allowed)
         assert (IssueState.CLAIMED, IssueState.FAILED) in ALLOWED_TRANSITIONS
         assert (IssueState.IN_PROGRESS, IssueState.FAILED) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.FAILED) in ALLOWED_TRANSITIONS
@@ -120,11 +135,12 @@ class TestTransitionRules:
 
     def test_closure_path_transitions_allowed(self):
         """Test that closure path transitions are allowed."""
-        # Only MERGE_READY -> DONE is allowed for normal delivery completion
-        assert (IssueState.MERGE_READY, IssueState.DONE) in ALLOWED_TRANSITIONS
-        # READY -> DONE and HANDOFF -> DONE are now forbidden
+        # MERGE_READY -> IN_PROGRESS (commit+PR), HANDOFF -> DONE (manager concludes)
+        assert (IssueState.MERGE_READY, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
+        assert (IssueState.HANDOFF, IssueState.DONE) in ALLOWED_TRANSITIONS
+        # Direct MERGE_READY -> DONE no longer allowed (goes through commit+PR flow)
+        assert (IssueState.MERGE_READY, IssueState.DONE) not in ALLOWED_TRANSITIONS
         assert (IssueState.READY, IssueState.DONE) not in ALLOWED_TRANSITIONS
-        assert (IssueState.HANDOFF, IssueState.DONE) not in ALLOWED_TRANSITIONS
 
     def test_forbidden_transitions_count(self):
         """Test that we have expected number of forbidden transitions."""
@@ -132,12 +148,12 @@ class TestTransitionRules:
 
     def test_skip_to_done_forbidden(self):
         """Test that skipping to done is forbidden."""
-        # All states except MERGE_READY cannot jump directly to DONE
+        # All states except HANDOFF cannot jump directly to DONE
         assert (IssueState.READY, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.CLAIMED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.BLOCKED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.FAILED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
-        assert (IssueState.HANDOFF, IssueState.DONE) in FORBIDDEN_TRANSITIONS
+        assert (IssueState.MERGE_READY, IssueState.DONE) in FORBIDDEN_TRANSITIONS
 
     def test_allowed_not_in_forbidden(self):
         """Test that allowed transitions are not in forbidden set."""

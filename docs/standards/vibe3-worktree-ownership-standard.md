@@ -51,10 +51,16 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 - 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。发布 `SupervisorApplyDispatched` 等事件。
 - Apply agent 能力范围：
   - 更改 issue labels、关闭 issue、写入 comment
+  - 在核查后关闭旧 issue 并创建 replacement issue（仅 GitHub 治理动作，不等于代码实现）
   - 简单文档修正（typo、补漏）
   - 参数配置调整（非代码逻辑）
   - **超出范围的复杂代码改动** → 创建正式 task issue（含 spec），交由 L3 manager 链条处理
+- 治理语义：
+  - `dev/issue-*` 是主线开发承载面
+  - `task/issue-*` 是自动化承载面
+  - 当 `task/issue-*` 现场被旧 PR / 旧 flow / 错误状态污染时，允许 supervisor 直接做 issue 级治理；不要因为“apply”二字就默认只能观察
 - Worktree：需要**临时隔离 worktree**。Apply agent 可能修改文档/配置，需要独立于主仓库的安全空间。
+- 注意：当前实现即使只做 issue/label/comment/close 动作，也仍可能统一分配临时 worktree；这不代表 apply 自动获得代码修改职责，也不意味着所有治理动作都必须转成实现任务。
 - 参数要求：`cwd=wt_path`（由系统自动分配临时隔离路径）。禁止使用已移除的 `--worktree` 标志。
 - 实现位置：`src/vibe3/orchestra/services/supervisor_handoff.py`
 - **当前状态**：`agent_resolver.py:65` 已传 `worktree=True`，方向正确，但 cwd 处理需确认（待代码重构 branch）。

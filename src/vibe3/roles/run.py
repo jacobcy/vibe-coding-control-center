@@ -28,7 +28,6 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.issue_failure_service import (
     block_executor_noop_issue,
-    confirm_run_handoff,
     fail_executor_issue,
 )
 
@@ -70,6 +69,8 @@ def build_run_request(
     branch: str | None = None,
     repo_path: Path | None = None,
     plan_ref: str | None = None,
+    audit_ref: str | None = None,
+    commit_mode: bool = False,
     actor: str = "orchestra:executor",
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
@@ -77,10 +78,15 @@ def build_run_request(
     refs: dict[str, str] = {"issue_number": str(issue.number)}
     if plan_ref:
         refs["plan_ref"] = plan_ref
-    # Correct command: use --plan instead of non-existent --issue and --plan-ref
-    command_args = (
-        ["run", "--plan", plan_ref, "--no-async"] if plan_ref else ["run", "--no-async"]
-    )
+    if audit_ref:
+        refs["audit_ref"] = audit_ref
+    if commit_mode:
+        command_args = ["run", "--skill", "vibe-commit", "--no-async"]
+        refs["commit_mode"] = "true"
+    elif plan_ref:
+        command_args = ["run", "--plan", plan_ref, "--no-async"]
+    else:
+        command_args = ["run", "--no-async"]
     return build_issue_async_cli_request(
         role="executor",
         issue=issue,
@@ -130,40 +136,25 @@ def build_run_sync_request(
 def publish_run_command_success(
     *,
     issue_number: int,
-    branch: str,
-    result: object,
+    _branch: str,
+    _result: object,
 ) -> None:
-    """Publish run success lifecycle for command-mode execution."""
-    from vibe3.domain.events import IssueStateChanged, ReportRefRequired
-    from vibe3.domain.publisher import publish
+    """Record run command success. State transitions are the agent's responsibility.
 
-    handoff_file = None
-    if isinstance(result, CodeagentResult):
-        handoff_file = result.handoff_file
+    The agent receives run_task / output_format from settings.yaml (via
+    build_run_standard_sections), which includes the instruction to change
+    issue label to state/handoff. Code layer MUST NOT auto-transition state
+    (noop-gate-boundary-standard).
+    """
+    from loguru import logger as _logger
 
-    if handoff_file:
-        publish(
-            IssueStateChanged(
-                issue_number=issue_number,
-                from_state=None,
-                to_state=IssueState.HANDOFF.value,
-                actor="agent:run",
-            )
-        )
-        return
-
-    publish(
-        ReportRefRequired(
-            issue_number=issue_number,
-            branch=branch,
-            ref_name="report_ref",
-            reason=(
-                "executor output artifact was saved, but no authoritative "
-                "report_ref was registered. Write a canonical report "
-                "document and run handoff report."
-            ),
-            actor="agent:run",
-        )
+    _logger.bind(
+        domain="run",
+        event="run_command_success",
+        issue=issue_number,
+    ).info(
+        "Run command completed successfully. "
+        "Agent should handle state transition via run_task instructions."
     )
 
 
@@ -185,11 +176,6 @@ def publish_run_command_failure(
     )
 
 
-def _confirm_run_handoff_wrapper(*, issue_number: int, actor: str) -> None:
-    """Wrapper for confirm_run_handoff that discards the return value."""
-    confirm_run_handoff(issue_number=issue_number, actor=actor)
-
-
 RUN_SYNC_SPEC = build_required_ref_sync_spec(
     role_name="executor",
     resolve_options=resolve_run_options,
@@ -208,8 +194,8 @@ RUN_SYNC_SPEC = build_required_ref_sync_spec(
         reason=reason,
         actor="agent:run",
     ),
-    # Advance state: IN_PROGRESS → HANDOFF after report_ref produced.
-    success_handler=_confirm_run_handoff_wrapper,
+    # No success_handler: agent must transition state or get blocked.
+    # See docs/standards/vibe3-noop-gate-boundary-standard.md
 )
 
 
@@ -364,13 +350,30 @@ def execute_manual_run(
         return CodeagentExecutionService(config).execute_sync(command)
 
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
+
+    # Read audit_ref from flow_state for retry mode (review feedback injection)
+    audit_file: str | None = None
+    if branch:
+        try:
+            flow_state = SQLiteClient().get_flow_state(branch)
+            if flow_state and flow_state.get("audit_ref"):
+                audit_file = str(flow_state["audit_ref"])
+        except Exception:
+            pass
+
     command = create_codeagent_command(
         role="executor",
-        context_builder=make_run_context_builder(plan_file, config),
+        context_builder=make_run_context_builder(
+            plan_file, config, audit_file=audit_file
+        ),
         task=instructions or run_prompt,
         dry_run=dry_run,
         handoff_kind="run",
-        handoff_metadata={"plan_ref": plan_file} if plan_file else None,
+        handoff_metadata=(
+            {"plan_ref": plan_file, "audit_ref": audit_file}
+            if plan_file or audit_file
+            else None
+        ),
         agent=agent,
         backend=backend,
         model=model,
@@ -409,8 +412,8 @@ def execute_manual_run(
         if result.success:
             publish_run_command_success(
                 issue_number=issue_number,
-                branch=branch,
-                result=result,
+                _branch=branch,
+                _result=result,
             )
         else:
             publish_run_command_failure(
