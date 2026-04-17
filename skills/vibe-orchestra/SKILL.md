@@ -1,6 +1,6 @@
 ---
 name: vibe-orchestra
-description: Use when the user wants heartbeat-style governance over the issue pool: inspect running issues, judge which issue is worth starting next, backfill assignee-triggered candidates, and propose non-state label or routing actions. Do not use for single-flow execution governance, coding, or implementation work.
+description: Use when the user wants heartbeat-style governance over the issue pool. inspect running issues, judge which issue is worth starting next, backfill assignee-triggered candidates, and propose non-state label or routing actions. Do not use for single-flow execution governance, coding, or implementation work.
 ---
 
 # Vibe Orchestra

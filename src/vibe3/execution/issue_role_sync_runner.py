@@ -73,7 +73,7 @@ def run_issue_role_mode(
 
     # Early capacity check to avoid wasteful request preparation
     if async_mode and not dry_run:
-        if not coordinator.capacity.can_dispatch(spec.role_name, issue_number):
+        if not coordinator.capacity.can_dispatch(spec.role_name):
             typer.echo(f"{spec.role_name} dispatch queued: Capacity full")
             return
 

@@ -239,14 +239,9 @@ class StateLabelDispatchService(ServiceBase):
     ) -> bool:
         """Use role definition's status_field + dispatch_predicate.
 
-        Also checks if a session is already in-flight for this target to
-        prevent duplicate dispatches before SQLite is updated.
+        Simple check: just use role definition's dispatch_predicate
+        (which checks has_live_session) without separate in-flight tracking.
         """
-        if self._capacity and self._capacity.is_in_flight(
-            self.role_def.registry_role, issue_number
-        ):
-            return False
-
         status_field = self.role_def.status_field
         if status_field is None or flow_state is None:
             has_live_session = self._has_live_dispatch(issue_number)

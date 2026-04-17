@@ -309,12 +309,21 @@ class TestOrchestrationFacadeDispatchServices:
         mock_monotonic.side_effect = [float(i) for i in range(20)]
 
         mock_service1 = MagicMock()
+        mock_service1.role_def = MagicMock()
+        mock_service1.role_def.registry_role = "reviewer"
         mock_service1.collect_ready_issues = AsyncMock(return_value=[])
         mock_service2 = MagicMock()
+        mock_service2.role_def = MagicMock()
+        mock_service2.role_def.registry_role = "executor"
         mock_service2.collect_ready_issues = AsyncMock(return_value=[])
 
         mock_capacity = MagicMock()
         mock_capacity.can_dispatch.return_value = True
+        mock_capacity.get_capacity_status.return_value = {
+            "remaining": 1,
+            "active_count": 0,
+            "max_capacity": 5,
+        }
 
         facade = OrchestrationFacade(
             tick_count=0,
@@ -379,15 +388,24 @@ class TestOrchestrationFacadeDispatchServices:
 
         failing_service = MagicMock()
         failing_service.service_name = "failing-dispatch"
+        failing_service.role_def = MagicMock()
+        failing_service.role_def.registry_role = "reviewer"
         failing_service.collect_ready_issues = AsyncMock(
             side_effect=RuntimeError("GitHub down")
         )
         healthy_service = MagicMock()
         healthy_service.service_name = "healthy-dispatch"
+        healthy_service.role_def = MagicMock()
+        healthy_service.role_def.registry_role = "executor"
         healthy_service.collect_ready_issues = AsyncMock(return_value=[])
 
         mock_capacity = MagicMock()
         mock_capacity.can_dispatch.return_value = False  # Skip all dispatches
+        mock_capacity.get_capacity_status.return_value = {
+            "remaining": 1,
+            "active_count": 4,
+            "max_capacity": 5,
+        }
 
         facade = OrchestrationFacade(
             tick_count=0,
