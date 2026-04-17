@@ -93,10 +93,14 @@ class GlobalDispatchCoordinator:
             else:
                 skipped_count += 1
 
+        # ANSI colors: green for dispatched, yellow for skipped
+        green = "\033[32m"
+        yellow = "\033[33m"
+        reset = "\033[0m"
         append_orchestra_event(
             "dispatcher",
-            f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
-            f"skipped={skipped_count} (capacity full)",
+            f"GlobalDispatchCoordinator: {green}dispatched={dispatched_count}{reset} "
+            f"{yellow}skipped={skipped_count}{reset} (capacity full)",
         )
 
     async def _collect_all(
@@ -226,9 +230,15 @@ class GlobalDispatchCoordinator:
 
         try:
             item.service._emit_dispatch_intent(item.issue)
+            # ANSI colors: green for dispatched success
+            green = "\033[32m"
+            reset = "\033[0m"
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: dispatched #{issue_id} ({role})",
+                (
+                    f"GlobalDispatchCoordinator: "
+                    f"{green}dispatched{reset} #{issue_id} ({role})"
+                ),
             )
             logger.bind(
                 domain="global_dispatch",

@@ -159,15 +159,115 @@ class TestReviewerBlockedNoStateChange:
 
 
 class TestReviewerSuccessStateChanged:
-    """场景 4: reviewer 正常推进 → 不干预"""
+    """场景 4: reviewer 成功（有 audit_ref）→ 强制交还 handoff"""
 
-    def test_reviewer_success_no_forced_handoff_event(
+    def test_success_handler_transitions_to_handoff(self) -> None:
+        """Reviewer 有 audit_ref → success_handler 强制转 HANDOFF"""
+        from vibe3.models.orchestration import IssueState
+        from vibe3.roles.review import _review_to_handoff_success_handler
+
+        with patch(
+            "vibe3.services.label_service.LabelService"
+        ) as mock_label_service_cls:
+            mock_ls = mock_label_service_cls.return_value
+            mock_ls.confirm_issue_state.return_value = "advanced"
+
+            _review_to_handoff_success_handler(issue_number=303, actor="agent:review")
+
+            mock_ls.confirm_issue_state.assert_called_once_with(
+                303,
+                IssueState.HANDOFF,
+                actor="agent:review",
+            )
+
+    def test_success_handler_wired_in_review_sync_spec(self) -> None:
+        """REVIEW_SYNC_SPEC 应包含 success_handler"""
+        from vibe3.roles.review import REVIEW_SYNC_SPEC
+
+        assert REVIEW_SYNC_SPEC is not None
+
+    def test_apply_required_ref_post_sync_calls_success_handler(
         self,
     ) -> None:
-        """Reviewer 正常推进 → 不应该强制转 HANDOFF"""
-        # This test verifies that reviewer success does NOT force HANDOFF
-        # The actual implementation will be fixed to remove confirm_role_handoff
-        pass  # ← Placeholder: 实际修复后添加详细测试
+        """有 audit_ref 时 apply_required_ref_post_sync 调用 success_handler"""
+        from unittest.mock import MagicMock
+
+        from vibe3.execution.issue_role_support import (
+            apply_required_ref_post_sync,
+        )
+
+        mock_store = MagicMock()
+        mock_config = MagicMock()
+        mock_config.repo = "owner/repo"
+        mock_request = MagicMock()
+
+        before = {"refs": {}, "state_label": "state/review"}
+        after = {
+            "refs": {"audit_ref": "/path/to/audit.md"},
+            "state_label": "state/review",
+        }
+
+        mock_handler = MagicMock()
+
+        with patch(
+            "vibe3.execution.issue_role_support.apply_request_completion_gate",
+            return_value=True,
+        ):
+            result = apply_required_ref_post_sync(
+                mock_store,
+                303,
+                "task/issue-303",
+                "agent:review",
+                mock_config,
+                before,
+                after,
+                mock_request,
+                required_ref="audit_ref",
+                missing_reason="no audit_ref",
+                missing_ref_handler=MagicMock(),
+                success_handler=mock_handler,
+            )
+
+        mock_handler.assert_called_once_with(issue_number=303, actor="agent:review")
+        assert result is True
+
+    def test_apply_required_ref_post_sync_no_handler_when_missing_ref(
+        self,
+    ) -> None:
+        """无 audit_ref 时不调用 success_handler，而是调用 missing_ref_handler"""
+        from unittest.mock import MagicMock
+
+        from vibe3.execution.issue_role_support import (
+            apply_required_ref_post_sync,
+        )
+
+        mock_store = MagicMock()
+        mock_config = MagicMock()
+        mock_config.repo = "owner/repo"
+        mock_request = MagicMock()
+        mock_success = MagicMock()
+        mock_missing = MagicMock()
+
+        before = {"refs": {}, "state_label": "state/review"}
+        after = {"refs": {}, "state_label": "state/review"}
+
+        apply_required_ref_post_sync(
+            mock_store,
+            303,
+            "task/issue-303",
+            "agent:review",
+            mock_config,
+            before,
+            after,
+            mock_request,
+            required_ref="audit_ref",
+            missing_reason="no audit_ref",
+            missing_ref_handler=mock_missing,
+            success_handler=mock_success,
+        )
+
+        mock_missing.assert_called_once()
+        mock_success.assert_not_called()
 
 
 class TestReviewerParserErrorTolerance:

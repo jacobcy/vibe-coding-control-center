@@ -218,6 +218,22 @@ def _process_review_sync_result(
     )
 
 
+def _review_to_handoff_success_handler(*, issue_number: int, actor: str) -> None:
+    """Transition issue from REVIEW to HANDOFF after audit_ref is produced.
+
+    This mechanically returns control to the manager without making business
+    judgments about the verdict content. The manager reads audit_ref at the
+    HANDOFF stage and decides PASS/MAJOR/UNKNOWN.
+    """
+    from vibe3.services.label_service import LabelService
+
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.HANDOFF,
+        actor=actor,
+    )
+
+
 REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
@@ -235,8 +251,7 @@ REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
         issue_number=issue_number,
         reason=reason,
     ),
-    # No success_handler: state transitions are managed by the manager AI agent,
-    # not by code. The no-op gate prevents automatic state advancement (Issue #303).
+    success_handler=_review_to_handoff_success_handler,
     # Write audit_ref from stdout before snapshot.
     process_sync_result=_process_review_sync_result,
 )

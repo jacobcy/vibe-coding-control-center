@@ -146,7 +146,7 @@ _ROLE_FAILURE_COPY = {
 _ROLE_MISSING_REF_COPY = {
     "plan": "规划执行完成，但未登记 authoritative",
     "run": "执行完成，但未登记 authoritative",
-    "review": "审查完成，但未登记 authoritative",
+    "review": "审查未产出可交接的 audit 结果，缺失 authoritative",
 }
 
 
