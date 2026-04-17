@@ -44,6 +44,15 @@ def _handle_completion_with_ref_gate(
 ) -> bool:
     """Helper function to handle completion events with authoritative ref gate.
 
+    Architecture limitation: This async path cannot implement full three-branch
+    no-op gate logic because CompletionEvent payload lacks before_state.
+    Full implementation requires event payload redesign (see issue TBD).
+
+    Current behavior:
+    - Branch 1: Missing ref → block (implemented)
+    - Branch 2/3: Cannot detect state change (requires before_state)
+    - Records current state to flow event as conservative fallback
+
     Args:
         event_name: Event name for logging
         issue_number: Issue number
@@ -56,6 +65,10 @@ def _handle_completion_with_ref_gate(
     Returns:
         True if ref exists, False if blocked
     """
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.services.flow_service import FlowService
+    from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
+
     flow_service = FlowService()
     has_ref = require_authoritative_ref(
         flow_service=flow_service,
@@ -68,14 +81,29 @@ def _handle_completion_with_ref_gate(
     )
 
     if has_ref:
-        # No ops gate: required_ref exists, nothing to do
-        # System should NOT decide state transition (修复 Issue #303)
+        # Cannot detect state change without before_state.
+        # Record current state as conservative fallback (event records current context).
+        flow = flow_service.get_flow_status(branch)
+        current_state = getattr(flow, "flow_status", "unknown") if flow else "unknown"
+
+        store = SQLiteClient()
+        store.add_event(
+            branch,
+            EVENT_STATE_TRANSITIONED,
+            actor,
+            detail=f"{ref_name} present, current state: {current_state}",
+            refs={
+                "state": current_state,
+                "ref_name": ref_name,
+                "issue": str(issue_number),
+            },
+        )
+
         logger.bind(
             domain="events",
             event=event_name,
             issue=issue_number,
-        ).info(f"{ref_name} found, no automatic state transition")
-        # ← 删除强制 HANDOFF 逻辑
+        ).info(f"{ref_name} found, state recorded to event")
     else:
         logger.bind(
             domain="events",
