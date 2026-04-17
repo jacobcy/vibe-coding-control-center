@@ -65,7 +65,11 @@ class GlobalDispatchCoordinator:
         self._frozen_queue: list[CandidateIssue] | None = None
 
     async def coordinate(self) -> None:
-        """Main dispatch entry: frozen queue model."""
+        """Main dispatch entry: frozen queue model.
+
+        Queue remains frozen until fully exhausted.
+        Only collect new queue when previous queue is empty.
+        """
         # Step 1: Check if we need to collect a new queue
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
@@ -109,6 +113,7 @@ class GlobalDispatchCoordinator:
         role_order = ["reviewer", "executor", "planner", "manager"]
 
         dispatched_count = 0
+        dispatched_candidates: list[CandidateIssue] = []
         for role in role_order:
             # Filter frozen queue for this role
             role_candidates = [c for c in self._frozen_queue if c.role == role]
@@ -121,12 +126,17 @@ class GlobalDispatchCoordinator:
                         f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
                         f"skipped remaining (capacity full)",
                     )
+                    # Remove dispatched candidates and return
+                    self._frozen_queue = [
+                        c for c in self._frozen_queue if c not in dispatched_candidates
+                    ]
                     return
 
                 # Dispatch
                 try:
                     candidate.service._emit_dispatch_intent(candidate.issue)
                     dispatched_count += 1
+                    dispatched_candidates.append(candidate)
 
                     green = "\033[32m"
                     reset = "\033[0m"
@@ -148,11 +158,15 @@ class GlobalDispatchCoordinator:
                         issue=candidate.issue.number,
                     ).error(f"Dispatch failed for #{candidate.issue.number}: {exc}")
 
-        # Step 4: Clear frozen queue after dispatch (next tick will collect new queue)
-        self._frozen_queue = None
-
-        # End of tick
+        # Step 4: Remove dispatched items from frozen queue (not clear entire queue)
+        # Queue remains frozen until fully exhausted
         if dispatched_count > 0:
+            # Remove dispatched candidates from frozen queue
+            # Keep remaining candidates for next tick
+            self._frozen_queue = [
+                c for c in self._frozen_queue if c not in dispatched_candidates
+            ]
+
             green = "\033[32m"
             reset = "\033[0m"
             append_orchestra_event(

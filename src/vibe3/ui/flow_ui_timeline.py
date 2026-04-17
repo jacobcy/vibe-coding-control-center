@@ -164,8 +164,11 @@ def render_flow_timeline(
     console.print()
 
     for event in reversed(events):
-        # Skip orchestra placeholder actors - only show actual backend/model
-        if event.actor.startswith("orchestra:"):
+        # Filter orchestra placeholder actors from non-dispatch events.
+        # Dispatch events have orchestra:dispatcher actor and should be shown.
+        if event.actor.startswith("orchestra:") and not event.event_type.endswith(
+            "_dispatched"
+        ):
             continue
 
         color = _EVENT_COLOR.get(event.event_type, "white")
@@ -185,7 +188,13 @@ def render_flow_timeline(
                 event.refs.get("verdict") if isinstance(event.refs, dict) else None
             )
             if verdict:
-                console.print(f"  [dim]- verdict: {verdict}[/]")
+                # Color verdict based on value
+                verdict_color = (
+                    "red"
+                    if verdict in ("BLOCK", "FAIL")
+                    else "yellow" if verdict == "UNKNOWN" else "green"
+                )
+                console.print(f"  [{verdict_color}]verdict: {verdict}[/]")
             # Priority: log_path > ref for display
             log_path = (
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
@@ -193,6 +202,7 @@ def render_flow_timeline(
             if log_path:
                 console.print(f"  [dim]- {log_path}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
+            # Skip ref if already shown in detail (audit_ref case)
             detail_contains_ref = bool(
                 isinstance(ref, str)
                 and isinstance(event.detail, str)
