@@ -91,6 +91,10 @@ class CodeagentExecutionService:
                 f"{command.role.capitalize()} started (status: running)",
                 session_id=session_id,
             )
+            # Write latest_actor immediately so subsequent handoff
+            # commands (e.g. `vibe3 handoff report`) resolve the
+            # correct actor instead of a stale one.
+            store.update_flow_state(branch, latest_actor=actor)
 
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
