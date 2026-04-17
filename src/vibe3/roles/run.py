@@ -194,8 +194,8 @@ RUN_SYNC_SPEC = build_required_ref_sync_spec(
         reason=reason,
         actor="agent:run",
     ),
-    # No success_handler: state transitions are managed by the manager AI agent,
-    # not by code. The no-op gate prevents automatic state advancement (Issue #303).
+    # No success_handler: agent must transition state or get blocked.
+    # See docs/standards/vibe3-noop-gate-boundary-standard.md
 )
 
 

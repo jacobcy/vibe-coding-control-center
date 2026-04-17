@@ -178,3 +178,97 @@ class TestPlannerNoProgressPolicy:
         )
 
         assert has_progress is False  # ← 无推进（plan_ref 缺失）
+
+
+class TestPlannerNoOpGate:
+    """Planner no-op gate: plan_ref 存在但 state 未变 → blocked"""
+
+    def test_planner_blocked_when_plan_ref_exists_but_state_unchanged(
+        self,
+    ) -> None:
+        """Planner 有 plan_ref 但 state/claimed 未变 → blocked"""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.execution.issue_role_support import (
+            apply_required_ref_post_sync,
+        )
+
+        mock_store = MagicMock()
+        mock_config = MagicMock()
+        mock_config.repo = "owner/repo"
+        mock_request = MagicMock()
+
+        before = {"refs": {}, "state_label": "state/claimed"}
+        after = {
+            "refs": {"plan_ref": "/path/to/plan.md"},
+            "state_label": "state/claimed",  # ← state 未变
+        }
+
+        mock_missing_handler = MagicMock()
+
+        with patch(
+            "vibe3.execution.issue_role_support.apply_request_completion_gate",
+            return_value=True,
+        ):
+            result = apply_required_ref_post_sync(
+                mock_store,
+                100,
+                "task/issue-100",
+                "agent:plan",
+                mock_config,
+                before,
+                after,
+                mock_request,
+                required_ref="plan_ref",
+                missing_reason="no plan_ref",
+                missing_ref_handler=mock_missing_handler,
+            )
+
+        # Verify: missing_ref_handler called (block on no-op)
+        mock_missing_handler.assert_called_once()
+        assert result is True
+
+    def test_planner_pass_when_plan_ref_exists_and_state_changed(
+        self,
+    ) -> None:
+        """Planner 有 plan_ref 且 state/claimed → state/handoff → pass"""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.execution.issue_role_support import (
+            apply_required_ref_post_sync,
+        )
+
+        mock_store = MagicMock()
+        mock_config = MagicMock()
+        mock_config.repo = "owner/repo"
+        mock_request = MagicMock()
+
+        before = {"refs": {}, "state_label": "state/claimed"}
+        after = {
+            "refs": {"plan_ref": "/path/to/plan.md"},
+            "state_label": "state/handoff",  # ← state 已变
+        }
+
+        mock_missing_handler = MagicMock()
+
+        with patch(
+            "vibe3.execution.issue_role_support.apply_request_completion_gate",
+            return_value=True,
+        ):
+            result = apply_required_ref_post_sync(
+                mock_store,
+                100,
+                "task/issue-100",
+                "agent:plan",
+                mock_config,
+                before,
+                after,
+                mock_request,
+                required_ref="plan_ref",
+                missing_reason="no plan_ref",
+                missing_ref_handler=mock_missing_handler,
+            )
+
+        # Verify: missing_ref_handler NOT called (pass)
+        mock_missing_handler.assert_not_called()
+        assert result is True

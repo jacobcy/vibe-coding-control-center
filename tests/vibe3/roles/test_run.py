@@ -259,3 +259,97 @@ class TestExecutorNoProgressPolicy:
         )
 
         assert has_progress is False  # ← 无推进（report_ref 缺失）
+
+
+class TestExecutorNoOpGate:
+    """Executor no-op gate: report_ref 存在但 state 未变 → blocked"""
+
+    def test_executor_blocked_when_report_ref_exists_but_state_unchanged(
+        self,
+    ) -> None:
+        """Executor 有 report_ref 但 state/in-progress 未变 → blocked"""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.execution.issue_role_support import (
+            apply_required_ref_post_sync,
+        )
+
+        mock_store = MagicMock()
+        mock_config = MagicMock()
+        mock_config.repo = "owner/repo"
+        mock_request = MagicMock()
+
+        before = {"refs": {}, "state_label": "state/in-progress"}
+        after = {
+            "refs": {"report_ref": "/path/to/report.md"},
+            "state_label": "state/in-progress",  # ← state 未变
+        }
+
+        mock_missing_handler = MagicMock()
+
+        with patch(
+            "vibe3.execution.issue_role_support.apply_request_completion_gate",
+            return_value=True,
+        ):
+            result = apply_required_ref_post_sync(
+                mock_store,
+                200,
+                "task/issue-200",
+                "agent:run",
+                mock_config,
+                before,
+                after,
+                mock_request,
+                required_ref="report_ref",
+                missing_reason="no report_ref",
+                missing_ref_handler=mock_missing_handler,
+            )
+
+        # Verify: missing_ref_handler called (block on no-op)
+        mock_missing_handler.assert_called_once()
+        assert result is True
+
+    def test_executor_pass_when_report_ref_exists_and_state_changed(
+        self,
+    ) -> None:
+        """Executor 有 report_ref 且 state/in-progress → state/handoff → pass"""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.execution.issue_role_support import (
+            apply_required_ref_post_sync,
+        )
+
+        mock_store = MagicMock()
+        mock_config = MagicMock()
+        mock_config.repo = "owner/repo"
+        mock_request = MagicMock()
+
+        before = {"refs": {}, "state_label": "state/in-progress"}
+        after = {
+            "refs": {"report_ref": "/path/to/report.md"},
+            "state_label": "state/handoff",  # ← state 已变
+        }
+
+        mock_missing_handler = MagicMock()
+
+        with patch(
+            "vibe3.execution.issue_role_support.apply_request_completion_gate",
+            return_value=True,
+        ):
+            result = apply_required_ref_post_sync(
+                mock_store,
+                200,
+                "task/issue-200",
+                "agent:run",
+                mock_config,
+                before,
+                after,
+                mock_request,
+                required_ref="report_ref",
+                missing_reason="no report_ref",
+                missing_ref_handler=mock_missing_handler,
+            )
+
+        # Verify: missing_ref_handler NOT called (pass)
+        mock_missing_handler.assert_not_called()
+        assert result is True

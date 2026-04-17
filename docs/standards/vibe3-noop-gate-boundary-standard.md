@@ -123,7 +123,37 @@ related_docs:
 - `handoff` 仍然是系统默认的重新分诊入口
 - 一旦 prompt 或代码残留强制 `handoff` 语义，就会很容易在这个状态上形成往返
 
-## 4. 核心原则总结
+## 4. Dispatch Predicates 原则
+
+**Orchestra dispatch 只看 label，不看 ref**：
+
+- ✅ **正确**: `state/claimed` → 派发 planner
+- ✅ **正确**: `state/in-progress` → 派发 executor
+- ✅ **正确**: `state/review` → 派发 reviewer
+- ❌ **错误**: 检查 `plan_ref` 存在才派发 executor
+- ❌ **错误**: 检查 `report_ref` 存在才派发 reviewer
+
+**Why**: ref 是 agent 的产出，不是 orchestra 的判断条件。底层不应侵入上层业务逻辑。
+
+**当前问题** (不在本 plan scope):
+
+```python
+# Executor (run.py:41-43)
+dispatch_predicate=lambda fs, live: (
+    bool(fs.get("plan_ref")) and not fs.get("report_ref") and not live
+)
+→ 检查 plan_ref/report_ref 存在性 → 底层业务判断
+
+# Reviewer (review.py:59-61)
+dispatch_predicate=lambda fs, live: (
+    bool(fs.get("report_ref")) and not fs.get("audit_ref") and not live
+)
+→ 检查 report_ref/audit_ref 存在性 → 底层业务判断
+```
+
+这些问题属于下一个 issue scope，当前 plan 只修 post-sync gate。
+
+## 5. 核心原则总结
 
 **label 处理的唯一正确方式**：
 
