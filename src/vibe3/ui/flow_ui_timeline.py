@@ -34,6 +34,7 @@ _EVENT_COLOR: dict[str, str] = {
     "reviewer_completed": "green",
     "reviewer_aborted": "red",
     "state_transitioned": "cyan bold",
+    "state_unchanged": "yellow",
     "blocked": "red bold",
     "failed": "red bold",
     "resumed": "green bold",

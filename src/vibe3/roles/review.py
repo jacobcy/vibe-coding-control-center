@@ -195,12 +195,14 @@ def _process_review_sync_result(
     the after snapshot is taken, allowing the review output to be parsed
     and audit_ref written before the required_ref gate check.
     """
+    from vibe3.utils.constants import VERDICT_UNKNOWN
+
     # Parse verdict from stdout (fallback to UNKNOWN if parse fails)
     try:
         review = parse_codex_review(stdout)
         verdict = review.verdict
     except ReviewParserError:
-        verdict = "UNKNOWN"
+        verdict = VERDICT_UNKNOWN
 
     # Create audit artifact and write audit_ref
     audit_ref = _resolve_authoritative_audit_ref(
@@ -212,6 +214,7 @@ def _process_review_sync_result(
     _build_handoff_service(branch).record_audit(
         audit_ref=audit_ref,
         actor=actor,
+        verdict=verdict,
     )
 
 
@@ -406,6 +409,8 @@ def execute_manual_review(
         return ReviewRunResult("DRY_RUN", None, issue_number)
 
     # 增加容错性：即使 parser 失败也写入 audit_ref
+    from vibe3.utils.constants import VERDICT_UNKNOWN
+
     try:
         review = review_parser(result.stdout)
         verdict = review.verdict
@@ -414,13 +419,13 @@ def execute_manual_review(
         logger.bind(domain="review").warning(
             f"Failed to parse review output, using verdict=UNKNOWN: {err}"
         )
-        verdict = "UNKNOWN"  # ← 不抛异常，继续写 audit_ref
+        verdict = VERDICT_UNKNOWN
 
     # 无论 parser 是否成功，只要有输出就写入 audit_ref
     audit_ref = _resolve_authoritative_audit_ref(
         str(result.handoff_file) if result.handoff_file else None,
         result.stdout,  # ← 直接使用原始输出
-        verdict,  # ← verdict 为 "UNKNOWN" 或实际值
+        verdict,
         branch,
     )
 
@@ -429,6 +434,7 @@ def execute_manual_review(
         _build_handoff_service(branch).record_audit(
             audit_ref=audit_ref,
             actor="agent:review",
+            verdict=verdict,
         )
         publish_review_command_success(
             issue_number=issue_number,

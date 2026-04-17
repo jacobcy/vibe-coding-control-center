@@ -263,18 +263,37 @@ def apply_required_ref_post_sync(
             )
             return True
 
-    # Record state transition if it occurred
+    # Record state change (or lack thereof) as flow event — always written
+    from vibe3.utils.constants import (
+        EVENT_STATE_TRANSITIONED,
+        EVENT_STATE_UNCHANGED,
+    )
+
     before_state = before_snapshot.get("state_label")
     after_state = after_snapshot.get("state_label")
     if before_state != after_state:
         store.add_event(
             _branch,
-            "state_transitioned",
+            EVENT_STATE_TRANSITIONED,
             actor,
             detail=f"State changed: {before_state} → {after_state}",
             refs={
                 "before_state": str(before_state or ""),
                 "after_state": str(after_state or ""),
+                "issue": str(issue_number),
+            },
+        )
+    else:
+        store.add_event(
+            _branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=(
+                f"State unchanged after {required_ref} gate: " f"still {before_state}"
+            ),
+            refs={
+                "state": str(before_state or ""),
+                "required_ref": required_ref,
                 "issue": str(issue_number),
             },
         )

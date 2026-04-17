@@ -55,3 +55,23 @@ ALL_CODEX_WARNINGS: Final[tuple[str, ...]] = (
 # L3 agent roles (manager/plan/run/review) that must not auto-increment session names
 # to prevent multiple physical sessions running for the same task
 L3_AGENT_ROLES: Final[frozenset[str]] = frozenset({"manager", "plan", "run", "review"})
+
+# =============================================================================
+# Flow Event Types (SQLite store.add_event event_type values)
+# =============================================================================
+
+# State change events — always recorded after role execution completes
+EVENT_STATE_TRANSITIONED: Final[str] = "state_transitioned"
+EVENT_STATE_UNCHANGED: Final[str] = "state_unchanged"
+
+# =============================================================================
+# Flow State Ref Fields
+# =============================================================================
+
+# Review verdict field name in flow_state and event refs
+FIELD_VERDICT: Final[str] = "verdict"
+
+# Known verdict values (observational only — manager decides business logic)
+VERDICT_PASS: Final[str] = "PASS"
+VERDICT_FAIL: Final[str] = "FAIL"
+VERDICT_UNKNOWN: Final[str] = "UNKNOWN"
