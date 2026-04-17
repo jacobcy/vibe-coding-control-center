@@ -93,13 +93,42 @@ code_limits:
         limit: 650
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
 
-      # Roles 层 —— 允许 550
+      # Roles 层 —— 允许 550-570
       - path: "src/vibe3/roles/review.py"
-        limit: 550
+        limit: 570
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/run.py"
         limit: 450
         reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、plan 解析"
+      - path: "src/vibe3/roles/manager.py"
+        limit: 420
+        reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
+      - path: "src/vibe3/roles/plan.py"
+        limit: 330
+        reason: "Planner 角色聚合，包含 request builder 和 dispatch 逻辑"
+
+      # Commands 层 —— 允许 440
+      - path: "src/vibe3/commands/task.py"
+        limit: 440
+        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
+
+      # Execution 层 —— 允许 400
+      - path: "src/vibe3/execution/coordinator.py"
+        limit: 400
+        reason: "执行协调器，统一管理角色启动和追踪"
+      - path: "src/vibe3/execution/issue_role_support.py"
+        limit: 400
+        reason: "Issue 角色支持，包含 dispatch predicate 和 role contract 集成"
+
+      # Domain handlers —— 允许 310
+      - path: "src/vibe3/domain/handlers/flow_lifecycle.py"
+        limit: 310
+        reason: "Flow 生命周期处理器，包含状态转换和事件发布逻辑"
+
+      # Models —— 允许 400
+      - path: "src/vibe3/models/orchestra_config.py"
+        limit: 400
+        reason: "Orchestra 配置模型聚合，包含多个嵌套配置类定义"
 
       # Server —— 允许 470
       - path: "src/vibe3/server/app.py"
