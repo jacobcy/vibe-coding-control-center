@@ -72,7 +72,7 @@ vibe-center/
 │   ├── README.md                # AI 工作区说明
 │   ├── context/                 # AI 上下文
 │   │   ├── task.md              # [UNTRACKED] 由 vibe3 handoff 命令管理，不直接编辑
-│   │   └── memory.md            # [TRACKED] 跨项目长期记忆与架构共识
+│   │   └── memory/              # [TRACKED] AI 上下文记忆（已迁移至 claude-memory MCP 工具）
 │   ├── rules/                   # 编码规则
 │   │   ├── coding-standards.md  # 编码标准
 │   │   ├── python-standards.md  # Python 标准（V3 权威）
@@ -256,7 +256,7 @@ vibe3 inspect commit <sha>                # 改动影响范围
 | 文件 | 职责 | 更新频率 |
 |------|------|---------|
 | `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff` 命令访问，不直接编辑） | 每个动作后 |
-| `memory.md` | **[TRACKED]** 长期共识、跨项目的架构决策池 | 重要架构决策时 |
+| `memory/` | **[TRACKED]** AI 上下文记忆目录（已迁移至 claude-memory MCP 工具） | 不再主动更新 |
 
 #### `.claude/rules/` - 编码规则
 
@@ -437,7 +437,7 @@ ls ~/.vibe/
 | `DEVELOPER.md` | 开发流程、工具变更 | 开发流程、工具使用 |
 | `docs/README.md` | 文档结构变更 | 文档组织、导航 |
 | `vibe3 handoff append` | 每个新任务 / skill 完成后 | 当前 flow handoff 状态（`vibe3 handoff show` 读取） |
-| `.agent/context/memory.md` | 重要决策时 | 历史决策记录 |
+| `claude-memory` MCP 工具 | 重要决策时 | 跨会话记忆：被动记忆通过 hooks 自动捕获 observations（`search`、`get_observations` 查询）；主动记忆通过 `build_corpus` 创建知识库，`prime_corpus` + `query_corpus` 查询 |
 
 ## 🎯 设计原则
 
