@@ -240,13 +240,22 @@ def status(
                 number = cast(int, item["number"])
                 title = cast(str, item["title"])
                 flow = cast(FlowStatusResponse | None, item["flow"])
+                blocked_by = cast(tuple[int, ...] | None, item.get("blocked_by"))
+                blocked_reason = cast(str | None, item.get("blocked_reason"))
+
                 if flow is None:
                     flow_info = "[dim](no flow scene)[/]"
                 elif getattr(flow, "flow_status", "active") == "stale":
                     flow_info = f"[dim]{flow.branch} (stale)[/]"
                 else:
                     flow_info = f"[cyan]{flow.branch}[/]"
+
                 console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
+                if blocked_by:
+                    blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)
+                    console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
+                if blocked_reason:
+                    console.print(f"         [yellow]reason:[/] {blocked_reason}")
         else:
             console.print("  [dim](none)[/]")
 

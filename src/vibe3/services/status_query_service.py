@@ -184,6 +184,21 @@ class StatusQueryService:
                 else None
             )
 
+            # Parse blocked_by from issue body
+            blocked_by = None
+            blocked_reason = None
+            if state == IssueState.BLOCKED:
+                from vibe3.clients.github_issues_ops import parse_blocked_by
+
+                body = str(item.get("body") or "")
+                blocked_by_nums = parse_blocked_by(body)
+                if blocked_by_nums:
+                    blocked_by = tuple(blocked_by_nums)
+
+                # Get blocked_reason from flow state if available
+                if flow:
+                    blocked_reason = getattr(flow, "blocked_reason", None)
+
             # Parse queue metadata from labels
             labels = [
                 label.get("name", "")
@@ -209,6 +224,8 @@ class StatusQueryService:
                     "flow": flow,
                     "queued": number in queued_set,
                     "failed_reason": failed_reason,
+                    "blocked_by": blocked_by,
+                    "blocked_reason": blocked_reason,
                     # Queue metadata
                     "milestone": milestone,
                     "roadmap": roadmap,
