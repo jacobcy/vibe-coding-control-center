@@ -396,6 +396,8 @@ def execute_manual_review(
         handoff_metadata={},
         config=cfg,
         branch=branch,
+        issue_number=issue_number,
+        pre_gate_callback=_process_review_sync_result,
     )
     if async_mode and not dry_run and branch:
         launch = _dispatch_async_manual_review(

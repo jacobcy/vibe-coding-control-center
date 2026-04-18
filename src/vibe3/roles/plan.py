@@ -247,6 +247,7 @@ def execute_spec_plan(
         task=request.task_guidance,
         handoff_kind="plan",
         branch=branch,
+        issue_number=issue_number,
         cwd=Path.cwd(),
         config=cfg,
     )

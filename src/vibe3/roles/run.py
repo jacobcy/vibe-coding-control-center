@@ -346,6 +346,7 @@ def execute_manual_run(
             model=model,
             config=config,
             branch=branch,
+            issue_number=issue_number,
         )
         return CodeagentExecutionService(config).execute_sync(command)
 
@@ -379,6 +380,7 @@ def execute_manual_run(
         model=model,
         config=config,
         branch=branch,
+        issue_number=issue_number,
     )
 
     if not dry_run and not no_async:

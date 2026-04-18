@@ -28,6 +28,8 @@ class CodeagentCommand:
     cwd: Path | None = None
     config: VibeConfig | None = None
     branch: str | None = None
+    issue_number: int | None = None
+    pre_gate_callback: Callable[..., None] | None = None
     cli_args: list[str] | None = None
 
 
@@ -59,6 +61,8 @@ def create_codeagent_command(
     cwd: Path | None = None,
     config: VibeConfig | None = None,
     branch: str | None = None,
+    issue_number: int | None = None,
+    pre_gate_callback: Callable[..., None] | None = None,
     cli_args: list[str] | None = None,
 ) -> CodeagentCommand:
     """Factory function to create CodeagentCommand.
@@ -76,6 +80,10 @@ def create_codeagent_command(
         cwd: Explicit working directory for agent execution
         config: VibeConfig instance
         branch: Current branch (for async execution)
+        issue_number: GitHub issue number (for no-op gate)
+        pre_gate_callback: Optional callback invoked after agent completes
+            but before the no-op gate fires. Receives (issue_number, branch,
+            actor, stdout). Used by reviewer to write audit_ref from stdout.
         cli_args: Optional explicit CLI args used for async self-invocation
 
     Returns:
@@ -100,5 +108,7 @@ def create_codeagent_command(
         cwd=cwd,
         config=config,
         branch=branch,
+        issue_number=issue_number,
+        pre_gate_callback=pre_gate_callback,
         cli_args=cli_args,
     )

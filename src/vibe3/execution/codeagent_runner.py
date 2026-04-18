@@ -34,6 +34,110 @@ __all__ = [
     "CodeagentExecutionService",
 ]
 
+_REQUIRED_REF_BY_ROLE: dict[ExecutionRole, str] = {
+    "planner": "plan_ref",
+    "executor": "report_ref",
+    "reviewer": "audit_ref",
+}
+
+
+def _apply_unified_noop_gate(
+    *,
+    store: SQLiteClient,
+    issue_number: int,
+    branch: str,
+    actor: str,
+    role: ExecutionRole,
+    required_ref: str,
+    before_state_label: str | None,
+) -> None:
+    """Apply the unified three-branch no-op gate after agent completion.
+
+    This gate fires inside codeagent_runner for BOTH sync and async paths,
+    ensuring consistent completion checking regardless of dispatch mode.
+
+    Three-branch logic:
+    1. Missing required_ref -> block
+    2. Ref present + state unchanged -> block (no-op)
+    3. Ref present + state changed -> pass (record transition)
+    """
+    from vibe3.services.issue_failure_service import (
+        block_executor_noop_issue,
+        block_planner_noop_issue,
+        block_reviewer_noop_issue,
+    )
+    from vibe3.utils.constants import EVENT_STATE_TRANSITIONED, EVENT_STATE_UNCHANGED
+
+    flow_state = store.get_flow_state(branch)
+    if not isinstance(flow_state, dict):
+        return
+
+    after_state_label = str(flow_state.get("state_label", "") or "")
+    ref_value = str(flow_state.get(required_ref, "") or "")
+
+    _block_fn = {
+        "planner": block_planner_noop_issue,
+        "executor": block_executor_noop_issue,
+        "reviewer": block_reviewer_noop_issue,
+    }[role]
+
+    # Branch 1: Missing required_ref -> block
+    if not ref_value:
+        store.add_event(
+            branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=f"Missing {required_ref} after {role} -> blocked",
+            refs={
+                "state": str(before_state_label or ""),
+                "required_ref": required_ref,
+                "issue": str(issue_number),
+            },
+        )
+        _block_fn(
+            issue_number=issue_number,
+            reason=f"{role} completed without producing {required_ref}",
+            actor=actor,
+        )
+        return
+
+    # Branch 2: Ref present + state unchanged -> block (no-op)
+    if before_state_label == after_state_label:
+        store.add_event(
+            branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=(
+                f"State unchanged after {required_ref} gate: "
+                f"still {before_state_label}"
+            ),
+            refs={
+                "state": str(before_state_label or ""),
+                "required_ref": required_ref,
+                "issue": str(issue_number),
+            },
+        )
+        _block_fn(
+            issue_number=issue_number,
+            reason=f"{required_ref} present but state unchanged",
+            actor=actor,
+        )
+        return
+
+    # Branch 3: Ref present + state changed -> pass
+    store.add_event(
+        branch,
+        EVENT_STATE_TRANSITIONED,
+        actor,
+        detail=f"State changed: {before_state_label} -> {after_state_label}",
+        refs={
+            "before_state": str(before_state_label or ""),
+            "after_state": after_state_label,
+            "required_ref": required_ref,
+            "issue": str(issue_number),
+        },
+    )
+
 
 class CodeagentExecutionService:
     """Unified sync execution shell for command-mode codeagent runs."""
@@ -99,6 +203,14 @@ class CodeagentExecutionService:
             # because the inner child has the real agent actor.
             store.update_flow_state(branch, latest_actor=actor)
 
+        # Capture before_state_label for unified no-op gate.
+        # Runs in both sync and async paths when issue_number is available.
+        before_state_label: str | None = None
+        if branch and store and command.issue_number is not None:
+            flow_state = store.get_flow_state(branch)
+            if isinstance(flow_state, dict):
+                before_state_label = str(flow_state.get("state_label", "") or "")
+
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
         execution_cwd = self._resolve_command_cwd(command.cwd)
@@ -149,44 +261,37 @@ class CodeagentExecutionService:
                         refs={"status": "completed"},
                     )
 
-                # Record current state for completion gate observability.
-                # Must execute in both sync and async child paths.
-                #
-                # KNOWN GAP: This code runs inside the container (tmux child
-                # process). The full three-branch no-op gate lives in
-                # issue_role_sync_runner's post_sync_hook path and requires
-                # before/after snapshots that are only captured in the
-                # container-outside (sync) path. When running inside tmux,
-                # no-op gate never fires. If the agent fails to change the
-                # issue label, the orchestra will re-dispatch on the next
-                # cycle, causing repeated dispatch loops (e.g. issue #323).
-                # See docs/standards/vibe3-execution-paths-standard.md section 3.
-                from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
+                # Pre-gate callback: allow roles to write refs from stdout
+                # before the gate checks. Used by reviewer to write audit_ref.
+                if (
+                    command.pre_gate_callback is not None
+                    and command.issue_number is not None
+                    and agent_result.stdout
+                ):
+                    try:
+                        command.pre_gate_callback(
+                            issue_number=command.issue_number,
+                            branch=branch,
+                            actor=actor,
+                            stdout=agent_result.stdout,
+                        )
+                    except Exception as cb_exc:
+                        log.warning(f"pre_gate_callback failed: {cb_exc}")
 
-                flow_state = store.get_flow_state(branch)
-                current_state = ""
-                if isinstance(flow_state, dict):
-                    current_state = str(flow_state.get("state_label", ""))
-                required_ref = (
-                    "report_ref"
-                    if command.role == "executor"
-                    else "plan_ref" if command.role == "planner" else "audit_ref"
-                )
-                ref_value = ""
-                if isinstance(flow_state, dict):
-                    ref_value = str(flow_state.get(required_ref, "") or "")
-                store.add_event(
-                    branch,
-                    EVENT_STATE_TRANSITIONED,
-                    actor,
-                    detail=f"{command.role} completed, state: {current_state}",
-                    refs={
-                        "state": current_state,
-                        "required_ref": required_ref,
-                        "ref_present": "yes" if ref_value else "no",
-                        "issue": "",
-                    },
-                )
+                # Unified no-op gate: fires in both sync and async paths.
+                # Checks required_ref presence and state_label change.
+                # Blocks the issue if the agent produced no observable progress.
+                required_ref = _REQUIRED_REF_BY_ROLE.get(command.role)
+                if command.issue_number is not None and required_ref:
+                    _apply_unified_noop_gate(
+                        store=store,
+                        issue_number=command.issue_number,
+                        branch=branch,
+                        actor=actor,
+                        role=command.role,
+                        required_ref=required_ref,
+                        before_state_label=before_state_label,
+                    )
 
             return CodeagentResult(
                 success=agent_result.is_success(),
