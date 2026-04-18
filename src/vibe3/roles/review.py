@@ -31,7 +31,7 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
-    build_required_ref_sync_spec,
+    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
@@ -44,21 +44,14 @@ from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.issue_failure_service import (
-    block_reviewer_noop_issue,
-    fail_reviewer_issue,
-)
+from vibe3.services.issue_failure_service import fail_reviewer_issue
 
 REVIEWER_ROLE = TriggerableRoleDefinition(
     name="reviewer",
     registry_role="reviewer",
-    gate_config=REVIEWER_GATE_CONFIG,
+    worktree=REVIEWER_GATE_CONFIG,
     trigger_name="review",
     trigger_state=IssueState.REVIEW,
-    status_field="reviewer_status",
-    # Re-dispatch while state remains REVIEW. No-op gate will block if audit_ref
-    # exists but the agent fails to move the state forward.
-    dispatch_predicate=lambda _fs, live: not live,
 )
 
 
@@ -105,8 +98,7 @@ def build_review_request(
         actor=actor,
         execution_name=f"vibe3-reviewer-issue-{issue.number}",
         refs=refs,
-        worktree_requirement=REVIEWER_ROLE.gate_config.worktree,
-        completion_gate=REVIEWER_ROLE.gate_config.completion_contract,
+        worktree_requirement=REVIEWER_ROLE.worktree,
         repo_path=repo_path,
     )
 
@@ -139,50 +131,7 @@ def build_review_sync_request(
         execution_name=f"vibe3-reviewer-issue-{issue.number}",
         session_id=session_id,
         dry_run=dry_run,
-        worktree_requirement=REVIEWER_ROLE.gate_config.worktree,
-        completion_gate=REVIEWER_ROLE.gate_config.completion_contract,
-    )
-
-
-def publish_review_command_success(
-    *,
-    issue_number: int | None,
-    branch: str | None,
-    verdict: str,
-) -> None:
-    """Publish review completion lifecycle for manual review commands."""
-    from vibe3.domain.events import ReviewCompleted
-    from vibe3.domain.publisher import publish
-
-    if issue_number is None or branch is None:
-        return
-    publish(
-        ReviewCompleted(
-            issue_number=issue_number,
-            branch=branch,
-            verdict=verdict,
-            actor="agent:review",
-        )
-    )
-
-
-def publish_review_command_failure(
-    *,
-    issue_number: int | None,
-    reason: str,
-) -> None:
-    """Publish review failure lifecycle for manual review commands."""
-    from vibe3.domain.events import IssueFailed
-    from vibe3.domain.publisher import publish
-
-    if issue_number is None:
-        return
-    publish(
-        IssueFailed(
-            issue_number=issue_number,
-            reason=reason,
-            actor="agent:review",
-        )
+        worktree_requirement=REVIEWER_ROLE.worktree,
     )
 
 
@@ -192,8 +141,8 @@ def _process_review_sync_result(
     """Process sync review output and write audit_ref to flow_state.
 
     This callback is invoked after sync execution completes but before
-    the after snapshot is taken, allowing the review output to be parsed
-    and audit_ref written before the required_ref gate check.
+    the unified no-op gate takes its after snapshot, allowing the review
+    output to be parsed and audit_ref written into flow state first.
     """
     from vibe3.utils.constants import VERDICT_UNKNOWN
 
@@ -218,7 +167,7 @@ def _process_review_sync_result(
     )
 
 
-REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
+REVIEW_SYNC_SPEC = build_issue_sync_spec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
     resolve_branch=REVIEW_BRANCH_RESOLVER,
@@ -228,17 +177,10 @@ REVIEW_SYNC_SPEC = build_required_ref_sync_spec(
         actor=actor,
     ),
     build_sync_request=build_review_sync_request,
-    required_ref="audit_ref",
-    missing_reason="Reviewer completed without producing audit_ref",
-    missing_ref_handler=block_reviewer_noop_issue,
     failure_handler=lambda issue_number, reason: fail_reviewer_issue(
         issue_number=issue_number,
         reason=reason,
     ),
-    # No success_handler: state transitions are managed by the agent.
-    # The no-op gate blocks if audit_ref exists but state unchanged.
-    # Write audit_ref from stdout before snapshot.
-    process_sync_result=_process_review_sync_result,
 )
 
 
@@ -447,11 +389,6 @@ def execute_manual_review(
             audit_ref=audit_ref,
             actor="agent:review",
             verdict=verdict,
-        )
-        publish_review_command_success(
-            issue_number=issue_number,
-            branch=branch,
-            verdict=verdict,  # ← 使用实际或 UNKNOWN verdict
         )
 
     return ReviewRunResult(verdict, audit_ref, issue_number)

@@ -60,9 +60,9 @@ class OrchestrationFacade(ServiceBase):
                 When provided, GlobalDispatchCoordinator is used for unified
                 dispatch with capacity checks before emitting intents.
                 When None, legacy concurrent gather path is used (backward compat).
-            failed_gate: Optional FailedGate to check if dispatch is frozen.
-                When provided, on_tick() checks gate before dispatch but
-                always reconciles in-flight markers to prevent capacity deadlock.
+            failed_gate: Optional FailedGate retained for compatibility with
+                existing server assembly. Runtime dispatch is no longer frozen
+                here; gating belongs on the authoritative sync execution path.
         """
         self._tick_count = tick_count
         self._config = OrchestraConfig.from_settings()
@@ -108,8 +108,7 @@ class OrchestrationFacade(ServiceBase):
                 "Both dispatch_services and capacity must be provided at init time."
             )
 
-        # ✅ Always reconcile session state to prevent stale capacity tracking
-        # This must happen even when failed_gate is frozen
+        # Always reconcile session state to prevent stale capacity tracking.
         if self._capacity:
             # Reconcile session state (mark dead tmux sessions as orphaned)
             # This ensures count_live_worker_sessions() returns accurate results.
@@ -119,20 +118,6 @@ class OrchestrationFacade(ServiceBase):
             backend = self._capacity._backend
             registry = SessionRegistryService(store, backend)
             registry.reconcile_live_state()
-
-        # Check if dispatch is frozen by failed gate
-        if self._failed_gate:
-            gate_result = self._failed_gate.check()
-            if gate_result.blocked:
-                logger.bind(
-                    domain="orchestration_facade",
-                    action="dispatch_frozen",
-                    issue=gate_result.issue_number,
-                ).info(
-                    f"Dispatch frozen by state/failed issue "
-                    f"#{gate_result.issue_number}, skipping collection and dispatch"
-                )
-                return
 
         await self._coordinator.coordinate()
 

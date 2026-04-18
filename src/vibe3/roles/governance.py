@@ -38,7 +38,7 @@ from vibe3.services.orchestra_status_service import (
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
     registry_role="governance",
-    gate_config=GOVERNANCE_GATE_CONFIG,
+    worktree=GOVERNANCE_GATE_CONFIG,
 )
 
 GOVERNANCE_TASK_PROMPT = (
@@ -227,8 +227,7 @@ def build_governance_request(
         refs={"task": GOVERNANCE_TASK_PROMPT},
         actor="orchestra:governance",
         mode="async",
-        worktree_requirement=GOVERNANCE_ROLE.gate_config.worktree,
-        completion_gate=GOVERNANCE_ROLE.gate_config.completion_contract,
+        worktree_requirement=GOVERNANCE_ROLE.worktree,
     )
 
 

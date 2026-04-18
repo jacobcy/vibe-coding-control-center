@@ -142,12 +142,27 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
 
 
 def handle_executor_dispatched(event: ExecutorDispatched) -> None:
-    """Handle ExecutorDispatched event via role request builder."""
+    """Handle ExecutorDispatched event via role request builder.
+
+    Enriches the neutral dispatch intent with execution-specific context
+    (plan_ref, audit_ref, commit_mode) read from flow state and handoff files.
+    """
+    store = SQLiteClient()
+
+    # Read execution context from flow state
+    flow_state = store.get_flow_state(event.branch) if event.branch else None
+    plan_ref = str(v) if flow_state and (v := flow_state.get("plan_ref")) else None
+    audit_ref = str(v) if flow_state and (v := flow_state.get("audit_ref")) else None
+
+    from vibe3.roles.run import check_merge_ready_commit
+
+    commit_mode = check_merge_ready_commit(event.branch) if event.branch else False
+
     logger.bind(
         domain="executor_handler",
         issue_number=event.issue_number,
         branch=event.branch,
-        plan_ref=event.plan_ref,
+        plan_ref=plan_ref,
     ).info("Executor dispatch triggered")
 
     try:
@@ -158,9 +173,9 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             request_builder=build_run_request,
             actor=event.actor,
             branch=event.branch,
-            plan_ref=event.plan_ref,
-            audit_ref=event.audit_ref,
-            commit_mode=event.commit_mode,
+            plan_ref=plan_ref,
+            audit_ref=audit_ref,
+            commit_mode=commit_mode,
         )
     except Exception as exc:
         logger.bind(
@@ -172,12 +187,21 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
 
 
 def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
-    """Handle ReviewerDispatched event via role request builder."""
+    """Handle ReviewerDispatched event via role request builder.
+
+    Enriches the neutral dispatch intent with report_ref read from flow state.
+    """
+    store = SQLiteClient()
+
+    # Read execution context from flow state
+    flow_state = store.get_flow_state(event.branch) if event.branch else None
+    report_ref = str(v) if flow_state and (v := flow_state.get("report_ref")) else None
+
     logger.bind(
         domain="reviewer_handler",
         issue_number=event.issue_number,
         branch=event.branch,
-        report_ref=event.report_ref,
+        report_ref=report_ref,
     ).info("Reviewer dispatch triggered")
 
     try:
@@ -188,7 +212,7 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
             request_builder=build_review_request,
             actor=event.actor,
             branch=event.branch,
-            report_ref=event.report_ref,
+            report_ref=report_ref,
         )
     except Exception as exc:
         logger.bind(

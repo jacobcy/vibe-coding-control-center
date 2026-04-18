@@ -18,7 +18,7 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
-    build_required_ref_sync_spec,
+    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
@@ -26,21 +26,14 @@ from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.services.issue_failure_service import (
-    block_executor_noop_issue,
-    fail_executor_issue,
-)
+from vibe3.services.issue_failure_service import fail_executor_issue
 
 EXECUTOR_ROLE = TriggerableRoleDefinition(
     name="executor",
     registry_role="executor",
-    gate_config=EXECUTOR_GATE_CONFIG,
+    worktree=EXECUTOR_GATE_CONFIG,
     trigger_name="run",
     trigger_state=IssueState.IN_PROGRESS,
-    status_field="executor_status",
-    # Re-dispatch while state remains IN_PROGRESS. No-op gate will block if
-    # report_ref exists but the agent fails to move the state forward.
-    dispatch_predicate=lambda _fs, live: not live,
 )
 
 
@@ -55,6 +48,27 @@ def resolve_run_options(config: OrchestraConfig) -> Any:
             config, VibeConfig.get_defaults()
         ),
     )
+
+
+_MERGE_READY_MARKER = "MERGE_READY_COMMIT"
+
+
+def check_merge_ready_commit(branch: str) -> bool:
+    """Check if handoff current.md contains merge-ready commit marker."""
+    try:
+        from vibe3.clients.git_client import GitClient
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        git_common = GitClient().get_git_common_dir()
+        if not git_common:
+            return False
+        handoff_dir = get_branch_handoff_dir(git_common, branch)
+        current_md = handoff_dir / "current.md"
+        if not current_md.exists():
+            return False
+        return _MERGE_READY_MARKER in current_md.read_text(encoding="utf-8")
+    except Exception:
+        return False
 
 
 RUN_BRANCH_RESOLVER = build_task_flow_branch_resolver(
@@ -95,8 +109,7 @@ def build_run_request(
         actor=actor,
         execution_name=f"vibe3-executor-issue-{issue.number}",
         refs=refs,
-        worktree_requirement=EXECUTOR_ROLE.gate_config.worktree,
-        completion_gate=EXECUTOR_ROLE.gate_config.completion_contract,
+        worktree_requirement=EXECUTOR_ROLE.worktree,
         repo_path=repo_path,
     )
 
@@ -128,8 +141,7 @@ def build_run_sync_request(
         execution_name=f"vibe3-executor-issue-{issue.number}",
         session_id=session_id,
         dry_run=dry_run,
-        worktree_requirement=EXECUTOR_ROLE.gate_config.worktree,
-        completion_gate=EXECUTOR_ROLE.gate_config.completion_contract,
+        worktree_requirement=EXECUTOR_ROLE.worktree,
     )
 
 
@@ -176,7 +188,7 @@ def publish_run_command_failure(
     )
 
 
-RUN_SYNC_SPEC = build_required_ref_sync_spec(
+RUN_SYNC_SPEC = build_issue_sync_spec(
     role_name="executor",
     resolve_options=resolve_run_options,
     resolve_branch=RUN_BRANCH_RESOLVER,
@@ -186,16 +198,11 @@ RUN_SYNC_SPEC = build_required_ref_sync_spec(
         actor=actor,
     ),
     build_sync_request=build_run_sync_request,
-    required_ref="report_ref",
-    missing_reason="Executor completed without producing report_ref",
-    missing_ref_handler=block_executor_noop_issue,
     failure_handler=lambda issue_number, reason: fail_executor_issue(
         issue_number=issue_number,
         reason=reason,
         actor="agent:run",
     ),
-    # No success_handler: agent must transition state or get blocked.
-    # See docs/standards/vibe3-noop-gate-boundary-standard.md
 )
 
 

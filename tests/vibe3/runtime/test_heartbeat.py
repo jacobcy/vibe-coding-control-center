@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
@@ -173,7 +172,7 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
+async def test_tick_loop_ignores_failed_gate_and_still_ticks(monkeypatch) -> None:
     server = HeartbeatServer(
         OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
     )
@@ -192,17 +191,7 @@ async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
         if calls["count"] >= 2:
             server.stop()
 
-    mock_gate = type(
-        "_Gate",
-        (),
-        {
-            "check": lambda self: GateResult(
-                blocked=True,
-                issue_number=320,
-                reason="state/failed",
-            )
-        },
-    )()
+    mock_gate = type("_Gate", (), {"check": lambda self: None})()
     server._failed_gate = mock_gate
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
@@ -211,10 +200,8 @@ async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
 
     await server._tick_loop()
 
-    assert any(
-        "state/failed issue #320" in item and "heartbeat tick #1 frozen by" in item
-        for item in events
-    )
+    assert svc.ticks == 1
+    assert any("server:tick #1 start" == item for item in events)
 
 
 @pytest.mark.asyncio

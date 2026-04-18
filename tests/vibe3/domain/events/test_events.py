@@ -1,31 +1,32 @@
 """Tests for domain events data structures."""
 
 from vibe3.domain.events.flow_lifecycle import (
-    ExecutionCompleted,
-    PlanCompleted,
-    ReviewCompleted,
+    IssueFailed,
+    ManagerDispatched,
 )
 
 
-def test_execution_completed_event_structure() -> None:
-    """Test ExecutionCompleted event has correct structure."""
-    event = ExecutionCompleted(
+def test_issue_failed_event_structure() -> None:
+    """Test IssueFailed event has correct structure."""
+    event = IssueFailed(
         issue_number=42,
-        branch="task/issue-42",
+        reason="execution crashed",
         actor="agent:executor",
+        role="executor",
     )
 
     assert event.issue_number == 42
-    assert event.branch == "task/issue-42"
+    assert event.reason == "execution crashed"
     assert event.actor == "agent:executor"
+    assert event.role == "executor"
     assert event.timestamp is None
 
 
-def test_execution_completed_with_timestamp() -> None:
-    """Test ExecutionCompleted event with custom timestamp."""
-    event = ExecutionCompleted(
+def test_issue_failed_with_timestamp() -> None:
+    """Test IssueFailed event with custom timestamp."""
+    event = IssueFailed(
         issue_number=42,
-        branch="task/issue-42",
+        reason="execution crashed",
         actor="agent:executor",
         timestamp="2026-04-09T12:00:00Z",
     )
@@ -33,29 +34,14 @@ def test_execution_completed_with_timestamp() -> None:
     assert event.timestamp == "2026-04-09T12:00:00Z"
 
 
-def test_plan_completed_event_structure() -> None:
-    """Test PlanCompleted event has correct structure."""
-    event = PlanCompleted(
+def test_manager_dispatched_event_structure() -> None:
+    """Test ManagerDispatched event has correct structure."""
+    event = ManagerDispatched(
         issue_number=42,
         branch="task/issue-42",
-        actor="agent:plan",
+        trigger_state="ready",
     )
 
     assert event.issue_number == 42
     assert event.branch == "task/issue-42"
-    assert event.actor == "agent:plan"
-
-
-def test_review_completed_event_structure() -> None:
-    """Test ReviewCompleted event has correct structure."""
-    event = ReviewCompleted(
-        issue_number=42,
-        branch="task/issue-42",
-        verdict="approved",
-        actor="agent:review",
-    )
-
-    assert event.issue_number == 42
-    assert event.branch == "task/issue-42"
-    assert event.verdict == "approved"
-    assert event.actor == "agent:review"
+    assert event.trigger_state == "ready"

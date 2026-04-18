@@ -124,12 +124,12 @@ class TestExecutorFailed:
 
 
 class TestExecutorBlockedNoReportRef:
-    """场景 2: executor 无产出 → state/blocked"""
+    """场景 2: executor 无行动 → state/blocked"""
 
     def test_executor_blocked_no_report_ref_calls_block_executor(
         self,
     ) -> None:
-        """Executor 无 report_ref → 调用 block_executor_noop_issue"""
+        """Executor 无行动 → 调用 block_executor_noop_issue"""
         with patch(
             "vibe3.services.issue_failure_service._ensure_flow_state_for_issue"
         ) as mock_ensure:
@@ -138,7 +138,7 @@ class TestExecutorBlockedNoReportRef:
             block_executor_noop_issue(
                 issue_number=201,
                 repo="jacobcy/vibe-coding-control-center",
-                reason="no report_ref",
+                reason="state unchanged",
                 actor="agent:run",
             )
 
@@ -146,7 +146,7 @@ class TestExecutorBlockedNoReportRef:
             mock_ensure.assert_called_once_with(
                 201,
                 "block",  # ← action 参数
-                "no report_ref",  # ← reason
+                "state unchanged",  # ← reason
                 "agent:run",  # ← actor
             )
 
@@ -262,94 +262,64 @@ class TestExecutorNoProgressPolicy:
 
 
 class TestExecutorNoOpGate:
-    """Executor no-op gate: report_ref 存在但 state 未变 → blocked"""
+    """Executor no-op gate: state 未变 → blocked"""
 
-    def test_executor_blocked_when_report_ref_exists_but_state_unchanged(
+    def test_executor_blocked_when_state_unchanged(
         self,
     ) -> None:
-        """Executor 有 report_ref 但 state/in-progress 未变 → blocked"""
+        """Executor state/in-progress 未变 → blocked"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
+        from vibe3.execution.codeagent_runner import (
+            _apply_unified_noop_gate,
         )
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
-
-        before = {"refs": {}, "state_label": "state/in-progress"}
-        after = {
-            "refs": {"report_ref": "/path/to/report.md"},
-            "state_label": "state/in-progress",  # ← state 未变
+        mock_store.get_flow_state.return_value = {
+            "report_ref": "/path/to/report.md",
+            "state_label": "state/in-progress",
         }
 
-        mock_missing_handler = MagicMock()
-
         with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
-        ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                200,
-                "task/issue-200",
-                "agent:run",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="report_ref",
-                missing_reason="no report_ref",
-                missing_ref_handler=mock_missing_handler,
+            "vibe3.services.issue_failure_service.block_executor_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=200,
+                branch="task/issue-200",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/in-progress",
             )
 
-        # Verify: missing_ref_handler called (block on no-op)
-        mock_missing_handler.assert_called_once()
-        assert result is True
+        mock_block.assert_called_once()
 
-    def test_executor_pass_when_report_ref_exists_and_state_changed(
+    def test_executor_pass_when_state_changed(
         self,
     ) -> None:
-        """Executor 有 report_ref 且 state/in-progress → state/handoff → pass"""
+        """Executor state/in-progress → state/handoff → pass"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
+        from vibe3.execution.codeagent_runner import (
+            _apply_unified_noop_gate,
         )
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
-
-        before = {"refs": {}, "state_label": "state/in-progress"}
-        after = {
-            "refs": {"report_ref": "/path/to/report.md"},
-            "state_label": "state/handoff",  # ← state 已变
+        mock_store.get_flow_state.return_value = {
+            "report_ref": "/path/to/report.md",
+            "state_label": "state/handoff",
         }
 
-        mock_missing_handler = MagicMock()
-
         with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
-        ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                200,
-                "task/issue-200",
-                "agent:run",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="report_ref",
-                missing_reason="no report_ref",
-                missing_ref_handler=mock_missing_handler,
+            "vibe3.services.issue_failure_service.block_executor_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=200,
+                branch="task/issue-200",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/in-progress",
             )
 
-        # Verify: missing_ref_handler NOT called (pass)
-        mock_missing_handler.assert_not_called()
-        assert result is True
+        mock_block.assert_not_called()

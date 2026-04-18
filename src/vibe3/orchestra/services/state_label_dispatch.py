@@ -175,13 +175,12 @@ class StateLabelDispatchService(ServiceBase):
         from vibe3.domain import publish
         from vibe3.roles.registry import build_label_dispatch_event
 
-        branch, flow_state = self._flow_context(issue.number)
+        branch, _ = self._flow_context(issue.number)
         publish(
             build_label_dispatch_event(
                 self.role_def,
                 issue,
                 branch=branch,
-                flow_state=flow_state,
             )
         )
 
@@ -247,21 +246,17 @@ class StateLabelDispatchService(ServiceBase):
         issue_number: int,
         flow_state: dict[str, object] | None,
     ) -> bool:
-        """Use role definition's status_field + dispatch_predicate.
+        """Use role definition's dispatch_predicate with registry liveness check.
 
-        Simple check: just use role definition's dispatch_predicate
-        (which checks has_live_session) without separate in-flight tracking.
+        Registry provides accurate liveness verification:
+        - Real-time tmux session verification
+        - Orphan detection (stale sessions > 60s)
+        - Grace period for recent starting sessions
+
+        Simplified: delegate all liveness checking to registry,
+        removing redundant flow_state.status_field check.
         """
-        status_field = self.role_def.status_field
-        if status_field is None or flow_state is None:
-            has_live_session = self._has_live_dispatch(issue_number)
-        else:
-            is_running = flow_state.get(status_field) == "running"
-            has_live_session = bool(
-                is_running and self._has_live_dispatch(issue_number)
-            )
-
-        # Fallback to empty dict if flow_state is missing
+        has_live_session = self._has_live_dispatch(issue_number)
         return self.role_def.dispatch_predicate(flow_state or {}, has_live_session)
 
     def _has_live_dispatch(self, issue_number: int) -> bool:

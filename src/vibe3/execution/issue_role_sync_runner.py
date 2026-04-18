@@ -62,12 +62,14 @@ def run_issue_role_mode(
 
     Container-outside path (async_mode=False):
       orchestra process runs the agent synchronously, waits for completion.
-      The no-op gate fires inside codeagent_runner.execute_sync().
+      Worker roles still enter codeagent_runner via ExecutionCoordinator, so
+      the same lifecycle / handoff / pre-gate / no-op shell is used.
 
     Container-inside path (async_mode=True):
       orchestra launches a tmux session and returns immediately.
       The tmux child runs codeagent_runner.execute_sync() independently.
-      The no-op gate fires inside execute_sync in both paths.
+      The tmux child is only the execution shell; worker gate logic stays on
+      the sync path in the outer orchestration flow.
     """
     config = OrchestraConfig.from_settings()
     issue = _load_issue_info(config, issue_number)
@@ -159,15 +161,3 @@ def run_issue_role_mode(
                 sync_result.reason or f"{spec.role_name} exited with failure",
             )
         raise typer.Exit(1)
-
-    # Process sync result (e.g., write audit_ref from stdout).
-    # Note: for roles using pre_gate_callback (reviewer), this is handled
-    # inside codeagent_runner before the gate. This call remains for
-    # backward compatibility with any remaining process_sync_result users.
-    if spec.process_sync_result is not None and sync_result.stdout is not None:
-        spec.process_sync_result(
-            issue_number=issue_number,
-            branch=branch,
-            actor=actor,
-            stdout=sync_result.stdout,
-        )

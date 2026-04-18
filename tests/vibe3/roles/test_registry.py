@@ -2,10 +2,10 @@
 
 from vibe3.domain.events import (
     ExecutorDispatched,
+    ManagerDispatched,
     PlannerDispatched,
     ReviewerDispatched,
 )
-from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import MANAGER_ROLE
 from vibe3.roles.plan import PLANNER_ROLE
@@ -29,11 +29,12 @@ def test_build_label_dispatch_event_for_manager():
         MANAGER_ROLE,
         _issue(),
         branch="task/issue-42",
-        flow_state={},
     )
 
-    assert isinstance(event, IssueStateChanged)
-    assert event.to_state == IssueState.READY.value
+    assert isinstance(event, ManagerDispatched)
+    assert event.issue_number == 42
+    assert event.branch == "task/issue-42"
+    assert event.trigger_state == IssueState.READY.value
 
 
 def test_build_label_dispatch_event_for_plan():
@@ -41,7 +42,6 @@ def test_build_label_dispatch_event_for_plan():
         PLANNER_ROLE,
         _issue(),
         branch="task/issue-42",
-        flow_state={},
     )
 
     assert isinstance(event, PlannerDispatched)
@@ -49,30 +49,31 @@ def test_build_label_dispatch_event_for_plan():
     assert event.trigger_state == IssueState.CLAIMED.value
 
 
-def test_build_label_dispatch_event_for_run_includes_plan_ref():
+def test_build_label_dispatch_event_for_run():
     event = build_label_dispatch_event(
         EXECUTOR_ROLE,
         _issue(),
         branch="task/issue-42",
-        flow_state={"plan_ref": "plan.md"},
     )
 
     assert isinstance(event, ExecutorDispatched)
-    assert event.plan_ref == "plan.md"
     assert event.trigger_state == IssueState.IN_PROGRESS.value
+    # Executor-specific context is NOT on the dispatch intent
+    assert not hasattr(event, "plan_ref")
+    assert not hasattr(event, "commit_mode")
 
 
-def test_build_label_dispatch_event_for_review_includes_report_ref():
+def test_build_label_dispatch_event_for_review():
     event = build_label_dispatch_event(
         REVIEWER_ROLE,
         _issue(),
         branch="task/issue-42",
-        flow_state={"report_ref": "report.md"},
     )
 
     assert isinstance(event, ReviewerDispatched)
-    assert event.report_ref == "report.md"
     assert event.trigger_state == IssueState.REVIEW.value
+    # Reviewer-specific context is NOT on the dispatch intent
+    assert not hasattr(event, "report_ref")
 
 
 def test_planner_dispatch_predicate_ignores_plan_ref() -> None:

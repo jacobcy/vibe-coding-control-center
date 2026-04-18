@@ -18,7 +18,7 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
-    build_required_ref_sync_spec,
+    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
@@ -27,21 +27,14 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.services.issue_failure_service import (
-    block_planner_noop_issue,
-    fail_planner_issue,
-)
+from vibe3.services.issue_failure_service import fail_planner_issue
 
 PLANNER_ROLE = TriggerableRoleDefinition(
     name="planner",
     registry_role="planner",
-    gate_config=PLANNER_GATE_CONFIG,
+    worktree=PLANNER_GATE_CONFIG,
     trigger_name="plan",
     trigger_state=IssueState.CLAIMED,
-    status_field="planner_status",
-    # Re-dispatch while state remains CLAIMED. No-op gate will block if plan_ref
-    # exists but the agent fails to move the state forward.
-    dispatch_predicate=lambda _fs, live: not live,
 )
 
 
@@ -137,8 +130,7 @@ def build_plan_request(
         actor=actor,
         execution_name=f"vibe3-planner-issue-{issue.number}",
         refs={"issue_number": str(issue.number)},
-        worktree_requirement=PLANNER_ROLE.gate_config.worktree,
-        completion_gate=PLANNER_ROLE.gate_config.completion_contract,
+        worktree_requirement=PLANNER_ROLE.worktree,
         repo_path=repo_path,
     )
 
@@ -167,12 +159,11 @@ def build_plan_sync_request(
         execution_name=f"vibe3-planner-issue-{issue.number}",
         session_id=session_id,
         dry_run=dry_run,
-        worktree_requirement=PLANNER_ROLE.gate_config.worktree,
-        completion_gate=PLANNER_ROLE.gate_config.completion_contract,
+        worktree_requirement=PLANNER_ROLE.worktree,
     )
 
 
-PLAN_SYNC_SPEC = build_required_ref_sync_spec(
+PLAN_SYNC_SPEC = build_issue_sync_spec(
     role_name="planner",
     resolve_options=resolve_plan_options,
     resolve_branch=PLAN_BRANCH_RESOLVER,
@@ -182,14 +173,9 @@ PLAN_SYNC_SPEC = build_required_ref_sync_spec(
         actor=actor,
     ),
     build_sync_request=build_plan_sync_request,
-    required_ref="plan_ref",
-    missing_reason="Planner completed without producing plan_ref",
-    missing_ref_handler=block_planner_noop_issue,
     failure_handler=lambda issue_number, reason: fail_planner_issue(
         issue_number=issue_number, reason=reason
     ),
-    # No success_handler: agent must transition state or get blocked.
-    # See docs/standards/vibe3-noop-gate-boundary-standard.md
 )
 
 
@@ -288,41 +274,4 @@ def execute_spec_plan(
         )
 
     result = CodeagentExecutionService(cfg).execute_sync(command)
-    if issue_number is None:
-        return result
-    if result.success:
-        publish_plan_command_success(issue_number=issue_number, branch=branch)
-    else:
-        publish_plan_command_failure(
-            issue_number=issue_number,
-            reason=result.stderr or "Plan execution failed",
-        )
     return result
-
-
-def publish_plan_command_success(*, issue_number: int, branch: str) -> None:
-    """Publish plan completion event for command-mode execution."""
-    from vibe3.domain.events import PlanCompleted
-    from vibe3.domain.publisher import publish
-
-    publish(
-        PlanCompleted(
-            issue_number=issue_number,
-            branch=branch,
-            actor="agent:plan",
-        )
-    )
-
-
-def publish_plan_command_failure(*, issue_number: int, reason: str) -> None:
-    """Publish plan failure event for command-mode execution."""
-    from vibe3.domain.events import IssueFailed
-    from vibe3.domain.publisher import publish
-
-    publish(
-        IssueFailed(
-            issue_number=issue_number,
-            reason=reason,
-            actor="agent:plan",
-        )
-    )

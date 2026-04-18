@@ -2,25 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from vibe3.domain.events import (
     ExecutorDispatched,
+    ManagerDispatched,
     PlannerDispatched,
     ReviewerDispatched,
 )
-from vibe3.domain.events.flow_lifecycle import IssueStateChanged
-from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.execution.contracts import ExecutionRequest
-from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
-from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.roles.manager import (
-    HANDOFF_MANAGER_ROLE,
-    MANAGER_ROLE,
-    build_manager_request,
-)
+from vibe3.roles.manager import HANDOFF_MANAGER_ROLE, MANAGER_ROLE
 from vibe3.roles.plan import (
     PLANNER_ROLE,
 )
@@ -39,72 +29,25 @@ LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
     REVIEWER_ROLE,
 )
 
-_MERGE_READY_MARKER = "MERGE_READY_COMMIT"
-
-
-def _check_merge_ready_commit(branch: str) -> bool:
-    """Check if handoff current.md contains merge-ready commit marker."""
-    try:
-        from vibe3.clients.git_client import GitClient
-        from vibe3.utils.git_helpers import get_branch_handoff_dir
-
-        git_common = GitClient().get_git_common_dir()
-        if not git_common:
-            return False
-        handoff_dir = get_branch_handoff_dir(git_common, branch)
-        current_md = handoff_dir / "current.md"
-        if not current_md.exists():
-            return False
-        return _MERGE_READY_MARKER in current_md.read_text(encoding="utf-8")
-    except Exception:
-        return False
-
-
-def resolve_issue_state_role(to_state: str) -> TriggerableRoleDefinition | None:
-    """Resolve the triggerable role definition for an IssueStateChanged event."""
-    if to_state == IssueState.READY.value:
-        return MANAGER_ROLE
-    if to_state == IssueState.HANDOFF.value:
-        return HANDOFF_MANAGER_ROLE
-    return None
-
-
-def build_issue_state_request(
-    config: OrchestraConfig,
-    issue: IssueInfo,
-    to_state: str,
-    *,
-    registry: SessionRegistryService | None = None,
-    repo_path: Path | None = None,
-) -> ExecutionRequest | None:
-    """Build a role request from IssueStateChanged when a role supports it."""
-    role = resolve_issue_state_role(to_state)
-    if role is None:
-        return None
-    if role.registry_role == "manager":
-        return build_manager_request(
-            config,
-            issue,
-            registry=registry,
-            repo_path=repo_path or resolve_orchestra_repo_root(),
-        )
-    return None
-
 
 def build_label_dispatch_event(
     role: TriggerableRoleDefinition,
     issue: IssueInfo,
     *,
     branch: str,
-    flow_state: dict[str, object] | None,
-) -> IssueStateChanged | PlannerDispatched | ExecutorDispatched | ReviewerDispatched:
-    """Build the authoritative domain event for a label-triggered role."""
+) -> ManagerDispatched | PlannerDispatched | ExecutorDispatched | ReviewerDispatched:
+    """Build the authoritative domain event for a label-triggered role.
+
+    Dispatch layer emits neutral intents only -- no execution-specific
+    context (refs, commit_mode) is read here.  The handler layer enriches
+    the request before calling the role builder.
+    """
     trigger = role.trigger_name
     if trigger == "manager":
-        return IssueStateChanged(
+        return ManagerDispatched(
             issue_number=issue.number,
-            from_state=None,
-            to_state=role.trigger_state.value,
+            branch=branch,
+            trigger_state=role.trigger_state.value,
             issue_title=issue.title if issue.title else None,
         )
     if trigger == "plan":
@@ -114,28 +57,15 @@ def build_label_dispatch_event(
             trigger_state=IssueState.CLAIMED.value,
         )
     if trigger == "run":
-        plan_ref = flow_state.get("plan_ref") if flow_state else None
-        audit_ref = flow_state.get("audit_ref") if flow_state else None
-        commit_mode = _check_merge_ready_commit(branch)
         return ExecutorDispatched(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.IN_PROGRESS.value,
-            plan_ref=str(plan_ref) if plan_ref else None,
-            audit_ref=str(audit_ref) if audit_ref else None,
-            commit_mode=commit_mode,
         )
     if trigger == "review":
-        report_ref = flow_state.get("report_ref") if flow_state else None
         return ReviewerDispatched(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.REVIEW.value,
-            report_ref=str(report_ref) if report_ref else None,
         )
-    return IssueStateChanged(
-        issue_number=issue.number,
-        from_state=None,
-        to_state=role.trigger_state.value,
-        issue_title=issue.title if issue.title else None,
-    )
+    raise ValueError(f"Unsupported label dispatch trigger: {trigger}")
