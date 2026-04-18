@@ -226,6 +226,16 @@ class StateLabelDispatchService(ServiceBase):
                 # This usually means manager hasn't run yet.
                 continue
 
+            # Verify the git branch actually exists, not just a stale flow record.
+            # A flow may reference a branch that was deleted (aborted/cleaned up).
+            if not self._flow_manager.git.branch_exists(branch):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} skip #{issue.number}: "
+                    f"branch '{branch}' not found in git",
+                )
+                continue
+
             if not self._should_dispatch(issue.number, flow_state):
                 continue
 

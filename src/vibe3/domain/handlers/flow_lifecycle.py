@@ -1,6 +1,13 @@
 """Event handlers for flow lifecycle events.
 
 Handlers for agent execution events (planner, executor, reviewer).
+
+Note: Ref validation (audit_ref, plan_ref, report_ref) is handled by
+apply_required_ref_post_sync in the sync runner's post_sync_hook, which
+has full before/after snapshot context. Domain event handlers only log
+completion events and do NOT perform ref validation — the domain event
+path lacks execution context and can fire incorrectly when the agent
+never actually ran.
 """
 
 from typing import Callable
@@ -17,9 +24,7 @@ from vibe3.domain.events.flow_lifecycle import (
     ReportRefRequired,
     ReviewCompleted,
 )
-from vibe3.execution.authoritative_ref_gate import require_authoritative_ref
 from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import (
     block_executor_noop_issue,
     block_manager_noop_issue,
@@ -31,87 +36,6 @@ from vibe3.services.issue_failure_service import (
     fail_reviewer_issue,
 )
 from vibe3.services.label_service import LabelService
-
-
-def _handle_completion_with_ref_gate(
-    event_name: str,
-    issue_number: int,
-    branch: str,
-    ref_name: str,
-    reason: str,
-    actor: str,
-    block_issue_func: Callable[..., None],  # Accept callable with keyword args
-) -> bool:
-    """Helper function to handle completion events with authoritative ref gate.
-
-    Architecture limitation: This async path cannot implement full three-branch
-    no-op gate logic because CompletionEvent payload lacks before_state.
-    Full implementation requires event payload redesign (see issue TBD).
-
-    Current behavior:
-    - Branch 1: Missing ref → block (implemented)
-    - Branch 2/3: Cannot detect state change (requires before_state)
-    - Records current state to flow event as conservative fallback
-
-    Args:
-        event_name: Event name for logging
-        issue_number: Issue number
-        branch: Branch name
-        ref_name: Reference name to validate (plan_ref, report_ref, audit_ref)
-        reason: Reason message if ref is missing
-        actor: Actor name
-        block_issue_func: Function to call if ref is missing (accepts keyword args)
-
-    Returns:
-        True if ref exists, False if blocked
-    """
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.services.flow_service import FlowService
-    from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
-
-    flow_service = FlowService()
-    has_ref = require_authoritative_ref(
-        flow_service=flow_service,
-        branch=branch,
-        ref_name=ref_name,
-        issue_number=issue_number,
-        reason=reason,
-        actor=actor,
-        block_issue=block_issue_func,
-    )
-
-    if has_ref:
-        # Cannot detect state change without before_state.
-        # Record current state as conservative fallback (event records current context).
-        flow = flow_service.get_flow_status(branch)
-        current_state = getattr(flow, "flow_status", "unknown") if flow else "unknown"
-
-        store = SQLiteClient()
-        store.add_event(
-            branch,
-            EVENT_STATE_TRANSITIONED,
-            actor,
-            detail=f"{ref_name} present, current state: {current_state}",
-            refs={
-                "state": current_state,
-                "ref_name": ref_name,
-                "issue": str(issue_number),
-            },
-        )
-
-        logger.bind(
-            domain="events",
-            event=event_name,
-            issue=issue_number,
-        ).info(f"{ref_name} found, state recorded to event")
-    else:
-        logger.bind(
-            domain="events",
-            event=event_name,
-            issue=issue_number,
-        ).warning(f"{ref_name} missing, issue blocked")
-
-    return has_ref
 
 
 def handle_issue_state_changed(event: IssueStateChanged) -> None:
@@ -199,7 +123,8 @@ def handle_issue_blocked(event: IssueBlocked) -> None:
 def handle_report_ref_required(event: ReportRefRequired) -> None:
     """Handle ReportRefRequired event.
 
-    Validates report reference via AuthoritativeRefGate.
+    Logs completion only. Ref validation is handled by
+    apply_required_ref_post_sync in the sync runner's post_sync_hook.
     """
     logger.bind(
         domain="events",
@@ -209,24 +134,12 @@ def handle_report_ref_required(event: ReportRefRequired) -> None:
         ref=event.ref_name,
     ).info("Handling ReportRefRequired")
 
-    # Note: This handler validates but doesn't raise exceptions
-    # The caller should check the return value if needed
-    flow_service = FlowService()
-    require_authoritative_ref(
-        flow_service=flow_service,
-        branch=event.branch,
-        ref_name=event.ref_name,
-        issue_number=event.issue_number,
-        reason=event.reason,
-        actor=event.actor,
-        block_issue=block_executor_noop_issue,
-    )
-
 
 def handle_plan_completed(event: PlanCompleted) -> None:
     """Handle PlanCompleted event.
 
-    Validates plan_ref and transitions issue to handoff state.
+    Logs completion only. Ref validation is handled by
+    apply_required_ref_post_sync in the sync runner's post_sync_hook.
     """
     logger.bind(
         domain="events",
@@ -235,21 +148,12 @@ def handle_plan_completed(event: PlanCompleted) -> None:
         branch=event.branch,
     ).info("Handling PlanCompleted")
 
-    _handle_completion_with_ref_gate(
-        event_name="plan_completed",
-        issue_number=event.issue_number,
-        branch=event.branch,
-        ref_name="plan_ref",
-        reason="Missing authoritative plan_ref",
-        actor=event.actor,
-        block_issue_func=block_planner_noop_issue,
-    )
-
 
 def handle_review_completed(event: ReviewCompleted) -> None:
     """Handle ReviewCompleted event.
 
-    Validates audit_ref and transitions issue to handoff state.
+    Logs completion only. Ref validation is handled by
+    apply_required_ref_post_sync in the sync runner's post_sync_hook.
     """
     logger.bind(
         domain="events",
@@ -259,25 +163,12 @@ def handle_review_completed(event: ReviewCompleted) -> None:
         verdict=event.verdict,
     ).info("Handling ReviewCompleted")
 
-    _handle_completion_with_ref_gate(
-        event_name="review_completed",
-        issue_number=event.issue_number,
-        branch=event.branch,
-        ref_name="audit_ref",
-        reason=(
-            "review output was saved, but no authoritative audit_ref "
-            "was registered. Write or regenerate a canonical audit "
-            "note and run handoff audit."
-        ),
-        actor=event.actor,
-        block_issue_func=block_reviewer_noop_issue,
-    )
-
 
 def handle_execution_completed(event: ExecutionCompleted) -> None:
     """Handle ExecutionCompleted event.
 
-    Validates report_ref and transitions issue to handoff state.
+    Logs completion only. Ref validation is handled by
+    apply_required_ref_post_sync in the sync runner's post_sync_hook.
     """
     logger.bind(
         domain="events",
@@ -285,19 +176,6 @@ def handle_execution_completed(event: ExecutionCompleted) -> None:
         issue=event.issue_number,
         branch=event.branch,
     ).info("Handling ExecutionCompleted")
-
-    _handle_completion_with_ref_gate(
-        event_name="execution_completed",
-        issue_number=event.issue_number,
-        branch=event.branch,
-        ref_name="report_ref",
-        reason=(
-            "executor output was saved, but no authoritative report_ref "
-            "was registered. Write a canonical report document and run handoff report."
-        ),
-        actor=event.actor,
-        block_issue_func=block_executor_noop_issue,
-    )
 
 
 def register_flow_lifecycle_handlers() -> None:

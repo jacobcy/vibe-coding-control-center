@@ -85,6 +85,38 @@ def _ensure_flow_state_for_issue(
         )
 
 
+_TERMINAL_LABELS = {
+    IssueState.FAILED.to_label(),
+    IssueState.BLOCKED.to_label(),
+}
+
+
+def _normalize_labels(raw_labels: object) -> list[str]:
+    """Extract label names from GitHub issue payload labels field."""
+    if not isinstance(raw_labels, list):
+        return []
+    result: list[str] = []
+    for item in raw_labels:
+        if isinstance(item, dict):
+            name = item.get("name")
+            if isinstance(name, str):
+                result.append(name)
+    return result
+
+
+def _issue_has_terminal_label(
+    github: GitHubClient,
+    issue_number: int,
+    repo: str | None,
+) -> bool:
+    """Return True if issue already carries a terminal state label."""
+    payload = github.view_issue(issue_number, repo=repo)
+    if not isinstance(payload, dict):
+        return False
+    labels = _normalize_labels(payload.get("labels"))
+    return any(lb in _TERMINAL_LABELS for lb in labels)
+
+
 def _transition_issue_state(
     *,
     issue_number: int,
@@ -95,9 +127,31 @@ def _transition_issue_state(
     repo: str | None = None,
     dedupe_latest_comment: bool = False,
     dedupe_reason: str | None = None,
-) -> None:
-    """Apply optional comment side effect, then transition the issue state."""
+    skip_if_terminal: bool = False,
+) -> bool:
+    """Apply optional comment side effect, then transition the issue state.
+
+    Args:
+        skip_if_terminal: When True, check current issue labels and skip
+            the transition if the issue is already in a terminal state
+            (failed, blocked, or closed). Returns False if skipped.
+
+    Returns:
+        True if transition was applied, False if skipped.
+    """
     github = GitHubClient()
+    if skip_if_terminal and _issue_has_terminal_label(github, issue_number, repo):
+        logger.bind(
+            domain="flow",
+            action="transition_skipped",
+            issue_number=issue_number,
+            to_state=to_state.value,
+        ).info(
+            f"Skipping transition to {to_state.value} for #{issue_number}: "
+            "already in terminal state"
+        )
+        return False
+
     if comment:
         if dedupe_latest_comment:
             _add_comment_if_missing(
@@ -122,6 +176,7 @@ def _transition_issue_state(
         actor=actor,
         force=force,
     )
+    return True
 
 
 def _build_failure_comment(role: str, reason: str) -> str:
@@ -381,6 +436,7 @@ def block_manager_noop_issue(
         repo=repo,
         dedupe_reason=reason,
         comment=f"[manager] 无法推进,已切换为 state/blocked。\n\n原因:{reason}",
+        skip_if_terminal=True,
     )
 
 
@@ -410,6 +466,7 @@ def block_planner_noop_issue(
         repo=repo,
         dedupe_latest_comment=True,
         comment=_build_missing_ref_comment("plan", "plan_ref", reason),
+        skip_if_terminal=True,
     )
 
 
@@ -439,6 +496,7 @@ def block_executor_noop_issue(
         repo=repo,
         dedupe_latest_comment=True,
         comment=_build_missing_ref_comment("run", "report_ref", reason),
+        skip_if_terminal=True,
     )
 
 
@@ -468,6 +526,7 @@ def block_reviewer_noop_issue(
         repo=repo,
         dedupe_latest_comment=True,
         comment=_build_missing_ref_comment("review", "audit_ref", reason),
+        skip_if_terminal=True,
     )
 
 
