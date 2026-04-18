@@ -261,6 +261,8 @@ class CodeagentExecutionService:
                     event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
                 )
 
+                # pre_gate_callback: role-specific business callback that must
+                # run BEFORE the gate (e.g., reviewer writes audit_ref from stdout).
                 if (
                     command.pre_gate_callback is not None
                     and command.issue_number is not None
@@ -276,6 +278,8 @@ class CodeagentExecutionService:
                     except Exception as cb_exc:
                         log.warning(f"pre_gate_callback failed: {cb_exc}")
 
+                # Unified no-op gate: single hard logic check after agent completion.
+                # Executes ONLY if issue_number is available (worker roles).
                 if command.issue_number is not None:
                     _apply_unified_noop_gate(
                         store=store,
