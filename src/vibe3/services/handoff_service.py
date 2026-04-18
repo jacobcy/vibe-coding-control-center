@@ -337,11 +337,11 @@ class HandoffService:
             flow_updates["next_step"] = next_step
         if blocked_by:
             flow_updates["blocked_by"] = blocked_by
-        if verdict:
-            flow_updates["verdict"] = verdict
+        # Note: verdict is NOT a flow_state field, only recorded in event_refs
 
         # 3. Build the update block content.
-        message = f"Recorded {ref_kind} reference: {ref_value}"
+        message = f"verdict: {verdict or 'UNKNOWN'}"
+        message += f"\nRecorded {ref_kind} reference: {ref_value}"
         if next_step:
             message += f"\nNext Step: {next_step}"
         if blocked_by:

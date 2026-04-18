@@ -226,6 +226,16 @@ class StateLabelDispatchService(ServiceBase):
                 # This usually means manager hasn't run yet.
                 continue
 
+            # Verify the git branch actually exists, not just a stale flow record.
+            # A flow may reference a branch that was deleted (aborted/cleaned up).
+            if not self._flow_manager.git.branch_exists(branch):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} skip #{issue.number}: "
+                    f"branch '{branch}' not found in git",
+                )
+                continue
+
             if not self._should_dispatch(issue.number, flow_state):
                 continue
 
@@ -239,14 +249,9 @@ class StateLabelDispatchService(ServiceBase):
     ) -> bool:
         """Use role definition's status_field + dispatch_predicate.
 
-        Also checks if a session is already in-flight for this target to
-        prevent duplicate dispatches before SQLite is updated.
+        Simple check: just use role definition's dispatch_predicate
+        (which checks has_live_session) without separate in-flight tracking.
         """
-        if self._capacity and self._capacity.is_in_flight(
-            self.role_def.registry_role, issue_number
-        ):
-            return False
-
         status_field = self.role_def.status_field
         if status_field is None or flow_state is None:
             has_live_session = self._has_live_dispatch(issue_number)

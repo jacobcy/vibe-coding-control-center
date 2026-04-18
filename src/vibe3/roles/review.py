@@ -56,9 +56,9 @@ REVIEWER_ROLE = TriggerableRoleDefinition(
     trigger_name="review",
     trigger_state=IssueState.REVIEW,
     status_field="reviewer_status",
-    dispatch_predicate=lambda fs, live: (
-        bool(fs.get("report_ref")) and not fs.get("audit_ref") and not live
-    ),
+    # Re-dispatch while state remains REVIEW. No-op gate will block if audit_ref
+    # exists but the agent fails to move the state forward.
+    dispatch_predicate=lambda _fs, live: not live,
 )
 
 
@@ -321,18 +321,6 @@ def _resolve_authoritative_audit_ref(
         if handoff_path.exists():
             return str(handoff_path)
     return str(_create_minimal_audit_artifact(review_output, verdict, branch))
-
-
-def _resolve_error_audit_ref(
-    handoff_file: str | None,
-    review_output: str,
-    branch: str | None,
-) -> str:
-    if handoff_file:
-        handoff_path = Path(handoff_file)
-        if handoff_path.exists():
-            return str(handoff_path)
-    return str(_create_minimal_audit_artifact(review_output, "ERROR", branch))
 
 
 def build_pr_review_request(

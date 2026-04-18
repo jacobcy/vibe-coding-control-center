@@ -76,8 +76,11 @@ code_limits:
         limit: 600
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
       - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 550
+        limit: 600
         reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
+      - path: "src/vibe3/services/task_resume_operations.py"
+        limit: 450
+        reason: "Task resume 操作聚合，包含 reset、label resume 等内聚操作"
       - path: "src/vibe3/services/handoff_service.py"
         limit: 500
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"

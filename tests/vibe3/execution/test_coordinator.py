@@ -16,7 +16,6 @@ def mock_dependencies():
     store = MagicMock()
     backend = MagicMock()
     capacity = MagicMock()
-    capacity.is_in_flight.return_value = False  # not pre-authorized by default
     lifecycle = MagicMock()
     return config, store, backend, capacity, lifecycle
 
@@ -61,11 +60,8 @@ def test_coordinator_dispatch_success(mock_dependencies):
         assert result.tmux_session == "test-session-123"
         assert result.log_path == "/tmp/test.log"
 
-        # Verify capacity checked and in-flight managed
-        capacity.can_dispatch.assert_called_once_with("planner", 42)
-        capacity.mark_launching.assert_called_once_with("planner", 42)
-        # Async success keeps in-flight marker (reconcile_in_flight cleans later)
-        capacity.prune_in_flight.assert_not_called()
+        # Verify capacity checked (no target_id parameter)
+        capacity.can_dispatch.assert_called_once_with("planner")
 
         # Verify start_async_command called correctly
         mock_start.assert_called_once_with(
@@ -86,6 +82,7 @@ def test_coordinator_dispatch_success(mock_dependencies):
             target="task/issue-42",
             actor="orchestra:system",
             refs=expected_refs,
+            event_type="tmux_plan_started",
         )
 
 
@@ -120,7 +117,6 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
 
     # Verify lifecycle not called
     lifecycle.record_started.assert_not_called()
-    capacity.mark_launching.assert_not_called()
 
 
 def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkeypatch):
@@ -238,9 +234,6 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
             error="Tmux failed to start",
             refs={"issue_number": "42"},
         )
-
-    # Verify capacity in-flight pruned even on error
-    capacity.prune_in_flight.assert_called_once_with("planner", {42})
 
 
 @patch("vibe3.execution.coordinator.WorktreeManager")

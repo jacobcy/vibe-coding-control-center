@@ -55,7 +55,21 @@ def run_issue_role_mode(
     fresh_session: bool,
     spec: IssueRoleSyncSpec,
 ) -> None:
-    """Run a role using a shared issue-scoped sync/async shell."""
+    """Run a role using a shared issue-scoped sync/async shell.
+
+    Two execution paths diverge here
+    (see docs/standards/vibe3-execution-paths-standard.md):
+
+    Container-outside path (async_mode=False):
+      orchestra process runs the agent synchronously, waits for completion,
+      then executes post_sync_hook (no-op gate). Has before/after snapshots.
+
+    Container-inside path (async_mode=True):
+      orchestra launches a tmux session and returns immediately.
+      The tmux child runs codeagent_runner.execute_sync() independently.
+      NO post_sync_hook or no-op gate fires in this path.
+      This is a known gap: see execution-paths-standard.md section 3.
+    """
     config = OrchestraConfig.from_settings()
     issue = _load_issue_info(config, issue_number)
 
@@ -73,7 +87,7 @@ def run_issue_role_mode(
 
     # Early capacity check to avoid wasteful request preparation
     if async_mode and not dry_run:
-        if not coordinator.capacity.can_dispatch(spec.role_name, issue_number):
+        if not coordinator.capacity.can_dispatch(spec.role_name):
             typer.echo(f"{spec.role_name} dispatch queued: Capacity full")
             return
 

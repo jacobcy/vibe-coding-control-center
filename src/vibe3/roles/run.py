@@ -38,9 +38,9 @@ EXECUTOR_ROLE = TriggerableRoleDefinition(
     trigger_name="run",
     trigger_state=IssueState.IN_PROGRESS,
     status_field="executor_status",
-    dispatch_predicate=lambda fs, live: (
-        bool(fs.get("plan_ref")) and not fs.get("report_ref") and not live
-    ),
+    # Re-dispatch while state remains IN_PROGRESS. No-op gate will block if
+    # report_ref exists but the agent fails to move the state forward.
+    dispatch_predicate=lambda _fs, live: not live,
 )
 
 

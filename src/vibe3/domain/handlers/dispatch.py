@@ -59,6 +59,7 @@ def _dispatch_role_intent(
     handler_domain: str,
     issue_number: int,
     request_builder: _RequestBuilder,
+    actor: str,
     **builder_kwargs: object,
 ) -> None:
     """Dispatch a role intent through role request builder + ExecutionCoordinator."""
@@ -74,9 +75,26 @@ def _dispatch_role_intent(
     request = request_builder(config, issue, **builder_kwargs)
 
     coordinator = ExecutionCoordinator(config, store)
+
+    # Record dispatch intent BEFORE execution (correct chronological order)
+    branch_arg = builder_kwargs.get("branch")
+    branch = str(branch_arg) if branch_arg else ""
+    if branch:
+        store.add_event(
+            branch,
+            f"{role}_dispatched",
+            actor,
+            detail=f"{role.capitalize()} dispatched",
+            refs={
+                "issue": str(issue_number),
+                "role": role,
+            },
+        )
+
     result = coordinator.dispatch_execution(request)
 
     if result.launched:
+
         logger.bind(
             domain=handler_domain,
             issue_number=issue_number,
@@ -111,6 +129,7 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
             handler_domain="planner_handler",
             issue_number=event.issue_number,
             request_builder=build_plan_request,
+            actor=event.actor,
             branch=event.branch,
         )
     except Exception as exc:
@@ -137,6 +156,7 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             handler_domain="executor_handler",
             issue_number=event.issue_number,
             request_builder=build_run_request,
+            actor=event.actor,
             branch=event.branch,
             plan_ref=event.plan_ref,
             audit_ref=event.audit_ref,
@@ -166,6 +186,7 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
             handler_domain="reviewer_handler",
             issue_number=event.issue_number,
             request_builder=build_review_request,
+            actor=event.actor,
             branch=event.branch,
             report_ref=event.report_ref,
         )

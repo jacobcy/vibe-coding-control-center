@@ -160,6 +160,8 @@ class HeartbeatServer:
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
 
             # Write tick marker for readability (INFO level - shows timeline)
+            # Blank line before each tick for visual separation
+            append_orchestra_event("server", "")
             append_orchestra_event("server", f"tick #{tick_number} start")
             if gate_result.blocked:
                 append_orchestra_event(

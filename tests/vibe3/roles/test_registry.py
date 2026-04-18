@@ -73,3 +73,21 @@ def test_build_label_dispatch_event_for_review_includes_report_ref():
     assert isinstance(event, ReviewerDispatched)
     assert event.report_ref == "report.md"
     assert event.trigger_state == IssueState.REVIEW.value
+
+
+def test_planner_dispatch_predicate_ignores_plan_ref() -> None:
+    assert PLANNER_ROLE.dispatch_predicate({}, False) is True
+    assert PLANNER_ROLE.dispatch_predicate({"plan_ref": "plan.md"}, False) is True
+    assert PLANNER_ROLE.dispatch_predicate({}, True) is False
+
+
+def test_executor_dispatch_predicate_ignores_report_ref() -> None:
+    assert EXECUTOR_ROLE.dispatch_predicate({}, False) is True
+    assert EXECUTOR_ROLE.dispatch_predicate({"report_ref": "report.md"}, False) is True
+    assert EXECUTOR_ROLE.dispatch_predicate({}, True) is False
+
+
+def test_reviewer_dispatch_predicate_ignores_audit_ref() -> None:
+    assert REVIEWER_ROLE.dispatch_predicate({}, False) is True
+    assert REVIEWER_ROLE.dispatch_predicate({"audit_ref": "audit.md"}, False) is True
+    assert REVIEWER_ROLE.dispatch_predicate({}, True) is False

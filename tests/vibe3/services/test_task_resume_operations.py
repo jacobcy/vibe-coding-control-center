@@ -115,7 +115,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         force=True,
     )
 
-    # Verify: blocked_reason/failed_reason cleared
+    # Verify: reasons cleared (minimal cleanup, flow record preserved)
     operations.flow_service.store.update_flow_state.assert_called_once()
 
 
@@ -149,7 +149,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         force=True,
     )
 
-    # Verify: failed_reason cleared
+    # Verify: reasons cleared (minimal cleanup, flow record preserved)
     operations.flow_service.store.update_flow_state.assert_called_once_with(
         "task/issue-303",
         blocked_reason=None,

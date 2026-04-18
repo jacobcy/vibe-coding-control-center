@@ -11,7 +11,7 @@ description: Use when the user wants to save session context, says /vibe-save, o
 
 - 以 `vibe3 handoff append` 记录当前状态。
 - 共享真源只同步最小必要事实，不在 skill 中堆叠额外业务推断。
-- 只有当本次会话形成了稳定、可复用的项目共识时，才更新 `.agent/context/memory.md`。
+- 只有当本次会话形成了稳定、可复用的项目共识时，才使用 `claude-memory` MCP 工具（`get_observations`）记录。
 - 任何共享状态判断都必须先读 shell 输出，再决定是否写回。
 
 **Announce at start:** "我正在使用 /vibe-save 技能来保存当前会话的 handoff。"
@@ -37,11 +37,11 @@ description: Use when the user wants to save session context, says /vibe-save, o
 
 1. 运行 `vibe3 handoff append` 记录当前状态，作为下个会话的主 handoff。
 2. 如果当前目录承载的 `flow` 已能从共享真源识别当前 `task`，则通过 Shell 命令同步最小共享事实，例如 `status`、`next_step`、必要时的 `pr_ref`。
-3. 仅当本次会话形成稳定项目共识时，才更新 `.agent/context/memory.md`。
+3. 仅当本次会话形成稳定项目共识时，才使用 `claude-memory` MCP 工具记录。
 
 默认不做：
 
-- 不默认创建 `memory/<topic>.md`。
+- 不默认创建 `claude-memory` 知识库或 corpus。
 - 不把 `uv run python src/vibe3/cli.py flow status` 之类查询命令描述成"自动对齐"。
 - 不把 save 描述成由 governance hook 自动编排完成。
 
@@ -105,11 +105,11 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 - 只运行 `vibe3 handoff append` 写入当前状态。
 - 明确向用户说明本次未回写共享 task 状态。
 
-### Step 4: 仅在形成稳定共识时更新 `memory.md`
+### Step 4: 仅在形成稳定共识时使用 claude-memory 记录
 
-只有在本次会话产出了稳定的项目约束、长期适用的定义或反复复用的规则时，才更新 `.agent/context/memory.md`。
+只有在本次会话产出了稳定的项目约束、长期适用的定义或反复复用的规则时，才使用 `claude-memory` MCP 工具（`get_observations`）记录。
 
-如果只是完成当前任务、记录 blockers 或保存下一步，不写 `memory.md`，更不默认创建新的 topic 文件。
+如果只是完成当前任务、记录 blockers 或保存下一步，不写记忆，更不默认创建新的知识库。
 
 ### Step 5: 输出保存摘要
 
@@ -117,7 +117,7 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 
 - handoff 是否已写入（`vibe3 handoff show` 可验证）
 - 是否同步了共享 task 状态
-- 是否更新了 `memory.md`
+- 是否使用了 `claude-memory` 记录稳定共识
 - 当前最关键的下一步是什么
 
 ## 推荐的 handoff 格式
@@ -162,4 +162,4 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 
 1. `vibe3 handoff append` 是标准写入方式，避免 save 默认散落出过多文件。
 2. 共享真源只同步最小必要事实，不把 save 扩展成 workflow 编排器。
-3. `memory.md` 只记录稳定共识，不承担每次会话的临时状态保存。
+3. `claude-memory` MCP 工具只记录稳定共识，不承担每次会话的临时状态保存。

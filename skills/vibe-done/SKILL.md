@@ -1,6 +1,6 @@
 ---
 name: vibe-done
-description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout: confirm PR outcome, close owned issues, record terminal handoff, and stop using this branch. Do not use for code changes or abandoned work.
+description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout. confirm PR outcome, close owned issues, record terminal handoff, and stop using this branch. Do not use for code changes or abandoned work.
 ---
 
 # /vibe-done - 终态收口

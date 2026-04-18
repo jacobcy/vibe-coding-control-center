@@ -81,16 +81,23 @@ class CodeagentExecutionService:
             except Exception as exc:  # pragma: no cover
                 log.warning(f"Failed to initialize lifecycle store: {exc}")
 
-        if branch and store and not is_async_child:
-            persist_execution_lifecycle_event(
-                store,
-                branch,
-                command.role,
-                "started",
-                actor,
-                f"{command.role.capitalize()} started (status: running)",
-                session_id=session_id,
-            )
+        if branch and store:
+            if not is_async_child:
+                persist_execution_lifecycle_event(
+                    store,
+                    branch,
+                    command.role,
+                    "started",
+                    actor,
+                    f"{command.role.capitalize()} started (status: running)",
+                    session_id=session_id,
+                )
+            # Write latest_actor immediately so subsequent handoff
+            # commands (e.g. `vibe3 handoff report`) resolve the
+            # correct actor instead of a stale one.
+            # Must execute in both sync and async child paths
+            # because the inner child has the real agent actor.
+            store.update_flow_state(branch, latest_actor=actor)
 
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
@@ -129,16 +136,56 @@ class CodeagentExecutionService:
             if handoff_file:
                 echo(f"-> {command.handoff_kind.capitalize()} saved: {handoff_file}")
 
-            if branch and store and not is_async_child:
-                persist_execution_lifecycle_event(
-                    store,
+            if branch and store:
+                if not is_async_child:
+                    persist_execution_lifecycle_event(
+                        store,
+                        branch,
+                        command.role,
+                        "completed",
+                        actor,
+                        f"{command.role.capitalize()} completed (status: done)",
+                        session_id=effective_session_id,
+                        refs={"status": "completed"},
+                    )
+
+                # Record current state for completion gate observability.
+                # Must execute in both sync and async child paths.
+                #
+                # KNOWN GAP: This code runs inside the container (tmux child
+                # process). The full three-branch no-op gate lives in
+                # issue_role_sync_runner's post_sync_hook path and requires
+                # before/after snapshots that are only captured in the
+                # container-outside (sync) path. When running inside tmux,
+                # no-op gate never fires. If the agent fails to change the
+                # issue label, the orchestra will re-dispatch on the next
+                # cycle, causing repeated dispatch loops (e.g. issue #323).
+                # See docs/standards/vibe3-execution-paths-standard.md section 3.
+                from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
+
+                flow_state = store.get_flow_state(branch)
+                current_state = ""
+                if isinstance(flow_state, dict):
+                    current_state = str(flow_state.get("state_label", ""))
+                required_ref = (
+                    "report_ref"
+                    if command.role == "executor"
+                    else "plan_ref" if command.role == "planner" else "audit_ref"
+                )
+                ref_value = ""
+                if isinstance(flow_state, dict):
+                    ref_value = str(flow_state.get(required_ref, "") or "")
+                store.add_event(
                     branch,
-                    command.role,
-                    "completed",
+                    EVENT_STATE_TRANSITIONED,
                     actor,
-                    f"{command.role.capitalize()} completed (status: done)",
-                    session_id=effective_session_id,
-                    refs={"status": "completed"},
+                    detail=f"{command.role} completed, state: {current_state}",
+                    refs={
+                        "state": current_state,
+                        "required_ref": required_ref,
+                        "ref_present": "yes" if ref_value else "no",
+                        "issue": "",
+                    },
                 )
 
             return CodeagentResult(
