@@ -31,6 +31,9 @@ class CodeagentCommand:
     issue_number: int | None = None
     pre_gate_callback: Callable[..., None] | None = None
     cli_args: list[str] | None = None
+    resolved_options: Any | None = None
+    actor: str | None = None
+    session_id: str | None = None
 
 
 @dataclass
@@ -64,6 +67,9 @@ def create_codeagent_command(
     issue_number: int | None = None,
     pre_gate_callback: Callable[..., None] | None = None,
     cli_args: list[str] | None = None,
+    resolved_options: Any | None = None,
+    actor: str | None = None,
+    session_id: str | None = None,
 ) -> CodeagentCommand:
     """Factory function to create CodeagentCommand.
 
@@ -85,6 +91,9 @@ def create_codeagent_command(
             but before the no-op gate fires. Receives (issue_number, branch,
             actor, stdout). Used by reviewer to write audit_ref from stdout.
         cli_args: Optional explicit CLI args used for async self-invocation
+        resolved_options: Pre-resolved agent options for shared execution paths
+        actor: Explicit actor override for shared execution paths
+        session_id: Explicit session id override for resumed executions
 
     Returns:
         CodeagentCommand instance
@@ -111,4 +120,7 @@ def create_codeagent_command(
         issue_number=issue_number,
         pre_gate_callback=pre_gate_callback,
         cli_args=cli_args,
+        resolved_options=resolved_options,
+        actor=actor,
+        session_id=session_id,
     )
