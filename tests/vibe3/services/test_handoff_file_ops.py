@@ -308,35 +308,33 @@ class TestHandoffRecordAPIs:
             next_step="Finalize PR",
         )
 
-    def test_record_audit_does_not_update_flow_state_when_event_write_fails(
+    def test_record_audit_updates_flow_state_without_event_recording(
         self, handoff_service, temp_git_dir, mock_git_client, mock_store
     ):
-        """Test record_audit avoids dirty flow state if event persistence fails."""
+        """Test record_audit updates flow state directly (no add_event call)."""
         mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
-        mock_store.add_event.side_effect = RuntimeError("event write failed")
 
-        with pytest.raises(RuntimeError, match="event write failed"):
-            handoff_service.record_audit(
-                audit_ref=".agent/reports/audit-result.md",
-                next_step="Finalize PR",
-                blocked_by=None,
-                actor="test-actor",
-            )
+        handoff_service.record_audit(
+            audit_ref=".agent/reports/audit-result.md",
+            next_step="Finalize PR",
+            blocked_by=None,
+            actor="test-actor",
+        )
 
-        mock_store.update_flow_state.assert_not_called()
-
-        handoff_path = handoff_service.ensure_current_handoff()
-        content = handoff_path.read_text()
-        assert ".agent/reports/audit-result.md" not in content
-        assert "Finalize PR" not in content
+        # _record_ref no longer calls add_event (skipped to avoid duplicates)
+        mock_store.add_event.assert_not_called()
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch",
+            audit_ref=".agent/reports/audit-result.md",
+            reviewer_actor="test-actor",
+            next_step="Finalize PR",
+        )
 
     def test_record_audit_treats_handoff_file_append_as_best_effort(
         self, handoff_service, temp_git_dir, mock_git_client, mock_store, monkeypatch
     ):
         """Test record_audit keeps authoritative writes when current.md append fails."""
         mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
-
-        original_append = handoff_service.append_current_handoff
 
         def fail_append(*args, **kwargs):
             raise OSError("disk full")
@@ -351,12 +349,11 @@ class TestHandoffRecordAPIs:
         )
 
         assert handoff_path.exists()
-        mock_store.add_event.assert_called_once()
+        # add_event is not called by _record_ref (skipped to avoid duplicates)
+        mock_store.add_event.assert_not_called()
         mock_store.update_flow_state.assert_called_once_with(
             "feature/test-branch",
             audit_ref=".agent/reports/audit-result.md",
             reviewer_actor="test-actor",
             next_step="Finalize PR",
         )
-
-        monkeypatch.setattr(handoff_service, "append_current_handoff", original_append)
