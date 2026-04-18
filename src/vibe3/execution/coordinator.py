@@ -105,6 +105,16 @@ class ExecutionCoordinator:
     def dispatch_execution(self, request: ExecutionRequest) -> ExecutionLaunchResult:
         """Dispatch an execution request.
 
+        Two dispatch modes (see docs/standards/vibe3-execution-paths-standard.md):
+
+        Container-outside (sync): Runs agent in this process, returns after
+        completion. The caller (issue_role_sync_runner) handles post_sync_hook
+        and no-op gate.
+
+        Container-inside (async): Launches a tmux session and returns
+        immediately. The tmux child runs independently through
+        codeagent_runner.execute_sync(). No post_sync_hook fires in this path.
+
         Simple dispatch model:
         1. Check for existing live session -> skip duplicate
         2. Check capacity -> skip if full

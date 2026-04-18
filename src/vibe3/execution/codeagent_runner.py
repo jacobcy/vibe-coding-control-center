@@ -151,9 +151,16 @@ class CodeagentExecutionService:
 
                 # Record current state for completion gate observability.
                 # Must execute in both sync and async child paths.
-                # Full three-branch no-op gate requires before/after
-                # snapshot which is only available in
-                # issue_role_sync_runner path.
+                #
+                # KNOWN GAP: This code runs inside the container (tmux child
+                # process). The full three-branch no-op gate lives in
+                # issue_role_sync_runner's post_sync_hook path and requires
+                # before/after snapshots that are only captured in the
+                # container-outside (sync) path. When running inside tmux,
+                # no-op gate never fires. If the agent fails to change the
+                # issue label, the orchestra will re-dispatch on the next
+                # cycle, causing repeated dispatch loops (e.g. issue #323).
+                # See docs/standards/vibe3-execution-paths-standard.md section 3.
                 from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
 
                 flow_state = store.get_flow_state(branch)
