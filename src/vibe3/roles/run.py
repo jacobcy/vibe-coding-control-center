@@ -38,9 +38,9 @@ EXECUTOR_ROLE = TriggerableRoleDefinition(
     trigger_name="run",
     trigger_state=IssueState.IN_PROGRESS,
     status_field="executor_status",
-    dispatch_predicate=lambda fs, live: (
-        bool(fs.get("plan_ref")) and not fs.get("report_ref") and not live
-    ),
+    # Dispatch: only prevent re-dispatch (report_ref exists) or live session.
+    # Business judgment is Manager's responsibility.
+    dispatch_predicate=lambda fs, live: not fs.get("report_ref") and not live,
 )
 
 
