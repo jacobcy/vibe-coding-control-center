@@ -115,6 +115,12 @@ _CREATE_FLOW_CONTEXT_CACHE = """
 
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
+    # Enable WAL mode so concurrent readers (CLI, orchestra, tmux agents)
+    # never block each other.  In DELETE journal mode (the default), a writer
+    # holds an exclusive lock that can cause CLI reads to see stale or
+    # incomplete data during multi-process access.
+    conn.execute("PRAGMA journal_mode=WAL")
+
     cursor = conn.cursor()
 
     cursor.execute(_CREATE_SCHEMA_META)
