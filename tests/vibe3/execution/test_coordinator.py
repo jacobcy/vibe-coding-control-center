@@ -123,7 +123,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
     """Sync child process should not short-circuit on its async wrapper session."""
     config, store, backend, capacity, lifecycle = mock_dependencies
     capacity.can_dispatch.return_value = True
-    backend.run.return_value.is_success.return_value = True
 
     coordinator = ExecutionCoordinator(
         config=config,
@@ -148,14 +147,20 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         refs={"task": "Manage issue #42"},
     )
 
-    result = coordinator.dispatch_execution(request)
+    # Manager now routes through CodeagentExecutionService (unified shell)
+    with patch("vibe3.execution.coordinator.CodeagentExecutionService") as mock_svc_cls:
+        mock_svc = MagicMock()
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.stdout = "done"
+        mock_svc.execute_sync_request.return_value = mock_result
+        mock_svc_cls.return_value = mock_svc
+
+        result = coordinator.dispatch_execution(request)
 
     assert result.launched is True
     coordinator.registry.get_truly_live_sessions_for_target.assert_not_called()
-    backend.run.assert_called_once()
-    # Async child sync should NOT call record_started (outer wrapper already registered)
-    lifecycle.record_started.assert_not_called()
-    lifecycle.record_completed.assert_called_once()
+    mock_svc.execute_sync_request.assert_called_once()
 
 
 def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
@@ -189,6 +194,104 @@ def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
     assert result.skipped is True
     assert result.reason_code == "already_running"
     backend.run.assert_not_called()
+
+
+def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
+    """Worker sync requests should route through the unified execution shell."""
+    config, store, backend, capacity, lifecycle = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+        lifecycle=lifecycle,
+    )
+
+    request = ExecutionRequest(
+        role="planner",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-planner-issue-42",
+        prompt="make a plan",
+        options=MagicMock(),
+        mode="sync",
+        refs={"task": "plan issue #42"},
+        actor="agent:planner",
+    )
+
+    with patch(
+        "vibe3.execution.coordinator.CodeagentExecutionService"
+    ) as mock_service_cls:
+        mock_result = MagicMock(
+            success=True,
+            stdout="plan output",
+            stderr="",
+        )
+        mock_service = mock_service_cls.return_value
+        mock_service.execute_sync_request.return_value = mock_result
+
+        result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    assert result.stdout == "plan output"
+    backend.run.assert_not_called()
+    lifecycle.record_started.assert_not_called()
+    lifecycle.record_completed.assert_not_called()
+    mock_service.execute_sync_request.assert_called_once_with(
+        request,
+        cwd=None,
+    )
+
+
+def test_sync_reviewer_uses_unified_execution_shell_for_pre_gate_callback(
+    mock_dependencies,
+):
+    """Reviewer sync requests should rely on the unified shell for pre-gate work."""
+    config, store, backend, capacity, lifecycle = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+        lifecycle=lifecycle,
+    )
+
+    request = ExecutionRequest(
+        role="reviewer",
+        target_branch="task/issue-55",
+        target_id=55,
+        execution_name="vibe3-reviewer-issue-55",
+        prompt="review issue #55",
+        options=MagicMock(),
+        mode="sync",
+        refs={"task": "review issue #55"},
+        actor="agent:review",
+    )
+
+    with patch(
+        "vibe3.execution.coordinator.CodeagentExecutionService"
+    ) as mock_service_cls:
+        mock_result = MagicMock(
+            success=True,
+            stdout="review output",
+            stderr="",
+        )
+        mock_service = mock_service_cls.return_value
+        mock_service.execute_sync_request.return_value = mock_result
+
+        result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    assert result.stdout == "review output"
+    backend.run.assert_not_called()
+    mock_service.execute_sync_request.assert_called_once_with(
+        request,
+        cwd=None,
+    )
 
 
 def test_coordinator_dispatch_launch_fails(mock_dependencies):

@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.agents.models import CodeagentCommand
 from vibe3.execution.codeagent_runner import (
-    _REQUIRED_REF_BY_ROLE,
     CodeagentExecutionService,
     _apply_unified_noop_gate,
 )
@@ -37,10 +36,10 @@ def _make_mock_agent_result(success: bool = True, stdout: str = "done") -> Magic
 
 
 class TestApplyUnifiedNoopGate:
-    """Tests for _apply_unified_noop_gate three-branch logic."""
+    """Tests for the simplified no-op gate."""
 
-    def test_branch1_missing_ref_blocks(self) -> None:
-        """Missing required_ref triggers block."""
+    def test_missing_ref_still_blocks_when_state_unchanged(self) -> None:
+        """Missing ref does not matter when state is unchanged: still block."""
         store = _make_mock_store(state_label="state/plan", ref_value="")
 
         with patch(
@@ -52,20 +51,19 @@ class TestApplyUnifiedNoopGate:
                 branch="task/issue-42",
                 actor="agent:plan",
                 role="planner",
-                required_ref="plan_ref",
                 before_state_label="state/plan",
             )
 
         mock_block.assert_called_once()
         call_kwargs = mock_block.call_args[1]
         assert call_kwargs["issue_number"] == 42
-        assert "plan_ref" in call_kwargs["reason"]
+        assert "state unchanged" in call_kwargs["reason"]
         store.add_event.assert_called_once()
         event_args = store.add_event.call_args
         assert event_args[0][1] == "state_unchanged"
 
-    def test_branch2_ref_present_state_unchanged_blocks(self) -> None:
-        """Ref present but state unchanged triggers no-op block."""
+    def test_ref_present_state_unchanged_blocks(self) -> None:
+        """Ref presence does not matter when state is unchanged: block."""
         store = _make_mock_store(state_label="state/plan", ref_value="/path/to/plan.md")
 
         with patch(
@@ -77,7 +75,6 @@ class TestApplyUnifiedNoopGate:
                 branch="task/issue-42",
                 actor="agent:plan",
                 role="planner",
-                required_ref="plan_ref",
                 before_state_label="state/plan",
             )
 
@@ -86,8 +83,8 @@ class TestApplyUnifiedNoopGate:
         assert "state unchanged" in call_kwargs["reason"]
         store.add_event.assert_called_once()
 
-    def test_branch3_ref_present_state_changed_passes(self) -> None:
-        """Ref present and state changed records transition."""
+    def test_state_changed_passes(self) -> None:
+        """State change is the only pass condition."""
         store = _make_mock_store(
             state_label="state/ready", ref_value="/path/to/plan.md"
         )
@@ -101,7 +98,6 @@ class TestApplyUnifiedNoopGate:
                 branch="task/issue-42",
                 actor="agent:plan",
                 role="planner",
-                required_ref="plan_ref",
                 before_state_label="state/plan",
             )
 
@@ -112,14 +108,8 @@ class TestApplyUnifiedNoopGate:
         assert "state/plan" in event_args[1]["detail"]
         assert "state/ready" in event_args[1]["detail"]
 
-    def test_all_roles_map_to_correct_ref(self) -> None:
-        """Each role maps to the correct required_ref."""
-        assert _REQUIRED_REF_BY_ROLE["planner"] == "plan_ref"
-        assert _REQUIRED_REF_BY_ROLE["executor"] == "report_ref"
-        assert _REQUIRED_REF_BY_ROLE["reviewer"] == "audit_ref"
-
-    def test_blocks_executor_on_missing_report_ref(self) -> None:
-        """Executor is blocked when report_ref is missing."""
+    def test_blocks_executor_when_state_unchanged(self) -> None:
+        """Executor is blocked when state is unchanged."""
         store = _make_mock_store(state_label="state/run", ref_value="")
         store.get_flow_state.return_value = {
             "state_label": "state/run",
@@ -134,14 +124,13 @@ class TestApplyUnifiedNoopGate:
                 branch="task/issue-99",
                 actor="agent:run",
                 role="executor",
-                required_ref="report_ref",
                 before_state_label="state/run",
             )
 
         mock_block.assert_called_once()
 
-    def test_blocks_reviewer_on_missing_audit_ref(self) -> None:
-        """Reviewer is blocked when audit_ref is missing."""
+    def test_blocks_reviewer_when_state_unchanged(self) -> None:
+        """Reviewer is blocked when state is unchanged."""
         store = _make_mock_store(state_label="state/review", ref_value="")
         store.get_flow_state.return_value = {
             "state_label": "state/review",
@@ -156,7 +145,6 @@ class TestApplyUnifiedNoopGate:
                 branch="task/issue-55",
                 actor="agent:review",
                 role="reviewer",
-                required_ref="audit_ref",
                 before_state_label="state/review",
             )
 
@@ -173,7 +161,6 @@ class TestApplyUnifiedNoopGate:
             branch="task/issue-42",
             actor="agent:plan",
             role="planner",
-            required_ref="plan_ref",
             before_state_label="state/plan",
         )
 
@@ -230,7 +217,6 @@ class TestExecuteSyncGateIntegration:
         call_kwargs = mock_gate.call_args[1]
         assert call_kwargs["issue_number"] == 42
         assert call_kwargs["role"] == "planner"
-        assert call_kwargs["required_ref"] == "plan_ref"
 
     def test_gate_skipped_without_issue_number(self) -> None:
         """Gate does not fire when issue_number is None."""
@@ -316,7 +302,7 @@ class TestExecuteSyncGateIntegration:
         mock_gate.assert_not_called()
 
     def test_pre_gate_callback_fires_before_gate(self) -> None:
-        """pre_gate_callback is called before the gate."""
+        """pre_gate_callback is called before the sync gate."""
         agent_result = _make_mock_agent_result(stdout="verdict: APPROVE")
         mock_store = _make_mock_store(state_label="state/review", ref_value="/audit.md")
         callback = MagicMock()
@@ -417,3 +403,56 @@ class TestExecuteSyncGateIntegration:
         # Verify before_state_label was captured from the initial flow state
         gate_kwargs = mock_gate.call_args[1]
         assert gate_kwargs["before_state_label"] == "state/plan"
+
+    def test_async_child_runs_callback_and_gate(self, monkeypatch) -> None:
+        """Async tmux child should run callback and gate (unified observability)."""
+        monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+        agent_result = _make_mock_agent_result(stdout="review output")
+        mock_store = _make_mock_store(state_label="state/review", ref_value="/audit.md")
+        callback = MagicMock()
+
+        command = CodeagentCommand(
+            role="reviewer",
+            context_builder=lambda: "review prompt",
+            branch="task/issue-88",
+            issue_number=88,
+            pre_gate_callback=callback,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:review",
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+            ) as mock_gate,
+        ):
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+            service = CodeagentExecutionService()
+            service.execute_sync(command)
+
+        callback.assert_called_once_with(
+            issue_number=88,
+            branch="task/issue-88",
+            actor="agent:review",
+            stdout="review output",
+        )
+        mock_gate.assert_called_once()
