@@ -323,18 +323,6 @@ def _resolve_authoritative_audit_ref(
     return str(_create_minimal_audit_artifact(review_output, verdict, branch))
 
 
-def _resolve_error_audit_ref(
-    handoff_file: str | None,
-    review_output: str,
-    branch: str | None,
-) -> str:
-    if handoff_file:
-        handoff_path = Path(handoff_file)
-        if handoff_path.exists():
-            return str(handoff_path)
-    return str(_create_minimal_audit_artifact(review_output, "ERROR", branch))
-
-
 def build_pr_review_request(
     pr_number: int,
     *,
