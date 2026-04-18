@@ -56,9 +56,9 @@ REVIEWER_ROLE = TriggerableRoleDefinition(
     trigger_name="review",
     trigger_state=IssueState.REVIEW,
     status_field="reviewer_status",
-    # Dispatch: only prevent re-dispatch (audit_ref exists) or live session.
-    # Business judgment is Manager's responsibility.
-    dispatch_predicate=lambda fs, live: not fs.get("audit_ref") and not live,
+    # Re-dispatch while state remains REVIEW. No-op gate will block if audit_ref
+    # exists but the agent fails to move the state forward.
+    dispatch_predicate=lambda _fs, live: not live,
 )
 
 
