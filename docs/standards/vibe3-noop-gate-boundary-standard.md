@@ -9,7 +9,7 @@ authority:
   - manager-decision-boundary
 author: GPT-5 Codex
 created: 2026-04-17
-last_updated: 2026-04-17
+last_updated: 2026-04-18
 related_docs:
   - docs/standards/vibe3-state-sync-standard.md
   - docs/standards/vibe3-orchestra-runtime-standard.md
@@ -269,4 +269,116 @@ dispatch_predicate=lambda fs, live: (
 - 后续 debug 成本会更高
 
 当前阶段，宁可多 `blocked`，也不要多伪成功。
+
+## 7. 完整闭环：No-Op Gate 与 Resume Task
+
+### 7.1 闭环流程
+
+```
+Agent 运行
+  ↓
+No-Op Gate (post_sync_hook, apply_required_ref_post_sync)
+  ├── 三分支判定:
+  │   1. ref 缺失 → block
+  │   2. ref 存在 + state 不变 → block
+  │   3. ref 存在 + state 改变 → 通过
+  ↓
+block 或 通过
+  ↓ (block 时)
+人工判断 + resume task
+  ├── resume (不带 --label) → 完整重建
+  │   删除 worktree / branch / flow / handoff
+  │   issue 回到 state/ready，manager 从零开始
+  ├── resume --label → 最小修复
+  │   只修 label + 清 reason，保留 flow / worktree / refs
+  │   issue 回到 state/handoff 或 state/ready
+  │   手动指派给原 agent 或下一个 manager
+  ↓
+Re-dispatch
+```
+
+### 7.2 两种 resume 路径的设计意图
+
+| 路径 | flow record | worktree / branch | 适用场景 |
+|------|------------|-------------------|---------|
+| `resume` (不带 `--label`) | 删除 | 删除 | 完整重建，从 scratch 开始 |
+| `resume --label` | 保留（只清 reason） | 保留 | agent 做了工作但 label 没改对 |
+
+`--label` 的场景：agent 实际完成了工作（产出了 ref、代码等），但没能正确修改 issue label，导致被 no-op gate block。此时 flow record 和 worktree 里的工作成果都是有效的，只需要修正 label 就能让 agent 继续推进。
+
+不带 `--label` 的场景：agent 的整个执行现场有问题（分支创建失败、执行报错、工作产出全废），需要从零开始。删除 flow record 防止 stale 数据被下游 dispatch 捡起。
+
+### 7.3 反模式：系统主动检测 flow / ref（已移除）
+
+**以下逻辑已在 2026-04-18 移除，此处记录以防止重新引入。**
+
+#### 反模式描述
+
+在 domain event handler（`flow_lifecycle.py`）中，`_handle_completion_with_ref_gate` 和 `require_authoritative_ref` 主动检查 flow store 中 ref 是否存在，不存在就 block issue。
+
+#### 为什么错误
+
+这条路径**替代了 agent 工作验证**，而非**验证 agent 工作**：
+
+| 维度 | 正确路径 (post_sync_hook) | 错误路径 (domain event handler) |
+|------|--------------------------|-------------------------------|
+| 触发时机 | agent 实际运行后 | agent 可能从未运行 |
+| 执行上下文 | 有 before/after snapshot | 无 snapshot，不知道 agent 是否跑过 |
+| 验证对象 | agent 的实际工作产出 | flow store 中的数据状态 |
+| 三分支判定 | 完整（缺 ref / 有 ref 未改 state / 通过） | 只有分支 1（缺 ref → block） |
+| 架构角色 | 执行后验证 | 主动巡检、替代 agent 判断 |
+
+#### 实际 bug（issue #301）
+
+1. manager 创建分支失败 → issue 进入 state/failed
+2. stale flow record 指向不存在的分支
+3. 下游 dispatch 基于 stale flow 派发 reviewer
+4. reviewer 从未实际运行
+5. domain event handler 的 `require_authoritative_ref` 发现无 audit_ref → block
+6. `force=True` 覆盖 failed 状态为 blocked
+7. 循环往复，每 30 秒一次
+
+根因：系统在**不知道 agent 是否跑过**的情况下，基于 flow store 状态做出了业务判断。
+
+#### 正确做法
+
+ref 验证只在 `apply_required_ref_post_sync`（post_sync_hook）中执行，该路径：
+- 由 sync runner 在 agent 实际运行后触发
+- 拥有完整的 before/after snapshot 上下文
+- 实现三分支 no-op gate 逻辑
+- domain event handler 只做日志记录，不做业务判断
+
+## 8. 设计理念：最小干预
+
+### 8.1 核心原则
+
+**系统不主动干预 agent 工作，只做观察和保护。**
+
+具体含义：
+
+- **观察优先于干预**：通过 issue comment、`flow show`、log 实现 agent 工作的可见性
+- **保护优先于推进**：no-op gate 只在 agent 没做好时 block，不替 agent 做下一步
+- **最小权限**：系统只执行 `gate / block / fail / dispatch`，不做业务决策
+- **断链优于伪成功**：宁可卡住暴露问题，也不要自动补平掩盖缺陷
+
+### 8.2 违反最小干预的信号
+
+以下行为表明代码在违反最小干预原则：
+
+- 系统代码主动检查 flow store / ref 是否存在来做业务判断
+- 系统代码在 agent 未实际运行的情况下修改 issue 状态
+- 系统代码用 `force=True` 覆盖已有的终态（failed / blocked）
+- 系统代码在 domain event 路径中执行需要执行上下文的验证逻辑
+
+### 8.3 正确的可见性手段
+
+| 手段 | 用途 | 真源 |
+|------|------|------|
+| issue comment | agent 产出和状态变更的公开记录 | GitHub issue |
+| `vibe3 flow show` | flow / ref / event 的本地查看 | SQLite flow store |
+| `vibe3 task status` | 全局编排状态概览 | GitHub + flow |
+| orchestra events.log | dispatch 和生命周期事件追踪 | 本地日志 |
+| `vibe3 handoff show` | agent 间交接上下文 | handoff store |
+
+这些是**只读的可见性手段**，不是**主动干预的入口**。系统写入 issue comment 是为了记录和通知，不是为了替代 agent 决策。
 
