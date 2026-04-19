@@ -42,6 +42,21 @@ def resolve_orchestra_repo_root() -> Path:
     return Path.cwd()
 
 
+def resolve_async_cli_project_root(repo_path: Path | None = None) -> Path:
+    """Resolve the code/project root used by async child self-invocation.
+
+    Rules:
+    - If `VIBE3_REPO_MODELS_ROOT` is set, use it. This is the debug-mode override
+      from `vibe3 serve start --debug`, and points at the current worktree code.
+    - Otherwise, use the provided repo_path / orchestra root, which defaults to
+      the main repository root in normal serve mode.
+    """
+    override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
+    if override_root:
+        return Path(override_root).expanduser().resolve()
+    return (repo_path or resolve_orchestra_repo_root()).resolve()
+
+
 def resolve_task_flow_branch(
     store: SQLiteClient,
     issue_number: int,
@@ -121,6 +136,7 @@ def build_issue_async_cli_request(
 ) -> ExecutionRequest:
     """Build a generic async self-invocation request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
+    command_root = resolve_async_cli_project_root(root)
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
     return ExecutionRequest(
@@ -132,10 +148,10 @@ def build_issue_async_cli_request(
             "uv",
             "run",
             "--project",
-            str(root),
+            str(command_root),
             "python",
             "-I",
-            str((root / "src" / "vibe3" / "cli.py").resolve()),
+            str((command_root / "src" / "vibe3" / "cli.py").resolve()),
             *command_args,
         ],
         repo_path=str(root),
