@@ -404,8 +404,10 @@ class TestExecuteSyncGateIntegration:
         gate_kwargs = mock_gate.call_args[1]
         assert gate_kwargs["before_state_label"] == "state/plan"
 
-    def test_async_child_runs_callback_and_gate(self, monkeypatch) -> None:
-        """Async tmux child should run callback and gate (unified observability)."""
+    def test_async_child_marker_does_not_change_sync_shell_behavior(
+        self, monkeypatch
+    ) -> None:
+        """Async-child marker must not alter sync shell behavior."""
         monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
         agent_result = _make_mock_agent_result(stdout="review output")
         mock_store = _make_mock_store(state_label="state/review", ref_value="/audit.md")

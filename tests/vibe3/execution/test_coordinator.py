@@ -1,5 +1,6 @@
 """Tests for execution coordinator."""
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,13 +17,12 @@ def mock_dependencies():
     store = MagicMock()
     backend = MagicMock()
     capacity = MagicMock()
-    lifecycle = MagicMock()
-    return config, store, backend, capacity, lifecycle
+    return config, store, backend, capacity
 
 
 def test_coordinator_dispatch_success(mock_dependencies):
     """Test successful async dispatch."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
 
     # Setup capacity
     capacity.can_dispatch.return_value = True
@@ -40,8 +40,9 @@ def test_coordinator_dispatch_success(mock_dependencies):
             store=store,
             backend=backend,
             capacity=capacity,
-            lifecycle=lifecycle,
         )
+        coordinator.registry.reserve = MagicMock(return_value=123)
+        coordinator.registry.mark_started = MagicMock()
 
         request = ExecutionRequest(
             role="planner",
@@ -71,24 +72,33 @@ def test_coordinator_dispatch_success(mock_dependencies):
             env={"FOO": "bar"},
         )
 
-        # Verify lifecycle called with right refs
-        expected_refs = {
-            "extra": "value",
-            "tmux_session": "test-session-123",
-            "log_path": "/tmp/test.log",
-        }
-        lifecycle.record_started.assert_called_once_with(
+        coordinator.registry.reserve.assert_called_once_with(
             role="planner",
-            target="task/issue-42",
-            actor="orchestra:system",
-            refs=expected_refs,
-            event_type="tmux_plan_started",
+            target_type="issue",
+            target_id="42",
+            branch="task/issue-42",
+        )
+        coordinator.registry.mark_started.assert_called_once_with(
+            123,
+            tmux_session="test-session-123",
+            log_path="/tmp/test.log",
+        )
+        store.add_event.assert_called_once_with(
+            "task/issue-42",
+            "tmux_plan_started",
+            "orchestra:system",
+            detail="Planner tmux wrapper started",
+            refs={
+                "extra": "value",
+                "tmux_session": "test-session-123",
+                "log_path": "/tmp/test.log",
+            },
         )
 
 
 def test_coordinator_dispatch_capacity_full(mock_dependencies):
     """Test dispatch rejected when capacity full."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
 
     # Setup capacity
     capacity.can_dispatch.return_value = False
@@ -98,7 +108,6 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
         store=store,
         backend=backend,
         capacity=capacity,
-        lifecycle=lifecycle,
     )
 
     request = ExecutionRequest(
@@ -115,13 +124,10 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
     assert "Capacity full" in result.reason
     assert result.reason_code == "capacity_full"
 
-    # Verify lifecycle not called
-    lifecycle.record_started.assert_not_called()
-
 
 def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkeypatch):
     """Sync child process should not short-circuit on its async wrapper session."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
@@ -129,7 +135,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         store=store,
         backend=backend,
         capacity=capacity,
-        lifecycle=lifecycle,
     )
     coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
         return_value=[{"id": 1, "branch": "task/issue-42"}]
@@ -163,16 +168,63 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
     mock_svc.execute_sync_request.assert_called_once()
 
 
-def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
-    """Regular sync launches should still respect live-session dedupe."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+def test_sync_child_clears_async_marker_before_entering_sync_shell(
+    mock_dependencies, monkeypatch
+):
+    """Async child marker should stay on the outer wrapper, not leak into sync shell."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
         config=config,
         store=store,
         backend=backend,
         capacity=capacity,
-        lifecycle=lifecycle,
+    )
+    monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
+
+    request = ExecutionRequest(
+        role="planner",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-planner-issue-42",
+        prompt="make a plan",
+        options=MagicMock(),
+        mode="sync",
+        refs={"task": "plan issue #42"},
+        actor="agent:planner",
+    )
+
+    seen_async_marker: list[str | None] = []
+
+    with patch("vibe3.execution.coordinator.CodeagentExecutionService") as mock_svc_cls:
+        mock_svc = MagicMock()
+
+        def _capture_marker(*args, **kwargs):
+            import os
+
+            seen_async_marker.append(os.environ.get("VIBE3_ASYNC_CHILD"))
+            return MagicMock(success=True, stdout="plan output", stderr="")
+
+        mock_svc.execute_sync_request.side_effect = _capture_marker
+        mock_svc_cls.return_value = mock_svc
+
+        result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    assert seen_async_marker == [None]
+    assert os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+
+
+def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
+    """Regular sync launches should still respect live-session dedupe."""
+    config, store, backend, capacity = mock_dependencies
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
     )
     coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
         return_value=[{"id": 1, "branch": "task/issue-42"}]
@@ -198,7 +250,7 @@ def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
 
 def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
     """Worker sync requests should route through the unified execution shell."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
@@ -206,7 +258,6 @@ def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
         store=store,
         backend=backend,
         capacity=capacity,
-        lifecycle=lifecycle,
     )
 
     request = ExecutionRequest(
@@ -237,8 +288,6 @@ def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
     assert result.launched is True
     assert result.stdout == "plan output"
     backend.run.assert_not_called()
-    lifecycle.record_started.assert_not_called()
-    lifecycle.record_completed.assert_not_called()
     mock_service.execute_sync_request.assert_called_once_with(
         request,
         cwd=None,
@@ -249,7 +298,7 @@ def test_sync_reviewer_uses_unified_execution_shell_for_pre_gate_callback(
     mock_dependencies,
 ):
     """Reviewer sync requests should rely on the unified shell for pre-gate work."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
@@ -257,7 +306,6 @@ def test_sync_reviewer_uses_unified_execution_shell_for_pre_gate_callback(
         store=store,
         backend=backend,
         capacity=capacity,
-        lifecycle=lifecycle,
     )
 
     request = ExecutionRequest(
@@ -296,7 +344,7 @@ def test_sync_reviewer_uses_unified_execution_shell_for_pre_gate_callback(
 
 def test_coordinator_dispatch_launch_fails(mock_dependencies):
     """Test dispatch fails and records failure if launch throws."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
 
     # Setup capacity
     capacity.can_dispatch.return_value = True
@@ -310,8 +358,9 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
             store=store,
             backend=backend,
             capacity=capacity,
-            lifecycle=lifecycle,
         )
+        coordinator.registry.reserve = MagicMock(return_value=123)
+        coordinator.registry.mark_failed = MagicMock()
 
         request = ExecutionRequest(
             role="planner",
@@ -328,15 +377,13 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
         assert "Tmux failed to start" in result.reason
         assert result.reason_code == "launch_failed"
 
-        # Verify lifecycle record_failed was called
-        lifecycle.record_started.assert_not_called()
-        lifecycle.record_failed.assert_called_once_with(
+        coordinator.registry.reserve.assert_called_once_with(
             role="planner",
-            target="task/issue-42",
-            actor="orchestra:system",
-            error="Tmux failed to start",
-            refs={"issue_number": "42"},
+            target_type="issue",
+            target_id="42",
+            branch="task/issue-42",
         )
+        coordinator.registry.mark_failed.assert_called_once_with(123)
 
 
 @patch("vibe3.execution.coordinator.WorktreeManager")
@@ -345,7 +392,7 @@ def test_coordinator_resolves_permanent_worktree_for_manager(
     mock_start_async, mock_worktree_cls, mock_dependencies, tmp_path
 ):
     """Coordinator should own permanent worktree resolution for manager-like roles."""
-    config, store, backend, capacity, lifecycle = mock_dependencies
+    config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
     handle = MagicMock()
@@ -362,7 +409,6 @@ def test_coordinator_resolves_permanent_worktree_for_manager(
         store=store,
         backend=backend,
         capacity=capacity,
-        lifecycle=lifecycle,
     )
     request = ExecutionRequest(
         role="manager",
