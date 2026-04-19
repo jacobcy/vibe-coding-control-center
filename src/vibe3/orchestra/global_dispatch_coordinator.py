@@ -1,14 +1,11 @@
-"""Simple queue-based dispatch coordinator with tick-level queue freezing.
+"""Frozen-queue dispatch coordinator.
 
-Each tick:
-1. Check if current queue is empty
-2. If empty, collect new queue (freeze for this tick)
-3. If not empty, continue processing current queue
-4. Dispatch by fixed role order until capacity full or queue exhausted
-5. End this tick
-
-Queue freezing ensures no duplicate dispatch within a tick.
-No tmux session checking - simpler and more reliable.
+Queue rule:
+1. Only collect a new queue when the frozen queue is empty
+2. Keep queued issues resident across ticks
+3. After dispatch, an issue waits for its state label to change
+4. Once state changes, move that issue to the front of the queue
+5. Only capacity uses tmux session counting
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.execution.capacity_service import CapacityService
-from vibe3.models.orchestration import IssueInfo
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 
 if TYPE_CHECKING:
@@ -27,32 +24,15 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class CandidateIssue:
-    """Issue candidate for dispatch."""
+class QueueEntry:
+    """Frozen queue entry tracked only by issue identity and wait state."""
 
-    issue: IssueInfo
-    service: StateLabelDispatchService
-
-    @property
-    def role(self) -> str:
-        """Use registry_role for capacity tracking."""
-        return str(self.service.role_def.registry_role)
+    issue_number: int
+    waiting_state: str | None = None
 
 
 class GlobalDispatchCoordinator:
-    """Simple queue-based coordinator with tick-level queue freezing.
-
-    Queue Model:
-    - Each tick starts with an empty queue
-    - Collect all ready issues once (queue frozen for this tick)
-    - Dispatch by role order until capacity full
-    - Next tick sees queue empty, collects new queue
-    - No tmux session checking - queue freezing prevents duplicates
-
-    Usage:
-        coordinator = GlobalDispatchCoordinator(capacity_service, dispatch_services)
-        await coordinator.coordinate()
-    """
+    """Frozen queue with state-change requeue semantics."""
 
     def __init__(
         self,
@@ -61,16 +41,14 @@ class GlobalDispatchCoordinator:
     ) -> None:
         self._capacity = capacity
         self._dispatch_services = dispatch_services
-        # Per-tick frozen queue
-        self._frozen_queue: list[CandidateIssue] | None = None
+        self._frozen_queue: list[QueueEntry] | None = None
+        self._github = (
+            dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
+        )
+        self._repo = dispatch_services[0].config.repo if dispatch_services else None
 
     async def coordinate(self) -> None:
-        """Main dispatch entry: frozen queue model.
-
-        Queue remains frozen until fully exhausted.
-        Only collect new queue when previous queue is empty.
-        """
-        # Step 1: Check if we need to collect a new queue
+        """Run one heartbeat tick against the frozen queue."""
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
             if not self._frozen_queue:
@@ -80,7 +58,8 @@ class GlobalDispatchCoordinator:
                 )
                 return
 
-        # Step 2: Get current capacity (simple tmux count)
+        self._promote_progressed_entries()
+
         import subprocess
 
         try:
@@ -90,15 +69,13 @@ class GlobalDispatchCoordinator:
                 text=True,
                 timeout=1,
             )
-            # Count vibe3- sessions, subtract 1 (orchestra dispatcher session)
             vibe3_count = len(
                 [line for line in result.stdout.splitlines() if "vibe3-" in line]
             )
-            live_worker_count = max(0, vibe3_count - 1)  # Exclude orchestra session
+            live_worker_count = max(0, vibe3_count - 1)
             max_capacity = self._capacity.config.max_concurrent_flows
             available_slots = max(0, max_capacity - live_worker_count)
         except Exception:
-            # Fallback to capacity service if tmux fails
             status = self._capacity.get_capacity_status("manager")
             available_slots = status["remaining"]
 
@@ -109,64 +86,69 @@ class GlobalDispatchCoordinator:
             )
             return
 
-        # Step 3: Dispatch by fixed role order from frozen queue
-        role_order = ["reviewer", "executor", "planner", "manager"]
-
         dispatched_count = 0
-        dispatched_candidates: list[CandidateIssue] = []
-        for role in role_order:
-            # Filter frozen queue for this role
-            role_candidates = [c for c in self._frozen_queue if c.role == role]
+        index = 0
+        while index < len(self._frozen_queue):
+            if dispatched_count >= available_slots:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
+                    f"skipped remaining (capacity full)",
+                )
+                return
 
-            for candidate in role_candidates:
-                # Check capacity limit
-                if dispatched_count >= available_slots:
-                    append_orchestra_event(
-                        "dispatcher",
-                        f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
-                        f"skipped remaining (capacity full)",
-                    )
-                    # Remove dispatched candidates and return
-                    self._frozen_queue = [
-                        c for c in self._frozen_queue if c not in dispatched_candidates
-                    ]
-                    return
+            entry = self._frozen_queue[index]
+            issue = self._load_issue(entry.issue_number)
+            if issue is None or issue.state is None:
+                self._frozen_queue.pop(index)
+                continue
 
-                # Dispatch
-                try:
-                    candidate.service._emit_dispatch_intent(candidate.issue)
-                    dispatched_count += 1
-                    dispatched_candidates.append(candidate)
+            if issue.state in {
+                IssueState.BLOCKED,
+                IssueState.FAILED,
+                IssueState.MERGE_READY,
+                IssueState.DONE,
+            }:
+                self._frozen_queue.pop(index)
+                continue
 
-                    green = "\033[32m"
-                    reset = "\033[0m"
-                    append_orchestra_event(
-                        "dispatcher",
-                        f"GlobalDispatchCoordinator: {green}dispatched{reset} "
-                        f"#{candidate.issue.number} ({role})",
-                    )
+            if entry.waiting_state is not None:
+                index += 1
+                continue
 
-                    logger.bind(
-                        domain="global_dispatch",
-                        role=role,
-                        issue=candidate.issue.number,
-                    ).info(f"Dispatched #{candidate.issue.number} ({role})")
-                except Exception as exc:
-                    logger.bind(
-                        domain="global_dispatch",
-                        role=role,
-                        issue=candidate.issue.number,
-                    ).error(f"Dispatch failed for #{candidate.issue.number}: {exc}")
+            service = self._find_service_for_state(issue.state)
+            if service is None:
+                self._frozen_queue.pop(index)
+                continue
 
-        # Step 4: Remove dispatched items from frozen queue (not clear entire queue)
-        # Queue remains frozen until fully exhausted
+            try:
+                service._emit_dispatch_intent(issue)
+                entry.waiting_state = issue.state.value
+                dispatched_count += 1
+
+                green = "\033[32m"
+                reset = "\033[0m"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: {green}dispatched{reset} "
+                    f"#{issue.number} ({service.role_def.registry_role})",
+                )
+                logger.bind(
+                    domain="global_dispatch",
+                    role=service.role_def.registry_role,
+                    issue=issue.number,
+                ).info(
+                    f"Dispatched #{issue.number} " f"({service.role_def.registry_role})"
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain="global_dispatch",
+                    role=service.role_def.registry_role,
+                    issue=issue.number,
+                ).error(f"Dispatch failed for #{issue.number}: {exc}")
+            index += 1
+
         if dispatched_count > 0:
-            # Remove dispatched candidates from frozen queue
-            # Keep remaining candidates for next tick
-            self._frozen_queue = [
-                c for c in self._frozen_queue if c not in dispatched_candidates
-            ]
-
             green = "\033[32m"
             reset = "\033[0m"
             append_orchestra_event(
@@ -175,63 +157,89 @@ class GlobalDispatchCoordinator:
                 f"{dispatched_count}{reset}",
             )
 
-    async def _collect_frozen_queue(self) -> list[CandidateIssue]:
-        """Collect all ready issues for frozen queue.
-
-        Priority ordering within queue:
-        1. Flows with pr_ref (closest to completion) - highest priority
-        2. Flows in merge-ready state
-        3. Other states by role order
-
-        This ensures flows close to completion are dispatched first.
-        """
-        candidates: list[CandidateIssue] = []
-        role_order = ["reviewer", "executor", "planner", "manager"]
-
-        for role in role_order:
-            service = self._find_service_for_role(role)
-            if not service:
+    async def _collect_frozen_queue(self) -> list[QueueEntry]:
+        """Collect a new frozen queue only when the current one is empty."""
+        queue: list[QueueEntry] = []
+        seen_issue_numbers: set[int] = set()
+        for state in (
+            IssueState.REVIEW,
+            IssueState.IN_PROGRESS,
+            IssueState.CLAIMED,
+            IssueState.HANDOFF,
+            IssueState.READY,
+        ):
+            service = self._find_service_for_state(state)
+            if service is None:
                 continue
-
-            # Scan candidates for this role (with error handling)
             try:
                 issues = await service.collect_ready_issues()
                 for issue in issues:
-                    candidates.append(CandidateIssue(issue=issue, service=service))
+                    if issue.number in seen_issue_numbers:
+                        continue
+                    seen_issue_numbers.add(issue.number)
+                    queue.append(QueueEntry(issue_number=issue.number))
             except Exception as exc:
                 logger.bind(
                     domain="global_dispatch",
-                    role=role,
-                ).error(f"collect_ready_issues failed for {role}: {exc}")
+                    state=state.value,
+                ).error(f"collect_ready_issues failed for {state.value}: {exc}")
+        return queue
 
-        # Additional sorting: prioritize flows with pr_ref
-        # Check flow_state.pr_ref for each candidate
-        def has_pr_ref(candidate: CandidateIssue) -> bool:
-            """Check if flow has pr_ref (indicating PR created)."""
-            from vibe3.clients.sqlite_client import SQLiteClient
+    def _promote_progressed_entries(self) -> None:
+        """Move completed-progress issues to the front of the frozen queue."""
+        if not self._frozen_queue:
+            return
 
-            try:
-                store = SQLiteClient()
-                branch = f"task/issue-{candidate.issue.number}"
-                flow_state = store.get_flow_state(branch)
-                if isinstance(flow_state, dict):
-                    pr_ref = flow_state.get("pr_ref")
-                    return isinstance(pr_ref, str) and bool(pr_ref)
-            except Exception:
-                pass
-            return False
+        promoted: list[QueueEntry] = []
+        retained: list[QueueEntry] = []
+        for entry in self._frozen_queue:
+            if entry.waiting_state is None:
+                retained.append(entry)
+                continue
 
-        # Sort: pr_ref flows first, then others
-        # Keep role order as secondary sort key
-        pr_ref_candidates = [c for c in candidates if has_pr_ref(c)]
-        other_candidates = [c for c in candidates if not has_pr_ref(c)]
+            issue = self._load_issue(entry.issue_number)
+            if issue is None or issue.state is None:
+                continue
 
-        # Return: pr_ref flows first, then others in role order
-        return pr_ref_candidates + other_candidates
+            current_state = issue.state.value
+            if current_state == entry.waiting_state:
+                retained.append(entry)
+                continue
 
-    def _find_service_for_role(self, role: str) -> StateLabelDispatchService | None:
-        """Find dispatch service for a role."""
+            entry.waiting_state = None
+            promoted.append(entry)
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: requeued #{entry.issue_number} "
+                f"to front after state change to {current_state}",
+            )
+
+        if promoted:
+            self._frozen_queue = promoted + retained
+        else:
+            self._frozen_queue = retained
+
+    def _load_issue(self, issue_number: int) -> IssueInfo | None:
+        """Load the current issue snapshot for an already-frozen issue."""
+        if self._github is None:
+            return None
+        try:
+            payload = self._github.view_issue(issue_number, repo=self._repo)
+        except Exception as exc:
+            logger.bind(domain="global_dispatch", issue=issue_number).error(
+                f"view_issue failed for #{issue_number}: {exc}"
+            )
+            return None
+        if not isinstance(payload, dict):
+            return None
+        return IssueInfo.from_github_payload(payload)
+
+    def _find_service_for_state(
+        self,
+        state: IssueState,
+    ) -> StateLabelDispatchService | None:
+        """Find the dispatch service responsible for a state label."""
         for service in self._dispatch_services:
-            if service.role_def.registry_role == role:
+            if service.role_def.trigger_state == state:
                 return service
         return None
