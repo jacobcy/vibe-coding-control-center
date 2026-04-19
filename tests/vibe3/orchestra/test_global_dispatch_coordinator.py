@@ -6,9 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from vibe3.orchestra.global_dispatch_coordinator import (
-    GlobalDispatchCoordinator,
-)
+from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
 
 
 def make_issue(number: int, priority: int = 5) -> MagicMock:
@@ -19,11 +18,22 @@ def make_issue(number: int, priority: int = 5) -> MagicMock:
     return issue
 
 
+def make_issue_info(number: int, state: IssueState) -> IssueInfo:
+    return IssueInfo(
+        number=number,
+        title=f"Issue {number}",
+        state=state,
+        labels=[state.to_label()],
+        assignees=[],
+    )
+
+
 def make_service(role: str, ready_issues: list) -> MagicMock:
     service = MagicMock()
     service.service_name = f"mock-{role}"
     role_map = {
         "manager": ("manager", "manager", "ready"),
+        "handoff-manager": ("manager", "manager", "handoff"),
         "planner": ("plan", "planner", "claimed"),
         "plan": ("plan", "planner", "claimed"),
         "executor": ("run", "executor", "in-progress"),
@@ -36,15 +46,17 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     )
     service.role_def.trigger_name = trigger_name
     service.role_def.registry_role = registry_role
-    service.role_def.trigger_state.value = trigger_state
+    service.role_def.trigger_state = IssueState(trigger_state)
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
+    service.config.repo = "owner/repo"
+    service._github = MagicMock()
     return service
 
 
 def make_capacity(remaining: int = 1) -> MagicMock:
-    """Create mock capacity service with specified remaining slots."""
     capacity = MagicMock()
+    capacity.config.max_concurrent_flows = max(remaining, 1)
     capacity.get_capacity_status = MagicMock(
         return_value={
             "remaining": remaining,
@@ -55,60 +67,84 @@ def make_capacity(remaining: int = 1) -> MagicMock:
     return capacity
 
 
-class TestGlobalDispatchCoordinator:
+def install_issue_loader(
+    coordinator: GlobalDispatchCoordinator,
+    states: dict[int, IssueState | None],
+) -> None:
+    coordinator._load_issue = lambda issue_number: (  # type: ignore[method-assign]
+        None
+        if states.get(issue_number) is None
+        else make_issue_info(issue_number, states[issue_number])
+    )
 
+
+class TestGlobalDispatchCoordinator:
     @pytest.mark.asyncio
     async def test_dispatch_all_when_capacity_available(self) -> None:
-        """容量足够时，所有 issues 被 dispatch。"""
         issues = [make_issue(1), make_issue(2)]
         service = make_service("planner", issues)
         capacity = make_capacity(remaining=2)
 
         coordinator = GlobalDispatchCoordinator(capacity, [service])
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.CLAIMED,
+                2: IssueState.CLAIMED,
+            },
+        )
+
         await coordinator.coordinate()
 
         assert service._emit_dispatch_intent.call_count == 2
 
     @pytest.mark.asyncio
     async def test_skip_when_capacity_full(self) -> None:
-        """容量满时跳过 issue，不 emit，下次 tick 再试。"""
         issues = [make_issue(1), make_issue(2), make_issue(3)]
         service = make_service("planner", issues)
-        # 只有 2 个槽位，第 3 个被跳过
         capacity = make_capacity(remaining=2)
 
         coordinator = GlobalDispatchCoordinator(capacity, [service])
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.CLAIMED,
+                2: IssueState.CLAIMED,
+                3: IssueState.CLAIMED,
+            },
+        )
+
         await coordinator.coordinate()
 
         assert service._emit_dispatch_intent.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_frozen_queue_prevents_duplicate_dispatch(self) -> None:
-        """队列冻结防止同一 tick 内重复派发。"""
-        # Tick 1: 派发 issue 1, 2
+    async def test_frozen_queue_prevents_duplicate_dispatch_without_state_change(
+        self,
+    ) -> None:
         issues = [make_issue(1), make_issue(2)]
         service = make_service("planner", issues)
         capacity = make_capacity(remaining=3)
 
         coordinator = GlobalDispatchCoordinator(capacity, [service])
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.CLAIMED,
+                2: IssueState.CLAIMED,
+            },
+        )
 
-        # Tick 1: 派发队列中的 issue 1, 2
         await coordinator.coordinate()
-        assert service._emit_dispatch_intent.call_count == 2
+        await coordinator.coordinate()
 
-        # Tick 2: 队列空了，重新收集（但假设没有新 issue）
-        service.collect_ready_issues = AsyncMock(return_value=[])
-        await coordinator.coordinate()
-        # 队列空了，不再派发
         assert service._emit_dispatch_intent.call_count == 2
 
     @pytest.mark.asyncio
     async def test_emit_failure_handled_gracefully(self) -> None:
-        """emit 失败时，异常被记录，继续尝试下一个 issue。"""
         issue1 = make_issue(1)
         issue2 = make_issue(2)
         service = make_service("planner", [issue1, issue2])
-        # Issue 1 emit 失败，Issue 2 成功
         service._emit_dispatch_intent.side_effect = [
             RuntimeError("emit failed"),
             None,
@@ -116,42 +152,47 @@ class TestGlobalDispatchCoordinator:
         capacity = make_capacity(remaining=2)
 
         coordinator = GlobalDispatchCoordinator(capacity, [service])
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.CLAIMED,
+                2: IssueState.CLAIMED,
+            },
+        )
+
         await coordinator.coordinate()
 
-        # Issue 1 和 Issue 2 都尝试了
         assert service._emit_dispatch_intent.call_count == 2
 
     @pytest.mark.asyncio
     async def test_collect_failure_does_not_affect_other_roles(self) -> None:
-        """某 service collect 失败，其他 service 正常继续。"""
         issue_planner = make_issue(10)
         bad_service = make_service("manager", [])
-        bad_service.collect_ready_issues = AsyncMock(
-            side_effect=RuntimeError("API error")
-        )
+        bad_service.collect_ready_issues = AsyncMock(side_effect=RuntimeError("API"))
         good_service = make_service("planner", [issue_planner])
         capacity = make_capacity(remaining=1)
 
         coordinator = GlobalDispatchCoordinator(capacity, [bad_service, good_service])
+        install_issue_loader(coordinator, {10: IssueState.CLAIMED})
+
         await coordinator.coordinate()
 
         good_service._emit_dispatch_intent.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_empty_queue_does_nothing(self) -> None:
-        """无 ready issues 时，coordinator 静默退出。"""
         service = make_service("planner", [])
-        capacity = make_capacity(remaining=0)
+        capacity = make_capacity(remaining=1)
 
         coordinator = GlobalDispatchCoordinator(capacity, [service])
+        install_issue_loader(coordinator, {})
+
         await coordinator.coordinate()
 
-        # 没有 issue 被 dispatch
         service._emit_dispatch_intent.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_fixed_role_order_dispatch(self) -> None:
-        """固定 role 顺序派发：reviewer → executor → planner → manager。"""
+    async def test_collect_order_prefers_higher_state_roles_first(self) -> None:
         manager_issue = make_issue(1)
         planner_issue = make_issue(2)
         manager_svc = make_service("manager", [manager_issue])
@@ -159,50 +200,90 @@ class TestGlobalDispatchCoordinator:
         capacity = make_capacity(remaining=2)
 
         coordinator = GlobalDispatchCoordinator(capacity, [manager_svc, planner_svc])
+        install_issue_loader(
+            coordinator,
+            {
+                1: IssueState.READY,
+                2: IssueState.CLAIMED,
+            },
+        )
+
         await coordinator.coordinate()
 
-        # planner 先派发（reviewer/executor 没有 issue）
         planner_svc._emit_dispatch_intent.assert_called_once()
         manager_svc._emit_dispatch_intent.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_dispatch_by_fixed_role_order_with_multiple_roles(self) -> None:
-        """多个 role 有 issue 时，按固定顺序派发。"""
+    async def test_capacity_limit_stops_dispatch(self) -> None:
         review_issue = make_issue(304)
         planner_issue = make_issue(303)
         manager_issue = make_issue(372)
         review_svc = make_service("review", [review_issue])
         planner_svc = make_service("plan", [planner_issue])
         manager_svc = make_service("manager", [manager_issue])
-        capacity = make_capacity(remaining=3)
+        capacity = make_capacity(remaining=2)
 
         coordinator = GlobalDispatchCoordinator(
             capacity, [manager_svc, planner_svc, review_svc]
         )
+        install_issue_loader(
+            coordinator,
+            {
+                304: IssueState.REVIEW,
+                303: IssueState.CLAIMED,
+                372: IssueState.READY,
+            },
+        )
+
         await coordinator.coordinate()
 
-        # reviewer → executor → planner → manager
-        review_svc._emit_dispatch_intent.assert_called_once_with(review_issue)
-        planner_svc._emit_dispatch_intent.assert_called_once_with(planner_issue)
-        manager_svc._emit_dispatch_intent.assert_called_once_with(manager_issue)
+        review_dispatched = review_svc._emit_dispatch_intent.call_args.args[0]
+        planner_dispatched = planner_svc._emit_dispatch_intent.call_args.args[0]
+        assert review_dispatched.number == 304
+        assert planner_dispatched.number == 303
+        manager_svc._emit_dispatch_intent.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_capacity_limit_stops_dispatch(self) -> None:
-        """容量不足时停止派发，即使还有更多 issue。"""
-        review_issue = make_issue(304)
-        planner_issue = make_issue(303)
-        manager_issue = make_issue(372)
-        review_svc = make_service("review", [review_issue])
-        planner_svc = make_service("plan", [planner_issue])
-        manager_svc = make_service("manager", [manager_issue])
-        capacity = make_capacity(remaining=2)  # 只能派发 2 个
-
-        coordinator = GlobalDispatchCoordinator(
-            capacity, [manager_svc, planner_svc, review_svc]
+    async def test_state_change_requeues_issue_to_front(self) -> None:
+        first_manager_issue = make_issue(1)
+        second_manager_issue = make_issue(2)
+        manager_svc = make_service(
+            "manager", [first_manager_issue, second_manager_issue]
         )
+        planner_svc = make_service("planner", [])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [manager_svc, planner_svc])
+        states = {
+            1: IssueState.READY,
+            2: IssueState.READY,
+        }
+        install_issue_loader(coordinator, states)
+
+        await coordinator.coordinate()
+        first_dispatched = manager_svc._emit_dispatch_intent.call_args.args[0]
+        assert first_dispatched.number == 1
+
+        states[1] = IssueState.CLAIMED
         await coordinator.coordinate()
 
-        # reviewer 和 planner 派发，manager 被跳过
-        review_svc._emit_dispatch_intent.assert_called_once_with(review_issue)
-        planner_svc._emit_dispatch_intent.assert_called_once_with(planner_issue)
-        manager_svc._emit_dispatch_intent.assert_not_called()
+        assert planner_svc._emit_dispatch_intent.call_count == 1
+        promoted_issue = planner_svc._emit_dispatch_intent.call_args.args[0]
+        assert promoted_issue.number == 1
+
+    @pytest.mark.asyncio
+    async def test_terminal_state_removes_issue_from_queue(self) -> None:
+        manager_issue = make_issue(1)
+        manager_svc = make_service("manager", [manager_issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [manager_svc])
+        states = {1: IssueState.READY}
+        install_issue_loader(coordinator, states)
+
+        await coordinator.coordinate()
+        states[1] = IssueState.BLOCKED
+        await coordinator.coordinate()
+        await coordinator.coordinate()
+
+        assert manager_svc._emit_dispatch_intent.call_count == 1

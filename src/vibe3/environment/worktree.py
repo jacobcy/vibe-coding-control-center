@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.worktree_support import (
     align_auto_scene_to_base,
     find_worktree_by_path,
@@ -76,6 +78,10 @@ class WorktreeManager:
         This is the canonical method for L3 manager/plan/run/review execution.
         The worktree is bound to the flow branch and persisted across sessions.
 
+        For flows woken up by dependency satisfaction, this will attempt to
+        create the worktree from the dependency's PR head branch instead of main.
+        If fetching the PR branch fails, it falls back to the standard creation.
+
         Args:
             issue_number: GitHub issue number
             branch: Git branch name for the worktree
@@ -102,8 +108,53 @@ class WorktreeManager:
                 issue_number=issue_number,
             )
 
-        # Create new worktree
+        # Check for dependency wake-up source PR
         wt_path = self.repo_path / ".worktrees" / branch
+        source_pr_number = self._find_dependency_wakeup_pr(branch)
+
+        if source_pr_number:
+            # Try to create from PR branch
+            context = self._create_from_pr_branch(
+                wt_path, branch, issue_number, source_pr_number
+            )
+            if context:
+                # Success! Return PR-based worktree
+                return context
+
+            # Failed, log and fall back to default
+            logger.bind(
+                issue=issue_number,
+                branch=branch,
+                source_pr=source_pr_number,
+            ).warning(
+                "Failed to create worktree from PR branch, "
+                "falling back to origin/main"
+            )
+
+            # Record fallback event
+            try:
+                # Calculate db path directly from repo_path without git command
+                git_common_dir = self.repo_path / ".git"
+                vibe3_dir = git_common_dir / "vibe3"
+                db_path = str(vibe3_dir / "handoff.db")
+                store = SQLiteClient(db_path=db_path)
+                store.add_event(
+                    branch,
+                    "dependency_branch_fallback",
+                    "worktree:manager",
+                    detail=f"Failed to fetch PR #{source_pr_number} branch, "
+                    f"falling back to origin/main",
+                    refs={"source_pr": str(source_pr_number)},
+                )
+            except Exception:
+                # Failed to record event, but fallback still happens
+                logger.bind(
+                    issue=issue_number,
+                    branch=branch,
+                    source_pr=source_pr_number,
+                ).warning("Failed to record fallback event")
+
+        # Default: create from standard base (origin/main)
         return self._create_issue_worktree(wt_path, branch, issue_number)
 
     def release_issue_worktree(self, context: WorktreeContext) -> None:
@@ -226,6 +277,205 @@ class WorktreeManager:
     def align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:
         """Align auto task scenes to configured base ref when safe."""
         return align_auto_scene_to_base(self.config, cwd, flow_branch)
+
+    def _find_dependency_wakeup_pr(self, flow_branch: str) -> Optional[int]:
+        """Find the source PR number from dependency wake-up event history.
+
+        Args:
+            flow_branch: The flow branch to check
+
+        Returns:
+            PR number if flow has dependency wake-up event with source_pr,
+            None otherwise
+        """
+        try:
+            # Calculate db path directly from repo_path without git command
+            # This avoids extra git invocation in unit tests
+            git_common_dir = self.repo_path / ".git"
+            vibe3_dir = git_common_dir / "vibe3"
+            db_path = str(vibe3_dir / "handoff.db")
+            store = SQLiteClient(db_path=db_path)
+            events = store.get_events(flow_branch, event_type="dependency_wake_up")
+        except Exception:
+            # Failed to access SQLite store (e.g. in test temp directory)
+            # Return None, fall back to default behavior
+            return None
+
+        if not events:
+            return None
+
+        # Find the most recent wake-up event
+        # get_events already orders by created_at DESC (newest first)
+        for event in events:
+            refs = event.get("refs")
+            if refs is None:
+                continue
+            source_pr = refs.get("source_pr")
+            if source_pr:
+                try:
+                    return int(source_pr)
+                except (ValueError, TypeError):
+                    continue
+
+        return None
+
+    def _fetch_pr_branch(self, pr_number: int) -> Optional[str]:
+        """Fetch PR head branch and verify it's accessible.
+
+        Args:
+            pr_number: The PR number to fetch
+
+        Returns:
+            Head branch name if fetch succeeds, None otherwise
+        """
+        gh = GitHubClient()
+        pr = gh.get_pr(pr_number=pr_number)
+
+        if not pr:
+            logger.bind(pr_number=pr_number).warning(
+                "Could not retrieve PR information for dependency branch creation"
+            )
+            return None
+
+        head_branch = pr.head_branch
+        if not head_branch:
+            logger.bind(pr_number=pr_number).warning("PR has no head branch name")
+            return None
+
+        # Fetch the PR branch
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "fetch",
+                    "origin",
+                    f"+refs/heads/{head_branch}:refs/remotes/origin/{head_branch}",
+                ],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception as exc:
+            logger.bind(
+                pr_number=pr_number,
+                head_branch=head_branch,
+                error=str(exc),
+            ).warning("Exception while fetching PR branch")
+            return None
+
+        if result.returncode != 0:
+            logger.bind(
+                pr_number=pr_number,
+                head_branch=head_branch,
+                stderr=result.stderr,
+            ).warning("Failed to fetch PR branch from origin")
+            return None
+
+        logger.bind(
+            pr_number=pr_number,
+            head_branch=head_branch,
+        ).info("Successfully fetched PR branch for dependency base")
+        return head_branch
+
+    def _create_from_pr_branch(
+        self,
+        wt_path: Path,
+        branch: str,
+        issue_number: int,
+        pr_number: int,
+    ) -> Optional[WorktreeContext]:
+        """Create worktree from PR head branch.
+
+        Attempts to fetch PR head branch and create worktree from it.
+        Falls back to None if fetch fails, caller should handle fallback to main.
+
+        Args:
+            wt_path: Target worktree path
+            branch: New branch name for the worktree
+            issue_number: Issue number for tracking
+            pr_number: PR number to create from
+
+        Returns:
+            WorktreeContext if creation succeeded, None otherwise
+            (caller should fallback)
+        """
+        # Fetch PR branch
+        head_branch = self._fetch_pr_branch(pr_number)
+        if not head_branch:
+            # Fetch failed, will fallback
+            return None
+
+        # Check if path needs cleanup
+        wt_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Pre-flight: cleanup stale references
+        try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception:
+            pass
+
+        # If path exists but is not registered, delete it
+        if wt_path.exists() and not find_worktree_by_path(self.repo_path, wt_path):
+            logger.warning(
+                "Deleting unregistered directory at target worktree path",
+                path=str(wt_path),
+            )
+            shutil.rmtree(wt_path)
+
+        # Create worktree from the fetched PR branch
+        # Use the remote ref to ensure we get the latest
+        base_ref = f"origin/{head_branch}"
+
+        try:
+            result = subprocess.run(
+                ["git", "worktree", "add", "-b", branch, str(wt_path), base_ref],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except Exception as exc:
+            logger.bind(
+                issue=issue_number,
+                branch=branch,
+                pr_number=pr_number,
+                error=str(exc),
+            ).error("Failed to create worktree from PR branch")
+            return None
+
+        if result.returncode != 0:
+            logger.bind(
+                issue=issue_number,
+                branch=branch,
+                pr_number=pr_number,
+                stderr=result.stderr,
+            ).error("Git worktree add failed from PR branch")
+            return None
+
+        logger.info(
+            "Created issue worktree from PR branch",
+            issue=issue_number,
+            branch=branch,
+            pr_number=pr_number,
+            source_branch=base_ref,
+            path=str(wt_path),
+        )
+        initialize_worktree(self.repo_path, wt_path, reason="issue")
+
+        return WorktreeContext(
+            path=wt_path,
+            is_temporary=False,
+            branch=branch,
+            issue_number=issue_number,
+        )
 
     def _create_issue_worktree(
         self,

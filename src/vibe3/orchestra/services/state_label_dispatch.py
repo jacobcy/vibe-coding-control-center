@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_labels import GhIssueLabelPort
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -100,8 +101,13 @@ class StateLabelDispatchService(ServiceBase):
         This method is for GlobalDispatchCoordinator to collect issues for
         capacity-aware dispatch. Capacity checking is done by coordinator.
 
+        **Dependency Handling**:
+        Issues with unresolved dependencies are marked as 'waiting' and excluded
+        from the ready list. Only issues without dependencies or with all
+        dependencies satisfied are returned as ready.
+
         Returns:
-            Filtered and sorted ready issues list
+            Filtered and sorted ready issues list (excluding waiting issues)
         """
         async with self._dispatch_guard:
             raw_issues = await asyncio.get_event_loop().run_in_executor(
@@ -191,9 +197,136 @@ class StateLabelDispatchService(ServiceBase):
             return "", None
         return branch, self._store.get_flow_state(branch)
 
+    def _get_issue_dependencies(self, issue_number: int) -> list[int]:
+        """Get dependency issue numbers from flow_issue_links.
+
+        Args:
+            issue_number: The issue number to check for dependencies
+
+        Returns:
+            List of dependency issue numbers (empty if no dependencies)
+        """
+        # Query flows where this issue is task role
+        flows = self._store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return []
+
+        branch = str(flows[0].get("branch") or "").strip()
+        if not branch:
+            return []
+
+        # Query dependency links for this branch
+        import sqlite3
+
+        with sqlite3.connect(self._store.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT issue_number FROM flow_issue_links "
+                "WHERE branch = ? AND issue_role = 'dependency'",
+                (branch,),
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def _is_dependency_satisfied(self, dep_issue_number: int) -> bool:
+        """Check if dependency issue has completed (PR created).
+
+        A dependency is satisfied when:
+        - Issue is closed
+        - Issue has state/done or state/merged label
+        - Issue body/comments mention PR reference
+
+        Args:
+            dep_issue_number: The dependency issue number to check
+
+        Returns:
+            True if dependency is satisfied, False otherwise
+        """
+        payload = self._github.view_issue(dep_issue_number, repo=self.config.repo)
+
+        if not isinstance(payload, dict):
+            return False
+
+        # Check issue state
+        state = payload.get("state")
+        if state == "closed":
+            return True  # Issue closed → dependency satisfied
+
+        # Check for PR reference (completion marker)
+        labels = _normalize_labels(payload.get("labels"))
+        if "state/done" in labels or "state/merged" in labels:
+            return True  # Task completed with PR
+
+        # Check for PR in issue body or comments
+        body = payload.get("body", "")
+        if isinstance(body, str):
+            if "pull request" in body.lower() or "pr #" in body.lower():
+                return True  # PR mentioned → likely completed
+
+        return False  # Dependency not yet satisfied
+
+    def _mark_issue_waiting(
+        self, issue_number: int, unresolved_deps: list[int]
+    ) -> None:
+        """Mark issue as waiting for dependencies.
+
+        Updates flow_status to waiting, sets blocked_by_issue, records event,
+        and syncs GitHub label.
+
+        Args:
+            issue_number: The issue number to mark as waiting
+            unresolved_deps: List of unresolved dependency issue numbers
+        """
+        flows = self._store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return
+
+        branch = str(flows[0].get("branch") or "").strip()
+        if not branch:
+            return
+
+        # Update flow_status to waiting
+        self._store.update_flow_state(
+            branch,
+            flow_status="waiting",
+            blocked_by_issue=unresolved_deps[0],  # Primary dependency
+            blocked_reason=f"Waiting for dependencies: #{unresolved_deps}",
+        )
+
+        # Add event
+        self._store.add_event(
+            branch,
+            "dependency_waiting",
+            "orchestra:dispatcher",
+            detail=f"Waiting for dependencies: {unresolved_deps}",
+            refs={"dependencies": [str(d) for d in unresolved_deps]},
+        )
+
+        # Sync GitHub label (use state/blocked for waiting)
+        try:
+            label_port = GhIssueLabelPort(repo=self.config.repo)
+            label_port.add_issue_label(issue_number, "state/blocked")
+        except Exception as exc:
+            logger.bind(
+                domain="orchestra",
+                dispatcher=self.service_name,
+                issue=issue_number,
+            ).warning(f"Failed to add state/blocked label: {exc}")
+
     def _select_ready_issues(
         self, raw_issues: list[dict[str, object]]
     ) -> list[IssueInfo]:
+        """Select ready issues, checking for unresolved dependencies.
+
+        Issues with dependencies are marked as 'waiting' and excluded from
+        the ready list. Only issues without dependencies or with all
+        dependencies satisfied are returned.
+
+        Args:
+            raw_issues: Raw issue payloads from GitHub
+
+        Returns:
+            Filtered and sorted ready issues (excluding waiting)
+        """
         selected: list[IssueInfo] = []
         for item in raw_issues:
             labels = _normalize_labels(item.get("labels"))
@@ -207,14 +340,33 @@ class StateLabelDispatchService(ServiceBase):
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
                 continue
-            if self.role_def.trigger_name == "manager":
-                # Manager is the entry point. Always dispatch if the label is present,
-                # unless there's already a live session (handled in _should_dispatch).
-                # We don't skip if branch/flow_state is missing because Manager
-                # is responsible for creating them.
-                branch, flow_state = self._flow_context(issue.number)
-                if not self._should_dispatch(issue.number, flow_state):
+
+            # Check for dependencies before proceeding
+            dependencies = self._get_issue_dependencies(issue.number)
+            if dependencies:
+                # Has dependencies → check if all are satisfied
+                unresolved = [
+                    d for d in dependencies if not self._is_dependency_satisfied(d)
+                ]
+
+                if unresolved:
+                    # Move to waiting state (not ready)
+                    self._mark_issue_waiting(issue.number, unresolved)
+                    logger.bind(
+                        domain="orchestra",
+                        dispatcher=self.service_name,
+                        issue=issue.number,
+                    ).info(
+                        f"Issue #{issue.number} has unresolved dependencies: "
+                        f"{unresolved}"
+                    )
                     continue
+
+            # No dependencies OR all satisfied → proceed with ready check
+            if self.role_def.trigger_name == "manager":
+                # Manager is the entry point. If the trigger label is present,
+                # keep the issue in the frozen queue and let the coordinator
+                # decide when to fire the next hop.
                 selected.append(issue)
                 continue
 
@@ -235,42 +387,5 @@ class StateLabelDispatchService(ServiceBase):
                 )
                 continue
 
-            if not self._should_dispatch(issue.number, flow_state):
-                continue
-
             selected.append(issue)
         return sort_ready_issues(selected)
-
-    def _should_dispatch(
-        self,
-        issue_number: int,
-        flow_state: dict[str, object] | None,
-    ) -> bool:
-        """Use role definition's dispatch_predicate with registry liveness check.
-
-        Registry provides accurate liveness verification:
-        - Real-time tmux session verification
-        - Orphan detection (stale sessions > 60s)
-        - Grace period for recent starting sessions
-
-        Simplified: delegate all liveness checking to registry,
-        removing redundant flow_state.status_field check.
-        """
-        has_live_session = self._has_live_dispatch(issue_number)
-        return self.role_def.dispatch_predicate(flow_state or {}, has_live_session)
-
-    def _has_live_dispatch(self, issue_number: int) -> bool:
-        if self._registry is None:
-            raise RuntimeError(
-                "SessionRegistryService is required to check live dispatch"
-            )
-
-        branch, _ = self._flow_context(issue_number)
-        if not branch:
-            return False
-        sessions = self._registry.get_truly_live_sessions_for_target(
-            role=self.role_def.registry_role,
-            branch=branch,
-            target_id=str(issue_number),
-        )
-        return len(sessions) > 0

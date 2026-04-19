@@ -172,6 +172,37 @@ class CodeagentBackend:
             return Path(f.name)
 
     @staticmethod
+    def _sanitize_task_shell_meta(task: str) -> str:
+        """Replace shell glob meta characters with safe equivalents.
+
+        Shell glob patterns (*?[]{}) in task arguments may expand unexpectedly
+        when passed through shell layers inside codeagent-wrapper. Replace them
+        with visually similar but non-glob characters to prevent expansion.
+
+        Args:
+            task: Task string that may contain shell meta characters
+
+        Returns:
+            Sanitized task string safe for command-line arguments
+
+        Example:
+            "回收 worktree（do/*）" → "回收 worktree（do/×）"
+        """
+        # Replace glob meta characters with visually similar safe equivalents
+        replacements = {
+            "*": "×",  # Asterisk → multiplication sign (looks similar)
+            "?": "？",  # Question mark → full-width question mark
+            "[": "【",  # Left bracket → full-width lenticular bracket
+            "]": "】",  # Right bracket → full-width lenticular bracket
+            "{": "｛",  # Left brace → full-width brace
+            "}": "｝",  # Right brace → full-width brace
+        }
+        result = task
+        for meta, safe in replacements.items():
+            result = result.replace(meta, safe)
+        return result
+
+    @staticmethod
     def _build_command(
         options: AgentOptions,
         prompt_file_path: str,
@@ -198,15 +229,18 @@ class CodeagentBackend:
 
         command.extend(["--prompt-file", prompt_file_path])
 
+        # Sanitize task for shell meta characters before adding to command
+        safe_task = CodeagentBackend._sanitize_task_shell_meta(task) if task else None
+
         if session_id:
             command.append("resume")
             command.append(cast(str, session_id))
-            if task:
-                command.append(task)
+            if safe_task:
+                command.append(safe_task)
             else:
                 command.append("continue")
-        elif task:
-            command.append(task)
+        elif safe_task:
+            command.append(safe_task)
 
         return command
 

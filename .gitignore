@@ -124,9 +124,12 @@ openspec/
 .agents/
 .github/prompts/
 .codex/
+.gemini/
+.opencode/
 .copilot/
 .trae/
 .kiro/
+.qoder/
 .augment/
 .codebuddy/
 # Claude: track project config, exclude local commands and skills

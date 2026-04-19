@@ -229,6 +229,29 @@ def status(
 
         console.print()
 
+        # NEW: Show flows with PRs (factually complete, waiting for merge)
+        pr_ref_items = [
+            item
+            for item in task_progress_items
+            if item.get("flow") and getattr(item["flow"], "pr_ref", None)
+        ]
+        console.print("[bold cyan]Flows with PRs (Merge-Ready/Done):[/]")
+        if pr_ref_items:
+            for item in pr_ref_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                flow = cast(FlowStatusResponse, item["flow"])
+                pr_ref = getattr(flow, "pr_ref", None)
+
+                # Show PR URL and state
+                state = cast(IssueState, item["state"])
+                status_str = state.value.upper()
+
+                console.print(f"  #{number:4}  [{status_str:10}]  {title[:48]}...")
+                console.print(f"         [cyan]PR: {pr_ref}[/]")
+        else:
+            console.print("  [dim](none)[/]")
+
         blocked_items = [
             item
             for item in task_progress_items
@@ -282,6 +305,31 @@ def status(
                     console.print(f"         [red]reason:[/] {reason}")
         else:
             console.print("  [dim](none)[/]")
+
+        # NEW: Show completed/aborted flows (no longer active)
+        if all_flows:
+            completed_flows = [
+                flow
+                for flow in flows
+                if getattr(flow, "flow_status", "active")
+                in {"done", "aborted", "merged"}
+            ]
+            console.print("\n[bold cyan]Completed/Aborted Flows:[/]")
+            if completed_flows:
+                for flow in completed_flows:
+                    task = (
+                        f"#{flow.task_issue_number}"
+                        if flow.task_issue_number
+                        else "(no task)"
+                    )
+                    flow_status = getattr(flow, "flow_status", "active")
+                    console.print(
+                        f"  [cyan]{flow.branch:30}[/] "
+                        f"[dim]task:[/] {task:10} "
+                        f"[dim]status:[/] {flow_status}"
+                    )
+            else:
+                console.print("  [dim](none)[/]")
 
         # 3. Local scene context (tracked flows + worktrees)
         worktree_map = query_service.fetch_worktree_map()

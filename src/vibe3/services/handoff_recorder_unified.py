@@ -165,7 +165,7 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         refs["log_path"] = record.log_path
     elif record.session_id:
         # Infer log_path from session_id pattern
-        log_dir = Path(__file__).resolve().parents[4] / "temp" / "logs"
+        log_dir = Path(__file__).resolve().parents[3] / "temp" / "logs"
         inferred_log_path = resolve_async_log_path(log_dir, record.session_id)
         refs["log_path"] = str(inferred_log_path)
 

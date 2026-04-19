@@ -259,6 +259,7 @@ class FlowManager:
                 branch=branch,
                 actor=None,
                 initiated_by=initiator,
+                source="dispatch",
             )
         except Exception as exc:
             existing = self.store.get_flow_state(branch) or {}

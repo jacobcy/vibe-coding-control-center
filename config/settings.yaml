@@ -106,9 +106,6 @@ code_limits:
       - path: "src/vibe3/roles/manager.py"
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
-      - path: "src/vibe3/roles/plan.py"
-        limit: 330
-        reason: "Planner 角色聚合，包含 request builder 和 dispatch 逻辑"
 
       # Commands 层 —— 允许 440
       - path: "src/vibe3/commands/task.py"
@@ -174,20 +171,17 @@ code_limits:
         limit: 500
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
       - path: "tests/vibe3/domain/test_orchestration_facade.py"
-        limit: 450
-        reason: "单一测试类，刚超限，拆分收益低"
+        limit: 350
+        reason: "Facade 核心测试（事件发布、governance、supervisor scan），已拆出 dispatch 测试"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
       - path: "tests/vibe3/agents/test_codeagent_config.py"
         limit: 450
         reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
-      - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
-        limit: 500
-        reason: "Gate 核心测试，两个测试类围绕统一执行壳 gate/callback 逻辑，共享 fixture，拆分收益低"
       - path: "tests/vibe3/execution/test_coordinator.py"
-        limit: 450
-        reason: "Coordinator 核心测试，25 个测试函数围绕调度逻辑，共享 mock_dependencies fixture，拆分收益低"
+        limit: 500
+        reason: "Coordinator 核心测试，10 个测试函数围绕调度逻辑，共享 mock_dependencies fixture，拆分收益低"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
@@ -365,7 +359,14 @@ review:
     The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
     If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
     and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
-    <important> you must change the issue label to state/handoff before exit(), or this flow will be blocked.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/review"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
   # Static: Custom review prompt (optional prefix)
   # Added to beginning of review context if provided
@@ -426,8 +427,14 @@ plan:
     You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
     Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
-    <important> you must change the issue label to state/handoff before exit()
-    If you do not register `plan_ref` and change issue label, the planner run is treated as no-op and the issue is moved to `state/blocked`.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/claimed"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
   # Static: Optional plain-text default task guidance.
   # Slash-prefixed external skill triggers are ignored by vibe3 plan.
@@ -489,8 +496,14 @@ run:
     You must write a canonical execution report under `docs/reports/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
     Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
-    <important> you must change the issue label to state/handoff before exit()
-    If you do not register `report_ref` and change label, the executor run is treated as no-op and the issue is moved to `state/blocked`.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/in-progress"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
 
   # Static: Custom run prompt (optional prefix)

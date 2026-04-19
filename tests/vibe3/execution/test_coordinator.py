@@ -126,7 +126,7 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
 
 
 def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkeypatch):
-    """Sync child process should not short-circuit on its async wrapper session."""
+    """Sync child process should still bypass capacity double-counting."""
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
@@ -135,9 +135,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         store=store,
         backend=backend,
         capacity=capacity,
-    )
-    coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
-        return_value=[{"id": 1, "branch": "task/issue-42"}]
     )
     monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
 
@@ -164,7 +161,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         result = coordinator.dispatch_execution(request)
 
     assert result.launched is True
-    coordinator.registry.get_truly_live_sessions_for_target.assert_not_called()
     mock_svc.execute_sync_request.assert_called_once()
 
 
@@ -216,9 +212,12 @@ def test_sync_child_clears_async_marker_before_entering_sync_shell(
     assert os.environ.get("VIBE3_ASYNC_CHILD") == "1"
 
 
-def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
-    """Regular sync launches should still respect live-session dedupe."""
+def test_sync_skips_when_live_session_exists_for_target(
+    mock_dependencies,
+):
+    """Regular sync dispatches should be deduped by live session for same target."""
     config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
         config=config,
@@ -226,9 +225,12 @@ def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
         backend=backend,
         capacity=capacity,
     )
-    coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
-        return_value=[{"id": 1, "branch": "task/issue-42"}]
-    )
+
+    # Mock registry to report an existing live session for the same target
+    coordinator.registry = MagicMock()
+    coordinator.registry.get_truly_live_sessions_for_target.return_value = [
+        {"id": 99, "role": "manager", "branch": "task/issue-42", "target_id": "42"},
+    ]
 
     request = ExecutionRequest(
         role="manager",
@@ -243,9 +245,12 @@ def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
     result = coordinator.dispatch_execution(request)
 
     assert result.launched is False
-    assert result.skipped is True
-    assert result.reason_code == "already_running"
-    backend.run.assert_not_called()
+    assert result.reason_code == "duplicate_dispatch"
+    coordinator.registry.get_truly_live_sessions_for_target.assert_called_once_with(
+        role="manager",
+        branch="task/issue-42",
+        target_id="42",
+    )
 
 
 def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
@@ -350,7 +355,10 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
     capacity.can_dispatch.return_value = True
 
     # Mock the module function start_async_command to raise exception
-    with patch("vibe3.execution.coordinator.start_async_command") as mock_start:
+    with (
+        patch("vibe3.execution.coordinator.start_async_command") as mock_start,
+        patch("vibe3.execution.coordinator.append_orchestra_event") as mock_event,
+    ):
         mock_start.side_effect = Exception("Tmux failed to start")
 
         coordinator = ExecutionCoordinator(
@@ -384,6 +392,45 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
             branch="task/issue-42",
         )
         coordinator.registry.mark_failed.assert_called_once_with(123)
+        assert "launch failed" in mock_event.call_args.args[1]
+
+
+def test_sync_failure_appends_orchestra_event(mock_dependencies):
+    """Sync execution failures should surface in orchestra events.log."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+    )
+    request = ExecutionRequest(
+        role="manager",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-manager-issue-42",
+        prompt="do work",
+        options=MagicMock(),
+        mode="sync",
+    )
+
+    with (
+        patch("vibe3.execution.coordinator.CodeagentExecutionService") as mock_service,
+        patch("vibe3.execution.coordinator.append_orchestra_event") as mock_event,
+    ):
+        mock_service.return_value.execute_sync_request.return_value = MagicMock(
+            success=False,
+            stdout="",
+            stderr="state unchanged",
+        )
+
+        result = coordinator.dispatch_execution(request)
+
+    assert result.launched is False
+    assert result.reason_code == "launch_failed"
+    assert "sync execution failed" in mock_event.call_args.args[1]
 
 
 @patch("vibe3.execution.coordinator.WorktreeManager")

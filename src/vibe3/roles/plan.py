@@ -185,27 +185,84 @@ def resolve_spec_plan_input(
     file: Path | None = None,
     msg: str | None = None,
 ) -> PlanSpecInput:
-    """Resolve spec planning input from file or inline message."""
+    """Resolve spec planning input from file, inline message, or flow spec_ref.
+
+    Priority:
+    1. Explicit --file or --msg from CLI
+    2. Flow's existing spec_ref (if available)
+    3. Error if none available
+    """
+    from vibe3.services.flow_service import FlowService
+    from vibe3.services.spec_ref_service import SpecRefService
+
     if file and msg:
         raise ValueError("Provide either --file or --msg, not both.")
-    if not file and not msg:
-        raise ValueError("Provide either --file or --msg.")
 
+    # Case 1: Explicit file provided
     if file:
         if not file.exists():
             raise FileNotFoundError(f"File not found: {file}")
         description = file.read_text(encoding="utf-8")
-        spec_path = str(file.resolve())
-    else:
-        description = msg or ""
-        spec_path = None
+        spec_path: str | None = str(file.resolve())
+        request = PlanRequest(scope=PlanScope.for_spec(description))
+        return PlanSpecInput(
+            branch=branch,
+            request=request,
+            description=description,
+            spec_path=spec_path,
+        )
 
-    request = PlanRequest(scope=PlanScope.for_spec(description))
-    return PlanSpecInput(
-        branch=branch,
-        request=request,
-        description=description,
-        spec_path=spec_path,
+    # Case 2: Explicit message provided
+    if msg:
+        description = msg
+        spec_path = None  # Already defined with str | None type in Case 1
+        request = PlanRequest(scope=PlanScope.for_spec(description))
+        return PlanSpecInput(
+            branch=branch,
+            request=request,
+            description=description,
+            spec_path=spec_path,
+        )
+
+    # Case 3: Try flow's spec_ref as default
+    flow_service = FlowService()
+    flow = flow_service.get_flow_status(branch)
+
+    if flow and flow.spec_ref:
+        spec_service = SpecRefService()
+        spec_info = spec_service.parse_spec_ref(flow.spec_ref)
+
+        # Validate spec_ref exists
+        is_valid, error = spec_service.validate_spec_ref(flow.spec_ref)
+        if not is_valid:
+            raise ValueError(f"Flow spec_ref invalid: {error}")
+
+        # Get spec content
+        spec_content = spec_service.get_spec_content_for_prompt(spec_info)
+        if not spec_content:
+            raise ValueError(f"Failed to read spec content from {flow.spec_ref}")
+
+        # Determine spec_path based on kind
+        spec_path = (
+            spec_info.file_path if spec_info.kind == "file" else None
+        )  # Already defined with str | None type in Case 1
+
+        request = PlanRequest(scope=PlanScope.for_spec(spec_content))
+        return PlanSpecInput(
+            branch=branch,
+            request=request,
+            description=spec_content,
+            spec_path=spec_path,
+        )
+
+    # Case 4: No spec available
+    raise ValueError(
+        "No spec provided.\n"
+        "Use one of:\n"
+        "  vibe3 plan spec --file <path>     # From spec file\n"
+        "  vibe3 plan spec --msg <text>      # From inline message\n"
+        "  vibe3 flow update --spec <ref>    # Bind spec to flow first\n"
+        "Or ensure flow has an existing spec_ref."
     )
 
 

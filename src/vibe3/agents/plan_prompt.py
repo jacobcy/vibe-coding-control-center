@@ -152,17 +152,18 @@ def build_plan_prompt_body(
     if tools_guide:
         sections.append(tools_guide)
 
-    plan_task_text = None
-    if plan_config and hasattr(plan_config, "plan_task"):
-        plan_task_text = plan_config.plan_task
-    task = build_plan_task_section(request, plan_task_text)
-    sections.append(task)
-
     output_format = None
     if plan_config and hasattr(plan_config, "output_format"):
         output_format = plan_config.output_format
     output_contract = build_plan_output_contract_section(output_format)
     sections.append(output_contract)
+
+    # Task section MUST be last so the exit label instruction has recency effect
+    plan_task_text = None
+    if plan_config and hasattr(plan_config, "plan_task"):
+        plan_task_text = plan_config.plan_task
+    task = build_plan_task_section(request, plan_task_text)
+    sections.append(task)
 
     body = "\n\n---\n\n".join(sections)
     log.bind(body_len=len(body)).success("Plan prompt body built")

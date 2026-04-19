@@ -36,13 +36,19 @@ class FlowTransitionMixin(FlowWriteMixin):
     config: VibeConfig
 
     def ensure_flow_for_branch(
-        self: Self, branch: str, slug: str | None = None
+        self: Self,
+        branch: str,
+        slug: str | None = None,
+        *,
+        source: str = "cli",
     ) -> FlowStatusResponse:
         """Ensure flow exists for branch, creating if needed.
 
         Args:
             branch: Git branch name
             slug: Optional flow slug (defaults to derived from branch)
+            source: Caller identity for audit logging
+                (e.g. "dispatch", "cli", "agent").
 
         Returns:
             Existing or newly created FlowStatusResponse
@@ -65,6 +71,7 @@ class FlowTransitionMixin(FlowWriteMixin):
                 action="ensure",
                 branch=branch,
                 existing=True,
+                source=source,
             ).debug("Flow already exists")
             return existing
 
@@ -81,9 +88,10 @@ class FlowTransitionMixin(FlowWriteMixin):
             branch=branch,
             slug=slug,
             existing=False,
+            source=source,
         ).info("Creating flow via ensure")
 
-        flow = self.create_flow(slug=slug, branch=branch)
+        flow = self.create_flow(slug=slug, branch=branch, source=source)
 
         # Initialize issue flow context cache if this is an issue branch
         self._initialize_issue_flow_context(branch)

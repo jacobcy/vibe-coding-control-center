@@ -1,6 +1,6 @@
 """Tests for flow model migrations."""
 
-from vibe3.models.flow import FlowState, IssueLink
+from vibe3.models.flow import FlowState, FlowStatusResponse, IssueLink
 
 
 class TestFlowStatusMigration:
@@ -35,6 +35,42 @@ class TestFlowStatusMigration:
         """Test that 'stale' status is not modified."""
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="stale")
         assert flow.flow_status == "stale"
+
+    def test_waiting_status_valid(self):
+        """Test that 'waiting' status is a valid flow_status value."""
+        flow = FlowState(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="waiting",
+            blocked_by_issue=123,
+            blocked_reason="Waiting for dependency #123",
+        )
+        assert flow.flow_status == "waiting"
+        assert flow.blocked_by_issue == 123
+        assert flow.blocked_reason == "Waiting for dependency #123"
+
+    def test_waiting_status_unchanged(self):
+        """Test that 'waiting' status is not modified (no migration)."""
+        flow = FlowState(branch="test-branch", flow_slug="test", flow_status="waiting")
+        assert flow.flow_status == "waiting"
+
+    def test_waiting_serialization(self):
+        """Test that FlowState serializes with waiting status."""
+        flow = FlowState(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="waiting",
+            blocked_by_issue=456,
+        )
+        data = flow.model_dump()
+        assert data["flow_status"] == "waiting"
+        assert data["blocked_by_issue"] == 456
+
+    def test_waiting_json_serialization(self):
+        """Test that FlowState JSON serialization preserves waiting status."""
+        flow = FlowState(branch="test-branch", flow_slug="test", flow_status="waiting")
+        json_str = flow.model_dump_json()
+        assert '"flow_status":"waiting"' in json_str
 
 
 class TestIssueRoleMigration:
@@ -89,3 +125,25 @@ class TestModelSerialization:
         link = IssueLink(branch="test-branch", issue_number=123, issue_role="repo")
         json_str = link.model_dump_json()
         assert '"issue_role":"related"' in json_str
+
+
+class TestExecutionStatusMigration:
+    """Tests for legacy execution status migration (completed->done)."""
+
+    def test_flow_state_migrates_completed_to_done(self):
+        flow = FlowState(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="active",
+            planner_status="completed",
+        )
+        assert flow.planner_status == "done"
+
+    def test_flow_status_response_migrates_completed_to_done(self):
+        response = FlowStatusResponse(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="active",
+            planner_status="completed",
+        )
+        assert response.planner_status == "done"

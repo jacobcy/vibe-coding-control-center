@@ -23,6 +23,7 @@ from vibe3.execution.execution_lifecycle import (
     execution_prefix,
     persist_execution_lifecycle_event,
 )
+from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
 from vibe3.execution.session_service import load_session_id
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
@@ -48,97 +49,6 @@ def _resolve_request_pre_gate_callback(
     from vibe3.roles.review import _process_review_sync_result
 
     return _process_review_sync_result
-
-
-def _apply_unified_noop_gate(
-    *,
-    store: SQLiteClient,
-    issue_number: int,
-    branch: str,
-    actor: str,
-    role: ExecutionRole,
-    before_state_label: str | None,
-) -> None:
-    """Apply the single hard no-op gate after agent completion.
-
-    The only hard rule is simple:
-    - if the agent did not change state_label, block
-    - if the agent changed state_label, record the transition and pass
-
-    Ref presence is observable metadata only. It must never advance state and it
-    is no longer a separate blocking branch here.
-    """
-    from vibe3.services.issue_failure_service import (
-        block_executor_noop_issue,
-        block_manager_noop_issue,
-        block_planner_noop_issue,
-        block_reviewer_noop_issue,
-    )
-    from vibe3.utils.constants import EVENT_STATE_TRANSITIONED, EVENT_STATE_UNCHANGED
-
-    flow_state = store.get_flow_state(branch)
-    if not isinstance(flow_state, dict):
-        return
-
-    after_state_label = str(flow_state.get("state_label", "") or "")
-
-    # Resolve role-specific block function
-    if role == "manager":
-        _block_fn = block_manager_noop_issue
-    elif role == "planner":
-        _block_fn = block_planner_noop_issue
-    elif role == "executor":
-        _block_fn = block_executor_noop_issue
-    else:
-        _block_fn = block_reviewer_noop_issue
-
-    if before_state_label == after_state_label:
-        state_desc = before_state_label or "(no state)"
-        logger.bind(
-            domain="codeagent",
-            role=role,
-            issue_number=issue_number,
-            branch=branch,
-        ).warning(
-            f"No-op gate BLOCK: state unchanged after {role} " f"(still {state_desc})"
-        )
-        store.add_event(
-            branch,
-            EVENT_STATE_UNCHANGED,
-            actor,
-            detail=f"State unchanged after {role}: still {state_desc}",
-            refs={
-                "state": str(before_state_label or ""),
-                "issue": str(issue_number),
-            },
-        )
-        _block_fn(
-            issue_number=issue_number,
-            reason="state unchanged",
-            actor=actor,
-        )
-        return
-
-    logger.bind(
-        domain="codeagent",
-        role=role,
-        issue_number=issue_number,
-        branch=branch,
-    ).info(
-        f"No-op gate PASS: state changed {before_state_label} -> "
-        f"{after_state_label}"
-    )
-    store.add_event(
-        branch,
-        EVENT_STATE_TRANSITIONED,
-        actor,
-        detail=f"State changed: {before_state_label} -> {after_state_label}",
-        refs={
-            "before_state": str(before_state_label or ""),
-            "after_state": after_state_label,
-            "issue": str(issue_number),
-        },
-    )
 
 
 class CodeagentExecutionService:
@@ -203,13 +113,21 @@ class CodeagentExecutionService:
             # correct actor instead of a stale one.
             store.update_flow_state(branch, latest_actor=actor)
 
-        # Capture before_state_label for unified no-op gate.
-        # Runs in both sync and async paths when issue_number is available.
+        # Capture before_state_label from GitHub for unified no-op gate.
+        # Remote source of truth: GitHub issue labels, not local SQLite cache.
         before_state_label: str | None = None
-        if branch and store and command.issue_number is not None:
-            flow_state = store.get_flow_state(branch)
-            if isinstance(flow_state, dict):
-                before_state_label = str(flow_state.get("state_label", "") or "")
+        if command.issue_number is not None:
+            try:
+                from vibe3.clients.github_client import GitHubClient
+
+                issue_payload = GitHubClient().view_issue(
+                    command.issue_number,
+                    repo=getattr(self.config, "repo", None),
+                )
+                if isinstance(issue_payload, dict):
+                    before_state_label = extract_state_label(issue_payload)
+            except Exception as exc:
+                log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
@@ -281,13 +199,14 @@ class CodeagentExecutionService:
                 # Unified no-op gate: single hard logic check after agent completion.
                 # Executes ONLY if issue_number is available (worker roles).
                 if command.issue_number is not None:
-                    _apply_unified_noop_gate(
+                    apply_unified_noop_gate(
                         store=store,
                         issue_number=command.issue_number,
                         branch=branch,
                         actor=actor,
                         role=command.role,
                         before_state_label=before_state_label,
+                        repo=getattr(self.config, "repo", None),
                     )
 
             return CodeagentResult(

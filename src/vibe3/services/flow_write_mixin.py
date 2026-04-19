@@ -59,6 +59,8 @@ class FlowWriteMixin(FlowReadMixin):
         branch: str,
         actor: str | None = None,
         initiated_by: str | None = None,
+        *,
+        source: str = "unknown",
     ) -> FlowStatusResponse:
         """Create a new flow.
 
@@ -67,6 +69,8 @@ class FlowWriteMixin(FlowReadMixin):
             branch: Git branch name
             actor: Optional actor name
             initiated_by: Optional initiator identifier
+            source: Caller identity for audit logging
+                (e.g. "dispatch", "cli", "agent").
 
         Returns:
             Created flow state
@@ -80,12 +84,34 @@ class FlowWriteMixin(FlowReadMixin):
                 "Switch to a feature branch first."
             )
 
+        # Idempotency: if flow already exists, return existing
+        existing_state = self.store.get_flow_state(branch)
+        if existing_state:
+            existing_slug = existing_state.get("flow_slug", slug)
+            logger.bind(
+                domain="flow",
+                action="create",
+                branch=branch,
+                source=source,
+                existing_slug=existing_slug,
+            ).warning(
+                f"Flow already exists for '{branch}' "
+                f"(slug={existing_slug}, source={source}). "
+                f"Returning existing — use reactivate_flow to reset."
+            )
+            existing = self.get_flow_status(branch)
+            if existing is not None:
+                return existing
+            # get_flow_state found a row but get_flow_status returned None;
+            # fall through to recreate (should not happen in practice).
+
         logger.bind(
             domain="flow",
             action="create",
             slug=slug,
             branch=branch,
             initiated_by=initiated_by,
+            source=source,
         ).info("Creating flow")
         # Flow state actor: only set when explicitly provided.
         # orchestra uses actor=None to signal "no agent has taken ownership yet".
@@ -115,6 +141,7 @@ class FlowWriteMixin(FlowReadMixin):
             "flow_created",
             event_actor,
             f"Flow '{slug}' created",
+            refs={"source": source},
         )
 
         status = self.get_flow_status(branch)
