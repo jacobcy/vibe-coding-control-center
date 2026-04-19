@@ -189,9 +189,7 @@ class TestPlannerNoOpGate:
         """Planner state/claimed 未变 → blocked"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
 
@@ -205,7 +203,7 @@ class TestPlannerNoOpGate:
                 "labels": [{"name": "state/claimed"}],
                 "state": "open",
             }
-            _apply_unified_noop_gate(
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=100,
                 branch="task/issue-100",
@@ -222,9 +220,7 @@ class TestPlannerNoOpGate:
         """Planner state/claimed → state/handoff → pass"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {
@@ -235,7 +231,7 @@ class TestPlannerNoOpGate:
         with patch(
             "vibe3.services.issue_failure_service.block_planner_noop_issue"
         ) as mock_block:
-            _apply_unified_noop_gate(
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=100,
                 branch="task/issue-100",

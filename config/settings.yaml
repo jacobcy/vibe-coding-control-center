@@ -106,9 +106,6 @@ code_limits:
       - path: "src/vibe3/roles/manager.py"
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
-      - path: "src/vibe3/roles/plan.py"
-        limit: 330
-        reason: "Planner 角色聚合，包含 request builder 和 dispatch 逻辑"
 
       # Commands 层 —— 允许 440
       - path: "src/vibe3/commands/task.py"

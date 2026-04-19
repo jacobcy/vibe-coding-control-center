@@ -270,9 +270,7 @@ class TestExecutorNoOpGate:
         """Executor state/in-progress 未变 → blocked"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
 
@@ -286,7 +284,7 @@ class TestExecutorNoOpGate:
                 "labels": [{"name": "state/in-progress"}],
                 "state": "open",
             }
-            _apply_unified_noop_gate(
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=200,
                 branch="task/issue-200",
@@ -303,9 +301,7 @@ class TestExecutorNoOpGate:
         """Executor state/in-progress → state/handoff → pass"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {
@@ -316,7 +312,7 @@ class TestExecutorNoOpGate:
         with patch(
             "vibe3.services.issue_failure_service.block_executor_noop_issue"
         ) as mock_block:
-            _apply_unified_noop_gate(
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=200,
                 branch="task/issue-200",

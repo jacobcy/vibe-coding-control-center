@@ -5,7 +5,9 @@ from unittest.mock import MagicMock, patch
 from vibe3.agents.models import CodeagentCommand
 from vibe3.execution.codeagent_runner import (
     CodeagentExecutionService,
-    _apply_unified_noop_gate,
+)
+from vibe3.execution.noop_gate import (
+    apply_unified_noop_gate as _apply_unified_noop_gate,
 )
 
 
@@ -355,7 +357,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -406,7 +408,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
             mock_backend.return_value.run.return_value = agent_result
@@ -445,7 +447,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -499,7 +501,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate",
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
                 side_effect=lambda **kw: call_order.append("gate"),
             ),
         ):
@@ -555,7 +557,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
@@ -610,7 +612,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(

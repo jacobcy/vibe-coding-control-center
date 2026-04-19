@@ -103,9 +103,7 @@ class TestReviewerNoOpGate:
         """Reviewer state/review 未变 → blocked"""
         from unittest.mock import patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
 
@@ -119,7 +117,7 @@ class TestReviewerNoOpGate:
                 "labels": [{"name": "state/review"}],
                 "state": "open",
             }
-            _apply_unified_noop_gate(
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=303,
                 branch="task/issue-303",
@@ -136,9 +134,7 @@ class TestReviewerNoOpGate:
         """Reviewer state/review → state/handoff → pass"""
         from unittest.mock import patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {
@@ -149,7 +145,7 @@ class TestReviewerNoOpGate:
         with patch(
             "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
         ) as mock_block:
-            _apply_unified_noop_gate(
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=303,
                 branch="task/issue-303",
