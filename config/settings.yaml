@@ -185,6 +185,9 @@ code_limits:
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 500
         reason: "Gate 核心测试，两个测试类围绕统一执行壳 gate/callback 逻辑，共享 fixture，拆分收益低"
+      - path: "tests/vibe3/execution/test_coordinator.py"
+        limit: 450
+        reason: "Coordinator 核心测试，25 个测试函数围绕调度逻辑，共享 mock_dependencies fixture，拆分收益低"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
