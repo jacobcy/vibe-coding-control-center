@@ -48,6 +48,10 @@ _EVENT_COLOR: dict[str, str] = {
     "handoff_run": "blue",
     "handoff_review": "magenta",
     "manager_completed": "green bold",
+    "tmux_manager_started": "dim yellow",
+    "codeagent_manager_started": "yellow",
+    "codeagent_manager_completed": "green",
+    "codeagent_manager_aborted": "red",
 }
 
 
@@ -158,13 +162,6 @@ def render_flow_timeline(
     console.print()
 
     for event in reversed(events):
-        # Filter orchestra placeholder actors from non-dispatch events.
-        # Dispatch events have orchestra:dispatcher actor and should be shown.
-        if event.actor.startswith("orchestra:") and not event.event_type.endswith(
-            "_dispatched"
-        ):
-            continue
-
         color = _EVENT_COLOR.get(event.event_type, "white")
         time_str = event.created_at[:16].replace("T", " ")
         actor_short = event.actor
