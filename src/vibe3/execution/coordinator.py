@@ -18,6 +18,7 @@ from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.execution_lifecycle import execution_prefix
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.logging import append_orchestra_event
 
 
 class ExecutionCoordinator:
@@ -288,6 +289,11 @@ class ExecutionCoordinator:
                         stdout=result.stdout,
                     )
                 error_msg = result.stderr or "Execution failed"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{request.role} sync execution failed for #{request.target_id}: "
+                    f"{error_msg}",
+                )
                 return ExecutionLaunchResult(
                     launched=False,
                     reason=error_msg,
@@ -299,6 +305,10 @@ class ExecutionCoordinator:
         except Exception as exc:
             if request.mode == "async" and runtime_session_id is not None:
                 self.registry.mark_failed(runtime_session_id)
+            append_orchestra_event(
+                "dispatcher",
+                f"{request.role} launch failed for #{request.target_id}: {exc}",
+            )
             logger.bind(
                 domain="execution_coordinator",
                 role=request.role,

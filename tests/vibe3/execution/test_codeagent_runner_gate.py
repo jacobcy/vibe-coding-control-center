@@ -129,6 +129,29 @@ class TestApplyUnifiedNoopGate:
 
         mock_block.assert_called_once()
 
+    def test_blocks_manager_when_state_unchanged_and_passes_repo(self) -> None:
+        """Manager block helper must receive repo to avoid post-gate crash."""
+        store = _make_mock_store(state_label="state/ready", ref_value="")
+        store.get_flow_state.return_value = {
+            "state_label": "state/ready",
+        }
+
+        with patch(
+            "vibe3.services.issue_failure_service.block_manager_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:manager",
+                role="manager",
+                before_state_label="state/ready",
+                repo="owner/repo",
+            )
+
+        mock_block.assert_called_once()
+        assert mock_block.call_args.kwargs["repo"] == "owner/repo"
+
     def test_blocks_reviewer_when_state_unchanged(self) -> None:
         """Reviewer is blocked when state is unchanged."""
         store = _make_mock_store(state_label="state/review", ref_value="")

@@ -58,6 +58,7 @@ def _apply_unified_noop_gate(
     actor: str,
     role: ExecutionRole,
     before_state_label: str | None,
+    repo: str | None = None,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -129,6 +130,7 @@ def _apply_unified_noop_gate(
         )
         _block_fn(
             issue_number=issue_number,
+            repo=repo,
             reason="state unchanged",
             actor=actor,
         )
@@ -303,6 +305,7 @@ class CodeagentExecutionService:
                         actor=actor,
                         role=command.role,
                         before_state_label=before_state_label,
+                        repo=getattr(self.config, "repo", None),
                     )
 
             return CodeagentResult(

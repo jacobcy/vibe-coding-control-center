@@ -11,6 +11,7 @@ from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.service_protocol import GitHubEvent
 
 
@@ -205,6 +206,38 @@ class TestOrchestrationFacade:
         await facade.handle_event(event)
 
         mock_publish.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.append_orchestra_event")
+    async def test_on_tick_blocks_dispatch_when_failed_gate_is_closed(
+        self,
+        mock_append_event: MagicMock,
+    ) -> None:
+        """Failed gate should freeze dispatch-intent emission, not heartbeat itself."""
+        dispatch_service = MagicMock()
+        capacity = MagicMock()
+        gate = MagicMock()
+        gate.check.return_value = GateResult(
+            blocked=True,
+            issue_number=328,
+            reason="manager failed",
+        )
+
+        facade = OrchestrationFacade(
+            dispatch_services=[dispatch_service],
+            capacity=capacity,
+            failed_gate=gate,
+        )
+        facade.on_supervisor_scan = AsyncMock()
+        facade._coordinator = MagicMock()
+        facade._coordinator.coordinate = AsyncMock()
+
+        await facade.on_tick()
+
+        gate.check.assert_called_once()
+        facade._coordinator.coordinate.assert_not_awaited()
+        assert mock_append_event.called
+        assert "dispatch blocked by failed gate" in mock_append_event.call_args.args[1]
 
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
