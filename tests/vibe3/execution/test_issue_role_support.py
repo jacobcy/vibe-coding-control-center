@@ -43,7 +43,6 @@ def test_build_issue_async_cli_request_uses_worktree_project_root() -> None:
             execution_name="vibe3-manager-issue-431",
             refs={},
             worktree_requirement=WorktreeRequirement.PERMANENT,
-            completion_gate=None,
         )
 
     assert request.cmd is not None

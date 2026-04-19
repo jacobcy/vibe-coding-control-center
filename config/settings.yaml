@@ -182,6 +182,9 @@ code_limits:
       - path: "tests/vibe3/agents/test_codeagent_config.py"
         limit: 450
         reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
+      - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
+        limit: 500
+        reason: "Gate 核心测试，两个测试类围绕统一执行壳 gate/callback 逻辑，共享 fixture，拆分收益低"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数

@@ -210,22 +210,16 @@ def persist_execution_lifecycle_event(
 ) -> None:
     """Persist lifecycle state and timeline event for an execution role."""
     now = datetime.now().isoformat()
-    status_field = _ROLE_STATUS_FIELD[role]
     state_updates: dict[str, object] = {}
 
-    if status_field:
-        if lifecycle == "started":
-            state_updates[status_field] = "running"
-            state_updates["execution_started_at"] = now
-            state_updates["execution_completed_at"] = None
-        elif lifecycle == "completed":
-            state_updates[status_field] = "done"
-            state_updates["execution_completed_at"] = now
-            state_updates["execution_pid"] = None
-        else:
-            state_updates[status_field] = "crashed"
-            state_updates["execution_completed_at"] = now
-            state_updates["execution_pid"] = None
+    if lifecycle == "started":
+        state_updates["execution_started_at"] = now
+    elif lifecycle == "completed":
+        state_updates["execution_completed_at"] = now
+        state_updates["execution_pid"] = None
+    else:
+        state_updates["execution_completed_at"] = now
+        state_updates["execution_pid"] = None
 
         actor_field = _ROLE_ACTOR_FIELD[role]
         if actor_field:

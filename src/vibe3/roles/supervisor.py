@@ -21,13 +21,13 @@ from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
     registry_role="supervisor",
-    gate_config=SUPERVISOR_IDENTIFY_GATE_CONFIG,
+    worktree=SUPERVISOR_IDENTIFY_GATE_CONFIG,
 )
 
 SUPERVISOR_APPLY_ROLE = RoleDefinition(
     name="supervisor-apply",
     registry_role="supervisor",
-    gate_config=SUPERVISOR_APPLY_GATE_CONFIG,
+    worktree=SUPERVISOR_APPLY_GATE_CONFIG,
 )
 
 
@@ -157,8 +157,7 @@ def build_supervisor_apply_request(
         refs={"task": task, "issue_number": str(issue_number)},
         actor=actor,
         mode="async",
-        worktree_requirement=SUPERVISOR_APPLY_ROLE.gate_config.worktree,
-        completion_gate=SUPERVISOR_APPLY_ROLE.gate_config.completion_contract,
+        worktree_requirement=SUPERVISOR_APPLY_ROLE.worktree,
     )
 
 
@@ -201,8 +200,7 @@ def build_supervisor_cli_request(
         refs={"task": task, "issue_number": str(issue_number)},
         actor=actor,
         mode="async",
-        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.gate_config.worktree,
-        completion_gate=SUPERVISOR_APPLY_ROLE.gate_config.completion_contract,
+        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
     )
 
 
@@ -239,8 +237,7 @@ def build_supervisor_cli_sync_request(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
-        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.gate_config.worktree,
-        completion_gate=SUPERVISOR_APPLY_ROLE.gate_config.completion_contract,
+        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
     )
 
 

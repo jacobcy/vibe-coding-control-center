@@ -101,8 +101,10 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
-    def test_executor_dispatch_passes_plan_ref(
+    @patch("vibe3.roles.run.check_merge_ready_commit")
+    def test_executor_dispatch_reads_flow_state(
         self,
+        mock_check_merge: MagicMock,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
         mock_sqlite_cls: MagicMock,
@@ -119,6 +121,13 @@ class TestExecutorDispatchHandler:
             "labels": [],
         }
 
+        # Mock flow_state with plan_ref
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"plan_ref": "plan.md"}
+        mock_sqlite_cls.return_value = mock_store
+
+        mock_check_merge.return_value = False
+
         expected_request = _make_mock_request("executor", 42)
         mock_build_request.return_value = expected_request
 
@@ -130,16 +139,19 @@ class TestExecutorDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
+        # Event no longer carries plan_ref; handler reads from flow_state
         handle_executor_dispatched(
             ExecutorDispatched(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="in-progress",
-                plan_ref="plan.md",
             )
         )
 
-        # Verify request builder was called with plan_ref
+        # Verify handler read flow_state
+        mock_store.get_flow_state.assert_called_once_with("task/issue-42")
+
+        # Verify request builder was called with plan_ref from flow_state
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
         assert call_kwargs[1].get("branch") == "task/issue-42"
@@ -156,7 +168,7 @@ class TestReviewerDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
-    def test_reviewer_dispatch_passes_report_ref(
+    def test_reviewer_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
@@ -174,6 +186,11 @@ class TestReviewerDispatchHandler:
             "labels": [],
         }
 
+        # Mock flow_state with report_ref
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {"report_ref": "report.md"}
+        mock_sqlite_cls.return_value = mock_store
+
         expected_request = _make_mock_request("reviewer", 42)
         mock_build_request.return_value = expected_request
 
@@ -185,16 +202,19 @@ class TestReviewerDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
+        # Event no longer carries report_ref; handler reads from flow_state
         handle_reviewer_dispatched(
             ReviewerDispatched(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="review",
-                report_ref="report.md",
             )
         )
 
-        # Verify request builder was called with report_ref
+        # Verify handler read flow_state
+        mock_store.get_flow_state.assert_called_once_with("task/issue-42")
+
+        # Verify request builder was called with report_ref from flow_state
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
         assert call_kwargs[1].get("branch") == "task/issue-42"

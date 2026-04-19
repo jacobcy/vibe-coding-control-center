@@ -214,13 +214,9 @@ class TestBuildGovernanceRequest:
         snapshot = _make_snapshot()
         config = _make_config()
         req = build_governance_request(config, 1, snapshot)
-        from vibe3.execution.role_contracts import (
-            CompletionContract,
-            WorktreeRequirement,
-        )
+        from vibe3.execution.role_contracts import WorktreeRequirement
 
         assert req.worktree_requirement == WorktreeRequirement.NONE
-        assert req.completion_gate == CompletionContract.MAY_COMMENT_OR_PROPOSE
 
 
 class TestBuildExecutionName:
@@ -242,13 +238,6 @@ class TestGovernanceRoleDefinition:
         assert GOVERNANCE_ROLE.registry_role == "governance"
 
     def test_gate_config(self):
-        from vibe3.execution.role_contracts import (
-            CompletionContract,
-            WorktreeRequirement,
-        )
+        from vibe3.execution.role_contracts import WorktreeRequirement
 
-        assert GOVERNANCE_ROLE.gate_config.worktree == WorktreeRequirement.NONE
-        assert (
-            GOVERNANCE_ROLE.gate_config.completion_contract
-            == CompletionContract.MAY_COMMENT_OR_PROPOSE
-        )
+        assert GOVERNANCE_ROLE.worktree == WorktreeRequirement.NONE

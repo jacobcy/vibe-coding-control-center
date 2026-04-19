@@ -1,17 +1,15 @@
-"""Tests for issue-state role dispatch handler."""
+"""Tests for manager dispatch-intent handler."""
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+from vibe3.domain.events.flow_lifecycle import ManagerDispatched
 
 
 class TestIssueStateDispatchHandler:
     """issue_state_dispatch handler dispatches manager role."""
 
-    # Dispatches on state/ready or state/handoff
-
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_human_resume_event_does_not_dispatch(
         self,
@@ -20,15 +18,14 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_issue_state_changed_for_roles,
+            handle_manager_dispatched,
         )
 
-        handle_issue_state_changed_for_roles(
-            IssueStateChanged(
+        handle_manager_dispatched(
+            ManagerDispatched(
                 issue_number=42,
-                from_state="failed",
-                to_state="ready",
-                issue_title="Test issue",
+                branch="task/issue-42",
+                trigger_state="ready",
                 actor="human:resume",
             )
         )
@@ -40,7 +37,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_ready_state_dispatches_manager(
         self,
         mock_build_request: MagicMock,
@@ -48,9 +45,7 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_issue_state_changed_for_roles,
-        )
+        from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
@@ -66,12 +61,12 @@ class TestIssueStateDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_issue_state_changed_for_roles(
-            IssueStateChanged(
+        handle_manager_dispatched(
+            ManagerDispatched(
                 issue_number=42,
-                from_state=None,
-                to_state="ready",
-                issue_title="Test issue",
+                branch="task/issue-42",
+                trigger_state="ready",
+                issue_title="Test Issue",
             )
         )
 
@@ -80,7 +75,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_handoff_state_dispatches_manager(
         self,
         mock_build_request: MagicMock,
@@ -88,9 +83,7 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_issue_state_changed_for_roles,
-        )
+        from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
@@ -106,12 +99,12 @@ class TestIssueStateDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_issue_state_changed_for_roles(
-            IssueStateChanged(
+        handle_manager_dispatched(
+            ManagerDispatched(
                 issue_number=42,
-                from_state="ready",
-                to_state="handoff",
-                issue_title="Test issue",
+                branch="task/issue-42",
+                trigger_state="handoff",
+                issue_title="Test Issue",
             )
         )
 
@@ -119,25 +112,21 @@ class TestIssueStateDispatchHandler:
 
     def test_unknown_state_no_dispatch(self) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_issue_state_changed_for_roles,
+            handle_manager_dispatched,
         )
 
-        # "claimed" is not a supported manager state.
-        # resolve_issue_state_role returns None, so no-op.
-        # This should be a no-op, no exceptions
-        handle_issue_state_changed_for_roles(
-            IssueStateChanged(
+        handle_manager_dispatched(
+            ManagerDispatched(
                 issue_number=42,
-                from_state="ready",
-                to_state="claimed",
-                issue_title="Test issue",
+                branch="task/issue-42",
+                trigger_state="claimed",
             )
         )
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_request_none_logs_error(
         self,
         mock_build_request: MagicMock,
@@ -145,9 +134,7 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_issue_state_changed_for_roles,
-        )
+        from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
 
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
@@ -157,12 +144,11 @@ class TestIssueStateDispatchHandler:
         mock_coordinator = MagicMock()
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_issue_state_changed_for_roles(
-            IssueStateChanged(
+        handle_manager_dispatched(
+            ManagerDispatched(
                 issue_number=42,
-                from_state=None,
-                to_state="ready",
-                issue_title="Test issue",
+                branch="task/issue-42",
+                trigger_state="ready",
             )
         )
 

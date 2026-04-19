@@ -1,8 +1,7 @@
 """Sync codeagent execution utilities for command-mode role entrypoints."""
 
-import os
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal, cast
 
 from loguru import logger
 from typer import echo
@@ -19,7 +18,11 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.actor_support import format_agent_actor
 from vibe3.execution.codeagent_support import resolve_command_agent_options
-from vibe3.execution.execution_lifecycle import persist_execution_lifecycle_event
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.execution_lifecycle import (
+    execution_prefix,
+    persist_execution_lifecycle_event,
+)
 from vibe3.execution.session_service import load_session_id
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
@@ -33,6 +36,109 @@ __all__ = [
     "create_codeagent_command",
     "CodeagentExecutionService",
 ]
+
+
+def _resolve_request_pre_gate_callback(
+    role: ExecutionRole,
+) -> Callable[..., None] | None:
+    """Resolve any role-specific callback that must run before the gate."""
+    if role != "reviewer":
+        return None
+
+    from vibe3.roles.review import _process_review_sync_result
+
+    return _process_review_sync_result
+
+
+def _apply_unified_noop_gate(
+    *,
+    store: SQLiteClient,
+    issue_number: int,
+    branch: str,
+    actor: str,
+    role: ExecutionRole,
+    before_state_label: str | None,
+) -> None:
+    """Apply the single hard no-op gate after agent completion.
+
+    The only hard rule is simple:
+    - if the agent did not change state_label, block
+    - if the agent changed state_label, record the transition and pass
+
+    Ref presence is observable metadata only. It must never advance state and it
+    is no longer a separate blocking branch here.
+    """
+    from vibe3.services.issue_failure_service import (
+        block_executor_noop_issue,
+        block_manager_noop_issue,
+        block_planner_noop_issue,
+        block_reviewer_noop_issue,
+    )
+    from vibe3.utils.constants import EVENT_STATE_TRANSITIONED, EVENT_STATE_UNCHANGED
+
+    flow_state = store.get_flow_state(branch)
+    if not isinstance(flow_state, dict):
+        return
+
+    after_state_label = str(flow_state.get("state_label", "") or "")
+
+    # Resolve role-specific block function
+    if role == "manager":
+        _block_fn = block_manager_noop_issue
+    elif role == "planner":
+        _block_fn = block_planner_noop_issue
+    elif role == "executor":
+        _block_fn = block_executor_noop_issue
+    else:
+        _block_fn = block_reviewer_noop_issue
+
+    if before_state_label == after_state_label:
+        state_desc = before_state_label or "(no state)"
+        logger.bind(
+            domain="codeagent",
+            role=role,
+            issue_number=issue_number,
+            branch=branch,
+        ).warning(
+            f"No-op gate BLOCK: state unchanged after {role} " f"(still {state_desc})"
+        )
+        store.add_event(
+            branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=f"State unchanged after {role}: still {state_desc}",
+            refs={
+                "state": str(before_state_label or ""),
+                "issue": str(issue_number),
+            },
+        )
+        _block_fn(
+            issue_number=issue_number,
+            reason="state unchanged",
+            actor=actor,
+        )
+        return
+
+    logger.bind(
+        domain="codeagent",
+        role=role,
+        issue_number=issue_number,
+        branch=branch,
+    ).info(
+        f"No-op gate PASS: state changed {before_state_label} -> "
+        f"{after_state_label}"
+    )
+    store.add_event(
+        branch,
+        EVENT_STATE_TRANSITIONED,
+        actor,
+        detail=f"State changed: {before_state_label} -> {after_state_label}",
+        refs={
+            "before_state": str(before_state_label or ""),
+            "after_state": after_state_label,
+            "issue": str(issue_number),
+        },
+    )
 
 
 class CodeagentExecutionService:
@@ -58,21 +164,21 @@ class CodeagentExecutionService:
             handoff_kind=command.handoff_kind,
         )
 
-        role_to_section: dict[str, Literal["plan", "run", "review"]] = {
+        role_to_section: dict[str, Literal["manager", "plan", "run", "review"]] = {
+            "manager": "manager",
             "planner": "plan",
             "executor": "run",
             "reviewer": "review",
         }
-        options = resolve_command_agent_options(
+        options = command.resolved_options or resolve_command_agent_options(
             config=self.config,
             section=role_to_section[command.role],
             agent=command.agent,
             backend=command.backend,
             model=command.model,
         )
-        session_id = load_session_id(command.role)
-        actor = format_agent_actor(options)
-        is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+        session_id = command.session_id or load_session_id(command.role)
+        actor = command.actor or format_agent_actor(options)
         branch = command.branch
         store = None
         if not command.dry_run and branch:
@@ -82,22 +188,28 @@ class CodeagentExecutionService:
                 log.warning(f"Failed to initialize lifecycle store: {exc}")
 
         if branch and store:
-            if not is_async_child:
-                persist_execution_lifecycle_event(
-                    store,
-                    branch,
-                    command.role,
-                    "started",
-                    actor,
-                    f"{command.role.capitalize()} started (status: running)",
-                    session_id=session_id,
-                )
+            persist_execution_lifecycle_event(
+                store,
+                branch,
+                command.role,
+                "started",
+                actor,
+                f"{command.role.capitalize()} started (status: running)",
+                session_id=session_id,
+                event_type=f"codeagent_{execution_prefix(command.role)}_started",  # type: ignore[arg-type]
+            )
             # Write latest_actor immediately so subsequent handoff
             # commands (e.g. `vibe3 handoff report`) resolve the
             # correct actor instead of a stale one.
-            # Must execute in both sync and async child paths
-            # because the inner child has the real agent actor.
             store.update_flow_state(branch, latest_actor=actor)
+
+        # Capture before_state_label for unified no-op gate.
+        # Runs in both sync and async paths when issue_number is available.
+        before_state_label: str | None = None
+        if branch and store and command.issue_number is not None:
+            flow_state = store.get_flow_state(branch)
+            if isinstance(flow_state, dict):
+                before_state_label = str(flow_state.get("state_label", "") or "")
 
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
@@ -137,56 +249,46 @@ class CodeagentExecutionService:
                 echo(f"-> {command.handoff_kind.capitalize()} saved: {handoff_file}")
 
             if branch and store:
-                if not is_async_child:
-                    persist_execution_lifecycle_event(
-                        store,
-                        branch,
-                        command.role,
-                        "completed",
-                        actor,
-                        f"{command.role.capitalize()} completed (status: done)",
-                        session_id=effective_session_id,
-                        refs={"status": "completed"},
-                    )
-
-                # Record current state for completion gate observability.
-                # Must execute in both sync and async child paths.
-                #
-                # KNOWN GAP: This code runs inside the container (tmux child
-                # process). The full three-branch no-op gate lives in
-                # issue_role_sync_runner's post_sync_hook path and requires
-                # before/after snapshots that are only captured in the
-                # container-outside (sync) path. When running inside tmux,
-                # no-op gate never fires. If the agent fails to change the
-                # issue label, the orchestra will re-dispatch on the next
-                # cycle, causing repeated dispatch loops (e.g. issue #323).
-                # See docs/standards/vibe3-execution-paths-standard.md section 3.
-                from vibe3.utils.constants import EVENT_STATE_TRANSITIONED
-
-                flow_state = store.get_flow_state(branch)
-                current_state = ""
-                if isinstance(flow_state, dict):
-                    current_state = str(flow_state.get("state_label", ""))
-                required_ref = (
-                    "report_ref"
-                    if command.role == "executor"
-                    else "plan_ref" if command.role == "planner" else "audit_ref"
-                )
-                ref_value = ""
-                if isinstance(flow_state, dict):
-                    ref_value = str(flow_state.get(required_ref, "") or "")
-                store.add_event(
+                persist_execution_lifecycle_event(
+                    store,
                     branch,
-                    EVENT_STATE_TRANSITIONED,
+                    command.role,
+                    "completed",
                     actor,
-                    detail=f"{command.role} completed, state: {current_state}",
-                    refs={
-                        "state": current_state,
-                        "required_ref": required_ref,
-                        "ref_present": "yes" if ref_value else "no",
-                        "issue": "",
-                    },
+                    f"{command.role.capitalize()} completed (status: done)",
+                    session_id=effective_session_id,
+                    refs={"status": "completed"},
+                    event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
                 )
+
+                # pre_gate_callback: role-specific business callback that must
+                # run BEFORE the gate (e.g., reviewer writes audit_ref from stdout).
+                if (
+                    command.pre_gate_callback is not None
+                    and command.issue_number is not None
+                    and agent_result.stdout
+                ):
+                    try:
+                        command.pre_gate_callback(
+                            issue_number=command.issue_number,
+                            branch=branch,
+                            actor=actor,
+                            stdout=agent_result.stdout,
+                        )
+                    except Exception as cb_exc:
+                        log.warning(f"pre_gate_callback failed: {cb_exc}")
+
+                # Unified no-op gate: single hard logic check after agent completion.
+                # Executes ONLY if issue_number is available (worker roles).
+                if command.issue_number is not None:
+                    _apply_unified_noop_gate(
+                        store=store,
+                        issue_number=command.issue_number,
+                        branch=branch,
+                        actor=actor,
+                        role=command.role,
+                        before_state_label=before_state_label,
+                    )
 
             return CodeagentResult(
                 success=agent_result.is_success(),
@@ -197,7 +299,7 @@ class CodeagentExecutionService:
                 session_id=effective_session_id,
             )
         except BaseException as exc:
-            if branch and store and not is_async_child:
+            if branch and store:
                 abort_msg = (
                     f"{command.role.capitalize()} aborted "
                     f"(status: aborted, reason: {exc})"
@@ -211,5 +313,29 @@ class CodeagentExecutionService:
                     abort_msg,
                     session_id=session_id,
                     refs={"reason": str(exc), "status": "aborted"},
+                    event_type=f"codeagent_{execution_prefix(command.role)}_aborted",  # type: ignore[arg-type]
                 )
             raise
+
+    def execute_sync_request(
+        self,
+        request: ExecutionRequest,
+        *,
+        cwd: Path | None = None,
+    ) -> CodeagentResult:
+        """Execute a sync worker request through the unified execution shell."""
+        role = cast(ExecutionRole, request.role)
+        command = create_codeagent_command(
+            role=role,
+            context_builder=lambda: request.prompt or "",
+            task=request.refs.get("task"),
+            dry_run=request.dry_run,
+            branch=request.target_branch,
+            issue_number=request.target_id,
+            cwd=cwd,
+            resolved_options=request.options,
+            actor=request.actor,
+            session_id=request.refs.get("session_id"),
+            pre_gate_callback=_resolve_request_pre_gate_callback(role),
+        )
+        return self.execute_sync(command)

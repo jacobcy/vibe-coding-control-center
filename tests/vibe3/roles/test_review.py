@@ -1,79 +1,14 @@
-"""Tests for reviewer role lifecycle publishing helpers."""
+"""Tests for reviewer role audit artifact helpers."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.domain.events import IssueFailed, ReviewCompleted
-from vibe3.domain.publisher import EventPublisher
 from vibe3.roles.review import (
     _create_minimal_audit_artifact,
     _resolve_authoritative_audit_ref,
-    publish_review_command_failure,
-    publish_review_command_success,
 )
-
-
-def test_publish_review_command_success_emits_review_completed() -> None:
-    EventPublisher.reset()
-    published_events = []
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        mock_publish.side_effect = lambda event: published_events.append(event)
-        publish_review_command_success(
-            issue_number=42,
-            branch="task/issue-42",
-            verdict="PASS",
-        )
-
-    assert len(published_events) == 1
-    event = published_events[0]
-    assert isinstance(event, ReviewCompleted)
-    assert event.issue_number == 42
-    assert event.branch == "task/issue-42"
-    assert event.verdict == "PASS"
-    assert event.actor == "agent:review"
-
-
-def test_publish_review_command_success_skips_without_issue_context() -> None:
-    EventPublisher.reset()
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        publish_review_command_success(
-            issue_number=None,
-            branch=None,
-            verdict="PASS",
-        )
-
-    mock_publish.assert_not_called()
-
-
-def test_publish_review_command_failure_emits_issue_failed() -> None:
-    EventPublisher.reset()
-    published_events = []
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        mock_publish.side_effect = lambda event: published_events.append(event)
-        publish_review_command_failure(
-            issue_number=24,
-            reason="review parse failed: invalid format",
-        )
-
-    assert len(published_events) == 1
-    event = published_events[0]
-    assert isinstance(event, IssueFailed)
-    assert event.issue_number == 24
-    assert "invalid format" in event.reason
-    assert event.actor == "agent:review"
-
-
-def test_publish_review_command_failure_skips_without_issue_number() -> None:
-    EventPublisher.reset()
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        publish_review_command_failure(
-            issue_number=None,
-            reason="ignored",
-        )
-
-    mock_publish.assert_not_called()
 
 
 class TestReviewerFailed:
@@ -104,12 +39,12 @@ class TestReviewerFailed:
 
 
 class TestReviewerBlockedNoAuditRef:
-    """场景 2: reviewer 无产出 → state/blocked"""
+    """场景 2: reviewer 无行动 → state/blocked"""
 
     def test_reviewer_blocked_no_audit_ref_calls_block_reviewer(
         self,
     ) -> None:
-        """Reviewer 无 audit_ref → 调用 block_reviewer_noop_issue"""
+        """Reviewer 无行动 → 调用 block_reviewer_noop_issue"""
         with patch(
             "vibe3.services.issue_failure_service._ensure_flow_state_for_issue"
         ) as mock_ensure:
@@ -118,7 +53,7 @@ class TestReviewerBlockedNoAuditRef:
             block_reviewer_noop_issue(
                 issue_number=301,
                 repo="jacobcy/vibe-coding-control-center",
-                reason="no audit_ref",
+                reason="state unchanged",
                 actor="agent:review",
             )
 
@@ -126,7 +61,7 @@ class TestReviewerBlockedNoAuditRef:
             mock_ensure.assert_called_once_with(
                 301,
                 "block",  # ← action 参数
-                "no audit_ref",  # ← reason
+                "state unchanged",  # ← reason
                 "agent:review",  # ← actor
             )
 
@@ -160,97 +95,67 @@ class TestReviewerBlockedNoStateChange:
 
 
 class TestReviewerNoOpGate:
-    """场景 4: reviewer 有 audit_ref 但 state 未变 → blocked"""
+    """场景 4: reviewer state 未变 → blocked"""
 
-    def test_reviewer_blocked_when_audit_ref_exists_but_state_unchanged(
+    def test_reviewer_blocked_when_state_unchanged(
         self,
     ) -> None:
-        """Reviewer 有 audit_ref 但 state/review 未变 → blocked"""
-        from unittest.mock import MagicMock, patch
+        """Reviewer state/review 未变 → blocked"""
+        from unittest.mock import patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
+        from vibe3.execution.codeagent_runner import (
+            _apply_unified_noop_gate,
         )
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
-
-        before = {"refs": {}, "state_label": "state/review"}
-        after = {
-            "refs": {"audit_ref": "/path/to/audit.md"},
-            "state_label": "state/review",  # ← state 未变
+        mock_store.get_flow_state.return_value = {
+            "audit_ref": "/path/to/audit.md",
+            "state_label": "state/review",
         }
 
-        mock_missing_handler = MagicMock()
-
         with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
-        ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                303,
-                "task/issue-303",
-                "agent:review",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="audit_ref",
-                missing_reason="no audit_ref",
-                missing_ref_handler=mock_missing_handler,
+            "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=303,
+                branch="task/issue-303",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
             )
 
-        # Verify: missing_ref_handler called (block on no-op)
-        mock_missing_handler.assert_called_once()
-        assert result is True
+        mock_block.assert_called_once()
 
-    def test_reviewer_pass_when_audit_ref_exists_and_state_changed(
+    def test_reviewer_pass_when_state_changed(
         self,
     ) -> None:
-        """Reviewer 有 audit_ref 且 state/review → state/handoff → pass"""
-        from unittest.mock import MagicMock, patch
+        """Reviewer state/review → state/handoff → pass"""
+        from unittest.mock import patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
+        from vibe3.execution.codeagent_runner import (
+            _apply_unified_noop_gate,
         )
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
-
-        before = {"refs": {}, "state_label": "state/review"}
-        after = {
-            "refs": {"audit_ref": "/path/to/audit.md"},
-            "state_label": "state/handoff",  # ← state 已变
+        mock_store.get_flow_state.return_value = {
+            "audit_ref": "/path/to/audit.md",
+            "state_label": "state/handoff",
         }
 
-        mock_missing_handler = MagicMock()
-
         with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
-        ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                303,
-                "task/issue-303",
-                "agent:review",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="audit_ref",
-                missing_reason="no audit_ref",
-                missing_ref_handler=mock_missing_handler,
+            "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=303,
+                branch="task/issue-303",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
             )
 
-        # Verify: missing_ref_handler NOT called (pass)
-        mock_missing_handler.assert_not_called()
-        assert result is True  # apply_request_completion_gate returned True
+        mock_block.assert_not_called()
 
 
 class TestReviewerParserErrorTolerance:

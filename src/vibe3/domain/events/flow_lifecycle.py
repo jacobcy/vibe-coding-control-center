@@ -45,103 +45,23 @@ class IssueFailed(DomainEvent):
     timestamp: str | None = None
 
 
-@dataclass(frozen=True)
-class IssueBlocked(DomainEvent):
-    """Issue blocked event.
-
-    Published when an issue is blocked due to missing requirements.
-    """
-
-    issue_number: int
-    reason: str
-    actor: str = "system"
-    role: str | None = None
-    timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class ReportRefRequired(DomainEvent):
-    """Report reference requirement event.
-
-    Published when an authoritative report_ref is required.
-    """
-
-    issue_number: int
-    branch: str
-    ref_name: str
-    reason: str
-    actor: str = "system"
-    timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class FlowBlocked(DomainEvent):
-    """Flow blocked event.
-
-    Published when a flow is blocked.
-    """
-
-    branch: str
-    reason: str | None = None
-    blocked_by_issue: int | None = None
-    actor: str = "system"
-    timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class FlowAborted(DomainEvent):
-    """Flow aborted event.
-
-    Published when a flow is aborted.
-    """
-
-    branch: str
-    reason: str
-    actor: str = "system"
-    timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class PlanCompleted(DomainEvent):
-    """Plan phase completed event.
-
-    Published when planner completes successfully.
-    """
-
-    issue_number: int
-    branch: str
-    actor: str = "agent:plan"
-    timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class ExecutionCompleted(DomainEvent):
-    """Execution phase completed event.
-
-    Published when executor completes successfully.
-    """
-
-    issue_number: int
-    branch: str
-    actor: str = "agent:executor"
-    timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class ReviewCompleted(DomainEvent):
-    """Review phase completed event.
-
-    Published when reviewer completes successfully.
-    """
-
-    issue_number: int
-    branch: str
-    verdict: str
-    actor: str = "agent:review"
-    timestamp: str | None = None
-
-
 # Dispatch-intent events (authoritative dispatch signals)
+
+
+@dataclass(frozen=True)
+class ManagerDispatched(DomainEvent):
+    """Manager dispatch intent event.
+
+    Authoritative signal that manager should be dispatched for an issue.
+    Published by StateLabelDispatchService for ready/handoff manager triggers.
+    """
+
+    issue_number: int
+    branch: str
+    trigger_state: str  # "ready" | "handoff"
+    issue_title: str | None = None
+    actor: str = "orchestra:dispatcher"
+    timestamp: str | None = None
 
 
 @dataclass(frozen=True)
@@ -165,14 +85,14 @@ class ExecutorDispatched(DomainEvent):
 
     Authoritative signal that executor should be dispatched for an issue.
     Published by StateLabelDispatchService when trigger_name="run".
+
+    Execution-specific context (plan_ref, audit_ref, commit_mode) is
+    resolved by the handler layer, not carried on the dispatch intent.
     """
 
     issue_number: int
     branch: str
     trigger_state: str  # "in-progress"
-    plan_ref: str | None = None
-    audit_ref: str | None = None
-    commit_mode: bool = False
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
 
@@ -183,11 +103,13 @@ class ReviewerDispatched(DomainEvent):
 
     Authoritative signal that reviewer should be dispatched for an issue.
     Published by StateLabelDispatchService when trigger_name="review".
+
+    Execution-specific context (report_ref) is resolved by the handler
+    layer, not carried on the dispatch intent.
     """
 
     issue_number: int
     branch: str
     trigger_state: str  # "review"
-    report_ref: str | None = None
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None

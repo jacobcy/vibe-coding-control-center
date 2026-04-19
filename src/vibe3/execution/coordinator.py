@@ -12,6 +12,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.capacity_service import CapacityService
+from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.execution_lifecycle import (
     ExecutionLifecycleService,
@@ -105,24 +106,21 @@ class ExecutionCoordinator:
     def dispatch_execution(self, request: ExecutionRequest) -> ExecutionLaunchResult:
         """Dispatch an execution request.
 
-        Two dispatch modes (see docs/standards/vibe3-execution-paths-standard.md):
+        Two dispatch modes:
 
-        Container-outside (sync): Runs agent in this process, returns after
-        completion. The caller (issue_role_sync_runner) handles post_sync_hook
-        and no-op gate.
+        Container-inside (sync): All roles run through
+        CodeagentExecutionService, which handles lifecycle events,
+        handoff, pre-gate callbacks, and no-op gate uniformly.
 
-        Container-inside (async): Launches a tmux session and returns
-        immediately. The tmux child runs independently through
-        codeagent_runner.execute_sync(). No post_sync_hook fires in this path.
+        Container-outside (async): Launches a tmux session and returns
+        immediately. The tmux child runs CodeagentExecutionService
+        independently with full observability.
 
         Simple dispatch model:
         1. Check for existing live session -> skip duplicate
         2. Check capacity -> skip if full
         3. Launch execution
-        4. Record lifecycle event
-
-        No in-flight or launching state tracking. True deduplication
-        is based on live tmux session existence only.
+        4. Record scheduling event (async path only)
         """
         logger.bind(
             domain="execution_coordinator",
@@ -238,75 +236,21 @@ class ExecutionCoordinator:
                 if not request.prompt or request.options is None:
                     raise ValueError("Sync execution requires prompt and options")
 
-                task = request.refs.get("task")
-
-                # 5. Record started
-                # For async child sync, the outer wrapper already registered
-                # the runtime_session, so the child should not create a duplicate.
-                if not is_async_child_sync:
-                    self.lifecycle.record_started(
-                        role=request.role,  # type: ignore[arg-type]
-                        target=request.target_branch,
-                        actor=request.actor,
-                        refs=request.refs,
-                    )
-
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                ).info(f"Execution started for {request.role} (sync)")
-
-                # Execute sync
-                result = self.backend.run(
-                    prompt=request.prompt,
-                    options=request.options,
-                    task=task,
-                    dry_run=request.dry_run,
-                    session_id=request.refs.get("session_id"),
+                result = CodeagentExecutionService().execute_sync_request(
+                    request,
                     cwd=cwd_path,
                 )
-
-                if result.is_success():
-                    self.lifecycle.record_completed(
-                        role=request.role,  # type: ignore[arg-type]
-                        target=request.target_branch,
-                        actor=request.actor,
-                        detail=f"Execution completed for {request.role}",
-                        refs=request.refs,
-                    )
-                    logger.bind(
-                        domain="execution_coordinator",
-                        role=request.role,
-                        target_id=request.target_id,
-                    ).success(f"Execution completed for {request.role} (sync)")
-
+                if result.success:
                     return ExecutionLaunchResult(
                         launched=True,
-                        stdout=result.stdout,  # Pass stdout for sync mode
+                        stdout=result.stdout,
                     )
-                else:
-                    error_msg = getattr(result, "stderr", "") or "Execution failed"
-                    self.lifecycle.record_failed(
-                        role=request.role,  # type: ignore[arg-type]
-                        target=request.target_branch,
-                        actor=request.actor,
-                        error=error_msg,
-                        refs=request.refs,
-                    )
-                    logger.bind(
-                        domain="execution_coordinator",
-                        role=request.role,
-                        target_id=request.target_id,
-                    ).warning(
-                        f"Execution failed for {request.role} (sync): {error_msg}"
-                    )
-
-                    return ExecutionLaunchResult(
-                        launched=False,
-                        reason=error_msg,
-                        reason_code="launch_failed",
-                    )
+                error_msg = result.stderr or "Execution failed"
+                return ExecutionLaunchResult(
+                    launched=False,
+                    reason=error_msg,
+                    reason_code="launch_failed",
+                )
             else:
                 raise ValueError(f"Unknown mode: {request.mode}")
 

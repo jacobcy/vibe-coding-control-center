@@ -347,27 +347,10 @@ class HandoffService:
         if blocked_by:
             message += f"\nBlocked By: {blocked_by}"
 
-        # 4. Record event in SQLite
-        event_refs: dict[str, str | None] = {
-            "ref": ref_value,
-            "kind": ref_kind.lower(),
-            "next_step": next_step,
-            "blocked_by": blocked_by,
-        }
-        if verdict:
-            event_refs["verdict"] = verdict
-        self.store.add_event(
-            branch=branch,
-            event_type=f"handoff_{ref_kind.lower()}",
-            actor=effective_actor,
-            detail=message,
-            refs=event_refs,
-        )
-
-        # 5. Persist flow state after event persistence succeeds.
+        # 4. Update flow state
         self.store.update_flow_state(branch, **flow_updates)
 
-        # 6. Append update block to handoff file only after authoritative writes
+        # 5. Append update block to handoff file only after authoritative writes
         #    succeed.
         try:
             self.append_current_handoff(

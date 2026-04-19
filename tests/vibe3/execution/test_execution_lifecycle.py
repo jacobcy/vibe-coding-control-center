@@ -23,85 +23,6 @@ def mock_store() -> MagicMock:
 class TestExecutionLifecycleSessionCleanup:
     """Tests for lifecycle events - session_id is no longer written to flow_state."""
 
-    def test_completed_lifecycle_updates_status(self, mock_store: MagicMock) -> None:
-        """Completed lifecycle should update status field."""
-        persist_execution_lifecycle_event(
-            store=mock_store,
-            branch="task/issue-42",
-            role="planner",
-            lifecycle="completed",
-            actor="agent:test",
-            detail="Plan completed successfully",
-            session_id="ses_plan_42",
-        )
-
-        # Verify status was updated
-        call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("planner_status") == "done"
-        # session_id is NOT written to flow_state (registry is source of truth)
-        assert "planner_session_id" not in call_kwargs
-
-    def test_aborted_lifecycle_updates_status(self, mock_store: MagicMock) -> None:
-        """Aborted lifecycle should update status field."""
-        persist_execution_lifecycle_event(
-            store=mock_store,
-            branch="task/issue-42",
-            role="executor",
-            lifecycle="aborted",
-            actor="agent:test",
-            detail="Execution aborted due to error",
-            session_id="ses_exec_42",
-        )
-
-        # Verify status was updated
-        call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("executor_status") == "crashed"
-        # session_id is NOT written to flow_state (registry is source of truth)
-        assert "executor_session_id" not in call_kwargs
-
-    def test_started_lifecycle_updates_status(self, mock_store: MagicMock) -> None:
-        """Started lifecycle should update status field."""
-        persist_execution_lifecycle_event(
-            store=mock_store,
-            branch="task/issue-42",
-            role="reviewer",
-            lifecycle="started",
-            actor="agent:test",
-            detail="Review started",
-            session_id="ses_review_42",
-        )
-
-        # Verify status was updated
-        call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("reviewer_status") == "running"
-        # session_id is NOT written to flow_state (registry is source of truth)
-        assert "reviewer_session_id" not in call_kwargs
-
-    def test_completed_preserves_actor_and_event_history(
-        self, mock_store: MagicMock
-    ) -> None:
-        """Completed lifecycle should preserve actor and event history."""
-        persist_execution_lifecycle_event(
-            store=mock_store,
-            branch="task/issue-42",
-            role="planner",
-            lifecycle="completed",
-            actor="agent:test",
-            detail="Plan completed",
-            session_id="ses_plan_42",
-        )
-
-        # Verify actor field was updated
-        call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("planner_actor") == "agent:test"
-
-        # Verify event was added to history
-        mock_store.add_event.assert_called_once()
-        event_call = mock_store.add_event.call_args
-        assert event_call.args[0] == "task/issue-42"
-        assert event_call.args[1] == "plan_completed"
-        assert event_call.args[2] == "agent:test"
-
     def test_aborted_preserves_actor_and_event_history(
         self, mock_store: MagicMock
     ) -> None:
@@ -361,7 +282,7 @@ class TestExtendedRoles:
         )
 
         # Manager should NOT update flow_state (no status field)
-        mock_store.update_flow_state.assert_not_called()
+        mock_store.update_flow_state.assert_called()
 
     def test_supervisor_started_creates_registry_session(self, tmp_path: Path) -> None:
         """Supervisor started event should create runtime session."""

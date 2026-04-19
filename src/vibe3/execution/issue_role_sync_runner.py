@@ -61,14 +61,15 @@ def run_issue_role_mode(
     (see docs/standards/vibe3-execution-paths-standard.md):
 
     Container-outside path (async_mode=False):
-      orchestra process runs the agent synchronously, waits for completion,
-      then executes post_sync_hook (no-op gate). Has before/after snapshots.
+      orchestra process runs the agent synchronously, waits for completion.
+      Worker roles still enter codeagent_runner via ExecutionCoordinator, so
+      the same lifecycle / handoff / pre-gate / no-op shell is used.
 
     Container-inside path (async_mode=True):
       orchestra launches a tmux session and returns immediately.
       The tmux child runs codeagent_runner.execute_sync() independently.
-      NO post_sync_hook or no-op gate fires in this path.
-      This is a known gap: see execution-paths-standard.md section 3.
+      The tmux child is only the execution shell; worker gate logic stays on
+      the sync path in the outer orchestration flow.
     """
     config = OrchestraConfig.from_settings()
     issue = _load_issue_info(config, issue_number)
@@ -93,13 +94,6 @@ def run_issue_role_mode(
 
     if async_mode and not dry_run:
         request = spec.build_async_request(config, issue, actor)
-        if request is None:
-            if spec.failure_handler is not None:
-                spec.failure_handler(
-                    issue_number,
-                    f"{spec.role_name} async request preparation failed",
-                )
-            raise typer.Exit(1)
         if request is None:
             if spec.failure_handler is not None:
                 spec.failure_handler(
@@ -138,15 +132,6 @@ def run_issue_role_mode(
                 )
             raise typer.Exit(1) from exc
 
-    before_snapshot = None
-    if spec.post_sync_hook is not None and spec.snapshot_progress is not None:
-        before_snapshot = spec.snapshot_progress(
-            issue_number=issue_number,
-            branch=branch,
-            store=store,
-            config=config,
-        )
-
     sync_request = spec.build_sync_request(
         config,
         issue,
@@ -176,31 +161,3 @@ def run_issue_role_mode(
                 sync_result.reason or f"{spec.role_name} exited with failure",
             )
         raise typer.Exit(1)
-
-    # Process sync result before snapshot (e.g., write audit_ref from stdout)
-    if spec.process_sync_result is not None and sync_result.stdout is not None:
-        spec.process_sync_result(
-            issue_number=issue_number,
-            branch=branch,
-            actor=actor,
-            stdout=sync_result.stdout,
-        )
-
-    if (
-        spec.post_sync_hook is not None
-        and spec.snapshot_progress is not None
-        and before_snapshot is not None
-    ):
-        store.update_flow_state(branch, latest_actor=actor)
-        after_snapshot = spec.snapshot_progress(issue_number, branch, store, config)
-        if spec.post_sync_hook(
-            store,
-            issue_number,
-            branch,
-            actor,
-            config,
-            before_snapshot,
-            after_snapshot,
-            sync_request,
-        ):
-            return

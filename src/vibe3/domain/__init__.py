@@ -12,24 +12,17 @@ from vibe3.domain.events import (
     # Base
     DomainEvent,
     # L3 Flow Lifecycle Events
-    FlowAborted,
-    FlowBlocked,
     # L1 Governance Events
     GovernanceDecisionRequired,
     GovernanceScanCompleted,
     GovernanceScanStarted,
-    IssueBlocked,
     IssueFailed,
     IssueStateChanged,
-    PlanCompleted,
-    ReportRefRequired,
-    ReviewCompleted,
     # L2 Supervisor Apply Events
     SupervisorApplyCompleted,
     SupervisorApplyDelegated,
     SupervisorApplyDispatched,
     SupervisorApplyStarted,
-    SupervisorExecutionCompleted,
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
@@ -71,17 +64,10 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueStateChanged",
     "IssueFailed",
-    "IssueBlocked",
-    "ReportRefRequired",
-    "FlowBlocked",
-    "FlowAborted",
-    "PlanCompleted",
-    "ReviewCompleted",
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
     "GovernanceDecisionRequired",
-    "SupervisorExecutionCompleted",
     # L2 Supervisor Apply Events
     "SupervisorIssueIdentified",
     "SupervisorPromptRendered",

@@ -156,21 +156,20 @@ Apply agent executes
 | `IssueStateChanged` | Issue 状态转换 | `from_state`, `to_state` | 标签变迁 |
 | `IssueFailed` | Agent 执行失败 | `reason` | 失败记录 |
 | `IssueBlocked` | Issue 被阻塞 | `reason` | 缺少前置条件 |
-| `ReportRefRequired` | 需要权威引用验证 | `ref_name` | plan_ref/report_ref/audit_ref |
-| `PlanCompleted` | Planner 完成 | `branch` | 验证 plan_ref |
-| `ReviewCompleted` | Reviewer 完成 | `verdict` | 验证 audit_ref |
-| `FlowBlocked` | Flow 被阻塞 | `blocked_by_issue` | 依赖阻塞 |
-| `FlowAborted` | Flow 中止 | `reason` | 强制终止 |
+| `ManagerDispatched` | Manager 调度 | `issue_number`, `branch` | 管理分发 |
+| `PlannerDispatched` | Planner 调度 | `issue_number`, `branch` | 计划分发 |
+| `ExecutorDispatched` | Executor 调度 | `issue_number`, `branch` | 执行分发 |
+| `ReviewerDispatched` | Reviewer 调度 | `issue_number`, `branch` | 审查分发 |
 
-**处理器** (`src/vibe3/domain/handlers/flow_lifecycle.py`):
-- 验证权威引用存在性（`require_authoritative_ref`）
-- 转换 issue 状态（由事件处理器调用 `LabelService.confirm_issue_state`）
-- 记录失败与阻塞（`IssueFailureService`）
+**处理器** (`src/vibe3/domain/handlers/`):
+- `flow_lifecycle.py` — 记录状态变迁日志（纯观察），不执行业务判断
+- `dispatch.py` — 接收 dispatch-intent 事件，enrichment with execution context，调用 role builder
+- `issue_state_dispatch.py` — manager 专属 dispatch handler（async dispatch via ExecutionCoordinator）
 
 **集成点**:
-- `agents/plan_agent.py` → 发布 `PlanCompleted`
-- `agents/run_agent.py` → 发布 `ReportRefRequired` + `IssueStateChanged`
-- `agents/review_agent.py` → 发布 `ReviewCompleted`
+- `orchestra/services/state_label_dispatch.py` → 发布 dispatch-intent 事件
+- `codeagent_runner.py` → no-op gate (state-unchanged → block)
+- `domain/handlers/dispatch.py` → handler 读取 flow_state 和 handoff 文件
 
 **Worktree 语义**: 持久 issue-worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
 
