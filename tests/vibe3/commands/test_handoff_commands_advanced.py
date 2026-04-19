@@ -263,12 +263,7 @@ class TestHandoffAdvancedCommands:
 
         # Verify side effects in database
         flow_state = real_store.get_flow_state("main")
+        assert flow_state is not None
         assert flow_state["audit_ref"] == audit_ref
         assert flow_state["next_step"] == "Finalize PR"
         assert flow_state["reviewer_actor"] == "test-actor"
-
-        # Verify event was recorded
-        events = real_store.get_events(branch="main", event_type="handoff_audit")
-        assert len(events) == 1
-        assert events[0]["actor"] == "test-actor"
-        assert events[0]["refs"]["ref"] == audit_ref

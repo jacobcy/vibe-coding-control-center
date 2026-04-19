@@ -347,8 +347,7 @@ class HandoffService:
         if blocked_by:
             message += f"\nBlocked By: {blocked_by}"
 
-        # 4. Update flow state (skip event recording to avoid duplicates)
-        #    Event recording is handled by record_handoff_unified()
+        # 4. Update flow state
         self.store.update_flow_state(branch, **flow_updates)
 
         # 5. Append update block to handoff file only after authoritative writes
