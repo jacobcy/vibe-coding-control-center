@@ -103,20 +103,21 @@ class TestReviewerNoOpGate:
         """Reviewer state/review 未变 → blocked"""
         from unittest.mock import patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_store.get_flow_state.return_value = {
-            "audit_ref": "/path/to/audit.md",
-            "state_label": "state/review",
-        }
 
-        with patch(
-            "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/review"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=303,
                 branch="task/issue-303",
@@ -133,20 +134,21 @@ class TestReviewerNoOpGate:
         """Reviewer state/review → state/handoff → pass"""
         from unittest.mock import patch
 
-        from vibe3.execution.codeagent_runner import (
-            _apply_unified_noop_gate,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_store.get_flow_state.return_value = {
-            "audit_ref": "/path/to/audit.md",
-            "state_label": "state/handoff",
-        }
 
-        with patch(
-            "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/handoff"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
                 store=mock_store,
                 issue_number=303,
                 branch="task/issue-303",

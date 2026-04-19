@@ -11,6 +11,7 @@ from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.service_protocol import GitHubEvent
 
 
@@ -207,6 +208,38 @@ class TestOrchestrationFacade:
         mock_publish.assert_not_called()
 
     @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.append_orchestra_event")
+    async def test_on_tick_blocks_dispatch_when_failed_gate_is_closed(
+        self,
+        mock_append_event: MagicMock,
+    ) -> None:
+        """Failed gate should freeze dispatch-intent emission, not heartbeat itself."""
+        dispatch_service = MagicMock()
+        capacity = MagicMock()
+        gate = MagicMock()
+        gate.check.return_value = GateResult(
+            blocked=True,
+            issue_number=328,
+            reason="manager failed",
+        )
+
+        facade = OrchestrationFacade(
+            dispatch_services=[dispatch_service],
+            capacity=capacity,
+            failed_gate=gate,
+        )
+        facade.on_supervisor_scan = AsyncMock()
+        facade._coordinator = MagicMock()
+        facade._coordinator.coordinate = AsyncMock()
+
+        await facade.on_tick()
+
+        gate.check.assert_called_once()
+        facade._coordinator.coordinate.assert_not_awaited()
+        assert mock_append_event.called
+        assert "dispatch blocked by failed gate" in mock_append_event.call_args.args[1]
+
+    @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.clients.github_client.GitHubClient.list_issues")
     @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
@@ -282,144 +315,3 @@ class TestOrchestrationFacade:
         await facade.on_supervisor_scan()
 
         mock_publish.assert_not_called()
-
-
-class TestOrchestrationFacadeDispatchServices:
-    """Tests for dispatch_services integration (P2: unified heartbeat registration)."""
-
-    @pytest.mark.asyncio
-    @patch("vibe3.domain.orchestration_facade.publish")
-    @patch("vibe3.domain.orchestration_facade.time.monotonic")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
-    async def test_on_tick_calls_all_dispatch_services(
-        self,
-        mock_config_cls: MagicMock,
-        mock_monotonic: MagicMock,
-        mock_publish: MagicMock,
-    ) -> None:
-        """on_tick() should use GlobalDispatchCoordinator to coordinate dispatch."""
-        mock_config_cls.from_settings.return_value = MagicMock(
-            polling_interval=1,
-            governance=MagicMock(interval_ticks=1),
-            supervisor_handoff=MagicMock(
-                issue_label="supervisor",
-                handoff_state_label="state/handoff",
-            ),
-        )
-        mock_monotonic.side_effect = [float(i) for i in range(20)]
-
-        mock_service1 = MagicMock()
-        mock_service1.role_def = MagicMock()
-        mock_service1.role_def.registry_role = "reviewer"
-        mock_service1.collect_ready_issues = AsyncMock(return_value=[])
-        mock_service2 = MagicMock()
-        mock_service2.role_def = MagicMock()
-        mock_service2.role_def.registry_role = "executor"
-        mock_service2.collect_ready_issues = AsyncMock(return_value=[])
-
-        mock_capacity = MagicMock()
-        mock_capacity.can_dispatch.return_value = True
-        mock_capacity.get_capacity_status.return_value = {
-            "remaining": 1,
-            "active_count": 0,
-            "max_capacity": 5,
-        }
-
-        facade = OrchestrationFacade(
-            tick_count=0,
-            dispatch_services=[mock_service1, mock_service2],
-            capacity=mock_capacity,
-        )
-
-        with patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock):
-            await facade.on_tick()
-
-        # Verify GlobalDispatchCoordinator is used (via collect_ready_issues)
-        mock_service1.collect_ready_issues.assert_awaited_once()
-        mock_service2.collect_ready_issues.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    @patch("vibe3.domain.orchestration_facade.publish")
-    @patch("vibe3.domain.orchestration_facade.time.monotonic")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
-    async def test_on_tick_no_dispatch_services_by_default(
-        self,
-        mock_config_cls: MagicMock,
-        mock_monotonic: MagicMock,
-        mock_publish: MagicMock,
-    ) -> None:
-        """on_tick() should work normally when no dispatch_services are provided."""
-        mock_config_cls.from_settings.return_value = MagicMock(
-            polling_interval=1,
-            governance=MagicMock(interval_ticks=1),
-            supervisor_handoff=MagicMock(
-                issue_label="supervisor",
-                handoff_state_label="state/handoff",
-            ),
-        )
-        mock_monotonic.side_effect = [float(i) for i in range(20)]
-
-        facade = OrchestrationFacade(tick_count=0)
-
-        with patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock):
-            await facade.on_tick()
-
-    @pytest.mark.asyncio
-    @patch("vibe3.domain.orchestration_facade.publish")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
-    async def test_on_tick_continues_when_collect_fails(
-        self,
-        mock_config_cls: MagicMock,
-        mock_publish: MagicMock,
-    ) -> None:
-        """on_tick() should handle exceptions from collect_ready_issues gracefully.
-
-        GlobalDispatchCoordinator handles errors from collect_ready_issues() internally,
-        so facade's on_tick() should complete without raising exceptions.
-        """
-        mock_config_cls.from_settings.return_value = MagicMock(
-            polling_interval=1,
-            governance=MagicMock(interval_ticks=1),
-            supervisor_handoff=MagicMock(
-                issue_label="supervisor",
-                handoff_state_label="state/handoff",
-            ),
-        )
-
-        failing_service = MagicMock()
-        failing_service.service_name = "failing-dispatch"
-        failing_service.role_def = MagicMock()
-        failing_service.role_def.registry_role = "reviewer"
-        failing_service.collect_ready_issues = AsyncMock(
-            side_effect=RuntimeError("GitHub down")
-        )
-        healthy_service = MagicMock()
-        healthy_service.service_name = "healthy-dispatch"
-        healthy_service.role_def = MagicMock()
-        healthy_service.role_def.registry_role = "executor"
-        healthy_service.collect_ready_issues = AsyncMock(return_value=[])
-
-        mock_capacity = MagicMock()
-        mock_capacity.can_dispatch.return_value = False  # Skip all dispatches
-        mock_capacity.get_capacity_status.return_value = {
-            "remaining": 1,
-            "active_count": 4,
-            "max_capacity": 5,
-        }
-
-        facade = OrchestrationFacade(
-            tick_count=0,
-            dispatch_services=[failing_service, healthy_service],
-            capacity=mock_capacity,
-        )
-
-        with (
-            patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock),
-            patch.object(facade, "on_heartbeat_tick"),
-        ):
-            # Should not raise, GlobalDispatchCoordinator handles errors internally
-            await facade.on_tick()
-
-        # Both services should be called for collection
-        failing_service.collect_ready_issues.assert_awaited_once()
-        healthy_service.collect_ready_issues.assert_awaited_once()

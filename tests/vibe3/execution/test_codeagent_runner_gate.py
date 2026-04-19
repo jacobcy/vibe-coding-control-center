@@ -1,28 +1,24 @@
-"""Tests for the unified no-op gate in codeagent_runner."""
+"""Integration tests for execute_sync gate/callback invocation."""
 
 from unittest.mock import MagicMock, patch
 
 from vibe3.agents.models import CodeagentCommand
 from vibe3.execution.codeagent_runner import (
     CodeagentExecutionService,
-    _apply_unified_noop_gate,
 )
 
 
-def _make_mock_store(
-    state_label: str = "state/plan",
-    ref_value: str = "",
-) -> MagicMock:
-    """Create a mock SQLiteClient with given flow state."""
+def _make_mock_store() -> MagicMock:
+    """Create a mock SQLiteClient."""
     store = MagicMock()
-    flow_state = {"state_label": state_label}
-    if ref_value:
-        # Set the appropriate ref based on a generic key
-        flow_state["plan_ref"] = ref_value
-        flow_state["report_ref"] = ref_value
-        flow_state["audit_ref"] = ref_value
-    store.get_flow_state.return_value = flow_state
+    store.get_flow_state.return_value = {}
     return store
+
+
+def _make_github_issue_payload(state_label: str = "state/plan") -> dict:
+    """Build a GitHub issue payload dict with given state label."""
+    labels = [{"name": state_label}] if state_label else []
+    return {"labels": labels, "state": "open"}
 
 
 def _make_mock_agent_result(success: bool = True, stdout: str = "done") -> MagicMock:
@@ -35,145 +31,13 @@ def _make_mock_agent_result(success: bool = True, stdout: str = "done") -> Magic
     return result
 
 
-class TestApplyUnifiedNoopGate:
-    """Tests for the simplified no-op gate."""
-
-    def test_missing_ref_still_blocks_when_state_unchanged(self) -> None:
-        """Missing ref does not matter when state is unchanged: still block."""
-        store = _make_mock_store(state_label="state/plan", ref_value="")
-
-        with patch(
-            "vibe3.services.issue_failure_service.block_planner_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
-                store=store,
-                issue_number=42,
-                branch="task/issue-42",
-                actor="agent:plan",
-                role="planner",
-                before_state_label="state/plan",
-            )
-
-        mock_block.assert_called_once()
-        call_kwargs = mock_block.call_args[1]
-        assert call_kwargs["issue_number"] == 42
-        assert "state unchanged" in call_kwargs["reason"]
-        store.add_event.assert_called_once()
-        event_args = store.add_event.call_args
-        assert event_args[0][1] == "state_unchanged"
-
-    def test_ref_present_state_unchanged_blocks(self) -> None:
-        """Ref presence does not matter when state is unchanged: block."""
-        store = _make_mock_store(state_label="state/plan", ref_value="/path/to/plan.md")
-
-        with patch(
-            "vibe3.services.issue_failure_service.block_planner_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
-                store=store,
-                issue_number=42,
-                branch="task/issue-42",
-                actor="agent:plan",
-                role="planner",
-                before_state_label="state/plan",
-            )
-
-        mock_block.assert_called_once()
-        call_kwargs = mock_block.call_args[1]
-        assert "state unchanged" in call_kwargs["reason"]
-        store.add_event.assert_called_once()
-
-    def test_state_changed_passes(self) -> None:
-        """State change is the only pass condition."""
-        store = _make_mock_store(
-            state_label="state/ready", ref_value="/path/to/plan.md"
-        )
-
-        with patch(
-            "vibe3.services.issue_failure_service.block_planner_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
-                store=store,
-                issue_number=42,
-                branch="task/issue-42",
-                actor="agent:plan",
-                role="planner",
-                before_state_label="state/plan",
-            )
-
-        mock_block.assert_not_called()
-        store.add_event.assert_called_once()
-        event_args = store.add_event.call_args
-        assert event_args[0][1] == "state_transitioned"
-        assert "state/plan" in event_args[1]["detail"]
-        assert "state/ready" in event_args[1]["detail"]
-
-    def test_blocks_executor_when_state_unchanged(self) -> None:
-        """Executor is blocked when state is unchanged."""
-        store = _make_mock_store(state_label="state/run", ref_value="")
-        store.get_flow_state.return_value = {
-            "state_label": "state/run",
-        }
-
-        with patch(
-            "vibe3.services.issue_failure_service.block_executor_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
-                store=store,
-                issue_number=99,
-                branch="task/issue-99",
-                actor="agent:run",
-                role="executor",
-                before_state_label="state/run",
-            )
-
-        mock_block.assert_called_once()
-
-    def test_blocks_reviewer_when_state_unchanged(self) -> None:
-        """Reviewer is blocked when state is unchanged."""
-        store = _make_mock_store(state_label="state/review", ref_value="")
-        store.get_flow_state.return_value = {
-            "state_label": "state/review",
-        }
-
-        with patch(
-            "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
-        ) as mock_block:
-            _apply_unified_noop_gate(
-                store=store,
-                issue_number=55,
-                branch="task/issue-55",
-                actor="agent:review",
-                role="reviewer",
-                before_state_label="state/review",
-            )
-
-        mock_block.assert_called_once()
-
-    def test_no_block_when_flow_state_missing(self) -> None:
-        """Gate is a no-op when flow_state is not a dict."""
-        store = MagicMock()
-        store.get_flow_state.return_value = None
-
-        _apply_unified_noop_gate(
-            store=store,
-            issue_number=42,
-            branch="task/issue-42",
-            actor="agent:plan",
-            role="planner",
-            before_state_label="state/plan",
-        )
-
-        store.add_event.assert_not_called()
-
-
 class TestExecuteSyncGateIntegration:
     """Tests that execute_sync invokes the gate correctly."""
 
     def test_gate_fires_with_issue_number(self) -> None:
         """Gate fires when issue_number is provided."""
         agent_result = _make_mock_agent_result()
-        mock_store = _make_mock_store(state_label="state/ready", ref_value="/plan.md")
+        mock_store = _make_mock_store()
 
         command = CodeagentCommand(
             role="planner",
@@ -187,6 +51,7 @@ class TestExecuteSyncGateIntegration:
                 "vibe3.execution.codeagent_runner.SQLiteClient",
                 return_value=mock_store,
             ),
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
@@ -204,9 +69,12 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/plan"
+            )
             mock_backend.return_value.run.return_value = agent_result
             mock_opts.return_value = MagicMock()
             service = CodeagentExecutionService()
@@ -252,7 +120,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
             mock_backend.return_value.run.return_value = agent_result
@@ -274,6 +142,7 @@ class TestExecuteSyncGateIntegration:
 
         with (
             patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
                 return_value=None,
@@ -290,9 +159,12 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/plan"
+            )
             mock_backend.return_value.run.return_value = _make_mock_agent_result()
             mock_opts.return_value = MagicMock()
             service = CodeagentExecutionService()
@@ -304,7 +176,7 @@ class TestExecuteSyncGateIntegration:
     def test_pre_gate_callback_fires_before_gate(self) -> None:
         """pre_gate_callback is called before the sync gate."""
         agent_result = _make_mock_agent_result(stdout="verdict: APPROVE")
-        mock_store = _make_mock_store(state_label="state/review", ref_value="/audit.md")
+        mock_store = _make_mock_store()
         callback = MagicMock()
 
         command = CodeagentCommand(
@@ -324,6 +196,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=mock_store,
             ),
             patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
                 return_value=None,
@@ -340,10 +213,13 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate",
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
                 side_effect=lambda **kw: call_order.append("gate"),
             ),
         ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
             mock_backend.return_value.run.return_value = agent_result
             mock_opts.return_value = MagicMock()
             service = CodeagentExecutionService()
@@ -358,8 +234,8 @@ class TestExecuteSyncGateIntegration:
         )
 
     def test_before_state_label_captured_before_agent(self) -> None:
-        """before_state_label is captured before agent execution."""
-        mock_store = _make_mock_store(state_label="state/plan", ref_value="/plan.md")
+        """before_state_label is captured from GitHub before agent execution."""
+        mock_store = _make_mock_store()
         agent_result = _make_mock_agent_result()
         agent_result.is_success.return_value = True
 
@@ -376,6 +252,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=mock_store,
             ),
             patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
                 return_value=None,
@@ -392,15 +269,18 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/plan"
+            )
             mock_backend.return_value.run.return_value = agent_result
             mock_opts.return_value = MagicMock()
             service = CodeagentExecutionService()
             service.execute_sync(command)
 
-        # Verify before_state_label was captured from the initial flow state
+        # Verify before_state_label was captured from GitHub
         gate_kwargs = mock_gate.call_args[1]
         assert gate_kwargs["before_state_label"] == "state/plan"
 
@@ -410,7 +290,7 @@ class TestExecuteSyncGateIntegration:
         """Async-child marker must not alter sync shell behavior."""
         monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
         agent_result = _make_mock_agent_result(stdout="review output")
-        mock_store = _make_mock_store(state_label="state/review", ref_value="/audit.md")
+        mock_store = _make_mock_store()
         callback = MagicMock()
 
         command = CodeagentCommand(
@@ -427,6 +307,7 @@ class TestExecuteSyncGateIntegration:
                 return_value=mock_store,
             ),
             patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.execution.codeagent_runner.load_session_id",
                 return_value=None,
@@ -443,9 +324,12 @@ class TestExecuteSyncGateIntegration:
                 return_value=None,
             ),
             patch(
-                "vibe3.execution.codeagent_runner._apply_unified_noop_gate"
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
             mock_backend.return_value.run.return_value = agent_result
             mock_opts.return_value = MagicMock()
             service = CodeagentExecutionService()

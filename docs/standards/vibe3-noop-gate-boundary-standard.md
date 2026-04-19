@@ -68,7 +68,7 @@ related_docs:
 
 ### 2.2 manager 仍然是业务 owner
 
-当前 [supervisor/manager.md](/Users/jacobcy/src/vibe-center/wt-claude-v3/supervisor/manager.md) 明确把 manager 定义为单 issue 的 `Issue Owner`。
+当前 [supervisor/manager.md](supervisor/manager.md) 明确把 manager 定义为单 issue 的 `Issue Owner`。
 
 这样做的收益是：
 
@@ -152,7 +152,7 @@ ref 存在但 agent 没改 state，dispatch 不再派发，系统也不 block，
 
 ### 3.3 人工恢复默认回到 `handoff`
 
-[src/vibe3/services/task_resume_operations.py](/Users/jacobcy/src/vibe-center/wt-claude-v3/src/vibe3/services/task_resume_operations.py:74) 中，`--label` 的默认恢复目标仍是 `HANDOFF`。
+[src/vibe3/services/task_resume_operations.py](src/vibe3/services/task_resume_operations.py:74) 中，`--label` 的默认恢复目标仍是 `HANDOFF`。
 
 这本身是有意设计，不属于 bug，但说明：
 

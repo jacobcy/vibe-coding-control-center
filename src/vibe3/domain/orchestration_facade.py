@@ -17,6 +17,7 @@ from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
+from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
@@ -118,6 +119,28 @@ class OrchestrationFacade(ServiceBase):
             backend = self._capacity._backend
             registry = SessionRegistryService(store, backend)
             registry.reconcile_live_state()
+
+        if self._failed_gate is not None:
+            gate_result = self._failed_gate.check()
+            if gate_result.blocked:
+                issue_part = (
+                    f" issue=#{gate_result.issue_number}"
+                    if gate_result.issue_number is not None
+                    else ""
+                )
+                reason_part = (
+                    f" reason={gate_result.reason}" if gate_result.reason else ""
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"dispatch blocked by failed gate:{issue_part}{reason_part}",
+                )
+                logger.bind(
+                    domain="orchestration_facade",
+                    issue_number=gate_result.issue_number,
+                    reason=gate_result.reason,
+                ).warning("Dispatch blocked by failed gate")
+                return
 
         await self._coordinator.coordinate()
 

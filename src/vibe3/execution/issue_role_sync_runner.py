@@ -149,7 +149,7 @@ def run_issue_role_mode(
 
     if not sync_result.launched:
         # Soft-skip reason codes: coordinator intentionally declined, not a failure
-        _skip_codes = {"capacity_full", "already_running", "already_launching"}
+        _skip_codes = {"capacity_full"}
         if sync_result.reason_code in _skip_codes:
             typer.echo(
                 f"{spec.role_name} dispatch queued/throttled: {sync_result.reason}"

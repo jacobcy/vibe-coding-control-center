@@ -30,6 +30,13 @@ def _migrate_flow_status_value(v: str) -> str:
     return v
 
 
+def _migrate_execution_status_value(v: str | None) -> str | None:
+    """Normalize legacy execution status values."""
+    if v == "completed":
+        return "done"
+    return v
+
+
 class FlowState(BaseModel):
     """Flow state model.
 
@@ -83,6 +90,17 @@ class FlowState(BaseModel):
         - merged -> done (completed state)
         """
         return _migrate_flow_status_value(v)
+
+    @field_validator(
+        "planner_status",
+        "executor_status",
+        "reviewer_status",
+        mode="before",
+    )
+    @classmethod
+    def migrate_execution_status(cls, v: str | None) -> str | None:
+        """Migrate legacy execution status values."""
+        return _migrate_execution_status_value(v)
 
 
 class IssueLink(BaseModel):
@@ -198,6 +216,17 @@ class FlowStatusResponse(BaseModel):
     def migrate_flow_status(cls, v: str) -> str:
         """Migrate legacy flow status values for status responses."""
         return _migrate_flow_status_value(v)
+
+    @field_validator(
+        "planner_status",
+        "executor_status",
+        "reviewer_status",
+        mode="before",
+    )
+    @classmethod
+    def migrate_execution_status(cls, v: str | None) -> str | None:
+        """Migrate legacy execution status values for status responses."""
+        return _migrate_execution_status_value(v)
 
     @classmethod
     def from_state(

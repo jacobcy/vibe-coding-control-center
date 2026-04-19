@@ -209,11 +209,12 @@ def build_review_prompt_body(
     if ast_analysis:
         sections.append(ast_analysis)
 
-    task = build_review_task_section(request.task_guidance or config.review.review_task)
-    sections.append(task)
-
     output_contract = build_output_contract_section(config.review.output_format)
     sections.append(output_contract)
+
+    # Task section MUST be last so the exit label instruction has recency effect
+    task = build_review_task_section(request.task_guidance or config.review.review_task)
+    sections.append(task)
 
     body = "\n\n---\n\n".join(sections)
     log.bind(body_len=len(body)).success("Review prompt body built")

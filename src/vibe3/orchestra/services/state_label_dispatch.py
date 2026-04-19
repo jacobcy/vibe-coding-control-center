@@ -208,13 +208,9 @@ class StateLabelDispatchService(ServiceBase):
             if issue is None:
                 continue
             if self.role_def.trigger_name == "manager":
-                # Manager is the entry point. Always dispatch if the label is present,
-                # unless there's already a live session (handled in _should_dispatch).
-                # We don't skip if branch/flow_state is missing because Manager
-                # is responsible for creating them.
-                branch, flow_state = self._flow_context(issue.number)
-                if not self._should_dispatch(issue.number, flow_state):
-                    continue
+                # Manager is the entry point. If the trigger label is present,
+                # keep the issue in the frozen queue and let the coordinator
+                # decide when to fire the next hop.
                 selected.append(issue)
                 continue
 
@@ -235,42 +231,5 @@ class StateLabelDispatchService(ServiceBase):
                 )
                 continue
 
-            if not self._should_dispatch(issue.number, flow_state):
-                continue
-
             selected.append(issue)
         return sort_ready_issues(selected)
-
-    def _should_dispatch(
-        self,
-        issue_number: int,
-        flow_state: dict[str, object] | None,
-    ) -> bool:
-        """Use role definition's dispatch_predicate with registry liveness check.
-
-        Registry provides accurate liveness verification:
-        - Real-time tmux session verification
-        - Orphan detection (stale sessions > 60s)
-        - Grace period for recent starting sessions
-
-        Simplified: delegate all liveness checking to registry,
-        removing redundant flow_state.status_field check.
-        """
-        has_live_session = self._has_live_dispatch(issue_number)
-        return self.role_def.dispatch_predicate(flow_state or {}, has_live_session)
-
-    def _has_live_dispatch(self, issue_number: int) -> bool:
-        if self._registry is None:
-            raise RuntimeError(
-                "SessionRegistryService is required to check live dispatch"
-            )
-
-        branch, _ = self._flow_context(issue_number)
-        if not branch:
-            return False
-        sessions = self._registry.get_truly_live_sessions_for_target(
-            role=self.role_def.registry_role,
-            branch=branch,
-            target_id=str(issue_number),
-        )
-        return len(sessions) > 0

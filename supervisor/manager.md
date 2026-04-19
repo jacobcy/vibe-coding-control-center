@@ -87,6 +87,13 @@ Forbidden:
 - scene 真源：当前 issue / flow / task / branch / worktree / session 的现场信息
 - 交接真源：当前 issue 对应的 handoff 和 refs
 
+真源优先级补充：
+
+- 如果重建 flow / worktree 后，历史 handoff / refs 与当前 GitHub issue / PR 现场不一致，优先相信**当前 issue / PR 现场**
+- `pr_ref` 缺失**不等于**“不存在 PR”；遇到恢复现场时，必须先检查当前 issue 是否已经有关联 PR、当前分支是否已有打开的 PR、CI 是否已完成
+- 如果现场已经存在可审查的 PR、checks、review comments，不要机械重跑 plan / run / review；先基于当前 PR 现场判断是否可直接收口、回退修复，或进入 blocked
+- 历史 refs/handoff 只用于补充上下文，不能覆盖当前 GitHub scene 真相
+
 以下内容**不是真源**：
 
 - 历史 comment 里写过的 `state/in-progress`
@@ -144,6 +151,8 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 **Flow / PR 现场**：
 ```bash
 gh pr checks <pr-number>
+gh pr view <pr-number> --json state,isDraft,headRefName,baseRefName
+gh issue view <issue-number> --json timelineItems
 pwd
 git branch --show-current
 uv run python src/vibe3/cli.py handoff show <target-branch>
@@ -384,8 +393,12 @@ Steps:
    - comment：明确说明已超过重试上限，需要人类介入
    - `exit()`
 3. 检查 refs 是否完整
-4. 根据 refs 决定当前 issue 应进入哪一步
-5. 如果当前无法推进：
+4. **先检查现场是否已存在 PR 真相**：
+   - 检查当前 issue 是否已经关联 PR、当前 branch 是否已有打开的 PR、当前 PR 的 CI / review 现场是否可读
+   - 若存在 PR 现场，则**优先按 PR 现场决策**，不要因为 `pr_ref` 缺失或历史 handoff 落后就机械重跑
+   - 只有确认当前 scene 中没有可用 PR 现场时，才按 refs 缺失路径处理
+5. 根据 refs 和现场真源决定当前 issue 应进入哪一步
+6. 如果当前无法推进：
    - 先检查最新评论里是否已经解释原因
    - 若无解释，再检查已有 comments 是否已经覆盖同一 blocker
    - 只有在 blocker 是新的、现有 comments 没有覆盖时，才写新的 issue comment
@@ -471,6 +484,17 @@ Decision sketch:
     - 写 handoff：明确 PR 需要修改的问题
     - 进入 `state/in-progress`（executor 会读 handoff 修复 PR）
     - comment：说明 PR 需要修改的问题
+    - `exit()`
+- 无 `pr_ref`，但**现场已存在当前 issue/branch 对应 PR**：
+  - 将该 PR 视为当前真源的一部分，不因 `pr_ref` 缺失而机械重跑
+  - 先核对 PR 是否属于当前 issue scope 与当前 branch
+  - 若 PR 属于当前 issue，且 CI / review 现场可读：
+    - 按“已有 `pr_ref`”同等标准审查 PR
+    - 若通过：写 handoff，进入 `state/done`，`exit()`
+    - 若需修复：写 handoff，进入 `state/in-progress`，`exit()`
+  - 若 PR 存在但归属不清、branch 不匹配、证据冲突：
+    - 进入 `state/blocked`
+    - comment：明确列出冲突点，要求人类确认
     - `exit()`
 - refs 缺失、冲突或证据不足：
   - comment 当前 issue，说明哪些 refs 缺失或冲突
@@ -743,4 +767,3 @@ handoff 不应用来：
 - 不能推进时，不允许静默退出
 - 要么最新评论里已经存在明确原因
 - 要么你必须补一条 issue comment 说明当前为什么停止
-
