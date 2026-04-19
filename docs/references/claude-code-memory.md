@@ -26,7 +26,7 @@
 
 **项目哈希生成规则**：
 - 项目路径被转换为哈希格式的目录名
-- 例如：`/Users/jacobcy/Documents/skills/openclaw-evolve-main` → `-Users-jacobcy-Documents-skills-openclaw-evolve-main`
+- 例如：`skills/openclaw-evolve-main` → `skills-openclaw-evolve-main`
 
 ### 1.3 记忆图谱 (Memory Graph)
 
@@ -102,8 +102,8 @@ vibe-center/                 # 主仓库
 
 | 目录路径 | 项目哈希 | 记忆目录 |
 |---------|---------|---------|
-| `/Users/jacobcy/src/vibe-center/wt-fix-pr-base-selection` | `-Users-jacobcy-src-vibe-center-wt-fix-pr-base-selection` | 独立 |
-| `/Users/jacobcy/src/vibe-center-main` | `-Users-jacobcy-src-vibe-center-main` | 独立 |
+| `vibe-center/wt-fix-pr-base-selection` | `vibe-center-wt-fix-pr-base-selection` | 独立 |
+| `vibe-center-main` | `vibe-center-main` | 独立 |
 
 **结论**：当前 Claude Code **没有**特殊的 worktree 处理机制，每个物理目录都有独立的记忆空间。
 
@@ -183,7 +183,7 @@ vibe-center/main/scripts/vibe-memory-sync.sh
 **快速开始**：
 ```bash
 # 在主仓库执行（首次）
-cd /Users/jacobcy/src/vibe-center/main
+cd vibe-center/main
 mkdir -p .claude-memory
 # 编辑 .claude-memory/MEMORY.md 添加项目共享知识
 

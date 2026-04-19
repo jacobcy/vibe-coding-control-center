@@ -3,7 +3,7 @@
 `vibe3 serve` 的核心是一个长期运行的 driver / 调度器。
 
 统一 runtime 语义以
-[docs/standards/vibe3-orchestra-runtime-standard.md](/Users/jacobcy/src/vibe-center/main/.worktrees/wt-openai-review/docs/standards/vibe3-orchestra-runtime-standard.md)
+[docs/standards/vibe3-orchestra-runtime-standard.md](docs/standards/vibe3-orchestra-runtime-standard.md)
 为准。
 
 ## 架构
