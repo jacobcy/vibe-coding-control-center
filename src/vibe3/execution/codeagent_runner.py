@@ -50,6 +50,20 @@ def _resolve_request_pre_gate_callback(
     return _process_review_sync_result
 
 
+def _extract_state_label(issue_payload: dict[str, object]) -> str | None:
+    """Extract state/ label from GitHub issue payload."""
+    labels = issue_payload.get("labels")
+    if not isinstance(labels, list):
+        return None
+    for label in labels:
+        if not isinstance(label, dict):
+            continue
+        name = label.get("name")
+        if isinstance(name, str) and name.startswith("state/"):
+            return name
+    return None
+
+
 def _apply_unified_noop_gate(
     *,
     store: SQLiteClient,
@@ -62,15 +76,12 @@ def _apply_unified_noop_gate(
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
-    The only hard rule is simple:
-    - if the agent did not change state_label, block
-    - if the agent changed state_label, record the transition and pass
+    Reads state labels from GitHub issue (remote source of truth).
 
-    Ref presence is observable metadata only. It must never advance state and it
-    is no longer a separate blocking branch here.
-
-    Skip the gate if flow has no state label (not managed by state machine).
-    This applies to manual `vibe3 run` executions without state machine setup.
+    Rules:
+    - if the issue has no state/ label, skip (not managed by state machine)
+    - if the agent did not change the issue's state/ label, block
+    - if the agent changed the issue's state/ label, record the transition and pass
     """
     from vibe3.services.issue_failure_service import (
         block_executor_noop_issue,
@@ -78,27 +89,13 @@ def _apply_unified_noop_gate(
         block_planner_noop_issue,
         block_reviewer_noop_issue,
     )
-    from vibe3.utils.constants import EVENT_STATE_TRANSITIONED, EVENT_STATE_UNCHANGED
+    from vibe3.utils.constants import (
+        EVENT_CANNOT_VERIFY_REMOTE_STATE,
+        EVENT_STATE_TRANSITIONED,
+        EVENT_STATE_UNCHANGED,
+    )
 
-    # Skip no-op gate if flow has no state label
-    if not before_state_label:
-        logger.bind(
-            domain="codeagent",
-            role=role,
-            issue_number=issue_number,
-            branch=branch,
-        ).info(
-            "No-op gate SKIP: flow has no state label (not managed by state machine)"
-        )
-        return
-
-    flow_state = store.get_flow_state(branch)
-    if not isinstance(flow_state, dict):
-        return
-
-    after_state_label = str(flow_state.get("state_label", "") or "")
-
-    # Resolve role-specific block function
+    # Resolve role-specific block function (used in all failure paths)
     if role == "manager":
         _block_fn = block_manager_noop_issue
     elif role == "planner":
@@ -107,6 +104,108 @@ def _apply_unified_noop_gate(
         _block_fn = block_executor_noop_issue
     else:
         _block_fn = block_reviewer_noop_issue
+
+    # Skip no-op gate if issue has no state/ label (not managed by state machine)
+    if not before_state_label:
+        logger.bind(
+            domain="codeagent",
+            role=role,
+            issue_number=issue_number,
+            branch=branch,
+        ).info("No-op gate SKIP: issue has no state/ label")
+        return
+
+    # Read after_state from GitHub issue (remote source of truth)
+    try:
+        from vibe3.clients.github_client import GitHubClient
+
+        issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
+    except Exception as exc:
+        # Fail-safe: if we cannot verify state, block rather than skip
+        logger.bind(
+            domain="codeagent",
+            role=role,
+            issue_number=issue_number,
+            branch=branch,
+        ).warning(f"No-op gate BLOCK: cannot read issue state: {exc}")
+        store.add_event(
+            branch,
+            EVENT_CANNOT_VERIFY_REMOTE_STATE,
+            actor,
+            detail=f"Gate cannot verify state (GitHub read failed): {exc}",
+            refs={
+                "state": str(before_state_label or ""),
+                "issue": str(issue_number),
+                "error": str(exc),
+            },
+        )
+        _block_fn(
+            issue_number=issue_number,
+            repo=repo,
+            reason=f"cannot verify remote state: {exc}",
+            actor=actor,
+        )
+        return
+
+    if not isinstance(issue_payload, dict):
+        # Fail-safe: malformed response, block
+        logger.bind(
+            domain="codeagent",
+            role=role,
+            issue_number=issue_number,
+            branch=branch,
+        ).warning("No-op gate BLOCK: GitHub returned non-dict payload")
+        store.add_event(
+            branch,
+            EVENT_CANNOT_VERIFY_REMOTE_STATE,
+            actor,
+            detail="Gate cannot verify state (malformed GitHub response)",
+            refs={
+                "state": str(before_state_label or ""),
+                "issue": str(issue_number),
+            },
+        )
+        _block_fn(
+            issue_number=issue_number,
+            repo=repo,
+            reason="cannot verify remote state: malformed GitHub response",
+            actor=actor,
+        )
+        return
+
+    after_state_label = _extract_state_label(issue_payload)
+
+    # Fail-safe: if state label disappeared after agent, block
+    if not after_state_label:
+        logger.bind(
+            domain="codeagent",
+            role=role,
+            issue_number=issue_number,
+            branch=branch,
+        ).warning(
+            f"No-op gate BLOCK: state label disappeared after {role} "
+            f"(was {before_state_label})"
+        )
+        store.add_event(
+            branch,
+            EVENT_STATE_UNCHANGED,
+            actor,
+            detail=(
+                f"State label disappeared after {role}: "
+                f"was {before_state_label}, now missing"
+            ),
+            refs={
+                "before_state": str(before_state_label or ""),
+                "issue": str(issue_number),
+            },
+        )
+        _block_fn(
+            issue_number=issue_number,
+            repo=repo,
+            reason="state label disappeared after agent",
+            actor=actor,
+        )
+        return
 
     if before_state_label == after_state_label:
         state_desc = before_state_label or "(no state)"
@@ -220,13 +319,21 @@ class CodeagentExecutionService:
             # correct actor instead of a stale one.
             store.update_flow_state(branch, latest_actor=actor)
 
-        # Capture before_state_label for unified no-op gate.
-        # Runs in both sync and async paths when issue_number is available.
+        # Capture before_state_label from GitHub for unified no-op gate.
+        # Remote source of truth: GitHub issue labels, not local SQLite cache.
         before_state_label: str | None = None
-        if branch and store and command.issue_number is not None:
-            flow_state = store.get_flow_state(branch)
-            if isinstance(flow_state, dict):
-                before_state_label = str(flow_state.get("state_label", "") or "")
+        if command.issue_number is not None:
+            try:
+                from vibe3.clients.github_client import GitHubClient
+
+                issue_payload = GitHubClient().view_issue(
+                    command.issue_number,
+                    repo=getattr(self.config, "repo", None),
+                )
+                if isinstance(issue_payload, dict):
+                    before_state_label = _extract_state_label(issue_payload)
+            except Exception as exc:
+                log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
