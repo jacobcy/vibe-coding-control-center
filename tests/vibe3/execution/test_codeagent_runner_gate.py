@@ -166,6 +166,51 @@ class TestApplyUnifiedNoopGate:
 
         store.add_event.assert_not_called()
 
+    def test_gate_skipped_when_no_state_label(self) -> None:
+        """Gate is skipped when flow has no state label (not managed by state machine).
+
+        This applies to manual `vibe3 run` executions without state machine setup.
+        If before_state_label is empty, the flow is not part of state machine,
+        so no-op gate should not enforce state transitions.
+        """
+        store = _make_mock_store(state_label="", ref_value="")
+
+        with patch(
+            "vibe3.services.issue_failure_service.block_executor_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="",  # No state label
+            )
+
+        # Gate should skip, not block
+        mock_block.assert_not_called()
+        store.add_event.assert_not_called()
+
+    def test_gate_skipped_when_before_state_label_none(self) -> None:
+        """Gate is skipped when before_state_label is None."""
+        store = _make_mock_store(state_label="", ref_value="")
+
+        with patch(
+            "vibe3.services.issue_failure_service.block_planner_noop_issue"
+        ) as mock_block:
+            _apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label=None,  # None state label
+            )
+
+        # Gate should skip, not block
+        mock_block.assert_not_called()
+        store.add_event.assert_not_called()
+
 
 class TestExecuteSyncGateIntegration:
     """Tests that execute_sync invokes the gate correctly."""

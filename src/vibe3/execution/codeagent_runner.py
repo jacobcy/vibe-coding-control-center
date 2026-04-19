@@ -67,6 +67,9 @@ def _apply_unified_noop_gate(
 
     Ref presence is observable metadata only. It must never advance state and it
     is no longer a separate blocking branch here.
+
+    Skip the gate if flow has no state label (not managed by state machine).
+    This applies to manual `vibe3 run` executions without state machine setup.
     """
     from vibe3.services.issue_failure_service import (
         block_executor_noop_issue,
@@ -75,6 +78,18 @@ def _apply_unified_noop_gate(
         block_reviewer_noop_issue,
     )
     from vibe3.utils.constants import EVENT_STATE_TRANSITIONED, EVENT_STATE_UNCHANGED
+
+    # Skip no-op gate if flow has no state label
+    if not before_state_label:
+        logger.bind(
+            domain="codeagent",
+            role=role,
+            issue_number=issue_number,
+            branch=branch,
+        ).info(
+            "No-op gate SKIP: flow has no state label (not managed by state machine)"
+        )
+        return
 
     flow_state = store.get_flow_state(branch)
     if not isinstance(flow_state, dict):
