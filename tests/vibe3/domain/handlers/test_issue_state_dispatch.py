@@ -66,6 +66,7 @@ class TestIssueStateDispatchHandler:
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="ready",
+                issue_title="Test Issue",
             )
         )
 
@@ -103,6 +104,7 @@ class TestIssueStateDispatchHandler:
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="handoff",
+                issue_title="Test Issue",
             )
         )
 
