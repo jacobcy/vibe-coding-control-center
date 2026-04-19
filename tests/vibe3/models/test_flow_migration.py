@@ -1,6 +1,6 @@
 """Tests for flow model migrations."""
 
-from vibe3.models.flow import FlowState, IssueLink
+from vibe3.models.flow import FlowState, FlowStatusResponse, IssueLink
 
 
 class TestFlowStatusMigration:
@@ -89,3 +89,25 @@ class TestModelSerialization:
         link = IssueLink(branch="test-branch", issue_number=123, issue_role="repo")
         json_str = link.model_dump_json()
         assert '"issue_role":"related"' in json_str
+
+
+class TestExecutionStatusMigration:
+    """Tests for legacy execution status migration (completed->done)."""
+
+    def test_flow_state_migrates_completed_to_done(self):
+        flow = FlowState(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="active",
+            planner_status="completed",
+        )
+        assert flow.planner_status == "done"
+
+    def test_flow_status_response_migrates_completed_to_done(self):
+        response = FlowStatusResponse(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="active",
+            planner_status="completed",
+        )
+        assert response.planner_status == "done"
