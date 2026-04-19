@@ -124,6 +124,8 @@ openspec/
 .agents/
 .github/prompts/
 .codex/
+.gemini/
+.opencode/
 .copilot/
 .trae/
 .kiro/
