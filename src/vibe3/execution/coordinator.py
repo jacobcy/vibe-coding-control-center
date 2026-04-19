@@ -1,8 +1,9 @@
 """Unified execution coordinator."""
 
 import os
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Generator, Optional
 
 from loguru import logger
 
@@ -14,10 +15,7 @@ from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.execution_lifecycle import (
-    ExecutionLifecycleService,
-    execution_prefix,
-)
+from vibe3.execution.execution_lifecycle import execution_prefix
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 
@@ -31,14 +29,12 @@ class ExecutionCoordinator:
         store: SQLiteClient,
         backend: Optional[CodeagentBackend] = None,
         capacity: Optional[CapacityService] = None,
-        lifecycle: Optional[ExecutionLifecycleService] = None,
     ) -> None:
         """Initialize the execution coordinator."""
         self.config = config
         self.store = store
         self.backend = backend or CodeagentBackend()
         self.capacity = capacity or CapacityService(config, store, self.backend)
-        self.lifecycle = lifecycle or ExecutionLifecycleService(store)
         self.registry = SessionRegistryService(store, self.backend)
 
     def _resolve_cwd(self, request: ExecutionRequest) -> Optional[Path]:
@@ -103,24 +99,52 @@ class ExecutionCoordinator:
         )
         return ctx.path
 
+    @staticmethod
+    def _resolve_runtime_target(request: ExecutionRequest) -> tuple[str, str]:
+        """Map an execution request to runtime-session target identifiers."""
+        target_branch = request.target_branch or ""
+        target_id = str(request.target_id)
+        if target_branch.startswith("task/issue-") or target_branch.startswith(
+            "issue-"
+        ):
+            return ("issue", target_id)
+        return ("branch", target_branch or target_id)
+
+    @staticmethod
+    @contextmanager
+    def _without_async_child_marker(enabled: bool) -> Generator[None, None, None]:
+        """Keep the async-child marker scoped to outer coordinator logic only."""
+        if not enabled:
+            yield
+            return
+
+        previous = os.environ.pop("VIBE3_ASYNC_CHILD", None)
+        try:
+            yield
+        finally:
+            if previous is not None:
+                os.environ["VIBE3_ASYNC_CHILD"] = previous
+
     def dispatch_execution(self, request: ExecutionRequest) -> ExecutionLaunchResult:
         """Dispatch an execution request.
 
         Two dispatch modes:
 
         Container-inside (sync): All roles run through
-        CodeagentExecutionService, which handles lifecycle events,
-        handoff, pre-gate callbacks, and no-op gate uniformly.
+        CodeagentExecutionService, which handles handoff,
+        pre-gate callbacks, gate, and lifecycle uniformly.
 
         Container-outside (async): Launches a tmux session and returns
-        immediately. The tmux child runs CodeagentExecutionService
-        independently with full observability.
+        immediately. The tmux child then re-enters the same sync shell.
+        `VIBE3_ASYNC_CHILD` is scoped to the outer wrapper guards only.
+        Coordinator may record a tmux-start checkpoint, but it does not own
+        execution lifecycle.
 
         Simple dispatch model:
         1. Check for existing live session -> skip duplicate
         2. Check capacity -> skip if full
-        3. Launch execution
-        4. Record scheduling event (async path only)
+        3. Reserve runtime_session for async wrappers
+        4. Launch execution
         """
         logger.bind(
             domain="execution_coordinator",
@@ -137,6 +161,7 @@ class ExecutionCoordinator:
         is_async_child_sync = request.mode == "sync" and (
             os.environ.get("VIBE3_ASYNC_CHILD") == "1"
         )
+        runtime_session_id: int | None = None
 
         # 1. Check for existing truly live session (starting or running with live tmux)
         # to prevent duplicate launches if multiple dispatchers fire concurrently.
@@ -178,6 +203,17 @@ class ExecutionCoordinator:
 
             # Launch async
             if request.mode == "async":
+                if request.target_branch:
+                    target_type, runtime_target_id = self._resolve_runtime_target(
+                        request
+                    )
+                    runtime_session_id = self.registry.reserve(
+                        role=request.role,
+                        target_type=target_type,
+                        target_id=runtime_target_id,
+                        branch=request.target_branch,
+                    )
+
                 if request.cmd:
                     handle = start_async_command(
                         request.cmd,
@@ -205,19 +241,24 @@ class ExecutionCoordinator:
                 tmux_session = handle.tmux_session
                 log_path = str(handle.log_path)
 
-                refs = dict(request.refs)
-                refs["tmux_session"] = tmux_session
-                refs["log_path"] = log_path
+                if runtime_session_id is not None:
+                    self.registry.mark_started(
+                        runtime_session_id,
+                        tmux_session=tmux_session,
+                        log_path=log_path,
+                    )
 
-                # 4. Record started (which handles session registry)
-                # Type ignore because ExecutionRole is a Literal constraint
-                self.lifecycle.record_started(
-                    role=request.role,  # type: ignore[arg-type]
-                    target=request.target_branch,
-                    actor=request.actor,
-                    refs=refs,
-                    event_type=f"tmux_{execution_prefix(request.role)}_started",  # type: ignore[arg-type]
-                )
+                if request.target_branch:
+                    checkpoint_refs = dict(request.refs)
+                    checkpoint_refs["tmux_session"] = tmux_session
+                    checkpoint_refs["log_path"] = log_path
+                    self.store.add_event(
+                        request.target_branch,
+                        f"tmux_{execution_prefix(request.role)}_started",  # type: ignore[arg-type]
+                        request.actor,
+                        detail=f"{request.role.capitalize()} tmux wrapper started",
+                        refs=checkpoint_refs,
+                    )
 
                 logger.bind(
                     domain="execution_coordinator",
@@ -236,10 +277,11 @@ class ExecutionCoordinator:
                 if not request.prompt or request.options is None:
                     raise ValueError("Sync execution requires prompt and options")
 
-                result = CodeagentExecutionService().execute_sync_request(
-                    request,
-                    cwd=cwd_path,
-                )
+                with self._without_async_child_marker(is_async_child_sync):
+                    result = CodeagentExecutionService().execute_sync_request(
+                        request,
+                        cwd=cwd_path,
+                    )
                 if result.success:
                     return ExecutionLaunchResult(
                         launched=True,
@@ -255,19 +297,13 @@ class ExecutionCoordinator:
                 raise ValueError(f"Unknown mode: {request.mode}")
 
         except Exception as exc:
+            if request.mode == "async" and runtime_session_id is not None:
+                self.registry.mark_failed(runtime_session_id)
             logger.bind(
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
             ).error(f"Execution launch failed: {exc}")
-
-            self.lifecycle.record_failed(
-                role=request.role,  # type: ignore[arg-type]
-                target=request.target_branch,
-                actor=request.actor,
-                error=str(exc),
-                refs=request.refs,
-            )
 
             return ExecutionLaunchResult(
                 launched=False,

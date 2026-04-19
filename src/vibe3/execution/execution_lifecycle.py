@@ -214,12 +214,24 @@ def persist_execution_lifecycle_event(
 
     if lifecycle == "started":
         state_updates["execution_started_at"] = now
+        # Update role status to running
+        status_field = _ROLE_STATUS_FIELD[role]
+        if status_field:
+            state_updates[status_field] = "running"
     elif lifecycle == "completed":
         state_updates["execution_completed_at"] = now
         state_updates["execution_pid"] = None
+        # Update role status to completed
+        status_field = _ROLE_STATUS_FIELD[role]
+        if status_field:
+            state_updates[status_field] = "completed"
     else:
         state_updates["execution_completed_at"] = now
         state_updates["execution_pid"] = None
+        # Update role status to lifecycle value (aborted/failed)
+        status_field = _ROLE_STATUS_FIELD[role]
+        if status_field:
+            state_updates[status_field] = lifecycle
 
         actor_field = _ROLE_ACTOR_FIELD[role]
         if actor_field:

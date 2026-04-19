@@ -67,9 +67,9 @@ def run_issue_role_mode(
 
     Container-inside path (async_mode=True):
       orchestra launches a tmux session and returns immediately.
-      The tmux child runs codeagent_runner.execute_sync() independently.
-      The tmux child is only the execution shell; worker gate logic stays on
-      the sync path in the outer orchestration flow.
+      The tmux child then re-enters the normal sync path locally.
+      `VIBE3_ASYNC_CHILD` only bypasses outer duplicate/capacity guards; the
+      sync shell itself stays unchanged.
     """
     config = OrchestraConfig.from_settings()
     issue = _load_issue_info(config, issue_number)
