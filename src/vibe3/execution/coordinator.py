@@ -142,10 +142,9 @@ class ExecutionCoordinator:
         execution lifecycle.
 
         Simple dispatch model:
-        1. Check for existing live session -> skip duplicate
-        2. Check capacity -> skip if full
-        3. Reserve runtime_session for async wrappers
-        4. Launch execution
+        1. Check capacity -> skip if full
+        2. Reserve runtime_session for async wrappers
+        3. Launch execution
         """
         logger.bind(
             domain="execution_coordinator",
@@ -164,29 +163,7 @@ class ExecutionCoordinator:
         )
         runtime_session_id: int | None = None
 
-        # 1. Check for existing truly live session (starting or running with live tmux)
-        # to prevent duplicate launches if multiple dispatchers fire concurrently.
-        if request.target_branch and not is_async_child_sync:
-            live_sessions = self.registry.get_truly_live_sessions_for_target(
-                role=request.role,
-                branch=request.target_branch,
-                target_id=str(request.target_id),
-            )
-            if live_sessions:
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                    branch=request.target_branch,
-                ).info(f"Already running for {request.role}, skipping duplicate")
-                return ExecutionLaunchResult(
-                    launched=False,
-                    skipped=True,
-                    reason=f"Execution already running for {request.role}",
-                    reason_code="already_running",
-                )
-
-        # 2. Check capacity
+        # 1. Check capacity
         # Async child sync: outer wrapper already reserved capacity and registered
         # the runtime_session; child must not re-check or it double-counts itself.
         if not is_async_child_sync:
@@ -197,8 +174,38 @@ class ExecutionCoordinator:
                     reason_code="capacity_full",
                 )
 
+            # 1b. Dispatch dedup: skip if a live session already exists for
+            # the same role + branch + target. This prevents the same issue
+            # from spawning concurrent duplicate executions.
+            if request.target_branch:
+                target_type, runtime_target_id = self._resolve_runtime_target(request)
+                live = self.registry.get_truly_live_sessions_for_target(
+                    role=request.role,
+                    branch=request.target_branch,
+                    target_id=runtime_target_id,
+                )
+                if live:
+                    logger.bind(
+                        domain="execution_coordinator",
+                        role=request.role,
+                        target_branch=request.target_branch,
+                        target_id=runtime_target_id,
+                        live_count=len(live),
+                    ).info(
+                        f"Skipping duplicate dispatch for {request.role} "
+                        f"on {request.target_branch}"
+                    )
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        reason=(
+                            f"Live session already exists for "
+                            f"{request.role}/{request.target_branch}"
+                        ),
+                        reason_code="duplicate_dispatch",
+                    )
+
         try:
-            # 3. Launch
+            # 2. Launch
             cwd_path = self._resolve_cwd(request)
             env = request.env or dict(os.environ)
 

@@ -126,7 +126,7 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
 
 
 def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkeypatch):
-    """Sync child process should not short-circuit on its async wrapper session."""
+    """Sync child process should still bypass capacity double-counting."""
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
@@ -135,9 +135,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         store=store,
         backend=backend,
         capacity=capacity,
-    )
-    coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
-        return_value=[{"id": 1, "branch": "task/issue-42"}]
     )
     monkeypatch.setenv("VIBE3_ASYNC_CHILD", "1")
 
@@ -164,7 +161,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         result = coordinator.dispatch_execution(request)
 
     assert result.launched is True
-    coordinator.registry.get_truly_live_sessions_for_target.assert_not_called()
     mock_svc.execute_sync_request.assert_called_once()
 
 
@@ -216,9 +212,12 @@ def test_sync_child_clears_async_marker_before_entering_sync_shell(
     assert os.environ.get("VIBE3_ASYNC_CHILD") == "1"
 
 
-def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
-    """Regular sync launches should still respect live-session dedupe."""
+def test_sync_skips_when_live_session_exists_for_target(
+    mock_dependencies,
+):
+    """Regular sync dispatches should be deduped by live session for same target."""
     config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
         config=config,
@@ -226,9 +225,12 @@ def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
         backend=backend,
         capacity=capacity,
     )
-    coordinator.registry.get_truly_live_sessions_for_target = MagicMock(
-        return_value=[{"id": 1, "branch": "task/issue-42"}]
-    )
+
+    # Mock registry to report an existing live session for the same target
+    coordinator.registry = MagicMock()
+    coordinator.registry.get_truly_live_sessions_for_target.return_value = [
+        {"id": 99, "role": "manager", "branch": "task/issue-42", "target_id": "42"},
+    ]
 
     request = ExecutionRequest(
         role="manager",
@@ -243,9 +245,12 @@ def test_sync_non_child_still_blocks_duplicate_live_session(mock_dependencies):
     result = coordinator.dispatch_execution(request)
 
     assert result.launched is False
-    assert result.skipped is True
-    assert result.reason_code == "already_running"
-    backend.run.assert_not_called()
+    assert result.reason_code == "duplicate_dispatch"
+    coordinator.registry.get_truly_live_sessions_for_target.assert_called_once_with(
+        role="manager",
+        branch="task/issue-42",
+        target_id="42",
+    )
 
 
 def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
