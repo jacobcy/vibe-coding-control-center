@@ -78,13 +78,13 @@ def build_run_standard_sections(config: VibeConfig) -> list[str]:
     if tools_guide:
         sections.append(tools_guide)
 
-    # Run task (hard standard: includes label-writing instruction)
-    run_task = getattr(run_config, "run_task", None) if run_config else None
-    sections.append(build_run_task_section(run_task))
-
-    # Output format (hard standard)
+    # Output format (hard standard — placed before task so task is the LAST section)
     output_format = getattr(run_config, "output_format", None) if run_config else None
     sections.append(build_run_output_contract_section(output_format))
+
+    # Run task (hard standard: includes label-writing instruction — MUST be last)
+    run_task = getattr(run_config, "run_task", None) if run_config else None
+    sections.append(build_run_task_section(run_task))
 
     return sections
 
