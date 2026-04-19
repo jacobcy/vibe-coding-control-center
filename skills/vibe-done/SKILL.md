@@ -26,10 +26,9 @@ description: Use when the current human-collaboration flow has reached terminal 
 
 ## 必读文档
 
-- `docs/standards/v3/git-workflow-standard.md`
-- `docs/standards/v3/worktree-lifecycle-standard.md`
-- `docs/standards/v3/command-standard.md`
-- `docs/standards/v3/handoff-governance-standard.md`
+- `docs/standards/v3/handoff-governance-standard.md`（handoff 治理规则）
+- `docs/standards/v3/handoff-store-standard.md`（handoff 存储结构）
+- `docs/standards/v3/git-workflow-standard.md`（PR、issue、git 操作）
 
 ## 完整流程
 
@@ -63,6 +62,7 @@ description: Use when the current human-collaboration flow has reached terminal 
 
 - 允许：读取 `flow show` / `handoff show` / `gh pr view`、关闭 issue、写入 handoff、必要时执行 `vibe3 check`
 - 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
+- **绝对禁止**：删除 worktree（这是人机合作流程的核心资源，worktree 生命周期完全由用户控制）
 - branch / PR / issue 生命周期优先直接使用 git / gh；`flow` / `handoff` 只负责创联和本地协作证据
 - 若 review evidence 尚不存在，或 PR 还没达到 merge 条件，必须停回 `/vibe-integrate`，不得强行继续
 
@@ -106,29 +106,15 @@ uv run python src/vibe3/cli.py flow show <branch>
 
 - 没有 review evidence
 - 或还有 unresolved review / CI 阻塞
+- 或 PR 未处于 merged/closed/aborted 等终态
 
-则立即停止，返回 `/vibe-integrate`，不要继续 Step 2 以后动作。
+则立即停止，返回 `/vibe-integrate`，不要继续后续动作。
 
-### Step 2: 执行 PR 合并（如满足条件）
-
-若 PR 状态为 MERGEABLE 且无阻塞：
-
-```bash
-gh pr merge <pr-number> --merge --delete-branch=false
-```
-
-**注意**：
-- 不自动删除 branch（保留用于 handoff 记录和后续清理）
-- Merge 后等待 CI 确认 merged 状态
-- 若 merge 失败或 PR 状态不支持，回到 `/vibe-integrate` 处理阻塞
-
-若 PR 已 merged 或明确 closed/aborted，跳过此步骤继续 Step 3。
-
-### Step 3: 确认 task 收口事实
+### Step 2: 确认 task 收口事实
 
 若 `flow show` 返回了 task / issue 线索，只在 handoff / 总结中记录该 flow 已进入终态；不要直接编辑任何本地 JSON / SQLite 真源。
 
-### Step 4: 关闭 issue
+### Step 3: 关闭 issue
 
 优先关闭 `primary_issue_ref` 指向的主闭环 issue；其余 issue 只有在当前 flow 明确负责时才关闭：
 
@@ -140,10 +126,10 @@ gh issue close <issue-number-or-ref>
 
 补充口径：
 
-- `primary_issue_ref` 若存在，它对应的 `repo issue` 是当前 task 的 `task issue`，应作为主闭环 issue 优先确认
+- `primary_issue_ref` 若存在，它指向的 GitHub issue 在当前 flow 中被关联为 task issue，应作为主闭环 issue 优先确认
 - 其余 `issue_refs` 只表示关联来源，不等于都应由当前收口动作负责关闭
 
-### Step 5: 记录 closeout 与一致性审计
+### Step 4: 记录 closeout 与一致性审计
 
 执行：
 
@@ -162,7 +148,7 @@ uv run python src/vibe3/cli.py check
 - 强行 merge 未就绪的 PR
 - 替代 git / gh 去删除 branch 或处理远端生命周期
 
-### Step 6: 汇总并反馈问题（仅在发现系统性问题时）
+### Step 5: 汇总并反馈问题（仅在发现系统性问题时）
 
 **重要**：仅在发现 vibe skill/system 性问题时创建 feedback issue，不针对单个 PR 的问题。
 
@@ -211,7 +197,7 @@ uv run python src/vibe3/cli.py check
    - completed_at: <ISO-8601>
    ```
 
-### Step 7: 写入 handoff
+### Step 6: 写入 handoff
 
 完成后运行：
 

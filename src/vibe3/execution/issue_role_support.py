@@ -17,22 +17,26 @@ from vibe3.roles.definitions import IssueRoleSyncSpec
 
 
 def resolve_orchestra_repo_root() -> Path:
-    """Resolve the active repo root for orchestra self-invocation.
+    """Resolve the main repository root for orchestra operations.
 
-    Prefer the current worktree root so async/sync self-invocations execute the
-    same checked-out code the operator is running. Fall back to the shared git
-    common dir parent only when worktree resolution is unavailable.
+    Prioritize git common dir to ensure:
+    1. Worktrees are created under main repo's .worktrees (not nested)
+    2. Shared state (.git/vibe3/) is consistently accessed from main repo
+    3. All orchestra operations reference the canonical repository root
+
+    Fallback to current worktree root only when git common dir is unavailable,
+    and finally to cwd if all git resolution fails.
     """
-    try:
-        worktree_root = GitClient().get_worktree_root()
-        if worktree_root:
-            return Path(worktree_root)
-    except Exception:
-        pass
     try:
         git_common_dir = GitClient().get_git_common_dir()
         if git_common_dir:
             return Path(git_common_dir).parent
+    except Exception:
+        pass
+    try:
+        worktree_root = GitClient().get_worktree_root()
+        if worktree_root:
+            return Path(worktree_root)
     except Exception:
         pass
     return Path.cwd()
