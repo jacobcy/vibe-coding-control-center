@@ -176,7 +176,15 @@ class GlobalDispatchCoordinator:
             )
 
     async def _collect_frozen_queue(self) -> list[CandidateIssue]:
-        """Collect all ready issues for frozen queue."""
+        """Collect all ready issues for frozen queue.
+
+        Priority ordering within queue:
+        1. Flows with pr_ref (closest to completion) - highest priority
+        2. Flows in merge-ready state
+        3. Other states by role order
+
+        This ensures flows close to completion are dispatched first.
+        """
         candidates: list[CandidateIssue] = []
         role_order = ["reviewer", "executor", "planner", "manager"]
 
@@ -196,7 +204,30 @@ class GlobalDispatchCoordinator:
                     role=role,
                 ).error(f"collect_ready_issues failed for {role}: {exc}")
 
-        return candidates
+        # Additional sorting: prioritize flows with pr_ref
+        # Check flow_state.pr_ref for each candidate
+        def has_pr_ref(candidate: CandidateIssue) -> bool:
+            """Check if flow has pr_ref (indicating PR created)."""
+            from vibe3.clients.sqlite_client import SQLiteClient
+
+            try:
+                store = SQLiteClient()
+                branch = f"task/issue-{candidate.issue.number}"
+                flow_state = store.get_flow_state(branch)
+                if isinstance(flow_state, dict):
+                    pr_ref = flow_state.get("pr_ref")
+                    return isinstance(pr_ref, str) and bool(pr_ref)
+            except Exception:
+                pass
+            return False
+
+        # Sort: pr_ref flows first, then others
+        # Keep role order as secondary sort key
+        pr_ref_candidates = [c for c in candidates if has_pr_ref(c)]
+        other_candidates = [c for c in candidates if not has_pr_ref(c)]
+
+        # Return: pr_ref flows first, then others in role order
+        return pr_ref_candidates + other_candidates
 
     def _find_service_for_role(self, role: str) -> StateLabelDispatchService | None:
         """Find dispatch service for a role."""
