@@ -115,7 +115,7 @@ class CircuitBreaker:
 
     def __init__(
         self,
-        failure_threshold: int = 3,
+        failure_threshold: int = 4,
         cooldown_seconds: int = 300,
         half_open_max_tests: int = 1,
     ) -> None:

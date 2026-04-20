@@ -58,7 +58,7 @@ class AssigneeDispatchConfig(BaseModel):
     timeout_seconds: int = Field(
         default=3600,
         ge=60,
-        description="Manager execution timeout in seconds (default 30 minutes)",
+        description="Manager execution timeout in seconds (default 60 minutes)",
     )
     prompt_template: str = Field(
         default="orchestra.assignee_dispatch.manager",
@@ -93,7 +93,7 @@ class CircuitBreakerConfig(BaseModel):
 
     enabled: bool = True
     failure_threshold: int = Field(
-        default=3,
+        default=4,
         ge=1,
         description="Consecutive failures to trigger OPEN",
     )

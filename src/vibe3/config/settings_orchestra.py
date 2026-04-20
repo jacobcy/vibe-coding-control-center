@@ -46,7 +46,7 @@ class OrchestraCircuitBreakerSettings(BaseModel):
     """Circuit breaker settings for orchestra dispatch."""
 
     enabled: bool = True
-    failure_threshold: int = 3
+    failure_threshold: int = 4
     cooldown_seconds: int = 300
     half_open_max_tests: int = 1
 
