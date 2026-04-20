@@ -185,6 +185,25 @@ def status(
                         f"  {title[:48]}..."
                     )
                     console.print(f"             {flow_info}")
+
+                    # Show refs for running tasks
+                    if flow:
+                        refs = []
+                        if flow.plan_ref:
+                            refs.append(f"[dim]plan:[/] [cyan]{flow.plan_ref}[/]")
+                        if flow.report_ref:
+                            refs.append(f"[dim]report:[/] [cyan]{flow.report_ref}[/]")
+                        if flow.pr_number:
+                            # Build PR URL from config.repo or use pr_number
+                            pr_ref = (
+                                f"https://github.com/{config.repo}/pull/{flow.pr_number}"
+                                if config.repo
+                                else f"PR #{flow.pr_number}"
+                            )
+                            refs.append(f"[dim]PR:[/] [cyan]{pr_ref}[/]")
+
+                        if refs:
+                            console.print(f"             {'  '.join(refs)}")
             else:
                 console.print("  [dim](none)[/]")
 
@@ -208,7 +227,7 @@ def status(
                     )
 
                     # Format queue metadata
-                    metadata_parts = []
+                    metadata_parts: list[str] = []
                     if queue_rank is not None:
                         metadata_parts.append(f"rank={queue_rank}")
                     if milestone:
@@ -241,14 +260,16 @@ def status(
                 number = cast(int, item["number"])
                 title = cast(str, item["title"])
                 flow = cast(FlowStatusResponse, item["flow"])
-                pr_ref = getattr(flow, "pr_ref", None)
+                pr_url_value = getattr(flow, "pr_ref", None)
+                pr_url: str | None = str(pr_url_value) if pr_url_value else None
 
                 # Show PR URL and state
                 state = cast(IssueState, item["state"])
                 status_str = state.value.upper()
 
                 console.print(f"  #{number:4}  [{status_str:10}]  {title[:48]}...")
-                console.print(f"         [cyan]PR: {pr_ref}[/]")
+                if pr_url:
+                    console.print(f"         [cyan]PR: {pr_url}[/]")
         else:
             console.print("  [dim](none)[/]")
 
