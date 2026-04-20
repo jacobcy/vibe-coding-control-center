@@ -123,33 +123,46 @@ class TestIssueStateDispatchHandler:
             )
         )
 
+    @patch("vibe3.services.issue_failure_service.fail_manager_issue")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
-    def test_request_none_logs_error(
+    def test_request_none_fails_issue(
         self,
         mock_build_request: MagicMock,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
+        mock_fail_issue: MagicMock,
     ) -> None:
+        """Test that when build_manager_request returns None, issue is failed explicitly."""
         from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
 
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
 
+        # Simulate build_manager_request returning None (e.g., capacity reached)
         mock_build_request.return_value = None
 
         mock_coordinator = MagicMock()
         mock_coordinator_cls.return_value = mock_coordinator
 
+        # Provide issue_title to avoid GitHub API call
         handle_manager_dispatched(
             ManagerDispatched(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="ready",
+                issue_title="Test Issue",
             )
         )
 
+        # Verify coordinator was NOT called (no dispatch)
         mock_coordinator.dispatch_execution.assert_not_called()
+        
+        # Verify fail_manager_issue WAS called to prevent silent freeze
+        mock_fail_issue.assert_called_once()
+        call_args = mock_fail_issue.call_args
+        assert call_args.kwargs["issue_number"] == 42
+        assert "build_manager_request returned None" in call_args.kwargs["reason"]
