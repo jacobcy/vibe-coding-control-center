@@ -186,13 +186,19 @@ def status(
                     )
                     console.print(f"             {flow_info}")
 
-                    # Show refs for running tasks
+                    # Show refs for running tasks (each on separate line)
                     if flow:
-                        refs = []
                         if flow.plan_ref:
-                            refs.append(f"[dim]plan:[/] [cyan]{flow.plan_ref}[/]")
+                            plan_msg = (
+                                f"             [dim]plan:[/] [cyan]{flow.plan_ref}[/]"
+                            )
+                            console.print(plan_msg)
                         if flow.report_ref:
-                            refs.append(f"[dim]report:[/] [cyan]{flow.report_ref}[/]")
+                            report_msg = (
+                                f"             [dim]report:[/] "
+                                f"[cyan]{flow.report_ref}[/]"
+                            )
+                            console.print(report_msg)
                         if flow.pr_number:
                             # Build PR URL from config.repo or use pr_number
                             pr_ref = (
@@ -200,10 +206,7 @@ def status(
                                 if config.repo
                                 else f"PR #{flow.pr_number}"
                             )
-                            refs.append(f"[dim]PR:[/] [cyan]{pr_ref}[/]")
-
-                        if refs:
-                            console.print(f"             {'  '.join(refs)}")
+                            console.print(f"             [dim]PR:[/] [cyan]{pr_ref}[/]")
             else:
                 console.print("  [dim](none)[/]")
 
