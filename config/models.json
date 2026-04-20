@@ -22,7 +22,7 @@
     },
     "vibe-executor": {
       "backend": "opencode",
-      "model": "alibaba-coding-plan-cn/glm-5",
+      "model": "my-provider/gpt-4o",
       "yolo": true,
       "description": "Task executor: implement features and fix bugs"
     },
