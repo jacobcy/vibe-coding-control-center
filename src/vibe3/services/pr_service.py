@@ -80,6 +80,12 @@ class PRService:
             existing = existing_prs[0]
             hydrated = self.github_client.get_pr(existing.number) or existing
             self._sync_pr_flow_state(hydrated, actor=effective_actor)
+            # Trigger dependency wake-up for pre-existing PRs too.
+            # This covers the scenario where a flow enters waiting AFTER the
+            # dependency PR already existed — the original DependencySatisfied
+            # event was emitted on first PR creation, but the dependent flow
+            # wasn't in waiting state yet and missed it.
+            self._trigger_dependency_wake_up(head_branch, hydrated.number)
             return hydrated
 
         try:

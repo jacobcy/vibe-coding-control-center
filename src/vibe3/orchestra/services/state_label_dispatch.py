@@ -231,6 +231,7 @@ class StateLabelDispatchService(ServiceBase):
         """Check if dependency issue has completed (PR created).
 
         A dependency is satisfied when:
+        - Local flow has a PR ref (primary truth source)
         - Issue is closed
         - Issue has state/done or state/merged label
         - Issue body/comments mention PR reference
@@ -241,6 +242,18 @@ class StateLabelDispatchService(ServiceBase):
         Returns:
             True if dependency is satisfied, False otherwise
         """
+        # Check local flow state first — this is the primary truth source.
+        # Covers scenarios: (a) PR already exists, flow enters waiting later;
+        # (b) service restart missed events.
+        dep_flows = self._store.get_flows_by_issue(dep_issue_number, role="task")
+        for dep_flow in dep_flows:
+            pr_ref = dep_flow.get("pr_ref")
+            if pr_ref and str(pr_ref).strip():
+                return True
+            pr_number = dep_flow.get("pr_number")
+            if pr_number:
+                return True
+
         payload = self._github.view_issue(dep_issue_number, repo=self.config.repo)
 
         if not isinstance(payload, dict):
