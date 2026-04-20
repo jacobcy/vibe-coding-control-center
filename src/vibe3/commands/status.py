@@ -176,9 +176,9 @@ def status(
                     status_str = "QUEUED" if is_queued else state.value.upper()
                     status_color = "yellow" if is_queued else "green"
                     flow_info = (
-                        f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
+                        f"[dim]flow:[/] [cyan]{flow.branch}[/]"
                         if flow
-                        else "  [dim]flow:[/] [dim](none)[/]"
+                        else "[dim]flow:[/] [dim](none)[/]"
                     )
                     console.print(
                         f"  #{number:4}  [{status_color}]{status_str:10}[/]"
