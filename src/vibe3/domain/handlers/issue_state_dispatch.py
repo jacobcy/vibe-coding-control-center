@@ -10,6 +10,7 @@ from vibe3.domain.events.flow_lifecycle import ManagerDispatched
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
+from vibe3.services.issue_failure_service import fail_manager_issue
 
 
 def handle_manager_dispatched(event: ManagerDispatched) -> None:
@@ -111,11 +112,16 @@ def handle_manager_dispatched(event: ManagerDispatched) -> None:
             )
 
             if request is None:
+                reason = "Failed to prepare role execution request"
                 logger.bind(
                     domain="issue_state_dispatch_handler",
                     role="manager",
                     issue_number=event.issue_number,
-                ).error("Failed to prepare role execution request")
+                ).error(reason)
+                fail_manager_issue(
+                    issue_number=event.issue_number,
+                    reason=reason,
+                )
                 return
 
             result = await loop.run_in_executor(
