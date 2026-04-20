@@ -153,30 +153,75 @@ class TestHandleDependencySatisfied:
 class TestFindWaitingFlows:
     """Tests for _find_waiting_flows helper."""
 
-    def test_find_flows_blocked_by_issue(self) -> None:
-        """Should find flows blocked by specific issue."""
+    def test_find_flows_with_dependency_link(self) -> None:
+        """Should find waiting flows that have a dependency link to the issue."""
+        import time
+
+        uid = int(time.time() * 1000)
         store = SQLiteClient()
 
-        # Create waiting flows
+        # Create waiting flows with unique branch names
+        branch_a = f"task/issue-wait-a-{uid}"
+        branch_b = f"task/issue-wait-b-{uid}"
+
         store.update_flow_state(
-            "task/issue-300",
-            flow_slug="test-300",
+            branch_a,
+            flow_slug=f"test-wait-a-{uid}",
             flow_status="waiting",
             blocked_by_issue=301,
         )
+        store.add_issue_link(branch_a, 300 + uid, "task")
+        store.add_issue_link(branch_a, 301, "dependency")
+
         store.update_flow_state(
-            "task/issue-302",
-            flow_slug="test-302",
+            branch_b,
+            flow_slug=f"test-wait-b-{uid}",
             flow_status="waiting",
             blocked_by_issue=303,
         )
+        store.add_issue_link(branch_b, 301 + uid, "task")
+        store.add_issue_link(branch_b, 303, "dependency")
 
-        # Find flows blocked by 301
+        # Find flows that depend on issue 301
         flows = _find_waiting_flows(store, 301)
 
-        assert len(flows) == 1
-        assert flows[0]["branch"] == "task/issue-300"
-        assert flows[0]["blocked_by_issue"] == 301
+        branch_names = [f["branch"] for f in flows]
+        assert branch_a in branch_names
+        assert branch_b not in branch_names
+
+    def test_no_dependency_link_excludes_flow(self) -> None:
+        """Waiting flow WITHOUT dependency link to the issue should NOT be found."""
+        import time
+
+        uid = int(time.time() * 1000)
+        store = SQLiteClient()
+
+        branch_a = f"task/issue-nolink-a-{uid}"
+        branch_b = f"task/issue-nolink-b-{uid}"
+
+        # Flow A: has dependency link to 301 → should be found
+        store.update_flow_state(
+            branch_a,
+            flow_slug=f"test-nolink-a-{uid}",
+            flow_status="waiting",
+        )
+        store.add_issue_link(branch_a, 400 + uid, "task")
+        store.add_issue_link(branch_a, 301, "dependency")
+
+        # Flow B: NO dependency link to 301 → should NOT be found
+        store.update_flow_state(
+            branch_b,
+            flow_slug=f"test-nolink-b-{uid}",
+            flow_status="waiting",
+        )
+        store.add_issue_link(branch_b, 401 + uid, "task")
+        # No dependency link to 301 for branch_b
+
+        flows = _find_waiting_flows(store, 301)
+
+        branch_names = [f["branch"] for f in flows]
+        assert branch_a in branch_names
+        assert branch_b not in branch_names
 
     def test_no_waiting_flows(self) -> None:
         """Should return empty list if no waiting flows."""
@@ -286,8 +331,15 @@ class TestIsIssueSatisfied:
             "body": "In progress",
         }
 
-        result = _is_issue_satisfied(gh, 301)
-        assert result is False
+        with patch(
+            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
+        ) as mock_store_cls:
+            mock_store = MagicMock()
+            mock_store.get_flows_by_issue.return_value = []
+            mock_store_cls.return_value = mock_store
+
+            result = _is_issue_satisfied(gh, 301)
+            assert result is False
 
 
 class TestWakeUpFlow:

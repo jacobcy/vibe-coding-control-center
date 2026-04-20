@@ -216,3 +216,181 @@ class TestCreateFromPRBranch:
 
             # Verify
             assert result is None
+
+
+class TestCreateFromPRBranchExistingBranch:
+    """Tests for _create_from_pr_branch when branch already exists locally."""
+
+    def test_existing_branch_update_ref_success(self) -> None:
+        """When branch exists and update-ref succeeds, attach worktree."""
+        from pathlib import Path
+
+        config = MagicMock()
+        repo_path = Path("/tmp/test-repo")
+        manager = WorktreeManager(config=config, repo_path=repo_path)
+
+        mock_pr = MagicMock()
+        mock_pr.head_branch = "feature/dep-work"
+
+        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+            mock_gh = MagicMock()
+            mock_gh.get_pr.return_value = mock_pr
+            mock_gh_cls.return_value = mock_gh
+
+            with patch.object(manager, "_branch_exists_locally", return_value=True):
+                with patch("vibe3.environment.worktree.find_worktree_by_path"):
+                    with patch("vibe3.environment.worktree.initialize_worktree"):
+                        with patch("vibe3.environment.worktree.shutil"):
+                            # Mock _fetch_pr_branch to return head_branch directly
+                            with patch.object(
+                                manager,
+                                "_fetch_pr_branch",
+                                return_value="feature/dep-work",
+                            ):
+                                # Mock update-ref + worktree add separately
+                                with patch(
+                                    "vibe3.environment.worktree.subprocess"
+                                ) as mock_subprocess:
+                                    mock_subprocess.run.side_effect = [
+                                        MagicMock(returncode=0),  # prune
+                                        MagicMock(returncode=0),  # update-ref
+                                        MagicMock(returncode=0),  # worktree add
+                                    ]
+
+                                    result = manager._create_from_pr_branch(
+                                        Path(
+                                            "/tmp/test-repo/.worktrees/task/issue-300"
+                                        ),
+                                        "task/issue-300",
+                                        300,
+                                        42,
+                                    )
+
+                                    assert result is not None
+                                    assert result.branch == "task/issue-300"
+
+                                    # Verify update-ref was called
+                                    calls = mock_subprocess.run.call_args_list
+                                    update_ref_call = calls[1]
+                                    assert "update-ref" in update_ref_call[0][0]
+
+                                    # Verify worktree add used existing
+                                    # branch (no -b flag)
+                                    add_call = calls[2]
+                                    add_args = add_call[0][0]
+                                    assert "-b" not in add_args
+                                    assert "task/issue-300" in add_args
+
+    def test_existing_branch_update_ref_failure_returns_none(self) -> None:
+        """When branch exists but update-ref fails, return None for fallback."""
+        from pathlib import Path
+
+        config = MagicMock()
+        repo_path = Path("/tmp/test-repo")
+        manager = WorktreeManager(config=config, repo_path=repo_path)
+
+        mock_pr = MagicMock()
+        mock_pr.head_branch = "feature/dep-work"
+
+        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+            mock_gh = MagicMock()
+            mock_gh.get_pr.return_value = mock_pr
+            mock_gh_cls.return_value = mock_gh
+
+            with patch.object(manager, "_branch_exists_locally", return_value=True):
+                with patch("vibe3.environment.worktree.find_worktree_by_path"):
+                    with patch("vibe3.environment.worktree.shutil"):
+                        with patch.object(
+                            manager,
+                            "_fetch_pr_branch",
+                            return_value="feature/dep-work",
+                        ):
+                            with patch(
+                                "vibe3.environment.worktree.subprocess"
+                            ) as mock_subprocess:
+                                mock_subprocess.run.side_effect = [
+                                    MagicMock(returncode=0),  # prune
+                                    MagicMock(
+                                        returncode=1,
+                                        stderr="ref lock failed",
+                                    ),  # update-ref fails
+                                ]
+
+                                result = manager._create_from_pr_branch(
+                                    Path("/tmp/test-repo/.worktrees/task/issue-300"),
+                                    "task/issue-300",
+                                    300,
+                                    42,
+                                )
+
+                                # Should return None (trigger fallback),
+                                # not silently proceed with wrong tip
+                                assert result is None
+
+
+class TestIsIssueSatisfiedWithPRRef:
+    """Tests for _is_issue_satisfied with local flow PR truth source."""
+
+    def test_flow_with_pr_ref_satisfies(self) -> None:
+        """Dependency with pr_ref in local flow should be satisfied."""
+        from vibe3.domain.handlers.dependency_wake_up import _is_issue_satisfied
+
+        gh = MagicMock()
+
+        with patch(
+            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
+        ) as mock_store_cls:
+            mock_store = MagicMock()
+            mock_store.get_flows_by_issue.return_value = [
+                {"pr_ref": "https://github.com/org/repo/pull/42"}
+            ]
+            mock_store_cls.return_value = mock_store
+
+            result = _is_issue_satisfied(gh, 301)
+            assert result is True
+            # Should NOT call GitHub — local truth source is sufficient
+            gh.view_issue.assert_not_called()
+
+    def test_flow_with_pr_number_satisfies(self) -> None:
+        """Dependency with pr_number in local flow should be satisfied."""
+        from vibe3.domain.handlers.dependency_wake_up import _is_issue_satisfied
+
+        gh = MagicMock()
+
+        with patch(
+            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
+        ) as mock_store_cls:
+            mock_store = MagicMock()
+            mock_store.get_flows_by_issue.return_value = [
+                {"pr_ref": None, "pr_number": 42}
+            ]
+            mock_store_cls.return_value = mock_store
+
+            result = _is_issue_satisfied(gh, 301)
+            assert result is True
+            gh.view_issue.assert_not_called()
+
+    def test_flow_without_pr_falls_back_to_github(self) -> None:
+        """Dependency without PR in local flow should fall back to GitHub check."""
+        from vibe3.domain.handlers.dependency_wake_up import _is_issue_satisfied
+
+        gh = MagicMock()
+        gh.view_issue.return_value = {
+            "number": 301,
+            "state": "open",
+            "labels": [{"name": "state/ready"}],
+            "body": "In progress",
+        }
+
+        with patch(
+            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
+        ) as mock_store_cls:
+            mock_store = MagicMock()
+            mock_store.get_flows_by_issue.return_value = [
+                {"pr_ref": None, "pr_number": None}
+            ]
+            mock_store_cls.return_value = mock_store
+
+            result = _is_issue_satisfied(gh, 301)
+            assert result is False
+            gh.view_issue.assert_called_once()

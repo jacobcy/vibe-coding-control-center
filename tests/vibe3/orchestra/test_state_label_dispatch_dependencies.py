@@ -333,11 +333,15 @@ class TestDependencySatisfactionCheck:
             "body": "Still in progress",
         }
 
+        mock_store = MagicMock()
+        mock_store.get_flows_by_issue.return_value = []
+
         service = StateLabelDispatchService(
             config,
             github=github,
             role_def=MANAGER_ROLE,
         )
+        service._store = mock_store
 
         result = service._is_dependency_satisfied(301)
         assert result is False
