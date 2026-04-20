@@ -113,3 +113,25 @@ class ReviewerDispatched(DomainEvent):
     trigger_state: str  # "review"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
+
+
+# Dependency Events
+
+
+@dataclass(frozen=True)
+class DependencySatisfied(DomainEvent):
+    """Dependency satisfied event.
+
+    Published when a PR is created for a dependency flow, signaling that
+    dependent flows may be woken up from waiting state.
+
+    This event triggers the dependency wake-up handler which checks all
+    waiting flows blocked by this dependency and wakes them up if all
+    dependencies are now satisfied.
+    """
+
+    issue_number: int  # The dependency issue number that was satisfied
+    branch: str  # The branch where the dependency flow was completed
+    pr_number: int  # The PR number that was created
+    actor: str = "flow:pr_create"
+    timestamp: str | None = None

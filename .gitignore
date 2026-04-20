@@ -129,6 +129,7 @@ openspec/
 .copilot/
 .trae/
 .kiro/
+.qoder/
 .augment/
 .codebuddy/
 # Claude: track project config, exclude local commands and skills

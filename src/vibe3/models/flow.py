@@ -16,7 +16,7 @@ class MainBranchProtectedError(Exception):
     pass
 
 
-ExecutionStatus = Literal["pending", "running", "done", "crashed"]
+ExecutionStatus = Literal["pending", "running", "done", "crashed", "aborted"]
 
 
 def _migrate_flow_status_value(v: str) -> str:
@@ -34,6 +34,9 @@ def _migrate_execution_status_value(v: str | None) -> str | None:
     """Normalize legacy execution status values."""
     if v == "completed":
         return "done"
+    # Map legacy "failed" to "crashed" for consistency
+    if v == "failed":
+        return "crashed"
     return v
 
 
@@ -67,7 +70,14 @@ class FlowState(BaseModel):
     failed_reason: str | None = None  # NEW: Fail reason text
     next_step: str | None = None
     flow_status: Literal[
-        "active", "blocked", "failed", "done", "stale", "aborted", "merged"
+        "active",
+        "blocked",
+        "failed",
+        "done",
+        "stale",
+        "aborted",
+        "merged",
+        "waiting",  # NEW: waiting for dependencies
     ] = "active"
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
@@ -184,7 +194,14 @@ class FlowStatusResponse(BaseModel):
     branch: str
     flow_slug: str
     flow_status: Literal[
-        "active", "blocked", "failed", "done", "stale", "aborted", "merged"
+        "active",
+        "blocked",
+        "failed",
+        "done",
+        "stale",
+        "aborted",
+        "merged",
+        "waiting",  # NEW: waiting for dependencies
     ]
     task_issue_number: int | None = None
     pr_number: int | None = None

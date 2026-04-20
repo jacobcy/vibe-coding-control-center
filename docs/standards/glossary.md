@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-04-02
+last_updated: 2026-04-20
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -181,10 +181,39 @@ related_docs:
 - 落点：
   - 命令边界见 [command-standard.md](command-standard.md)
   - 现场态边界见 [data-model-standard.md](data-model-standard.md)
+  - 状态定义：`flow_status` 字段在 `flow_state` 表
 - 使用规则：
   - 讨论当前交付切片、由 branch 锚定且由 worktree 承载的任务现场时使用 `flow`
   - 讨论用户正在推进哪个目标时，默认优先从 `repo issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
+
+### 3.4.1 Flow Status 语义
+
+`flow_status` 定义了 flow 当前的执行状态，各状态语义：
+
+- **`active`**：flow 正常执行中，准备就绪或正在处理
+- **`waiting`**：flow 等待**外部依赖满足**，依赖完成后会自动唤醒；这是**可自动恢复**的等待状态
+  - 触发条件：flow 有未满足的依赖 issue，orchestra 会将其标记为 waiting
+  - 唤醒条件：所有依赖 issue 创建 PR 后，自动触发 `DependencySatisfied` 事件唤醒 flow
+  - 和 `blocked` 区别：`waiting` 是等待外部依赖（可自动恢复），`blocked` 是内部执行阻塞（需人工介入）
+- **`blocked`**：flow 执行被内部问题阻塞，需要人工介入才能恢复
+  - 不会自动唤醒，必须人工 resume
+- **`failed`**：flow 执行失败，需要人工修复或放弃
+- **`done`**：flow 执行完成，所有任务已办结
+- **`stale`**：flow 长期未活动，被系统标记为休眠
+- **`aborted`**：flow 被人工中止
+- **`merged`**：flow 的 PR 已合并
+
+### 3.4.2 `dependency` (issue role)
+
+- 正式术语：`dependency` (issue role)
+- 别称：依赖 issue
+- 定义：在 `flow_issue_links` 表中，`issue_role = 'dependency'` 表示该 issue 是当前 flow 所依赖的前置任务。
+- 语义：当前 flow 必须等待所有依赖 issue 完成（PR created）才能开始执行。
+- 机制：
+  - 依赖未满足 → flow 标记为 `waiting`
+  - 所有依赖满足 → flow 自动从 `waiting` 唤醒为 `active`
+  - 被唤醒 flow 的 worktree 默认从依赖的 PR 分支创建，确保代码基于最新依赖
 
 ### 3.5 `pr`
 

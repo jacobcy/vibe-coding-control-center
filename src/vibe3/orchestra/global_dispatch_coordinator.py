@@ -186,12 +186,18 @@ class GlobalDispatchCoordinator:
         return queue
 
     def _promote_progressed_entries(self) -> None:
-        """Move completed-progress issues to the front of the frozen queue."""
+        """Move progressed issues to the front; remove blocked/failed from queue.
+
+        Blocked and failed states require human intervention and should not be
+        automatically retried by the dispatcher. Remove them from the frozen queue
+        to avoid wasting dispatch slots.
+        """
         if not self._frozen_queue:
             return
 
         promoted: list[QueueEntry] = []
         retained: list[QueueEntry] = []
+        removed: list[QueueEntry] = []
         for entry in self._frozen_queue:
             if entry.waiting_state is None:
                 retained.append(entry)
@@ -206,6 +212,18 @@ class GlobalDispatchCoordinator:
                 retained.append(entry)
                 continue
 
+            # Blocked/failed states require human intervention - remove from queue
+            if current_state in ("blocked", "failed"):
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    f"from queue (state changed to {current_state}, "
+                    f"requires human intervention)",
+                )
+                continue
+
+            # Progress detected (state changed to non-terminal) - promote to front
             entry.waiting_state = None
             promoted.append(entry)
             append_orchestra_event(
@@ -214,10 +232,9 @@ class GlobalDispatchCoordinator:
                 f"to front after state change to {current_state}",
             )
 
-        if promoted:
+        # Update frozen queue: promoted + retained (removed entries discarded)
+        if promoted or retained:
             self._frozen_queue = promoted + retained
-        else:
-            self._frozen_queue = retained
 
     def _load_issue(self, issue_number: int) -> IssueInfo | None:
         """Load the current issue snapshot for an already-frozen issue."""

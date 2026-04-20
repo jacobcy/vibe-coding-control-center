@@ -80,6 +80,12 @@ class PRService:
             existing = existing_prs[0]
             hydrated = self.github_client.get_pr(existing.number) or existing
             self._sync_pr_flow_state(hydrated, actor=effective_actor)
+            # Trigger dependency wake-up for pre-existing PRs too.
+            # This covers the scenario where a flow enters waiting AFTER the
+            # dependency PR already existed — the original DependencySatisfied
+            # event was emitted on first PR creation, but the dependent flow
+            # wasn't in waiting state yet and missed it.
+            self._trigger_dependency_wake_up(head_branch, hydrated.number)
             return hydrated
 
         try:
@@ -116,6 +122,9 @@ class PRService:
             effective_actor,
             f"Draft PR #{pr.number} created: {pr.url}",
         )
+
+        # Trigger dependency wake-up after successful PR creation
+        self._trigger_dependency_wake_up(head_branch, pr.number)
 
         logger.bind(pr_number=pr.number, url=pr.url).success("Draft PR created")
         return pr
@@ -372,4 +381,56 @@ class PRService:
             issue_title=existing_cache.get("issue_title") if existing_cache else None,
             pr_number=pr.number,
             pr_title=pr.title,
+        )
+
+    def _trigger_dependency_wake_up(self, branch: str, pr_number: int) -> None:
+        """Wake up flows waiting on this branch's completion.
+
+        Publishes DependencySatisfied event to trigger wake-up of any flows
+        that are waiting for this branch's issue to complete.
+
+        Args:
+            branch: The branch where PR was created
+            pr_number: The PR number that was created
+        """
+        from vibe3.domain import publish
+        from vibe3.domain.events import DependencySatisfied
+
+        # Get task issue for this branch
+        links = self.store.get_issue_links(branch)
+        task_issue = next(
+            (link for link in links if link.get("issue_role") == "task"), None
+        )
+
+        if not task_issue:
+            logger.bind(
+                domain="pr",
+                branch=branch,
+                pr_number=pr_number,
+            ).debug("No task issue found, skipping dependency wake-up")
+            return
+
+        issue_number = task_issue.get("issue_number")
+        if issue_number is None:
+            logger.bind(
+                domain="pr",
+                branch=branch,
+                pr_number=pr_number,
+            ).debug("Task issue has no issue_number, skipping dependency wake-up")
+            return
+
+        # Publish dependency satisfied event
+        logger.bind(
+            domain="pr",
+            branch=branch,
+            issue_number=issue_number,
+            pr_number=pr_number,
+        ).info("Triggering dependency wake-up")
+
+        publish(
+            DependencySatisfied(
+                issue_number=issue_number,
+                branch=branch,
+                pr_number=pr_number,
+            )
         )

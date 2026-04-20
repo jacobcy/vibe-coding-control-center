@@ -23,6 +23,7 @@ class DomainEvent:
 
 # Import from submodules
 from vibe3.domain.events.flow_lifecycle import (  # noqa: E402
+    DependencySatisfied,
     ExecutorDispatched,
     IssueFailed,
     IssueStateChanged,
@@ -55,6 +56,8 @@ __all__ = [
     "PlannerDispatched",
     "ExecutorDispatched",
     "ReviewerDispatched",
+    # L3 Dependency Events
+    "DependencySatisfied",
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
@@ -78,6 +81,8 @@ EVENT_TYPES = {
     "planner_dispatched": PlannerDispatched,
     "executor_dispatched": ExecutorDispatched,
     "reviewer_dispatched": ReviewerDispatched,
+    # L3 Dependency
+    "dependency_satisfied": DependencySatisfied,
     # L1 Governance
     "governance_scan_started": GovernanceScanStarted,
     "governance_scan_completed": GovernanceScanCompleted,

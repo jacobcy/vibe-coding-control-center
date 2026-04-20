@@ -165,6 +165,9 @@ code_limits:
       - path: "src/vibe3/services/orchestra_status_service.py"
         limit: 450
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
+      - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
+        limit: 450
+        reason: "State label dispatch 服务，包含依赖检查、状态查询、事件发射等紧密耦合的调度逻辑"
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
@@ -182,6 +185,9 @@ code_limits:
       - path: "tests/vibe3/execution/test_coordinator.py"
         limit: 500
         reason: "Coordinator 核心测试，10 个测试函数围绕调度逻辑，共享 mock_dependencies fixture，拆分收益低"
+      - path: "tests/vibe3/environment/test_worktree_branch_from_pr.py"
+        limit: 450
+        reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数

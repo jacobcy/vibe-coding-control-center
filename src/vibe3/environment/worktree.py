@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.worktree_pr_mixin import WorktreePRMixin
 from vibe3.environment.worktree_support import (
     align_auto_scene_to_base,
     find_worktree_by_path,
@@ -35,7 +37,7 @@ class WorktreeContext:
     issue_number: Optional[int] = None  # For tracking temporary worktrees
 
 
-class WorktreeManager:
+class WorktreeManager(WorktreePRMixin):
     """Unified manager for issue worktrees (L3) and temporary worktrees (L2).
 
     This manager is the SINGLE AUTHORITY for worktree allocation in vibe3.
@@ -76,6 +78,10 @@ class WorktreeManager:
         This is the canonical method for L3 manager/plan/run/review execution.
         The worktree is bound to the flow branch and persisted across sessions.
 
+        For flows woken up by dependency satisfaction, this will attempt to
+        create the worktree from the dependency's PR head branch instead of main.
+        If fetching the PR branch fails, it falls back to the standard creation.
+
         Args:
             issue_number: GitHub issue number
             branch: Git branch name for the worktree
@@ -102,8 +108,52 @@ class WorktreeManager:
                 issue_number=issue_number,
             )
 
-        # Create new worktree
+        # Check for dependency wake-up source PR
         wt_path = self.repo_path / ".worktrees" / branch
+        source_pr_number = self._find_dependency_wakeup_pr(branch)
+
+        if source_pr_number:
+            # Try to create from PR branch
+            context = self._create_from_pr_branch(
+                wt_path, branch, issue_number, source_pr_number
+            )
+            if context:
+                # Success! Return PR-based worktree
+                return context
+
+            # Failed, log and fall back to default
+            logger.bind(
+                issue=issue_number,
+                branch=branch,
+                source_pr=source_pr_number,
+            ).warning(
+                "Failed to create worktree from PR branch, falling back to origin/main"
+            )
+
+            # Record fallback event
+            try:
+                # Calculate db path directly from repo_path without git command
+                git_common_dir = self.repo_path / ".git"
+                vibe3_dir = git_common_dir / "vibe3"
+                db_path = str(vibe3_dir / "handoff.db")
+                store = SQLiteClient(db_path=db_path)
+                store.add_event(
+                    branch,
+                    "dependency_branch_fallback",
+                    "worktree:manager",
+                    detail=f"Failed to fetch PR #{source_pr_number} branch, "
+                    f"falling back to origin/main",
+                    refs={"source_pr": str(source_pr_number)},
+                )
+            except Exception:
+                # Failed to record event, but fallback still happens
+                logger.bind(
+                    issue=issue_number,
+                    branch=branch,
+                    source_pr=source_pr_number,
+                ).warning("Failed to record fallback event")
+
+        # Default: create from standard base (origin/main)
         return self._create_issue_worktree(wt_path, branch, issue_number)
 
     def release_issue_worktree(self, context: WorktreeContext) -> None:
