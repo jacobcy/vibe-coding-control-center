@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -287,3 +288,38 @@ class TestGlobalDispatchCoordinator:
         await coordinator.coordinate()
 
         assert manager_svc._emit_dispatch_intent.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_logs_dispatch_intent_instead_of_dispatch_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        planner_issue = make_issue(303)
+        planner_svc = make_service("planner", [planner_issue])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [planner_svc])
+        install_issue_loader(coordinator, {303: IssueState.CLAIMED})
+
+        events: list[str] = []
+
+        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+            _ = level
+            events.append(message)
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event",
+            capture_event,
+        )
+
+        await coordinator.coordinate()
+
+        normalized_events = [
+            re.sub(r"\x1b\[[0-9;]*m", "", message) for message in events
+        ]
+
+        assert any(
+            "dispatch-intent #303 (planner)" in message for message in normalized_events
+        )
+        assert not any(
+            "dispatched #303 (planner)" in message for message in normalized_events
+        )

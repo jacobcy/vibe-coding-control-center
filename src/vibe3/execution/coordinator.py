@@ -1,6 +1,7 @@
 """Unified execution coordinator."""
 
 import os
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Optional
@@ -310,20 +311,34 @@ class ExecutionCoordinator:
                 raise ValueError(f"Unknown mode: {request.mode}")
 
         except Exception as exc:
+            error_msg = self._format_launch_error(exc)
             if request.mode == "async" and runtime_session_id is not None:
                 self.registry.mark_failed(runtime_session_id)
             append_orchestra_event(
                 "dispatcher",
-                f"{request.role} launch failed for #{request.target_id}: {exc}",
+                f"{request.role} launch failed for #{request.target_id}: {error_msg}",
             )
             logger.bind(
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
-            ).error(f"Execution launch failed: {exc}")
+            ).error(f"Execution launch failed: {error_msg}")
 
             return ExecutionLaunchResult(
                 launched=False,
-                reason=str(exc),
+                reason=error_msg,
                 reason_code="launch_failed",
             )
+
+    @staticmethod
+    def _format_launch_error(exc: Exception) -> str:
+        """Add context for known launch-failure patterns."""
+        error_msg = str(exc)
+        match = re.search(r"Tmux session '([^']+)' already exists", error_msg)
+        if match:
+            session_name = match.group(1)
+            return (
+                f"{error_msg} (previous session still alive: {session_name}; "
+                "launch skipped to avoid duplicate worker)"
+            )
+        return error_msg

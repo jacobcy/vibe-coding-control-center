@@ -130,7 +130,7 @@ class GlobalDispatchCoordinator:
                 reset = "\033[0m"
                 append_orchestra_event(
                     "dispatcher",
-                    f"GlobalDispatchCoordinator: {green}dispatched{reset} "
+                    f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
                     f"#{issue.number} ({service.role_def.registry_role})",
                 )
                 logger.bind(
@@ -138,7 +138,8 @@ class GlobalDispatchCoordinator:
                     role=service.role_def.registry_role,
                     issue=issue.number,
                 ).info(
-                    f"Dispatched #{issue.number} " f"({service.role_def.registry_role})"
+                    f"Emitted dispatch intent for #{issue.number} "
+                    f"({service.role_def.registry_role})"
                 )
             except Exception as exc:
                 logger.bind(
@@ -153,7 +154,7 @@ class GlobalDispatchCoordinator:
             reset = "\033[0m"
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: {green}dispatched="
+                f"GlobalDispatchCoordinator: {green}dispatch-intent="
                 f"{dispatched_count}{reset}",
             )
 
