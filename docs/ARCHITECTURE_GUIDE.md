@@ -12,6 +12,7 @@
 
 | 文档 | 路径 | 关键内容 | 权威性 |
 |------|------|---------|--------|
+| **Human-Mirror 架构** | [docs/standards/vibe3-human-mirror-architecture.md](standards/vibe3-human-mirror-architecture.md) | 核心设计哲学：系统操作 = 人类操作 | ⭐⭐⭐ 权威 |
 | **事件驱动架构** | [docs/standards/vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) | 事件发布/订阅机制、处理器注册、向后兼容 | ⭐⭐⭐ 权威 |
 | **Worktree 所有权** | [docs/standards/vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md) | 执行层级（L0-L4）、worktree 语义、隔离规则 | ⭐⭐⭐ 权威 |
 | **Orchestra Runtime** | [docs/standards/vibe3-orchestra-runtime-standard.md](standards/vibe3-orchestra-runtime-standard.md) | Driver/Tick/Async Child 架构、调度主循环 | ⭐⭐⭐ 权威 |
