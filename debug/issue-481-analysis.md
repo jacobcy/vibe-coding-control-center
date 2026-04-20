@@ -55,17 +55,49 @@ if request is None:
 
 ---
 
-### Bug B: Review 后状态收口问题 ⚠️ 待验证
+### Bug B: Review 后状态收口问题 ✅ 已分析
 
-**怀疑点**：
-- reviewer 的 `pre_gate_callback` 写 `audit_ref`
-- unified no-op gate 判断 state 是否推进
-- 但 manager 是否稳定接到后续状态不确定
+**代码路径**（`src/vibe3/roles/review.py`）：
 
-**需要验证**：
-1. review 完成后 issue label 实际是否变化
-2. audit_ref 存在但 state 未离开 review
-3. manager 是否真的恢复/重入
+1. **`_process_review_sync_result()`** (第 133-157 行)
+   - 解析 review verdict
+   - 创建 audit artifact
+   - 调用 `HandoffService.record_audit()` 写入 audit_ref
+
+2. **`apply_unified_noop_gate()`** (`src/vibe3/execution/noop_gate.py`)
+   - 从 GitHub 读取 before_state_label 和 after_state_label
+   - 如果 state 未变化 → 调用 `block_reviewer_noop_issue()`
+   - 如果 state 已变化 → 记录 EVENT_STATE_TRANSITIONED
+
+**潜在问题点**：
+
+1. **review 完成后 state 应该变成什么？**
+   - 当前代码没有显式设置 state
+   - 依赖 reviewer agent 主动修改 GitHub label
+   - 如果 agent 没有正确设置 state/... label，no-op gate 会 block
+
+2. **Manager 恢复机制**
+   - Review 通过后，manager 应该自动 dispatch
+   - 触发条件：`handle_manager_dispatched()` 监听 `ManagerDispatched` event
+   - 但 review 完成后是否触发该 event？需要验证
+
+3. **竞态条件**
+   - `_process_review_sync_result()` 写 audit_ref
+   - no-op gate 读取 after_state
+   - 如果 GitHub label 更新延迟，可能导致误判
+
+**调试建议**：
+```bash
+# 查看 review 完成后的事件
+tail -f temp/logs/orchestra/events.log | grep -E "review|manager|state"
+
+# 检查 issue label
+gh issue view {n} --json labels,state
+
+# 查看 handoff/audit 记录
+ls temp/logs/issues/issue-{n}/
+cat temp/logs/issues/issue-{n}/reviewer.async.log
+```
 
 ---
 
