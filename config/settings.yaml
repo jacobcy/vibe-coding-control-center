@@ -183,8 +183,8 @@ code_limits:
         limit: 450
         reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
       - path: "tests/vibe3/execution/test_coordinator.py"
-        limit: 500
-        reason: "Coordinator 核心测试，10 个测试函数围绕调度逻辑，共享 mock_dependencies fixture，拆分收益低"
+        limit: 600
+        reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
       - path: "tests/vibe3/environment/test_worktree_branch_from_pr.py"
         limit: 450
         reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
