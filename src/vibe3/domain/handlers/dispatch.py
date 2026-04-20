@@ -14,9 +14,9 @@ from loguru import logger
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events import (
-    ExecutorDispatched,
-    PlannerDispatched,
-    ReviewerDispatched,
+    ExecutorDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
 )
 from vibe3.domain.events.flow_lifecycle import DomainEvent
 from vibe3.execution.contracts import ExecutionRequest
@@ -115,8 +115,8 @@ def _dispatch_role_intent(
     ).warning(f"{role.capitalize()} dispatch not launched: {result.reason}")
 
 
-def handle_planner_dispatched(event: PlannerDispatched) -> None:
-    """Handle PlannerDispatched event via role request builder."""
+def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
+    """Handle PlannerDispatchIntent event via role request builder."""
     logger.bind(
         domain="planner_handler",
         issue_number=event.issue_number,
@@ -141,8 +141,8 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
         raise
 
 
-def handle_executor_dispatched(event: ExecutorDispatched) -> None:
-    """Handle ExecutorDispatched event via role request builder.
+def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
+    """Handle ExecutorDispatchIntent event via role request builder.
 
     Enriches the neutral dispatch intent with execution-specific context
     (plan_ref, audit_ref, commit_mode) read from flow state and handoff files.
@@ -186,8 +186,8 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
         raise
 
 
-def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
-    """Handle ReviewerDispatched event via role request builder.
+def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
+    """Handle ReviewerDispatchIntent event via role request builder.
 
     Enriches the neutral dispatch intent with report_ref read from flow state.
     """
@@ -225,21 +225,36 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
 
 def register_dispatch_handlers() -> None:
     """Register all dispatch-intent event handlers."""
-    from typing import Callable, cast
+    from typing import cast
 
     from vibe3.domain.publisher import subscribe
 
+    # Subscribe to new event names
+    subscribe(
+        "PlannerDispatchIntent",
+        cast(Callable[[DomainEvent], None], handle_planner_dispatch_intent),
+    )
+    subscribe(
+        "ExecutorDispatchIntent",
+        cast(Callable[[DomainEvent], None], handle_executor_dispatch_intent),
+    )
+    subscribe(
+        "ReviewerDispatchIntent",
+        cast(Callable[[DomainEvent], None], handle_reviewer_dispatch_intent),
+    )
+
+    # Backward compatibility: subscribe to old event names
     subscribe(
         "PlannerDispatched",
-        cast(Callable[[DomainEvent], None], handle_planner_dispatched),
+        cast(Callable[[DomainEvent], None], handle_planner_dispatch_intent),
     )
     subscribe(
         "ExecutorDispatched",
-        cast(Callable[[DomainEvent], None], handle_executor_dispatched),
+        cast(Callable[[DomainEvent], None], handle_executor_dispatch_intent),
     )
     subscribe(
         "ReviewerDispatched",
-        cast(Callable[[DomainEvent], None], handle_reviewer_dispatched),
+        cast(Callable[[DomainEvent], None], handle_reviewer_dispatch_intent),
     )
 
     logger.bind(domain="events").info("Dispatch-intent event handlers registered")

@@ -36,9 +36,17 @@ _EVENT_COLOR: dict[str, str] = {
     "reviewer_started": "yellow",
     "reviewer_completed": "green",
     "reviewer_aborted": "red",
+    # Dispatch Intent Events (new names)
+    "manager_dispatch_intent": "green bold",
+    "planner_dispatch_intent": "green bold",
+    "executor_dispatch_intent": "green bold",
+    "reviewer_dispatch_intent": "green bold",
+    # Dispatch Intent Events (backward compatibility)
     "planner_dispatched": "green bold",
     "executor_dispatched": "green bold",
     "reviewer_dispatched": "green bold",
+    # Audit Events (new name)
+    "audit_recorded": "cyan bold",
     "state_transitioned": "cyan bold",
     "state_unchanged": "yellow",
     "cannot_verify_remote_state": "yellow",
@@ -54,6 +62,30 @@ _EVENT_COLOR: dict[str, str] = {
     "codeagent_manager_completed": "green",
     "codeagent_manager_aborted": "red",
 }
+
+
+def _format_event_type(event_type: str) -> str:
+    """Format event type for display with friendly names.
+
+    Maps internal event types to user-friendly display names.
+    Supports both new and legacy event type names.
+    """
+    display_names = {
+        # Dispatch Intent Events
+        "manager_dispatch_intent": "Manager Dispatch",
+        "planner_dispatch_intent": "Planner Dispatch",
+        "executor_dispatch_intent": "Executor Dispatch",
+        "reviewer_dispatch_intent": "Reviewer Dispatch",
+        # Backward compatibility (old names)
+        "manager_dispatched": "Manager Dispatch",
+        "planner_dispatched": "Planner Dispatch",
+        "executor_dispatched": "Executor Dispatch",
+        "reviewer_dispatched": "Reviewer Dispatch",
+        # Audit Events
+        "audit_recorded": "Audit Recorded",
+        "handoff_audit": "Audit Recorded",  # Backward compatibility
+    }
+    return display_names.get(event_type, event_type)
 
 
 def render_milestone(
@@ -166,8 +198,9 @@ def render_flow_timeline(
         color = _EVENT_COLOR.get(event.event_type, "white")
         time_str = event.created_at[:16].replace("T", " ")
         actor_short = event.actor
+        event_display = _format_event_type(event.event_type)
         console.print(
-            f"[dim]{time_str}[/]  [{color}]{event.event_type}[/]  [dim]{actor_short}[/]"
+            f"[dim]{time_str}[/]  [{color}]{event_display}[/]  [dim]{actor_short}[/]"
         )
         if event.detail:
             console.print(f"  {event.detail}")

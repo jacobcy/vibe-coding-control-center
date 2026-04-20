@@ -47,7 +47,7 @@ class TestPlannerDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.dispatch import handle_planner_dispatched
+        from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.from_settings.return_value = config
@@ -71,7 +71,7 @@ class TestPlannerDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_planner_dispatched(
+        handle_planner_dispatch_intent(
             PlannerDispatched(
                 issue_number=42,
                 branch="task/issue-42",
@@ -111,7 +111,7 @@ class TestExecutorDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.dispatch import handle_executor_dispatched
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.from_settings.return_value = config
@@ -140,7 +140,7 @@ class TestExecutorDispatchHandler:
         mock_coordinator_cls.return_value = mock_coordinator
 
         # Event no longer carries plan_ref; handler reads from flow_state
-        handle_executor_dispatched(
+        handle_executor_dispatch_intent(
             ExecutorDispatched(
                 issue_number=42,
                 branch="task/issue-42",
@@ -176,7 +176,7 @@ class TestReviewerDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.dispatch import handle_reviewer_dispatched
+        from vibe3.domain.handlers.dispatch import handle_reviewer_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.from_settings.return_value = config
@@ -203,7 +203,7 @@ class TestReviewerDispatchHandler:
         mock_coordinator_cls.return_value = mock_coordinator
 
         # Event no longer carries report_ref; handler reads from flow_state
-        handle_reviewer_dispatched(
+        handle_reviewer_dispatch_intent(
             ReviewerDispatched(
                 issue_number=42,
                 branch="task/issue-42",
@@ -239,7 +239,7 @@ class TestDispatchNotLaunched:
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.dispatch import handle_planner_dispatched
+        from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.from_settings.return_value = config
@@ -260,7 +260,7 @@ class TestDispatchNotLaunched:
         mock_coordinator_cls.return_value = mock_coordinator
 
         # Should not raise
-        handle_planner_dispatched(
+        handle_planner_dispatch_intent(
             PlannerDispatched(
                 issue_number=42,
                 branch="task/issue-42",

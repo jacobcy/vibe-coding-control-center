@@ -2,7 +2,7 @@
 
 from vibe3.domain.events.flow_lifecycle import (
     IssueFailed,
-    ManagerDispatched,
+    ManagerDispatchIntent,
 )
 
 
@@ -34,9 +34,9 @@ def test_issue_failed_with_timestamp() -> None:
     assert event.timestamp == "2026-04-09T12:00:00Z"
 
 
-def test_manager_dispatched_event_structure() -> None:
-    """Test ManagerDispatched event has correct structure."""
-    event = ManagerDispatched(
+def test_manager_dispatch_intent_event_structure() -> None:
+    """Test ManagerDispatchIntent event has correct structure."""
+    event = ManagerDispatchIntent(
         issue_number=42,
         branch="task/issue-42",
         trigger_state="ready",
