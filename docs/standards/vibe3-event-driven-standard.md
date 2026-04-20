@@ -28,6 +28,16 @@
 
 **命名规范**: 事件名称使用过去式（如 `IssueStateChanged`, `PlanCompleted`）。
 
+**Dispatch Intent 事件命名**（特殊规则）：
+- Dispatch Intent 事件使用未来式 + Intent 后缀（如 `ManagerDispatchIntent`）
+- 明确表达这是"意图"而非"完成"，避免语义混淆
+- 示例：`ManagerDispatchIntent` 表示"应该 dispatch manager"，不是"已 dispatched"
+- 向后兼容：旧事件名 `*Dispatched` 作为别名保留
+
+**Audit 事件命名**：
+- `audit_recorded` 表示系统解析并记录 audit_ref 的行为
+- 区别于 `handoff_*` 事件：handoff 是 agent 主动提交，audit_recorded 是系统被动解析
+
 ### 1.3 处理器设计原则
 
 **纯函数**: 处理器应是纯函数或无状态方法，不依赖外部可变状态。
@@ -156,10 +166,10 @@ Apply agent executes
 | `IssueStateChanged` | Issue 状态转换 | `from_state`, `to_state` | 标签变迁 |
 | `IssueFailed` | Agent 执行失败 | `reason` | 失败记录 |
 | `IssueBlocked` | Issue 被阻塞 | `reason` | 缺少前置条件 |
-| `ManagerDispatched` | Manager 调度 | `issue_number`, `branch` | 管理分发 |
-| `PlannerDispatched` | Planner 调度 | `issue_number`, `branch` | 计划分发 |
-| `ExecutorDispatched` | Executor 调度 | `issue_number`, `branch` | 执行分发 |
-| `ReviewerDispatched` | Reviewer 调度 | `issue_number`, `branch` | 审查分发 |
+| `ManagerDispatchIntent` | Manager 调度意图 | `issue_number`, `branch` | 管理分发意图 |
+| `PlannerDispatchIntent` | Planner 调度意图 | `issue_number`, `branch` | 计划分发意图 |
+| `ExecutorDispatchIntent` | Executor 调度意图 | `issue_number`, `branch` | 执行分发意图 |
+| `ReviewerDispatchIntent` | Reviewer 调度意图 | `issue_number`, `branch` | 审查分发意图 |
 
 **处理器** (`src/vibe3/domain/handlers/`):
 - `flow_lifecycle.py` — 记录状态变迁日志（纯观察），不执行业务判断
@@ -282,6 +292,49 @@ subscribe(
     "PlanCompleted",
     cast(Callable[[DomainEvent], None], handle_plan_completed),
 )
+```
+
+### 5.5 向后兼容性注册
+
+**事件重命名场景**：当事件名称变更时，必须保持向后兼容。
+
+**注册方式**：同时订阅新旧事件名称。
+
+```python
+# 新事件名称
+subscribe(
+    "ManagerDispatchIntent",
+    cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
+)
+
+# 向后兼容：订阅旧事件名称
+subscribe(
+    "ManagerDispatched",  # 旧名称
+    cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
+)
+```
+
+**事件定义**：在事件类定义中提供别名。
+
+```python
+@dataclass(frozen=True)
+class ManagerDispatchIntent(DomainEvent):
+    """Manager dispatch intent event."""
+    ...
+
+# 向后兼容别名
+ManagerDispatched = ManagerDispatchIntent
+```
+
+**事件注册表**：支持新旧名称映射。
+
+```python
+EVENT_TYPES = {
+    # 新名称
+    "manager_dispatch_intent": ManagerDispatchIntent,
+    # 向后兼容
+    "manager_dispatched": ManagerDispatchIntent,
+}
 ```
 
 ---
@@ -500,9 +553,10 @@ LabelService().transition(
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
+| 1.1 | 2026-04-21 | 重命名 Dispatch 事件为 *DispatchIntent，明确语义；添加 audit_recorded 事件；补充向后兼容性注册规范 |
 | 1.0 | 2026-04-08 | 初始版本，定义四条执行链路的事件驱动架构 |
 
 ---
 
 **维护者**: Vibe Team
-**最后更新**: 2026-04-08
+**最后更新**: 2026-04-21
