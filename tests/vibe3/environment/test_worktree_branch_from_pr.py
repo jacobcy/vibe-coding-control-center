@@ -1,5 +1,6 @@
 """Unit tests for branch-from-PR creation in WorktreeManager."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients.sqlite_client import SQLiteClient
@@ -26,12 +27,13 @@ class TestFindDependencyWakeupPR:
             detail="Planning started",
         )
 
-        # Mock manager
+        # Mock manager with real Path
         config = MagicMock()
-        manager = WorktreeManager(config=config, repo_path=MagicMock())
+        repo_path = Path("/tmp/test-repo")
+        manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
             return_value=store,
         ):
             # Execute
@@ -53,12 +55,13 @@ class TestFindDependencyWakeupPR:
             refs={"source_pr": "42"},
         )
 
-        # Mock manager
+        # Mock manager with real Path for repo_path
         config = MagicMock()
-        manager = WorktreeManager(config=config, repo_path=MagicMock())
+        repo_path = Path("/tmp/test-repo")
+        manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
             return_value=store,
         ):
             # Execute
@@ -94,12 +97,13 @@ class TestFindDependencyWakeupPR:
             refs={"source_pr": "43"},
         )
 
-        # Mock manager
+        # Mock manager with real Path
         config = MagicMock()
-        manager = WorktreeManager(config=config, repo_path=MagicMock())
+        repo_path = Path("/tmp/test-repo")
+        manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
             return_value=store,
         ):
             # Execute
@@ -126,12 +130,13 @@ class TestFindDependencyWakeupPR:
             refs={},  # No source_pr
         )
 
-        # Mock manager
+        # Mock manager with real Path
         config = MagicMock()
-        manager = WorktreeManager(config=config, repo_path=MagicMock())
+        repo_path = Path("/tmp/test-repo")
+        manager = WorktreeManager(config=config, repo_path=repo_path)
 
         with patch(
-            "vibe3.environment.worktree.SQLiteClient",
+            "vibe3.environment.worktree_pr_mixin.SQLiteClient",
             return_value=store,
         ):
             # Execute
@@ -150,7 +155,7 @@ class TestFetchPRBranch:
         config = MagicMock()
         manager = WorktreeManager(config=config, repo_path=MagicMock())
 
-        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+        with patch("vibe3.environment.worktree_pr_mixin.GitHubClient") as mock_gh_cls:
             mock_gh = MagicMock()
             mock_gh.get_pr.return_value = None
             mock_gh_cls.return_value = mock_gh
@@ -173,7 +178,7 @@ class TestFetchPRBranch:
         mock_pr = MagicMock()
         mock_pr.head_branch = "feature/dependency-work"
 
-        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+        with patch("vibe3.environment.worktree_pr_mixin.GitHubClient") as mock_gh_cls:
             mock_gh = MagicMock()
             mock_gh.get_pr.return_value = mock_pr
             mock_gh_cls.return_value = mock_gh
@@ -204,7 +209,7 @@ class TestCreateFromPRBranch:
         repo_path = MagicMock()
         manager = WorktreeManager(config=config, repo_path=repo_path)
 
-        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+        with patch("vibe3.environment.worktree_pr_mixin.GitHubClient") as mock_gh_cls:
             mock_gh = MagicMock()
             mock_gh.get_pr.return_value = None
             mock_gh_cls.return_value = mock_gh
@@ -232,15 +237,17 @@ class TestCreateFromPRBranchExistingBranch:
         mock_pr = MagicMock()
         mock_pr.head_branch = "feature/dep-work"
 
-        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+        with patch("vibe3.environment.worktree_pr_mixin.GitHubClient") as mock_gh_cls:
             mock_gh = MagicMock()
             mock_gh.get_pr.return_value = mock_pr
             mock_gh_cls.return_value = mock_gh
 
             with patch.object(manager, "_branch_exists_locally", return_value=True):
-                with patch("vibe3.environment.worktree.find_worktree_by_path"):
-                    with patch("vibe3.environment.worktree.initialize_worktree"):
-                        with patch("vibe3.environment.worktree.shutil"):
+                with patch("vibe3.environment.worktree_support.find_worktree_by_path"):
+                    with patch(
+                        "vibe3.environment.worktree_support.initialize_worktree"
+                    ):
+                        with patch("shutil.rmtree"):
                             # Mock _fetch_pr_branch to return head_branch directly
                             with patch.object(
                                 manager,
@@ -249,7 +256,7 @@ class TestCreateFromPRBranchExistingBranch:
                             ):
                                 # Mock update-ref + worktree add separately
                                 with patch(
-                                    "vibe3.environment.worktree.subprocess"
+                                    "vibe3.environment.worktree_pr_mixin.subprocess"
                                 ) as mock_subprocess:
                                     mock_subprocess.run.side_effect = [
                                         MagicMock(returncode=0),  # prune
@@ -292,21 +299,21 @@ class TestCreateFromPRBranchExistingBranch:
         mock_pr = MagicMock()
         mock_pr.head_branch = "feature/dep-work"
 
-        with patch("vibe3.environment.worktree.GitHubClient") as mock_gh_cls:
+        with patch("vibe3.environment.worktree_pr_mixin.GitHubClient") as mock_gh_cls:
             mock_gh = MagicMock()
             mock_gh.get_pr.return_value = mock_pr
             mock_gh_cls.return_value = mock_gh
 
             with patch.object(manager, "_branch_exists_locally", return_value=True):
-                with patch("vibe3.environment.worktree.find_worktree_by_path"):
-                    with patch("vibe3.environment.worktree.shutil"):
+                with patch("vibe3.environment.worktree_support.find_worktree_by_path"):
+                    with patch("shutil.rmtree"):
                         with patch.object(
                             manager,
                             "_fetch_pr_branch",
                             return_value="feature/dep-work",
                         ):
                             with patch(
-                                "vibe3.environment.worktree.subprocess"
+                                "vibe3.environment.worktree_pr_mixin.subprocess"
                             ) as mock_subprocess:
                                 mock_subprocess.run.side_effect = [
                                     MagicMock(returncode=0),  # prune
