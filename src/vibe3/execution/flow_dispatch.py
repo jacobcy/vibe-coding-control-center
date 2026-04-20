@@ -232,10 +232,12 @@ class FlowManager:
         active_count = self._registry.count_live_worker_sessions(role="manager")
         if active_count >= self.config.max_concurrent_flows:
             limit = self.config.max_concurrent_flows
-            raise RuntimeError(
-                f"Manager capacity reached ({active_count}/{limit}). "
-                f"Deferred flow creation."
+            # Gracefully return None instead of raising to allow upper layer to handle
+            log.warning(
+                f"Manager capacity reached ({active_count}/{limit}), "
+                f"deferring flow creation for issue #{issue.number}"
             )
+            return None
 
         branch_created = False
         if not self.git.branch_exists(branch):

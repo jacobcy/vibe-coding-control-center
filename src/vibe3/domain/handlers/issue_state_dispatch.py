@@ -116,6 +116,22 @@ def handle_manager_dispatched(event: ManagerDispatched) -> None:
                     role="manager",
                     issue_number=event.issue_number,
                 ).error("Failed to prepare role execution request")
+                
+                # Fail the issue explicitly to avoid silent freeze
+                from vibe3.services.issue_failure_service import fail_manager_issue
+                
+                await loop.run_in_executor(
+                    None,
+                    lambda: fail_manager_issue(
+                        issue_number=event.issue_number,
+                        reason=(
+                            "Manager dispatch failed: build_manager_request returned None. "
+                            "Possible causes: flow creation failed, capacity reached, or branch error. "
+                            "Check orchestra logs for details."
+                        ),
+                        actor="orchestra:issue_state_dispatch",
+                    ),
+                )
                 return
 
             result = await loop.run_in_executor(
