@@ -127,8 +127,7 @@ class WorktreeManager:
                 branch=branch,
                 source_pr=source_pr_number,
             ).warning(
-                "Failed to create worktree from PR branch, "
-                "falling back to origin/main"
+                "Failed to create worktree from PR branch, falling back to origin/main"
             )
 
             # Record fallback event
@@ -379,6 +378,28 @@ class WorktreeManager:
         ).info("Successfully fetched PR branch for dependency base")
         return head_branch
 
+    def _branch_exists_locally(self, branch: str) -> bool:
+        """Check if a local branch exists (regardless of worktree registration).
+
+        Args:
+            branch: Branch name to check
+
+        Returns:
+            True if the branch exists locally
+        """
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
     def _create_from_pr_branch(
         self,
         wt_path: Path,
@@ -434,9 +455,37 @@ class WorktreeManager:
         # Use the remote ref to ensure we get the latest
         base_ref = f"origin/{head_branch}"
 
+        # Check if the target branch already exists (pre-created by flow_dispatch).
+        # If so, attach it to the worktree without -b (which would try to create it).
+        branch_exists = self._branch_exists_locally(branch)
+
         try:
+            if branch_exists:
+                # Branch already exists (pre-created by flow_dispatch from
+                # scene_base_ref) — reset it to the PR base before attaching.
+                ref_result = subprocess.run(
+                    ["git", "update-ref", f"refs/heads/{branch}", base_ref],
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+                if ref_result.returncode != 0:
+                    logger.bind(
+                        issue=issue_number,
+                        branch=branch,
+                        pr_number=pr_number,
+                        stderr=ref_result.stderr,
+                    ).error("git update-ref failed, cannot reset branch to PR base")
+                    return None
+                cmd = ["git", "worktree", "add", str(wt_path), branch]
+            else:
+                # Create new branch from the PR base ref
+                cmd = ["git", "worktree", "add", "-b", branch, str(wt_path), base_ref]
+
             result = subprocess.run(
-                ["git", "worktree", "add", "-b", branch, str(wt_path), base_ref],
+                cmd,
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
