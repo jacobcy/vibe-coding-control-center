@@ -39,10 +39,8 @@ def handle_dependency_satisfied(event: DependencySatisfied) -> None:
 
     for flow in waiting_flows:
         branch = str(flow.get("branch") or "").strip()
-        blocked_by = flow.get("blocked_by_issue")
-
-        if blocked_by != event.issue_number:
-            continue  # Not blocked by this specific issue
+        if not branch:
+            continue
 
         # Check if ALL dependencies are now satisfied
         all_deps = _get_all_dependencies(store, branch)
@@ -54,24 +52,42 @@ def handle_dependency_satisfied(event: DependencySatisfied) -> None:
 
 
 def _find_waiting_flows(store: SQLiteClient, dep_issue_number: int) -> list[dict]:
-    """Find flows blocked by this specific issue.
+    """Find flows that depend on this specific issue.
 
     Args:
         store: SQLite client
         dep_issue_number: The dependency issue number
 
     Returns:
-        List of flow_state records that are waiting on this dependency
+        List of flow_state records that are waiting and depend on this issue
     """
     with sqlite3.connect(store.db_path) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        # Query all waiting flows, then filter by dependency link
         cursor.execute(
-            "SELECT * FROM flow_state "
-            "WHERE flow_status = 'waiting' AND blocked_by_issue = ?",
-            (dep_issue_number,),
+            "SELECT * FROM flow_state WHERE flow_status = 'waiting'",
         )
-        return [dict(row) for row in cursor.fetchall()]
+        waiting_flows = [dict(row) for row in cursor.fetchall()]
+
+        # Filter by checking if they have dependency on this issue
+        result = []
+        for flow in waiting_flows:
+            branch = str(flow.get("branch") or "").strip()
+            if not branch:
+                continue
+
+            # Check if this branch has dependency on dep_issue_number
+            cursor.execute(
+                "SELECT COUNT(*) FROM flow_issue_links "
+                "WHERE branch = ? AND issue_number = ? AND issue_role = 'dependency'",
+                (branch, dep_issue_number),
+            )
+            count = cursor.fetchone()[0]
+            if count > 0:
+                result.append(flow)
+
+        return result
 
 
 def _get_all_dependencies(store: SQLiteClient, branch: str) -> list[int]:
@@ -98,6 +114,7 @@ def _is_issue_satisfied(gh: GitHubClient, issue_number: int) -> bool:
     """Check if issue is completed (PR created/closed).
 
     A dependency is satisfied when:
+    - Local flow has a PR ref (primary truth source)
     - Issue is closed
     - Issue has state/done or state/merged label
     - Issue body mentions PR reference
@@ -110,6 +127,19 @@ def _is_issue_satisfied(gh: GitHubClient, issue_number: int) -> bool:
         True if dependency is satisfied, False otherwise
     """
     from vibe3.orchestra.services.state_label_dispatch import _normalize_labels
+
+    # Check local flow state first — this is the primary truth source.
+    # Covers scenarios: (a) PR already exists, flow enters waiting later;
+    # (b) service restart missed events.
+    store = SQLiteClient()
+    dep_flows = store.get_flows_by_issue(issue_number, role="task")
+    for dep_flow in dep_flows:
+        pr_ref = dep_flow.get("pr_ref")
+        if pr_ref and str(pr_ref).strip():
+            return True
+        pr_number = dep_flow.get("pr_number")
+        if pr_number:
+            return True
 
     payload = gh.view_issue(issue_number)
 
