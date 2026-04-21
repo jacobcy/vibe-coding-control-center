@@ -390,3 +390,25 @@ class TestHandoffRecordAPIs:
         assert call_args[0][1] == "audit_recorded"
         assert call_args[1]["refs"]["ref"] == "docs/reports/agent-authored-audit.md"
         assert call_args[1]["refs"]["verdict"] == "PASS"
+
+    def test_record_audit_normalizes_absolute_ref_within_branch_worktree(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        branch_root = Path("/tmp/feature-test-branch")
+        mock_git_client.find_worktree_path_for_branch.return_value = branch_root
+        absolute_ref = str(branch_root / "docs" / "reports" / "audit.md")
+
+        handoff_service.record_audit(
+            audit_ref=absolute_ref,
+            actor="test-actor",
+            verdict="PASS",
+        )
+
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch",
+            audit_ref="docs/reports/audit.md",
+            reviewer_actor="test-actor",
+        )
+        call_args = mock_store.add_event.call_args
+        assert call_args[1]["refs"]["ref"] == "docs/reports/audit.md"

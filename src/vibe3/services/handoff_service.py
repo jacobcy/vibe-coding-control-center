@@ -20,6 +20,8 @@ class _GitClientProtocol(Protocol):
 
     def get_current_branch(self) -> str: ...
     def get_git_common_dir(self) -> str: ...
+    def get_worktree_root(self) -> str: ...
+    def find_worktree_path_for_branch(self, branch_name: str) -> Path | None: ...
 
 
 class _BranchBoundGitClient:
@@ -34,6 +36,12 @@ class _BranchBoundGitClient:
 
     def get_git_common_dir(self) -> str:
         return self._delegate.get_git_common_dir()
+
+    def get_worktree_root(self) -> str:
+        return self._delegate.get_worktree_root()
+
+    def find_worktree_path_for_branch(self, branch_name: str) -> Path | None:
+        return self._delegate.find_worktree_path_for_branch(branch_name)
 
 
 class HandoffService:
@@ -312,6 +320,7 @@ class HandoffService:
             Path to the current.md file
         """
         branch = self.git_client.get_current_branch()
+        ref_value = self._normalize_ref_value(branch, ref_value)
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
             branch,
@@ -390,6 +399,38 @@ class HandoffService:
             ).warning(f"Skipping non-authoritative handoff file append: {exc}")
 
         return handoff_path
+
+    def _normalize_ref_value(self, branch: str, ref_value: str) -> str:
+        """Prefer worktree-relative refs for files under the branch worktree."""
+        try:
+            ref_path = Path(ref_value)
+        except (TypeError, ValueError):
+            return ref_value
+
+        if not ref_path.is_absolute():
+            return ref_value
+
+        worktree_root: Path | None = None
+        try:
+            worktree_root = self.git_client.find_worktree_path_for_branch(branch)
+        except Exception:
+            worktree_root = None
+
+        if worktree_root is None:
+            try:
+                current_root = self.git_client.get_worktree_root()
+            except Exception:
+                current_root = ""
+            if current_root:
+                worktree_root = Path(current_root)
+
+        if worktree_root is None:
+            return ref_value
+
+        try:
+            return str(ref_path.relative_to(worktree_root))
+        except ValueError:
+            return ref_value
 
     def record_plan(
         self,
