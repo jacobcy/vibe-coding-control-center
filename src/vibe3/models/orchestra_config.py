@@ -112,9 +112,24 @@ class GovernanceConfig(BaseModel):
 
     enabled: bool = True
     supervisor_file: str = Field(
-        default="supervisor/orchestra.md",
+        default="supervisor/governance/assignee-pool.md",
         description="Supervisor file to include in the composed governance prompt",
     )
+    supervisor_files: list[str] = Field(
+        default=[],
+        description="Multiple governance material files for round-robin rotation. "
+        "Takes precedence over supervisor_file when non-empty.",
+    )
+
+    def get_supervisor_materials(self) -> list[str]:
+        """Return the list of governance material files to rotate through.
+
+        supervisor_files takes precedence; falls back to [supervisor_file].
+        """
+        if self.supervisor_files:
+            return list(self.supervisor_files)
+        return [self.supervisor_file]
+
     prompt_template: str = Field(
         default="orchestra.governance.plan",
         description="Dotted prompts.yaml path used to render governance prompt",

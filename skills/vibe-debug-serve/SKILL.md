@@ -191,7 +191,7 @@ cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
 
 检查点：
 
-- prompt 是否使用了 `supervisor/orchestra.md`（governance 链）或 `supervisor/manager.md`（manager 链）
+- prompt 是否使用了 `supervisor/governance/assignee-pool.md`（governance 链）或 `supervisor/manager.md`（manager 链）
 - runtime vars 是否正确注入（active_count、issue_list 等）
 - 业务判断是否错误下沉到底层（见标准 §2.1）
 

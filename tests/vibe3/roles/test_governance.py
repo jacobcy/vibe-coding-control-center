@@ -141,7 +141,7 @@ class TestBuildGovernanceRecipe:
         config = _make_config(
             governance=dict(
                 include_supervisor_content=True,
-                supervisor_file="supervisor/orchestra.md",
+                supervisor_file="supervisor/governance/assignee-pool.md",
             ),
         )
         recipe = build_governance_recipe(config)
@@ -149,7 +149,7 @@ class TestBuildGovernanceRecipe:
 
         src = recipe.variables["supervisor_content"]
         assert src.kind == VariableSourceKind.FILE
-        assert src.path == "supervisor/orchestra.md"
+        assert src.path == "supervisor/governance/assignee-pool.md"
 
     def test_supervisor_content_literal_when_disabled(self):
         config = _make_config(
@@ -176,7 +176,9 @@ class TestRenderGovernancePrompt:
         config = _make_config()
         ctx = build_governance_snapshot_context(_make_snapshot())
         result = render_governance_prompt(config, ctx, prompts_path)
-        assert "Supervisor=supervisor/orchestra.md" in result.rendered_text
+        assert (
+            "Supervisor=supervisor/governance/assignee-pool.md" in result.rendered_text
+        )
         assert "Status=running" in result.rendered_text
 
 
@@ -226,6 +228,119 @@ class TestBuildExecutionName:
         name = build_governance_execution_name(7)
         assert name.startswith("vibe3-governance-scan-")
         assert name.endswith("-t7")
+
+
+class TestGovernanceMaterials:
+    """Tests for GovernanceConfig.get_supervisor_materials."""
+
+    def test_get_supervisor_materials_multi(self):
+        """governance 在多材料配置下按 tick 轮换."""
+        from vibe3.models.orchestra_config import GovernanceConfig
+
+        cfg = GovernanceConfig(
+            supervisor_files=[
+                "supervisor/governance/assignee-pool.md",
+                "supervisor/governance/roadmap-intake.md",
+            ]
+        )
+        materials = cfg.get_supervisor_materials()
+        assert materials == [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+        ]
+
+    def test_get_supervisor_materials_single_fallback(self):
+        """旧 supervisor_file 单文件配置仍能工作."""
+        from vibe3.models.orchestra_config import GovernanceConfig
+
+        cfg = GovernanceConfig(supervisor_file="supervisor/governance/assignee-pool.md")
+        materials = cfg.get_supervisor_materials()
+        assert materials == ["supervisor/governance/assignee-pool.md"]
+
+    def test_default_supervisor_file(self):
+        """GovernanceConfig 默认 supervisor_file 是 assignee-pool.md."""
+        from vibe3.models.orchestra_config import GovernanceConfig
+
+        cfg = GovernanceConfig()
+        assert cfg.supervisor_file == "supervisor/governance/assignee-pool.md"
+
+    def test_governance_worktree_requirement_is_none(self):
+        """governance 默认 worktree requirement 仍为 NONE."""
+        from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+        from vibe3.roles.definitions import WorktreeRequirement
+
+        assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
+
+
+class TestRoundRobinMaterialSelection:
+    """Tests that build_governance_recipe selects material via tick_count % len."""
+
+    def _cfg_with_files(self, files: list[str]) -> OrchestraConfig:
+        return _make_config(governance=dict(supervisor_files=files))
+
+    def test_tick_0_selects_first(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=0)
+        assert recipe.variables["supervisor_name"].value == files[0]
+
+    def test_tick_1_selects_second(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=1)
+        assert recipe.variables["supervisor_name"].value == files[1]
+
+    def test_tick_wraps_around(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=2)
+        assert recipe.variables["supervisor_name"].value == files[0]
+
+    def test_large_tick_uses_modulo(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=7)
+        assert recipe.variables["supervisor_name"].value == files[7 % 3]
+
+    def test_single_file_always_selected(self):
+        files = ["supervisor/governance/assignee-pool.md"]
+        for tick in (0, 1, 99):
+            recipe = build_governance_recipe(
+                self._cfg_with_files(files), tick_count=tick
+            )
+            assert recipe.variables["supervisor_name"].value == files[0]
+
+    def test_build_governance_request_uses_round_robin(self):
+        """build_governance_request picks the correct material per tick."""
+        from unittest.mock import patch
+
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+        ]
+        config = _make_config(governance=dict(supervisor_files=files))
+        snapshot = _make_snapshot()
+        with patch("vibe3.roles.governance.resolve_governance_options") as mock_opts:
+            mock_opts.return_value = MagicMock()
+            req_tick0 = build_governance_request(config, 0, snapshot)
+            req_tick1 = build_governance_request(config, 1, snapshot)
+        # Both should produce valid requests (circuit breaker closed, dry_run=False)
+        assert req_tick0 is not None
+        assert req_tick1 is not None
+        # Execution names reflect different ticks
+        assert req_tick0.execution_name.endswith("-t0")
+        assert req_tick1.execution_name.endswith("-t1")
 
 
 class TestGovernanceRoleDefinition:

@@ -549,10 +549,35 @@ LabelService().transition(
 
 ---
 
-## 十二、变更历史
+## 十二、三层概念说明：governance / apply / runtime
+
+以下三个概念容易混淆，特此明确：
+
+**governance scan**（L1）
+- 周期扫描观察，`WorktreeRequirement.NONE`，无 worktree
+- 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
+- 材料来源：`supervisor/governance/*.md`
+- 不执行治理动作，只生成结论并写入 GitHub issue
+
+**supervisor/apply**（L2）
+- 执行治理动作，`WorktreeRequirement.TEMPORARY`，有临时 worktree
+- 事件链：`SupervisorIssueIdentified` → `SupervisorApplyDispatched` / `SupervisorApplyDelegated`
+- 材料来源：`supervisor/apply.md`
+- 处理 `supervisor` label issue，执行 label/comment/close/recreate 等动作
+
+**runtime**
+- 指 vibe3 服务器运行时（EventBus、Heartbeat、HTTP server）
+- 与上述两个治理概念无关，负责基础事件调度与 tick 循环
+
+这三个概念不等价，不可混用。见 `vibe3-worktree-ownership-standard.md` §二 了解完整层级定义。
+
+---
+
+## 十三、变更历史
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
+| 1.2 | 2026-04-21 | 补充 governance/apply/runtime 三层概念说明，消除混淆 |
 | 1.1 | 2026-04-21 | 重命名 Dispatch 事件为 *DispatchIntent，明确语义；添加 audit_recorded 事件；补充向后兼容性注册规范 |
 | 1.0 | 2026-04-08 | 初始版本，定义四条执行链路的事件驱动架构 |
 
