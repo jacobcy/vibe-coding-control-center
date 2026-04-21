@@ -152,11 +152,13 @@ class TestIssueStateDispatchHandler:
         mock_coordinator = MagicMock()
         mock_coordinator_cls.return_value = mock_coordinator
 
+        # Provide issue_title to skip GitHub API call
         handle_manager_dispatch_intent(
             ManagerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="ready",
+                issue_title="Test Issue",
             )
         )
 
