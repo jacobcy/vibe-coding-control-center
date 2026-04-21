@@ -39,6 +39,19 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
     ).info("Manager dispatch intent received, scheduling async dispatch")
 
     async def _do_dispatch() -> None:
+        def _block_for_noop(reason: str) -> None:
+            logger.bind(
+                domain="issue_state_dispatch_handler",
+                role="manager",
+                issue_number=event.issue_number,
+            ).error(reason)
+            block_manager_noop_issue(
+                issue_number=event.issue_number,
+                repo=None,
+                reason=reason,
+                actor="agent:manager",
+            )
+
         loop = asyncio.get_event_loop()
         config = OrchestraConfig.from_settings()
 
@@ -63,32 +76,22 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
             )
 
             if issue_data is None or isinstance(issue_data, str):
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                    error="issue_not_found",
-                ).error("Failed to fetch issue details from GitHub")
+                _block_for_noop(
+                    "Failed to fetch issue details from GitHub for manager dispatch"
+                )
                 return
 
             issue_info = IssueInfo.from_github_payload(issue_data)
             if issue_info is None:
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                    error="invalid_issue_data",
-                ).error("Failed to parse issue data from GitHub response")
+                _block_for_noop(
+                    "Failed to parse issue data from GitHub response for manager dispatch"
+                )
                 return
 
             issue_info.state = target_state
 
         if issue_info is None:
-            logger.bind(
-                domain="issue_state_dispatch_handler",
-                role="manager",
-                issue_number=event.issue_number,
-            ).error("Issue info is None, cannot dispatch role")
+            _block_for_noop("Issue info is None, cannot dispatch manager role")
             return
 
         from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -112,18 +115,7 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
             )
 
             if request is None:
-                reason = "Failed to prepare role execution request"
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                ).error(reason)
-                block_manager_noop_issue(
-                    issue_number=event.issue_number,
-                    repo=None,
-                    reason=reason,
-                    actor="agent:manager",
-                )
+                _block_for_noop("Failed to prepare role execution request")
                 return
 
             result = await loop.run_in_executor(
