@@ -10,26 +10,8 @@ import os
 import re
 import shlex
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
-
-# Known Codex runtime warnings to filter from async logs
-KNOWN_CODEX_STATE_DB_WARNINGS: Final[tuple[str, ...]] = (
-    r"failed to open state db at .*migration .*missing in the resolved migrations",
-    r"failed to initialize state runtime at .*migration "
-    r".*missing in the resolved migrations",
-    r"state db discrepancy during "
-    r"find_thread_path_by_id_str_in_subdir: falling_back",
-)
-KNOWN_CODEX_SNAPSHOT_WARNING: Final[str] = (
-    r'Failed to delete shell snapshot at ".*": Os \{ code: 2, kind: NotFound, '
-    r'message: "No such file or directory" \}'
-)
-KNOWN_CODEX_ANALYTICS_WARNING: Final[str] = (
-    r"analytics_client: events failed with status 403 Forbidden:"
-)
 
 
 @dataclass(frozen=True)
@@ -235,127 +217,6 @@ def allocate_log_path(log_dir: Path, execution_name: str) -> Path:
             counter += 1
 
 
-def build_async_log_filter() -> list[str]:
-    """Return awk filter that strips known Codex runtime noise from async logs.
-
-    Also filters out <agent-prompt> blocks to prevent full prompts from
-    appearing in repository logs.
-
-    Returns:
-        awk command arguments
-    """
-    state_patterns = " || ".join(
-        f"$0 ~ /{pattern}/" for pattern in KNOWN_CODEX_STATE_DB_WARNINGS
-    )
-    script = (
-        # Filter agent-prompt blocks
-        "$0 ~ /<agent-prompt>/ { skip_prompt=1; prompt_lines++; next }\n"
-        "skip_prompt { if ($0 ~ /<\\/agent-prompt>/) { skip_prompt=0 } next }\n"
-        # Filter known Codex warnings
-        f"({state_patterns}) {{ state_db++; next }}\n"
-        f"$0 ~ /{KNOWN_CODEX_SNAPSHOT_WARNING}/ "
-        f"{{ shell_snapshot++; next }}\n"
-        f"$0 ~ /{KNOWN_CODEX_ANALYTICS_WARNING}/ "
-        f"{{ analytics++; skip_html=1; next }}\n"
-        "skip_html { if ($0 ~ /<\\/html>/) { skip_html=0 } next }\n"
-        "{ print; fflush() }\n"
-        "END {\n"
-        '  if (prompt_lines > 0) print "[vibe3 async] suppressed " '
-        'prompt_lines " agent-prompt line(s)"; fflush()\n'
-        '  if (state_db > 0) print "[vibe3 async] suppressed " '
-        'state_db " codex state-db warning line(s)"; fflush()\n'
-        '  if (shell_snapshot > 0) print "[vibe3 async] suppressed " '
-        'shell_snapshot " codex shell-snapshot cleanup warning line(s)"; fflush()\n'
-        '  if (analytics > 0) print "[vibe3 async] suppressed " '
-        'analytics " codex analytics 403 warning block(s)"; fflush()\n'
-        "}\n"
-    )
-    # tmux send-keys feeds literal newlines as Enter presses; keep the awk
-    # program on a single shell line so async sessions don't get stuck in
-    # zsh "pipe quote>" continuation mode.
-    script = script.replace("\n", "; ").replace("{;", "{ ").strip()
-    return ["awk", script]
-
-
-def build_async_shell_command(
-    command: list[str],
-    *,
-    log_path: Path,
-    keep_alive_seconds: int,
-    env: dict[str, str] | None = None,
-) -> str:
-    """Build shell command for async execution with logging.
-
-    Args:
-        command: Command to execute
-        log_path: Path for filtered log
-        keep_alive_seconds: Seconds to keep tmux session alive after completion
-        env: Optional environment overrides
-
-    Returns:
-        Shell command string
-    """
-    filter_command = shlex.join(build_async_log_filter())
-    env = env or {}
-    env_overrides = {
-        key: value for key, value in env.items() if os.environ.get(key) != value
-    }
-    command_with_env = command
-    if env_overrides:
-        env_prefix = ["env"] + [
-            f"{key}={value}" for key, value in sorted(env_overrides.items())
-        ]
-        command_with_env = env_prefix + command
-    cmd_str = shlex.join(command_with_env)
-    log_str = shlex.quote(str(log_path))
-
-    # Single filtered log file (removed wrapper.full.log to avoid duplication)
-    # Use stdbuf for line buffering to enable real-time streaming in tmux
-    # Note: macOS tee doesn't support -u, but stdbuf -oL ensures line-buffered output
-    shell = (
-        f"stdbuf -oL -eL {cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
-        "cmd_status=${PIPESTATUS[0]:-$?}; "
-        "echo; "
-        'echo "[vibe3 async] command exited with status: ${cmd_status}"; '
-    )
-    if keep_alive_seconds > 0:
-        shell += (
-            f'echo "[vibe3 async] keeping tmux session alive for '
-            f'{keep_alive_seconds}s for inspection..."; '
-            f"sleep {keep_alive_seconds}; "
-        )
-    return shell + "exit ${cmd_status}"
-
-
-def write_async_wrapper_script(shell_command: str, *, execution_name: str) -> Path:
-    """Persist the async wrapper command to a script file for tmux launch.
-
-    Launching tmux with a script avoids racing interactive shell startup
-    output against `send-keys`, which can corrupt long async commands.
-
-    Args:
-        shell_command: Shell command to execute
-        execution_name: Execution name for script filename
-
-    Returns:
-        Path to wrapper script
-    """
-    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", execution_name).strip("-") or "async"
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        prefix=f"vibe3-{slug}-",
-        suffix=".sh",
-        delete=False,
-    ) as tmp:
-        tmp.write("#!/usr/bin/env zsh\n")
-        tmp.write(shell_command)
-        tmp.write("\n")
-    path = Path(tmp.name)
-    path.chmod(0o700)
-    return path
-
-
 def spawn_tmux_command(
     command: list[str],
     *,
@@ -410,21 +271,44 @@ def spawn_tmux_command(
     log_path = allocate_log_path(log_dir, session_id)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    shell_command = build_async_shell_command(
-        command,
-        log_path=log_path,
-        keep_alive_seconds=keep_alive_seconds,
-        env=env,
-    )
-    wrapper_path = write_async_wrapper_script(
-        shell_command,
-        execution_name=execution_name,
-    )
+    # Prepend environment overrides to the command
+    final_command = command
+    if env:
+        env_overrides = {k: v for k, v in env.items() if os.environ.get(k) != v}
+        if env_overrides:
+            final_command = (
+                ["env"]
+                + [f"{k}={v}" for k, v in sorted(env_overrides.items())]
+                + command
+            )
 
+    # Launch directly in tmux PTY
+    tmux_args = ["tmux", "new-session", "-d", "-s", session_id]
+    if keep_alive_seconds > 0:
+        # Use remain-on-exit so pane stays open after process exits
+        tmux_args += ["-e", "TMUX_PANE_REMAIN=1"]
+    tmux_args += final_command
+
+    subprocess.run(tmux_args, cwd=project_root, check=True)
+
+    if keep_alive_seconds > 0:
+        # Set remain-on-exit option explicitly as well
+        subprocess.run(
+            ["tmux", "set-option", "-t", session_id, "remain-on-exit", "on"],
+            check=False,
+        )
+
+    # Pipe pane output to log file so we get persistence without breaking the PTY.
+    # The command runs directly in the tmux PTY, so isatty() is true for the process.
     subprocess.run(
-        ["tmux", "new-session", "-d", "-s", session_id, "zsh", str(wrapper_path)],
-        cwd=project_root,
-        check=True,
+        [
+            "tmux",
+            "pipe-pane",
+            "-t",
+            session_id,
+            f"cat >> {shlex.quote(str(log_path))}",
+        ],
+        check=False,
     )
 
     return AsyncExecutionHandle(

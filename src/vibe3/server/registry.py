@@ -4,6 +4,7 @@ Extracted from orchestra/serve_utils.py.
 """
 
 import os
+import shlex
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -341,11 +342,6 @@ def _build_async_serve_command(
 
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
     """Start serve command in tmux session with streaming output."""
-    from vibe3.agents.backends.async_launcher import (
-        build_async_shell_command,
-        write_async_wrapper_script,
-    )
-
     session_name = ORCHESTRA_TMUX_SESSION
     launch_cwd = Path.cwd()
     cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
@@ -354,22 +350,22 @@ def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str
     log_path = orchestra_events_log_path(launch_cwd)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    shell_command = build_async_shell_command(
-        cmd,
-        log_path=log_path,
-        keep_alive_seconds=0,
-    )
-
     try:
-        wrapper_path = write_async_wrapper_script(
-            shell_command,
-            execution_name=session_name,
-        )
         subprocess.run(
-            ["tmux", "new-session", "-d", "-s", session_name, "zsh", str(wrapper_path)],
+            ["tmux", "new-session", "-d", "-s", session_name, *cmd],
             check=True,
             capture_output=True,
             text=True,
+        )
+        subprocess.run(
+            [
+                "tmux",
+                "pipe-pane",
+                "-t",
+                session_name,
+                f"cat >> {shlex.quote(str(log_path))}",
+            ],
+            check=False,
         )
     except FileNotFoundError:
         return False, "tmux not found, cannot start --async serve mode"
