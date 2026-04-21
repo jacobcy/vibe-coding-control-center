@@ -182,7 +182,12 @@ class OrchestraStatusService:
             return None
 
     def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
-        """Build current status snapshot."""
+        """Build current status snapshot for the assignee issue pool.
+
+        The snapshot only includes assignee issues (issues assigned to manager
+        usernames and managed by the manager chain). Supervisor issues are
+        excluded as they are handled by supervisor/apply.
+        """
         log = logger.bind(domain="orchestra", action="status_snapshot")
         log.debug("Building orchestra status snapshot")
 
@@ -240,6 +245,10 @@ class OrchestraStatusService:
                 for label in issue.get("labels", [])
                 if isinstance(label, dict) and "name" in label
             ]
+
+            # Skip supervisor issues - handled by supervisor/apply, not manager chain
+            if "supervisor" in labels:
+                continue
 
             # Extract milestone from GitHub milestone field
             milestone = None
