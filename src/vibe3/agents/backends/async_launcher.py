@@ -300,14 +300,18 @@ def spawn_tmux_command(
 
     # Pipe pane output to log file so we get persistence without breaking the PTY.
     # The command runs directly in the tmux PTY, so isatty() is true for the process.
+    # Strip <agent-prompt>...</agent-prompt> blocks: codeagent-wrapper echoes the
+    # prompt body between those tags on stdout, and persisting it pollutes the
+    # repo-local async log (the live tmux pane still shows it).
+    awk_filter = (
+        "/<agent-prompt>/{skip=1;next} "
+        "skip && /<\\/agent-prompt>/{skip=0;next} "
+        "skip{next} "
+        "{print;fflush()}"
+    )
+    pipe_cmd = f"awk {shlex.quote(awk_filter)} >> {shlex.quote(str(log_path))}"
     subprocess.run(
-        [
-            "tmux",
-            "pipe-pane",
-            "-t",
-            session_id,
-            f"cat >> {shlex.quote(str(log_path))}",
-        ],
+        ["tmux", "pipe-pane", "-t", session_id, pipe_cmd],
         check=False,
     )
 

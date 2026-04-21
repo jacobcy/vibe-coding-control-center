@@ -191,4 +191,5 @@ def make_skill_context_builder(
         body_provider_key="run.context",
         body_fn=build,
         prompts_path=prompts_path,
+        variable_name="skill_content",
     )

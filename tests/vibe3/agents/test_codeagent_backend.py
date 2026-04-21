@@ -27,6 +27,42 @@ from vibe3.models.review_runner import (
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
 
+    def test_run_subprocess_streams_output_and_captures_return_value(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Subprocess output should stream live while remaining available in result."""
+
+        class FakeStream:
+            def __init__(self, chunks: list[str]) -> None:
+                self._chunks = iter(chunks)
+
+            def readline(self) -> str:
+                return next(self._chunks, "")
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs) -> None:
+                self.args = args[0]
+                self.returncode = 0
+                self.stdout = FakeStream(["hello\n", "world\n", ""])
+                self.stderr = FakeStream(["warn\n", ""])
+
+            def wait(self, timeout: int | None = None) -> int:
+                return self.returncode
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
+            result = CodeagentBackend._run_subprocess(
+                ["codeagent-wrapper", "run"],
+                project_root=str(tmp_path),
+                timeout_seconds=30,
+            )
+
+        captured = capsys.readouterr()
+        assert captured.out == "hello\nworld\n"
+        assert captured.err == "warn\n"
+        assert result.stdout == "hello\nworld\n"
+        assert result.stderr == "warn\n"
+        assert result.returncode == 0
+
     def test_build_prompt_file_content_prepends_global_notice(self) -> None:
         config = VibeConfig(
             agent_prompt=AgentPromptConfig(global_notice="## Debug Stop Rule\nStop now")
@@ -79,7 +115,7 @@ class TestCodeagentBackend:
         )
 
         with (
-            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
                 "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 repo_models,
@@ -118,7 +154,7 @@ class TestCodeagentBackend:
         )
 
         with (
-            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
                 "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 repo_models,
@@ -143,7 +179,7 @@ class TestCodeagentBackend:
         repo_models.write_text('{"default_backend":"claude","agents":{}}')
 
         with (
-            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch(
                 "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 repo_models,
@@ -168,7 +204,7 @@ class TestCodeagentBackend:
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.return_value = mock_result
             backend = CodeagentBackend()
             backend.run(
@@ -177,7 +213,7 @@ class TestCodeagentBackend:
                 cwd=Path("/tmp/worktree-430"),
             )
 
-        assert mock_run.call_args.kwargs["cwd"] == "/tmp/worktree-430"
+        assert mock_run.call_args.kwargs["project_root"] == "/tmp/worktree-430"
 
     def test_run_writes_global_notice_into_prompt_file(self, tmp_path: Path) -> None:
         mock_result = MagicMock()
@@ -221,7 +257,7 @@ class TestCodeagentBackend:
         mock_result.stdout = "Error: something failed\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
@@ -239,7 +275,7 @@ class TestCodeagentBackend:
         mock_result.stdout = "stdout ignored\n"
         mock_result.stderr = "wrapper stderr details\n"
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
@@ -281,7 +317,7 @@ Traceback (most recent call last):
         )
 
         with (
-            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch("builtins.print") as mock_print,
         ):
             mock_run.return_value = mock_result
@@ -315,7 +351,7 @@ Traceback (most recent call last):
             "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
             return_value=VibeConfig(),
         ):
-            with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
                 mock_run.side_effect = [invalid_resume, fresh_success]
                 backend = CodeagentBackend()
 
@@ -348,7 +384,7 @@ Traceback (most recent call last):
             "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
             return_value=VibeConfig(),
         ):
-            with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
                 mock_run.return_value = hard_failure
                 backend = CodeagentBackend()
 
@@ -365,7 +401,7 @@ Traceback (most recent call last):
         """Runner should give clear error when wrapper not found."""
         from vibe3.exceptions import AgentExecutionError
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.side_effect = FileNotFoundError("codeagent-wrapper not found")
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
@@ -381,7 +417,7 @@ Traceback (most recent call last):
 
         from vibe3.exceptions import AgentExecutionError
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(
                 cmd=["codeagent-wrapper"], timeout=300
             )
@@ -403,7 +439,7 @@ Traceback (most recent call last):
         mock_result.stdout = "Result\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
@@ -430,7 +466,7 @@ Traceback (most recent call last):
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.return_value = mock_result
             backend = CodeagentBackend()
             backend.run(
@@ -448,7 +484,7 @@ Traceback (most recent call last):
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.return_value = mock_result
             backend = CodeagentBackend()
             backend.run(

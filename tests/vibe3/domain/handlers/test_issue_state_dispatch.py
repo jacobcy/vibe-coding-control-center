@@ -207,7 +207,10 @@ class TestIssueStateDispatchHandler:
         mock_block_issue.assert_called_once_with(
             issue_number=42,
             repo=None,
-            reason="Failed to parse issue data from GitHub response for manager dispatch",
+            reason=(
+                "Failed to parse issue data from GitHub response "
+                "for manager dispatch"
+            ),
             actor="agent:manager",
         )
 

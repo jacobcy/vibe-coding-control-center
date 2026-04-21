@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Final, cast
+from typing import Any, Final, cast
 
 from loguru import logger
 
@@ -251,21 +251,74 @@ class CodeagentBackend:
         project_root: str,
         timeout_seconds: int,
     ) -> subprocess.CompletedProcess[str]:
-        """Run subprocess and capture output with optional full log save."""
-        result = subprocess.run(
+        """Run subprocess with streaming output and capture return value.
+
+        Streams stdout/stderr to live console while accumulating for return value.
+        """
+        import sys
+        import threading
+
+        def _stream_reader(
+            stream: Any,
+            accumulator: list[str],
+            output_file: Any,
+        ) -> None:
+            """Read from stream line-by-line, accumulate, and write to output."""
+            for line in iter(stream.readline, ""):
+                if not line:
+                    break
+                accumulator.append(line)
+                output_file.write(line)
+                output_file.flush()
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        proc = subprocess.Popen(
             command,
             cwd=project_root,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout_seconds,
-            check=False,
+        )
+
+        stdout_thread = threading.Thread(
+            target=_stream_reader,
+            args=(proc.stdout, stdout_chunks, sys.stdout),
+        )
+        stderr_thread = threading.Thread(
+            target=_stream_reader,
+            args=(proc.stderr, stderr_chunks, sys.stderr),
+        )
+
+        stdout_thread.start()
+        stderr_thread.start()
+
+        try:
+            proc.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            stdout_thread.join(timeout=1)
+            stderr_thread.join(timeout=1)
+            raise
+
+        stdout_thread.join()
+        stderr_thread.join()
+
+        stdout_text = "".join(stdout_chunks)
+        stderr_text = "".join(stderr_chunks)
+
+        result = subprocess.CompletedProcess(
+            args=command,
+            returncode=proc.returncode,
+            stdout=stdout_text,
+            stderr=stderr_text,
         )
 
         # Save complete wrapper logs for diagnostics (sync execution)
-        # Extract issue number from command or cwd if available
         log_dir = Path(project_root) / "temp" / "logs" / "issues"
         if "issue-" in project_root or any("issue-" in arg for arg in command):
-            # Try to find issue number from execution context
             import re
 
             issue_match = re.search(r"issue-(\d+)", project_root)
@@ -281,7 +334,7 @@ class CodeagentBackend:
                     log_dir / f"issue-{issue_number}" / "wrapper.sync.full.log"
                 )
                 wrapper_log_path.parent.mkdir(parents=True, exist_ok=True)
-                wrapper_log_path.write_text(f"{result.stdout}\n{result.stderr}")
+                wrapper_log_path.write_text(f"{stdout_text}\n{stderr_text}")
 
         return result
 

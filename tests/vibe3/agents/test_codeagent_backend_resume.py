@@ -6,7 +6,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.models.review_runner import AgentOptions
 
 
-@patch("vibe3.agents.backends.codeagent.subprocess.run")
+@patch.object(CodeagentBackend, "_run_subprocess")
 @patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
 def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     mock_file = MagicMock()
@@ -46,7 +46,7 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     assert result.exit_code == 0
 
 
-@patch("vibe3.agents.backends.codeagent.subprocess.run")
+@patch.object(CodeagentBackend, "_run_subprocess")
 @patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
 def test_codeagent_backend_new_session(mock_tempfile, mock_run):
     mock_file = MagicMock()

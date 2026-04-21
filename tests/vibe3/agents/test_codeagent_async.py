@@ -249,8 +249,8 @@ class TestRunStreamingAndEdgeCases:
         mock_result.stdout = "line one\nVERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
+        with patch.object(
+            CodeagentBackend, "_run_subprocess", return_value=mock_result
         ):
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
@@ -268,8 +268,8 @@ class TestRunStreamingAndEdgeCases:
         mock_result.stdout = None
         mock_result.stderr = ""
 
-        with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
+        with patch.object(
+            CodeagentBackend, "_run_subprocess", return_value=mock_result
         ):
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
@@ -279,14 +279,14 @@ class TestRunStreamingAndEdgeCases:
     def test_run_handles_os_error(self) -> None:
         """Runner should handle OSError gracefully."""
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
             mock_run.side_effect = OSError("I/O error")
 
             backend = CodeagentBackend()
             with pytest.raises(OSError, match="I/O error"):
                 backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
-    @patch("vibe3.agents.backends.codeagent.subprocess.run")
+    @patch.object(CodeagentBackend, "_run_subprocess")
     @patch("vibe3.agents.backends.codeagent.Path.mkdir")
     def test_run_creates_codeagent_agents_dir(self, mock_mkdir, mock_run) -> None:
         """Runner should ensure the codeagent agents directory exists."""
@@ -302,7 +302,7 @@ class TestRunStreamingAndEdgeCases:
         assert result.exit_code == 0
         mock_mkdir.assert_any_call(parents=True, exist_ok=True)
 
-    @patch("vibe3.agents.backends.codeagent.subprocess.run")
+    @patch.object(CodeagentBackend, "_run_subprocess")
     @patch("vibe3.agents.backends.codeagent.Path.mkdir")
     def test_run_uses_codeagent_agents_dir_for_prompt_file(
         self, mock_mkdir, mock_run
