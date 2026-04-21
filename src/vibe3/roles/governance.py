@@ -124,19 +124,23 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
     return registry
 
 
-def build_governance_recipe(config: OrchestraConfig) -> PromptRecipe:
+def build_governance_recipe(
+    config: OrchestraConfig, tick_count: int = 0
+) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
+    materials = config.governance.get_supervisor_materials()
+    current_material = materials[tick_count % len(materials)]
     supervisor_content_source = (
         PromptVariableSource(
             kind=VariableSourceKind.FILE,
-            path=config.governance.supervisor_file,
+            path=current_material,
         )
         if config.governance.include_supervisor_content
         else PromptVariableSource(kind=VariableSourceKind.LITERAL, value="")
     )
     variables: dict[str, PromptVariableSource] = {
         "supervisor_name": PromptVariableSource(
-            kind=VariableSourceKind.LITERAL, value=config.governance.supervisor_file
+            kind=VariableSourceKind.LITERAL, value=current_material
         ),
         "supervisor_content": supervisor_content_source,
     }
@@ -155,10 +159,11 @@ def render_governance_prompt(
     config: OrchestraConfig,
     snapshot_context: dict[str, Any],
     prompts_path: Path | None = None,
+    tick_count: int = 0,
 ) -> PromptRenderResult:
     """Render governance plan from snapshot context via PromptAssembler."""
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
-    recipe = build_governance_recipe(config)
+    recipe = build_governance_recipe(config, tick_count=tick_count)
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
     return assembler.render(recipe, runtime_context=snapshot_context)
@@ -195,16 +200,21 @@ def build_governance_request(
         return None
 
     snapshot_context = build_governance_snapshot_context(snapshot)
-    render_result = render_governance_prompt(config, snapshot_context, prompts_path)
+    render_result = render_governance_prompt(
+        config, snapshot_context, prompts_path, tick_count=tick_count
+    )
     plan_content = render_result.rendered_text
+    current_material = config.governance.get_supervisor_materials()[
+        tick_count % len(config.governance.get_supervisor_materials())
+    ]
 
     if config.governance.dry_run:
         root = repo_path or resolve_orchestra_repo_root()
-        dry_run_plan_path = _write_dry_run_plan(root, plan_content)
+        dry_run_plan_path = _write_dry_run_plan(root, plan_content, current_material)
         log.info("Dry run: governance plan prepared")
         log.info(f"Dry run plan file: {dry_run_plan_path}")
         append_governance_event(
-            f"dry-run plan written: {dry_run_plan_path}",
+            f"dry-run plan written ({current_material}): {dry_run_plan_path}",
             repo_root=root,
         )
         return None
@@ -213,7 +223,7 @@ def build_governance_request(
 
     root = repo_path or resolve_orchestra_repo_root()
     append_governance_event(
-        f"dispatching governance scan tick={tick_count}",
+        f"dispatching governance scan tick={tick_count} material={current_material}",
         repo_root=root,
     )
 
@@ -231,13 +241,18 @@ def build_governance_request(
     )
 
 
-def _write_dry_run_plan(repo_path: Path, plan_content: str) -> Path:
+def _write_dry_run_plan(
+    repo_path: Path, plan_content: str, current_material: str | None = None
+) -> Path:
     """Write governance dry-run plan to a temp file."""
     output_dir = governance_dry_run_dir(repo_path)
+    material_slug = (
+        Path(current_material).stem.replace("-", "_") if current_material else "unknown"
+    )
     with tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".md",
-        prefix="governance_dry_run_",
+        prefix=f"governance_dry_run_{material_slug}_",
         dir=output_dir,
         delete=False,
     ) as handle:
