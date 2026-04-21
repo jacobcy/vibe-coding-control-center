@@ -201,7 +201,7 @@ Inputs:
 
 - target issue
 - latest human comment
-- latest orchestra suggest (if exists)
+- latest governance suggest (if exists)
 - current labels/state
 - current scene
 - current handoff
@@ -209,8 +209,8 @@ Inputs:
 Steps:
 
 1. 读取当前 issue comments
-2. 识别最新人类指示（署名为人类用户，不含 `[orchestra suggest]` 标记）
-3. 识别最新 orchestra 建议（署名为 `[orchestra suggest]`）
+2. 识别最新人类指示（署名为人类用户，不含 `[governance suggest]` 标记）
+3. 识别最新 governance 建议（署名为 `[governance suggest]`）
 4. 读取当前 labels/state
 5. 核查当前 issue / flow / task / branch / worktree / session
 6. 读取 handoff 与 refs
@@ -241,10 +241,10 @@ Steps:
 
 1. 调用 `read_context()`
 2. **过时判断（预审阶段）**：结合 issue 文本与代码实际，检查 Issue 是否已过时或实质不需要执行：
-   - **Orchestra 建议判断**：检查最新评论中是否有 `[orchestra suggest] 建议关闭此 Issue`
-     - 若存在 orchestra 建议，直接采纳并执行关闭流程（步骤 3）
-     - Orchestra 建议优先级高于 manager 自主判断
-   - **自主判断**（仅当无 orchestra 建议时执行）：
+   - **Governance 建议判断**：检查最新评论中是否有 `[governance suggest] 建议关闭此 Issue`
+     - 若存在 governance 建议，直接采纳并执行关闭流程（步骤 3）
+     - Governance 建议优先级高于 manager 自主判断
+   - **自主判断**（仅当无 governance 建议时执行）：
      - **重复判断**：检查是否存在另一个 Issue 目标相同或高度重叠
        - 搜索同类 Issue（相似标题、相同 `roadmap/*` 或 `component/*` 标签）
        - 若发现重复，记录重复 Issue 编号
@@ -265,7 +265,7 @@ Steps:
 3. 如果判定 Issue 已过时或不需要执行：
    - 写 issue comment，说明关闭理由（重复/已解决/低优先级无意义/测试失败无计划）
    - **署名规则**：
-     - 若采纳 orchestra 建议：署名 `[manager] 执行 orchestra 建议：<理由>`
+     - 若采纳 governance 建议：署名 `[manager] 执行 governance 建议：<理由>`
      - 若 manager 自主判断：署名 `[manager] 自主判断关闭：<理由>`
    - 若为重复，引用重复 Issue 编号
    - 若为已解决，引用解决 PR/commit 编号
@@ -299,16 +299,16 @@ Steps:
    - 如果需要写新 comment，则追加 comment 说明 scene 不健康的原因
    - `exit()`
 
-6. 如果最新人类评论（不含 `[orchestra suggest]`）明确要求暂停、等待或阻止推进：
+6. 如果最新人类评论（不含 `[governance suggest]`）明确要求暂停、等待或阻止推进：
    - 将当前 issue 调整为 `state/blocked`
    - 调用 `check_blocker_explained()` 检查是否需要写新 comment
    - 如果需要写新 comment，则追加 comment
    - `exit()`
 
 **注意**：
-- `[orchestra suggest]` 是自动化建议，manager 应优先采纳
-- 最新人类评论（不含 `[orchestra suggest]`）是最高优先级的人类指示
-- 如果 orchestra 建议与最新人类评论冲突，优先遵循人类指示
+- `[governance suggest]` 是自动化建议，manager 应优先采纳
+- 最新人类评论（不含 `[governance suggest]`）是最高优先级的人类指示
+- 如果 governance 建议与最新人类评论冲突，优先遵循人类指示
 
 7. 如果 scene 健康且最新评论中没有明确阻止推进的指示：
    - 执行：
