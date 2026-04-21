@@ -147,6 +147,7 @@ def _build_server_with_launch_cwd(
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
     facade = OrchestrationFacade(
+        config=config,
         dispatch_services=dispatch_services,
         capacity=shared_capacity,
         failed_gate=failed_gate,

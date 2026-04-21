@@ -258,16 +258,16 @@ def build_async_log_filter() -> list[str]:
         f"$0 ~ /{KNOWN_CODEX_ANALYTICS_WARNING}/ "
         f"{{ analytics++; skip_html=1; next }}\n"
         "skip_html { if ($0 ~ /<\\/html>/) { skip_html=0 } next }\n"
-        "{ print }\n"
+        "{ print; fflush() }\n"
         "END {\n"
         '  if (prompt_lines > 0) print "[vibe3 async] suppressed " '
-        'prompt_lines " agent-prompt line(s)"\n'
+        'prompt_lines " agent-prompt line(s)"; fflush()\n'
         '  if (state_db > 0) print "[vibe3 async] suppressed " '
-        'state_db " codex state-db warning line(s)"\n'
+        'state_db " codex state-db warning line(s)"; fflush()\n'
         '  if (shell_snapshot > 0) print "[vibe3 async] suppressed " '
-        'shell_snapshot " codex shell-snapshot cleanup warning line(s)"\n'
+        'shell_snapshot " codex shell-snapshot cleanup warning line(s)"; fflush()\n'
         '  if (analytics > 0) print "[vibe3 async] suppressed " '
-        'analytics " codex analytics 403 warning block(s)"\n'
+        'analytics " codex analytics 403 warning block(s)"; fflush()\n'
         "}\n"
     )
     # tmux send-keys feeds literal newlines as Enter presses; keep the awk
@@ -310,8 +310,10 @@ def build_async_shell_command(
     log_str = shlex.quote(str(log_path))
 
     # Single filtered log file (removed wrapper.full.log to avoid duplication)
+    # Use stdbuf for line buffering to enable real-time streaming in tmux
+    # Note: macOS tee doesn't support -u, but stdbuf -oL ensures line-buffered output
     shell = (
-        f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
+        f"stdbuf -oL -eL {cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
         "cmd_status=${PIPESTATUS[0]:-$?}; "
         "echo; "
         'echo "[vibe3 async] command exited with status: ${cmd_status}"; '

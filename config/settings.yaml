@@ -344,10 +344,13 @@ review:
 
   # Static: Output format requirements (VERDICT contract)
   output_format: |
+    The first line must be exactly:
+    VERDICT: PASS | MAJOR | BLOCK
+
     Each finding should follow this format:
     path/to/file.py:42 [MAJOR] concise issue description
 
-    The final line must be:
+    The final line must repeat the same `VERDICT:`:
     VERDICT: PASS | MAJOR | BLOCK
 
     Where:
@@ -362,9 +365,13 @@ review:
     Use AST analysis to understand impact scope.
     Prioritize actionable findings with clear severity.
     Follow the repository review contract.
-    The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
-    If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
+    You must directly output the review result in stdout.
+    The first line must be exactly `VERDICT: PASS | MAJOR | BLOCK`.
+    The final line must repeat the same `VERDICT:` line.
+    Keep `VERDICT` and `audit_ref` separate: verdict is the conclusion, audit_ref is the detailed report.
+    You must write a canonical audit report under `docs/reports/` in the current worktree
     and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
+    Use a repository-relative path such as `docs/reports/issue-123-audit-report.md`.
 
     ### MANDATORY EXIT STEP — you MUST do this before exit():
     Run this command to change the issue state label:
@@ -590,7 +597,7 @@ orchestra:
   # Governance prompt composition
   governance:
     enabled: true
-    interval_ticks: 1
+    interval_ticks: 4
     # Supervisor file source: supervisor/<name>.md
     supervisor_file: "supervisor/orchestra.md"
     # Template selector: config/prompts.yaml under this dotted key

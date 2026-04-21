@@ -10,6 +10,7 @@ from vibe3.domain.events import (
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
+from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.service_protocol import GitHubEvent
@@ -112,6 +113,28 @@ class TestOrchestrationFacade:
         event = mock_publish.call_args.args[0]
         assert isinstance(event, GovernanceScanStarted)
         assert event.tick_count == 2
+
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    def test_on_heartbeat_tick_uses_injected_runtime_config(
+        self,
+        mock_monotonic: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        mock_monotonic.side_effect = [0.0, 60.0]
+        config = OrchestraConfig(
+            polling_interval=60,
+            governance=GovernanceConfig(interval_ticks=1),
+        )
+
+        facade = OrchestrationFacade(tick_count=0, config=config)
+
+        facade.on_heartbeat_tick()
+
+        assert mock_publish.call_count == 1
+        event = mock_publish.call_args.args[0]
+        assert isinstance(event, GovernanceScanStarted)
+        assert event.tick_count == 1
 
     @patch("vibe3.clients.github_client.GitHubClient.add_comment")
     def test_on_governance_decision_posts_comment(

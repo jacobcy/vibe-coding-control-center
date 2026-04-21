@@ -14,7 +14,7 @@
 | 文件 | 职责 |
 |------|------|
 | settings.py | 主配置 schema (VibeConfig) |
-| settings_orchestra.py | Orchestra 子配置 |
+| settings.py | 根配置与 orchestra 子配置 |
 | settings_pr.py | PR quality gate 子配置 |
 | loader.py | YAML 加载逻辑 |
 | get.py | 全局配置访问入口 |

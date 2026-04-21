@@ -114,8 +114,8 @@ Decision sketch:
   - 当前必须是 `state/blocked`
   - `blocked_reason` 必须精确匹配 `state unchanged`
   - 必须先读取 `flow show`
-  - 只有当 authoritative `plan_ref` 或 `report_ref` 已存在时，才允许把 state 恢复到 `state/handoff`
-  - `audit_ref` 不自动恢复，避免越过 reviewer/verdict 边界
+  - 只有当 authoritative `plan_ref`、`report_ref` 或 `audit_ref` 已存在时，才允许把 state 恢复到 `state/handoff`
+  - orchestra 不读取或解释 verdict；只做漏改 state 的最小纠偏
   - 没有 authoritative ref、同时存在多种不一致信号、或无法唯一判断时，一律不自动恢复，只写建议评论
 - **label 调整（仅非 state labels）**：
   - milestone 调整
@@ -196,7 +196,7 @@ Exit:
 
 - 当前 label 为 `state/blocked`
 - `blocked_reason == "state unchanged"`
-- `flow show` 中已存在 authoritative `plan_ref` 或 `report_ref`
+- `flow show` 中已存在 authoritative `plan_ref`、`report_ref` 或 `audit_ref`
 - 目标状态可唯一确定为 `state/handoff`
 
 执行格式：
@@ -206,7 +206,7 @@ Exit:
 
 恢复原因：检测到 blocked 原因是 state unchanged，但 authoritative ref 已存在，判定为 agent 漏改 state。
 恢复动作：state/blocked -> state/handoff
-依据：<plan_ref 或 report_ref>
+依据：<plan_ref 或 report_ref 或 audit_ref>
 说明：本动作只做最小一致性修正，不代表后续阶段已完成。
 ```
 
@@ -214,7 +214,7 @@ Exit:
 
 - 不得恢复到 `state/claimed`
 - 不得恢复到 `state/in-progress`
-- 不得处理 `audit_ref`
+- 不得基于 verdict 决定恢复与否
 - 不得在没有 authoritative ref 时自动恢复
 - 不得连续推进多个状态
 

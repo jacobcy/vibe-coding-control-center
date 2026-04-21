@@ -10,7 +10,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, model_validator
 
-from vibe3.config.settings_orchestra import OrchestraSettings
 from vibe3.config.settings_pr import (
     FileChangeWeights,
     LineChangeWeights,
@@ -22,6 +21,7 @@ from vibe3.config.settings_pr import (
     SizeThreshold,
     SizeThresholds,
 )
+from vibe3.models.orchestra_config import OrchestraConfig
 
 
 class AIConfig(BaseModel):
@@ -202,7 +202,7 @@ class VibeConfig(BaseModel):
     run: RunConfig = Field(default_factory=RunConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
-    orchestra: OrchestraSettings = Field(default_factory=OrchestraSettings)
+    orchestra: OrchestraConfig = Field(default_factory=OrchestraConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":

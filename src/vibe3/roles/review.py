@@ -144,22 +144,15 @@ def _process_review_sync_result(
     the unified no-op gate takes its after snapshot, allowing the review
     output to be parsed and audit_ref written into flow state first.
     """
-    from vibe3.utils.constants import VERDICT_UNKNOWN
-
-    # Parse verdict from stdout (fallback to UNKNOWN if parse fails)
-    try:
-        review = parse_codex_review(stdout)
-        verdict = review.verdict
-    except ReviewParserError:
-        verdict = VERDICT_UNKNOWN
-
-    # Create audit artifact and write audit_ref
+    existing_audit_ref = _load_existing_audit_ref(branch)
     audit_ref = _resolve_authoritative_audit_ref(
         None,  # No handoff_file in sync mode
         stdout,
-        verdict,
+        None,
         branch,
+        existing_audit_ref=existing_audit_ref,
     )
+    verdict = _resolve_review_verdict(stdout, audit_ref=audit_ref)
     _build_handoff_service(branch).record_audit(
         audit_ref=audit_ref,
         actor=actor,
@@ -255,14 +248,58 @@ def _resolve_minimal_audit_dir(branch: str | None) -> Path:
 def _resolve_authoritative_audit_ref(
     handoff_file: str | None,
     review_output: str,
-    verdict: str,
+    verdict: str | None,
     branch: str | None,
+    *,
+    existing_audit_ref: str | None = None,
 ) -> str:
+    if existing_audit_ref:
+        return existing_audit_ref
     if handoff_file:
         handoff_path = Path(handoff_file)
         if handoff_path.exists():
             return str(handoff_path)
-    return str(_create_minimal_audit_artifact(review_output, verdict, branch))
+    return str(
+        _create_minimal_audit_artifact(
+            review_output,
+            verdict or "UNKNOWN",
+            branch,
+        )
+    )
+
+
+def _load_existing_audit_ref(branch: str | None) -> str | None:
+    if not branch:
+        return None
+    flow = FlowService().get_flow_status(branch)
+    if flow and flow.audit_ref:
+        return flow.audit_ref
+    return None
+
+
+def _resolve_review_verdict(
+    review_output: str,
+    *,
+    audit_ref: str | None = None,
+) -> str:
+    from vibe3.utils.constants import VERDICT_UNKNOWN
+
+    try:
+        review = parse_codex_review(review_output)
+        return review.verdict
+    except ReviewParserError:
+        pass
+
+    if audit_ref:
+        audit_path = Path(audit_ref)
+        if audit_path.exists():
+            try:
+                review = parse_codex_review(audit_path.read_text(encoding="utf-8"))
+                return review.verdict
+            except (OSError, ReviewParserError):
+                pass
+
+    return VERDICT_UNKNOWN
 
 
 def build_pr_review_request(
@@ -362,29 +399,21 @@ def execute_manual_review(
     if dry_run:
         return ReviewRunResult("DRY_RUN", None, issue_number)
 
-    # 增加容错性：即使 parser 失败也写入 audit_ref
-    from vibe3.utils.constants import VERDICT_UNKNOWN
-
-    try:
-        review = review_parser(result.stdout)
-        verdict = review.verdict
-    except ReviewParserError as err:
-        # Parser 失败时，verdict 为空，交给 manager 判断
-        logger.bind(domain="review").warning(
-            f"Failed to parse review output, using verdict=UNKNOWN: {err}"
-        )
-        verdict = VERDICT_UNKNOWN
-
-    # 无论 parser 是否成功，只要有输出就写入 audit_ref
+    existing_audit_ref = _load_existing_audit_ref(branch)
     audit_ref = _resolve_authoritative_audit_ref(
         str(result.handoff_file) if result.handoff_file else None,
         result.stdout,  # ← 直接使用原始输出
-        verdict,
+        None,
         branch,
+        existing_audit_ref=existing_audit_ref,
+    )
+    verdict = _resolve_review_verdict(
+        result.stdout,
+        audit_ref=audit_ref,
     )
 
     flow = service.get_flow_status(branch) if branch else None
-    if flow is not None and branch is not None:
+    if flow is not None and branch is not None and flow.audit_ref != audit_ref:
         _build_handoff_service(branch).record_audit(
             audit_ref=audit_ref,
             actor="agent:review",

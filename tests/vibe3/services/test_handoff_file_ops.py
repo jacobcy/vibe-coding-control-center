@@ -311,7 +311,7 @@ class TestHandoffRecordAPIs:
     def test_record_audit_updates_flow_state_without_event_recording(
         self, handoff_service, temp_git_dir, mock_git_client, mock_store
     ):
-        """Test record_audit updates flow state directly (no add_event call)."""
+        """Test record_audit updates flow state and records event with verdict."""
         mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
 
         handoff_service.record_audit(
@@ -321,8 +321,15 @@ class TestHandoffRecordAPIs:
             actor="test-actor",
         )
 
-        # _record_ref no longer calls add_event (skipped to avoid duplicates)
-        mock_store.add_event.assert_not_called()
+        # _record_ref now calls add_event to record verdict
+        mock_store.add_event.assert_called_once()
+        call_args = mock_store.add_event.call_args
+        assert call_args[0][0] == "feature/test-branch"
+        assert call_args[0][1] == "handoff_audit"
+        assert call_args[0][2] == "test-actor"
+        assert "verdict: UNKNOWN" in call_args[1]["detail"]
+        assert call_args[1]["refs"]["ref"] == ".agent/reports/audit-result.md"
+
         mock_store.update_flow_state.assert_called_with(
             "feature/test-branch",
             audit_ref=".agent/reports/audit-result.md",
@@ -349,11 +356,37 @@ class TestHandoffRecordAPIs:
         )
 
         assert handoff_path.exists()
-        # add_event is not called by _record_ref (skipped to avoid duplicates)
-        mock_store.add_event.assert_not_called()
+        # add_event is called to record verdict
+        mock_store.add_event.assert_called_once()
         mock_store.update_flow_state.assert_called_once_with(
             "feature/test-branch",
             audit_ref=".agent/reports/audit-result.md",
             reviewer_actor="test-actor",
             next_step="Finalize PR",
         )
+
+    def test_record_audit_persists_event_even_when_audit_ref_already_exists(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Agent-authored audit_ref should still get authoritative event recording."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        mock_store.get_flow_state.return_value = {
+            "audit_ref": "docs/reports/agent-authored-audit.md"
+        }
+
+        handoff_service.record_audit(
+            audit_ref="docs/reports/agent-authored-audit.md",
+            actor="test-actor",
+            verdict="PASS",
+        )
+
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch",
+            audit_ref="docs/reports/agent-authored-audit.md",
+            reviewer_actor="test-actor",
+        )
+        mock_store.add_event.assert_called_once()
+        call_args = mock_store.add_event.call_args
+        assert call_args[0][1] == "handoff_audit"
+        assert call_args[1]["refs"]["ref"] == "docs/reports/agent-authored-audit.md"
+        assert call_args[1]["refs"]["verdict"] == "PASS"
