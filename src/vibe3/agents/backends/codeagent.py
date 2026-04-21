@@ -262,13 +262,40 @@ class CodeagentBackend:
             accumulator: list[str],
             output_file: Any,
         ) -> None:
-            """Read from stream line-by-line, accumulate, and write to output."""
+            """Read from stream line-by-line, accumulate, and write to output.
+
+            Filters out uv installation noise (lines before "-> " marker).
+            """
             for line in iter(stream.readline, ""):
                 if not line:
                     break
-                accumulator.append(line)
-                output_file.write(line)
-                output_file.flush()
+
+                # Filter out uv installation progress noise
+                # Only show lines from "-> " marker onwards
+                if "-> " in line:
+                    # Extract everything after "-> "
+                    filtered_line = line.split("-> ", 1)[1]
+                    accumulator.append(filtered_line)
+                    output_file.write(filtered_line)
+                    output_file.flush()
+                elif any(
+                    noise in line
+                    for noise in [
+                        "[2m",  # ANSI escape codes
+                        "░",  # Progress bar characters
+                        "█",  # Progress bar characters
+                        "Uninstalled",
+                        "Installing wheels",
+                        "Installed 1 package",
+                    ]
+                ):
+                    # Skip installation noise lines
+                    continue
+                else:
+                    # Keep other lines as-is
+                    accumulator.append(line)
+                    output_file.write(line)
+                    output_file.flush()
 
         stdout_chunks: list[str] = []
         stderr_chunks: list[str] = []

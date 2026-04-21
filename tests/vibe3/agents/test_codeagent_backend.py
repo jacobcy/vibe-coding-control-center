@@ -66,6 +66,62 @@ class TestCodeagentBackend:
         assert result.stderr == "warning\n"
         assert result.returncode == 42
 
+    def test_run_subprocess_filters_installation_noise(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """_run_subprocess filters out uv installation progress noise."""
+
+        class FakeStream:
+            def __init__(self, chunks: list[str]) -> None:
+                self._chunks = iter(chunks)
+
+            def readline(self) -> str:
+                return next(self._chunks, "")
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs) -> None:
+                self.args = args[0]
+                self.returncode = 0
+                self.stdout = FakeStream(
+                    [
+                        "[2mUninstalled 1 package\n",
+                        "░░░░░░░░░░░░░░░░░░░░ [0/1] Installing wheels...\n",
+                        "████████████████████ [1/1] vibe3==3.0.0\n",
+                        "-> Executing with gemini...\n",
+                        "[codeagent-wrapper]\n",
+                        "  Backend: gemini\n",
+                        "",
+                    ]
+                )
+                self.stderr = FakeStream([""])
+
+            def wait(self, timeout: int | None = None) -> int:
+                return self.returncode
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
+            result = CodeagentBackend._run_subprocess(
+                ["codeagent-wrapper", "run"],
+                project_root=str(tmp_path),
+                timeout_seconds=30,
+            )
+
+        # Verify noise is filtered from console output
+        captured = capsys.readouterr()
+        assert "[2m" not in captured.out
+        assert "Uninstalled" not in captured.out
+        assert "░" not in captured.out
+        assert "█" not in captured.out
+        assert "Installing wheels" not in captured.out
+        assert "-> Executing with gemini...\n" not in captured.out
+        assert "Executing with gemini...\n" in captured.out
+        assert "[codeagent-wrapper]\n" in captured.out
+        assert "Backend: gemini\n" in captured.out
+
+        # Verify complete output captured in return value
+        assert "Executing with gemini...\n" in result.stdout
+        assert "[codeagent-wrapper]\n" in result.stdout
+        assert "Backend: gemini\n" in result.stdout
+
     def test_build_prompt_file_content_prepends_global_notice(self) -> None:
         config = VibeConfig(
             agent_prompt=AgentPromptConfig(global_notice="## Debug Stop Rule\nStop now")
