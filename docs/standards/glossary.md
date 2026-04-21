@@ -129,7 +129,45 @@ related_docs:
   - PR 合并时会自动关闭关联的 task issue（联动操作）
 
 
-### 3.3.3 `task audit`
+### 3.3.2 `assignee issue`
+
+- 正式术语：`assignee issue`
+- 别称：无
+- 定义：已进入执行池、由 manager 主链负责推进的 GitHub issue。是 governance scan 当前的唯一观察对象。
+- 边界：
+  - assignee issue **不是** supervisor issue
+  - assignee issue **不是** broader repo backlog 的全量 issue
+- 使用规则：
+  - manager 只消费 assignee issue
+  - 当前 governance 只对 assignee issue 池做排序、观察、建议
+  - 不把 repo 全量 open issue 直接等同于 assignee issue
+
+### 3.3.3 `supervisor issue`
+
+- 正式术语：`supervisor issue`
+- 别称：无
+- 定义：显式立项的治理 issue，通常带 `supervisor` label，由 `supervisor/apply` 处理，不进入 manager 主执行闭环。
+- 边界：
+  - supervisor issue **不是** assignee issue
+  - supervisor issue 用于文档治理、过期测试治理、治理清理、任务安排等主代码无关动作
+- 使用规则：
+  - `supervisor/apply` 只消费 supervisor issue
+  - 超出 supervisor issue 范围的治理动作应委托为 task issue
+
+### 3.3.4 `broader repo issue pool`
+
+- 正式术语：`broader repo issue pool`
+- 别称：无
+- 定义：repo 中更大范围的 open issues / backlog 候选，不自动等于执行池。
+- 边界：
+  - broader repo issue pool **不是** assignee issue pool
+  - broader repo issue pool **不是** supervisor issue 池
+- 使用规则：
+  - 由 future `governance/roadmap` 从中识别哪些应进入 assignee issue 池
+  - 由 future `governance/cron` 从中识别哪些应形成 supervisor issue
+  - 当前 governance scan 不直接处理 broader repo issue pool
+
+### 3.3.5 `task audit`
 
 - 正式术语：`task audit`
 - 别称：无

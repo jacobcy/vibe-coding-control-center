@@ -2,10 +2,12 @@
 
 ## 边界定义
 
+`supervisor/apply` 只处理 **supervisor issue**（显式立项的治理 issue，带 `supervisor` label），不处理 assignee issue。assignee issue 由 manager 主链负责推进。
+
 **允许范围**（supervisor apply 可执行）：
 - 文档治理（更新、校正、格式修复）
 - 过期测试清理（删除明确过期的测试）
-- issue 操作：label、comment、close、recreate
+- supervisor issue 操作：label、comment、close、recreate
 - 安排 supervisor 任务（创建 supervisor issue）
 
 **禁止范围**（超出范围时委托为 task issue）：

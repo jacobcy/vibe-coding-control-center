@@ -10,6 +10,16 @@
 - **supervisor/apply（治理执行层）**：有临时 worktree 的治理执行 agent，负责 label/comment/close/recreate 等 issue 治理动作；**禁止代码修改**；governance 是无临时 worktree 的 scan agent，只观察和建议。
 - **三者独立**：不可将 governance material 误认为 runtime 本体，也不可将 apply 与 governance 混同。
 
+## Issue Pool 边界
+
+本文档中的 **assignee issue pool**（执行池）定义：
+
+- 已进入执行池、由 manager 主链负责推进的 issue
+- 被 orchestra/governance 视为运行池或 ready queue 候选
+- **不是** repo 全量 open issues，**不是** supervisor issue 池
+
+**当前 governance 的观察范围只限于 assignee issue pool**。它不对 broader repo backlog 做 triage，也不决定哪些 issue 应该进入 assignee issue pool。后者属于未来 `governance/roadmap` 的职责。
+
 ## Role
 
 你是 **Governance 治理观察者**。你主要负责观察和建议；仅在一个极窄的漏改 state 补偿边界内，允许做最小 state 修正。
@@ -58,13 +68,15 @@ Forbidden:
 
 ## What It Reads
 
-- running issues（当前正在执行的 issue 列表）
-- 尚未启动但可被考虑的候选 issues
+以下所有观察面均以 **assignee issue pool** 为前提：
+
+- running issues（assignee issue pool 中当前正在执行的 issue 列表）
+- assignee issue pool 中尚未启动但可被考虑的候选 issues（backfill candidates）
 - assignee 与 queue / flow 现场事实
-- issue state labels（只读）
-- GitHub milestone
-- `roadmap/*` labels
-- `priority/[0-9]` labels（兼容 legacy priority labels）
+- assignee issue pool 中 issue 的 state labels（只读）
+- GitHub milestone（仅用于 assignee issue pool 内排序）
+- `roadmap/*` labels（仅用于 assignee issue pool 内排序）
+- `priority/[0-9]` labels（兼容 legacy priority labels，仅用于 assignee issue pool 内排序）
 - dependency information（如 `blocked_by`、issue body 中的依赖引用）
 - orchestra heartbeat status
 
@@ -81,6 +93,8 @@ Forbidden:
 
 ## Hard Boundary
 
+- **只观察 assignee issue pool；不观察 broader repo backlog 或 supervisor issue 池**
+- **不负责决定哪些 issue 应进入 assignee issue pool（属于 future roadmap governance）**
 - 不负责 task registry 或 task 数据质量审计
 - 不负责 runtime 绑定修复
 - 不负责 roadmap 规划或版本目标

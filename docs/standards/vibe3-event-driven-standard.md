@@ -557,19 +557,33 @@ LabelService().transition(
 - 周期扫描观察，`WorktreeRequirement.NONE`，无 worktree
 - 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
 - 材料来源：`supervisor/governance/*.md`
+- **当前 governance 只观察 assignee issue pool（`supervisor/governance/assignee-pool.md`）**
+- **future roadmap governance（`supervisor/governance/roadmap-intake.md`）负责 broader repo issue pool 扫描和 assignee issue 识别**
+- **future cron governance（`supervisor/governance/cron-supervisor.md`）负责周期性识别治理问题和 supervisor issue 生成**
 - 不执行治理动作，只生成结论并写入 GitHub issue
 
 **supervisor/apply**（L2）
 - 执行治理动作，`WorktreeRequirement.TEMPORARY`，有临时 worktree
 - 事件链：`SupervisorIssueIdentified` → `SupervisorApplyDispatched` / `SupervisorApplyDelegated`
 - 材料来源：`supervisor/apply.md`
-- 处理 `supervisor` label issue，执行 label/comment/close/recreate 等动作
+- **只处理 supervisor issue（带 `supervisor` label），不处理 assignee issue**
+- 执行 label/comment/close/recreate 等动作
 
 **runtime**
 - 指 vibe3 服务器运行时（EventBus、Heartbeat、HTTP server）
 - 与上述两个治理概念无关，负责基础事件调度与 tick 循环
 
 这三个概念不等价，不可混用。见 `vibe3-worktree-ownership-standard.md` §二 了解完整层级定义。
+
+### Issue 池边界总结
+
+| 角色 | 处理对象 | 说明 |
+|------|---------|------|
+| governance scan（当前） | assignee issue pool | `supervisor/governance/assignee-pool.md` |
+| governance/roadmap（future） | broader repo issue pool | 识别应进入 assignee issue pool 的候选 |
+| governance/cron（future） | broader repo issue pool | 周期性识别治理问题，建议形成 supervisor issue |
+| supervisor/apply | supervisor issue | 显式立项的治理 issue，带 `supervisor` label |
+| manager | assignee issue | 已进入执行池的 issue，由 manager 主链推进 |
 
 ---
 
