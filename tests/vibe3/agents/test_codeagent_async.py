@@ -143,6 +143,60 @@ class TestStartAsyncCommand:
         assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in final_cmd
         assert "src/vibe3/cli.py" in final_cmd
 
+    def test_start_async_command_preserves_path_for_tmux_session(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
+
+        tmux_commands: list[list[str]] = []
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            if cmd[:3] == ["tmux", "new-session", "-d"]:
+                tmux_commands.append(cmd)
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+        test_path = "/tmp/test-bin:/usr/local/bin"
+        monkeypatch.setenv("PATH", test_path)
+
+        with patch(
+            "vibe3.agents.backends.async_launcher.subprocess.run",
+            side_effect=fake_run,
+        ):
+            start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-run-issue-417",
+                env={"PATH": test_path, "VIBE3_ASYNC_CHILD": "1"},
+            )
+
+        assert tmux_commands
+        final_cmd = tmux_commands[0]
+        assert "env" in final_cmd
+        assert f"PATH={test_path}" in final_cmd
+        assert "VIBE3_ASYNC_CHILD=1" in final_cmd
+
     def test_start_async_command_rejects_duplicate_l3_session(
         self, monkeypatch, tmp_path
     ) -> None:

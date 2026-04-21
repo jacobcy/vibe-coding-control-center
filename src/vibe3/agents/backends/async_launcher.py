@@ -13,6 +13,16 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+CRITICAL_ENV_PASSTHROUGH = {
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "SHELL",
+    "TMPDIR",
+    "USER",
+}
+
 
 @dataclass(frozen=True)
 class AsyncExecutionHandle:
@@ -274,7 +284,11 @@ def spawn_tmux_command(
     # Prepend environment overrides to the command
     final_command = command
     if env:
-        env_overrides = {k: v for k, v in env.items() if os.environ.get(k) != v}
+        env_overrides = {
+            k: v
+            for k, v in env.items()
+            if os.environ.get(k) != v or k in CRITICAL_ENV_PASSTHROUGH
+        }
         if env_overrides:
             final_command = (
                 ["env"]
