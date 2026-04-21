@@ -6,36 +6,53 @@
 
 ---
 
+## Issue 池分层
+
+本项目中的 issue 按职责和执行链分为三层：
+
+1. **Assignee Issue Pool**（本地开发链）
+   - **对象**：已分配、待执行的需求、缺陷或功能任务。
+   - **处理链**：Manager -> Plan -> Run -> Review -> PR。
+   - **治理关注**：Orchestra 的实时观察与排序对象。
+
+2. **Supervisor Issue Pool**（本地治理链）
+   - **对象**：带 `supervisor` 标签的治理任务（如文档修正、过期测试清理）。
+   - **处理链**：Supervisor/Apply。
+   - **边界**：不进入 Manager 开发主链，不影响业务代码交付。
+
+3. **Broader Repo Issue Pool**（全量池 / 规划池）
+   - **对象**：Repo 中所有 Open issues。
+   - **处理链**：Future Governance / Cron 扫描。
+   - **状态**：非当前执行真源，仅作为积压需求参考。
+
+---
+
 ## 核心概念
 
-### GitHub Issue（统一概念）
+### GitHub Issue（统一对象）
 
 ```
-所有 issue 都是 GitHub repository issue
-
-- 在 GitHub Issues API 中管理
-- 可以是需求、任务、缺陷、讨论等
-- 通过 label 分类（如 vibe-task, enhancement, bug 等）
+所有 issue 都是 GitHub repository issue，是外部实体对象。
 ```
 
-### Task Issue（vibe3 视角）
+### Task Issue（执行关系角色）
 
 ```
-task issue 是 vibe3 的视角概念，不是独立的实体
+task issue 是 vibe3 视角下的角色映射，不是 GitHub 的新实体分类。
 
 判定基线：
 1. SQLite flow_issue_links 中存在记录，且 issue_role = task 或 dependency
-2. 对应的 issue 属于 assignee issue pool（由 manager 主链管理）
-3. vibe-task 标签由 flow bind 自动镜像，是副作用，不作为判定依据
+2. 对应的 issue 属于 assignee issue pool
+3. flow bind / flow_issue_links 是执行绑定的唯一事实真源
 
-本质：
-- 一个 GitHub issue 被 vibe3 纳入 flow 管理时，就成了 task issue
-- 这是关系视角，不是实体类型
+副作用（Mirror）：
+- vibe-task 标签由 flow bind 自动镜像，用于 GitHub 视角过滤
+- 它不是治理判定的依据，也不是 execution record 本体
 ```
 
 **重要**：
-- 不说 "创建 task issue"，而是 "将 issue 关联为 task"
-- task issue 是 GitHub issue 在 vibe3 执行语义下的角色，不是 GitHub 的新实体分类
+- 不说 "创建 task issue"，而是 "将 issue 关联为 task"。
+- task issue 是 GitHub issue 在 vibe3 执行语义下的角色，不是新的 GitHub 对象类型。
 
 ---
 

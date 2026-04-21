@@ -75,98 +75,81 @@ related_docs:
 
 - 正式术语：`roadmap item`
 - 别称：`规划项`
-- 定义：规划层工作单元概念，用于表达版本规划窗口中的工作项。当前 governance 以 GitHub issue 直接为管理对象，不经过 roadmap item 中间层转换；`roadmap.json` 与 `GitHub Project` 仅为历史兼容的 mirror/cache 形式，不作为主真源。
+- 定义：规划层工作单元概念，用于表达版本规划窗口中的工作项。
+- 状态：**历史兼容 / 规划参考语义**。
 - 边界：
-  - `roadmap item` 不是 execution record
-  - `roadmap item` 不表达 branch/worktree 当前态
-- 落点：
-  - 规划语义见 [command-standard.md](command-standard.md)
+  - `roadmap item` 仅为 planning 层概念，不是执行层真源。
+  - 当前治理（Orchestra）直接管理 `assignee issue`，不经过 `roadmap item -> task` 中间层转换。
+  - `roadmap.json` 与 `GitHub Project` 仅为历史兼容镜像，不作为主开发链锚点。
 - 使用规则：
-  - 讨论 `p0/current/next/deferred/rejected` 时使用 `roadmap item`
-  - `roadmap item` 是 planning 层概念，不是执行层真源
-  - 不要把 roadmap 状态当成分支当前执行状态
-  - 当前 governance 直接管理 assignee issue，不经过 roadmap item -> task 转换链
+  - 仅在讨论版本排期（`p0/current/next/deferred/rejected`）时使用。
+  - 不得将 roadmap 状态作为分支执行进度的判定依据。
 
 ### 3.3 `task`
 
 - 正式术语：`task`
 - 别称：`执行任务`
-- 定义：execution bridge 概念，用于表达当前 flow 绑定的主执行 issue 及相关执行语义。
+- 定义：execution bridge 概念，用于表达当前 flow 绑定的主执行 issue 及其关联执行事实。
 - 边界：
-  - `task` 不是外部需求入口
-  - `task` 不等于 PR
-  - `task` 不等于 roadmap item
-- 落点：
-  - 命令语义见 [command-standard.md](command-standard.md)
-  - 文件字段见 [registry-json-standard.md](registry-json-standard.md)
+  - `task` 不是外部需求入口。
+  - `task` 不等于 PR，不等于 roadmap item。
 - 使用规则：
-  - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
-  - `task` 是 flow 建立后的 execution bridge，不是 roadmap item 的下游产物
-  - `task` 不是用户默认主链的第一锚点
-  - 当前公共 CLI 读路径已收敛到 `flow show` / `flow status` / `status`，不再默认要求独立 `vibe3 task` 命令
-  - GitHub issue 可以被关联为一个或多个 `task`（在不同 flow 中）
+  - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用。
+  - `task` 是 flow 建立后的 execution bridge，不是 roadmap item 的强制下游产物。
+  - 它是执行现场的“任务视图”，不是用户默认主链的第一锚点。
 
 ### 3.3.1 task issue
 
 - 正式术语：`task issue`
 - 别称：无
-- 定义：**vibe3 视角概念**，指被 vibe3 纳入 flow 管理的 assignee issue。判定标准：
-  - 在 SQLite `flow_issue_links` 中有记录，`issue_role = task` 或 `dependency`
-  - 对应的 issue 属于 assignee issue pool（由 manager 主链推进）
-  - `vibe-task` 标签由 flow bind 自动镜像，是副作用，不作为 governance 的判定依据
+- 定义：**vibe3 视角下的执行关系角色**。指被 vibe3 纳入 flow 管理的 `assignee issue`。
+- 判定标准：
+  - 在 SQLite `flow_issue_links` 中有记录，且角色为 `task` 或 `dependency`。
+  - 该 issue 必须属于 `assignee issue pool`。
 - 边界：
-  - task issue **不是**新的 GitHub 对象类型
-  - task issue **不是**与 GitHub issue 平行的新实体
-  - task issue 是 GitHub issue 在 vibe3 管理视角下的**角色**
-- 落点：
-  - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
-  - 命令语义见 [command-standard.md](command-standard.md)
-  - 标准规范见 [issue-standard.md](issue-standard.md)
+  - **不是**新的 GitHub 对象类型。
+  - **不是**与 GitHub issue 平行的实体。
+  - `vibe-task` 标签是 flow bind 的自动镜像（副作用），不作为治理判定依据。
 - 使用规则：
-  - 不说 "创建 task issue"，而是 "将 issue 关联为 task"
-  - task issue 是相对于 flow 的**关系**，不是 issue 的类型属性
-  - 同一个 issue 可以在不同 flow 中有不同角色
-  - PR 合并时会自动关闭关联的 task issue（联动操作）
-
+  - 不说 "创建 task issue"，而是 "将 issue 关联为 task"。
+  - 它是相对于 flow 的**关系**，而不是 issue 的固有属性。
 
 ### 3.3.2 `assignee issue`
 
 - 正式术语：`assignee issue`
 - 别称：无
-- 定义：已进入执行池、由 manager 主链负责推进的 GitHub issue。是 governance scan 当前的唯一观察对象。
+- 定义：**本地开发链的处理对象**。指已进入执行池、由 Manager 主链（Plan/Run/Review）负责推进的 GitHub issue。
+- 职责：它是当前 Governance (Orchestra) 事实观察的**真实且唯一范围**。
 - 边界：
-  - assignee issue **不是** supervisor issue
-  - assignee issue **不是** broader repo backlog 的全量 issue
+  - **不是** supervisor issue。
+  - **不是** broader repo issue pool。
 - 使用规则：
-  - manager 只消费 assignee issue
-  - 当前 governance 只对 assignee issue 池做排序、观察、建议
-  - 不把 repo 全量 open issue 直接等同于 assignee issue
+  - Manager 链只消费 `assignee issue`。
+  - 当前 governance 排序与建议只针对此池。
 
 ### 3.3.3 `supervisor issue`
 
 - 正式术语：`supervisor issue`
 - 别称：无
-- 定义：显式立项的治理 issue，通常带 `supervisor` label，由 `supervisor/apply` 处理，不进入 manager 主执行闭环。
+- 定义：**本地治理链的处理对象**。指显式立项的治理任务（带 `supervisor` label），由 `supervisor/apply` 负责闭环。
 - 边界：
-  - supervisor issue **不是** assignee issue
-  - supervisor issue 用于文档治理、过期测试治理、治理清理、任务安排等主代码无关动作
+  - **不进入** Manager 主开发链。
+  - 用于文档治理、测试治理、环境清理等非业务开发动作。
 - 使用规则：
-  - `supervisor/apply` 只消费 supervisor issue
-  - 超出 supervisor issue 范围的治理动作应委托为 task issue
+  - `supervisor/apply` 只消费 `supervisor issue`。
 
 ### 3.3.4 `broader repo issue pool`
 
 - 正式术语：`broader repo issue pool`
 - 别称：无
-- 定义：repo 中更大范围的 open issues / backlog 候选，不自动等于执行池。
+- 定义：仓库中全量的开放 issue 或积压需求。
+- 状态：**Future Scope / Cron Governance 观察对象**。
 - 边界：
-  - broader repo issue pool **不是** assignee issue pool
-  - broader repo issue pool **不是** supervisor issue 池
+  - **不是**当前 Governance (Orchestra) 的实时输入。
+  - 它不自动等于执行池。
 - 使用规则：
-  - 由 `governance/roadmap` 从中识别哪些应进入 assignee issue 池（当前轮换运行但数据源仍为 assignee issue pool；需独立数据源后才能真正观察 broader pool）
-  - 由 `governance/cron` 从中识别哪些应形成 supervisor issue（当前轮换运行但数据源仍为 assignee issue pool；需独立数据源后才能真正观察 broader pool）
-  - 当前 governance scan 不直接处理 broader repo issue pool
-
+  - 当前 Orchestra 不直接扫描此池。
+  - 它是未来 roadmap 自动化和长期治理的原材料。
 ### 3.3.5 `task audit`
 
 - 正式术语：`task audit`

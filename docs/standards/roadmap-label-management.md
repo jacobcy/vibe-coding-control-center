@@ -195,7 +195,7 @@ gh issue edit <issue_number> --milestone "Phase 1: 基础设施"
 
 #### Step 5: 绑定执行入口
 
-将 issue 绑定到 flow，纳入 manager 主链执行：
+将 issue 绑定到 flow，正式进入 **Manager 主开发链**：
 
 ```bash
 # 绑定到 Flow（开始执行）
@@ -203,7 +203,10 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 # 自动镜像 vibe-task 标签（副作用，不作为真源）
 ```
 
-**注意**：flow bind 后，issue 进入 manager 主执行闭环，由 Manager/Plan/Run/Review 推进至 PR 合并。vibe-task 标签由绑定操作自动镜像，不是 governance 的判定依据。
+**注意**：
+- `flow bind` 是 issue 进入执行现场的正式绑定入口。
+- `vibe-task` 与 `state/*` 标签是由绑定和执行状态自动镜像的副作用，**不建议作为手工主入口**。
+- 一旦绑定，issue 进入 manager 主执行闭环，由 Manager/Plan/Run/Review 推进。
 
 ### 3.2 版本管理流程
 

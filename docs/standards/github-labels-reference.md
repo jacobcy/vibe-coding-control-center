@@ -79,7 +79,11 @@
 
 | 标签名称 | 描述 | 示例命令 |
 |---------|------|----------|
-| `vibe-task` | 执行项镜像标签 | 自动添加，无需手动 |
+| `vibe-task` | 执行项镜像标签 | 自动镜像，不建议手动维护 |
+
+**说明**：
+- `vibe-task` 是 `vibe3 flow bind` 绑定的自动镜像（副作用）。
+- 它不是 Governance 判定的真源，仅用于 GitHub 视角过滤。
 
 ### 2.4 编排状态标签 (state/*)
 
@@ -94,9 +98,9 @@
 | `state/merge-ready` | 已满足合并条件 | 通常由自动化镜像，不建议手工维护 |
 | `state/done` | 已完成 | 通常由自动化镜像，不建议手工维护 |
 
-说明：
-- assignee issue 的执行状态优先以 flow 状态与 orchestration scene 为准
-- `state/*` 标签是可选镜像，不是执行态主真源
+**说明**：
+- `state/*` 标签是执行状态的**可选镜像**，不是执行态主真源。
+- `assignee issue` 的真实执行状态优先以 flow 状态与 orchestration scene 为准。
 
 ---
 
