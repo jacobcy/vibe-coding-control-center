@@ -127,16 +127,18 @@ class TestIssueStateDispatchHandler:
             )
         )
 
+    @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
-    def test_request_none_logs_error(
+    def test_request_none_blocks_issue(
         self,
         mock_build_request: MagicMock,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
+        mock_block_issue: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
@@ -159,3 +161,9 @@ class TestIssueStateDispatchHandler:
         )
 
         mock_coordinator.dispatch_execution.assert_not_called()
+        mock_block_issue.assert_called_once_with(
+            issue_number=42,
+            repo=None,
+            reason="Failed to prepare role execution request",
+            actor="agent:manager",
+        )
