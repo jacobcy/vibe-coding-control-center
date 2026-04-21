@@ -325,7 +325,7 @@ class TestHandoffRecordAPIs:
         mock_store.add_event.assert_called_once()
         call_args = mock_store.add_event.call_args
         assert call_args[0][0] == "feature/test-branch"
-        assert call_args[0][1] == "handoff_audit"
+        assert call_args[0][1] == "audit_recorded"
         assert call_args[0][2] == "test-actor"
         assert "verdict: UNKNOWN" in call_args[1]["detail"]
         assert call_args[1]["refs"]["ref"] == ".agent/reports/audit-result.md"
@@ -387,6 +387,6 @@ class TestHandoffRecordAPIs:
         )
         mock_store.add_event.assert_called_once()
         call_args = mock_store.add_event.call_args
-        assert call_args[0][1] == "handoff_audit"
+        assert call_args[0][1] == "audit_recorded"
         assert call_args[1]["refs"]["ref"] == "docs/reports/agent-authored-audit.md"
         assert call_args[1]["refs"]["verdict"] == "PASS"

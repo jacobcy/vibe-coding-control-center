@@ -177,7 +177,7 @@ def test_record_handoff_unified_ignores_reserved_metadata_keys(
     refs = mock_persist.call_args.kwargs["refs"]
     # backend is resolved from AgentOptions by resolve_actor_backend_model
     assert refs["backend"] == "opencode"
-    assert refs["model"] == "alibaba-coding-plan-cn/glm-5"
+    assert refs["model"] == "my-provider/gpt-4o"
     assert refs["custom"] == "ok"
 
 
