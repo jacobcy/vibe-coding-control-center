@@ -4,9 +4,11 @@ This module provides a single source of truth for role-specific policies,
 eliminating scattered mappings across multiple modules.
 """
 
-from typing import Callable, Literal
+from typing import TYPE_CHECKING, Callable, Literal
 
-from vibe3.agents.models import ExecutionRole
+if TYPE_CHECKING:
+    from vibe3.agents.models import ExecutionRole
+    from vibe3.services.handoff_recorder_unified import HandoffKind
 
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"
@@ -19,7 +21,9 @@ ROLE_TO_SECTION: dict[str, Literal["manager", "plan", "run", "review"]] = {
 }
 
 
-def get_role_section(role: str) -> Literal["manager", "plan", "run", "review"]:
+def get_role_section(
+    role: "ExecutionRole | str",
+) -> Literal["manager", "plan", "run", "review"]:
     """Get the config section for a given role."""
     return ROLE_TO_SECTION[role]
 
@@ -33,7 +37,7 @@ KIND_TO_ACTOR_KEY: dict[str, str] = {
 }
 
 
-def get_kind_actor_key(kind: str) -> str:
+def get_kind_actor_key(kind: "HandoffKind") -> str:
     """Get the actor state key for a given handoff kind."""
     return KIND_TO_ACTOR_KEY[kind]
 
@@ -56,13 +60,13 @@ def _get_block_functions() -> dict[str, Callable[..., None]]:
     }
 
 
-def get_role_block_function(role: str) -> Callable[..., None]:
+def get_role_block_function(role: "ExecutionRole | str") -> Callable[..., None]:
     """Get the block function for a given role."""
     return _get_block_functions()[role]
 
 
 def get_role_pre_gate_callback(
-    role: ExecutionRole,
+    role: "ExecutionRole",
 ) -> Callable[..., None] | None:
     """Get role-specific callback that must run before the gate.
 
