@@ -67,7 +67,13 @@ _GOVERNANCE_RUNTIME_VARS = (
 
 
 def build_governance_snapshot_context(snapshot: Any) -> dict[str, Any]:
-    """Convert an OrchestraSnapshot into the prompt context dict."""
+    """Convert an OrchestraSnapshot into the prompt context dict.
+
+    The snapshot.active_issues fed into this function represents the
+    assignee issue pool (issues managed by the manager chain).
+    Governance scan only observes this pool; broader repo backlog
+    triage is the responsibility of future roadmap governance.
+    """
     active_entries = snapshot.active_issues
     active_count = len(active_entries)
     running_entries = tuple(

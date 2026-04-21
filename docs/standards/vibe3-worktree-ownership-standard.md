@@ -41,7 +41,8 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 ### L1 — Governance Service
 
-- 职责：扫描仓库状态（LOC、标签、规则合规），向 GitHub issue 写入治理结论，发布扫描事件，更新 labels。
+- 职责：扫描 assignee issue pool 状态，向 GitHub issue 写入治理结论，发布扫描事件，更新 labels。
+- **边界**：当前 governance 只观察 assignee issue pool（由 manager 主链推进的 issue），不扫描 broader repo backlog。future roadmap/cron governance 负责更大范围的扫描。
 - Worktree：**不需要**（`WorktreeRequirement.NONE`）。Governance 是周期扫描观察，只读取文件、操作 GitHub API，不修改代码，无临时 worktree。
 - 参数要求：`cwd=None`。可在主仓库路径或任意目录执行。禁止使用已移除的 `--worktree` 标志。
 - 实现位置：`src/vibe3/orchestra/services/governance_service.py`

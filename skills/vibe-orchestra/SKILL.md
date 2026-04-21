@@ -7,7 +7,7 @@ description: Use when the user wants heartbeat-style governance over the issue p
 
 > 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
-`vibe-orchestra` 负责 orchestra 心跳层的 issue pool 治理。它关心的是现在有哪些 issue 正在运行、哪些已满足 assignee 触发条件但尚未进入调度，以及在人机协作环节接下来哪个 issue 值得优先处理。它不负责单 flow 执行。
+`vibe-orchestra` 负责 orchestra 心跳层的 **assignee issue pool** 治理。它关心的范围仅限于 assignee issue pool：现在有哪些 issue 正在运行、哪些已满足 assignee 触发条件但尚未进入调度，以及在人机协作环节接下来哪个 assignee issue 值得优先处理。它不负责单 flow 执行，也不负责 broader repo backlog 的 triage。
 
 ## 概念区别
 
@@ -30,10 +30,10 @@ description: Use when the user wants heartbeat-style governance over the issue p
 
 ## Scope
 
-`vibe-orchestra` 只回答两类问题：
+`vibe-orchestra` 只回答两类问题，且均以 **assignee issue pool** 为前提：
 
-- 现在有哪些 issue 正在运行
-- 在当前现场下，接下来哪个 issue 值得建议优先处理
+- assignee issue pool 中现在有哪些 issue 正在运行
+- 在当前现场下，assignee issue pool 中接下来哪个 issue 值得建议优先处理
 
 这里的“建议 issue”只是参考，不是强制调度结果；最终仍需结合 flow / PR / 人类当前上下文判断。
 
@@ -42,17 +42,20 @@ description: Use when the user wants heartbeat-style governance over the issue p
 - assignee 是启动事实源
 - `state/*` label 只反映 flow 实际状态，不是主触发源
 - 常驻 server 与定时巡检只是运行模式差异，不改变本 skill 的职责边界
-- 自动 ready queue 的建议顺序按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 理解
-- 人机协作时，若某个 issue 已被人类明确接手、已有活跃 PR、或当前上下文要求先收口 follow-up，可临时覆盖自动顺序，但必须说明理由
+- 自动 ready queue 的建议顺序按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 理解，仅作用于 assignee issue pool 内部
+- 人机协作时，若某个 assignee issue 已被人类明确接手、已有活跃 PR、或当前上下文要求先收口 follow-up，可临时覆盖自动顺序，但必须说明理由
+- **不处理 supervisor issue，也不对 broader repo backlog 做 triage**
 
 ## What It Reads
 
-- running issues
-- 尚未启动但可被考虑的候选 issues
-- `uv run python src/vibe3/cli.py task status` 中的 active / ready / blocked 现场与 ready queue rank
-- 当前是否已有人工明确接手的 issue / PR follow-up / review 收口上下文
+以下观察面均以 **assignee issue pool** 为范围：
+
+- running issues（assignee issue pool 中正在运行的 issue）
+- assignee issue pool 中尚未启动但可被考虑的候选 issues
+- `uv run python src/vibe3/cli.py task status` 中 assignee issue 的 active / ready / blocked 现场与 ready queue rank
+- 当前是否已有人工明确接手的 assignee issue / PR follow-up / review 收口上下文
 - assignee 与 queue / flow 现场事实
-- issue state labels
+- assignee issue pool 中 issue 的 state labels
 - dependency information such as blocked_by
 - orchestra heartbeat status 与相关文档
 - `supervisor/governance/assignee-pool.md` 中的 queue guidance 与治理边界
@@ -82,12 +85,12 @@ description: Use when the user wants heartbeat-style governance over the issue p
 
 ## Execution Pattern
 
-1. 查看当前 running issues 与 queue / flow 现场
-2. 补捞已满足 assignee 条件但尚未进入调度的候选 issue
-3. 判断是否已经存在足够明确的执行现场
-4. 参考 `supervisor/governance/assignee-pool.md`，按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 对自动 ready queue 做人机治理判断
-5. 结合当前人工上下文，识别哪些 issue 虽然不在自动顺位最前，但更适合现在先处理
-6. 如有必要，提出最小 non-state label 调整建议
+1. 查看当前 assignee issue pool 中的 running issues 与 queue / flow 现场
+2. 补捞 assignee issue pool 中已满足 assignee 条件但尚未进入调度的候选 issue
+3. 判断 assignee issue pool 中是否已经存在足够明确的执行现场
+4. 参考 `supervisor/governance/assignee-pool.md`，按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 对 assignee issue pool 的自动 ready queue 做人机治理判断
+5. 结合当前人工上下文，识别 assignee issue pool 中哪些 issue 虽然不在自动顺位最前，但更适合现在先处理
+6. 如有必要，提出最小 non-state label 调整建议（仅作用于 assignee issue pool 内）
 7. 在治理结论处停止
 
 ## Output Contract
