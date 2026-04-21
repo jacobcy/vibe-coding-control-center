@@ -69,7 +69,11 @@ class TestCodeagentBackend:
     def test_run_subprocess_filters_installation_noise(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """_run_subprocess filters out uv installation progress noise."""
+        """_run_subprocess filters out uv installation progress noise.
+
+        All output before '-> ' marker is discarded; only output after
+        the marker is shown and captured.
+        """
 
         class FakeStream:
             def __init__(self, chunks: list[str]) -> None:
@@ -87,9 +91,11 @@ class TestCodeagentBackend:
                         "[2mUninstalled 1 package\n",
                         "░░░░░░░░░░░░░░░░░░░░ [0/1] Installing wheels...\n",
                         "████████████████████ [1/1] vibe3==3.0.0\n",
+                        "Installed 1 package in 6ms\n",
                         "-> Executing with gemini...\n",
                         "[codeagent-wrapper]\n",
                         "  Backend: gemini\n",
+                        "line one\n",
                         "",
                     ]
                 )
@@ -105,22 +111,31 @@ class TestCodeagentBackend:
                 timeout_seconds=30,
             )
 
-        # Verify noise is filtered from console output
+        # Verify all noise before marker is filtered from console output
         captured = capsys.readouterr()
         assert "[2m" not in captured.out
         assert "Uninstalled" not in captured.out
         assert "░" not in captured.out
         assert "█" not in captured.out
         assert "Installing wheels" not in captured.out
-        assert "-> Executing with gemini...\n" not in captured.out
+        assert "Installed 1 package" not in captured.out
+
+        # Verify marker itself is filtered but content after is kept
+        assert "-> " not in captured.out
         assert "Executing with gemini...\n" in captured.out
         assert "[codeagent-wrapper]\n" in captured.out
         assert "Backend: gemini\n" in captured.out
+        assert "line one\n" in captured.out
 
-        # Verify complete output captured in return value
+        # Verify complete output after marker captured in return value
         assert "Executing with gemini...\n" in result.stdout
         assert "[codeagent-wrapper]\n" in result.stdout
         assert "Backend: gemini\n" in result.stdout
+        assert "line one\n" in result.stdout
+
+        # Verify noise NOT in return value
+        assert "[2m" not in result.stdout
+        assert "Uninstalled" not in result.stdout
 
     def test_build_prompt_file_content_prepends_global_notice(self) -> None:
         config = VibeConfig(

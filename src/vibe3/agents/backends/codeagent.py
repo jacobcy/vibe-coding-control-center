@@ -264,37 +264,43 @@ class CodeagentBackend:
         ) -> None:
             """Read from stream line-by-line, accumulate, and write to output.
 
-            Filters out uv installation noise (lines before "-> " marker).
+            Filters out uv installation noise by waiting for "-> " marker.
+            All output before the marker is discarded; only output after
+            the marker is shown and captured. If no marker is found,
+            outputs everything (backward compatibility).
             """
+            found_marker = False
+            buffer: list[str] = []  # Buffer lines before marker
+
             for line in iter(stream.readline, ""):
                 if not line:
                     break
 
-                # Filter out uv installation progress noise
-                # Only show lines from "-> " marker onwards
-                if "-> " in line:
-                    # Extract everything after "-> "
+                # Look for the marker that indicates real output starts
+                if "-> " in line and not found_marker:
+                    found_marker = True
+                    # Clear the buffer (discard pre-marker noise)
+                    buffer.clear()
+                    # Extract content after the marker
                     filtered_line = line.split("-> ", 1)[1]
-                    accumulator.append(filtered_line)
-                    output_file.write(filtered_line)
-                    output_file.flush()
-                elif any(
-                    noise in line
-                    for noise in [
-                        "[2m",  # ANSI escape codes
-                        "░",  # Progress bar characters
-                        "█",  # Progress bar characters
-                        "Uninstalled",
-                        "Installing wheels",
-                        "Installed 1 package",
-                    ]
-                ):
-                    # Skip installation noise lines
-                    continue
-                else:
-                    # Keep other lines as-is
+                    if filtered_line.strip():  # Only output if there's content
+                        accumulator.append(filtered_line)
+                        output_file.write(filtered_line)
+                        output_file.flush()
+                elif found_marker:
+                    # After marker found, output everything
                     accumulator.append(line)
                     output_file.write(line)
+                    output_file.flush()
+                else:
+                    # Before marker: buffer the line
+                    buffer.append(line)
+
+            # If no marker was found, output everything (backward compatibility)
+            if not found_marker:
+                for buffered_line in buffer:
+                    accumulator.append(buffered_line)
+                    output_file.write(buffered_line)
                     output_file.flush()
 
         stdout_chunks: list[str] = []
