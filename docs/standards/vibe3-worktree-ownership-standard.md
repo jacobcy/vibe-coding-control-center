@@ -42,7 +42,7 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 ### L1 — Governance Service
 
 - 职责：扫描仓库状态（LOC、标签、规则合规），向 GitHub issue 写入治理结论，发布扫描事件，更新 labels。
-- Worktree：**不需要**。Governance 只读取文件、操作 GitHub API，不修改代码。
+- Worktree：**不需要**（`WorktreeRequirement.NONE`）。Governance 是周期扫描观察，只读取文件、操作 GitHub API，不修改代码，无临时 worktree。
 - 参数要求：`cwd=None`。可在主仓库路径或任意目录执行。禁止使用已移除的 `--worktree` 标志。
 - 实现位置：`src/vibe3/orchestra/services/governance_service.py`
 
@@ -59,7 +59,7 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
   - `dev/issue-*` 是主线开发承载面
   - `task/issue-*` 是自动化承载面
   - 当 `task/issue-*` 现场被旧 PR / 旧 flow / 错误状态污染时，允许 supervisor 直接做 issue 级治理；不要因为“apply”二字就默认只能观察
-- Worktree：需要**临时隔离 worktree**。Apply agent 可能修改文档/配置，需要独立于主仓库的安全空间。
+- Worktree：需要**临时隔离 worktree**（`WorktreeRequirement.TEMPORARY`）。Apply agent 可能修改文档/配置，需要独立于主仓库的安全空间。与 governance scan 不同：apply 是执行治理动作，需要 worktree；governance 是扫描观察，不需要 worktree。
 - 注意：当前实现即使只做 issue/label/comment/close 动作，也仍可能统一分配临时 worktree；这不代表 apply 自动获得代码修改职责，也不意味着所有治理动作都必须转成实现任务。
 - 参数要求：`cwd=wt_path`（由系统自动分配临时隔离路径）。禁止使用已移除的 `--worktree` 标志。
 - 实现位置：`src/vibe3/orchestra/services/supervisor_handoff.py`

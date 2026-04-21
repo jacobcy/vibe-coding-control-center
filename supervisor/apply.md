@@ -1,5 +1,22 @@
 # Supervisor Apply 治理材料
 
+## 边界定义
+
+**允许范围**（supervisor apply 可执行）：
+- 文档治理（更新、校正、格式修复）
+- 过期测试清理（删除明确过期的测试）
+- issue 操作：label、comment、close、recreate
+- 安排 supervisor 任务（创建 supervisor issue）
+
+**禁止范围**（超出范围时委托为 task issue）：
+- 主代码实现（进入 plan/run/review 主执行链）
+- 跨 worktree 操作
+- 修改 CI/CD pipeline
+
+**与 governance 的区别**：
+- supervisor/apply：有临时 worktree，处理 `supervisor` label issue
+- governance scan：无临时 worktree，周期扫描，使用 supervisor/governance/*.md 材料
+
 ## Scope
 
 只回答一个问题：

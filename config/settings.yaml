@@ -602,7 +602,11 @@ orchestra:
     enabled: true
     interval_ticks: 4
     # Supervisor file source: supervisor/<name>.md
-    supervisor_file: "supervisor/orchestra.md"
+    supervisor_file: "supervisor/governance/assignee-pool.md"
+    supervisor_files:
+      - "supervisor/governance/assignee-pool.md"
+      - "supervisor/governance/roadmap-intake.md"
+      - "supervisor/governance/cron-supervisor.md"
     # Template selector: config/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
     # Whether to inline the supervisor file into the composed governance prompt

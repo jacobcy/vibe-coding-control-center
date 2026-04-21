@@ -84,12 +84,14 @@ class TestManagerHandlerIssueFetching:
     """
 
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_github_none(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
+        mock_block_noop: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns None (slow path)."""
@@ -105,14 +107,17 @@ class TestManagerHandlerIssueFetching:
 
         # Should NOT dispatch
         mock_build_request.assert_not_called()
+        mock_block_noop.assert_called_once()
 
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_network_error(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
+        mock_block_noop: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns network error."""
@@ -126,14 +131,17 @@ class TestManagerHandlerIssueFetching:
         handle_manager_dispatch_intent(event)
 
         mock_build_request.assert_not_called()
+        mock_block_noop.assert_called_once()
 
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_invalid_issue_data(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
+        mock_block_noop: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
         """Handler should skip dispatch when from_github_payload returns None."""
@@ -152,6 +160,7 @@ class TestManagerHandlerIssueFetching:
             handle_manager_dispatch_intent(event)
 
         mock_build_request.assert_not_called()
+        mock_block_noop.assert_called_once()
 
 
 class TestManagerHandlerDispatch:
