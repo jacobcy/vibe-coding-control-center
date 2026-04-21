@@ -558,8 +558,8 @@ LabelService().transition(
 - 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
 - 材料来源：`supervisor/governance/*.md`
 - **当前 governance 只观察 assignee issue pool（`supervisor/governance/assignee-pool.md`）**
-- **future roadmap governance（`supervisor/governance/roadmap-intake.md`）负责 broader repo issue pool 扫描和 assignee issue 识别**
-- **future cron governance（`supervisor/governance/cron-supervisor.md`）负责周期性识别治理问题和 supervisor issue 生成**
+- **roadmap governance（`supervisor/governance/roadmap-intake.md`）当前轮换运行但数据源与 assignee-pool 相同；future 获得独立 broader repo issue pool 数据源后，才能实现真正的 broader 扫描和 assignee issue 识别**
+- **cron governance（`supervisor/governance/cron-supervisor.md`）当前轮换运行但数据源与 assignee-pool 相同；future 获得独立 broader repo issue pool 数据源后，才能实现真正的周期性 supervisor issue 生成**
 - 不执行治理动作，只生成结论并写入 GitHub issue
 
 **supervisor/apply**（L2）
@@ -580,8 +580,8 @@ LabelService().transition(
 | 角色 | 处理对象 | 说明 |
 |------|---------|------|
 | governance scan（当前） | assignee issue pool | `supervisor/governance/assignee-pool.md` |
-| governance/roadmap（future） | broader repo issue pool | 识别应进入 assignee issue pool 的候选 |
-| governance/cron（future） | broader repo issue pool | 周期性识别治理问题，建议形成 supervisor issue |
+| governance/roadmap（轮换中） | assignee issue pool（当前）→ broader repo（future） | 当前数据源与 assignee-pool 相同；future 独立数据源后实现 broader 扫描 |
+| governance/cron（轮换中） | assignee issue pool（当前）→ broader repo（future） | 当前数据源与 assignee-pool 相同；future 独立数据源后实现 supervisor issue 生成 |
 | supervisor/apply | supervisor issue | 显式立项的治理 issue，带 `supervisor` label |
 | manager | assignee issue | 已进入执行池的 issue，由 manager 主链推进 |
 

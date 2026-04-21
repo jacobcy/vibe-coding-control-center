@@ -163,8 +163,8 @@ related_docs:
   - broader repo issue pool **不是** assignee issue pool
   - broader repo issue pool **不是** supervisor issue 池
 - 使用规则：
-  - 由 future `governance/roadmap` 从中识别哪些应进入 assignee issue 池
-  - 由 future `governance/cron` 从中识别哪些应形成 supervisor issue
+  - 由 `governance/roadmap` 从中识别哪些应进入 assignee issue 池（当前轮换运行但数据源仍为 assignee issue pool；需独立数据源后才能真正观察 broader pool）
+  - 由 `governance/cron` 从中识别哪些应形成 supervisor issue（当前轮换运行但数据源仍为 assignee issue pool；需独立数据源后才能真正观察 broader pool）
   - 当前 governance scan 不直接处理 broader repo issue pool
 
 ### 3.3.5 `task audit`
