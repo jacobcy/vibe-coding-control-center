@@ -74,7 +74,7 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
         HandoffRecord(
             kind="plan",
             content="# plan",
-            options=AgentOptions(agent="planner"),
+            options=AgentOptions(backend="test-be", model="test-model"),
             session_id="sess-plan",
         )
     )
@@ -82,8 +82,7 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     assert result == artifact
     kwargs = mock_persist.call_args.kwargs
     assert kwargs["event_type"] == "handoff_plan"
-    # Actor expands agent preset to full backend/model via format_agent_actor
-    assert kwargs["flow_state_updates"]["planner_actor"] == "claude/claude-sonnet-4-6"
+    assert kwargs["flow_state_updates"]["planner_actor"] == "test-be/test-model"
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "planner_session_id" not in kwargs["flow_state_updates"]
     assert "plan_ref" not in kwargs["flow_state_updates"]
@@ -140,7 +139,7 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
         HandoffRecord(
             kind="review",
             content="VERDICT: PASS",
-            options=AgentOptions(agent="reviewer"),
+            options=AgentOptions(backend="claude", model="claude-sonnet-4-6"),
             session_id="sess-review",
             metadata={"verdict": "PASS", "comment_count": "3"},
         )
@@ -150,7 +149,6 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
     kwargs = mock_persist.call_args.kwargs
     assert kwargs["event_type"] == "handoff_review"
     assert kwargs["refs"]["verdict"] == "PASS"
-    # Actor expands agent preset to full backend/model via format_agent_actor
     assert kwargs["flow_state_updates"]["reviewer_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "reviewer_session_id" not in kwargs["flow_state_updates"]
@@ -169,15 +167,16 @@ def test_record_handoff_unified_ignores_reserved_metadata_keys(
         HandoffRecord(
             kind="run",
             content="### Modified Files\n- src/foo.py\n",
-            options=AgentOptions(agent="executor"),
+            options=AgentOptions(backend="test-be", model="test-model"),
             metadata={"backend": "fake-backend", "custom": "ok"},
         )
     )
 
     refs = mock_persist.call_args.kwargs["refs"]
-    # backend is resolved from AgentOptions by resolve_actor_backend_model
-    assert refs["backend"] == "opencode"
-    assert refs["model"] == "my-provider/gpt-4o"
+    # metadata["backend"] is a reserved key, resolved from AgentOptions instead
+    assert refs["backend"] == "test-be"
+    assert refs["model"] == "test-model"
+    # custom metadata key is preserved
     assert refs["custom"] == "ok"
 
 
@@ -196,7 +195,7 @@ def test_record_handoff_unified_sanitizes_prompt_before_writing(
                 "<agent-prompt>\nsecret prompt\n</agent-prompt>\n\n"
                 "/writing-plan\n\nplan body\n"
             ),
-            options=AgentOptions(agent="planner"),
+            options=AgentOptions(backend="test-be", model="test-model"),
             session_id="sess-plan",
         )
     )
@@ -223,7 +222,7 @@ def test_record_handoff_unified_uses_sanitized_run_content_for_refs(
                 "- fake/prompt.py\n</agent-prompt>\n\n"
                 "### Modified Files\n- src/real.py: changed\n"
             ),
-            options=AgentOptions(agent="executor"),
+            options=AgentOptions(backend="test-be", model="test-model"),
         )
     )
 
@@ -246,7 +245,7 @@ def test_record_handoff_unified_uses_sanitized_review_content_for_verdict(
             content=(
                 "<agent-prompt>\nVERDICT: PASS\n</agent-prompt>\n\n" "VERDICT: MAJOR\n"
             ),
-            options=AgentOptions(agent="reviewer"),
+            options=AgentOptions(backend="test-be", model="test-model"),
         )
     )
 
@@ -268,7 +267,7 @@ def test_record_handoff_unified_review_prefers_sanitized_content_over_metadata(
             content=(
                 "<agent-prompt>\nVERDICT: BLOCK\n</agent-prompt>\n\n" "VERDICT: MAJOR\n"
             ),
-            options=AgentOptions(agent="reviewer"),
+            options=AgentOptions(backend="test-be", model="test-model"),
             metadata={"verdict": "BLOCK"},
         )
     )
