@@ -16,6 +16,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from vibe3.agents.backends.codeagent_config import find_missing_backend_commands
 from vibe3.clients.git_client import GitClient
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
@@ -328,6 +329,19 @@ def start(
         typer.echo(
             "\nResolve the failed issue manually, transition it back to state/handoff, "
             "then retry serve start."
+        )
+        raise typer.Exit(1)
+
+    missing_backend_commands = find_missing_backend_commands(
+        env_path=os.environ.get("PATH")
+    )
+    if missing_backend_commands:
+        typer.echo("\nOrchestra start blocked by missing backend executables in PATH\n")
+        for backend, command in missing_backend_commands.items():
+            typer.echo(f"- {backend}: expected `{command}` in PATH")
+        typer.echo(
+            "\nFix the shell environment used to launch serve, or update "
+            "`config/models.json` to use only installed backends, then retry."
         )
         raise typer.Exit(1)
 

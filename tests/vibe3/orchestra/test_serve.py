@@ -120,6 +120,34 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
     assert "already exists" in result.stdout.lower()
 
 
+def test_start_async_blocks_when_configured_backend_missing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        OrchestraConfig,
+        "from_settings",
+        lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(
+        "vibe3.orchestra.failed_gate.FailedGate.check",
+        lambda self: GateResult.open(),
+    )
+    monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {"opencode": "opencode"},
+    )
+
+    with patch(
+        "vibe3.config.settings.VibeConfig.get_defaults", return_value=VibeConfig()
+    ):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "start"])
+
+    assert result.exit_code == 1
+    assert "missing backend executables" in result.stdout.lower()
+    assert "opencode" in result.stdout
+
+
 def test_build_async_serve_command_forces_sync_child_process() -> None:
     cmd = _build_async_serve_command(
         OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"), debug=True),
