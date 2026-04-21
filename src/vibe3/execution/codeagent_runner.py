@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, cast
+from typing import cast
 
 from loguru import logger
 from typer import echo
@@ -25,7 +25,10 @@ from vibe3.execution.execution_lifecycle import (
     persist_execution_lifecycle_event,
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
-from vibe3.execution.role_policy import get_role_section
+from vibe3.execution.role_policy import (
+    get_role_pre_gate_callback,
+    get_role_section,
+)
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_recorder_unified import (
@@ -53,18 +56,6 @@ class SyncExecutionContext:
     store: SQLiteClient | None
     before_state_label: str | None
     execution_cwd: Path
-
-
-def _resolve_request_pre_gate_callback(
-    role: ExecutionRole,
-) -> Callable[..., None] | None:
-    """Resolve any role-specific callback that must run before the gate."""
-    if role != "reviewer":
-        return None
-
-    from vibe3.roles.review import _process_review_sync_result
-
-    return _process_review_sync_result
 
 
 class CodeagentExecutionService:
@@ -303,6 +294,6 @@ class CodeagentExecutionService:
             resolved_options=request.options,
             actor=request.actor,
             session_id=request.refs.get("session_id"),
-            pre_gate_callback=_resolve_request_pre_gate_callback(role),
+            pre_gate_callback=get_role_pre_gate_callback(role),
         )
         return self.execute_sync(command)

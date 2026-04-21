@@ -6,6 +6,8 @@ eliminating scattered mappings across multiple modules.
 
 from typing import Callable, Literal
 
+from vibe3.agents.models import ExecutionRole
+
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"
 # which is not part of ExecutionRole (only planner/executor/reviewer)
@@ -57,3 +59,20 @@ def _get_block_functions() -> dict[str, Callable[..., None]]:
 def get_role_block_function(role: str) -> Callable[..., None]:
     """Get the block function for a given role."""
     return _get_block_functions()[role]
+
+
+def get_role_pre_gate_callback(
+    role: ExecutionRole,
+) -> Callable[..., None] | None:
+    """Get role-specific callback that must run before the gate.
+
+    Currently only reviewer has a pre_gate_callback to process audit_ref.
+    Returns None for other roles.
+    """
+    if role != "reviewer":
+        return None
+
+    # Lazy import to avoid circular dependency
+    from vibe3.roles.review import _process_review_sync_result
+
+    return _process_review_sync_result
