@@ -34,16 +34,17 @@
 
 Vibe3 的架构是**协作式制衡**:
 
-- 共同目标明确: 所有角色的目标都是把 issue 从 ready 推进到 done
+- 共同目标分层: Governance (L1) 负责 assignee issue pool 的观察与排序；Manager/Plan/Run/Review (L3) 负责把 assignee issue 从 ready 推进到 done；Supervisor/Apply (L2) 负责 supervisor issue 的治理执行。三者不是同一条执行链
 - 边界清晰: 每个角色有明确的 Allowed / Forbidden list
-- 有共同真源: `state/*` labels 是统一的状态机真源
+- 有分层真源: assignee issue 的状态由 flow 状态管理，supervisor issue 由 supervisor/apply 管理，`state/*` 标签仅为可选镜像
 - 有仲裁机制: 人类评论 > Orchestra 系统 > 各角色
 
 ### 2.2 这是"三权分立"的制衡架构
 
 | 分支 | 对应角色 | 权力 | 制衡机制 |
 |------|----------|------|----------|
-| 立法 / 观察 | Governance (L1) | 观察、建议、写 `[governance suggest]` | 无强制执行权，只能通过建议影响 Manager |
+| 立法 / 观察 | Governance (L1) | 观察 assignee pool、建议、写 `[governance suggest]` | 无强制执行权，只能通过建议影响 Manager |
+| 治理执行 | Supervisor/Apply (L2) | 处理 supervisor issue、close/recreate 治理 issue | Manager 不干预 supervisor issue；人类可 override |
 | 行政 / 执行 | Manager + Plan / Run (L3) | 状态机推进、代码实现、PR 产出 | Review 可 BLOCK; Orchestra 系统可强制回退 |
 | 司法 / 审计 | Review (L3) | PASS / MAJOR / BLOCK 裁决 | Manager 可覆盖 UNKNOWN / 判定 review 不可信 |
 
@@ -92,7 +93,6 @@ apply:
     - issue: 可 close / recreate 治理 issue
     - label: 可读写（限 supervisor label issue）
   can_be_overridden_by:
-    - manager: state 流转权
     - human: comment 指导
   teeth: limited_execution
 
@@ -141,17 +141,21 @@ review:
 - Orchestra 系统应将"Manager 覆盖 BLOCK verdict"作为 observability event 记录，供人类审计
 - 覆盖条件已在 `supervisor/manager.md` 中限定: "review 内容空洞、与 diff 矛盾"
 
-### 4.3 Apply 与 Manager 的领土重叠
+### 4.3 Apply 与 Manager 的边界串扰风险
 
 **现状**:
 
 - Apply 处理 `supervisor` label issue，可 close / recreate
-- Manager 处理 `dev/issue-*`，控制 state 流转
-- 两者都操作 issue labels / comments
+- Manager 处理 assignee issue，推进主执行闭环
+- 两者都可能操作 issue labels / comments，但对象池应分离
 
-**风险**: 竞态。若一个 issue 同时有 `supervisor` 和 `state/*` label，双方可能同时操作。
+**风险**: 如果治理 issue 与 assignee issue 分类错误，或同一个 issue 同时被当成 `supervisor issue` 和 assignee issue，两条链会出现串扰。
 
-**缓解**: 明确标签互斥规则 —— `supervisor` label 的 issue 不应同时有 `state/*` label，或至少不应同时处于 Manager 的状态机控制下。
+**缓解**:
+
+- 明确 issue pool 分离规则：`supervisor issue` 不进入 Manager 主链，assignee issue 不交给 Apply
+- `supervisor` label issue 不应同时作为 Manager 正在推进的 assignee issue
+- 如果发现分类错误，应由 governance/roadmap 或人工纠正 issue 类型，而不是让两条链同时处理
 
 ## 5. 风险矩阵
 

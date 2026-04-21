@@ -85,14 +85,18 @@
 
 | 标签名称 | 含义 | 示例命令 |
 |---------|------|----------|
-| `state/ready` | 可认领 | `gh issue edit 123 --add-label "state/ready"` |
-| `state/claimed` | 已认领，待进入执行 | `gh issue edit 123 --add-label "state/claimed"` |
-| `state/in-progress` | 执行中 | `gh issue edit 123 --add-label "state/in-progress"` |
-| `state/blocked` | 阻塞中 | `gh issue edit 123 --add-label "state/blocked"` |
-| `state/handoff` | 待交接 | `gh issue edit 123 --add-label "state/handoff"` |
-| `state/review` | 待 review | `gh issue edit 123 --add-label "state/review"` |
-| `state/merge-ready` | 已满足合并条件 | `gh issue edit 123 --add-label "state/merge-ready"` |
-| `state/done` | 已完成 | `gh issue edit 123 --add-label "state/done"` |
+| `state/ready` | 可认领 | 通常由自动化镜像，不建议手工维护 |
+| `state/claimed` | 已认领，待进入执行 | 通常由自动化镜像，不建议手工维护 |
+| `state/in-progress` | 执行中 | 通常由自动化镜像，不建议手工维护 |
+| `state/blocked` | 阻塞中 | 通常由自动化镜像，不建议手工维护 |
+| `state/handoff` | 待交接 | 通常由自动化镜像，不建议手工维护 |
+| `state/review` | 待 review | 通常由自动化镜像，不建议手工维护 |
+| `state/merge-ready` | 已满足合并条件 | 通常由自动化镜像，不建议手工维护 |
+| `state/done` | 已完成 | 通常由自动化镜像，不建议手工维护 |
+
+说明：
+- assignee issue 的执行状态优先以 flow 状态与 orchestration scene 为准
+- `state/*` 标签是可选镜像，不是执行态主真源
 
 ---
 
@@ -153,10 +157,10 @@ gh issue list --milestone "Phase 1: 基础设施"
 | 中优先级 bug 修复 | `type/fix` + `priority/medium` + `roadmap/p1` |
 | 低优先级文档更新 | `type/docs` + `priority/low` + `roadmap/p2` |
 | 需要讨论的设计 | `type/feature` + `roadmap/rfc` |
-| 正在执行的任务 | `vibe-task` + `state/in-progress` |
-| 被阻塞的任务 | `vibe-task` + `state/blocked` |
-| 待 review 的任务 | `vibe-task` + `state/review` |
-| 已完成的任务 | `vibe-task` + `state/done` |
+| 正在执行的任务 | `vibe-task`（flow bind 自动镜像）+ `state/in-progress`（可选） |
+| 被阻塞的任务 | `vibe-task`（flow bind 自动镜像）+ `state/blocked`（可选） |
+| 待 review 的任务 | `vibe-task`（flow bind 自动镜像）+ `state/review`（可选） |
+| 已完成的任务 | `vibe-task`（flow bind 自动镜像）+ `state/done`（可选） |
 
 ---
 

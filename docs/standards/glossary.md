@@ -75,18 +75,17 @@ related_docs:
 
 - 正式术语：`roadmap item`
 - 别称：`规划项`
-- 定义：写入 `roadmap.json` 的规划层工作单元，是 mirrored `GitHub Project item` 的本地表达。
+- 定义：规划层工作单元概念，用于表达版本规划窗口中的工作项。当前 governance 以 GitHub issue 直接为管理对象，不经过 roadmap item 中间层转换；`roadmap.json` 与 `GitHub Project` 仅为历史兼容的 mirror/cache 形式，不作为主真源。
 - 边界：
   - `roadmap item` 不是 execution record
   - `roadmap item` 不表达 branch/worktree 当前态
 - 落点：
   - 规划语义见 [command-standard.md](command-standard.md)
-  - 文件边界见 [roadmap-json-standard.md](roadmap-json-standard.md)
 - 使用规则：
-  - `feature` / `task` / `bug` 是 roadmap item 的 `type`
   - 讨论 `p0/current/next/deferred/rejected` 时使用 `roadmap item`
-  - `roadmap item` 是 planning 中间层，不是用户默认主链锚点
+  - `roadmap item` 是 planning 层概念，不是执行层真源
   - 不要把 roadmap 状态当成分支当前执行状态
+  - 当前 governance 直接管理 assignee issue，不经过 roadmap item -> task 转换链
 
 ### 3.3 `task`
 
@@ -102,8 +101,8 @@ related_docs:
   - 文件字段见 [registry-json-standard.md](registry-json-standard.md)
 - 使用规则：
   - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
-  - 一个 `type=feature` 的 roadmap item 可以拆出多个执行层 `task` 语义
-  - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
+  - `task` 是 flow 建立后的 execution bridge，不是 roadmap item 的下游产物
+  - `task` 不是用户默认主链的第一锚点
   - 当前公共 CLI 读路径已收敛到 `flow show` / `flow status` / `status`，不再默认要求独立 `vibe3 task` 命令
   - GitHub issue 可以被关联为一个或多个 `task`（在不同 flow 中）
 
@@ -111,9 +110,10 @@ related_docs:
 
 - 正式术语：`task issue`
 - 别称：无
-- 定义：**vibe3 视角概念**，指被 vibe3 管理的 GitHub issue。判定标准：
+- 定义：**vibe3 视角概念**，指被 vibe3 纳入 flow 管理的 assignee issue。判定标准：
   - 在 SQLite `flow_issue_links` 中有记录，`issue_role = task` 或 `dependency`
-  - GitHub issue 有 `vibe-task` 标签（由 vibe3 自动管理）
+  - 对应的 issue 属于 assignee issue pool（由 manager 主链推进）
+  - `vibe-task` 标签由 flow bind 自动镜像，是副作用，不作为 governance 的判定依据
 - 边界：
   - task issue **不是**新的 GitHub 对象类型
   - task issue **不是**与 GitHub issue 平行的新实体
@@ -179,7 +179,7 @@ related_docs:
   - 讨论 task registry、分支、OpenSpec、plans 的执行层核对时使用 `task audit`
   - 不要把 `task audit` 表述成 GitHub Project 同步
 
-### 3.3.4 `OpenSpec 注册`
+### 3.3.6 `OpenSpec 注册`
 
 - 正式术语：`OpenSpec 注册`
 - 别称：`OpenSpec execution spec 来源桥接`
@@ -191,7 +191,7 @@ related_docs:
   - 讨论 `spec_standard/spec_ref` 来源时使用 `OpenSpec 注册`
   - 不要把 OpenSpec change 直接说成 roadmap item 或 task 本体
 
-### 3.3.5 `milestone`
+### 3.3.7 `milestone`
 
 - 正式术语：`milestone`
 - 别称：无
@@ -222,7 +222,7 @@ related_docs:
   - 状态定义：`flow_status` 字段在 `flow_state` 表
 - 使用规则：
   - 讨论当前交付切片、由 branch 锚定且由 worktree 承载的任务现场时使用 `flow`
-  - 讨论用户正在推进哪个目标时，默认优先从 `repo issue -> flow` 叙述
+  - 讨论用户正在推进哪个目标时，默认优先从 `GitHub issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
 
 ### 3.4.1 Flow Status 语义

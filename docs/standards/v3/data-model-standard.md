@@ -29,7 +29,7 @@ related_docs:
 
 - [database-schema-standard.md](database-schema-standard.md)
 
-本文档涉及的 `repo issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](glossary.md) 为准。
+本文档涉及的 `GitHub issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](glossary.md) 为准。
 
 ## 1. Scope
 
@@ -42,8 +42,8 @@ related_docs:
    - `task_execution` 表：task 执行记录（V3 暂不实现，预留）
 
 2. **GitHub 外部真源**
-   - GitHub Issues：repo issue 真源
-   - GitHub Projects：roadmap item 真源
+   - GitHub Issues：GitHub issue 真源
+   - GitHub Projects：roadmap 规划参考，不作为执行层真源
    - GitHub Pull Requests：PR 真源
 
 ## 2. Canonical Tables
@@ -80,9 +80,9 @@ related_docs:
 
 ### 2.2 GitHub 外部真源
 
-- **GitHub Issues**：`repo issue` 真源，通过 GitHub API 读写
-- **GitHub Projects**：`roadmap item` 真源，GitHub Project item 的 mirror/cache
-- **GitHub Pull Requests**：`PR` 真源，通过 GitHub API 读写
+- **GitHub Issues**：GitHub issue 真源，通过 GitHub API 读写
+- **GitHub Projects**：roadmap 规划参考，不作为执行层真源
+- **GitHub Pull Requests**：PR 真源，通过 GitHub API 读写
 
 ## 3. Layer Ownership
 
@@ -91,17 +91,17 @@ related_docs:
 - **SQLite `flow_state` 表** = 执行态（当前开放 flow 的运行时状态真源）
 - **SQLite `flow_issue_links` 表** = flow 与 GitHub issue 的关联关系真源
 - **SQLite `flow_worktrees` 表** = 开放现场的兼容期 cache / audit hint
-- **GitHub Issues** = repo issue 外部真源
-- **GitHub Projects** = roadmap item 外部真源
+- **GitHub Issues** = GitHub issue 外部真源
+- **GitHub Projects** = roadmap 规划参考，不作为执行层真源
 - **GitHub Pull Requests** = PR 外部真源
 
 补充约束：
 
-- `repo issue` 是外部来源对象（GitHub），不是本地执行对象
+- `GitHub issue` 是外部来源对象，不是本地执行对象
 - `openspec` 属于执行层输入，不属于规划层来源
-- `roadmap item` 是 mirrored `GitHub Project item`
+- `roadmap item` 仅为历史兼容的 mirror/cache 概念，当前 governance 直接管理 assignee issue，不经过 roadmap item 中间层转换
 - GitHub 官方对象语义必须原样保留；项目自定义语义只能作为扩展字段叠加
-- `feature` / `task` / `bug` 在规划层默认解释为 roadmap item `type`
+- `feature` / `task` / `bug` 是 GitHub issue 的 label 分类，当前 governance 直接管理 assignee issue，不经过 roadmap item type 转换
 - `task` 是 execution record，不等于 roadmap item 的 `type=task`
 - `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
 - `milestone` 属于 roadmap 规划窗口锚点，不属于 flow runtime 字段
@@ -183,33 +183,28 @@ related_docs:
 
 允许的实体关系如下：
 
-- repo issue 与 roadmap item：多对多
-- repo issue 与 task：多对多
-- roadmap item 与 task：多对多
-- roadmap item 与 roadmap item：可以存在依赖关系，具体方案仍在参考材料中收敛
-- milestone 与 roadmap item：一对多
+- GitHub issue 与 flow：多对多（一个 issue 可在不同 flow 中作为 task，一个 flow 可关联多个 issue role）
+- GitHub issue 与 task：多对多（task 是 execution bridge，issue 是外部真源）
+- roadmap item 与 GitHub issue：历史上为多对多（当前 governance 直接管理 assignee issue，不经过 roadmap item 中间层）
+- milestone 与 roadmap item：一对多（规划层概念）
 - flow 与 task：一对多
 - PR 与 task：一对一
 - task 与相关 task：通过 `related_task_ids` 建立关联
 
 补充约束：
 
-- 用户主视角主链是 `repo issue -> flow -> plan/spec -> commit -> PR -> done`
-- 内部桥接链保留为 `repo issue -> roadmap item -> task -> flow`
-- `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
-- roadmap item 与 task 只建立关联关系，不共享身份
-- roadmap item 是 mirrored GitHub Project item，不是 execution record
+- 用户主视角主链是 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done`
+- 旧桥接链 `GitHub issue -> roadmap item -> task -> flow` 仅为历史兼容描述，当前 governance 直接管理 assignee issue，不经过 roadmap item 中间层转换
+- GitHub issue 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
+- roadmap item 与 task 历史上建立关联关系，不共享身份；当前 governance 不依赖此关联
+- roadmap item 仅为历史兼容的 mirror/cache 概念，不是 execution record
 - 若 task 有多个 `issue_refs`，可指定其中一个作为主闭环 issue；该角色称为 `task issue`
 - `ready` / `blocked` / `blockers` 若存在，应作为派生视图而非共享真源持久化字段
-- `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
-- task 是 execution record / execution bridge，不等于 GitHub Project `type=task` item 本体
+- task 是 execution record / execution bridge，不等于 roadmap item 的规划分类
 - milestone 只锚定规划窗口，不直接驱动 runtime 切换
 - GitHub 官方字段与 Vibe 扩展字段必须可双向同步，且扩展字段不得改写官方对象身份
 - task 只允许绑定一个主 PR
 - task 不允许跨多个 PR
-- roadmap item 可以关联多个 task
-- 一个 `type=feature` 的 roadmap item 可以关联多个 `task` execution record
-- roadmap item 是 planning 中间层，task 是 flow 建立后的 execution bridge
 - task 可以关联多个 issue ref
 - `flow` 只属于执行层，不承担规划层关系建模
 
