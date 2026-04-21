@@ -533,3 +533,48 @@ Traceback (most recent call last):
         assert captured.out == "streamed stdout\n"
         assert captured.err == "streamed stderr\n"
         assert result.exit_code == 0
+
+    def test_run_subprocess_streams_and_captures_full_output(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify _run_subprocess streams live AND returns complete output."""
+
+        class FakeStream:
+            def __init__(self, chunks: list[str]) -> None:
+                self._chunks = iter(chunks)
+
+            def readline(self) -> str:
+                return next(self._chunks, "")
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs) -> None:
+                self.args = args[0]
+                self.returncode = 42
+                self.stdout = FakeStream(
+                    ["line one\n", "line two\n", "line three\n", ""]
+                )
+                self.stderr = FakeStream(
+                    ["warning: deprecated\n", "error: failed\n", ""]
+                )
+
+            def wait(self, timeout: int | None = None) -> int:
+                return self.returncode
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
+            result = CodeagentBackend._run_subprocess(
+                ["codeagent-wrapper", "run"],
+                project_root=str(tmp_path),
+                timeout_seconds=30,
+            )
+
+        # Verify streaming output went to console
+        captured = capsys.readouterr()
+        assert captured.out == "line one\nline two\nline three\n"
+        assert captured.err == "warning: deprecated\nerror: failed\n"
+
+        # Verify complete output captured in return value
+        assert result.stdout == "line one\nline two\nline three\n"
+        assert result.stderr == "warning: deprecated\nerror: failed\n"
+
+        # Verify return code preserved
+        assert result.returncode == 42
