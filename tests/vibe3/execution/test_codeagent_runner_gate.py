@@ -342,3 +342,70 @@ class TestExecuteSyncGateIntegration:
             stdout="review output",
         )
         mock_gate.assert_called_once()
+
+    def test_execute_sync_runs_handoff_callback_and_noop_gate_in_order(
+        self,
+    ) -> None:
+        """execute_sync must run handoff -> callback -> gate in that order."""
+        from pathlib import Path
+
+        agent_result = _make_mock_agent_result(stdout="verdict: APPROVE")
+        mock_store = _make_mock_store()
+
+        events: list[str] = []
+
+        def fake_record(*args, **kwargs) -> Path | None:
+            events.append("handoff")
+            return Path("/tmp/handoff.md")
+
+        def fake_callback(**kwargs) -> None:
+            events.append("callback")
+
+        def fake_gate(**kwargs) -> None:
+            events.append("gate")
+
+        command = CodeagentCommand(
+            role="reviewer",
+            context_builder=lambda: "review prompt",
+            branch="task/issue-99",
+            issue_number=99,
+            pre_gate_callback=fake_callback,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:review",
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                side_effect=fake_record,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
+                side_effect=fake_gate,
+            ),
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+            service = CodeagentExecutionService()
+            result = service.execute_sync(command)
+
+        assert result.success
+        assert events == ["handoff", "callback", "gate"]

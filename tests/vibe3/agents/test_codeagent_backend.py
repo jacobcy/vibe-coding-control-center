@@ -495,3 +495,41 @@ Traceback (most recent call last):
 
         command = mock_run.call_args[0][0]
         assert "--worktree" not in command
+
+    def test_run_does_not_double_print_when_subprocess_already_streams(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Backend must not double-print when _run_subprocess already streams."""
+        # Setup: _run_subprocess streams to stdout/stderr AND returns captured text
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "streamed stdout\n"
+        mock_result.stderr = "streamed stderr\n"
+
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
+            # Simulate streaming: _run_subprocess writes to sys.stdout/stderr
+            import sys
+
+            original_stdout = sys.stdout
+            original_stderr = sys.stderr
+
+            try:
+                sys.stdout.write("streamed stdout\n")
+                sys.stdout.flush()
+                sys.stderr.write("streamed stderr\n")
+                sys.stderr.flush()
+
+                mock_run.return_value = mock_result
+                backend = CodeagentBackend()
+                result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
+            finally:
+                sys.stdout = original_stdout
+                sys.stderr = original_stderr
+
+        # Read what was actually printed
+        captured = capsys.readouterr()
+
+        # Expectation: Only the streamed output, no additional print
+        assert captured.out == "streamed stdout\n"
+        assert captured.err == "streamed stderr\n"
+        assert result.exit_code == 0
