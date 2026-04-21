@@ -11,17 +11,12 @@ from vibe3.execution.actor_support import (
     format_agent_actor,
     resolve_actor_backend_model,
 )
+from vibe3.execution.role_policy import get_kind_actor_key
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
 
 HandoffKind = Literal["plan", "run", "review"]
-
-_ACTOR_ROLE_BY_KIND: dict[HandoffKind, str] = {
-    "plan": "planner_actor",
-    "run": "executor_actor",
-    "review": "reviewer_actor",
-}
 
 _RESERVED_REF_KEYS = {
     "ref",
@@ -170,7 +165,7 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         refs["log_path"] = str(inferred_log_path)
 
     flow_state_updates: dict[str, object] = {
-        _ACTOR_ROLE_BY_KIND[record.kind]: actor,
+        get_kind_actor_key(record.kind): actor,
     }
 
     handoff_service.persist_artifact_event(

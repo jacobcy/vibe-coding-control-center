@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Literal, cast
+from typing import Callable, cast
 
 from loguru import logger
 from typer import echo
@@ -25,6 +25,7 @@ from vibe3.execution.execution_lifecycle import (
     persist_execution_lifecycle_event,
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
+from vibe3.execution.role_policy import get_role_section
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_recorder_unified import (
@@ -89,15 +90,9 @@ class CodeagentExecutionService:
             handoff_kind=command.handoff_kind,
         )
 
-        role_to_section: dict[str, Literal["manager", "plan", "run", "review"]] = {
-            "manager": "manager",
-            "planner": "plan",
-            "executor": "run",
-            "reviewer": "review",
-        }
         options = command.resolved_options or resolve_command_agent_options(
             config=self.config,
-            section=role_to_section[command.role],
+            section=get_role_section(command.role),
             agent=command.agent,
             backend=command.backend,
             model=command.model,
