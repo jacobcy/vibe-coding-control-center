@@ -244,14 +244,27 @@ class TestStartAsyncCommand:
 class TestRunStreamingAndEdgeCases:
     def test_run_streams_output_while_capturing(self, capsys) -> None:
         """Runner should stream wrapper output to console and capture it."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "line one\nVERDICT: PASS\n"
-        mock_result.stderr = ""
+        # Note: After refactoring, _run_subprocess() is the single source of streaming.
+        # When we mock it, we need to simulate the actual streaming behavior.
 
-        with patch.object(
-            CodeagentBackend, "_run_subprocess", return_value=mock_result
-        ):
+        class FakeStream:
+            def __init__(self, chunks: list[str]) -> None:
+                self._chunks = iter(chunks)
+
+            def readline(self) -> str:
+                return next(self._chunks, "")
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs) -> None:
+                self.args = args[0]
+                self.returncode = 0
+                self.stdout = FakeStream(["line one\n", "VERDICT: PASS\n", ""])
+                self.stderr = FakeStream([""])
+
+            def wait(self, timeout: int | None = None) -> int:
+                return self.returncode
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
