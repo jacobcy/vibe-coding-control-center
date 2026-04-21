@@ -6,14 +6,14 @@ from typing import Callable
 from loguru import logger
 
 from vibe3.domain.events import DomainEvent
-from vibe3.domain.events.flow_lifecycle import ManagerDispatched
+from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
 from vibe3.services.issue_failure_service import fail_manager_issue
 
 
-def handle_manager_dispatched(event: ManagerDispatched) -> None:
+def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
     """Dispatch manager from an authoritative dispatch-intent event."""
     if event.actor == "human:resume":
         logger.bind(
@@ -170,9 +170,15 @@ def register_issue_state_dispatch_handlers() -> None:
 
     from vibe3.domain.publisher import subscribe
 
+    # Subscribe to new event name
+    subscribe(
+        "ManagerDispatchIntent",
+        cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
+    )
+    # Backward compatibility: subscribe to old event name
     subscribe(
         "ManagerDispatched",
-        cast(Callable[[DomainEvent], None], handle_manager_dispatched),
+        cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
     )
 
     logger.bind(domain="events").info("Issue-state role dispatch handlers registered")

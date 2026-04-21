@@ -311,16 +311,20 @@ Traceback (most recent call last):
             stderr="",
         )
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
-            mock_run.side_effect = [invalid_resume, fresh_success]
-            backend = CodeagentBackend()
+        with patch(
+            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            return_value=VibeConfig(),
+        ):
+            with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+                mock_run.side_effect = [invalid_resume, fresh_success]
+                backend = CodeagentBackend()
 
-            result = backend.run(
-                "prompt body",
-                AgentOptions(agent="vibe-reviewer"),
-                task="custom task",
-                session_id="11111111-1111-1111-1111-111111111111",
-            )
+                result = backend.run(
+                    "prompt body",
+                    AgentOptions(agent="vibe-reviewer"),
+                    task="custom task",
+                    session_id="11111111-1111-1111-1111-111111111111",
+                )
 
         assert result.exit_code == 0
         assert result.session_id == "262f0fea-eacb-4223-b842-b5b5097f94e8"
@@ -340,16 +344,20 @@ Traceback (most recent call last):
             stderr="fatal error\n",
         )
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
-            mock_run.return_value = hard_failure
-            backend = CodeagentBackend()
+        with patch(
+            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            return_value=VibeConfig(),
+        ):
+            with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+                mock_run.return_value = hard_failure
+                backend = CodeagentBackend()
 
-            with pytest.raises(AgentExecutionError):
-                backend.run(
-                    "prompt body",
-                    AgentOptions(agent="vibe-reviewer"),
-                    session_id="11111111-1111-1111-1111-111111111111",
-                )
+                with pytest.raises(AgentExecutionError):
+                    backend.run(
+                        "prompt body",
+                        AgentOptions(agent="vibe-reviewer"),
+                        session_id="11111111-1111-1111-1111-111111111111",
+                    )
 
         assert mock_run.call_count == 1
 

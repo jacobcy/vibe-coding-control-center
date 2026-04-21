@@ -17,7 +17,7 @@ from vibe3.models.review_runner import AgentOptions
 @patch.object(
     ExecutionRolePolicyService,
     "resolve_effective_agent_options",
-    return_value=AgentOptions(backend="claude", model="sonnet"),
+    return_value=AgentOptions(backend="test-be", model="test-model"),
 )
 def test_resolve_governance_returns_agent_options(mock_resolve):
     config = OrchestraConfig()
@@ -29,7 +29,7 @@ def test_resolve_governance_returns_agent_options(mock_resolve):
 @patch.object(
     ExecutionRolePolicyService,
     "resolve_effective_agent_options",
-    return_value=AgentOptions(backend="claude", model="sonnet"),
+    return_value=AgentOptions(backend="test-be", model="test-model"),
 )
 def test_resolve_supervisor_returns_agent_options(mock_resolve):
     config = OrchestraConfig()
@@ -41,12 +41,12 @@ def test_resolve_supervisor_returns_agent_options(mock_resolve):
 @patch.object(
     ExecutionRolePolicyService,
     "resolve_effective_agent_options",
-    return_value=AgentOptions(backend="gemini", model="gemini-3-flash-preview"),
+    return_value=AgentOptions(backend="test-be", model="test-model"),
 )
 def test_resolve_manager_returns_agent_options(mock_resolve):
     config = OrchestraConfig()
-    config.assignee_dispatch.backend = "gemini"
-    config.assignee_dispatch.model = "gemini-3-flash-preview"
+    config.assignee_dispatch.backend = "test-be"
+    config.assignee_dispatch.model = "test-model"
     runtime_config = MagicMock()
     result = resolve_manager_agent_options(config, runtime_config)
     assert isinstance(result, AgentOptions)

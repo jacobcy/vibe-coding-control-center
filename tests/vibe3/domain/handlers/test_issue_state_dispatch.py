@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.domain.events.flow_lifecycle import ManagerDispatched
+from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 
 
 class TestIssueStateDispatchHandler:
@@ -18,11 +18,11 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_manager_dispatched,
+            handle_manager_dispatch_intent,
         )
 
-        handle_manager_dispatched(
-            ManagerDispatched(
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="ready",
@@ -45,7 +45,9 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_manager_dispatch_intent,
+        )
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
@@ -61,8 +63,8 @@ class TestIssueStateDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_manager_dispatched(
-            ManagerDispatched(
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="ready",
@@ -83,7 +85,9 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_manager_dispatch_intent,
+        )
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
@@ -99,8 +103,8 @@ class TestIssueStateDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_manager_dispatched(
-            ManagerDispatched(
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="handoff",
@@ -112,11 +116,11 @@ class TestIssueStateDispatchHandler:
 
     def test_unknown_state_no_dispatch(self) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
-            handle_manager_dispatched,
+            handle_manager_dispatch_intent,
         )
 
-        handle_manager_dispatched(
-            ManagerDispatched(
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="claimed",
@@ -136,7 +140,9 @@ class TestIssueStateDispatchHandler:
         mock_registry_cls: MagicMock,
         mock_fail_issue: MagicMock,
     ) -> None:
-        from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_manager_dispatch_intent,
+        )
 
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
@@ -146,8 +152,8 @@ class TestIssueStateDispatchHandler:
         mock_coordinator = MagicMock()
         mock_coordinator_cls.return_value = mock_coordinator
 
-        handle_manager_dispatched(
-            ManagerDispatched(
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="ready",

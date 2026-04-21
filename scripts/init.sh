@@ -124,7 +124,7 @@ echo "📦 Initializing OpenSpec..."
 if [[ -d "openspec/specs" || -f "openspec/config.yaml" ]]; then
   echo "✅ OpenSpec already initialized"
 elif command -v openspec &> /dev/null; then
-  openspec init --tools claude,codex,gemini,opencode,qoder,codebuddy,trae
+  openspec init --tools claude,codex,opencode,qoder,codebuddy,trae
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping.\033[0m"
   echo "   Install via: pnpm add -g @openspec/tools"

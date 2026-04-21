@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from vibe3.domain.events import (
-    ExecutorDispatched,
-    ManagerDispatched,
-    PlannerDispatched,
-    ReviewerDispatched,
+    ExecutorDispatchIntent,
+    ManagerDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
 )
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
@@ -35,7 +35,12 @@ def build_label_dispatch_event(
     issue: IssueInfo,
     *,
     branch: str,
-) -> ManagerDispatched | PlannerDispatched | ExecutorDispatched | ReviewerDispatched:
+) -> (
+    ManagerDispatchIntent
+    | PlannerDispatchIntent
+    | ExecutorDispatchIntent
+    | ReviewerDispatchIntent
+):
     """Build the authoritative domain event for a label-triggered role.
 
     Dispatch layer emits neutral intents only -- no execution-specific
@@ -44,26 +49,26 @@ def build_label_dispatch_event(
     """
     trigger = role.trigger_name
     if trigger == "manager":
-        return ManagerDispatched(
+        return ManagerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=role.trigger_state.value,
             issue_title=issue.title if issue.title else None,
         )
     if trigger == "plan":
-        return PlannerDispatched(
+        return PlannerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.CLAIMED.value,
         )
     if trigger == "run":
-        return ExecutorDispatched(
+        return ExecutorDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.IN_PROGRESS.value,
         )
     if trigger == "review":
-        return ReviewerDispatched(
+        return ReviewerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.REVIEW.value,

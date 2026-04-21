@@ -10,8 +10,8 @@ Tests cover:
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.domain.events.flow_lifecycle import ManagerDispatched
-from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatched
+from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
+from vibe3.domain.handlers.issue_state_dispatch import handle_manager_dispatch_intent
 from vibe3.models.orchestration import IssueState
 
 
@@ -21,9 +21,9 @@ def _make_event(
     branch: str = "task/issue-42",
     issue_title: str | None = None,
     actor: str = "orchestra:dispatcher",
-) -> ManagerDispatched:
-    """Create a sample ManagerDispatched event."""
-    return ManagerDispatched(
+) -> ManagerDispatchIntent:
+    """Create a sample ManagerDispatchIntent event."""
+    return ManagerDispatchIntent(
         issue_number=issue_number,
         branch=branch,
         trigger_state=trigger_state,
@@ -63,7 +63,7 @@ class TestManagerHandlerGuardLogic:
         event = _make_event(trigger_state="in-progress")
 
         # Should not raise and should not create any services
-        handle_manager_dispatched(event)
+        handle_manager_dispatch_intent(event)
 
         # No services should be created for non-trigger states
         mock_config_cls.from_settings.assert_not_called()
@@ -73,7 +73,7 @@ class TestManagerHandlerGuardLogic:
         event = _make_event(actor="human:resume")
 
         # Should not raise and should not create any services
-        handle_manager_dispatched(event)
+        handle_manager_dispatch_intent(event)
 
 
 class TestManagerHandlerIssueFetching:
@@ -101,7 +101,7 @@ class TestManagerHandlerIssueFetching:
 
         # No issue_title triggers slow path
         event = _make_event(issue_title=None)
-        handle_manager_dispatched(event)
+        handle_manager_dispatch_intent(event)
 
         # Should NOT dispatch
         mock_build_request.assert_not_called()
@@ -123,7 +123,7 @@ class TestManagerHandlerIssueFetching:
         mock_github_cls.return_value = mock_github
 
         event = _make_event(issue_title=None)
-        handle_manager_dispatched(event)
+        handle_manager_dispatch_intent(event)
 
         mock_build_request.assert_not_called()
 
@@ -149,7 +149,7 @@ class TestManagerHandlerIssueFetching:
             "vibe3.models.orchestration.IssueInfo.from_github_payload",
             return_value=None,
         ):
-            handle_manager_dispatched(event)
+            handle_manager_dispatch_intent(event)
 
         mock_build_request.assert_not_called()
 
@@ -183,7 +183,7 @@ class TestManagerHandlerDispatch:
         # Provide issue_title to use the fast path
         event = _make_event(issue_title="Test issue")
 
-        handle_manager_dispatched(event)
+        handle_manager_dispatch_intent(event)
 
         # Verify build_manager_request was called
         mock_build_request.assert_called_once()
