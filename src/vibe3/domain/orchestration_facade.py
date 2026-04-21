@@ -44,6 +44,7 @@ class OrchestrationFacade(ServiceBase):
     def __init__(
         self,
         tick_count: int = 0,
+        config: OrchestraConfig | None = None,
         dispatch_services: list[StateLabelDispatchService] | None = None,
         capacity: CapacityService | None = None,
         failed_gate: "FailedGate | None" = None,
@@ -52,6 +53,8 @@ class OrchestrationFacade(ServiceBase):
 
         Args:
             tick_count: Initial tick count for governance scan tracking
+            config: Runtime orchestra config. When omitted, falls back to
+                settings-based defaults for tests and direct construction.
             dispatch_services: Optional list of issue-polling dispatch services
                 (StateLabelDispatchService instances). When provided, their
                 on_tick() methods are called concurrently from this facade's
@@ -66,7 +69,7 @@ class OrchestrationFacade(ServiceBase):
                 here; gating belongs on the authoritative sync execution path.
         """
         self._tick_count = tick_count
-        self._config = OrchestraConfig.from_settings()
+        self._config = config or OrchestraConfig.from_settings()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
         self._dispatch_services = list(dispatch_services or [])

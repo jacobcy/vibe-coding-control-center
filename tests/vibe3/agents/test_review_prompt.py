@@ -214,3 +214,19 @@ class TestBuildReviewPromptBody:
         )
         for token in forbidden_tokens:
             assert token not in context
+
+    def test_build_review_prompt_body_requires_explicit_verdict_and_audit_file(
+        self,
+    ) -> None:
+        """Prompt should separate direct verdict output from canonical audit writing."""
+        scope = ReviewScope.for_base("main")
+        request = ReviewRequest(scope=scope)
+
+        context = build_review_prompt_body(request)
+
+        assert "The first line must be exactly:" in context
+        assert "The final line must repeat the same `VERDICT:`" in context
+        assert (
+            "You must write a canonical audit report under `docs/reports/`" in context
+        )
+        assert "handoff audit" in context

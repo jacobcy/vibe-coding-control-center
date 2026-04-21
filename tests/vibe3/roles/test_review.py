@@ -8,6 +8,7 @@ import pytest
 from vibe3.roles.review import (
     _create_minimal_audit_artifact,
     _resolve_authoritative_audit_ref,
+    _resolve_review_verdict,
 )
 
 
@@ -193,6 +194,47 @@ class TestReviewerParserErrorTolerance:
 
             # Verify: audit_ref returned
             assert audit_ref == str(mock_audit_path)
+
+    def test_reviewer_verdict_prefers_stdout_over_audit_file(
+        self, tmp_path: Path
+    ) -> None:
+        audit_path = tmp_path / "audit.md"
+        audit_path.write_text("VERDICT: BLOCK\n", encoding="utf-8")
+
+        verdict = _resolve_review_verdict(
+            review_output="Looks good\nVERDICT: PASS",
+            audit_ref=str(audit_path),
+        )
+
+        assert verdict == "PASS"
+
+    def test_reviewer_verdict_falls_back_to_audit_file_when_stdout_invalid(
+        self, tmp_path: Path
+    ) -> None:
+        audit_path = tmp_path / "audit.md"
+        audit_path.write_text("# Audit\nVERDICT: MAJOR\n", encoding="utf-8")
+
+        verdict = _resolve_review_verdict(
+            review_output="LGTM without parseable verdict",
+            audit_ref=str(audit_path),
+        )
+
+        assert verdict == "MAJOR"
+
+    def test_authoritative_audit_ref_prefers_existing_agent_written_ref(
+        self,
+    ) -> None:
+        with patch("vibe3.roles.review._create_minimal_audit_artifact") as mock_create:
+            audit_ref = _resolve_authoritative_audit_ref(
+                handoff_file=None,
+                review_output="VERDICT: PASS",
+                verdict="PASS",
+                branch="task/issue-303",
+                existing_audit_ref="docs/reports/issue-303-review.md",
+            )
+
+        mock_create.assert_not_called()
+        assert audit_ref == "docs/reports/issue-303-review.md"
 
     def test_reviewer_parser_error_does_not_raise_exception(
         self,

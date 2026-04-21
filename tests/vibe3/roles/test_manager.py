@@ -168,7 +168,7 @@ class TestManagerBlockedReasonWriting:
                 issue_number=mock_issue_number,
                 repo="jacobcy/vibe-coding-control-center",
                 reason="manager 本轮未产生状态迁移",
-                actor="gemini/gemini-3-flash-preview",
+                actor="test-backend/test-model",
             )
 
             # Verify: _ensure_flow_state_for_issue called with "block" action
@@ -176,7 +176,7 @@ class TestManagerBlockedReasonWriting:
                 mock_issue_number,
                 "block",  # ← action 参数
                 "manager 本轮未产生状态迁移",  # ← reason
-                "gemini/gemini-3-flash-preview",  # ← actor
+                "test-backend/test-model",  # ← actor (透传)
             )
 
 

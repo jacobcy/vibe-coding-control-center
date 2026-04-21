@@ -60,10 +60,17 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
     )
     monkeypatch.setattr(utils_module, "_validate_pid_file", lambda _: (None, False))
 
+    with patch(
+        "vibe3.models.orchestra_config._default_pid_file",
+        return_value=Path(".git/vibe3/orchestra.pid"),
+    ):
+        mock_vibe_config = VibeConfig()
+
     with (
         patch("vibe3.server.registry.subprocess.run") as mock_run,
         patch(
-            "vibe3.config.settings.VibeConfig.get_defaults", return_value=VibeConfig()
+            "vibe3.config.settings.VibeConfig.get_defaults",
+            return_value=mock_vibe_config,
         ),
     ):
         runner = CliRunner()
@@ -71,7 +78,8 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "tmux session" in result.stdout.lower()
-    cmd = mock_run.call_args.args[0]
+    # Check the first call (new-session), not the last (pipe-pane)
+    cmd = mock_run.call_args_list[0].args[0]
     assert cmd[:4] == ["tmux", "new-session", "-d", "-s"]
 
 
@@ -92,10 +100,17 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
         cmd=["tmux"],
         stderr="duplicate session: vibe3-orchestra-serve",
     )
+    with patch(
+        "vibe3.models.orchestra_config._default_pid_file",
+        return_value=Path(".git/vibe3/orchestra.pid"),
+    ):
+        mock_vibe_config = VibeConfig()
+
     with (
         patch("vibe3.server.registry.subprocess.run", side_effect=error),
         patch(
-            "vibe3.config.settings.VibeConfig.get_defaults", return_value=VibeConfig()
+            "vibe3.config.settings.VibeConfig.get_defaults",
+            return_value=mock_vibe_config,
         ),
     ):
         runner = CliRunner()

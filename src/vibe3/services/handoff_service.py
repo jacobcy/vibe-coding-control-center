@@ -321,9 +321,10 @@ class HandoffService:
         # 1. Ensure current.md exists (idempotent)
         handoff_path = self.ensure_current_handoff()
 
+        ref_field = f"{ref_kind.lower()}_ref"
+
         # 2. Build flow state updates, but defer persistence until file/event
         #    writes succeed.
-        ref_field = f"{ref_kind.lower()}_ref"
         flow_updates = {ref_field: ref_value}
         actor_field_by_kind = {
             "plan": "planner_actor",
@@ -350,7 +351,28 @@ class HandoffService:
         # 4. Update flow state
         self.store.update_flow_state(branch, **flow_updates)
 
-        # 5. Append update block to handoff file only after authoritative writes
+        # 5. Build event refs (include verdict for audit events)
+        event_refs: dict[str, str] = {"ref": ref_value}
+        if verdict:
+            event_refs["verdict"] = verdict
+
+        # 6. Persist event
+        # Use "audit_recorded" for audit events (system parsing behavior)
+        # Use "handoff_{kind}" for plan/report events (agent handoff behavior)
+        event_type = (
+            "audit_recorded"
+            if ref_kind.lower() == "audit"
+            else f"handoff_{ref_kind.lower()}"
+        )
+        self.store.add_event(
+            branch,
+            event_type,
+            effective_actor,
+            detail=message,
+            refs=event_refs,
+        )
+
+        # 7. Append update block to handoff file only after authoritative writes
         #    succeed.
         try:
             self.append_current_handoff(

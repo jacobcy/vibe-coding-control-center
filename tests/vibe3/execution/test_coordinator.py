@@ -125,6 +125,43 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
     assert result.reason_code == "capacity_full"
 
 
+def test_governance_dispatch_bypasses_capacity_pool(mock_dependencies):
+    """Governance dispatch should not be skipped when worker capacity is full."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.side_effect = lambda role: role == "governance"
+
+    handle = MagicMock()
+    handle.tmux_session = "vibe3-gov-1"
+    handle.log_path = Path("/tmp/gov.log")
+
+    with patch(
+        "vibe3.execution.coordinator.start_async_command", return_value=handle
+    ) as mock_start:
+        coordinator = ExecutionCoordinator(
+            config=config,
+            store=store,
+            backend=backend,
+            capacity=capacity,
+        )
+        coordinator.registry.reserve = MagicMock(return_value=321)
+        coordinator.registry.mark_started = MagicMock()
+
+        request = ExecutionRequest(
+            role="governance",
+            target_branch="governance",
+            target_id=1,
+            execution_name="vibe3-governance-scan-20260420-t5",
+            cmd=["echo", "governance"],
+        )
+
+        result = coordinator.dispatch_execution(request)
+
+        assert result.launched is True
+        assert result.tmux_session == "vibe3-gov-1"
+        capacity.can_dispatch.assert_called_once_with("governance")
+        mock_start.assert_called_once()
+
+
 def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkeypatch):
     """Sync child process should still bypass capacity double-counting."""
     config, store, backend, capacity = mock_dependencies
@@ -393,6 +430,48 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
         )
         coordinator.registry.mark_failed.assert_called_once_with(123)
         assert "launch failed" in mock_event.call_args.args[1]
+
+
+def test_coordinator_dispatch_launch_failed_duplicate_tmux_gets_context(
+    mock_dependencies,
+):
+    """Duplicate tmux launch failures should explain that the previous session lives."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    with (
+        patch("vibe3.execution.coordinator.start_async_command") as mock_start,
+        patch("vibe3.execution.coordinator.append_orchestra_event") as mock_event,
+    ):
+        mock_start.side_effect = RuntimeError(
+            "Tmux session 'vibe3-planner-issue-303' already exists"
+        )
+
+        coordinator = ExecutionCoordinator(
+            config=config,
+            store=store,
+            backend=backend,
+            capacity=capacity,
+        )
+        coordinator.registry.reserve = MagicMock(return_value=123)
+        coordinator.registry.mark_failed = MagicMock()
+
+        request = ExecutionRequest(
+            role="planner",
+            target_branch="task/issue-303",
+            target_id=303,
+            execution_name="vibe3-planner-issue-303",
+            cmd=["echo", "hello"],
+            refs={"issue_number": "303"},
+        )
+
+        result = coordinator.dispatch_execution(request)
+
+        assert result.launched is False
+        assert result.reason_code == "launch_failed"
+        assert "previous session still alive" in result.reason
+        assert "vibe3-planner-issue-303" in result.reason
+        assert "previous session still alive" in mock_event.call_args.args[1]
 
 
 def test_sync_failure_appends_orchestra_event(mock_dependencies):

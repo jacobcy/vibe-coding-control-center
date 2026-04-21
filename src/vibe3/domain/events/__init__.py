@@ -24,12 +24,16 @@ class DomainEvent:
 # Import from submodules
 from vibe3.domain.events.flow_lifecycle import (  # noqa: E402
     DependencySatisfied,
-    ExecutorDispatched,
+    ExecutorDispatched,  # Backward compatibility alias
+    ExecutorDispatchIntent,
     IssueFailed,
     IssueStateChanged,
-    ManagerDispatched,
-    PlannerDispatched,
-    ReviewerDispatched,
+    ManagerDispatched,  # Backward compatibility alias
+    ManagerDispatchIntent,
+    PlannerDispatched,  # Backward compatibility alias
+    PlannerDispatchIntent,
+    ReviewerDispatched,  # Backward compatibility alias
+    ReviewerDispatchIntent,
 )
 from vibe3.domain.events.governance import (  # noqa: E402
     GovernanceDecisionRequired,
@@ -51,7 +55,12 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueStateChanged",
     "IssueFailed",
-    # L3 Dispatch-Intent Events
+    # L3 Dispatch-Intent Events (new names)
+    "ManagerDispatchIntent",
+    "PlannerDispatchIntent",
+    "ExecutorDispatchIntent",
+    "ReviewerDispatchIntent",
+    # L3 Dispatch-Intent Events (backward compatibility)
     "ManagerDispatched",
     "PlannerDispatched",
     "ExecutorDispatched",
@@ -71,16 +80,21 @@ __all__ = [
     "SupervisorApplyDelegated",
 ]
 
-# Event type registry
+# Event type registry with backward compatibility
 EVENT_TYPES = {
     # L3 Flow Lifecycle
     "issue_state_changed": IssueStateChanged,
     "issue_failed": IssueFailed,
-    # L3 Dispatch-Intent
-    "manager_dispatched": ManagerDispatched,
-    "planner_dispatched": PlannerDispatched,
-    "executor_dispatched": ExecutorDispatched,
-    "reviewer_dispatched": ReviewerDispatched,
+    # L3 Dispatch-Intent (new names)
+    "manager_dispatch_intent": ManagerDispatchIntent,
+    "planner_dispatch_intent": PlannerDispatchIntent,
+    "executor_dispatch_intent": ExecutorDispatchIntent,
+    "reviewer_dispatch_intent": ReviewerDispatchIntent,
+    # L3 Dispatch-Intent (backward compatibility)
+    "manager_dispatched": ManagerDispatchIntent,
+    "planner_dispatched": PlannerDispatchIntent,
+    "executor_dispatched": ExecutorDispatchIntent,
+    "reviewer_dispatched": ReviewerDispatchIntent,
     # L3 Dependency
     "dependency_satisfied": DependencySatisfied,
     # L1 Governance
