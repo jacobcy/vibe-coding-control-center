@@ -27,10 +27,10 @@ from vibe3.models.review_runner import (
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
 
-    def test_run_subprocess_streams_output_and_captures_return_value(
+    def test_run_subprocess_streams_and_captures(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Subprocess output should stream live while remaining available in result."""
+        """_run_subprocess streams output live AND captures complete content."""
 
         class FakeStream:
             def __init__(self, chunks: list[str]) -> None:
@@ -42,9 +42,9 @@ class TestCodeagentBackend:
         class FakePopen:
             def __init__(self, *args, **kwargs) -> None:
                 self.args = args[0]
-                self.returncode = 0
-                self.stdout = FakeStream(["hello\n", "world\n", ""])
-                self.stderr = FakeStream(["warn\n", ""])
+                self.returncode = 42
+                self.stdout = FakeStream(["line one\n", "line two\n", ""])
+                self.stderr = FakeStream(["warning\n", ""])
 
             def wait(self, timeout: int | None = None) -> int:
                 return self.returncode
@@ -56,12 +56,15 @@ class TestCodeagentBackend:
                 timeout_seconds=30,
             )
 
+        # Verify streaming output went to console
         captured = capsys.readouterr()
-        assert captured.out == "hello\nworld\n"
-        assert captured.err == "warn\n"
-        assert result.stdout == "hello\nworld\n"
-        assert result.stderr == "warn\n"
-        assert result.returncode == 0
+        assert captured.out == "line one\nline two\n"
+        assert captured.err == "warning\n"
+
+        # Verify complete output captured in return value
+        assert result.stdout == "line one\nline two\n"
+        assert result.stderr == "warning\n"
+        assert result.returncode == 42
 
     def test_build_prompt_file_content_prepends_global_notice(self) -> None:
         config = VibeConfig(
@@ -495,86 +498,3 @@ Traceback (most recent call last):
 
         command = mock_run.call_args[0][0]
         assert "--worktree" not in command
-
-    def test_run_does_not_double_print_when_subprocess_already_streams(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Backend must not double-print when _run_subprocess already streams."""
-        # Setup: _run_subprocess streams to stdout/stderr AND returns captured text
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "streamed stdout\n"
-        mock_result.stderr = "streamed stderr\n"
-
-        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            # Simulate streaming: _run_subprocess writes to sys.stdout/stderr
-            import sys
-
-            original_stdout = sys.stdout
-            original_stderr = sys.stderr
-
-            try:
-                sys.stdout.write("streamed stdout\n")
-                sys.stdout.flush()
-                sys.stderr.write("streamed stderr\n")
-                sys.stderr.flush()
-
-                mock_run.return_value = mock_result
-                backend = CodeagentBackend()
-                result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
-            finally:
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
-
-        # Read what was actually printed
-        captured = capsys.readouterr()
-
-        # Expectation: Only the streamed output, no additional print
-        assert captured.out == "streamed stdout\n"
-        assert captured.err == "streamed stderr\n"
-        assert result.exit_code == 0
-
-    def test_run_subprocess_streams_and_captures_full_output(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Verify _run_subprocess streams live AND returns complete output."""
-
-        class FakeStream:
-            def __init__(self, chunks: list[str]) -> None:
-                self._chunks = iter(chunks)
-
-            def readline(self) -> str:
-                return next(self._chunks, "")
-
-        class FakePopen:
-            def __init__(self, *args, **kwargs) -> None:
-                self.args = args[0]
-                self.returncode = 42
-                self.stdout = FakeStream(
-                    ["line one\n", "line two\n", "line three\n", ""]
-                )
-                self.stderr = FakeStream(
-                    ["warning: deprecated\n", "error: failed\n", ""]
-                )
-
-            def wait(self, timeout: int | None = None) -> int:
-                return self.returncode
-
-        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
-            result = CodeagentBackend._run_subprocess(
-                ["codeagent-wrapper", "run"],
-                project_root=str(tmp_path),
-                timeout_seconds=30,
-            )
-
-        # Verify streaming output went to console
-        captured = capsys.readouterr()
-        assert captured.out == "line one\nline two\nline three\n"
-        assert captured.err == "warning: deprecated\nerror: failed\n"
-
-        # Verify complete output captured in return value
-        assert result.stdout == "line one\nline two\nline three\n"
-        assert result.stderr == "warning: deprecated\nerror: failed\n"
-
-        # Verify return code preserved
-        assert result.returncode == 42
