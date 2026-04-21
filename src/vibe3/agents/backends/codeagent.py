@@ -255,7 +255,6 @@ class CodeagentBackend:
 
         Streams stdout/stderr to live console while accumulating for return value.
         """
-        import sys
         import threading
 
         def _stream_reader(
@@ -466,11 +465,6 @@ class CodeagentBackend:
                     error_msg += f"\n\n{diagnosis}"
 
                 raise AgentExecutionError(error_msg)
-
-            if result.stdout:
-                print(result.stdout, end="", flush=True)
-            if result.stderr:
-                print(result.stderr, file=sys.stderr, end="", flush=True)
 
             return agent_result
         finally:
