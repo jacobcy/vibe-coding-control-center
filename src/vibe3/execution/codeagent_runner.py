@@ -1,12 +1,13 @@
 """Sync codeagent execution utilities for command-mode role entrypoints."""
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal, cast
 
 from loguru import logger
 from typer import echo
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.codeagent import AgentResult, CodeagentBackend
 from vibe3.agents.models import (
     CodeagentCommand,
     CodeagentResult,
@@ -25,6 +26,7 @@ from vibe3.execution.execution_lifecycle import (
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
 from vibe3.execution.session_service import load_session_id
+from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
     record_handoff_unified,
@@ -37,6 +39,19 @@ __all__ = [
     "create_codeagent_command",
     "CodeagentExecutionService",
 ]
+
+
+@dataclass
+class SyncExecutionContext:
+    """Execution context for sync execution shell."""
+
+    options: AgentOptions
+    session_id: str | None
+    actor: str
+    branch: str | None
+    store: SQLiteClient | None
+    before_state_label: str | None
+    execution_cwd: Path
 
 
 def _resolve_request_pre_gate_callback(
@@ -66,8 +81,8 @@ class CodeagentExecutionService:
         except Exception:
             return Path.cwd()
 
-    def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
-        """Execute codeagent synchronously."""
+    def _prepare_sync_context(self, command: CodeagentCommand) -> SyncExecutionContext:
+        """Prepare execution context before agent run."""
         log = logger.bind(
             domain="codeagent",
             role=command.role,
@@ -129,19 +144,111 @@ class CodeagentExecutionService:
             except Exception as exc:
                 log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
+        execution_cwd = self._resolve_command_cwd(command.cwd)
+
+        return SyncExecutionContext(
+            options=options,
+            session_id=session_id,
+            actor=actor,
+            branch=branch,
+            store=store,
+            before_state_label=before_state_label,
+            execution_cwd=execution_cwd,
+        )
+
+    def _finalize_sync_execution(
+        self,
+        command: CodeagentCommand,
+        ctx: SyncExecutionContext,
+        agent_result: AgentResult,
+    ) -> Path | None:
+        """Finalize sync execution: handoff, lifecycle, callback, gate."""
+        log = logger.bind(
+            domain="codeagent",
+            role=command.role,
+            handoff_kind=command.handoff_kind,
+        )
+
+        effective_session_id = agent_result.session_id or ctx.session_id
+        handoff_file = record_handoff_unified(
+            HandoffRecord(
+                kind=command.handoff_kind,  # type: ignore[arg-type]
+                content=agent_result.stdout,
+                options=ctx.options,
+                session_id=effective_session_id,
+                metadata=command.handoff_metadata,
+                branch=command.branch,
+            )
+        )
+        if handoff_file:
+            echo(f"-> {command.handoff_kind.capitalize()} saved: {handoff_file}")
+
+        if ctx.branch and ctx.store:
+            persist_execution_lifecycle_event(
+                ctx.store,
+                ctx.branch,
+                command.role,
+                "completed",
+                ctx.actor,
+                f"{command.role.capitalize()} completed (status: done)",
+                session_id=effective_session_id,
+                refs={"status": "completed"},
+                event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
+            )
+
+            # pre_gate_callback: role-specific business callback that must
+            # run BEFORE the gate (e.g., reviewer writes audit_ref from stdout).
+            if (
+                command.pre_gate_callback is not None
+                and command.issue_number is not None
+                and agent_result.stdout
+            ):
+                try:
+                    command.pre_gate_callback(
+                        issue_number=command.issue_number,
+                        branch=ctx.branch,
+                        actor=ctx.actor,
+                        stdout=agent_result.stdout,
+                    )
+                except Exception as cb_exc:
+                    log.warning(f"pre_gate_callback failed: {cb_exc}")
+
+            # Unified no-op gate: single hard logic check after agent completion.
+            # Executes ONLY if issue_number is available (worker roles).
+            if command.issue_number is not None:
+                apply_unified_noop_gate(
+                    store=ctx.store,
+                    issue_number=command.issue_number,
+                    branch=ctx.branch,
+                    actor=ctx.actor,
+                    role=command.role,
+                    before_state_label=ctx.before_state_label,
+                    repo=getattr(self.config, "repo", None),
+                )
+
+        return handoff_file
+
+    def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
+        """Execute codeagent synchronously."""
+        log = logger.bind(
+            domain="codeagent",
+            role=command.role,
+            handoff_kind=command.handoff_kind,
+        )
+
+        ctx = self._prepare_sync_context(command)
         log.info("Starting sync execution")
         prompt_content = command.context_builder()
-        execution_cwd = self._resolve_command_cwd(command.cwd)
-        echo(f"-> Executing with {options.agent or options.backend}...")
+        echo(f"-> Executing with {ctx.options.agent or ctx.options.backend}...")
 
         try:
             agent_result = CodeagentBackend().run(
                 prompt=prompt_content,
-                options=options,
+                options=ctx.options,
                 task=command.task,
                 dry_run=command.dry_run,
-                session_id=session_id,
-                cwd=execution_cwd,
+                session_id=ctx.session_id,
+                cwd=ctx.execution_cwd,
             )
             if command.dry_run:
                 return CodeagentResult(
@@ -149,65 +256,11 @@ class CodeagentExecutionService:
                     exit_code=agent_result.exit_code,
                     stdout=agent_result.stdout,
                     stderr=agent_result.stderr,
-                    session_id=agent_result.session_id or session_id,
+                    session_id=agent_result.session_id or ctx.session_id,
                 )
 
-            effective_session_id = agent_result.session_id or session_id
-            handoff_file = record_handoff_unified(
-                HandoffRecord(
-                    kind=command.handoff_kind,  # type: ignore[arg-type]
-                    content=agent_result.stdout,
-                    options=options,
-                    session_id=effective_session_id,
-                    metadata=command.handoff_metadata,
-                    branch=command.branch,
-                )
-            )
-            if handoff_file:
-                echo(f"-> {command.handoff_kind.capitalize()} saved: {handoff_file}")
-
-            if branch and store:
-                persist_execution_lifecycle_event(
-                    store,
-                    branch,
-                    command.role,
-                    "completed",
-                    actor,
-                    f"{command.role.capitalize()} completed (status: done)",
-                    session_id=effective_session_id,
-                    refs={"status": "completed"},
-                    event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
-                )
-
-                # pre_gate_callback: role-specific business callback that must
-                # run BEFORE the gate (e.g., reviewer writes audit_ref from stdout).
-                if (
-                    command.pre_gate_callback is not None
-                    and command.issue_number is not None
-                    and agent_result.stdout
-                ):
-                    try:
-                        command.pre_gate_callback(
-                            issue_number=command.issue_number,
-                            branch=branch,
-                            actor=actor,
-                            stdout=agent_result.stdout,
-                        )
-                    except Exception as cb_exc:
-                        log.warning(f"pre_gate_callback failed: {cb_exc}")
-
-                # Unified no-op gate: single hard logic check after agent completion.
-                # Executes ONLY if issue_number is available (worker roles).
-                if command.issue_number is not None:
-                    apply_unified_noop_gate(
-                        store=store,
-                        issue_number=command.issue_number,
-                        branch=branch,
-                        actor=actor,
-                        role=command.role,
-                        before_state_label=before_state_label,
-                        repo=getattr(self.config, "repo", None),
-                    )
+            handoff_file = self._finalize_sync_execution(command, ctx, agent_result)
+            effective_session_id = agent_result.session_id or ctx.session_id
 
             return CodeagentResult(
                 success=agent_result.is_success(),
@@ -218,19 +271,19 @@ class CodeagentExecutionService:
                 session_id=effective_session_id,
             )
         except BaseException as exc:
-            if branch and store:
+            if ctx.branch and ctx.store:
                 abort_msg = (
                     f"{command.role.capitalize()} aborted "
                     f"(status: aborted, reason: {exc})"
                 )
                 persist_execution_lifecycle_event(
-                    store,
-                    branch,
+                    ctx.store,
+                    ctx.branch,
                     command.role,
                     "aborted",
-                    actor,
+                    ctx.actor,
                     abort_msg,
-                    session_id=session_id,
+                    session_id=ctx.session_id,
                     refs={"reason": str(exc), "status": "aborted"},
                     event_type=f"codeagent_{execution_prefix(command.role)}_aborted",  # type: ignore[arg-type]
                 )
