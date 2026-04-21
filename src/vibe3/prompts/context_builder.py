@@ -55,6 +55,7 @@ def make_context_builder(
     body_provider_key: str,
     body_fn: Callable[[], str],
     prompts_path: Path | None = None,
+    variable_name: str | None = None,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for a single-variable body recipe.
 
@@ -63,17 +64,20 @@ def make_context_builder(
         body_provider_key: Provider registry key, e.g. ``"run.context"``.
         body_fn: Zero-arg callable returning the assembled prompt body string.
         prompts_path: Optional override for prompts.yaml path.
+        variable_name: Override for the variable name in the template. By default,
+            derived from body_provider_key as ``{prefix}_prompt_body``. Use this
+            when the template expects a different name (e.g. ``skill_content``).
 
     Returns:
         PromptContextBuilder ready to be used as CodeagentCommand.context_builder.
     """
     prefix = body_provider_key.split(".")[0]  # "run", "plan", "review"
-    variable_name = f"{prefix}_prompt_body"
+    var_name = variable_name or f"{prefix}_prompt_body"
 
     recipe = PromptRecipe(
         template_key=template_key,
         variables={
-            variable_name: PromptVariableSource(
+            var_name: PromptVariableSource(
                 kind=VariableSourceKind.PROVIDER,
                 provider=body_provider_key,
             )
