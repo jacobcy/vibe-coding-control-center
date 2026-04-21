@@ -84,7 +84,8 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
             issue_info = IssueInfo.from_github_payload(issue_data)
             if issue_info is None:
                 _block_for_noop(
-                    "Failed to parse issue data from GitHub response for manager dispatch"
+                    "Failed to parse issue data from GitHub"
+                    " response for manager dispatch"
                 )
                 return
 
