@@ -10,6 +10,38 @@ from loguru import logger
 class IssueAdminMixin:
     """Mixin for advanced issue operations used by orchestra."""
 
+    def remove_assignees(
+        self: Any,
+        issue_number: int,
+        assignees: list[str],
+        repo: str | None = None,
+    ) -> bool:
+        """Remove one or more assignees from a GitHub issue."""
+        normalized = [assignee.strip() for assignee in assignees if assignee.strip()]
+        if not normalized:
+            return True
+
+        logger.bind(
+            external="github",
+            operation="remove_assignees",
+            issue_number=issue_number,
+            assignee_count=len(normalized),
+        ).debug("Calling GitHub API: remove_assignees")
+
+        cmd = ["gh", "issue", "edit", str(issue_number)]
+        for assignee in normalized:
+            cmd.extend(["--remove-assignee", assignee])
+        if repo:
+            cmd.extend(["--repo", repo])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            logger.bind(external="github", error=result.stderr).error(
+                f"Failed to remove assignees from issue #{issue_number}"
+            )
+            return False
+        return True
+
     def list_issues_with_assignees(
         self: Any,
         limit: int = 100,
