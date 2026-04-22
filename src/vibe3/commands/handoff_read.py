@@ -119,16 +119,14 @@ def list_handoffs(
             # Map event types back to handoff kinds
             # handoff_plan    -> plan
             # handoff_report  -> run
-            # handoff_review  -> review  (reviewer raw output artifact, new)
-            # handoff_audit   -> review  (reviewer-initiated authoritative audit, new)
+            # handoff_audit   -> review  (reviewer-initiated authoritative audit)
             # audit_recorded  -> review  (system auto-generated minimal audit, legacy)
             # handoff_indicate -> indicate
             event_type_to_kind = {
                 "handoff_plan": "plan",
                 "handoff_report": "run",
                 "handoff_run": "run",  # backward-compat: old event type
-                "handoff_review": "review",  # new: reviewer raw output artifact
-                "handoff_audit": "review",  # new: reviewer-initiated audit
+                "handoff_audit": "review",
                 "audit_recorded": "review",  # legacy: system auto-generated
                 # (backward-compat)
                 "handoff_indicate": "indicate",

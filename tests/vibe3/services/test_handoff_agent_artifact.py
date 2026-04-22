@@ -46,16 +46,8 @@ def test_record_agent_artifact_plan(handoff_service, mock_store):
         artifact_path = handoff_service.record_agent_artifact(record)
 
         assert artifact_path == Path("plan_1.md")
-        # Verify event was persisted with correct details
-        mock_store.add_event.assert_called_once()
-        args, kwargs = mock_store.add_event.call_args
-        assert args[1] == "handoff_plan"
-        assert kwargs["refs"]["backend"] == "openai"
-        assert kwargs["refs"]["model"] == "gpt-4"
-        assert kwargs["refs"]["custom"] == "value"
-        # Plan kind shouldn't have modified_files in refs usually,
-        # but our ArtifactParser currently only does it for "run" kind.
-        assert "modified_files" not in kwargs["refs"]
+        mock_store.add_event.assert_not_called()
+        mock_store.update_flow_state.assert_not_called()
 
 
 def test_record_agent_artifact_run(handoff_service, mock_store):
@@ -74,11 +66,8 @@ def test_record_agent_artifact_run(handoff_service, mock_store):
         artifact_path = handoff_service.record_agent_artifact(record)
 
         assert artifact_path == Path("run_1.md")
-        mock_store.add_event.assert_called_once()
-        args, kwargs = mock_store.add_event.call_args
-        assert args[1] == "handoff_report"
-        assert kwargs["refs"]["modified_files"] == "src/main.py,tests/test_main.py"
-        assert kwargs["refs"]["modified_count"] == "2"
+        mock_store.add_event.assert_not_called()
+        mock_store.update_flow_state.assert_not_called()
 
 
 def test_record_agent_artifact_review(handoff_service, mock_store):
@@ -98,17 +87,12 @@ def test_record_agent_artifact_review(handoff_service, mock_store):
         artifact_path = handoff_service.record_agent_artifact(record)
 
         assert artifact_path == Path("review_1.md")
-        mock_store.add_event.assert_called_once()
-        args, kwargs = mock_store.add_event.call_args
-        assert args[1] == "handoff_review"
-        assert kwargs["refs"]["verdict"] == "PASS"
-        # comment_count should be in detail but NOT in refs if it's handled specifically
-        assert "Verdict: PASS, 5 comments" in kwargs["detail"]
-        assert "comment_count" not in kwargs["refs"]
+        mock_store.add_event.assert_not_called()
+        mock_store.update_flow_state.assert_not_called()
 
 
 def test_record_agent_artifact_with_log_path(handoff_service, mock_store):
-    """Test recording an artifact with an external log path."""
+    """Passive artifact persistence should ignore log-only event metadata."""
     options = AgentOptions(backend="openai", model="gpt-4")
     record = HandoffRecord(
         kind="run",
@@ -120,10 +104,21 @@ def test_record_agent_artifact_with_log_path(handoff_service, mock_store):
 
     with patch.object(handoff_service.storage, "create_artifact") as mock_create:
         mock_create.return_value = ("feature/test", Path("run_1.md"))
-        with patch.object(handoff_service.storage, "normalize_ref_value") as mock_norm:
-            mock_norm.return_value = "temp/log.txt"
+        artifact_path = handoff_service.record_agent_artifact(record)
 
-            handoff_service.record_agent_artifact(record)
+        assert artifact_path == Path("run_1.md")
+        mock_store.add_event.assert_not_called()
+        mock_store.update_flow_state.assert_not_called()
 
-            kwargs = mock_store.add_event.call_args[1]
-            assert kwargs["refs"]["log_path"] == "temp/log.txt"
+
+def test_record_plan_reference_does_not_inject_unknown_verdict(
+    handoff_service, mock_store
+):
+    with patch.object(handoff_service.storage, "ensure_current_handoff") as mock_ensure:
+        mock_ensure.return_value = Path("current.md")
+        with patch.object(handoff_service, "append_current_handoff"):
+            handoff_service.record_plan("docs/plans/test-plan.md", actor="planner")
+
+    kwargs = mock_store.add_event.call_args[1]
+    assert kwargs["detail"] == "Recorded plan reference: docs/plans/test-plan.md"
+    assert "verdict" not in kwargs["refs"]
