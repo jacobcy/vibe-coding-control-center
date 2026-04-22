@@ -117,6 +117,52 @@ class TestManagerBlockedIssueNotDispatched:
         assert 303 not in [issue.number for issue in ready_issues]
         assert 201 in [issue.number for issue in ready_issues]
 
+    def test_supervisor_issue_skipped_by_handoff_dispatcher(
+        self,
+    ) -> None:
+        """带 supervisor 标签的 handoff issue 应交给 supervisor/apply."""
+        supervisor_issue_data = {
+            "number": 467,
+            "title": "Supervisor handoff issue",
+            "labels": [
+                {"name": "supervisor"},
+                {"name": IssueState.HANDOFF.to_label()},
+            ],
+            "state": "open",
+        }
+
+        normal_handoff_issue = {
+            "number": 201,
+            "title": "Normal handoff issue",
+            "labels": [{"name": IssueState.HANDOFF.to_label()}],
+            "state": "open",
+        }
+
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_github_class:
+            mock_github = mock_github_class.return_value
+            mock_github.list_issues.return_value = [
+                supervisor_issue_data,
+                normal_handoff_issue,
+            ]
+
+            mock_config = Mock()
+            mock_config.max_concurrent_flows = 4
+            mock_registry = Mock()
+
+            dispatcher = StateLabelDispatchService(
+                config=mock_config,
+                github=mock_github,
+                role_def=HANDOFF_MANAGER_ROLE,
+                registry=mock_registry,
+            )
+
+            import asyncio
+
+            ready_issues = asyncio.run(dispatcher.collect_ready_issues())
+
+        assert 467 not in [issue.number for issue in ready_issues]
+        assert 201 in [issue.number for issue in ready_issues]
+
 
 class TestManagerBlockedToHandoffTransitionBlocked:
     """blocked → handoff 转换应该被阻止"""

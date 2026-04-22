@@ -113,6 +113,9 @@ class TestFlowBinding:
         }
         mock_label_port = MagicMock()
         mock_label_port.add_issue_label.return_value = True
+        mock_label_port.get_issue_labels.return_value = ["state/claimed"]
+        mock_label_port.remove_issue_label.return_value = True
+        mock_label_port.ensure_label_exists.return_value = True
         config = OrchestraConfig(
             repo="owner/repo",
             supervisor_handoff=SupervisorHandoffConfig(issue_label="supervisor"),
@@ -144,7 +147,15 @@ class TestFlowBinding:
             ["alice", "bob"],
             repo="owner/repo",
         )
-        mock_label_port.add_issue_label.assert_called_once_with(467, "supervisor")
+        assert mock_label_port.add_issue_label.call_args_list[0].args == (
+            467,
+            "supervisor",
+        )
+        assert mock_label_port.add_issue_label.call_args_list[1].args == (
+            467,
+            "state/handoff",
+        )
+        mock_label_port.remove_issue_label.assert_called_once_with(467, "state/claimed")
         mock_github.add_comment.assert_called_once()
         body = mock_github.add_comment.call_args.args[1]
         assert "[codex/gpt-5.4]" in body

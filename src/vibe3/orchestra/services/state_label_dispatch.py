@@ -302,6 +302,8 @@ class StateLabelDispatchService(ServiceBase):
                 continue
             if self.role_def.trigger_state.to_label() not in labels:
                 continue
+            if "supervisor" in labels:
+                continue
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
                 continue

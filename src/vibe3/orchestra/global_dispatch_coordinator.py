@@ -104,6 +104,15 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
+            if "supervisor" in issue.labels:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue (supervisor issue)",
+                )
+                self._frozen_queue.pop(index)
+                continue
+
             if issue.state in {
                 IssueState.BLOCKED,
                 IssueState.FAILED,
@@ -234,6 +243,15 @@ class GlobalDispatchCoordinator:
 
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
+                continue
+
+            if "supervisor" in issue.labels:
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue (supervisor issue)",
+                )
                 continue
 
             current_state = issue.state.value

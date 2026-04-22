@@ -12,8 +12,10 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
+from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
@@ -265,6 +267,19 @@ class TaskService:
                 issue_number=issue_number,
                 label=supervisor_label,
             ).warning("Failed to add supervisor label for superseded task flow")
+
+        try:
+            LabelService(issue_port=self._get_issue_label_port()).set_state(
+                issue_number,
+                IssueState.HANDOFF,
+            )
+        except Exception as exc:
+            logger.bind(
+                domain="task",
+                action="notify_superseded_canonical_flow",
+                issue_number=issue_number,
+                state_label=config.supervisor_handoff.handoff_state_label,
+            ).warning(f"Failed to move superseded task issue to handoff: {exc}")
 
         pr_state = pr.state.value.lower()
         comment = (

@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
+from vibe3.orchestra.global_dispatch_coordinator import (
+    GlobalDispatchCoordinator,
+    QueueEntry,
+)
 
 
 def make_issue(number: int, priority: int = 5) -> MagicMock:
@@ -98,6 +101,29 @@ class TestGlobalDispatchCoordinator:
         await coordinator.coordinate()
 
         assert service._emit_dispatch_intent.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_supervisor_issue_removed_from_existing_frozen_queue(self) -> None:
+        issue = make_issue(467)
+        service = make_service("handoff-manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=467, collected_state="claimed", waiting_state=None)
+        ]
+        coordinator._load_issue = lambda issue_number: IssueInfo(  # type: ignore[method-assign]
+            number=issue_number,
+            title=f"Issue {issue_number}",
+            state=IssueState.HANDOFF,
+            labels=["supervisor", IssueState.HANDOFF.to_label()],
+            assignees=[],
+        )
+
+        await coordinator.coordinate()
+
+        service._emit_dispatch_intent.assert_not_called()
+        assert coordinator._frozen_queue == []
 
     @pytest.mark.asyncio
     async def test_skip_when_capacity_full(self) -> None:

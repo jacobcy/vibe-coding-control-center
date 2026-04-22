@@ -132,18 +132,23 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
             return True
 
     class FakeLabelPort:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, int, str]] = []
+
         def add_issue_label(self, issue_number: int, label: str) -> bool:
+            self.calls.append(("add", issue_number, label))
             assert issue_number == 467
-            assert label == "supervisor"
+            assert label in {"supervisor", "state/handoff"}
             return True
 
         def get_issue_labels(self, issue_number: int):
             _ = issue_number
-            return []
+            return ["state/claimed"]
 
         def remove_issue_label(self, issue_number: int, label: str) -> bool:
+            self.calls.append(("remove", issue_number, label))
             _ = issue_number
-            _ = label
+            assert label == "state/claimed"
             return True
 
         def ensure_label_exists(self, label: str, *, color: str, description: str):
@@ -152,10 +157,11 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
             _ = description
             return True
 
+    label_port = FakeLabelPort()
     service = TaskService(
         store=store,
         github_client=FakeGitHub(),
-        issue_label_port=FakeLabelPort(),
+        issue_label_port=label_port,
         orchestra_config=OrchestraConfig(
             repo="owner/repo",
             supervisor_handoff=SupervisorHandoffConfig(issue_label="supervisor"),
@@ -169,3 +175,6 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
 
     assert [flow["branch"] for flow in task_flows] == ["debug/new-attempt"]
     assert any(flow["branch"] == "task/issue-467" for flow in related_flows)
+    assert ("add", 467, "supervisor") in label_port.calls
+    assert ("add", 467, "state/handoff") in label_port.calls
+    assert ("remove", 467, "state/claimed") in label_port.calls
