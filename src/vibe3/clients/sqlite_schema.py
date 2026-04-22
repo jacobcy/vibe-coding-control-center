@@ -190,6 +190,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added failed_reason column to flow_state"
         )
 
+    # Migration: add latest_verdict field for verdict tracking
+    if "latest_verdict" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_verdict TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added latest_verdict column to flow_state"
+        )
+
     # Migration: migrate existing blocked_by data to new fields
     # Pattern: "#218" → blocked_by_issue=218, other text → blocked_reason
     if "blocked_by" in existing and (

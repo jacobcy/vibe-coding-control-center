@@ -1,12 +1,13 @@
 """Handoff write commands - Modify handoff state and record events."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
 
 
@@ -232,3 +233,60 @@ def audit(
         trace=trace,
         method_name="record_audit",
     )
+
+
+def verdict(
+    verdict_value: Annotated[
+        Literal["PASS", "MAJOR", "BLOCK", "UNKNOWN"],
+        typer.Argument(help="Verdict value (PASS, MAJOR, BLOCK, UNKNOWN)"),
+    ],
+    reason: Annotated[
+        str | None, typer.Option("--reason", "-r", help="Verdict reason")
+    ] = None,
+    issues: Annotated[
+        str | None, typer.Option("--issues", "-i", help="Issues description")
+    ] = None,
+    branch: Annotated[
+        str | None, typer.Argument(help="Target branch (current if not specified)")
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Write verdict to handoff chain and flow state.
+
+    This command records an agent's judgment about the flow state.
+    It does NOT make any decisions - it only records the verdict.
+
+    Verdict values:
+    - PASS: No issues, ready to merge
+    - MAJOR: Issues found, needs fix before merge
+    - BLOCK: Critical issues, blocks merge
+    - UNKNOWN: Cannot determine
+
+    Examples:
+        vibe3 handoff verdict MAJOR --reason "Found indentation errors and missing docs"
+        vibe3 handoff verdict PASS --reason "Code looks good"
+        vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
+    """
+    with trace_scope(trace, "handoff verdict", domain="handoff"):
+        logger.bind(
+            command="handoff verdict",
+            verdict=verdict_value,
+            reason=reason,
+            branch=branch,
+        ).info("Writing verdict")
+
+        service = VerdictService()
+        record = service.write_verdict(
+            verdict=verdict_value,
+            reason=reason,
+            issues=issues,
+            branch=branch,
+        )
+
+        console.print(f"[green]✓[/] Verdict written: {verdict_value}")
+        if reason:
+            console.print(f"  [dim]Reason: {reason}[/]")
+        console.print(f"  [dim]Actor: {record.actor}[/]")
+        console.print(f"  [dim]Role: {record.role}[/]")

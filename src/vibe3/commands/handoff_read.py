@@ -18,6 +18,7 @@ from vibe3.commands.handoff_render import (
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,
@@ -216,6 +217,23 @@ def show(
         if worktree_path:
             console.print(f"[dim]worktree: {worktree_root}[/]")
         console.print()
+
+        # Show latest verdict at the top
+        verdict_service = VerdictService(store=service.store)
+        latest_verdict = verdict_service.get_latest_verdict(target_branch)
+        if latest_verdict:
+            console.print("[bold]## Latest Verdict[/]")
+            console.print(f"  [cyan]verdict:[/] {latest_verdict.verdict}")
+            console.print(f"  [cyan]actor:[/] {latest_verdict.actor}")
+            console.print(f"  [cyan]role:[/] {latest_verdict.role}")
+            console.print(
+                f"  [cyan]timestamp:[/] {latest_verdict.timestamp.isoformat()}"
+            )
+            if latest_verdict.reason:
+                console.print(f"  [cyan]reason:[/] {latest_verdict.reason}")
+            if latest_verdict.issues:
+                console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
+            console.print()
 
         _render_agent_chain(
             state,

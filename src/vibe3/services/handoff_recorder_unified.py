@@ -16,7 +16,7 @@ from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
 
-HandoffKind = Literal["plan", "run", "review"]
+HandoffKind = Literal["plan", "run", "review", "indicate"]
 
 _RESERVED_REF_KEYS = {
     "ref",
