@@ -145,7 +145,11 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     """Handle ExecutorDispatchIntent event via role request builder.
 
     Enriches the neutral dispatch intent with execution-specific context
-    (plan_ref, audit_ref, commit_mode) read from flow state and handoff files.
+    (plan_ref, audit_ref, commit_mode) read from flow state.
+
+    commit_mode is now derived from the structured ``latest_indicate_action``
+    field in flow state (written by ``handoff indicate --action commit_pr``).
+    This replaces the previous MERGE_READY_COMMIT free-text sentinel scan.
     """
     store = SQLiteClient()
 
@@ -154,15 +158,20 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     plan_ref = str(v) if flow_state and (v := flow_state.get("plan_ref")) else None
     audit_ref = str(v) if flow_state and (v := flow_state.get("audit_ref")) else None
 
-    from vibe3.roles.run import check_merge_ready_commit
-
-    commit_mode = check_merge_ready_commit(event.branch) if event.branch else False
+    # Structured action replaces MERGE_READY_COMMIT free-text sentinel.
+    # Values: "fix" (retry), "commit_pr" (run vibe-commit skill)
+    indicate_action = (
+        str(flow_state.get("latest_indicate_action", "")) if flow_state else ""
+    )
+    commit_mode = indicate_action == "commit_pr"
 
     logger.bind(
         domain="executor_handler",
         issue_number=event.issue_number,
         branch=event.branch,
         plan_ref=plan_ref,
+        indicate_action=indicate_action,
+        commit_mode=commit_mode,
     ).info("Executor dispatch triggered")
 
     try:

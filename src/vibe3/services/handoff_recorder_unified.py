@@ -169,14 +169,15 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
     }
 
     # Map handoff kind to event type
-    # - "run" -> "handoff_report"
-    # - "review" -> "audit_recorded"
-    # - others -> "handoff_{kind}"
+    # - "run"     -> "handoff_report"  (executor output artifact)
+    # - "review"  -> "handoff_review"  (reviewer raw output artifact,
+    #                NOT authoritative audit)
+    # - "audit"   -> "handoff_audit"   (reviewer-initiated authoritative audit)
+    # - others    -> "handoff_{kind}"
+    # NOTE: "audit_recorded" is reserved for system-auto-generated minimal audit.
     event_type: str
     if record.kind == "run":
         event_type = "handoff_report"
-    elif record.kind == "review":
-        event_type = "audit_recorded"
     else:
         event_type = f"handoff_{record.kind}"
 

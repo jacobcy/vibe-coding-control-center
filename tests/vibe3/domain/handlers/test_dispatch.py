@@ -101,10 +101,8 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
-    @patch("vibe3.roles.run.check_merge_ready_commit")
     def test_executor_dispatch_reads_flow_state(
         self,
-        mock_check_merge: MagicMock,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
         mock_sqlite_cls: MagicMock,
@@ -121,12 +119,10 @@ class TestExecutorDispatchHandler:
             "labels": [],
         }
 
-        # Mock flow_state with plan_ref
+        # Mock flow_state with plan_ref and no indicate_action (normal fix path)
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {"plan_ref": "plan.md"}
         mock_sqlite_cls.return_value = mock_store
-
-        mock_check_merge.return_value = False
 
         expected_request = _make_mock_request("executor", 42)
         mock_build_request.return_value = expected_request
@@ -152,12 +148,69 @@ class TestExecutorDispatchHandler:
         mock_store.get_flow_state.assert_called_once_with("task/issue-42")
 
         # Verify request builder was called with plan_ref from flow_state
+        # and commit_mode=False (no indicate_action=commit_pr in flow_state)
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
         assert call_kwargs[1].get("branch") == "task/issue-42"
         assert call_kwargs[1].get("plan_ref") == "plan.md"
+        assert call_kwargs[1].get("commit_mode") is False
 
         mock_coordinator.dispatch_execution.assert_called_once()
+
+    @patch("vibe3.domain.handlers.dispatch.build_run_request")
+    @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    def test_executor_dispatch_commit_pr_from_indicate_action(
+        self,
+        mock_config_cls: MagicMock,
+        mock_github_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_build_request: MagicMock,
+    ) -> None:
+        """commit_mode=True when flow_state.latest_indicate_action == 'commit_pr'."""
+        from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
+
+        config = MagicMock(dry_run=False, repo="owner/repo")
+        mock_config_cls.from_settings.return_value = config
+
+        mock_github_cls.return_value.view_issue.return_value = {
+            "title": "Test issue",
+            "labels": [],
+        }
+
+        # Simulate manager having written handoff indicate --action commit_pr
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {
+            "plan_ref": "plan.md",
+            "latest_indicate_action": "commit_pr",
+        }
+        mock_sqlite_cls.return_value = mock_store
+
+        expected_request = _make_mock_request("executor", 42)
+        mock_build_request.return_value = expected_request
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-executor-issue-42",
+            log_path="/tmp/test.log",
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        handle_executor_dispatch_intent(
+            ExecutorDispatched(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="in-progress",
+            )
+        )
+
+        call_kwargs = mock_build_request.call_args
+        # commit_mode must be True when latest_indicate_action == "commit_pr"
+        assert call_kwargs[1].get("commit_mode") is True
 
 
 class TestReviewerDispatchHandler:

@@ -325,7 +325,9 @@ class TestHandoffRecordAPIs:
         mock_store.add_event.assert_called_once()
         call_args = mock_store.add_event.call_args
         assert call_args[0][0] == "feature/test-branch"
-        assert call_args[0][1] == "audit_recorded"
+        # Default record_audit (not system-auto) records as handoff_audit.
+        # Only is_system_auto=True produces audit_recorded.
+        assert call_args[0][1] == "handoff_audit"
         assert call_args[0][2] == "test-actor"
         assert "verdict: UNKNOWN" in call_args[1]["detail"]
         assert call_args[1]["refs"]["ref"] == ".agent/reports/audit-result.md"
@@ -387,7 +389,8 @@ class TestHandoffRecordAPIs:
         )
         mock_store.add_event.assert_called_once()
         call_args = mock_store.add_event.call_args
-        assert call_args[0][1] == "audit_recorded"
+        # Agent-authored audit uses handoff_audit (not system-auto).
+        assert call_args[0][1] == "handoff_audit"
         assert call_args[1]["refs"]["ref"] == "docs/reports/agent-authored-audit.md"
         assert call_args[1]["refs"]["verdict"] == "PASS"
 
@@ -412,3 +415,52 @@ class TestHandoffRecordAPIs:
         )
         call_args = mock_store.add_event.call_args
         assert call_args[1]["refs"]["ref"] == "docs/reports/audit.md"
+
+
+class TestRecordIndicateAction:
+    """Tests for record_indicate latest_indicate_action persistence."""
+
+    def test_record_indicate_with_action_writes_indicate_action(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ) -> None:
+        """record_indicate --action commit_pr must write latest_indicate_action."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+
+        handoff_service.record_indicate(
+            indicate_ref="docs/indicate/manager-indicate.md",
+            actor="manager",
+            action="commit_pr",
+        )
+
+        # update_flow_state should have been called twice:
+        # 1st for flow_updates (indicate_ref, etc.), 2nd for latest_indicate_action
+        calls = mock_store.update_flow_state.call_args_list
+        # Find the call that sets latest_indicate_action
+        action_call = next(
+            (c for c in calls if "latest_indicate_action" in c.kwargs),
+            None,
+        )
+        assert action_call is not None, "latest_indicate_action must be written"
+        assert action_call.kwargs["latest_indicate_action"] == "commit_pr"
+
+    def test_record_indicate_without_action_clears_indicate_action(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ) -> None:
+        """record_indicate without --action must clear latest_indicate_action (None)."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+
+        handoff_service.record_indicate(
+            indicate_ref="docs/indicate/manager-indicate.md",
+            actor="manager",
+            action=None,  # No action → clear
+        )
+
+        calls = mock_store.update_flow_state.call_args_list
+        action_call = next(
+            (c for c in calls if "latest_indicate_action" in c.kwargs),
+            None,
+        )
+        assert action_call is not None, "latest_indicate_action must always be written"
+        assert (
+            action_call.kwargs["latest_indicate_action"] is None
+        ), "latest_indicate_action must be cleared (None) when no action provided"

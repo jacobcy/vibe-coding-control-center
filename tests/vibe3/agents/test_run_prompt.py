@@ -55,6 +55,17 @@ def test_build_run_prompt_body_requires_report_ref_registration(tmp_path: Path) 
     assert "handoff report" in context
 
 
+def test_build_run_prompt_body_fix_mode_uses_fix_task(tmp_path: Path) -> None:
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nFix round\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config, mode="fix")
+
+    assert "focused fix round" in context
+    assert "Follow plan steps strictly" not in context
+
+
 def test_build_run_output_contract_section_keeps_output_contract_only() -> None:
     result = build_run_output_contract_section("Use exactly this report format")
 

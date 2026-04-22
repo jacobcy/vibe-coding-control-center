@@ -21,6 +21,7 @@ def _record_handoff_reference(
     actor: str | None,
     trace: bool,
     method_name: str,
+    **extra_kw: object,
 ) -> None:
     with trace_scope(trace, command, domain="handoff"):
         specific_ref_key = f"{ref_label.lower()}_ref"
@@ -33,7 +34,9 @@ def _record_handoff_reference(
 
         service = HandoffService()
         method = getattr(service, method_name)
-        method(ref_value, next_step, blocked_by, actor)
+        # Support optional 'action' kwarg for indicate command
+        extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
+        method(ref_value, next_step, blocked_by, actor, **extra_kwargs)
         console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
@@ -182,11 +185,27 @@ def indicate(
             ),
         ),
     ] = None,
+    action: Annotated[
+        str | None,
+        typer.Option(
+            "--action",
+            help=(
+                "Structured action directive for executor dispatch. "
+                "Valid values: fix (retry execution), commit_pr "
+                "(run vibe-commit skill). "
+                "Written to latest_indicate_action in flow state."
+            ),
+        ),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Record manager indicate handoff (manager directive to downstream agents)."""
+    """Record manager indicate handoff (manager directive to downstream agents).
+
+    Use --action fix to signal executor should retry with audit feedback.
+    Use --action commit_pr to signal executor should run vibe-commit skill.
+    """
     _record_handoff_reference(
         command="handoff indicate",
         ref_label="Indicate",
@@ -196,6 +215,7 @@ def indicate(
         actor=actor,
         trace=trace,
         method_name="record_indicate",
+        action=action,
     )
 
 

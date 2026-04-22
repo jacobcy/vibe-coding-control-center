@@ -64,6 +64,16 @@ def render_task_show(task_result: "TaskShowResult", json_output: bool) -> None:
         console.print(f"Next Step: {task.next_step}")
     if task.blocked_by:
         console.print(f"Blocked By: {task.blocked_by}")
+    if task.latest_verdict:
+        v = task.latest_verdict
+        color = {
+            "PASS": "green",
+            "MAJOR": "yellow",
+            "BLOCK": "red",
+        }.get(v.verdict, "cyan")
+        console.print(f"Verdict: [{color}]{v.verdict}[/] ({v.actor})")
+    if task.latest_indicate_action:
+        console.print(f"Action:  [yellow bold]{task.latest_indicate_action}[/]")
 
 
 def render_task_show_with_milestone(

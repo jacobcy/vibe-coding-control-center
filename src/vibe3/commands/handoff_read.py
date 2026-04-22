@@ -116,16 +116,20 @@ def list_handoffs(
 
         for event in events:
             # Map event types back to handoff kinds
-            # handoff_plan -> plan
-            # handoff_report -> run
-            # audit_recorded -> review
+            # handoff_plan    -> plan
+            # handoff_report  -> run
+            # handoff_review  -> review  (reviewer raw output artifact, new)
+            # handoff_audit   -> review  (reviewer-initiated authoritative audit, new)
+            # audit_recorded  -> review  (system auto-generated minimal audit, legacy)
             # handoff_indicate -> indicate
             event_type_to_kind = {
                 "handoff_plan": "plan",
                 "handoff_report": "run",
                 "handoff_run": "run",  # backward-compat: old event type
-                "audit_recorded": "review",
-                "handoff_review": "review",  # backward-compat: old event type
+                "handoff_review": "review",  # new: reviewer raw output artifact
+                "handoff_audit": "review",  # new: reviewer-initiated audit
+                "audit_recorded": "review",  # legacy: system auto-generated
+                # (backward-compat)
                 "handoff_indicate": "indicate",
             }
             event_kind = event_type_to_kind.get(event.event_type)
@@ -251,6 +255,15 @@ def show(
                 console.print(f"  [cyan]reason:[/] {latest_verdict.reason}")
             if latest_verdict.issues:
                 console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
+            console.print()
+
+        # Show pending indicate action (manager dispatch hint)
+        if state.latest_indicate_action:
+            console.print("[bold]## Pending Dispatch[/]")
+            console.print(
+                f"  [cyan]indicate_action:[/] [yellow]{state.latest_indicate_action}[/]"
+                "  [dim](executor will consume on next dispatch)[/]"
+            )
             console.print()
 
         _render_agent_chain(

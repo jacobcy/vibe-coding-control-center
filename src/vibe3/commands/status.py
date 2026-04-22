@@ -199,6 +199,22 @@ def status(
                                 f"[cyan]{flow.report_ref}[/]"
                             )
                             console.print(report_msg)
+                        if flow.latest_verdict:
+                            v = flow.latest_verdict
+                            color = {
+                                "PASS": "green",
+                                "MAJOR": "yellow",
+                                "BLOCK": "red",
+                            }.get(v.verdict, "cyan")
+                            console.print(
+                                f"             [dim]verdict:[/] "
+                                f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+                            )
+                        if flow.latest_indicate_action:
+                            console.print(
+                                f"             [dim]action:[/] "
+                                f"[yellow bold]{flow.latest_indicate_action}[/]"
+                            )
                         if flow.pr_number:
                             # Build PR URL from config.repo or use pr_number
                             pr_ref = (

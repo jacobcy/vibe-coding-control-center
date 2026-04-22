@@ -45,6 +45,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
+from vibe3.services.verdict_service import VerdictService
 
 REVIEWER_ROLE = TriggerableRoleDefinition(
     name="reviewer",
@@ -144,19 +145,11 @@ def _process_review_sync_result(
     the unified no-op gate takes its after snapshot, allowing the review
     output to be parsed and audit_ref written into flow state first.
     """
-    existing_audit_ref = _load_existing_audit_ref(branch)
-    audit_ref = _resolve_authoritative_audit_ref(
-        None,  # No handoff_file in sync mode
-        stdout,
-        None,
-        branch,
-        existing_audit_ref=existing_audit_ref,
-    )
-    verdict = _resolve_review_verdict(stdout, audit_ref=audit_ref)
-    _build_handoff_service(branch).record_audit(
-        audit_ref=audit_ref,
+    finalize_review_output(
+        review_output=stdout,
+        handoff_file=None,
+        branch=branch,
         actor=actor,
-        verdict=verdict,
     )
 
 
@@ -302,6 +295,105 @@ def _resolve_review_verdict(
     return VERDICT_UNKNOWN
 
 
+def finalize_review_output(
+    *,
+    review_output: str,
+    handoff_file: str | None,
+    branch: str | None,
+    actor: str,
+) -> tuple[str, str]:
+    """Finalize review output by confirming audit_ref and writing verdict.
+
+    This is the single authoritative finalizer for every review path
+    (sync, manual pr, manual base). It:
+
+    1. Checks whether an authoritative audit_ref already exists in flow state
+       (meaning the reviewer actively ran ``handoff audit``).
+    2. If no audit_ref exists:
+       - Creates a minimal audit artifact from review output.
+       - Records the event as ``audit_recorded`` (``is_system_auto=True``).
+       - Updates ``audit_ref`` in flow state.
+    3. Parses the VERDICT from the authoritative audit file.
+    4. Calls ``VerdictService.write_verdict()`` to persist ``latest_verdict``
+       and record a ``verdict_recorded`` event.
+
+    Returns:
+        (audit_ref, verdict) tuple.
+    """
+    existing_audit_ref = _load_existing_audit_ref(branch)
+
+    # Determine whether reviewer explicitly registered an audit (handoff audit command)
+    reviewer_wrote_audit = bool(existing_audit_ref)
+
+    audit_ref: str
+    if reviewer_wrote_audit:
+        # Reviewer ran `handoff audit <path>` → already recorded as handoff_audit
+        audit_ref = existing_audit_ref  # type: ignore[assignment]
+        logger.bind(domain="review", action="finalize").info(
+            f"Using reviewer-written audit_ref: {audit_ref}"
+        )
+    else:
+        # System auto-generates minimal audit from stdout
+        # handoff_file takes precedence over stdout if it exists
+        if handoff_file and Path(handoff_file).exists():
+            # Reviewer's unified recorder already saved the review artifact.
+            # Promote it to the authoritative audit file.
+            audit_ref = handoff_file
+        else:
+            audit_ref = str(
+                _create_minimal_audit_artifact(
+                    review_output,
+                    _resolve_review_verdict(review_output),
+                    branch,
+                )
+            )
+        # Record as system-auto audit_recorded event
+        _build_handoff_service(branch).record_audit(
+            audit_ref=audit_ref,
+            actor=actor,
+            is_system_auto=True,
+        )
+        logger.bind(domain="review", action="finalize", audit_ref=audit_ref).info(
+            "System auto-generated minimal audit"
+        )
+
+    # Parse verdict from the final authoritative source.
+    # When reviewer explicitly wrote handoff_audit, the audit FILE is authoritative.
+    # When system auto-generated the audit, stdout is equivalent (it was used to create
+    # the audit), so _resolve_review_verdict with audit_ref fallback is correct.
+    if reviewer_wrote_audit:
+        # Prefer the audit file content; fall back to stdout only if file is unreadable
+        audit_path = Path(audit_ref)
+        audit_content = None
+        if audit_path.exists():
+            try:
+                audit_content = audit_path.read_text(encoding="utf-8")
+            except OSError:
+                pass
+        verdict = _resolve_review_verdict(
+            audit_content or review_output,
+            audit_ref=audit_ref,
+        )
+    else:
+        # System-auto path: stdout and audit file are equivalent
+        verdict = _resolve_review_verdict(review_output, audit_ref=audit_ref)
+
+    # Write verdict to handoff chain + flow state (verdict_recorded event)
+    try:
+        VerdictService(
+            git_client=_BranchBoundGitClient(branch) if branch else None
+        ).write_verdict(
+            verdict=verdict,  # type: ignore[arg-type]
+            branch=branch,
+        )
+    except Exception as exc:
+        logger.bind(domain="review", action="finalize").warning(
+            f"Failed to write verdict: {exc}"
+        )
+
+    return audit_ref, verdict
+
+
 def build_pr_review_request(
     pr_number: int,
     *,
@@ -363,7 +455,6 @@ def execute_manual_review(
 ) -> ReviewRunResult:
     """Execute manual review for `review pr` and `review base`."""
     cfg = config or VibeConfig.get_defaults()
-    service = flow_service or FlowService()
     log = logger.bind(domain="review", scope=request.scope.kind)
     task = _build_manual_review_task(cfg, instructions, request, pr_number, log)
     command = create_codeagent_command(
@@ -399,26 +490,12 @@ def execute_manual_review(
     if dry_run:
         return ReviewRunResult("DRY_RUN", None, issue_number)
 
-    existing_audit_ref = _load_existing_audit_ref(branch)
-    audit_ref = _resolve_authoritative_audit_ref(
-        str(result.handoff_file) if result.handoff_file else None,
-        result.stdout,  # ← 直接使用原始输出
-        None,
-        branch,
-        existing_audit_ref=existing_audit_ref,
+    audit_ref, verdict = finalize_review_output(
+        review_output=result.stdout,
+        handoff_file=str(result.handoff_file) if result.handoff_file else None,
+        branch=branch,
+        actor="agent:review",
     )
-    verdict = _resolve_review_verdict(
-        result.stdout,
-        audit_ref=audit_ref,
-    )
-
-    flow = service.get_flow_status(branch) if branch else None
-    if flow is not None and branch is not None and flow.audit_ref != audit_ref:
-        _build_handoff_service(branch).record_audit(
-            audit_ref=audit_ref,
-            actor="agent:review",
-            verdict=verdict,
-        )
 
     return ReviewRunResult(verdict, audit_ref, issue_number)
 

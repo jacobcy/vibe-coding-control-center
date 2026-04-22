@@ -55,8 +55,9 @@ _EVENT_COLOR: dict[str, str] = {
     "handoff_plan": "blue",
     "handoff_report": "blue",
     "handoff_run": "blue",  # backward-compat: old event type
-    "audit_recorded": "magenta",
-    "handoff_review": "magenta",  # backward-compat: old event type
+    "handoff_review": "magenta",  # new: reviewer raw output artifact
+    "handoff_audit": "magenta bold",  # new: reviewer-initiated authoritative audit
+    "audit_recorded": "magenta",  # legacy: system auto-generated / backward-compat
     "handoff_indicate": "cyan bold",
     "manager_completed": "green bold",
     "tmux_manager_started": "dim yellow",
@@ -83,9 +84,11 @@ def _format_event_type(event_type: str) -> str:
         "planner_dispatched": "Planner Dispatch",
         "executor_dispatched": "Executor Dispatch",
         "reviewer_dispatched": "Reviewer Dispatch",
-        # Audit Events
-        "audit_recorded": "Audit Recorded",
-        "handoff_audit": "Audit Recorded",  # Backward compatibility
+        # Audit Events — new semantic names
+        "handoff_review": "Review Output",  # reviewer raw output artifact
+        "handoff_audit": "Audit Recorded",  # reviewer-initiated authoritative audit
+        "audit_recorded": "Audit Recorded",  # system auto-generated / backward-compat
+        "handoff_audit_fallback": "Audit Recorded",  # backward compatibility
     }
     return display_names.get(event_type, event_type)
 
@@ -260,5 +263,23 @@ def render_flow_timeline(
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
-            console.print(f"  [dim]{label}[/]  {val}{actor_str}")
+            console.print(f"  [dim]{label:10}[/]  {val}{actor_str}")
+
+    # Show latest state summary if available
+    if state.latest_verdict or state.latest_indicate_action:
+        console.print("[bold]--- State ---[/]")
+        if state.latest_verdict:
+            v = state.latest_verdict
+            color = {
+                "PASS": "green",
+                "MAJOR": "yellow",
+                "BLOCK": "red",
+            }.get(v.verdict, "cyan")
+            console.print(
+                f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+            )
+        if state.latest_indicate_action:
+            console.print(
+                f"  [dim]action[/]      [yellow bold]{state.latest_indicate_action}[/]"
+            )
     console.print()

@@ -91,6 +91,9 @@ class FlowState(BaseModel):
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None  # Latest verdict for quick query
+    latest_indicate_action: str | None = (
+        None  # Latest structured action from manager indicate
+    )
 
     model_config = {"extra": "ignore"}
 
@@ -265,6 +268,9 @@ class FlowStatusResponse(BaseModel):
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None
+    latest_indicate_action: str | None = (
+        None  # Latest structured action from manager indicate
+    )
 
     @field_validator("flow_status", mode="before")
     @classmethod
@@ -331,6 +337,7 @@ class FlowStatusResponse(BaseModel):
             execution_started_at=data.get("execution_started_at"),
             execution_completed_at=data.get("execution_completed_at"),
             latest_verdict=data.get("latest_verdict"),
+            latest_indicate_action=data.get("latest_indicate_action"),
         )
 
 

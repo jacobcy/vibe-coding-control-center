@@ -372,9 +372,14 @@ review:
     The first line must be exactly `VERDICT: PASS | MAJOR | BLOCK`.
     The final line must repeat the same `VERDICT:` line.
     Keep `VERDICT` and `audit_ref` separate: verdict is the conclusion, audit_ref is the detailed report.
-    You must write a canonical audit report under `docs/reports/` in the current worktree
+    You must explicitly record your final conclusion with
+    `uv run python src/vibe3/cli.py handoff verdict <PASS|MAJOR|BLOCK>`.
+    You should write a canonical audit report under `docs/reports/` in the current worktree
     and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
     Use a repository-relative path such as `docs/reports/issue-123-audit-report.md`.
+    If you do not explicitly run `handoff audit`, the system may save a minimal fallback audit_ref
+    from your reviewer output, but that is only a minimal safety net and not your primary path.
+    Do not rely on manager to reconstruct your verdict unless you truly cannot produce a valid one.
 
     ### MANDATORY EXIT STEP — you MUST do this before exit():
     Run this command to change the issue state label:
@@ -522,6 +527,15 @@ run:
     Follow plan steps strictly, verify each step before proceeding.
     Write clean code with tests, run verification after changes.
     Document any deviations with reasons.
+    Follow the repository execution contract.
+
+  # Static: Fix execution task — injected when manager routes executor with --action fix
+  fix_task: |
+    Treat this run as a focused fix round, not a fresh implementation pass.
+    Read the audit feedback carefully and fix the cited problems first.
+    Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
+    Explain any audit item you intentionally do not change, with a concrete reason.
+    Re-run the most relevant verification for the reported failures before exit.
     Follow the repository execution contract.
 
 

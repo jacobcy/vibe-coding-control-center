@@ -147,7 +147,10 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
 
     assert result == artifact
     kwargs = mock_persist.call_args.kwargs
-    assert kwargs["event_type"] == "audit_recorded"
+    # reviewer raw output artifact is now recorded as handoff_review,
+    # NOT audit_recorded.
+    # audit_recorded is reserved for system-auto-generated minimal audit fallback.
+    assert kwargs["event_type"] == "handoff_review"
     assert kwargs["refs"]["verdict"] == "PASS"
     assert kwargs["flow_state_updates"]["reviewer_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)

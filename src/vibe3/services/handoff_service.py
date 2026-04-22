@@ -314,6 +314,8 @@ class HandoffService:
         blocked_by: str | None,
         actor: str | None,
         verdict: str | None = None,
+        audit_is_system_auto: bool = False,
+        action: str | None = None,
     ) -> Path:
         """Internal helper to record a handoff reference.
 
@@ -370,6 +372,14 @@ class HandoffService:
         # 4. Update flow state
         self.store.update_flow_state(branch, **flow_updates)
 
+        # 4b. For indicate: always persist latest_indicate_action in flow_state.
+        # Write None (clear) when no action provided to prevent stale commit_pr
+        # from leaking into subsequent executor dispatch rounds.
+        if ref_kind.lower() == "indicate":
+            self.store.update_flow_state(
+                branch, latest_indicate_action=action  # None clears the field
+            )
+
         # 5. Build event refs (include verdict for audit events)
         event_refs: dict[str, str] = {"ref": ref_value}
         if verdict:
@@ -380,8 +390,12 @@ class HandoffService:
         # Use "handoff_{kind}" for plan/report events (agent handoff behavior)
         event_type = (
             "audit_recorded"
-            if ref_kind.lower() == "audit"
-            else f"handoff_{ref_kind.lower()}"
+            if ref_kind.lower() == "audit" and audit_is_system_auto
+            else (
+                "handoff_audit"
+                if ref_kind.lower() == "audit"
+                else f"handoff_{ref_kind.lower()}"
+            )
         )
         self.store.add_event(
             branch,
@@ -469,10 +483,29 @@ class HandoffService:
         blocked_by: str | None = None,
         actor: str | None = None,
         verdict: str | None = None,
+        is_system_auto: bool = False,
     ) -> Path:
-        """Record audit handoff reference."""
+        """Record audit handoff reference.
+
+        Args:
+            audit_ref: Path to the authoritative audit file.
+            next_step: Optional next step suggestion.
+            blocked_by: Optional blocker description.
+            actor: Optional explicit actor identifier.
+            verdict: Optional review verdict (PASS/MAJOR/BLOCK/UNKNOWN).
+            is_system_auto: If True, records event as ``audit_recorded``
+                (system-generated minimal audit). If False (default), records as
+                ``handoff_audit`` (reviewer actively registered this audit as
+                authoritative).
+        """
         return self._record_ref(
-            "audit", audit_ref, next_step, blocked_by, actor, verdict=verdict
+            "audit",
+            audit_ref,
+            next_step,
+            blocked_by,
+            actor,
+            verdict=verdict,
+            audit_is_system_auto=is_system_auto,
         )
 
     def record_indicate(
@@ -481,13 +514,26 @@ class HandoffService:
         next_step: str | None = None,
         blocked_by: str | None = None,
         actor: str | None = None,
+        action: str | None = None,
     ) -> Path:
         """Record manager indicate handoff reference.
 
         Used by manager to signal its decision/directive to downstream agents,
         distinct from executor handoff_report or reviewer audit_recorded.
+
+        Args:
+            indicate_ref: Path to the indicate document.
+            next_step: Optional next step suggestion.
+            blocked_by: Optional blocker description.
+            actor: Optional explicit actor identifier.
+            action: Structured action directive for executor dispatch.
+                    Valid values: ``fix`` (retry), ``commit_pr`` (run vibe-commit).
+                    Written to ``latest_indicate_action`` in flow state so executor
+                    dispatch can read it without scanning free text.
         """
-        return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)
+        return self._record_ref(
+            "indicate", indicate_ref, next_step, blocked_by, actor, action=action
+        )
 
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.

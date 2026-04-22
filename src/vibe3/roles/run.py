@@ -8,7 +8,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.run_prompt import make_run_context_builder, make_skill_context_builder
+from vibe3.agents.run_prompt import (
+    RunPromptMode,
+    make_run_context_builder,
+    make_skill_context_builder,
+)
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -359,20 +363,24 @@ def execute_manual_run(
 
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
 
-    # Read audit_ref from flow_state for retry mode (review feedback injection)
+    # Read flow-state execution hints for retry/fix routing.
     audit_file: str | None = None
+    prompt_mode: RunPromptMode = "coding"
     if branch:
         try:
             flow_state = SQLiteClient().get_flow_state(branch)
-            if flow_state and flow_state.get("audit_ref"):
-                audit_file = str(flow_state["audit_ref"])
+            if flow_state:
+                if flow_state.get("audit_ref"):
+                    audit_file = str(flow_state["audit_ref"])
+                if flow_state.get("latest_indicate_action") == "fix":
+                    prompt_mode = "fix"
         except Exception:
             pass
 
     command = create_codeagent_command(
         role="executor",
         context_builder=make_run_context_builder(
-            plan_file, config, audit_file=audit_file
+            plan_file, config, audit_file=audit_file, mode=prompt_mode
         ),
         task=instructions or run_prompt,
         dry_run=dry_run,
