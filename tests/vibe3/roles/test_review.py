@@ -262,6 +262,7 @@ def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
 ) -> None:
     with patch("vibe3.roles.review.GitClient") as mock_git_cls:
         mock_git = mock_git_cls.return_value
+        mock_git.get_worktree_root.return_value = None
         mock_git.find_worktree_path_for_branch.return_value = tmp_path
         artifact_path = _create_minimal_audit_artifact(
             "LGTM - The implementation looks good",

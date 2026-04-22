@@ -378,7 +378,8 @@ class TestStartAsyncCommand:
         assert "Uninstalled" in pipe_pane_cmd[-1]
         assert "Installing wheels" in pipe_pane_cmd[-1]
         assert "skip_prompt = 1" in pipe_pane_cmd[-1]
-        assert respawn_cmd[-1].startswith("exec ")
+        assert "VIBE3_LOG_PATH=" in respawn_cmd[-1]
+        assert "exec " in respawn_cmd[-1]
 
 
 class TestRunStreamingAndEdgeCases:
