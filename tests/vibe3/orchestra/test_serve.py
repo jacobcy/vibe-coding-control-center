@@ -59,6 +59,11 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(utils_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {},
+    )
 
     with patch(
         "vibe3.models.orchestra_config._default_pid_file",
@@ -93,6 +98,11 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(utils_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {},
+    )
 
     error = subprocess.CalledProcessError(
         returncode=1,
@@ -163,6 +173,11 @@ def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
     monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {},
+    )
+    monkeypatch.setattr(
         serve_module, "_start_async_serve", lambda _c, _v: (True, "started async")
     )
     monkeypatch.setattr(
@@ -188,6 +203,11 @@ def test_start_async_with_ts_exits_nonzero_when_setup_fails(monkeypatch) -> None
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {},
+    )
     monkeypatch.setattr(
         serve_module, "_start_async_serve", lambda _c, _v: (True, "started async")
     )
