@@ -33,18 +33,21 @@ class TestCodeagentBackend:
         """_run_subprocess streams output live AND captures complete content."""
 
         class FakeStream:
-            def __init__(self, chunks: list[str]) -> None:
+            def __init__(self, chunks: list[bytes]) -> None:
                 self._chunks = iter(chunks)
 
-            def readline(self) -> str:
-                return next(self._chunks, "")
+            def read(self, n: int) -> bytes:
+                return next(self._chunks, b"")
+
+            def read1(self, n: int) -> bytes:
+                return self.read(n)
 
         class FakePopen:
             def __init__(self, *args, **kwargs) -> None:
                 self.args = args[0]
                 self.returncode = 42
-                self.stdout = FakeStream(["line one\n", "line two\n", ""])
-                self.stderr = FakeStream(["warning\n", ""])
+                self.stdout = FakeStream([b"line one\n", b"line two\n", b""])
+                self.stderr = FakeStream([b"warning\n", b""])
 
             def wait(self, timeout: int | None = None) -> int:
                 return self.returncode
@@ -76,11 +79,14 @@ class TestCodeagentBackend:
         """
 
         class FakeStream:
-            def __init__(self, chunks: list[str]) -> None:
+            def __init__(self, chunks: list[bytes]) -> None:
                 self._chunks = iter(chunks)
 
-            def readline(self) -> str:
-                return next(self._chunks, "")
+            def read(self, n: int) -> bytes:
+                return next(self._chunks, b"")
+
+            def read1(self, n: int) -> bytes:
+                return self.read(n)
 
         class FakePopen:
             def __init__(self, *args, **kwargs) -> None:
@@ -88,18 +94,24 @@ class TestCodeagentBackend:
                 self.returncode = 0
                 self.stdout = FakeStream(
                     [
-                        "[2mUninstalled 1 package\n",
-                        "░░░░░░░░░░░░░░░░░░░░ [0/1] Installing wheels...\n",
-                        "████████████████████ [1/1] vibe3==3.0.0\n",
-                        "Installed 1 package in 6ms\n",
-                        "-> Executing with gemini...\n",
-                        "[codeagent-wrapper]\n",
-                        "  Backend: gemini\n",
-                        "line one\n",
-                        "",
+                        b"[2mUninstalled 1 package\n",
+                        (
+                            b"\xe2\x96\x91\xe2\x96\x91\xe2\x96\x91\xe2\x96\x91 "
+                            b"[0/1] Installing wheels...\n"
+                        ),
+                        (
+                            b"\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88 "
+                            b"[1/1] vibe3==3.0.0\n"
+                        ),
+                        b"Installed 1 package in 6ms\n",
+                        b"-> Executing with gemini...\n",
+                        b"[codeagent-wrapper]\n",
+                        b"  Backend: gemini\n",
+                        b"line one\n",
+                        b"",
                     ]
                 )
-                self.stderr = FakeStream([""])
+                self.stderr = FakeStream([b""])
 
             def wait(self, timeout: int | None = None) -> int:
                 return self.returncode
@@ -115,20 +127,20 @@ class TestCodeagentBackend:
         captured = capsys.readouterr()
         assert "[2m" not in captured.out
         assert "Uninstalled" not in captured.out
-        assert "░" not in captured.out
-        assert "█" not in captured.out
+        assert "\xe2\x96\x91" not in captured.out
+        assert "\xe2\x96\x88" not in captured.out
         assert "Installing wheels" not in captured.out
         assert "Installed 1 package" not in captured.out
 
-        # Verify marker itself is filtered but content after is kept
-        assert "-> " not in captured.out
+        # Verify marker itself IS retained (regression fix)
+        assert "-> " in captured.out
         assert "Executing with gemini...\n" in captured.out
         assert "[codeagent-wrapper]\n" in captured.out
         assert "Backend: gemini\n" in captured.out
         assert "line one\n" in captured.out
 
         # Verify complete output after marker captured in return value
-        assert "Executing with gemini...\n" in result.stdout
+        assert "-> Executing with gemini...\n" in result.stdout
         assert "[codeagent-wrapper]\n" in result.stdout
         assert "Backend: gemini\n" in result.stdout
         assert "line one\n" in result.stdout

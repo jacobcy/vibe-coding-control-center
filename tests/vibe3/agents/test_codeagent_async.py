@@ -298,22 +298,30 @@ class TestStartAsyncCommand:
 class TestRunStreamingAndEdgeCases:
     def test_run_streams_output_while_capturing(self, capsys) -> None:
         """Runner should stream wrapper output to console and capture it."""
-        # Note: After refactoring, _run_subprocess() is the single source of streaming.
-        # When we mock it, we need to simulate the actual streaming behavior.
 
         class FakeStream:
-            def __init__(self, chunks: list[str]) -> None:
+            def __init__(self, chunks: list[bytes]) -> None:
                 self._chunks = iter(chunks)
 
-            def readline(self) -> str:
-                return next(self._chunks, "")
+            def read(self, n: int) -> bytes:
+                return next(self._chunks, b"")
+
+            def read1(self, n: int) -> bytes:
+                return self.read(n)
 
         class FakePopen:
             def __init__(self, *args, **kwargs) -> None:
                 self.args = args[0]
                 self.returncode = 0
-                self.stdout = FakeStream(["line one\n", "VERDICT: PASS\n", ""])
-                self.stderr = FakeStream([""])
+                self.stdout = FakeStream(
+                    [
+                        b"-> Executing with gemini...\n",
+                        b"line one\n",
+                        b"VERDICT: PASS\n",
+                        b"",
+                    ]
+                )
+                self.stderr = FakeStream([b""])
 
             def wait(self, timeout: int | None = None) -> int:
                 return self.returncode
@@ -323,8 +331,10 @@ class TestRunStreamingAndEdgeCases:
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         captured = capsys.readouterr()
+        assert "-> Executing with gemini" in captured.out
         assert "line one" in captured.out
         assert "VERDICT: PASS" in captured.out
+        assert "-> Executing with gemini" in result.stdout
         assert "line one" in result.stdout
         assert "VERDICT: PASS" in result.stdout
 
