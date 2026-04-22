@@ -159,14 +159,17 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
+        limit: 600
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建等紧密耦合逻辑"
+      - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
-        reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
+        reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
+      - path: "tests/vibe3/agents/test_codeagent_config.py"
+        limit: 500
+        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
-      - path: "tests/vibe3/agents/test_codeagent_config.py"
-        limit: 450
-        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
       - path: "tests/vibe3/execution/test_coordinator.py"
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
