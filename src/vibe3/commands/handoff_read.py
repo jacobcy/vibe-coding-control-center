@@ -115,8 +115,22 @@ def list_handoffs(
         stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0, "indicates": 0}
 
         for event in events:
-            event_kind = event.event_type.replace("handoff_", "", 1)
-            if event_kind not in allowed_kinds:
+            # Map event types back to handoff kinds
+            # handoff_plan -> plan
+            # handoff_report -> run
+            # audit_recorded -> review
+            # handoff_indicate -> indicate
+            event_type_to_kind = {
+                "handoff_plan": "plan",
+                "handoff_report": "run",
+                "handoff_run": "run",  # backward-compat: old event type
+                "audit_recorded": "review",
+                "handoff_review": "review",  # backward-compat: old event type
+                "handoff_indicate": "indicate",
+            }
+            event_kind = event_type_to_kind.get(event.event_type)
+            if event_kind is None:
+                # Skip non-handoff events
                 continue
             if filter_kind and event_kind != filter_kind:
                 continue

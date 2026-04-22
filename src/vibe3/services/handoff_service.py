@@ -196,9 +196,18 @@ class HandoffService:
         return handoff_dir
 
     def get_handoff_events(
-        self, branch: str, event_type_prefix: str = "handoff_", limit: int | None = None
+        self,
+        branch: str,
+        event_type_prefix: str | None = None,
+        limit: int | None = None,
     ) -> list[FlowEvent]:
-        """Return handoff events for a branch from the authoritative store."""
+        """Return handoff events for a branch from the authoritative store.
+
+        Note: does NOT filter by prefix by default — the caller (handoff_read)
+        is responsible for keeping only known handoff event types via its
+        whitelist map. Filtering here with "handoff_" would silently drop
+        "audit_recorded" events which do not share that prefix.
+        """
         events_data = self.store.get_events(
             branch, event_type_prefix=event_type_prefix, limit=limit
         )
@@ -476,7 +485,7 @@ class HandoffService:
         """Record manager indicate handoff reference.
 
         Used by manager to signal its decision/directive to downstream agents,
-        distinct from executor report (handoff_run) or reviewer audit.
+        distinct from executor handoff_report or reviewer audit_recorded.
         """
         return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)
 

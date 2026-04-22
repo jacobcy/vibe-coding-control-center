@@ -45,8 +45,7 @@ _EVENT_COLOR: dict[str, str] = {
     "planner_dispatched": "green bold",
     "executor_dispatched": "green bold",
     "reviewer_dispatched": "green bold",
-    # Audit Events (new name)
-    "audit_recorded": "cyan bold",
+    # Audit Events (new name) — kept here for ordering, actual color defined below
     "state_transitioned": "cyan bold",
     "state_unchanged": "yellow",
     "cannot_verify_remote_state": "yellow",
@@ -54,8 +53,10 @@ _EVENT_COLOR: dict[str, str] = {
     "failed": "red bold",
     "resumed": "green bold",
     "handoff_plan": "blue",
-    "handoff_run": "blue",
-    "handoff_review": "magenta",
+    "handoff_report": "blue",
+    "handoff_run": "blue",  # backward-compat: old event type
+    "audit_recorded": "magenta",
+    "handoff_review": "magenta",  # backward-compat: old event type
     "handoff_indicate": "cyan bold",
     "manager_completed": "green bold",
     "tmux_manager_started": "dim yellow",

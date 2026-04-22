@@ -125,7 +125,7 @@ class TestHandoffBasicCommands:
             ),
             FlowEvent(
                 branch="feature/test",
-                event_type="handoff_run",
+                event_type="handoff_report",
                 actor="executor",
                 detail="Run completed",
                 created_at="2026-03-26T11:10:00",

@@ -117,7 +117,7 @@ def test_record_handoff_unified_for_run_tracks_modified_files(
 
     assert result == artifact
     kwargs = mock_persist.call_args.kwargs
-    assert kwargs["event_type"] == "handoff_run"
+    assert kwargs["event_type"] == "handoff_report"
     assert kwargs["refs"]["modified_count"] == "2"
     assert kwargs["refs"]["modified_files"] == "src/foo.py,tests/test_foo.py"
     assert kwargs["refs"]["plan_ref"] == "docs/plans/demo.md"
@@ -147,7 +147,7 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
 
     assert result == artifact
     kwargs = mock_persist.call_args.kwargs
-    assert kwargs["event_type"] == "handoff_review"
+    assert kwargs["event_type"] == "audit_recorded"
     assert kwargs["refs"]["verdict"] == "PASS"
     assert kwargs["flow_state_updates"]["reviewer_actor"] == "claude/claude-sonnet-4-6"
     # session_id is NOT written to flow_state (registry is source of truth)

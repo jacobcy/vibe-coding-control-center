@@ -168,9 +168,21 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         get_kind_actor_key(record.kind): actor,
     }
 
+    # Map handoff kind to event type
+    # - "run" -> "handoff_report"
+    # - "review" -> "audit_recorded"
+    # - others -> "handoff_{kind}"
+    event_type: str
+    if record.kind == "run":
+        event_type = "handoff_report"
+    elif record.kind == "review":
+        event_type = "audit_recorded"
+    else:
+        event_type = f"handoff_{record.kind}"
+
     handoff_service.persist_artifact_event(
         branch=branch,
-        event_type=f"handoff_{record.kind}",
+        event_type=event_type,
         actor=actor,
         detail=detail,
         refs=refs,
