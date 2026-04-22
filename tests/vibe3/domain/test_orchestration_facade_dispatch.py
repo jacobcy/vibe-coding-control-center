@@ -22,7 +22,7 @@ class TestOrchestrationFacadeDispatchServices:
         mock_publish: MagicMock,
     ) -> None:
         """on_tick() should use GlobalDispatchCoordinator to coordinate dispatch."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_config_cls.return_value = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
             supervisor_handoff=MagicMock(
@@ -73,7 +73,7 @@ class TestOrchestrationFacadeDispatchServices:
         mock_publish: MagicMock,
     ) -> None:
         """on_tick() should work normally when no dispatch_services are provided."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_config_cls.return_value = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
             supervisor_handoff=MagicMock(
@@ -101,7 +101,7 @@ class TestOrchestrationFacadeDispatchServices:
         GlobalDispatchCoordinator handles errors from collect_ready_issues() internally,
         so facade's on_tick() should complete without raising exceptions.
         """
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_config_cls.return_value = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
             supervisor_handoff=MagicMock(

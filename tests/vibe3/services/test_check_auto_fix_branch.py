@@ -47,7 +47,7 @@ class TestAutoFixBranch:
     """Tests for auto_fix_branch method."""
 
     def test_auto_fix_branch_creates_handoff(self, check_service, mock_git_client):
-        """auto_fix_branch creates handoff for the specified branch."""
+        """auto_fix creates handoff for the specified branch."""
         with tempfile.TemporaryDirectory() as tmpdir:
             git_dir = Path(tmpdir) / ".git"
             git_dir.mkdir()
@@ -57,9 +57,9 @@ class TestAutoFixBranch:
                 "get_git_common_dir",
                 return_value=str(git_dir),
             ):
-                result = check_service.auto_fix_branch(
-                    "feature/other-branch",
+                result = check_service.auto_fix(
                     ["Shared handoff file not found: /some/path/current.md"],
+                    branch="feature/other-branch",
                 )
 
         assert result.success
@@ -71,9 +71,9 @@ class TestAutoFixBranch:
         # "database missing pr_number" is no longer emitted by _check_branch
         # (GitHub-as-truth: PR state is fetched live, not cached locally).
         # Passing it to auto_fix should return success=False cleanly.
-        result = check_service.auto_fix_branch(
-            "feature/other-branch",
+        result = check_service.auto_fix(
             ["Branch has open PR #789 but database missing pr_number"],
+            branch="feature/other-branch",
         )
         assert not result.success
         mock_github_client.list_prs_for_branch.assert_not_called()

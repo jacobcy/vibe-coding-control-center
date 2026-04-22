@@ -10,7 +10,7 @@ class TestIssueStateDispatchHandler:
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_human_resume_event_does_not_dispatch(
         self,
         mock_config_cls: MagicMock,
@@ -30,13 +30,13 @@ class TestIssueStateDispatchHandler:
             )
         )
 
-        mock_config_cls.from_settings.assert_not_called()
+        mock_config_cls.assert_not_called()
         mock_build_request.assert_not_called()
         mock_coordinator_cls.assert_not_called()
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_ready_state_dispatches_manager(
         self,
@@ -51,7 +51,7 @@ class TestIssueStateDispatchHandler:
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
-        mock_config_cls.from_settings.return_value = mock_config
+        mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
         mock_request.role = "manager"
@@ -76,7 +76,7 @@ class TestIssueStateDispatchHandler:
 
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_handoff_state_dispatches_manager(
         self,
@@ -91,7 +91,7 @@ class TestIssueStateDispatchHandler:
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
-        mock_config_cls.from_settings.return_value = mock_config
+        mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
         mock_request.role = "manager"
@@ -131,7 +131,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_issue_fetch_failure_blocks_issue(
         self,
@@ -147,7 +147,7 @@ class TestIssueStateDispatchHandler:
         )
 
         mock_config = MagicMock()
-        mock_config_cls.from_settings.return_value = mock_config
+        mock_config_cls.return_value = mock_config
         mock_github_client = MagicMock()
         mock_github_client.view_issue.return_value = None
         mock_github_client_cls.return_value = mock_github_client
@@ -173,7 +173,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_issue_parse_failure_blocks_issue(
         self,
@@ -189,7 +189,7 @@ class TestIssueStateDispatchHandler:
         )
 
         mock_config = MagicMock()
-        mock_config_cls.from_settings.return_value = mock_config
+        mock_config_cls.return_value = mock_config
         mock_github_client = MagicMock()
         mock_github_client.view_issue.return_value = {"id": "invalid_payload"}
         mock_github_client_cls.return_value = mock_github_client
@@ -217,7 +217,7 @@ class TestIssueStateDispatchHandler:
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     def test_request_none_blocks_issue(
         self,
@@ -232,7 +232,7 @@ class TestIssueStateDispatchHandler:
         )
 
         mock_config = MagicMock()
-        mock_config_cls.from_settings.return_value = mock_config
+        mock_config_cls.return_value = mock_config
 
         mock_build_request.return_value = None
 

@@ -7,7 +7,7 @@ from vibe3.models.review_runner import AgentOptions
 
 
 @patch.object(CodeagentBackend, "_run_subprocess")
-@patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
+@patch("vibe3.utils.codeagent_helpers.tempfile.NamedTemporaryFile")
 def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"
@@ -47,7 +47,7 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
 
 
 @patch.object(CodeagentBackend, "_run_subprocess")
-@patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
+@patch("vibe3.utils.codeagent_helpers.tempfile.NamedTemporaryFile")
 def test_codeagent_backend_new_session(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"

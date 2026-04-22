@@ -18,8 +18,9 @@ from vibe3.server.registry import _build_async_serve_command
 @pytest.fixture(autouse=True)
 def mock_preflights():
     """Patch pre-flight checks that require local network resources."""
-    with patch("vibe3.server.app._ensure_port_available", return_value=None):
-        yield
+    # Note: _ensure_port_available was removed in refactoring
+    # If port availability checks are needed, they should be patched here
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -54,8 +55,7 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
     from vibe3.server import registry as utils_module
 
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(utils_module, "_validate_pid_file", lambda _: (None, False))
@@ -89,8 +89,7 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
     from vibe3.server import registry as utils_module
 
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(utils_module, "_validate_pid_file", lambda _: (None, False))
@@ -122,8 +121,7 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
 
 def test_start_async_blocks_when_configured_backend_missing(monkeypatch) -> None:
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
@@ -160,8 +158,7 @@ def test_build_async_serve_command_forces_sync_child_process() -> None:
 
 def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
@@ -187,8 +184,7 @@ def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
 
 def test_start_async_with_ts_exits_nonzero_when_setup_fails(monkeypatch) -> None:
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
@@ -248,8 +244,7 @@ async def test_run_stops_uvicorn_when_heartbeat_exits(monkeypatch) -> None:
 
 def test_status_reports_tmux_session_when_pid_file_missing(monkeypatch) -> None:
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
@@ -267,8 +262,7 @@ def test_status_reports_tmux_session_when_pid_file_missing(monkeypatch) -> None:
 
 def test_stop_kills_tmux_session_when_pid_file_missing(monkeypatch) -> None:
     monkeypatch.setattr(
-        OrchestraConfig,
-        "from_settings",
+        "vibe3.config.orchestra_settings.load_orchestra_config",
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))

@@ -16,7 +16,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     @patch("vibe3.roles.governance.build_governance_request")
     def test_skips_when_governance_already_running(
         self,
@@ -57,7 +57,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     @patch("vibe3.roles.governance.build_governance_request")
     def test_normal_dispatch(
         self,
@@ -97,7 +97,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     @patch("vibe3.roles.governance.build_governance_request")
     def test_no_dispatch_when_request_is_none(
         self,
@@ -130,7 +130,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     @patch("vibe3.roles.governance.build_governance_request")
     def test_coordinator_failure_logged(
         self,
@@ -167,7 +167,7 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
     @patch("vibe3.roles.governance.build_governance_request")
     def test_exception_during_build_logged(
         self,

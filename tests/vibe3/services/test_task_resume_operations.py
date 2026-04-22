@@ -34,8 +34,11 @@ def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
     with patch(
         "vibe3.services.task_resume_operations.HandoffService"
     ) as mock_handoff_cls:
-        handoff_service = MagicMock()
-        mock_handoff_cls.return_value = handoff_service
+        # Mock the HandoffService instance and its storage attribute
+        mock_handoff_instance = MagicMock()
+        mock_storage = MagicMock()
+        mock_handoff_instance.storage = mock_storage
+        mock_handoff_cls.return_value = mock_handoff_instance
 
         operations.reset_task_scene("task/issue-329")
 
@@ -47,7 +50,13 @@ def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
         force=True,
         skip_if_worktree=True,
     )
-    handoff_service.clear_handoff_for_branch.assert_called_once_with("task/issue-329")
+    # Verify HandoffService was instantiated with correct parameters
+    mock_handoff_cls.assert_called_once_with(
+        store=operations.flow_service.store,
+        git_client=operations.git_client,
+    )
+    # Verify storage.clear_handoff_for_branch was called
+    mock_storage.clear_handoff_for_branch.assert_called_once_with("task/issue-329")
     operations.flow_service.delete_flow.assert_called_once_with("task/issue-329")
 
 

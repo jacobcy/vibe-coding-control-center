@@ -313,7 +313,7 @@ class TestOrchestrationFacade:
         mock_publish: MagicMock,
     ) -> None:
         """Test that on_supervisor_scan skips issues without both required labels."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_config_cls.return_value = MagicMock(
             repo="owner/repo",
             supervisor_handoff=MagicMock(
                 issue_label="supervisor",

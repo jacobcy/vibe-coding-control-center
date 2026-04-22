@@ -38,7 +38,7 @@ class TestPlannerDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
-    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_planner_dispatch_delegates_to_role_builder(
         self,
         mock_config_cls: MagicMock,
@@ -50,7 +50,7 @@ class TestPlannerDispatchHandler:
         from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
-        mock_config_cls.from_settings.return_value = config
+        mock_config_cls.return_value = config
 
         # Mock GitHub issue loading
         mock_github_cls.return_value.view_issue.return_value = {
@@ -100,7 +100,7 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
-    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_executor_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
@@ -112,7 +112,7 @@ class TestExecutorDispatchHandler:
         from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
-        mock_config_cls.from_settings.return_value = config
+        mock_config_cls.return_value = config
 
         mock_github_cls.return_value.view_issue.return_value = {
             "title": "Test issue",
@@ -161,7 +161,7 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
-    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_executor_dispatch_commit_pr_from_indicate_action(
         self,
         mock_config_cls: MagicMock,
@@ -174,7 +174,7 @@ class TestExecutorDispatchHandler:
         from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
-        mock_config_cls.from_settings.return_value = config
+        mock_config_cls.return_value = config
 
         mock_github_cls.return_value.view_issue.return_value = {
             "title": "Test issue",
@@ -220,7 +220,7 @@ class TestReviewerDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
-    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_reviewer_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
@@ -232,7 +232,7 @@ class TestReviewerDispatchHandler:
         from vibe3.domain.handlers.dispatch import handle_reviewer_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
-        mock_config_cls.from_settings.return_value = config
+        mock_config_cls.return_value = config
 
         mock_github_cls.return_value.view_issue.return_value = {
             "title": "Test issue",
@@ -283,7 +283,7 @@ class TestDispatchNotLaunched:
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
-    @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_dispatch_not_launched_logs_warning(
         self,
         mock_config_cls: MagicMock,
@@ -295,7 +295,7 @@ class TestDispatchNotLaunched:
         from vibe3.domain.handlers.dispatch import handle_planner_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
-        mock_config_cls.from_settings.return_value = config
+        mock_config_cls.return_value = config
 
         mock_github_cls.return_value.view_issue.return_value = {
             "title": "Test issue",

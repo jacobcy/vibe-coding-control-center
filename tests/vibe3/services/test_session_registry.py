@@ -236,11 +236,13 @@ def test_reconcile_live_state_releases_supervisor_temp_worktree(
     backend.has_tmux_session.return_value = False
 
     with (
-        patch("vibe3.models.orchestra_config.OrchestraConfig") as mock_config_cls,
+        patch(
+            "vibe3.config.orchestra_settings.load_orchestra_config",
+        ) as mock_load_config,
         patch("vibe3.clients.git_client.GitClient") as mock_git_cls,
         patch("vibe3.environment.worktree.WorktreeManager") as mock_wt_cls,
     ):
-        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_load_config.return_value = MagicMock()
         mock_git_cls.return_value.get_git_common_dir.return_value = "/tmp/repo/.git"
         mock_wt = MagicMock()
         mock_wt_cls.return_value = mock_wt
