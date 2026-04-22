@@ -54,20 +54,6 @@ class HandoffService:
         )
         return [FlowEvent(**event) for event in events_data]
 
-    def persist_artifact_event(
-        self,
-        *,
-        branch: str,
-        event_type: str,
-        actor: str,
-        detail: str,
-        refs: dict[str, str],
-        flow_state_updates: dict[str, object] | None = None,
-    ) -> None:
-        self.store.add_event(branch, event_type, actor, detail=detail, refs=refs)
-        if flow_state_updates:
-            self.store.update_flow_state(branch, **flow_state_updates)
-
     def append_current_handoff(
         self,
         message: str,
@@ -94,21 +80,10 @@ class HandoffService:
         audit_is_system_auto: bool = False,
         action: str | None = None,
     ) -> Path:
-        """Internal helper to record a handoff reference.
-
-        Args:
-            ref_kind: Kind of reference (plan, report, audit)
-            ref_value: Reference value (path or identifier)
-            next_step: Optional next step suggestion
-            blocked_by: Optional blocker description
-            actor: Optional explicit actor identifier
-            verdict: Optional review verdict (observational, e.g. PASS/FAIL/UNKNOWN)
-
-        Returns:
-            Path to the current.md file
-        """
+        """Internal helper to record a handoff reference."""
         branch = self.git_client.get_current_branch()
-        ref_value = self._normalize_ref_value(branch, ref_value)
+        # Inlined _normalize_ref_value
+        ref_value = self.storage.normalize_ref_value(ref_value, branch)
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
             branch,
@@ -119,14 +94,12 @@ class HandoffService:
 
         ref_field = f"{ref_kind.lower()}_ref"
 
-        # Build flow state updates, but defer persistence until file/event
-        # writes succeed.
+        # Build flow state updates
         flow_updates = {ref_field: ref_value}
         actor_field_by_kind = {
             "plan": "planner_actor",
             "report": "executor_actor",
             "audit": "reviewer_actor",
-            # "indicate" intentionally omitted — manager_actor not in flow state schema
         }
         actor_field = actor_field_by_kind.get(ref_kind.lower())
         if actor_field:
@@ -136,7 +109,6 @@ class HandoffService:
         if blocked_by:
             flow_updates["blocked_by"] = blocked_by
 
-        # Integrate VerdictService for audit verdicts
         if verdict:
             role = extract_role_from_actor(effective_actor)
             record = VerdictRecord(
@@ -150,7 +122,6 @@ class HandoffService:
             )
             flow_updates["latest_verdict"] = record.model_dump_json()
 
-        # Build the update block content.
         message = f"verdict: {verdict or 'UNKNOWN'}"
         message += f"\nRecorded {ref_kind} reference: {ref_value}"
         if next_step:
@@ -158,25 +129,17 @@ class HandoffService:
         if blocked_by:
             message += f"\nBlocked By: {blocked_by}"
 
-        # 5. Update flow state
         self.store.update_flow_state(branch, **flow_updates)
 
-        # 4b. For indicate: always persist latest_indicate_action in flow_state.
-        # Write None (clear) when no action provided to prevent stale commit_pr
-        # from leaking into subsequent executor dispatch rounds.
         if ref_kind.lower() == "indicate":
             self.store.update_flow_state(
                 branch, latest_indicate_action=action  # None clears the field
             )
 
-        # 7. Build event refs (include verdict for audit events)
         event_refs: dict[str, str] = {"ref": ref_value}
         if verdict:
             event_refs["verdict"] = verdict
 
-        # 8. Persist event
-        # Use "audit_recorded" for audit events (system parsing behavior)
-        # Use "handoff_{kind}" for plan/report events (agent handoff behavior)
         event_type = (
             "audit_recorded"
             if ref_kind.lower() == "audit" and audit_is_system_auto
@@ -194,8 +157,6 @@ class HandoffService:
             refs=event_refs,
         )
 
-        # 7. Append update block to handoff file only after authoritative writes
-        #    succeed.
         try:
             self.append_current_handoff(
                 message=message,
@@ -213,15 +174,8 @@ class HandoffService:
 
         return handoff_path
 
-    def _normalize_ref_value(self, branch: str, ref_value: str) -> str:
-        """Prefer worktree-relative refs for files under the branch worktree."""
-        return self.storage.normalize_ref_value(ref_value, branch)
-
     def record_agent_artifact(self, record: HandoffRecord) -> Path | None:
-        """Persist a plan/run/review artifact and corresponding handoff event.
-
-        This replaces the external record_handoff_unified function.
-        """
+        """Persist a plan/run/review artifact and corresponding handoff event."""
         sanitized_content = ArtifactParser.sanitize_handoff_content(record.content)
         artifact = self.storage.create_artifact(
             record.kind,
@@ -242,7 +196,8 @@ class HandoffService:
         detail, derived_refs = ArtifactParser.build_artifact_detail(
             record.kind, sanitized_content, artifact_file, record.metadata
         )
-        normalized_ref = self._normalize_ref_value(branch, str(artifact_file))
+        # Inlined _normalize_ref_value
+        normalized_ref = self.storage.normalize_ref_value(str(artifact_file), branch)
         refs: dict[str, str] = {
             "ref": normalized_ref,
             "backend": backend,
@@ -253,9 +208,9 @@ class HandoffService:
         if record.session_id:
             refs["session_id"] = record.session_id
 
-        # Add real log_path to refs when the caller provides it.
         if record.log_path:
-            normalized_log = self._normalize_ref_value(branch, record.log_path)
+            # Inlined _normalize_ref_value
+            normalized_log = self.storage.normalize_ref_value(record.log_path, branch)
             refs["log_path"] = normalized_log
 
         flow_state_updates: dict[str, object] = {}
@@ -263,20 +218,15 @@ class HandoffService:
         if actor_key is not None:
             flow_state_updates[actor_key] = actor
 
-        # Map handoff kind to event type
         if record.kind == "run":
             event_type = "handoff_report"
         else:
             event_type = f"handoff_{record.kind}"
 
-        self.persist_artifact_event(
-            branch=branch,
-            event_type=event_type,
-            actor=actor,
-            detail=detail,
-            refs=refs,
-            flow_state_updates=flow_state_updates,
-        )
+        # Inlined persist_artifact_event
+        self.store.add_event(branch, event_type, actor, detail=detail, refs=refs)
+        if flow_state_updates:
+            self.store.update_flow_state(branch, **flow_state_updates)
 
         return artifact_file
 
@@ -309,19 +259,7 @@ class HandoffService:
         verdict: str | None = None,
         is_system_auto: bool = False,
     ) -> Path:
-        """Record audit handoff reference.
-
-        Args:
-            audit_ref: Path to the authoritative audit file.
-            next_step: Optional next step suggestion.
-            blocked_by: Optional blocker description.
-            actor: Optional explicit actor identifier.
-            verdict: Optional review verdict (PASS/MAJOR/BLOCK/UNKNOWN).
-            is_system_auto: If True, records event as ``audit_recorded``
-                (system-generated minimal audit). If False (default), records as
-                ``handoff_audit`` (reviewer actively registered this audit as
-                authoritative).
-        """
+        """Record audit handoff reference."""
         return self._record_ref(
             "audit",
             audit_ref,
@@ -340,21 +278,7 @@ class HandoffService:
         actor: str | None = None,
         action: str | None = None,
     ) -> Path:
-        """Record manager indicate handoff reference.
-
-        Used by manager to signal its decision/directive to downstream agents,
-        distinct from executor handoff_report or reviewer audit_recorded.
-
-        Args:
-            indicate_ref: Path to the indicate document.
-            next_step: Optional next step suggestion.
-            blocked_by: Optional blocker description.
-            actor: Optional explicit actor identifier.
-            action: Structured action directive for executor dispatch.
-                    Valid values: ``fix`` (retry), ``commit_pr`` (run vibe-commit).
-                    Written to ``latest_indicate_action`` in flow state so executor
-                    dispatch can read it without scanning free text.
-        """
+        """Record manager indicate handoff reference."""
         return self._record_ref(
             "indicate", indicate_ref, next_step, blocked_by, actor, action=action
         )

@@ -365,7 +365,3 @@ class CheckService(CheckRemote):
             )
             return FixResult(success=False, error=error)
         return FixResult(success=True, applied=fixed)
-
-    def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
-        """Auto-fix issues for a specific branch."""
-        return self.auto_fix(issues, branch=branch)

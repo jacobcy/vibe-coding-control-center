@@ -14,6 +14,16 @@ from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
 from vibe3.utils.label_utils import normalize_labels
 
+_ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
+
+
+def _get_issue_flow_service() -> IssueFlowService:
+    """Return cached IssueFlowService instance."""
+    global _ISSUE_FLOW_SERVICE_CACHE
+    if _ISSUE_FLOW_SERVICE_CACHE is None:
+        _ISSUE_FLOW_SERVICE_CACHE = IssueFlowService()
+    return _ISSUE_FLOW_SERVICE_CACHE
+
 
 def _ensure_flow_state_for_issue(
     issue_number: int,
@@ -23,7 +33,7 @@ def _ensure_flow_state_for_issue(
 ) -> None:
     """Record block/fail reason on the flow for observability."""
     try:
-        issue_flow_service = IssueFlowService()
+        issue_flow_service = _get_issue_flow_service()
         store = issue_flow_service.store
 
         # Find any flow for this issue (active or otherwise)
@@ -246,7 +256,7 @@ def resume_issue(
 ) -> None:
     """Generic resume issue handler."""
     # Write to flow (source of truth) before GitHub sync
-    issue_flow_service = IssueFlowService()
+    issue_flow_service = _get_issue_flow_service()
     flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
     if flows:
         branch = str(flows[0].get("branch") or "").strip()

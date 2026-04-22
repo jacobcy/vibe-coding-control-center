@@ -37,7 +37,7 @@ from vibe3.services.orchestra_status_service import (
     format_issue_summary_line,
     is_running_issue,
 )
-from vibe3.utils.label_utils import normalize_labels
+from vibe3.utils.label_utils import normalize_assignees, normalize_labels
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
@@ -135,19 +135,6 @@ def _resolve_governance_material(
     return materials[tick_count % len(materials)]
 
 
-def _normalize_assignees(raw_assignees: object) -> list[str]:
-    assignees: list[str] = []
-    if not isinstance(raw_assignees, list):
-        return assignees
-    for item in raw_assignees:
-        if not isinstance(item, dict):
-            continue
-        login = item.get("login")
-        if isinstance(login, str) and login:
-            assignees.append(login)
-    return assignees
-
-
 def _is_doc_candidate(title: str, body: str, labels: list[str]) -> bool:
     if any(label in {"type/docs", "scope/documentation"} for label in labels):
         return True
@@ -181,7 +168,7 @@ def _build_broader_repo_entries(
         if "supervisor" in labels:
             continue
 
-        assignees = _normalize_assignees(item.get("assignees"))
+        assignees = normalize_assignees(item.get("assignees"))
         is_assignee_issue = any(
             assignee in config.manager_usernames for assignee in assignees
         )

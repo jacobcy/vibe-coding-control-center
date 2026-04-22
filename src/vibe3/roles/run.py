@@ -21,13 +21,15 @@ from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
-    build_issue_async_cli_request,
-    build_issue_sync_prompt_request,
     build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
+from vibe3.execution.role_request_factory import (
+    build_role_async_request,
+    build_role_sync_request,
+)
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
@@ -72,8 +74,7 @@ def build_run_request(
     actor: str = "orchestra:executor",
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
-    target_branch = branch or f"task/issue-{issue.number}"
-    refs: dict[str, str] = {"issue_number": str(issue.number)}
+    refs: dict[str, str] = {}
     if plan_ref:
         refs["plan_ref"] = plan_ref
     if audit_ref:
@@ -85,16 +86,17 @@ def build_run_request(
         command_args = ["run", "--plan", plan_ref, "--no-async"]
     else:
         command_args = ["run", "--no-async"]
-    return build_issue_async_cli_request(
+
+    return build_role_async_request(
         role="executor",
+        config=config,
         issue=issue,
-        target_branch=target_branch,
         command_args=command_args,
-        actor=actor,
-        execution_name=f"vibe3-executor-issue-{issue.number}",
-        refs=refs,
         worktree_requirement=EXECUTOR_ROLE.worktree,
+        branch=branch,
         repo_path=repo_path,
+        actor=actor,
+        refs=refs,
     )
 
 
@@ -114,18 +116,18 @@ def build_run_sync_request(
         run_prompt or f"Execute implementation for issue #{issue.number}: {issue.title}"
     )
 
-    return build_issue_sync_prompt_request(
+    return build_role_sync_request(
         role="executor",
+        config=config,
         issue=issue,
-        target_branch=branch,
+        branch=branch,
         prompt=task,
-        options=options,
         task=task,
-        actor=actor,
-        execution_name=f"vibe3-executor-issue-{issue.number}",
-        session_id=session_id,
-        dry_run=dry_run,
+        options=options,
         worktree_requirement=EXECUTOR_ROLE.worktree,
+        session_id=session_id,
+        actor=actor,
+        dry_run=dry_run,
     )
 
 

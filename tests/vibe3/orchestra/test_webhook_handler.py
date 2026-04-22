@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.server.registry import _verify_signature, make_webhook_router
+from vibe3.server.webhook_utils import _verify_signature, make_webhook_router
 
 
 def _make_app(secret: str | None = None) -> tuple[TestClient, HeartbeatServer]:

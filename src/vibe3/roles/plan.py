@@ -17,13 +17,15 @@ from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
-    build_issue_async_cli_request,
-    build_issue_sync_prompt_request,
     build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.role_contracts import PLANNER_GATE_CONFIG
+from vibe3.execution.role_request_factory import (
+    build_role_async_request,
+    build_role_sync_request,
+)
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
@@ -122,17 +124,15 @@ def build_plan_request(
     actor: str = "orchestra:planner",
 ) -> ExecutionRequest:
     """Build the planner async execution request for dispatch."""
-    target_branch = branch or f"task/issue-{issue.number}"
-    return build_issue_async_cli_request(
+    return build_role_async_request(
         role="planner",
+        config=config,
         issue=issue,
-        target_branch=target_branch,
         command_args=["plan", "--issue", str(issue.number), "--no-async"],
-        actor=actor,
-        execution_name=f"vibe3-planner-issue-{issue.number}",
-        refs={"issue_number": str(issue.number)},
         worktree_requirement=PLANNER_ROLE.worktree,
+        branch=branch,
         repo_path=repo_path,
+        actor=actor,
     )
 
 
@@ -149,18 +149,18 @@ def build_plan_sync_request(
     prompt = build_plan_prompt(config, issue, branch)
     task = f"Create implementation plan for issue #{issue.number}: {issue.title}"
 
-    return build_issue_sync_prompt_request(
+    return build_role_sync_request(
         role="planner",
+        config=config,
         issue=issue,
-        target_branch=branch,
+        branch=branch,
         prompt=prompt,
-        options=options,
         task=task,
-        actor=actor,
-        execution_name=f"vibe3-planner-issue-{issue.number}",
-        session_id=session_id,
-        dry_run=dry_run,
+        options=options,
         worktree_requirement=PLANNER_ROLE.worktree,
+        session_id=session_id,
+        actor=actor,
+        dry_run=dry_run,
     )
 
 

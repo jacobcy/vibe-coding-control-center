@@ -3,18 +3,13 @@
 Extracted from orchestra/serve_utils.py.
 """
 
-import hashlib
-import hmac
-import json
 import os
 import shlex
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
@@ -32,94 +27,13 @@ from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchServ
 from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.runtime.service_protocol import GitHubEvent
+from vibe3.server.webhook_utils import make_webhook_router
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
-
-
-def _verify_signature(body: bytes, secret: str, header: str) -> bool:
-    """Return True if the HMAC-SHA256 signature matches."""
-    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, header)
-
-
-def make_webhook_router(
-    heartbeat: HeartbeatServer,
-    webhook_secret: str | None,
-) -> APIRouter:
-    """Build a FastAPI router with GitHub webhook and health endpoints."""
-    router = APIRouter()
-
-    @router.post("/webhook/github")
-    async def receive_webhook(
-        request: Request,
-        x_github_event: str = Header(...),
-        x_hub_signature_256: str | None = Header(None),
-        x_github_delivery: str | None = Header(None),
-    ) -> JSONResponse:
-        body = await request.body()
-
-        if webhook_secret:
-            if not x_hub_signature_256:
-                raise HTTPException(status_code=401, detail="Missing webhook signature")
-            if not _verify_signature(body, webhook_secret, x_hub_signature_256):
-                raise HTTPException(status_code=403, detail="Invalid webhook signature")
-
-        try:
-            payload: dict[str, Any] = json.loads(body)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
-
-        action = str(payload.get("action", ""))
-
-        logger.bind(
-            domain="orchestra",
-            action="webhook",
-            delivery=x_github_delivery,
-        ).info(
-            "Received: "
-            f"{x_github_event}/{action} "
-            f"(source=webhook, delivery={x_github_delivery or '-'})"
-        )
-
-        event = GitHubEvent(
-            event_type=x_github_event,
-            action=action,
-            payload=payload,
-            source="webhook",
-        )
-        await heartbeat.emit(event)
-
-        return JSONResponse({"status": "accepted", "event": x_github_event})
-
-    @router.get("/health")
-    async def health() -> JSONResponse:
-        return JSONResponse(
-            {
-                "status": "ok",
-                "services": heartbeat.service_names,
-                "queue_size": heartbeat.queue_size,
-            }
-        )
-
-    @router.get("/heartbeat")
-    async def heartbeat_status() -> JSONResponse:
-        """Legacy heartbeat status (use /status for full orchestra snapshot)."""
-        return JSONResponse(
-            {
-                "running": heartbeat.running,
-                "services": heartbeat.service_names,
-                "polling_interval": heartbeat.config.polling_interval,
-                "polling_enabled": heartbeat.config.polling.enabled,
-                "max_concurrent": heartbeat.config.max_concurrent_flows,
-            }
-        )
-
-    return router
 
 
 def _resolve_dispatcher_models_root(
