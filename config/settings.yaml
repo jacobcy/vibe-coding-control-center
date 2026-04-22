@@ -96,14 +96,6 @@ code_limits:
         limit: 650
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
 
-      # Roles 层 —— 允许 550-570
-      - path: "src/vibe3/roles/run.py"
-        limit: 450
-        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、plan 解析"
-      - path: "src/vibe3/roles/manager.py"
-        limit: 420
-        reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
-
       # Commands 层 —— 允许 440-480
       - path: "src/vibe3/commands/task.py"
         limit: 480
