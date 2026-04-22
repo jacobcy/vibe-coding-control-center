@@ -35,16 +35,6 @@ from vibe3.services.orchestra_status_service import (
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
 
-def _resolve_dispatcher_repo_root(
-    config: OrchestraConfig,
-    launch_cwd: Path | None = None,
-) -> Path:
-    """Resolve the worktree root used for dispatcher-managed auto scenes."""
-    _ = config
-    _ = launch_cwd
-    return resolve_orchestra_repo_root().resolve()
-
-
 def _resolve_dispatcher_models_root(
     config: OrchestraConfig,
     launch_cwd: Path | None = None,

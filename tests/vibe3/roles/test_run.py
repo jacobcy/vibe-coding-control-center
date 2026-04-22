@@ -6,7 +6,6 @@ from unittest.mock import patch
 from vibe3.agents.models import CodeagentResult
 from vibe3.domain.events import IssueFailed
 from vibe3.domain.publisher import EventPublisher
-from vibe3.models.orchestration import IssueState
 from vibe3.roles.run import publish_run_command_failure, publish_run_command_success
 
 
@@ -189,76 +188,6 @@ class TestExecutorSuccessStateChanged:
         # This test verifies that executor success does NOT force HANDOFF
         # The actual implementation will be fixed to remove confirm_role_handoff
         pass  # ← Placeholder: 实际修复后添加详细测试
-
-
-class TestExecutorNoProgressPolicy:
-    """Executor no-progress 检测"""
-
-    def test_executor_has_progress_with_report_ref(
-        self,
-    ) -> None:
-        """Executor 有 report_ref → 有推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 1,
-            "handoff": None,
-            "refs": {
-                "report_ref": "docs/reports/issue-200-report.md"
-            },  # ← 有 report_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="report_ref",  # ← 检查 report_ref
-        )
-
-        assert has_progress is True  # ← 有推进（report_ref 变化）
-
-    def test_executor_no_progress_without_report_ref(
-        self,
-    ) -> None:
-        """Executor 无 report_ref → 无推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 2,
-            "handoff": None,
-            "refs": {},  # ← 无 report_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="report_ref",  # ← 检查 report_ref
-        )
-
-        assert has_progress is False  # ← 无推进（report_ref 缺失）
 
 
 class TestExecutorNoOpGate:

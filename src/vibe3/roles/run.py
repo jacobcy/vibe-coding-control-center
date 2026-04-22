@@ -54,27 +54,6 @@ def resolve_run_options(config: OrchestraConfig) -> Any:
     )
 
 
-_MERGE_READY_MARKER = "MERGE_READY_COMMIT"
-
-
-def check_merge_ready_commit(branch: str) -> bool:
-    """Check if handoff current.md contains merge-ready commit marker."""
-    try:
-        from vibe3.clients.git_client import GitClient
-        from vibe3.utils.git_helpers import get_branch_handoff_dir
-
-        git_common = GitClient().get_git_common_dir()
-        if not git_common:
-            return False
-        handoff_dir = get_branch_handoff_dir(git_common, branch)
-        current_md = handoff_dir / "current.md"
-        if not current_md.exists():
-            return False
-        return _MERGE_READY_MARKER in current_md.read_text(encoding="utf-8")
-    except Exception:
-        return False
-
-
 RUN_BRANCH_RESOLVER = build_task_flow_branch_resolver(
     fallback_branch=lambda _issue_number, current_branch: current_branch
 )
