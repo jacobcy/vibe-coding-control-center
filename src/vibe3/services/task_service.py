@@ -93,6 +93,59 @@ class TaskService:
             issue_role=role,
         )
 
+    def reclassify_issue(
+        self,
+        branch: str,
+        issue_number: int,
+        *,
+        old_role: Literal["task", "related", "dependency"],
+        new_role: Literal["task", "related", "dependency"],
+        actor: str | None = None,
+    ) -> IssueLink:
+        """Reclassify an existing issue link without deleting flow history."""
+        logger.bind(
+            domain="task",
+            action="reclassify_issue",
+            branch=branch,
+            issue_number=issue_number,
+            old_role=old_role,
+            new_role=new_role,
+        ).info("Reclassifying issue link")
+
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
+
+        updated = self.store.update_issue_link_role(
+            branch,
+            issue_number,
+            old_role,
+            new_role,
+        )
+        if not updated:
+            raise ValueError(
+                f"Issue #{issue_number} not linked as {old_role} on flow {branch}"
+            )
+
+        self.store.update_flow_state(
+            branch,
+            latest_actor=effective_actor,
+        )
+        self.store.add_event(
+            branch,
+            "issue_reclassified",
+            effective_actor,
+            f"Issue #{issue_number} reclassified: {old_role} -> {new_role}",
+        )
+
+        return IssueLink(
+            branch=branch,
+            issue_number=issue_number,
+            issue_role=new_role,
+        )
+
     def get_task(self, branch: str) -> FlowStatusResponse | None:
         """Get task (flow) details."""
         logger.bind(domain="task", action="get", branch=branch).debug("Getting task")

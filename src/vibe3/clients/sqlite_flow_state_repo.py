@@ -109,6 +109,33 @@ class SQLiteFlowStateRepo:
                 role=role,
             ).debug("Added issue link")
 
+    def update_issue_link_role(
+        self,
+        branch: str,
+        issue_number: int,
+        old_role: str,
+        new_role: str,
+    ) -> bool:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_issue_links SET issue_role = ? "
+                "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
+                (new_role, branch, issue_number, old_role),
+            )
+            conn.commit()
+            updated = cursor.rowcount > 0
+            logger.bind(
+                external="sqlite",
+                operation="update_issue_link_role",
+                branch=branch,
+                issue=issue_number,
+                old_role=old_role,
+                new_role=new_role,
+                updated=updated,
+            ).debug("Updated issue link role")
+            return updated
+
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -177,14 +204,23 @@ class SQLiteFlowStateRepo:
         ).info("Deleted persisted flow records and cache")
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
+        canonical_branch = f"task/issue-{issue_number}"
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT f.* FROM flow_state f "
                 "JOIN flow_issue_links l ON f.branch = l.branch "
-                "WHERE l.issue_number = ? AND l.issue_role = ?",
-                (issue_number, role),
+                "WHERE l.issue_number = ? AND l.issue_role = ? "
+                "ORDER BY CASE "
+                "WHEN COALESCE(f.flow_status, 'active') = 'active' "
+                "AND f.branch = ? THEN 0 "
+                "WHEN COALESCE(f.flow_status, 'active') = 'active' THEN 1 "
+                "WHEN f.branch = ? THEN 2 "
+                "ELSE 3 END, "
+                "COALESCE(f.updated_at, '') DESC, "
+                "f.branch ASC",
+                (issue_number, role, canonical_branch, canonical_branch),
             )
             flows = [dict(row) for row in cursor.fetchall()]
             logger.bind(

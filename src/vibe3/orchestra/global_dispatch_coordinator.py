@@ -145,10 +145,6 @@ class GlobalDispatchCoordinator:
                 continue
 
             try:
-                service._emit_dispatch_intent(issue)
-                entry.waiting_state = issue.state.value
-                dispatched_count += 1
-
                 green = "\033[32m"
                 reset = "\033[0m"
                 append_orchestra_event(
@@ -156,6 +152,10 @@ class GlobalDispatchCoordinator:
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
                     f"#{issue.number} ({service.role_def.registry_role})",
                 )
+                service._emit_dispatch_intent(issue)
+                entry.waiting_state = issue.state.value
+                dispatched_count += 1
+
                 logger.bind(
                     domain="global_dispatch",
                     role=service.role_def.registry_role,

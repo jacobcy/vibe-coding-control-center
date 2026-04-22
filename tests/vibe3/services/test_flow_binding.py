@@ -52,3 +52,33 @@ class TestFlowBinding:
 
         assert result.issue_role == "related"
         mock_store.add_issue_link.assert_called_once_with("test-branch", 219, "related")
+
+    def test_reclassify_issue_role(self, mock_store) -> None:
+        """Existing issue link can be reclassified without deleting the flow."""
+        mock_store.update_issue_link_role.return_value = True
+        service = TaskService(store=mock_store)
+
+        result = service.reclassify_issue(
+            "debug/vibe-server-fix",
+            467,
+            old_role="task",
+            new_role="related",
+        )
+
+        assert result.issue_role == "related"
+        mock_store.update_issue_link_role.assert_called_once_with(
+            "debug/vibe-server-fix",
+            467,
+            "task",
+            "related",
+        )
+        mock_store.update_flow_state.assert_called_once_with(
+            "debug/vibe-server-fix",
+            latest_actor="test-actor",
+        )
+        mock_store.add_event.assert_called_once_with(
+            "debug/vibe-server-fix",
+            "issue_reclassified",
+            "test-actor",
+            "Issue #467 reclassified: task -> related",
+        )

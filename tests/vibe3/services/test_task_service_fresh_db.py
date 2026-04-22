@@ -42,3 +42,33 @@ def test_link_issue_task_on_fresh_db(tmp_path):
     # Hydrate should find it
     status = service._flow_service.get_flow_status("task/test")
     assert status.task_issue_number == 220
+
+
+def test_reclassify_issue_moves_task_link_to_related_on_fresh_db(tmp_path):
+    """Verify issue role reclassification updates hydrated task truth."""
+    db_path = tmp_path / "fresh.db"
+    store = SQLiteClient(db_path=str(db_path))
+    service = TaskService(store=store)
+
+    store.update_flow_state("debug/vibe-server-fix", flow_slug="debug-vibe-server-fix")
+    service.link_issue("debug/vibe-server-fix", 467, role="task")
+
+    result = service.reclassify_issue(
+        "debug/vibe-server-fix",
+        467,
+        old_role="task",
+        new_role="related",
+    )
+
+    assert result.issue_role == "related"
+    links = store.get_issue_links("debug/vibe-server-fix")
+    assert any(
+        link["issue_number"] == 467 and link["issue_role"] == "related"
+        for link in links
+    )
+    assert not any(
+        link["issue_number"] == 467 and link["issue_role"] == "task" for link in links
+    )
+
+    status = service._flow_service.get_flow_status("debug/vibe-server-fix")
+    assert status.task_issue_number is None

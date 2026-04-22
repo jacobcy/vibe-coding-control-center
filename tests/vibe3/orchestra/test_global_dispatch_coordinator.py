@@ -323,3 +323,46 @@ class TestGlobalDispatchCoordinator:
         assert not any(
             "dispatched #303 (planner)" in message for message in normalized_events
         )
+
+    @pytest.mark.asyncio
+    async def test_logs_dispatch_intent_before_emit_side_effect(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        planner_issue = make_issue(467)
+        planner_svc = make_service("planner", [planner_issue])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [planner_svc])
+        install_issue_loader(coordinator, {467: IssueState.CLAIMED})
+
+        events: list[str] = []
+
+        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+            _ = level
+            events.append(message)
+
+        def emit_side_effect(_issue: MagicMock) -> None:
+            capture_event(
+                "dispatcher",
+                "planner launch failed for #467: Failed to resolve permanent worktree",
+            )
+
+        planner_svc._emit_dispatch_intent.side_effect = emit_side_effect
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event",
+            capture_event,
+        )
+
+        await coordinator.coordinate()
+
+        normalized_events = [
+            re.sub(r"\x1b\[[0-9;]*m", "", message) for message in events
+        ]
+
+        assert normalized_events[0] == (
+            "GlobalDispatchCoordinator: dispatch-intent #467 (planner)"
+        )
+        assert normalized_events[1] == (
+            "planner launch failed for #467: Failed to resolve permanent worktree"
+        )
