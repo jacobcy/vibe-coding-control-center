@@ -10,7 +10,7 @@ class TestSupervisorScanHandler:
     """supervisor_scan handler dispatches supervisor apply via coordinator."""
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     @patch("vibe3.roles.supervisor.build_supervisor_apply_request")
     def test_normal_dispatch(
         self,
@@ -52,7 +52,7 @@ class TestSupervisorScanHandler:
         mock_coordinator.dispatch_execution.assert_called_once_with(mock_request)
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     def test_dry_run_skips_dispatch(
         self,
         mock_from_settings: MagicMock,
@@ -76,7 +76,7 @@ class TestSupervisorScanHandler:
         mock_coordinator_cls.assert_not_called()
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     @patch("vibe3.roles.supervisor.build_supervisor_apply_request")
     def test_dispatch_failure_logged(
         self,
@@ -111,7 +111,7 @@ class TestSupervisorScanHandler:
         mock_coordinator.dispatch_execution.assert_called_once()
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.models.orchestra_config.OrchestraConfig.from_settings")
+    @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     @patch("vibe3.roles.supervisor.build_supervisor_apply_request")
     def test_exception_during_build_logged(
         self,

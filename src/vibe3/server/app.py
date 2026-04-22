@@ -1,27 +1,21 @@
 """vibe3 server - HTTP webhook receiver and CLI management."""
 
 import asyncio
-import hashlib
-import hmac
-import json
 import os
 import signal
 import sys
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 import uvicorn
-from fastapi import APIRouter, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
-from loguru import logger
 
+from vibe3.agents.backends.codeagent_config import find_missing_backend_commands
 from vibe3.clients.git_client import GitClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.runtime.service_protocol import GitHubEvent
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,
@@ -32,120 +26,12 @@ from vibe3.server.registry import (
     _start_async_serve,
     _validate_pid_file,
 )
+from vibe3.server.server_utils import ensure_port_available
 
 app = typer.Typer(
     help="Orchestra server: GitHub webhook receiver + heartbeat polling",
     no_args_is_help=True,
 )
-
-
-def _verify_signature(body: bytes, secret: str, header: str) -> bool:
-    """Return True if the HMAC-SHA256 signature matches."""
-    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, header)
-
-
-def make_webhook_router(
-    heartbeat: HeartbeatServer,
-    webhook_secret: str | None,
-) -> APIRouter:
-    """Build a FastAPI router with GitHub webhook and health endpoints."""
-
-    router = APIRouter()
-
-    @router.post("/webhook/github")
-    async def receive_webhook(
-        request: Request,
-        x_github_event: str = Header(...),
-        x_hub_signature_256: str | None = Header(None),
-        x_github_delivery: str | None = Header(None),
-    ) -> JSONResponse:
-        body = await request.body()
-
-        if webhook_secret:
-            if not x_hub_signature_256:
-                raise HTTPException(status_code=401, detail="Missing webhook signature")
-            if not _verify_signature(body, webhook_secret, x_hub_signature_256):
-                raise HTTPException(status_code=403, detail="Invalid webhook signature")
-
-        try:
-            payload: dict[str, Any] = json.loads(body)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
-
-        action = str(payload.get("action", ""))
-
-        logger.bind(
-            domain="orchestra",
-            action="webhook",
-            delivery=x_github_delivery,
-        ).info(
-            "Received: "
-            f"{x_github_event}/{action} "
-            f"(source=webhook, delivery={x_github_delivery or '-'})"
-        )
-
-        event = GitHubEvent(
-            event_type=x_github_event,
-            action=action,
-            payload=payload,
-            source="webhook",
-        )
-        await heartbeat.emit(event)
-
-        return JSONResponse({"status": "accepted", "event": x_github_event})
-
-    @router.get("/health")
-    async def health() -> JSONResponse:
-        return JSONResponse(
-            {
-                "status": "ok",
-                "services": heartbeat.service_names,
-                "queue_size": heartbeat.queue_size,
-            }
-        )
-
-    @router.get("/heartbeat")
-    async def heartbeat_status() -> JSONResponse:
-        """Legacy heartbeat status (use /status for full orchestra snapshot)."""
-        return JSONResponse(
-            {
-                "running": heartbeat.running,
-                "services": heartbeat.service_names,
-                "polling_interval": heartbeat.config.polling_interval,
-                "polling_enabled": heartbeat.config.polling.enabled,
-                "max_concurrent": heartbeat.config.max_concurrent_flows,
-            }
-        )
-
-    return router
-
-
-def _ensure_port_available(port: int) -> None:
-    """Raise typer.Exit if port is already in use."""
-    import socket
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            # Use SO_REUSEADDR to be consistent with common server behavior
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind(("0.0.0.0", port))
-        except OSError as e:
-            if e.errno in (48, 98):  # MacOS: 48, Linux: 98
-                typer.echo(
-                    f"\n[bold red]Error:[/] Port {port} is already in use.",
-                    err=True,
-                )
-                typer.echo(
-                    "Check if another Orchestra service is running on this port.",
-                    err=True,
-                )
-                typer.echo(
-                    "Use [bold]vibe3 serve stop[/] or specify [bold]--port[/].\n",
-                    err=True,
-                )
-                raise typer.Exit(1)
-            raise
 
 
 # --- Server Run Logic ---
@@ -277,7 +163,7 @@ def start(
         # Default and -v: show key events (tick completion, issue dispatch, etc.)
         _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "INFO"
 
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     if not config.enabled:
         typer.echo("Orchestra is disabled in config (orchestra.enabled=false)")
         raise typer.Exit(1)
@@ -311,7 +197,7 @@ def start(
         config.pid_file.unlink(missing_ok=True)
 
     # Pre-flight: Check if port is available
-    _ensure_port_available(config.port)
+    ensure_port_available(config.port)
 
     # Phase 1: FailedGate Preflight
     from vibe3.orchestra.failed_gate import FailedGate
@@ -328,6 +214,19 @@ def start(
         typer.echo(
             "\nResolve the failed issue manually, transition it back to state/handoff, "
             "then retry serve start."
+        )
+        raise typer.Exit(1)
+
+    missing_backend_commands = find_missing_backend_commands(
+        env_path=os.environ.get("PATH")
+    )
+    if missing_backend_commands:
+        typer.echo("\nOrchestra start blocked by missing backend executables in PATH\n")
+        for backend, command in missing_backend_commands.items():
+            typer.echo(f"- {backend}: expected `{command}` in PATH")
+        typer.echo(
+            "\nFix the shell environment used to launch serve, or update "
+            "`config/models.json` to use only installed backends, then retry."
         )
         raise typer.Exit(1)
 
@@ -387,7 +286,7 @@ def start(
 @app.command()
 def status() -> None:
     """Show Orchestra server status."""
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     pid, is_valid = _validate_pid_file(config.pid_file)
 
     if pid is None:
@@ -416,7 +315,7 @@ def status() -> None:
 @app.command()
 def stop() -> None:
     """Stop Orchestra server via SIGTERM."""
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     pid_file = config.pid_file
     pid, is_valid = _validate_pid_file(pid_file)
 

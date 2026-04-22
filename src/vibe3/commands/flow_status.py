@@ -7,6 +7,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_binding_guard import build_bind_task_hint
@@ -228,10 +229,9 @@ def status(
             raise typer.Exit(0)
 
         # Try to fetch cached issue titles from orchestra server first
-        from vibe3.models.orchestra_config import OrchestraConfig
         from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-        config = OrchestraConfig.from_settings()
+        config = load_orchestra_config()
         orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
 
         # Use projection service to fetch issue titles (fallback if server not running)

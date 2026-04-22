@@ -129,54 +129,6 @@ class StateLabelDispatchService(ServiceBase):
             )
             return ready
 
-    async def on_tick(self) -> None:
-        """Periodic scan and async dispatch for the configured trigger state.
-
-        **DEPRECATED**: This method bypasses capacity checks and should not be
-        called directly. Use GlobalDispatchCoordinator.coordinate() instead,
-        which properly checks capacity before emitting dispatch intents.
-
-        This method is kept for backward compatibility but will raise a warning
-        if called outside of GlobalDispatchCoordinator context.
-        """
-        import warnings
-
-        warnings.warn(
-            f"{self.service_name}.on_tick() is deprecated: "
-            "bypasses capacity checks. Use GlobalDispatchCoordinator instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        ready = await self.collect_ready_issues()
-
-        for issue in ready:
-            try:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} emitting dispatch-intent event "
-                    f"for #{issue.number}",
-                    level="DEBUG",
-                )
-                self._emit_dispatch_intent(issue)
-
-                logger.bind(
-                    domain="orchestra",
-                    trigger=self.role_def.trigger_name,
-                    issue=issue.number,
-                ).debug("Dispatch-intent event emitted, handler will dispatch")
-            except Exception as exc:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} failed to emit event "
-                    f"for #{issue.number}: {exc}",
-                )
-                logger.bind(
-                    domain="orchestra",
-                    trigger=self.role_def.trigger_name,
-                    issue=issue.number,
-                ).warning(f"State dispatch failed: {exc}")
-
     def _emit_dispatch_intent(self, issue: IssueInfo) -> None:
         from vibe3.domain import publish
         from vibe3.roles.registry import build_label_dispatch_event
@@ -384,7 +336,7 @@ class StateLabelDispatchService(ServiceBase):
                 continue
 
             # For downstream roles (plan/run/review), we need a branch to exist.
-            branch, flow_state = self._flow_context(issue.number)
+            branch, _ = self._flow_context(issue.number)
             if not branch or not _is_auto_task_branch(branch):
                 # If no branch exists yet, we can't dispatch downstream agents.
                 # This usually means manager hasn't run yet.

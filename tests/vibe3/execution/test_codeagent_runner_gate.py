@@ -65,7 +65,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -86,92 +86,54 @@ class TestExecuteSyncGateIntegration:
         assert call_kwargs["issue_number"] == 42
         assert call_kwargs["role"] == "planner"
 
-    def test_gate_skipped_without_issue_number(self) -> None:
-        """Gate does not fire when issue_number is None."""
-        agent_result = _make_mock_agent_result()
-        mock_store = _make_mock_store()
-
-        command = CodeagentCommand(
+    def test_gate_skipped_without_issue_number_or_branch(self) -> None:
+        """Gate does not fire when issue_number or branch is None."""
+        # Test 1: No issue_number
+        command_no_issue = CodeagentCommand(
             role="planner",
             context_builder=lambda: "test prompt",
             branch="task/issue-42",
             issue_number=None,
         )
-
-        with (
-            patch(
-                "vibe3.execution.codeagent_runner.SQLiteClient",
-                return_value=mock_store,
-            ),
-            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
-            patch(
-                "vibe3.execution.codeagent_runner.load_session_id",
-                return_value=None,
-            ),
-            patch(
-                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
-            ) as mock_opts,
-            patch(
-                "vibe3.execution.codeagent_runner.format_agent_actor",
-                return_value="agent:plan",
-            ),
-            patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
-                return_value=None,
-            ),
-            patch(
-                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
-            ) as mock_gate,
-        ):
-            mock_backend.return_value.run.return_value = agent_result
-            mock_opts.return_value = MagicMock()
-            service = CodeagentExecutionService()
-            result = service.execute_sync(command)
-
-        assert result.success
-        mock_gate.assert_not_called()
-
-    def test_gate_skipped_without_branch(self) -> None:
-        """Gate does not fire when branch is None."""
-        command = CodeagentCommand(
+        # Test 2: No branch
+        command_no_branch = CodeagentCommand(
             role="planner",
             context_builder=lambda: "test prompt",
             branch=None,
             issue_number=42,
         )
 
-        with (
-            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch(
-                "vibe3.execution.codeagent_runner.load_session_id",
-                return_value=None,
-            ),
-            patch(
-                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
-            ) as mock_opts,
-            patch(
-                "vibe3.execution.codeagent_runner.format_agent_actor",
-                return_value="agent:plan",
-            ),
-            patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
-                return_value=None,
-            ),
-            patch(
-                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
-            ) as mock_gate,
-        ):
-            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
-                "state/plan"
-            )
-            mock_backend.return_value.run.return_value = _make_mock_agent_result()
-            mock_opts.return_value = MagicMock()
-            service = CodeagentExecutionService()
-            result = service.execute_sync(command)
+        for command in [command_no_issue, command_no_branch]:
+            with (
+                patch(
+                    "vibe3.execution.codeagent_runner.CodeagentBackend"
+                ) as mock_backend,
+                patch(
+                    "vibe3.execution.codeagent_runner.load_session_id",
+                    return_value=None,
+                ),
+                patch(
+                    "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+                ) as mock_opts,
+                patch(
+                    "vibe3.execution.codeagent_runner.format_agent_actor",
+                    return_value="agent:plan",
+                ),
+                patch(
+                    "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
+                    return_value=None,
+                ),
+                patch(
+                    "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
+                ) as mock_gate,
+            ):
+                mock_backend.return_value.run.return_value = _make_mock_agent_result()
+                mock_opts.return_value = MagicMock()
+                service = CodeagentExecutionService()
+                result = service.execute_sync(command)
 
-        assert result.success
-        mock_gate.assert_not_called()
+            assert result.success
+            mock_gate.assert_not_called()
 
     def test_pre_gate_callback_fires_before_gate(self) -> None:
         """pre_gate_callback is called before the sync gate."""
@@ -209,7 +171,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -265,7 +227,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -320,7 +282,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -342,3 +304,70 @@ class TestExecuteSyncGateIntegration:
             stdout="review output",
         )
         mock_gate.assert_called_once()
+
+    def test_execute_sync_runs_handoff_callback_and_noop_gate_in_order(
+        self,
+    ) -> None:
+        """execute_sync must run handoff -> callback -> gate in that order."""
+        from pathlib import Path
+
+        agent_result = _make_mock_agent_result(stdout="verdict: APPROVE")
+        mock_store = _make_mock_store()
+
+        events: list[str] = []
+
+        def fake_record(*args, **kwargs) -> Path | None:
+            events.append("handoff")
+            return Path("/tmp/handoff.md")
+
+        def fake_callback(**kwargs) -> None:
+            events.append("callback")
+
+        def fake_gate(**kwargs) -> None:
+            events.append("gate")
+
+        command = CodeagentCommand(
+            role="reviewer",
+            context_builder=lambda: "review prompt",
+            branch="task/issue-99",
+            issue_number=99,
+            pre_gate_callback=fake_callback,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:review",
+            ),
+            patch(
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
+                side_effect=fake_record,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
+                side_effect=fake_gate,
+            ),
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+            service = CodeagentExecutionService()
+            result = service.execute_sync(command)
+
+        assert result.success
+        assert events == ["handoff", "callback", "gate"]

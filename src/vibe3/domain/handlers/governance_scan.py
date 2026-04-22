@@ -8,10 +8,10 @@ from typing import Callable, cast
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import DomainEvent
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.execution.contracts import ExecutionLaunchResult
-from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
@@ -24,7 +24,7 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     from vibe3.roles.governance import build_governance_request
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     store = SQLiteClient()
     backend = CodeagentBackend()
     registry = SessionRegistryService(store, backend)

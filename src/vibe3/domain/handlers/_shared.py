@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def dispatch_request(
@@ -32,7 +32,7 @@ def dispatch_request(
     from vibe3.execution.coordinator import ExecutionCoordinator
 
     try:
-        config = OrchestraConfig.from_settings()
+        config = load_orchestra_config()
         store = SQLiteClient()
         coordinator = ExecutionCoordinator(config, store)
     except Exception as exc:

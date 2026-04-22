@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.environment.worktree_pr_mixin import WorktreePRMixin
 from vibe3.environment.worktree_support import (
     align_auto_scene_to_base,
@@ -25,16 +25,6 @@ from vibe3.exceptions import SystemError
 if TYPE_CHECKING:
     from vibe3.execution.flow_dispatch import FlowManager
     from vibe3.models.orchestra_config import OrchestraConfig
-
-
-@dataclass
-class WorktreeContext:
-    """Context for a git worktree resource."""
-
-    path: Path
-    is_temporary: bool
-    branch: Optional[str] = None
-    issue_number: Optional[int] = None  # For tracking temporary worktrees
 
 
 class WorktreeManager(WorktreePRMixin):

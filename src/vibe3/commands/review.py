@@ -221,7 +221,7 @@ def base(
     log.info("Starting branch review")
     typer.echo(f"→ Review: {current_branch} vs {resolved_base.base_branch}")
 
-    request, issue_number = build_base_review_request(
+    request, issue_number, _ = build_base_review_request(
         current_branch,
         resolved_base.base_branch,
         flow_service=flow_service,

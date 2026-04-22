@@ -30,7 +30,7 @@ def test_ensure_flow_state_for_issue_existing_flow_block():
 
         # Mock IssueFlowService to expose the real store
         with patch(
-            "vibe3.services.issue_failure_service.IssueFlowService"
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
@@ -59,7 +59,7 @@ def test_ensure_flow_state_for_issue_existing_flow_fail():
         store.add_issue_link(branch, 456, "task")
 
         with patch(
-            "vibe3.services.issue_failure_service.IssueFlowService"
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
@@ -82,7 +82,7 @@ def test_ensure_flow_state_for_issue_no_flow_is_noop():
         store = SQLiteClient(db_path=str(db_path))
 
         with patch(
-            "vibe3.services.issue_failure_service.IssueFlowService"
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
@@ -131,7 +131,7 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
         store.add_issue_link(branch, 100, "task")
 
         with patch(
-            "vibe3.services.issue_failure_service.IssueFlowService"
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
@@ -177,7 +177,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
         store.add_issue_link(branch, 200, "task")
 
         with patch(
-            "vibe3.services.issue_failure_service.IssueFlowService"
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
         ) as mock_issue_flow_service_class:
             mock_issue_flow_service = MagicMock()
             mock_issue_flow_service_class.return_value = mock_issue_flow_service

@@ -557,10 +557,10 @@ LabelService().transition(
 - 周期扫描观察，`WorktreeRequirement.NONE`，无 worktree
 - 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
 - 材料来源：`supervisor/governance/*.md`
-- **当前 governance 只观察 assignee issue pool（`supervisor/governance/assignee-pool.md`）**
-- **roadmap governance（`supervisor/governance/roadmap-intake.md`）当前轮换运行但数据源与 assignee-pool 相同；future 获得独立 broader repo issue pool 数据源后，才能实现真正的 broader 扫描和 assignee issue 识别**
-- **cron governance（`supervisor/governance/cron-supervisor.md`）当前轮换运行但数据源与 assignee-pool 相同；future 获得独立 broader repo issue pool 数据源后，才能实现真正的周期性 supervisor issue 生成**
-- 不执行治理动作，只生成结论并写入 GitHub issue
+- `assignee-pool governance`：观察当前 assignee issue pool
+- `roadmap governance`：扫描 broader repo issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool；不处理 discussion / refactor / big feature
+- `cron governance`：周期性派发过时文档治理 supervisor issue；当前固定一批最多 5 个文档
+- governance 不进入主代码实现链；动作限于观察、最小 routing、派单
 
 **supervisor/apply**（L2）
 - 执行治理动作，`WorktreeRequirement.TEMPORARY`，有临时 worktree
@@ -568,6 +568,7 @@ LabelService().transition(
 - 材料来源：`supervisor/apply.md`
 - **只处理 supervisor issue（带 `supervisor` label），不处理 assignee issue**
 - 执行 label/comment/close/recreate 等动作
+- 可在 L2 临时分支完成文档类与测试修补类修改，并直接 commit / push / pr create
 
 **runtime**
 - 指 vibe3 服务器运行时（EventBus、Heartbeat、HTTP server）
@@ -579,9 +580,9 @@ LabelService().transition(
 
 | 角色 | 处理对象 | 说明 |
 |------|---------|------|
-| governance scan（当前） | assignee issue pool | `supervisor/governance/assignee-pool.md` |
-| governance/roadmap（轮换中） | assignee issue pool（当前）→ broader repo（future） | 当前数据源与 assignee-pool 相同；future 独立数据源后实现 broader 扫描 |
-| governance/cron（轮换中） | assignee issue pool（当前）→ broader repo（future） | 当前数据源与 assignee-pool 相同；future 独立数据源后实现 supervisor issue 生成 |
+| governance scan | assignee issue pool | `supervisor/governance/assignee-pool.md` |
+| governance/roadmap | broader repo issue pool | 自动纳入适合自动化推进的 bug fix / small feature 到 assignee issue pool |
+| governance/cron | broader repo docs scope | 每轮最多派发 5 个过时文档到 supervisor issue |
 | supervisor/apply | supervisor issue | 显式立项的治理 issue，带 `supervisor` label |
 | manager | assignee issue | 已进入执行池的 issue，由 manager 主链推进 |
 

@@ -1,10 +1,11 @@
 """Flow UI timeline rendering components."""
 
+from pathlib import Path
 from typing import Any
 
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
+from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
@@ -45,8 +46,7 @@ _EVENT_COLOR: dict[str, str] = {
     "planner_dispatched": "green bold",
     "executor_dispatched": "green bold",
     "reviewer_dispatched": "green bold",
-    # Audit Events (new name)
-    "audit_recorded": "cyan bold",
+    # Audit Events (new name) — kept here for ordering, actual color defined below
     "state_transitioned": "cyan bold",
     "state_unchanged": "yellow",
     "cannot_verify_remote_state": "yellow",
@@ -54,8 +54,12 @@ _EVENT_COLOR: dict[str, str] = {
     "failed": "red bold",
     "resumed": "green bold",
     "handoff_plan": "blue",
-    "handoff_run": "blue",
-    "handoff_review": "magenta",
+    "handoff_report": "blue",
+    "handoff_run": "blue",  # backward-compat: old event type
+    "handoff_review": "magenta",  # new: reviewer raw output artifact
+    "handoff_audit": "magenta bold",  # new: reviewer-initiated authoritative audit
+    "audit_recorded": "magenta",  # legacy: system auto-generated / backward-compat
+    "handoff_indicate": "cyan bold",
     "manager_completed": "green bold",
     "tmux_manager_started": "dim yellow",
     "codeagent_manager_started": "yellow",
@@ -81,9 +85,11 @@ def _format_event_type(event_type: str) -> str:
         "planner_dispatched": "Planner Dispatch",
         "executor_dispatched": "Executor Dispatch",
         "reviewer_dispatched": "Reviewer Dispatch",
-        # Audit Events
-        "audit_recorded": "Audit Recorded",
-        "handoff_audit": "Audit Recorded",  # Backward compatibility
+        # Audit Events — new semantic names
+        "handoff_review": "Review Output",  # reviewer raw output artifact
+        "handoff_audit": "Audit Recorded",  # reviewer-initiated authoritative audit
+        "audit_recorded": "Audit Recorded",  # system auto-generated / backward-compat
+        "handoff_audit_fallback": "Audit Recorded",  # backward compatibility
     }
     return display_names.get(event_type, event_type)
 
@@ -224,8 +230,16 @@ def render_flow_timeline(
             log_path = (
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
             )
-            if log_path:
-                console.print(f"  [dim]- {log_path}[/]")
+            if log_path and isinstance(log_path, str):
+                log_display = resolve_ref_path(
+                    log_path, state.worktree_root, absolute=True
+                )
+                _log_suffix = (
+                    " [dim yellow](not found)[/]"
+                    if not Path(log_display).exists()
+                    else ""
+                )
+                console.print(f"  [dim]- {log_display}[/]{_log_suffix}")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             # Skip ref if already shown in detail (audit_ref case)
             detail_contains_ref = bool(
@@ -233,8 +247,19 @@ def render_flow_timeline(
                 and isinstance(event.detail, str)
                 and ref in event.detail
             )
-            if ref and not log_path and not detail_contains_ref:
-                console.print(f"  [dim]- {ref}[/]")
+            if (
+                ref
+                and isinstance(ref, str)
+                and not log_path
+                and not detail_contains_ref
+            ):
+                ref_display = resolve_ref_path(ref, state.worktree_root, absolute=True)
+                _ref_suffix = (
+                    " [dim yellow](not found)[/]"
+                    if not Path(ref_display).exists()
+                    else ""
+                )
+                console.print(f"  [dim]- {ref_display}[/]{_ref_suffix}")
         console.print()
 
     if milestone_data:
@@ -258,5 +283,27 @@ def render_flow_timeline(
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
-            console.print(f"  [dim]{label}[/]  {val}{actor_str}")
+            display_val = resolve_ref_path(val, state.worktree_root, absolute=True)
+            _missing = (
+                " [dim yellow](not found)[/]" if not Path(display_val).exists() else ""
+            )
+            console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
+
+    # Show latest state summary if available
+    if state.latest_verdict or state.latest_indicate_action:
+        console.print("[bold]--- State ---[/]")
+        if state.latest_verdict:
+            v = state.latest_verdict
+            color = {
+                "PASS": "green",
+                "MAJOR": "yellow",
+                "BLOCK": "red",
+            }.get(v.verdict, "cyan")
+            console.print(
+                f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+            )
+        if state.latest_indicate_action:
+            console.print(
+                f"  [dim]action[/]      [yellow bold]{state.latest_indicate_action}[/]"
+            )
     console.print()

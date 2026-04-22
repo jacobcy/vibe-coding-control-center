@@ -8,21 +8,28 @@ from types import SimpleNamespace
 from typing import Any
 
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.run_prompt import make_run_context_builder, make_skill_context_builder
+from vibe3.agents.run_prompt import (
+    RunPromptMode,
+    make_run_context_builder,
+    make_skill_context_builder,
+)
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
-    build_issue_async_cli_request,
-    build_issue_sync_prompt_request,
     build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
+from vibe3.execution.role_request_factory import (
+    build_role_async_request,
+    build_role_sync_request,
+)
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
@@ -50,27 +57,6 @@ def resolve_run_options(config: OrchestraConfig) -> Any:
     )
 
 
-_MERGE_READY_MARKER = "MERGE_READY_COMMIT"
-
-
-def check_merge_ready_commit(branch: str) -> bool:
-    """Check if handoff current.md contains merge-ready commit marker."""
-    try:
-        from vibe3.clients.git_client import GitClient
-        from vibe3.utils.git_helpers import get_branch_handoff_dir
-
-        git_common = GitClient().get_git_common_dir()
-        if not git_common:
-            return False
-        handoff_dir = get_branch_handoff_dir(git_common, branch)
-        current_md = handoff_dir / "current.md"
-        if not current_md.exists():
-            return False
-        return _MERGE_READY_MARKER in current_md.read_text(encoding="utf-8")
-    except Exception:
-        return False
-
-
 RUN_BRANCH_RESOLVER = build_task_flow_branch_resolver(
     fallback_branch=lambda _issue_number, current_branch: current_branch
 )
@@ -88,8 +74,7 @@ def build_run_request(
     actor: str = "orchestra:executor",
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
-    target_branch = branch or f"task/issue-{issue.number}"
-    refs: dict[str, str] = {"issue_number": str(issue.number)}
+    refs: dict[str, str] = {}
     if plan_ref:
         refs["plan_ref"] = plan_ref
     if audit_ref:
@@ -101,16 +86,17 @@ def build_run_request(
         command_args = ["run", "--plan", plan_ref, "--no-async"]
     else:
         command_args = ["run", "--no-async"]
-    return build_issue_async_cli_request(
+
+    return build_role_async_request(
         role="executor",
+        config=config,
         issue=issue,
-        target_branch=target_branch,
         command_args=command_args,
-        actor=actor,
-        execution_name=f"vibe3-executor-issue-{issue.number}",
-        refs=refs,
         worktree_requirement=EXECUTOR_ROLE.worktree,
+        branch=branch,
         repo_path=repo_path,
+        actor=actor,
+        refs=refs,
     )
 
 
@@ -130,18 +116,18 @@ def build_run_sync_request(
         run_prompt or f"Execute implementation for issue #{issue.number}: {issue.title}"
     )
 
-    return build_issue_sync_prompt_request(
+    return build_role_sync_request(
         role="executor",
+        config=config,
         issue=issue,
-        target_branch=branch,
+        branch=branch,
         prompt=task,
-        options=options,
         task=task,
-        actor=actor,
-        execution_name=f"vibe3-executor-issue-{issue.number}",
-        session_id=session_id,
-        dry_run=dry_run,
+        options=options,
         worktree_requirement=EXECUTOR_ROLE.worktree,
+        session_id=session_id,
+        actor=actor,
+        dry_run=dry_run,
     )
 
 
@@ -281,7 +267,7 @@ def dispatch_run_command_async(
     if handoff_metadata:
         refs.update({k: str(v) for k, v in handoff_metadata.items()})
     ExecutionCoordinator(
-        OrchestraConfig.from_settings(),
+        load_orchestra_config(),
         SQLiteClient(),
     ).dispatch_execution(
         ExecutionRequest(
@@ -359,20 +345,24 @@ def execute_manual_run(
 
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
 
-    # Read audit_ref from flow_state for retry mode (review feedback injection)
+    # Read flow-state execution hints for retry/fix routing.
     audit_file: str | None = None
+    prompt_mode: RunPromptMode = "coding"
     if branch:
         try:
             flow_state = SQLiteClient().get_flow_state(branch)
-            if flow_state and flow_state.get("audit_ref"):
-                audit_file = str(flow_state["audit_ref"])
+            if flow_state:
+                if flow_state.get("audit_ref"):
+                    audit_file = str(flow_state["audit_ref"])
+                if flow_state.get("latest_indicate_action") == "fix":
+                    prompt_mode = "fix"
         except Exception:
             pass
 
     command = create_codeagent_command(
         role="executor",
         context_builder=make_run_context_builder(
-            plan_file, config, audit_file=audit_file
+            plan_file, config, audit_file=audit_file, mode=prompt_mode
         ),
         task=instructions or run_prompt,
         dry_run=dry_run,
@@ -416,7 +406,16 @@ def execute_manual_run(
         return None
 
     execution_service = CodeagentExecutionService(config)
-    result = execution_service.execute_sync(command)
+    try:
+        result = execution_service.execute_sync(command)
+    except Exception as exc:
+        if not dry_run and no_async and issue_number is not None:
+            publish_run_command_failure(
+                issue_number=issue_number,
+                reason=str(exc) or "Execution aborted",
+            )
+        raise
+
     if not dry_run and no_async and issue_number is not None:
         if result.success:
             publish_run_command_success(

@@ -5,8 +5,8 @@
 `supervisor/apply` 只处理 **supervisor issue**（显式立项的治理 issue，带 `supervisor` label），不处理 assignee issue。assignee issue 由 manager 主链负责推进。
 
 **允许范围**（supervisor apply 可执行）：
-- 文档治理（更新、校正、格式修复）
-- 过期测试清理（删除明确过期的测试）
+- 文档治理（更新、校正、格式修复、语义对齐）
+- 测试修补治理（仅限测试文件、测试夹具、测试文案、过期测试清理）
 - supervisor issue 操作：label、comment、close、recreate
 - 安排 supervisor 任务（创建 supervisor issue）
 
@@ -31,7 +31,9 @@
 - `task/issue-*` 是自动化链；只适合边界清晰、可被自动链稳定消费的任务
 - 当前 apply 的职责是处理治理 issue，而不是保守地把一切都转回人工
 - 如果治理动作只涉及 issue / labels / comments / close / recreate，不需要因为“没有代码改动”就转成新的 task issue
-- 只有当动作明确需要修改代码、文档或配置文件时，才把它视为需要 worktree 的实现工作
+- L2 临时分支可以承接轻量实现，但仅限文档类和测试修补类
+- 只要**不涉及主代码**，且范围清晰、无需复杂测试或业务论证，就优先由 supervisor/apply 直接完成
+- 一旦触及主代码、架构讨论、重构决策或较重验证，就必须转回 task issue / L3 主链
 
 ## What It Reads
 
@@ -70,10 +72,17 @@ Allowed:
 - `scene`: read
 - `flow/task status`: read
 - `gh issue view/comment/edit/close/create`: allowed
+- `docs.write`: allowed（仅当前 supervisor issue 明确授权的文档修补）
+- `tests.write`: allowed（仅当前 supervisor issue 明确授权的测试修补）
+- `git.commit`: allowed
+- `git.push`: allowed
+- `pr.create`: allowed
 
 Forbidden:
 
-- `code_write`: 任何源码、文档、配置文件修改
+- `code_write`: 主代码源码修改（`src/` 等业务/运行时代码）
+- 大范围文档重写、结构重组、信息架构改造
+- 非测试范围的配置 / pipeline / runtime 逻辑修改
 - `flow.create`: 创建新的 flow 或直接启动新的自动化执行
 - `runtime.modify`: 终止 session、篡改共享 runtime 状态
 - 把“新 issue 已创建”伪装成“旧 issue 已修复”
@@ -91,10 +100,11 @@ Forbidden:
    - 修正 metadata 后继续沿用旧 issue
    - 关闭旧 issue，并创建新的干净 issue
    - 转为新的 task issue 承接更重的实现工作
-6. 仅当需要改代码、文档、配置，或需要新的正式实现 flow 时，才转为 task issue
+6. 仅当需要主代码改动、复杂测试、配置 / pipeline 变更，或需要新的正式实现 flow 时，才转为 task issue
 7. 执行范围保持最小；如果 issue 中没有允许某种重动作，不要擅自扩大
-8. 把完整结果 comment 回当前治理 issue，而且只发布一条正式结果评论
-9. 完成后关闭当前治理 issue；关闭时不要再追加第二条 close comment
+8. 如果当前 issue 授权的是文档类或测试修补类工作，直接在 L2 临时分支完成修改、commit、push、pr create
+9. 把完整结果 comment 回当前治理 issue，而且只发布一条正式结果评论
+10. 完成后关闭当前治理 issue；关闭时不要再追加第二条 close comment
 
 ## Trigger Assumption
 
@@ -108,6 +118,8 @@ Forbidden:
 
 - `Decision`
 - `Actions`
+- `Commit`
+- `PR`
 - `Why`
 - `Comment`
 - `Close`
@@ -131,4 +143,4 @@ Forbidden:
 
 ## Stop Point
 
-完成核查、必要动作、comment 和 close 后停止。
+完成核查、必要动作、必要时的文档/测试修补、comment 和 close 后停止。

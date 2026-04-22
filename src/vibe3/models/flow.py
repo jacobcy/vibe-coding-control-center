@@ -1,9 +1,12 @@
 """Flow and Task data models."""
 
+import json
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+from vibe3.models.verdict import VerdictRecord
 
 
 class MainBranchProtectedError(Exception):
@@ -87,6 +90,10 @@ class FlowState(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+    latest_verdict: VerdictRecord | None = None  # Latest verdict for quick query
+    latest_indicate_action: str | None = (
+        None  # Latest structured action from manager indicate
+    )
 
     model_config = {"extra": "ignore"}
 
@@ -112,6 +119,37 @@ class FlowState(BaseModel):
         """Migrate legacy execution status values."""
         return _migrate_execution_status_value(v)
 
+    @field_validator("latest_verdict", mode="before")
+    @classmethod
+    def parse_verdict_record(
+        cls, v: str | dict[str, object] | None
+    ) -> VerdictRecord | None:
+        """Parse verdict record from JSON string or dict.
+
+        SQLite stores latest_verdict as JSON TEXT, so we need to
+        deserialize it when loading from the database.
+
+        Args:
+            v: JSON string, dict, VerdictRecord, or None
+
+        Returns:
+            VerdictRecord instance or None
+        """
+        if v is None:
+            return None
+        if isinstance(v, VerdictRecord):
+            return v
+        if isinstance(v, str):
+            try:
+                data = json.loads(v)
+                return VerdictRecord(**data)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if isinstance(v, dict):
+            # Type ignore: v is validated JSON from database
+            return VerdictRecord(**v)  # type: ignore[arg-type]
+        return None
+
 
 class IssueLink(BaseModel):
     """Issue link model."""
@@ -134,7 +172,7 @@ class IssueLink(BaseModel):
 
     @staticmethod
     def resolve_task_number(
-        links: list["IssueLink"] | list[dict],
+        links: list["IssueLink"] | list[dict[str, Any]],
     ) -> int | None:
         """Resolve the primary task issue number from links.
 
@@ -143,11 +181,13 @@ class IssueLink(BaseModel):
         for link in links:
             role = link.get("issue_role") if isinstance(link, dict) else link.issue_role
             if role == "task":
-                return (
+                result = (
                     link.get("issue_number")
                     if isinstance(link, dict)
                     else link.issue_number
                 )
+                # Type cast for Pyright strict mode
+                return result if isinstance(result, int) else None
         return None
 
 
@@ -227,6 +267,11 @@ class FlowStatusResponse(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+    latest_verdict: VerdictRecord | None = None
+    latest_indicate_action: str | None = (
+        None  # Latest structured action from manager indicate
+    )
+    worktree_root: str | None = None  # NEW: Worktree root path for path resolution
 
     @field_validator("flow_status", mode="before")
     @classmethod
@@ -248,10 +293,11 @@ class FlowStatusResponse(BaseModel):
     @classmethod
     def from_state(
         cls,
-        state: FlowState | dict,
+        state: FlowState | dict[str, Any],
         issues: list[IssueLink] | None = None,
         pr_number: int | None = None,
         pr_ready: bool | None = None,
+        worktree_root: str | None = None,
     ) -> "FlowStatusResponse":
         """Build a hydrated response from state and links."""
         data = state.model_dump() if isinstance(state, FlowState) else dict(state)
@@ -292,6 +338,9 @@ class FlowStatusResponse(BaseModel):
             execution_pid=data.get("execution_pid"),
             execution_started_at=data.get("execution_started_at"),
             execution_completed_at=data.get("execution_completed_at"),
+            latest_verdict=data.get("latest_verdict"),
+            latest_indicate_action=data.get("latest_indicate_action"),
+            worktree_root=worktree_root,
         )
 
 

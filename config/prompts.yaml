@@ -115,6 +115,8 @@ orchestra:
     # Available template variables:
     # - {supervisor_name}
     # - {supervisor_content}
+    # - {issue_scope_name}
+    # - {scope_note}
     # - {server_status}
     # - {running_issue_count}
     # - {suggested_issue_count}
@@ -128,8 +130,6 @@ orchestra:
     # - {issue_list}
     # - {truncated_note}
     #
-    # NOTE: All issue-related variables below represent the assignee issue pool
-    # (issues managed by the manager chain), not the broader repo backlog.
     plan: |
       # Orchestra Governance Scan
 
@@ -140,8 +140,9 @@ orchestra:
 
       ## Runtime Summary
       - Server: {server_status}
-      - Running issues (assignee pool): {running_issue_count}
-      - Suggested issues (assignee pool): {suggested_issue_count}
+      - Scope: {issue_scope_name}
+      - Running issues: {running_issue_count}
+      - Suggested issues: {suggested_issue_count}
       - Active flows: {active_flows}
       - Circuit breaker: {circuit_breaker_state} (failures={circuit_breaker_failures})
 
@@ -149,7 +150,7 @@ orchestra:
       {running_issue_details}
 
       ## Suggested Issues
-      以下均为 assignee issue pool 内的建议；最终仍需结合 flow / worktree / PR 现场判断。
+      {scope_note}
       {suggested_issue_details}
 
       ## 指令
@@ -164,7 +165,7 @@ orchestra:
       **注意**：
       - 不要直接修改 Assignee，除非 Supervisor 材料明确要求。
       - 不要擅自创建 Flow、Worktree 或进入 manager 场景，除非 Supervisor 材料明确要求。
-      - 当前 governance 只观察 assignee issue pool，不处理 broader repo backlog 或 supervisor issue。
+      - 优先相信当前 Supervisor 材料的对象边界；不要沿用其他治理材料的默认假设。
 
   supervisor:
     apply: |

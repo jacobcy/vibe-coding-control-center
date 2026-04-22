@@ -28,6 +28,7 @@ class QueueEntry:
     """Frozen queue entry tracked only by issue identity and wait state."""
 
     issue_number: int
+    collected_state: str | None = None
     waiting_state: str | None = None
 
 
@@ -112,6 +113,28 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
+            # NEW: Check if remote state changed since collection. If changed,
+            # move to end of queue to let others go first and re-evaluate later.
+            if entry.collected_state and issue.state.value != entry.collected_state:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: #{issue.number} state changed "
+                    f"({entry.collected_state} -> {issue.state.value}), "
+                    "moving to end of queue",
+                )
+                logger.bind(
+                    domain="global_dispatch",
+                    issue=issue.number,
+                ).info(
+                    f"Issue #{issue.number} state changed from "
+                    f"{entry.collected_state} to {issue.state.value}, moving to end"
+                )
+                self._frozen_queue.pop(index)
+                entry.collected_state = issue.state.value
+                self._frozen_queue.append(entry)
+                # Do NOT increment index because current item was popped
+                continue
+
             if entry.waiting_state is not None:
                 index += 1
                 continue
@@ -178,7 +201,12 @@ class GlobalDispatchCoordinator:
                     if issue.number in seen_issue_numbers:
                         continue
                     seen_issue_numbers.add(issue.number)
-                    queue.append(QueueEntry(issue_number=issue.number))
+                    queue.append(
+                        QueueEntry(
+                            issue_number=issue.number,
+                            collected_state=state.value,
+                        )
+                    )
             except Exception as exc:
                 logger.bind(
                     domain="global_dispatch",
@@ -226,6 +254,7 @@ class GlobalDispatchCoordinator:
 
             # Progress detected (state changed to non-terminal) - promote to front
             entry.waiting_state = None
+            entry.collected_state = current_state  # Sync with current state
             promoted.append(entry)
             append_orchestra_event(
                 "dispatcher",

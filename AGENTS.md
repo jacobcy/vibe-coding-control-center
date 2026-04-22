@@ -1,6 +1,6 @@
 # AI Agent Guide
 
-Welcome, AI Agent. This file serves as your entry point to Vibe Center 2.0.
+Welcome, AI Agent. This file serves as your entry point to Vibe Center 3.0.
 
 > **Single Entry Policy**: `AGENTS.md` is the canonical root entry for all agents.
 > **Single Source of Truth**: Each document has a specific responsibility. See [SOUL.md](SOUL.md) §0 for document responsibility matrix.
@@ -60,6 +60,32 @@ Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):
 - **Respect** hard rules in [CLAUDE.md](CLAUDE.md)
 - **Follow** workflows in `.agent/workflows/`
 
+## ⚠️ Important Principles (Hard Rules)
+
+这些原则选自 [CLAUDE.md](CLAUDE.md)，Agent 必须严格遵守：
+
+1. **本地测试节奏 (CI 优先)**：
+   - **避免全量测试**：本地默认执行**定向回归测试**。
+   - **禁止在同一轮修改中反复运行全量 `uv run pytest`**。
+   - 全量测试交给线上 CI；创建 PR draft 后查看 CI 结果。
+   - 仅在用户明确要求或复现 CI 特有失败时才本地跑全量。
+
+2. **Git 纪律 (强制两步提交)**：
+   - ✅ **第一步**：temp commit -> pre-commit 自动修复格式问题。
+   - ✅ **第二步**：reset -> 正式分组提交（按功能模块）。
+   - ❌ 禁止使用 `--no-verify` 绕过质量门禁。
+
+3. **署名规则**：
+   - ✅ Issue/PR 创建必须包含贡献者列表或署名。
+   - ✅ Comment 必须明确标注发布者身份。
+
+4. **最短路径优先**：
+   - 优先复用现有命令/流程，避免新增边缘命令或过度工程化。
+
+5. **技术栈约束**：
+   - **必须使用 `uv run`**，禁止直接使用 `python`/`pip`。
+   - 禁止在文档/输出中使用线框图 (box drawing characters)，使用 YAML/Mermaid/ASCII。
+
 ## 📦 External Dependencies
 
 This project uses community skills:
@@ -71,7 +97,6 @@ Install via respective tools, then create symlinks in `.agent/skills/`. See [DEV
 ## 代码分析工具
 
 - `vibe3 inspect symbols/files/base/pr/commit` — 代码结构与影响分析
-- `mcp_auggie_codebase-retrieval` — 语义理解与跨文件探索
 - `claude-memory smart search` — 项目记忆搜索（跨对话上下文）
 - 详细用法见 [.agent/policies/common.md](.agent/policies/common.md)
 

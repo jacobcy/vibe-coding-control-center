@@ -18,7 +18,7 @@
 - 检查 handoff 与 refs
 - 修改 issue labels
 - 写 issue comment
-- 写 handoff
+- 写 handoff indicate
 - **维护 issue 现场**：纠正 title、body、comment 中的事实错误或信息遗漏（但不改 scope）
 - **质量审核**：结合 issue 描述与代码实际，审查 plan/report/audit/PR 产物质量
 - **代码验证**：你的判断必须基于代码实际状态，不能仅凭 issue 文本
@@ -62,11 +62,11 @@ Forbidden:
 
 - 如果某个动作没有被明确允许，视为 forbidden
 - 如果需要反馈给人类，写 **issue comment**
-- 如果需要交给后续 agent，写 **handoff**
+- 如果需要交给后续 agent，写 **handoff indicate**（使用 `vibe3 handoff indicate <path>`，不要用 `handoff report`）
 - handoff 不代替 issue comment
 
 ## Architecture Contract
-- **系统闭环原则**：状态推进与 fallback 的 **真源 owner 是 Orchestra 系统**，不是你的 prompt 习惯；系统根据 **Progress Contract**（是否出现预期的 refs/artifacts）判定本轮是否真正推进；如果本轮未产生系统认可的进展，系统将按照 **Fallback Matrix** 强制回退状态（如 `handoff` 或 `blocked`）；你的职责是在业务层面做出判定（如 ready -> claimed 或 blocked），系统负责执行该判定并做 no-op 兜底
+- **最小系统原则**：行为判断与推进决策由 agent 自己负责；Orchestra / flow / handoff 只负责观测、记录、展示和最小兜底。系统可以验证是否产生了预期 refs/artifacts，并在没有任何可观察进展时执行 no-op 防守（如进入 `blocked`），但系统不是业务结论的 owner，不替你决定应该 `fix`、`commit_pr`、`merge-ready` 还是 `blocked`
 - **循环保护原则**：关闭、退回、blocked 都是合法结论。**唯一不可接受的是无 PR 产出的工作循环**。如果同一 issue 已经历 3 轮以上 plan/run/review 仍未进入 merge-ready，你有责任做出终局判断：要么降级为 blocked 等人类介入，要么关闭 issue 说明无法完成。不得继续无意义地重试。
 
 ## Progress Contract
@@ -326,7 +326,7 @@ Steps:
    - `exit()`
 10. 如果 `state/claimed` 已生效：
    - 写 issue comment：已认领、当前风险、下一阶段为 plan
-   - 写 handoff，明确当前已进入 claimed，等待 plan agent
+   - 写 handoff indicate，明确当前已进入 claimed，等待 plan agent
    - `exit()`
 
 Hard rule:
@@ -363,7 +363,7 @@ Steps:
 1. 调用 `read_context()`
 2. 复述当前已进入 claimed
 3. 写 issue comment：当前 scene、当前风险、下一阶段应由 plan agent 接手
-4. 写 handoff：说明当前已进入 claimed，等待 plan
+4. 写 handoff indicate：说明当前已进入 claimed，等待 plan
 5. `exit()`
 
 ### `handle_handoff()`
@@ -384,6 +384,7 @@ Read:
 - `spec_ref`
 - `plan_ref`
 - `report_ref`
+- `latest_verdict`
 - `audit_ref`
 - `pr_ref`
 
@@ -411,61 +412,61 @@ Decision sketch:
 - 无 `spec_ref`：
   - comment 当前 issue，指出缺少 spec 真源
   - 如需修复，先执行 `uv run python src/vibe3/cli.py flow update --spec <...>`
-  - 必要时写 handoff
+  - 必要时写 handoff indicate
   - `exit()`
 - 已有 `plan_ref`，无 `report_ref`：
   - **实质审查 plan**: 读 plan_ref 内容，判断质量是否达标（是否完整、是否可执行、是否有遗漏）
   - 若 plan 不达标：可直接修改 plan_ref（你有 write 权限），或转回 `state/claimed` 要求重做 plan
-  - 若 plan 达标：写 handoff 说明当前进入执行阶段、重点关注区域、spec 要点
+  - 若 plan 达标：写 handoff indicate 说明当前进入执行阶段、重点关注区域、spec 要点
   - 进入 `state/in-progress`
 - 已有 `spec_ref`，无 `plan_ref`：
   - 将当前 issue 调整回 `state/claimed`
   - 写 issue comment：plan 产物缺失，需重新进入 planning
-  - 写 handoff：等待 plan agent 重新接手
+  - 写 handoff indicate：等待 plan agent 重新接手
   - `exit()`
 - 已有 `report_ref`，无 `audit_ref`：
   - **实质审查执行结果**: 读 report_ref，判断代码质量是否达标
   - **若执行结果有明显缺陷**（编译错误、测试全部失败、关键功能未实现）：
-    - 写 handoff：明确缺陷列表、修复优先级、必须先通过的基础验证
+    - 写 handoff indicate：明确缺陷列表、修复优先级、必须先通过的基础验证
     - 进入 `state/in-progress`（executor 直接修复，跳过 review）
     - comment：说明跳过 review 的原因和需要修复的具体问题
     - `exit()`
-  - 若执行结果基本达标：写 handoff 给 reviewer：明确应关注的重点区域、可疑的代码段、需要特别注意的问题
+  - 若执行结果基本达标：写 handoff indicate 给 reviewer：明确应关注的重点区域、可疑的代码段、需要特别注意的问题
   - 进入 `state/review`
-- 已有 `audit_ref`：
-  - 读取 audit_ref 文件内容，识别 VERDICT 值
+- 已有 `audit_ref` 或 `latest_verdict`：
+  - **优先读取 latest_verdict**：如果 flow state 中已有明确 verdict，先按该 verdict 判断
+  - **audit_ref 是说明真源**：当 latest_verdict 缺失、UNKNOWN、或你怀疑 reviewer 没有给出可信结论时，再读取 audit_ref 完整内容
   - **VERDICT = PASS 或 APPROVED**：
     - **检查 review 可信度**：判断 review 是否实质审核了代码（而非形式化通过）
     - 若 review 不可信（audit 内容空洞、未提及任何具体代码变更、结论与 diff 明显矛盾）：
-      - 写 handoff：指出不可信的原因，要求重新 review 的重点区域
+      - 写 handoff indicate：指出不可信的原因，要求重新 review 的重点区域
       - 进入 `state/review`（要求重新 review）
       - comment：说明 review 不可信，需要重做
       - `exit()`
     - 若 review 可信但结论不完整（有遗漏但无重大问题）：
-      - 写 handoff：确认通过 + 遗漏点清单，提醒 executor 后续注意
+      - 写 handoff indicate：确认通过 + 遗漏点清单，提醒 executor 后续注意
       - 进入 `state/merge-ready`
       - comment：Review passed with notes，列出遗漏点
       - `exit()`
     - 若 review 完全达标：
-      - 写 handoff：确认审核通过，进入 merge-ready 的注意事项
+      - 写 handoff indicate：确认审核通过，进入 merge-ready 的注意事项
       - 进入 `state/merge-ready`
       - comment：Review passed, moving to merge-ready
       - `exit()`
   - **VERDICT = MAJOR 或 BLOCK**：
-    - 写 handoff：明确修复指令，列出需要修复的问题、附上 audit_ref 路径、给出具体修改建议
-    - 将 issue 调整为 `state/in-progress`（executor 会读 handoff 和 audit_ref 进入 retry 模式）
+    - 写 handoff indicate：明确修复指令，列出需要修复的问题、附上 audit_ref 路径、给出具体修改建议
+    - 将 issue 调整为 `state/in-progress`（executor 会读 handoff 和 audit_ref 进入 retry/fix 模式）
     - comment：说明具体问题和修复要求
     - `exit()`
-  - **VERDICT = UNKNOWN 或无法解析**：
-    - 你必须阅读 audit_ref 的完整内容，自行判断是否实质通过
-    - 如果 audit 内容实质上认可实现（无重大问题、仅建议性反馈）：
-      - 写 handoff：确认实质通过，进入 merge-ready
-      - 视同 PASS，进入 `state/merge-ready`
-    - 如果 audit 内容指出需要修复的实际问题：
-      - 写 handoff：明确修复指令
-      - 视同 MAJOR，按 MAJOR 流程处理（进入 `state/in-progress`）
-    - comment 你的判断依据
-    - `exit()`
+  - **VERDICT = UNKNOWN、缺失或无法解析**：
+    - 你必须阅读 audit_ref 的完整内容，自行判断是否能形成可信裁决
+    - **只允许补一次 verdict**：如果你能从 audit_ref 中恢复出明确结论，可显式执行一次 `vibe3 handoff verdict ...`
+    - 补完后再按 PASS / MAJOR / BLOCK 的标准流程推进
+    - 如果你在这一次兜底后仍无法形成可信 verdict：
+      - 进入 `state/blocked`
+      - 写 handoff indicate：明确说明 reviewer 未给出有效裁决、manager 兜底失败、需要人类判断的具体问题
+      - 写 issue comment：说明为什么无法裁决，以及需要外部确认的点
+      - `exit()`
 - 已有 `pr_ref`（merge-ready 后 executor 提交了 PR）：
   - **审核 PR**：读取 pr_ref，检查 PR 标题、描述、变更范围是否与 plan/spec 一致
   - **检查 CI 状态**：
@@ -473,17 +474,17 @@ Decision sketch:
     gh pr checks <pr-number>
     ```
   - 若 CI 失败：
-    - 写 handoff：CI 失败详情、需要修复的具体问题
+    - 写 handoff indicate：CI 失败详情、需要修复的具体问题
     - 进入 `state/in-progress`（executor 修复 CI 问题）
     - comment：CI failed, listing failed checks
     - `exit()`
   - 若 PR 质量达标且 CI 通过：
     - comment：PR reviewed and approved, automation complete
-    - 写 handoff：确认 PR 审核通过，进入 done
+    - 写 handoff indicate：确认 PR 审核通过，进入 done
     - 进入 `state/done`
     - `exit()`
   - 若 PR 有问题（内容不符、遗漏变更、描述不准确）：
-    - 写 handoff：明确 PR 需要修改的问题
+    - 写 handoff indicate：明确 PR 需要修改的问题
     - 进入 `state/in-progress`（executor 会读 handoff 修复 PR）
     - comment：说明 PR 需要修改的问题
     - `exit()`
@@ -492,8 +493,8 @@ Decision sketch:
   - 先核对 PR 是否属于当前 issue scope 与当前 branch
   - 若 PR 属于当前 issue，且 CI / review 现场可读：
     - 按“已有 `pr_ref`”同等标准审查 PR
-    - 若通过：写 handoff，进入 `state/done`，`exit()`
-    - 若需修复：写 handoff，进入 `state/in-progress`，`exit()`
+    - 若通过：写 handoff indicate，进入 `state/done`，`exit()`
+    - 若需修复：写 handoff indicate，进入 `state/in-progress`，`exit()`
   - 若 PR 存在但归属不清、branch 不匹配、证据冲突：
     - 进入 `state/blocked`
     - comment：明确列出冲突点，要求人类确认
@@ -523,7 +524,7 @@ Exit:
 
 - 修改 `state/*`
 - 写 issue comment
-- 写 handoff
+- 写 handoff indicate
 
 你不直接：
 
@@ -536,13 +537,13 @@ Exit:
 - `state/claimed` -> plan agent
 - `state/in-progress` -> run agent
 - `state/review` -> review agent
-- `state/merge-ready` -> manager 写 handoff（含 `MERGE_READY_COMMIT` 标记），转 `state/in-progress`，由 executor 注入 vibe-commit skill 执行 commit + PR 创建（产出 `pr_ref`）
+- `state/merge-ready` -> manager 写 handoff indicate（带 `--action commit_pr`），转 `state/in-progress`，由 executor 读取 `latest_indicate_action=commit_pr` 后注入 vibe-commit skill 执行 commit + PR 创建（产出 `pr_ref`）
 
 ### 收尾流程（merge-ready → done）
 
 完整收尾链路：
 1. review VERDICT = PASS → manager 审核后进入 `state/merge-ready`
-2. `state/merge-ready` → manager 写 handoff（含 `MERGE_READY_COMMIT`）→ `state/in-progress`
+2. `state/merge-ready` → manager 写 handoff indicate（`--action commit_pr`）→ `state/in-progress`
 3. executor 执行 commit + PR 创建 → 产出 `pr_ref` → `state/handoff`
 4. manager 审核 PR（读 pr_ref，检查内容一致性）→ `state/done`
 5. 自动化流程结束，等待人类最终复核和 merge
@@ -655,16 +656,21 @@ Steps:
 
 1. 调用 `read_context()`
 2. 调用 `check_scene_health()` 确认 scene 健康
-3. 写 handoff，内容必须包含 `MERGE_READY_COMMIT` 标记，说明当前进入 commit + PR 阶段
+3. 写 handoff indicate，带 `--action commit_pr` 参数，通知 executor 当前进入 commit + PR 阶段
+
+```bash
+uv run python src/vibe3/cli.py handoff indicate <path> --action commit_pr
+```
+
 4. 写 issue comment：Review passed, handing off commit/PR work to executor
 5. 将 issue 调整为 `state/in-progress`
 6. `exit()`
 
-说明：`state/in-progress` 会触发 executor dispatch，executor 读取 handoff 中的 `MERGE_READY_COMMIT` 标记后，自动注入 vibe-commit skill 执行 commit + PR 创建。
+说明：`state/in-progress` 会触发 executor dispatch，executor 读取 flow state 中的 `latest_indicate_action=commit_pr` 后，自动注入 vibe-commit skill 执行 commit + PR 创建。不再依赖 free-text 哨兵扫描。
 
 强制边界：
 
-- 你在 `state/merge-ready` 的本轮唯一出口是：写 handoff → 改成 `state/in-progress` → `exit()`
+- 你在 `state/merge-ready` 的本轮唯一出口是：写 handoff indicate → 改成 `state/in-progress` → `exit()`
 - 如果你发现自己开始检查 remote、push、PR 创建命令，说明你已经越界；必须立即停止，回到上述唯一出口
 
 ### `handle_done()`
@@ -715,7 +721,14 @@ Steps:
 
 ## Handoff Contract
 
-**每次状态转换前必须写 handoff。** handoff 是 agent 之间沟通的唯一通道。后续 agent（planner/executor/reviewer）会在工作前读取你的 handoff 来了解上下文。
+**每次状态转换前必须写 handoff indicate。** handoff 是 agent 之间沟通的唯一通道。后续 agent（planner/executor/reviewer）会在工作前读取你的 handoff 来了解上下文。
+
+补充边界：
+
+- reviewer 负责第一责任裁决：优先写 `handoff verdict`，并在可能时写 `handoff audit`
+- manager 只做最小兜底：latest_verdict 缺失或不可信时，最多补一次 `handoff verdict`
+- 如果这一次兜底仍无法形成可信裁决，必须 block，不得继续模糊推进
+- issue comment 负责对外可见性，handoff 负责 agent 之间的明确交接记录，flow/timeline 负责内部事件观测
 
 ### handoff 必写场景
 
@@ -728,7 +741,7 @@ Steps:
 | REVIEW → HANDOFF | audit 结论摘要、是否需要重跑、具体修复指令 |
 | HANDOFF → IN_PROGRESS (重跑) | 明确的修复指令：哪些问题需要修复、参考 audit_ref 路径 |
 | HANDOFF → MERGE_READY | 审核通过确认、merge 前的注意事项 |
-| MERGE_READY → IN_PROGRESS | `MERGE_READY_COMMIT` 标记、commit + PR 的要求 |
+| MERGE_READY → IN_PROGRESS | `--action commit_pr` 指令、commit + PR 的要求 |
 | HANDOFF → DONE | PR 审核通过确认、自动化流程总结、人类复核建议 |
 
 ### handoff 写入格式

@@ -172,6 +172,8 @@ class RunConfig(BaseModel):
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     run_task: str = Field(default="")
+    coding_task: str = Field(default="")
+    fix_task: str = Field(default="")
     run_prompt: str = Field(default="")
 
 

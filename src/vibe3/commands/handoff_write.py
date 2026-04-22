@@ -1,12 +1,13 @@
 """Handoff write commands - Modify handoff state and record events."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
 
 
@@ -20,6 +21,7 @@ def _record_handoff_reference(
     actor: str | None,
     trace: bool,
     method_name: str,
+    **extra_kw: object,
 ) -> None:
     with trace_scope(trace, command, domain="handoff"):
         specific_ref_key = f"{ref_label.lower()}_ref"
@@ -32,7 +34,9 @@ def _record_handoff_reference(
 
         service = HandoffService()
         method = getattr(service, method_name)
-        method(ref_value, next_step, blocked_by, actor)
+        # Support optional 'action' kwarg for indicate command
+        extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
+        method(ref_value, next_step, blocked_by, actor, **extra_kwargs)
         console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
@@ -47,7 +51,7 @@ def init(
         logger.bind(command="handoff init", force=force).info("Initializing handoff")
 
         service = HandoffService()
-        handoff_path = service.ensure_current_handoff(force=force)
+        handoff_path = service.storage.ensure_current_handoff(force=force)
 
         console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
 
@@ -158,6 +162,63 @@ def report(
     )
 
 
+def indicate(
+    indicate_ref: Annotated[
+        str, typer.Argument(help="Manager indicate document reference")
+    ],
+    next_step: Annotated[
+        str | None,
+        typer.Option("--next-step", "-n", help="Next step for downstream agents"),
+    ] = None,
+    blocked_by: Annotated[
+        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    ] = None,
+    actor: Annotated[
+        str | None,
+        typer.Option(
+            "--actor",
+            "-a",
+            help=(
+                "Actor identifier (format: backend/model, "
+                "e.g., gemini/gemini-3-flash-preview). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
+        ),
+    ] = None,
+    action: Annotated[
+        str | None,
+        typer.Option(
+            "--action",
+            help=(
+                "Structured action directive for executor dispatch. "
+                "Valid values: fix (retry execution), commit_pr "
+                "(run vibe-commit skill). "
+                "Written to latest_indicate_action in flow state."
+            ),
+        ),
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Record manager indicate handoff (manager directive to downstream agents).
+
+    Use --action fix to signal executor should retry with audit feedback.
+    Use --action commit_pr to signal executor should run vibe-commit skill.
+    """
+    _record_handoff_reference(
+        command="handoff indicate",
+        ref_label="Indicate",
+        ref_value=indicate_ref,
+        next_step=next_step,
+        blocked_by=blocked_by,
+        actor=actor,
+        trace=trace,
+        method_name="record_indicate",
+        action=action,
+    )
+
+
 def audit(
     audit_ref: Annotated[str, typer.Argument(help="Audit document reference")],
     next_step: Annotated[
@@ -192,3 +253,60 @@ def audit(
         trace=trace,
         method_name="record_audit",
     )
+
+
+def verdict(
+    verdict_value: Annotated[
+        Literal["PASS", "MAJOR", "BLOCK", "UNKNOWN"],
+        typer.Argument(help="Verdict value (PASS, MAJOR, BLOCK, UNKNOWN)"),
+    ],
+    reason: Annotated[
+        str | None, typer.Option("--reason", "-r", help="Verdict reason")
+    ] = None,
+    issues: Annotated[
+        str | None, typer.Option("--issues", "-i", help="Issues description")
+    ] = None,
+    branch: Annotated[
+        str | None, typer.Argument(help="Target branch (current if not specified)")
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Write verdict to handoff chain and flow state.
+
+    This command records an agent's judgment about the flow state.
+    It does NOT make any decisions - it only records the verdict.
+
+    Verdict values:
+    - PASS: No issues, ready to merge
+    - MAJOR: Issues found, needs fix before merge
+    - BLOCK: Critical issues, blocks merge
+    - UNKNOWN: Cannot determine
+
+    Examples:
+        vibe3 handoff verdict MAJOR --reason "Found indentation errors and missing docs"
+        vibe3 handoff verdict PASS --reason "Code looks good"
+        vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
+    """
+    with trace_scope(trace, "handoff verdict", domain="handoff"):
+        logger.bind(
+            command="handoff verdict",
+            verdict=verdict_value,
+            reason=reason,
+            branch=branch,
+        ).info("Writing verdict")
+
+        service = VerdictService()
+        record = service.write_verdict(
+            verdict=verdict_value,
+            reason=reason,
+            issues=issues,
+            branch=branch,
+        )
+
+        console.print(f"[green]✓[/] Verdict written: {verdict_value}")
+        if reason:
+            console.print(f"  [dim]Reason: {reason}[/]")
+        console.print(f"  [dim]Actor: {record.actor}[/]")
+        console.print(f"  [dim]Role: {record.role}[/]")

@@ -27,22 +27,13 @@ from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchServ
 from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.server.webhook_utils import make_webhook_router
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
-
-
-def _resolve_dispatcher_repo_root(
-    config: OrchestraConfig,
-    launch_cwd: Path | None = None,
-) -> Path:
-    """Resolve the worktree root used for dispatcher-managed auto scenes."""
-    _ = config
-    _ = launch_cwd
-    return resolve_orchestra_repo_root().resolve()
 
 
 def _resolve_dispatcher_models_root(
@@ -72,7 +63,6 @@ def _build_server_with_launch_cwd(
 ) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.server.app import make_webhook_router
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()

@@ -15,7 +15,7 @@ from vibe3.server.app import app
 
 def test_serve_start_preflight_blocked() -> None:
     """serve start should fail if FailedGate reports blocked."""
-    with patch("vibe3.server.app.OrchestraConfig.from_settings") as mock_cfg:
+    with patch("vibe3.server.app.load_orchestra_config") as mock_cfg:
         mock_cfg.return_value = OrchestraConfig(enabled=True)
 
         with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:

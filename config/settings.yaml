@@ -96,9 +96,17 @@ code_limits:
         limit: 650
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
 
-      # Roles 层 —— 允许 550-570
+      # Commands 层 —— 允许 440-480
+      - path: "src/vibe3/commands/task.py"
+        limit: 480
+        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
+      - path: "src/vibe3/commands/status.py"
+        limit: 440
+        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示"
+
+      # Roles 层 —— 允许 350-600
       - path: "src/vibe3/roles/review.py"
-        limit: 570
+        limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/run.py"
         limit: 450
@@ -106,32 +114,9 @@ code_limits:
       - path: "src/vibe3/roles/manager.py"
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
-
-      # Commands 层 —— 允许 440
-      - path: "src/vibe3/commands/task.py"
-        limit: 440
-        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
-      - path: "src/vibe3/commands/status.py"
-        limit: 440
-        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示"
-
-      # Execution 层 —— 允许 400
-      - path: "src/vibe3/execution/coordinator.py"
-        limit: 400
-        reason: "执行协调器，统一管理角色启动和追踪"
-      - path: "src/vibe3/execution/issue_role_support.py"
-        limit: 400
-        reason: "Issue 角色支持，包含 dispatch predicate 和 role contract 集成"
-
-      # Domain handlers —— 允许 310
-      - path: "src/vibe3/domain/handlers/flow_lifecycle.py"
-        limit: 310
-        reason: "Flow 生命周期处理器，包含状态转换和事件发布逻辑"
-
-      # Models —— 允许 400
-      - path: "src/vibe3/models/orchestra_config.py"
-        limit: 400
-        reason: "Orchestra 配置模型聚合，包含多个嵌套配置类定义"
+      - path: "src/vibe3/roles/governance.py"
+        limit: 450
+        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑"
 
       # Server —— 允许 470
       - path: "src/vibe3/server/app.py"
@@ -174,23 +159,29 @@ code_limits:
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
+        limit: 600
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建等紧密耦合逻辑"
+      - path: "tests/vibe3/agents/test_codeagent_async.py"
         limit: 500
-        reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
-      - path: "tests/vibe3/domain/test_orchestration_facade.py"
-        limit: 350
-        reason: "Facade 核心测试（事件发布、governance、supervisor scan），已拆出 dispatch 测试"
+        reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
+      - path: "tests/vibe3/agents/test_codeagent_config.py"
+        limit: 500
+        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
-      - path: "tests/vibe3/agents/test_codeagent_config.py"
-        limit: 450
-        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
       - path: "tests/vibe3/execution/test_coordinator.py"
         limit: 600
         reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
       - path: "tests/vibe3/environment/test_worktree_branch_from_pr.py"
         limit: 450
         reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
+      - path: "tests/vibe3/roles/test_governance.py"
+        limit: 500
+        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景"
+      - path: "tests/vibe3/roles/test_review.py"
+        limit: 450
+        reason: "Review 角色测试集，覆盖 request builder、sync/async dispatch、parser 集成等紧密耦合逻辑"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
@@ -372,9 +363,14 @@ review:
     The first line must be exactly `VERDICT: PASS | MAJOR | BLOCK`.
     The final line must repeat the same `VERDICT:` line.
     Keep `VERDICT` and `audit_ref` separate: verdict is the conclusion, audit_ref is the detailed report.
-    You must write a canonical audit report under `docs/reports/` in the current worktree
+    You must explicitly record your final conclusion with
+    `uv run python src/vibe3/cli.py handoff verdict <PASS|MAJOR|BLOCK>`.
+    You should write a canonical audit report under `docs/reports/` in the current worktree
     and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
     Use a repository-relative path such as `docs/reports/issue-123-audit-report.md`.
+    If you do not explicitly run `handoff audit`, the system may save a minimal fallback audit_ref
+    from your reviewer output, but that is only a minimal safety net and not your primary path.
+    Do not rely on manager to reconstruct your verdict unless you truly cannot produce a valid one.
 
     ### MANDATORY EXIT STEP — you MUST do this before exit():
     Run this command to change the issue state label:
@@ -501,13 +497,8 @@ run:
     - [ ] No type errors
     - [ ] No lint errors
 
-  # Static: Default run task guidance
-  # Can be overridden via CLI: vibe run execute --message "Skip slow tests"
+  # Static: Common task contract — applies to ALL execution paths (code, commit, skill, etc.)
   run_task: |
-    Follow plan steps strictly, verify each step before proceeding.
-    Write clean code with tests, run verification after changes.
-    Document any deviations with reasons.
-    Follow the repository execution contract.
     The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
     You must write a canonical execution report under `docs/reports/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
@@ -520,6 +511,23 @@ run:
     ```
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
+  # Static: Code execution skill — injected ONLY for plan/flow_plan/lightweight modes
+  # Not included in skill or commit paths to avoid instruction conflicts.
+  coding_task: |
+    Follow plan steps strictly, verify each step before proceeding.
+    Write clean code with tests, run verification after changes.
+    Document any deviations with reasons.
+    Follow the repository execution contract.
+
+  # Static: Fix execution task — injected when manager routes executor with --action fix
+  fix_task: |
+    Treat this run as a focused fix round, not a fresh implementation pass.
+    Read the audit feedback carefully and fix the cited problems first.
+    Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
+    Explain any audit item you intentionally do not change, with a concrete reason.
+    Re-run the most relevant verification for the reported failures before exit.
+    Follow the repository execution contract.
 
 
   # Static: Custom run prompt (optional prefix)

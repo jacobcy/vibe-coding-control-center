@@ -6,6 +6,7 @@ from typing import Annotated, cast
 import typer
 
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
@@ -66,7 +67,7 @@ def status(
             run_full_check_shortcut()
 
         # 1. Orchestra State (Issues & Managers)
-        config = OrchestraConfig.from_settings()
+        config = load_orchestra_config()
         orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
         snapshot_found = orch_snapshot is not None
 
@@ -199,6 +200,22 @@ def status(
                                 f"[cyan]{flow.report_ref}[/]"
                             )
                             console.print(report_msg)
+                        if flow.latest_verdict:
+                            v = flow.latest_verdict
+                            color = {
+                                "PASS": "green",
+                                "MAJOR": "yellow",
+                                "BLOCK": "red",
+                            }.get(v.verdict, "cyan")
+                            console.print(
+                                f"             [dim]verdict:[/] "
+                                f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+                            )
+                        if flow.latest_indicate_action:
+                            console.print(
+                                f"             [dim]action:[/] "
+                                f"[yellow bold]{flow.latest_indicate_action}[/]"
+                            )
                         if flow.pr_number:
                             # Build PR URL from config.repo or use pr_number
                             pr_ref = (

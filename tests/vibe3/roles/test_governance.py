@@ -51,8 +51,9 @@ class TestBuildSnapshotContext:
 
     def test_empty_issues(self):
         snapshot = _make_snapshot()
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["server_status"] == "running"
+        assert ctx["issue_scope_name"] == "assignee issue pool"
         assert ctx["active_count"] == 0
         assert ctx["running_issue_count"] == 0
         assert ctx["suggested_issue_count"] == 0
@@ -93,7 +94,7 @@ class TestBuildSnapshotContext:
             active_flows=1,
             active_worktrees=1,
         )
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["active_count"] == 2
         assert ctx["running_issue_count"] == 1
         assert ctx["suggested_issue_count"] == 1
@@ -102,7 +103,7 @@ class TestBuildSnapshotContext:
 
     def test_server_stopped(self):
         snapshot = _make_snapshot(server_running=False)
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["server_status"] == "stopped"
 
     def test_truncation_note(self):
@@ -123,8 +124,86 @@ class TestBuildSnapshotContext:
             for i in range(25)
         )
         snapshot = _make_snapshot(active_issues=issues)
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert "已截断" in ctx["truncated_note"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_roadmap_intake_uses_broader_repo_candidates(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        config = _make_config(
+            governance=dict(
+                supervisor_files=[
+                    "supervisor/governance/assignee-pool.md",
+                    "supervisor/governance/roadmap-intake.md",
+                ]
+            )
+        )
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 101,
+                "title": "fix: small bug",
+                "body": "clear repro steps",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            },
+            {
+                "number": 102,
+                "title": "already in pool",
+                "body": "",
+                "assignees": [{"login": "vibe-manager-agent"}],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert ctx["active_count"] == 1
+        assert "#101" in ctx["suggested_issue_details"]
+        assert "#102" not in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_cron_supervisor_filters_to_docs_candidates(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        config = _make_config(
+            governance=dict(
+                supervisor_files=[
+                    "supervisor/governance/assignee-pool.md",
+                    "supervisor/governance/cron-supervisor.md",
+                ]
+            )
+        )
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 201,
+                "title": "docs: align README",
+                "body": "documentation drift",
+                "assignees": [],
+                "labels": [{"name": "type/docs"}],
+                "milestone": None,
+            },
+            {
+                "number": 202,
+                "title": "feat: real feature",
+                "body": "not docs",
+                "assignees": [],
+                "labels": [{"name": "type/feature"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo docs scope"
+        assert ctx["active_count"] == 1
+        assert "#201" in ctx["suggested_issue_details"]
+        assert "#202" not in ctx["suggested_issue_details"]
 
 
 class TestBuildGovernanceRecipe:
@@ -331,8 +410,14 @@ class TestRoundRobinMaterialSelection:
         ]
         config = _make_config(governance=dict(supervisor_files=files))
         snapshot = _make_snapshot()
-        with patch("vibe3.roles.governance.resolve_governance_options") as mock_opts:
+        with (
+            patch("vibe3.roles.governance.resolve_governance_options") as mock_opts,
+            patch("vibe3.roles.governance.GitHubClient") as mock_github_cls,
+        ):
             mock_opts.return_value = MagicMock()
+            mock_github = MagicMock()
+            mock_github.list_issues.return_value = []
+            mock_github_cls.return_value = mock_github
             req_tick0 = build_governance_request(config, 0, snapshot)
             req_tick1 = build_governance_request(config, 1, snapshot)
         # Both should produce valid requests (circuit breaker closed, dry_run=False)

@@ -1,8 +1,3 @@
-"""Tests for CodeagentBackend - codeagent-wrapper runner.
-
-Tests the core runner functionality with extensible interface design.
-"""
-
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -15,53 +10,137 @@ from vibe3.agents.backends.async_launcher import (
 )
 from vibe3.agents.backends.codeagent import (
     CodeagentBackend,
-    _summarize_backend_output,
 )
 from vibe3.config.settings import AgentPromptConfig, VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
 )
+from vibe3.utils.codeagent_helpers import (
+    build_prompt_file_content,
+    summarize_backend_output,
+)
 
 
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
 
-    def test_run_subprocess_streams_output_and_captures_return_value(
+    def test_run_subprocess_streams_and_captures(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Subprocess output should stream live while remaining available in result."""
+        """_run_subprocess streams output live AND captures complete content."""
 
         class FakeStream:
-            def __init__(self, chunks: list[str]) -> None:
+            def __init__(self, chunks: list[bytes]) -> None:
                 self._chunks = iter(chunks)
 
-            def readline(self) -> str:
-                return next(self._chunks, "")
+            def read(self, n: int) -> bytes:
+                return next(self._chunks, b"")
+
+            def read1(self, n: int) -> bytes:
+                return self.read(n)
 
         class FakePopen:
             def __init__(self, *args, **kwargs) -> None:
                 self.args = args[0]
-                self.returncode = 0
-                self.stdout = FakeStream(["hello\n", "world\n", ""])
-                self.stderr = FakeStream(["warn\n", ""])
+                self.returncode = 42
+                self.stdout = FakeStream([b"line one\n", b"line two\n", b""])
+                self.stderr = FakeStream([b"warning\n", b""])
 
             def wait(self, timeout: int | None = None) -> int:
                 return self.returncode
 
         with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
-            result = CodeagentBackend._run_subprocess(
+            result, _ = CodeagentBackend._run_subprocess(
                 ["codeagent-wrapper", "run"],
                 project_root=str(tmp_path),
                 timeout_seconds=30,
             )
 
+        # Verify streaming output went to console
         captured = capsys.readouterr()
-        assert captured.out == "hello\nworld\n"
-        assert captured.err == "warn\n"
-        assert result.stdout == "hello\nworld\n"
-        assert result.stderr == "warn\n"
-        assert result.returncode == 0
+        assert captured.out == "line one\nline two\n"
+        assert captured.err == "warning\n"
+
+        # Verify complete output captured in return value
+        assert result.stdout == "line one\nline two\n"
+        assert result.stderr == "warning\n"
+        assert result.returncode == 42
+
+    def test_run_subprocess_filters_installation_noise(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """_run_subprocess filters uv noise but streams other output immediately."""
+
+        class FakeStream:
+            def __init__(self, chunks: list[bytes]) -> None:
+                self._chunks = iter(chunks)
+
+            def read(self, n: int) -> bytes:
+                return next(self._chunks, b"")
+
+            def read1(self, n: int) -> bytes:
+                return self.read(n)
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs) -> None:
+                self.args = args[0]
+                self.returncode = 0
+                self.stdout = FakeStream(
+                    [
+                        b"[2mUninstalled 1 package\n",
+                        (
+                            b"\xe2\x96\x91\xe2\x96\x91\xe2\x96\x91\xe2\x96\x91 "
+                            b"[0/1] Installing wheels...\n"
+                        ),
+                        (
+                            b"\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88 "
+                            b"[1/1] vibe3==3.0.0\n"
+                        ),
+                        b"Installed 1 package in 6ms\n",
+                        b"normal preface\n",
+                        b"[codeagent-wrapper]\n",
+                        b"  Backend: gemini\n",
+                        b"line one\n",
+                        b"",
+                    ]
+                )
+                self.stderr = FakeStream([b""])
+
+            def wait(self, timeout: int | None = None) -> int:
+                return self.returncode
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
+            result, _ = CodeagentBackend._run_subprocess(
+                ["codeagent-wrapper", "run"],
+                project_root=str(tmp_path),
+                timeout_seconds=30,
+            )
+
+        # Verify all noise before marker is filtered from console output
+        captured = capsys.readouterr()
+        assert "[2m" not in captured.out
+        assert "Uninstalled" not in captured.out
+        assert "\xe2\x96\x91" not in captured.out
+        assert "\xe2\x96\x88" not in captured.out
+        assert "Installing wheels" not in captured.out
+        assert "Installed 1 package" not in captured.out
+
+        # Non-noise output should still stream immediately without marker gating
+        assert "normal preface\n" in captured.out
+        assert "[codeagent-wrapper]\n" in captured.out
+        assert "Backend: gemini\n" in captured.out
+        assert "line one\n" in captured.out
+
+        # Verify complete non-noise output captured in return value
+        assert "normal preface\n" in result.stdout
+        assert "[codeagent-wrapper]\n" in result.stdout
+        assert "Backend: gemini\n" in result.stdout
+        assert "line one\n" in result.stdout
+
+        # Verify noise NOT in return value
+        assert "[2m" not in result.stdout
+        assert "Uninstalled" not in result.stdout
 
     def test_build_prompt_file_content_prepends_global_notice(self) -> None:
         config = VibeConfig(
@@ -69,20 +148,20 @@ class TestCodeagentBackend:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
             return_value=config,
         ):
-            content = CodeagentBackend._build_prompt_file_content("prompt body")
+            content = build_prompt_file_content("prompt body")
 
         assert content.startswith("## Debug Stop Rule\nStop now\n\n---\n\n")
         assert content.endswith("prompt body")
 
     def test_build_prompt_file_content_keeps_prompt_when_notice_empty(self) -> None:
         with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
             return_value=VibeConfig(),
         ):
-            content = CodeagentBackend._build_prompt_file_content("prompt body")
+            content = build_prompt_file_content("prompt body")
 
         assert content == "prompt body"
 
@@ -121,7 +200,7 @@ class TestCodeagentBackend:
                 repo_models,
             ),
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(
                 agent="vibe-reviewer",
             )
@@ -160,7 +239,7 @@ class TestCodeagentBackend:
                 repo_models,
             ),
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="unknown-preset"))
 
@@ -185,7 +264,7 @@ class TestCodeagentBackend:
                 repo_models,
             ),
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
             result = backend.run("prompt body", options)
@@ -205,7 +284,7 @@ class TestCodeagentBackend:
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
@@ -227,14 +306,16 @@ class TestCodeagentBackend:
         )
         captured_prompt: dict[str, str] = {}
 
-        def fake_run_subprocess(command, *, project_root, timeout_seconds):
+        def fake_run_subprocess(
+            command, *, project_root, timeout_seconds, role="executor"
+        ):
             prompt_file = Path(command[command.index("--prompt-file") + 1])
             captured_prompt["content"] = prompt_file.read_text()
-            return mock_result
+            return mock_result, None
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+                "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
                 return_value=config,
             ),
             patch("pathlib.Path.home", return_value=tmp_path),
@@ -258,7 +339,7 @@ class TestCodeagentBackend:
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
@@ -276,7 +357,7 @@ class TestCodeagentBackend:
         mock_result.stderr = "wrapper stderr details\n"
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
@@ -297,7 +378,7 @@ Traceback (most recent call last):
   File "cli.py", line 1, in <module>
 """
 
-        summary = _summarize_backend_output(stderr, "")
+        summary = summarize_backend_output(stderr, "")
 
         assert "TypeError: undefined is not an object" in summary
         assert "Failed to parse event: plugin loading" in summary
@@ -320,7 +401,7 @@ Traceback (most recent call last):
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch("builtins.print") as mock_print,
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
 
             with pytest.raises(AgentExecutionError) as exc_info:
@@ -347,20 +428,16 @@ Traceback (most recent call last):
             stderr="",
         )
 
-        with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
-            return_value=VibeConfig(),
-        ):
-            with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-                mock_run.side_effect = [invalid_resume, fresh_success]
-                backend = CodeagentBackend()
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
+            mock_run.side_effect = [(invalid_resume, None), (fresh_success, None)]
+            backend = CodeagentBackend()
 
-                result = backend.run(
-                    "prompt body",
-                    AgentOptions(agent="vibe-reviewer"),
-                    task="custom task",
-                    session_id="11111111-1111-1111-1111-111111111111",
-                )
+            result = backend.run(
+                "prompt body",
+                AgentOptions(agent="vibe-reviewer"),
+                task="custom task",
+                session_id="11111111-1111-1111-1111-111111111111",
+            )
 
         assert result.exit_code == 0
         assert result.session_id == "262f0fea-eacb-4223-b842-b5b5097f94e8"
@@ -380,20 +457,16 @@ Traceback (most recent call last):
             stderr="fatal error\n",
         )
 
-        with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
-            return_value=VibeConfig(),
-        ):
-            with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-                mock_run.return_value = hard_failure
-                backend = CodeagentBackend()
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
+            mock_run.return_value = (hard_failure, None)
+            backend = CodeagentBackend()
 
-                with pytest.raises(AgentExecutionError):
-                    backend.run(
-                        "prompt body",
-                        AgentOptions(agent="vibe-reviewer"),
-                        session_id="11111111-1111-1111-1111-111111111111",
-                    )
+            with pytest.raises(AgentExecutionError):
+                backend.run(
+                    "prompt body",
+                    AgentOptions(agent="vibe-reviewer"),
+                    session_id="11111111-1111-1111-1111-111111111111",
+                )
 
         assert mock_run.call_count == 1
 
@@ -440,7 +513,7 @@ Traceback (most recent call last):
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
             backend.run("my prompt file content", options, task="custom task")
@@ -467,7 +540,7 @@ Traceback (most recent call last):
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
@@ -485,7 +558,7 @@ Traceback (most recent call last):
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",

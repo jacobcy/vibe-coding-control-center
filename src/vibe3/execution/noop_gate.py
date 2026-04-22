@@ -4,6 +4,7 @@ from loguru import logger
 
 from vibe3.agents.models import ExecutionRole
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.role_policy import get_role_block_function
 
 
 def extract_state_label(issue_payload: dict[str, object]) -> str | None:
@@ -39,12 +40,6 @@ def apply_unified_noop_gate(
     - if the agent did not change the issue's state/ label, block
     - if the agent changed the issue's state/ label, record and pass
     """
-    from vibe3.services.issue_failure_service import (
-        block_executor_noop_issue,
-        block_manager_noop_issue,
-        block_planner_noop_issue,
-        block_reviewer_noop_issue,
-    )
     from vibe3.utils.constants import (
         EVENT_CANNOT_VERIFY_REMOTE_STATE,
         EVENT_STATE_TRANSITIONED,
@@ -52,14 +47,7 @@ def apply_unified_noop_gate(
     )
 
     # Resolve role-specific block function (used in all failure paths)
-    if role == "manager":
-        _block_fn = block_manager_noop_issue
-    elif role == "planner":
-        _block_fn = block_planner_noop_issue
-    elif role == "executor":
-        _block_fn = block_executor_noop_issue
-    else:
-        _block_fn = block_reviewer_noop_issue
+    _block_fn = get_role_block_function(role)
 
     # Skip no-op gate if issue has no state/ label (not managed by state machine)
     if not before_state_label:

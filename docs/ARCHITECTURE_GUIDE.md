@@ -115,7 +115,7 @@ def register_dispatch_handlers() -> None:
 **语义**：
 - 系统解析 review output，提取 verdict，写入 audit_ref
 - 不是 agent 的 handoff 行为，是系统的解析行为
-- 区别于 `handoff_plan` / `handoff_run` / `handoff_review`（agent 主动提交）
+- 区别于 `handoff_plan` / `handoff_report` / `handoff_indicate`（agent 主动提交）
 
 **详细文档**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) §1.2
 

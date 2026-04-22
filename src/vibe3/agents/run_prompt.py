@@ -1,14 +1,15 @@
 """Run context builder - assemble prompt body for execution agent.
 
 Public API:
-- ``build_run_prompt_body(plan_file, config, audit_file)``
-- ``make_run_context_builder(plan_file, config, prompts_path, audit_file)``
+- ``build_run_prompt_body(plan_file, config, audit_file, mode)``
+- ``make_run_context_builder(plan_file, config, prompts_path, audit_file, mode)``
 - ``make_skill_context_builder(skill_content)``
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
@@ -59,8 +60,8 @@ no matter what. Do not include this section in your response until the very end.
 def build_run_standard_sections(config: VibeConfig) -> list[str]:
     """Run role-level hard-standard sections. All run paths must include these.
 
-    Includes: policy_file, common_rules, run_task, output_format.
-    Does NOT include path-specific content (plan, audit, skill).
+    Includes: policy_file, common_rules, output_format, run_task (common contract).
+    Does NOT include path-specific content (plan, audit, skill, coding_task).
     """
     from vibe3.agents.review_prompt import build_tools_guide_section
 
@@ -89,10 +90,39 @@ def build_run_standard_sections(config: VibeConfig) -> list[str]:
     return sections
 
 
+RunPromptMode = Literal["coding", "fix"]
+
+
+def build_run_mode_sections(config: VibeConfig, mode: RunPromptMode) -> list[str]:
+    """Mode-specific execution sections.
+
+    Injected ONLY for non-skill executor paths.
+    - ``coding``: regular implementation round
+    - ``fix``: focused retry/fix round based on prior audit feedback
+    NOT included in skill/commit paths to avoid instruction conflicts.
+    """
+    run_config = getattr(config, "run", None)
+    if not run_config:
+        return []
+
+    section_text: str | None
+    if mode == "fix":
+        section_text = getattr(run_config, "fix_task", None) or getattr(
+            run_config, "coding_task", None
+        )
+    else:
+        section_text = getattr(run_config, "coding_task", None)
+
+    if not section_text:
+        return []
+    return [section_text]
+
+
 def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
     audit_file: str | None = None,
+    mode: RunPromptMode = "coding",
 ) -> str:
     """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
@@ -102,6 +132,8 @@ def build_run_prompt_body(
         audit_file: Path to previous review audit file. When provided, the run
             is a retry — review feedback is injected into the prompt so the
             executor addresses the issues found by the reviewer.
+        mode: Prompt mode for executor routing. ``coding`` is the default
+            implementation path; ``fix`` is a focused repair path.
 
     Returns:
         Assembled prompt body string.
@@ -111,7 +143,7 @@ def build_run_prompt_body(
 
     log = logger.bind(domain="run_context_builder", action="build_run_prompt_body")
     retry = bool(audit_file)
-    log.info(f"Building run prompt body (retry={retry})")
+    log.info(f"Building run prompt body (retry={retry}, mode={mode})")
 
     plan_content = None
     if plan_file:
@@ -141,11 +173,16 @@ def build_run_prompt_body(
             f"{audit_content}"
         )
 
+    # Mode-specific guidance (not for skill/commit paths)
+    sections.extend(build_run_mode_sections(config, mode))
+
     # Run role hard-standard sections (shared with all run paths)
     sections.extend(build_run_standard_sections(config))
 
     body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body), retry=retry).success("Run prompt body built")
+    log.bind(body_len=len(body), retry=retry, mode=mode).success(
+        "Run prompt body built"
+    )
     return body
 
 
@@ -154,6 +191,7 @@ def make_run_context_builder(
     config: VibeConfig | None = None,
     prompts_path: Path | None = None,
     audit_file: str | None = None,
+    mode: RunPromptMode = "coding",
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for plan/flow_plan/lightweight run mode.
 
@@ -164,7 +202,7 @@ def make_run_context_builder(
     return make_context_builder(
         template_key="run.plan",
         body_provider_key="run.context",
-        body_fn=lambda: build_run_prompt_body(plan_file, cfg, audit_file),
+        body_fn=lambda: build_run_prompt_body(plan_file, cfg, audit_file, mode),
         prompts_path=prompts_path,
     )
 
@@ -176,9 +214,9 @@ def make_skill_context_builder(
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for skill execution mode.
 
-    Uses build_run_standard_sections() so the skill agent receives the same
-    role-level hard standards (run_task, output_format, policy, common_rules)
-    as the normal run path.
+    Uses build_run_standard_sections() so the skill agent receives the common
+    contract (output_format, run_task exit step, policy, common_rules).
+    coding_task is intentionally excluded — skills define their own execution guidance.
     """
     cfg = config or VibeConfig.get_defaults()
 

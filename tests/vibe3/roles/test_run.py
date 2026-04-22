@@ -3,10 +3,11 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from vibe3.agents.models import CodeagentResult
 from vibe3.domain.events import IssueFailed
 from vibe3.domain.publisher import EventPublisher
-from vibe3.models.orchestration import IssueState
 from vibe3.roles.run import publish_run_command_failure, publish_run_command_success
 
 
@@ -94,6 +95,44 @@ def test_publish_run_command_failure_emits_issue_failed() -> None:
     assert event.issue_number == 789
     assert "timeout expired" in event.reason
     assert event.actor == "agent:run"
+
+
+def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> None:
+    from types import SimpleNamespace
+
+    from vibe3.roles.run import execute_manual_run
+
+    with (
+        patch("vibe3.roles.run.CodeagentExecutionService") as mock_service_cls,
+        patch(
+            "vibe3.roles.run.make_run_context_builder", return_value=lambda: "prompt"
+        ),
+        patch("vibe3.roles.run.publish_run_command_failure") as mock_publish_failure,
+    ):
+        mock_service_cls.return_value.execute_sync.side_effect = RuntimeError(
+            "backend returned empty result"
+        )
+
+        with pytest.raises(RuntimeError, match="backend returned empty result"):
+            execute_manual_run(
+                config=object(),
+                branch="task/issue-349",
+                issue_number=349,
+                instructions=None,
+                plan_file="docs/plans/issue-349.md",
+                skill=None,
+                summary=SimpleNamespace(mode="plan"),
+                dry_run=False,
+                no_async=True,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        mock_publish_failure.assert_called_once_with(
+            issue_number=349,
+            reason="backend returned empty result",
+        )
 
 
 class TestExecutorFailed:
@@ -189,76 +228,6 @@ class TestExecutorSuccessStateChanged:
         # This test verifies that executor success does NOT force HANDOFF
         # The actual implementation will be fixed to remove confirm_role_handoff
         pass  # ← Placeholder: 实际修复后添加详细测试
-
-
-class TestExecutorNoProgressPolicy:
-    """Executor no-progress 检测"""
-
-    def test_executor_has_progress_with_report_ref(
-        self,
-    ) -> None:
-        """Executor 有 report_ref → 有推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 1,
-            "handoff": None,
-            "refs": {
-                "report_ref": "docs/reports/issue-200-report.md"
-            },  # ← 有 report_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="report_ref",  # ← 检查 report_ref
-        )
-
-        assert has_progress is True  # ← 有推进（report_ref 变化）
-
-    def test_executor_no_progress_without_report_ref(
-        self,
-    ) -> None:
-        """Executor 无 report_ref → 无推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 2,
-            "handoff": None,
-            "refs": {},  # ← 无 report_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="report_ref",  # ← 检查 report_ref
-        )
-
-        assert has_progress is False  # ← 无推进（report_ref 缺失）
 
 
 class TestExecutorNoOpGate:

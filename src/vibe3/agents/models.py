@@ -9,7 +9,7 @@ from typing import Any, Callable, Literal
 
 from vibe3.config.settings import VibeConfig
 
-ExecutionRole = Literal["planner", "executor", "reviewer"]
+ExecutionRole = Literal["planner", "executor", "reviewer", "manager"]
 
 
 @dataclass
@@ -102,6 +102,7 @@ def create_codeagent_command(
         "planner": "plan",
         "executor": "run",
         "reviewer": "review",
+        "manager": "indicate",
     }
 
     return CodeagentCommand(

@@ -32,7 +32,6 @@ Manager 可能已写入质量审查意见、具体修复要求、重点关注区
 - **何时用**：需要回顾架构决策、寻找类似问题的解法、了解模块演进历史
 - **推荐命令**：`smart_search`（智能搜索）、`timeline`（时间线）、`get_observations`（获取详情）
 - **与 handoff 的区别**：claude-memory 是跨对话长期记忆；handoff 是当前 flow 的临时交接记录
-- **与 auggie 的区别**：claude-memory 检索历史记忆片段；auggie retrieval 理解当前代码实现
 
 ## 工具选择顺序
 
@@ -67,18 +66,7 @@ uv run python src/vibe3/cli.py inspect base --json
 - 当前实际 CLI 中**没有** `inspect structure` 子命令，不要继续引用它。
 - `inspect symbols` 的稳定用法是 `<file>` 或 `<file>:<symbol>`；不要把“symbol-only 全仓搜索”当默认能力。
 
-### 2. 语义理解与跨文件探索
-
-不知道代码在哪、职责边界不清、需要理解实现意图时，使用 `mcp_auggie_codebase-retrieval`。
-
-适合：
-- 找负责某项功能的模块
-- 理解 plan / review / run 链路如何拼装 prompt
-- 理解配置、命令、service 之间的关系
-
-不要拿它代替精确引用分析；涉及“谁调用了谁”时，还是优先回到 `vibe3 inspect`。
-
-### 3. 精确字符串与配置项查找
+### 2. 精确字符串与配置项查找
 
 只在需要精确字面量时使用 `rg`。
 
@@ -92,7 +80,7 @@ uv run python src/vibe3/cli.py inspect base --json
 - 判断某函数真实影响面
 - 替代 AST 分析
 
-### 4. Handoff 记录
+### 3. Handoff 记录
 
 执行过程中出现 finding、bug、blocker、next step 等需要留痕的事项，用 `handoff append` 记录：
 

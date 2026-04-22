@@ -52,13 +52,13 @@ def _make_github_response(
 class TestManagerHandlerGuardLogic:
     """Test guard: only handle ready/handoff trigger states."""
 
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_ignores_non_manager_trigger_state(
         self,
         mock_config_cls: MagicMock,
     ) -> None:
         """Handler should return early when trigger_state is not ready/handoff."""
-        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_config_cls.return_value = MagicMock()
 
         event = _make_event(trigger_state="in-progress")
 
@@ -66,7 +66,7 @@ class TestManagerHandlerGuardLogic:
         handle_manager_dispatch_intent(event)
 
         # No services should be created for non-trigger states
-        mock_config_cls.from_settings.assert_not_called()
+        mock_config_cls.assert_not_called()
 
     def test_skips_human_resume_actor(self) -> None:
         """Handler should skip dispatch for human:resume actor."""
@@ -86,7 +86,7 @@ class TestManagerHandlerIssueFetching:
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_records_failed_on_github_none(
         self,
         mock_config_cls: MagicMock,
@@ -95,7 +95,7 @@ class TestManagerHandlerIssueFetching:
         mock_build_request: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns None (slow path)."""
-        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_config_cls.return_value = MagicMock()
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = None
@@ -112,7 +112,7 @@ class TestManagerHandlerIssueFetching:
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_records_failed_on_network_error(
         self,
         mock_config_cls: MagicMock,
@@ -121,7 +121,7 @@ class TestManagerHandlerIssueFetching:
         mock_build_request: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns network error."""
-        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_config_cls.return_value = MagicMock()
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = "network_error"
@@ -136,7 +136,7 @@ class TestManagerHandlerIssueFetching:
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_records_failed_on_invalid_issue_data(
         self,
         mock_config_cls: MagicMock,
@@ -145,7 +145,7 @@ class TestManagerHandlerIssueFetching:
         mock_build_request: MagicMock,
     ) -> None:
         """Handler should skip dispatch when from_github_payload returns None."""
-        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_config_cls.return_value = MagicMock()
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = _make_github_response()
@@ -168,7 +168,7 @@ class TestManagerHandlerDispatch:
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
-    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_dispatch_success(
         self,
         mock_config_cls: MagicMock,
@@ -177,7 +177,7 @@ class TestManagerHandlerDispatch:
     ) -> None:
         """Handler should dispatch manager with correct IssueInfo via fast path."""
         mock_config = MagicMock()
-        mock_config_cls.from_settings.return_value = mock_config
+        mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
         mock_request.role = "manager"

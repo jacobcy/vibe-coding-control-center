@@ -20,7 +20,7 @@ class TestHandoffBasicCommands:
     def test_handoff_init_command(self, mock_service_class, force, expected_force):
         """Test handoff init command."""
         mock_service = MagicMock()
-        mock_service.ensure_current_handoff.return_value = "/path/to/current.md"
+        mock_service.storage.ensure_current_handoff.return_value = "/path/to/current.md"
         mock_service_class.return_value = mock_service
 
         args = ["handoff", "init"]
@@ -31,7 +31,7 @@ class TestHandoffBasicCommands:
         assert result.exit_code == 0
         assert "✓" in result.output
         assert "Handoff file ready" in result.output
-        mock_service.ensure_current_handoff.assert_called_once_with(
+        mock_service.storage.ensure_current_handoff.assert_called_once_with(
             force=expected_force
         )
 
@@ -125,7 +125,7 @@ class TestHandoffBasicCommands:
             ),
             FlowEvent(
                 branch="feature/test",
-                event_type="handoff_run",
+                event_type="handoff_report",
                 actor="executor",
                 detail="Run completed",
                 created_at="2026-03-26T11:10:00",

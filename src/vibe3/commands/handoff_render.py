@@ -3,45 +3,13 @@
 Pure functions for rendering agent chains, handoff events, and updates log.
 """
 
-from pathlib import Path
-
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
 
 # Preview limit for update messages
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
-
-
-def _resolve_ref_path(ref_value: str | None, worktree_root: str | None) -> str:
-    """Resolve ref path to relative path if within worktree.
-
-    Args:
-        ref_value: Absolute or relative ref path (may be None)
-        worktree_root: Worktree root path for resolution
-
-    Returns:
-        Relative path or original value if not resolvable
-    """
-    if not ref_value or not worktree_root:
-        return ""
-
-    try:
-        ref_path = Path(ref_value)
-        root_path = Path(worktree_root)
-
-        # If ref is within worktree, return relative path
-        if ref_path.is_absolute() and str(ref_path).startswith(str(root_path)):
-            return str(ref_path.relative_to(root_path))
-        elif not ref_path.is_absolute():
-            # Already relative, just return as-is
-            return str(ref_path)
-        else:
-            # Absolute path outside worktree - just show filename
-            return ref_path.name
-    except Exception:
-        # Fallback: just show the raw value
-        return ref_value
 
 
 def _render_agent_chain(
@@ -135,7 +103,7 @@ def _render_agent_chain(
             console.print(f"  [dim]{label}[/]  [dim](pending)[/]")
         else:
             # Normal ref display (plan_ref, report_ref, audit_ref)
-            display_val = _resolve_ref_path(val, worktree_root)
+            display_val = resolve_ref_path(val, worktree_root)
             if display_val:
                 label_line = f"  [dim]{label}[/]{actor_str}"
                 console.print(label_line)
@@ -159,11 +127,13 @@ def _render_agent_chain(
             )
 
 
-def _render_handoff_events(events: list) -> None:
+def _render_handoff_events(events: list, worktree_root: str | None = None) -> None:
     """Render handoff events in reverse chronological order."""
     if not events:
         console.print("[dim]  no handoff events[/]")
         return
+
+    from vibe3.ui.flow_ui_primitives import resolve_ref_path
 
     for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
@@ -176,10 +146,12 @@ def _render_handoff_events(events: list) -> None:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:
-                    console.print(f"  [dim]- {f}[/]")
+                    display_f = resolve_ref_path(f, worktree_root)
+                    console.print(f"  [dim]- {display_f}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             if ref:
-                console.print(f"  [dim]- {ref}[/]")
+                display_ref = resolve_ref_path(ref, worktree_root)
+                console.print(f"  [dim]- {display_ref}[/]")
         console.print()
 
 

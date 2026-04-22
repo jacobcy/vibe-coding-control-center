@@ -18,7 +18,9 @@ from vibe3.commands.handoff_render import (
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,
     render_handoff_list,
@@ -88,7 +90,7 @@ def list_handoffs(
     ] = None,
     kind: Annotated[
         str | None,
-        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review"),
+        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review/indicate"),
     ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -102,18 +104,38 @@ def list_handoffs(
         target_branch = branch if branch else flow_service.get_current_branch()
         events = handoff_service.get_handoff_events(target_branch)
 
-        allowed_kinds = {"plan", "run", "review"}
+        allowed_kinds = {"plan", "run", "review", "indicate"}
         filter_kind = kind.lower() if kind else None
         if filter_kind and filter_kind not in allowed_kinds:
-            typer.echo("Error: --kind must be one of: plan, run, review", err=True)
+            typer.echo(
+                "Error: --kind must be one of: plan, run, review, indicate", err=True
+            )
             raise typer.Exit(1)
 
         handoffs: list[dict[str, str]] = []
-        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0}
+        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0, "indicates": 0}
 
         for event in events:
-            event_kind = event.event_type.replace("handoff_", "", 1)
-            if event_kind not in allowed_kinds:
+            # Map event types back to handoff kinds
+            # handoff_plan    -> plan
+            # handoff_report  -> run
+            # handoff_review  -> review  (reviewer raw output artifact, new)
+            # handoff_audit   -> review  (reviewer-initiated authoritative audit, new)
+            # audit_recorded  -> review  (system auto-generated minimal audit, legacy)
+            # handoff_indicate -> indicate
+            event_type_to_kind = {
+                "handoff_plan": "plan",
+                "handoff_report": "run",
+                "handoff_run": "run",  # backward-compat: old event type
+                "handoff_review": "review",  # new: reviewer raw output artifact
+                "handoff_audit": "review",  # new: reviewer-initiated audit
+                "audit_recorded": "review",  # legacy: system auto-generated
+                # (backward-compat)
+                "handoff_indicate": "indicate",
+            }
+            event_kind = event_type_to_kind.get(event.event_type)
+            if event_kind is None:
+                # Skip non-handoff events
                 continue
             if filter_kind and event_kind != filter_kind:
                 continue
@@ -125,6 +147,8 @@ def list_handoffs(
                 stats["runs"] += 1
             elif event_kind == "review":
                 stats["reviews"] += 1
+            elif event_kind == "indicate":
+                stats["indicates"] += 1
 
             handoffs.append(
                 {
@@ -154,14 +178,31 @@ def show(
     """Show agent handoff chain and events."""
     with trace_scope(trace, "handoff show", domain="handoff"):
         if artifact is not None:
-            if not artifact.exists():
+            # 1. Try resolving relative to current CWD/Worktree
+            resolved_artifact = artifact
+            service = FlowService()
+
+            if not resolved_artifact.exists():
+                # 2. Try resolving relative to git common dir (shared artifacts)
+                try:
+                    git_common = Path(service.get_git_common_dir())
+                    if git_common:
+                        potential = git_common / artifact
+                        if potential.exists():
+                            resolved_artifact = potential
+                except Exception:
+                    pass
+
+            if not resolved_artifact.exists():
                 typer.echo(f"Error: artifact not found: {artifact}", err=True)
                 raise typer.Exit(1)
-            if not artifact.is_file():
-                typer.echo(f"Error: artifact is not a file: {artifact}", err=True)
+            if not resolved_artifact.is_file():
+                typer.echo(
+                    f"Error: artifact is not a file: {resolved_artifact}", err=True
+                )
                 raise typer.Exit(1)
             try:
-                render_handoff_detail(artifact)
+                render_handoff_detail(resolved_artifact)
             except (OSError, UnicodeDecodeError) as exc:
                 typer.echo(f"Error: failed to read artifact: {exc}", err=True)
                 raise typer.Exit(1)
@@ -217,6 +258,32 @@ def show(
             console.print(f"[dim]worktree: {worktree_root}[/]")
         console.print()
 
+        # Show latest verdict at the top
+        verdict_service = VerdictService(store=service.store)
+        latest_verdict = verdict_service.get_latest_verdict(target_branch)
+        if latest_verdict:
+            console.print("[bold]## Latest Verdict[/]")
+            console.print(f"  [cyan]verdict:[/] {latest_verdict.verdict}")
+            console.print(f"  [cyan]actor:[/] {latest_verdict.actor}")
+            console.print(f"  [cyan]role:[/] {latest_verdict.role}")
+            console.print(
+                f"  [cyan]timestamp:[/] {latest_verdict.timestamp.isoformat()}"
+            )
+            if latest_verdict.reason:
+                console.print(f"  [cyan]reason:[/] {latest_verdict.reason}")
+            if latest_verdict.issues:
+                console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
+            console.print()
+
+        # Show pending indicate action (manager dispatch hint)
+        if state.latest_indicate_action:
+            console.print("[bold]## Pending Dispatch[/]")
+            console.print(
+                f"  [cyan]indicate_action:[/] [yellow]{state.latest_indicate_action}[/]"
+                "  [dim](executor will consume on next dispatch)[/]"
+            )
+            console.print()
+
         _render_agent_chain(
             state,
             store=service.store,
@@ -241,7 +308,7 @@ def show(
 
         console.print("[bold]--- Recent Handoff Events ---[/]")
         console.print()
-        _render_handoff_events(handoff_events)
+        _render_handoff_events(handoff_events, worktree_root=worktree_root)
 
         # Show current.md updates in log format
         git_dir = service.get_git_common_dir()
@@ -249,7 +316,8 @@ def show(
         current_md = handoff_dir / "current.md"
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
-        console.print(f"  [dim]path[/]  {current_md}")
+        current_md_display = resolve_ref_path(str(current_md))
+        console.print(f"  [dim]path[/]  {current_md_display}")
         console.print()
 
         if current_md.exists():

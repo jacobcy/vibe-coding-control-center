@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.agents.backends.async_launcher import (
+    build_tmux_log_filter,
     start_async_command,
 )
 from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -14,6 +15,35 @@ from vibe3.models.review_runner import AgentOptions
 
 
 class TestStartAsyncCommand:
+    def test_build_tmux_log_filter_is_valid_for_local_awk(self, tmp_path: Path) -> None:
+        sample = tmp_path / "sample.log"
+        sample.write_text(
+            "noise 1\n"
+            "Uninstalled 1 package in 11ms\n"
+            "Installing wheels...\n"
+            "[codeagent-wrapper]\n"
+            "line one\n",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            ["awk", build_tmux_log_filter("test_session_id"), str(sample)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0
+        assert result.stdout == ("noise 1\n" "[codeagent-wrapper]\n" "line one\n")
+
+    def test_build_tmux_log_filter_filters_known_uv_noise_only(self) -> None:
+        awk_script = build_tmux_log_filter("test_session_id")
+
+        assert "Uninstalled" in awk_script
+        assert "Installing wheels" in awk_script
+        assert "Installed 1 package" in awk_script
+        assert "skip_prompt = 1" in awk_script
+
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:
@@ -96,7 +126,7 @@ class TestStartAsyncCommand:
                     stdout="",
                     stderr="no session",
                 )
-            if cmd[:3] == ["tmux", "new-session", "-d"]:
+            if cmd[:2] in (["tmux", "new-session"], ["tmux", "respawn-pane"]):
                 tmux_commands.append(cmd)
                 return subprocess.CompletedProcess(
                     args=cmd,
@@ -136,12 +166,72 @@ class TestStartAsyncCommand:
             )
 
         assert tmux_commands
-        final_cmd = tmux_commands[0]
-        assert "env" in final_cmd
-        assert "VIBE3_ASYNC_CHILD=1" in final_cmd
-        assert "VIBE3_MANAGER_BACKEND=opencode" in final_cmd
-        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in final_cmd
-        assert "src/vibe3/cli.py" in final_cmd
+        respawn_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "respawn-pane"]
+        )
+        payload = respawn_cmd[-1]
+        assert "env" in payload
+        assert "VIBE3_ASYNC_CHILD=1" in payload
+        assert "VIBE3_MANAGER_BACKEND=opencode" in payload
+        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in payload
+        assert "src/vibe3/cli.py" in payload
+
+    def test_start_async_command_preserves_path_for_tmux_session(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
+
+        tmux_commands: list[list[str]] = []
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            if cmd[:2] in (["tmux", "new-session"], ["tmux", "respawn-pane"]):
+                tmux_commands.append(cmd)
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+        test_path = "/tmp/test-bin:/usr/local/bin"
+        monkeypatch.setenv("PATH", test_path)
+
+        with patch(
+            "vibe3.agents.backends.async_launcher.subprocess.run",
+            side_effect=fake_run,
+        ):
+            start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-run-issue-417",
+                env={"PATH": test_path, "VIBE3_ASYNC_CHILD": "1"},
+            )
+
+        assert tmux_commands
+        respawn_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "respawn-pane"]
+        )
+        payload = respawn_cmd[-1]
+        assert "env" in payload
+        assert f"PATH={test_path}" in payload
+        assert "VIBE3_ASYNC_CHILD=1" in payload
 
     def test_start_async_command_rejects_duplicate_l3_session(
         self, monkeypatch, tmp_path
@@ -240,24 +330,98 @@ class TestStartAsyncCommand:
             log_dir / "orchestra" / "governance" / "scan-20260405-114913-t1.async.log"
         )
 
+    def test_start_async_command_pipe_pane_uses_filtered_log_capture(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
+
+        tmux_commands: list[list[str]] = []
+
+        def fake_run(cmd, *args, **kwargs):
+            tmux_commands.append(cmd)
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+        with patch(
+            "vibe3.agents.backends.async_launcher.subprocess.run",
+            side_effect=fake_run,
+        ):
+            handle = start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-run-issue-348",
+            )
+
+        pipe_pane_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "pipe-pane"]
+        )
+        respawn_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "respawn-pane"]
+        )
+        assert str(handle.log_path) in pipe_pane_cmd[-1]
+        assert "Uninstalled" in pipe_pane_cmd[-1]
+        assert "Installing wheels" in pipe_pane_cmd[-1]
+        assert "skip_prompt = 1" in pipe_pane_cmd[-1]
+        assert "VIBE3_LOG_PATH=" in respawn_cmd[-1]
+        assert "exec " in respawn_cmd[-1]
+
 
 class TestRunStreamingAndEdgeCases:
     def test_run_streams_output_while_capturing(self, capsys) -> None:
         """Runner should stream wrapper output to console and capture it."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "line one\nVERDICT: PASS\n"
-        mock_result.stderr = ""
 
-        with patch.object(
-            CodeagentBackend, "_run_subprocess", return_value=mock_result
-        ):
+        class FakeStream:
+            def __init__(self, chunks: list[bytes]) -> None:
+                self._chunks = iter(chunks)
+
+            def read(self, n: int) -> bytes:
+                return next(self._chunks, b"")
+
+            def read1(self, n: int) -> bytes:
+                return self.read(n)
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs) -> None:
+                self.args = args[0]
+                self.returncode = 0
+                self.stdout = FakeStream(
+                    [
+                        b"-> Executing with gemini...\n",
+                        b"line one\n",
+                        b"VERDICT: PASS\n",
+                        b"",
+                    ]
+                )
+                self.stderr = FakeStream([b""])
+
+            def wait(self, timeout: int | None = None) -> int:
+                return self.returncode
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
 
         captured = capsys.readouterr()
+        assert "-> Executing with gemini" in captured.out
         assert "line one" in captured.out
         assert "VERDICT: PASS" in captured.out
+        assert "-> Executing with gemini" in result.stdout
         assert "line one" in result.stdout
         assert "VERDICT: PASS" in result.stdout
 
@@ -269,7 +433,7 @@ class TestRunStreamingAndEdgeCases:
         mock_result.stderr = ""
 
         with patch.object(
-            CodeagentBackend, "_run_subprocess", return_value=mock_result
+            CodeagentBackend, "_run_subprocess", return_value=(mock_result, None)
         ):
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
@@ -294,7 +458,7 @@ class TestRunStreamingAndEdgeCases:
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
-        mock_run.return_value = mock_result
+        mock_run.return_value = (mock_result, None)
 
         backend = CodeagentBackend()
         result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
@@ -312,7 +476,7 @@ class TestRunStreamingAndEdgeCases:
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
-        mock_run.return_value = mock_result
+        mock_run.return_value = (mock_result, None)
 
         backend = CodeagentBackend()
         backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))

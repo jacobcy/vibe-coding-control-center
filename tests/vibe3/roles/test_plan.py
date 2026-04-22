@@ -9,8 +9,6 @@
 
 from unittest.mock import patch
 
-from vibe3.models.orchestration import IssueState
-
 
 class TestPlannerFailed:
     """场景 1: planner 执行报错 → state/failed"""
@@ -110,74 +108,6 @@ class TestPlannerSuccessStateChanged:
         # The actual implementation will be fixed to remove confirm_role_handoff
         # For now, we document the expected behavior
         pass  # ← Placeholder: 实际修复后添加详细测试
-
-
-class TestPlannerNoProgressPolicy:
-    """Planner no-progress 检测"""
-
-    def test_planner_has_progress_with_plan_ref(
-        self,
-    ) -> None:
-        """Planner 有 plan_ref → 有推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 1,
-            "handoff": None,
-            "refs": {"plan_ref": "docs/plans/issue-100-plan.md"},  # ← 有 plan_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="plan_ref",  # ← 检查 plan_ref
-        )
-
-        assert has_progress is True  # ← 有推进（plan_ref 变化）
-
-    def test_planner_no_progress_without_plan_ref(
-        self,
-    ) -> None:
-        """Planner 无 plan_ref → 无推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 2,
-            "handoff": None,
-            "refs": {},  # ← 无 plan_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="plan_ref",  # ← 检查 plan_ref
-        )
-
-        assert has_progress is False  # ← 无推进（plan_ref 缺失）
 
 
 class TestPlannerNoOpGate:

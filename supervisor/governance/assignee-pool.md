@@ -7,7 +7,7 @@
 
 - **本文件（governance supervisor material）**：governance agent 读取的角色材料，定义治理观察者的权限与行为边界。
 - **runtime orchestra（系统层）**：heartbeat / event-bus 等基础设施，负责定时触发和事件分发，不含业务判断逻辑。
-- **supervisor/apply（治理执行层）**：有临时 worktree 的治理执行 agent，负责 label/comment/close/recreate 等 issue 治理动作；**禁止代码修改**；governance 是无临时 worktree 的 scan agent，只观察和建议。
+- **supervisor/apply（治理执行层）**：有临时 worktree 的治理执行 agent，负责 label/comment/close/recreate 等 issue 治理动作，并可执行文档类 / 测试修补类的 L2 小改动；禁止主代码修改；governance 是无临时 worktree 的 scan agent，只观察和建议。
 - **三者独立**：不可将 governance material 误认为 runtime 本体，也不可将 apply 与 governance 混同。
 
 ## Issue Pool 边界

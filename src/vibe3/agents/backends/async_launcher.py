@@ -13,6 +13,16 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+CRITICAL_ENV_PASSTHROUGH = {
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "SHELL",
+    "TMPDIR",
+    "USER",
+}
+
 
 @dataclass(frozen=True)
 class AsyncExecutionHandle:
@@ -21,6 +31,40 @@ class AsyncExecutionHandle:
     tmux_session: str
     log_path: Path
     prompt_file_path: Path
+
+
+def build_tmux_log_filter(session_id: str) -> str:
+    """Return the awk program used to persist tmux pane output."""
+    awk_script = """
+/<agent-prompt>/ {
+    skip_prompt = 1
+    next
+}
+skip_prompt && /<\\/agent-prompt>/ {
+    skip_prompt = 0
+    next
+}
+skip_prompt {
+    next
+}
+/Uninstalled/ { next }
+/Installing wheels/ { next }
+/Installed 1 package/ { next }
+/\\[2m/ { next }
+/░/ { next }
+/█/ { next }
+/API Error: 429/ || /ServerOverloaded/ || /TooManyRequests/ || /rate_limit/ {
+    print "\\n[vibe3] FATAL: 429 Rate Limit. Aborting to prevent loop."
+    fflush()
+    system("tmux kill-session -t {SESSION_ID}")
+    exit 1
+}
+{
+    print
+    fflush()
+}
+"""
+    return awk_script.replace("{SESSION_ID}", session_id).strip()
 
 
 def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
@@ -274,7 +318,11 @@ def spawn_tmux_command(
     # Prepend environment overrides to the command
     final_command = command
     if env:
-        env_overrides = {k: v for k, v in env.items() if os.environ.get(k) != v}
+        env_overrides = {
+            k: v
+            for k, v in env.items()
+            if os.environ.get(k) != v or k in CRITICAL_ENV_PASSTHROUGH
+        }
         if env_overrides:
             final_command = (
                 ["env"]
@@ -282,14 +330,14 @@ def spawn_tmux_command(
                 + command
             )
 
-    # Launch directly in tmux PTY
-    tmux_args = ["tmux", "new-session", "-d", "-s", session_id]
+    # Start an idle tmux shell first so we can attach pipe-pane before the
+    # real command begins emitting output. Otherwise we can miss the opening
+    # <agent-prompt> marker and leak prompt body into repo-local logs.
+    tmux_args = ["tmux", "new-session", "-d", "-s", session_id, "-c", str(project_root)]
     if keep_alive_seconds > 0:
-        # Use remain-on-exit so pane stays open after process exits
         tmux_args += ["-e", "TMUX_PANE_REMAIN=1"]
-    tmux_args += final_command
 
-    subprocess.run(tmux_args, cwd=project_root, check=True)
+    subprocess.run(tmux_args, check=True)
 
     if keep_alive_seconds > 0:
         # Set remain-on-exit option explicitly as well
@@ -298,21 +346,30 @@ def spawn_tmux_command(
             check=False,
         )
 
-    # Pipe pane output to log file so we get persistence without breaking the PTY.
-    # The command runs directly in the tmux PTY, so isatty() is true for the process.
-    # Strip <agent-prompt>...</agent-prompt> blocks: codeagent-wrapper echoes the
-    # prompt body between those tags on stdout, and persisting it pollutes the
-    # repo-local async log (the live tmux pane still shows it).
-    awk_filter = (
-        "/<agent-prompt>/{skip=1;next} "
-        "skip && /<\\/agent-prompt>/{skip=0;next} "
-        "skip{next} "
-        "{print;fflush()}"
-    )
+    # Pipe pane output to a repo-local log without breaking PTY behavior.
+    # Keep the filter deliberately dumb: strip prompt echoes and a few known
+    # uv/bootstrap noise lines, but do not gate on markers or buffer output.
+    awk_filter = build_tmux_log_filter(session_id)
     pipe_cmd = f"awk {shlex.quote(awk_filter)} >> {shlex.quote(str(log_path))}"
     subprocess.run(
         ["tmux", "pipe-pane", "-t", session_id, pipe_cmd],
         check=False,
+    )
+
+    command_str = f"VIBE3_LOG_PATH={shlex.quote(str(log_path))} exec {
+        shlex.join(final_command)}"
+    subprocess.run(
+        [
+            "tmux",
+            "respawn-pane",
+            "-k",
+            "-t",
+            session_id,
+            "-c",
+            str(project_root),
+            command_str,
+        ],
+        check=True,
     )
 
     return AsyncExecutionHandle(

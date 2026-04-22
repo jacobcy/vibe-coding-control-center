@@ -59,15 +59,15 @@ class TestOrchestrationFacade:
 
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
     def test_on_heartbeat_tick_publishes_governance_scan_started(
         self,
-        mock_config_cls: MagicMock,
+        mock_load_config: MagicMock,
         mock_monotonic: MagicMock,
         mock_publish: MagicMock,
     ) -> None:
         """Test that on_heartbeat_tick publishes GovernanceScanStarted."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_load_config.return_value = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
         )
@@ -90,14 +90,14 @@ class TestOrchestrationFacade:
 
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
     def test_on_heartbeat_tick_respects_absolute_governance_interval(
         self,
-        mock_config_cls: MagicMock,
+        mock_load_config: MagicMock,
         mock_monotonic: MagicMock,
         mock_publish: MagicMock,
     ) -> None:
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_load_config.return_value = MagicMock(
             polling_interval=900,
             governance=MagicMock(interval_ticks=1),
         )
@@ -157,16 +157,16 @@ class TestOrchestrationFacade:
 
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
     def test_facade_publishes_only_events_not_dispatch(
         self,
-        mock_config_cls: MagicMock,
+        mock_load_config: MagicMock,
         mock_monotonic: MagicMock,
         mock_publish: MagicMock,
         sample_issue_info: IssueInfo,
     ) -> None:
         """Test facade only publishes domain events, never does execution assembly."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_load_config.return_value = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
         )
@@ -265,15 +265,15 @@ class TestOrchestrationFacade:
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.clients.github_client.GitHubClient.list_issues")
-    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
     async def test_on_supervisor_scan_publishes_supervisor_issue_identified(
         self,
-        mock_config_cls: MagicMock,
+        mock_load_config: MagicMock,
         mock_list_issues: MagicMock,
         mock_publish: MagicMock,
     ) -> None:
         """Test that on_supervisor_scan publishes SupervisorIssueIdentified events."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_load_config.return_value = MagicMock(
             repo="owner/repo",
             supervisor_handoff=MagicMock(
                 issue_label="supervisor",
@@ -313,7 +313,7 @@ class TestOrchestrationFacade:
         mock_publish: MagicMock,
     ) -> None:
         """Test that on_supervisor_scan skips issues without both required labels."""
-        mock_config_cls.from_settings.return_value = MagicMock(
+        mock_config_cls.return_value = MagicMock(
             repo="owner/repo",
             supervisor_handoff=MagicMock(
                 issue_label="supervisor",
