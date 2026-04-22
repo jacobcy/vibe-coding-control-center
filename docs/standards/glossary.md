@@ -143,13 +143,13 @@ related_docs:
 - 正式术语：`broader repo issue pool`
 - 别称：无
 - 定义：仓库中全量的开放 issue 或积压需求。
-- 状态：**Future Scope / Cron Governance 观察对象**。
+- 状态：roadmap governance 的 intake 输入池，也是 cron governance 的上游观察范围之一。
 - 边界：
-  - **不是**当前 Governance (Orchestra) 的实时输入。
+  - 不是 assignee issue pool。
   - 它不自动等于执行池。
 - 使用规则：
-  - 当前 Orchestra 不直接扫描此池。
-  - 它是未来 roadmap 自动化和长期治理的原材料。
+  - roadmap governance 可从此池中把适合自动化推进的 issue 纳入 assignee issue pool。
+  - cron governance 可从与文档治理相关的 broader repo 范围中形成 supervisor issue。
 ### 3.3.5 `task audit`
 
 - 正式术语：`task audit`
