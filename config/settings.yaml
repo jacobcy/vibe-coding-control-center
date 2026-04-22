@@ -173,6 +173,12 @@ code_limits:
       - path: "tests/vibe3/environment/test_worktree_branch_from_pr.py"
         limit: 450
         reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
+      - path: "tests/vibe3/roles/test_governance.py"
+        limit: 500
+        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景"
+      - path: "tests/vibe3/roles/test_review.py"
+        limit: 450
+        reason: "Review 角色测试集，覆盖 request builder、sync/async dispatch、parser 集成等紧密耦合逻辑"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
