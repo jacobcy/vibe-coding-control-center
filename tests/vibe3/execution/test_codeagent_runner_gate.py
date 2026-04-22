@@ -65,7 +65,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -120,7 +120,7 @@ class TestExecuteSyncGateIntegration:
                     return_value="agent:plan",
                 ),
                 patch(
-                    "vibe3.execution.codeagent_runner.record_handoff_unified",
+                    "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                     return_value=None,
                 ),
                 patch(
@@ -171,7 +171,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -227,7 +227,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -282,7 +282,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 return_value=None,
             ),
             patch(
@@ -353,7 +353,7 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.execution.codeagent_runner.record_handoff_unified",
+                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
                 side_effect=fake_record,
             ),
             patch(
