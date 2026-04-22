@@ -3,6 +3,7 @@
 Core execution logic with session and async launching delegated to dedicated modules.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -244,15 +245,52 @@ class CodeagentBackend:
 
         return command
 
+    _ROLE_LOG_NAME: dict[str, str] = {
+        "executor": "run",
+        "planner": "plan",
+        "reviewer": "review",
+        "manager": "manager",
+        "supervisor": "supervisor",
+        "governance": "governance",
+    }
+
+    @staticmethod
+    def _allocate_sync_log_path(
+        log_dir: Path, role_log_name: str, issue_number: str
+    ) -> Path:
+        """Allocate a non-colliding sync log path with numeric suffix."""
+        base = log_dir / f"issue-{issue_number}" / f"{role_log_name}.sync.log"
+        base.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fd = os.open(str(base), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            os.close(fd)
+            return base
+        except FileExistsError:
+            pass
+        counter = 2
+        while True:
+            candidate = base.parent / f"{role_log_name}-{counter}.sync.log"
+            try:
+                fd = os.open(
+                    str(candidate), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644
+                )
+                os.close(fd)
+                return candidate
+            except FileExistsError:
+                counter += 1
+
     @staticmethod
     def _run_subprocess(
         command: list[str],
         *,
         project_root: str,
         timeout_seconds: int,
-    ) -> subprocess.CompletedProcess[str]:
+        role: str = "executor",
+    ) -> tuple[subprocess.CompletedProcess[str], "Path | None"]:
         """Run subprocess with streaming output and capture return value.
 
+        Returns (result, sync_log_path) — sync_log_path is None when no
+        issue number is found in the cwd/args (e.g. ad-hoc runs).
         Streams stdout/stderr to live console while accumulating for return value.
         """
         import threading
@@ -349,7 +387,8 @@ class CodeagentBackend:
         )
 
         # Save complete wrapper logs for diagnostics (sync execution)
-        log_dir = Path(project_root) / "temp" / "logs" / "issues"
+        saved_log_path: Path | None = None
+        log_dir = Path(project_root) / "temp" / "logs"
         if "issue-" in project_root or any("issue-" in arg for arg in command):
             import re
 
@@ -361,14 +400,14 @@ class CodeagentBackend:
                         break
 
             if issue_match:
-                issue_number = issue_match.group(1)
-                wrapper_log_path = (
-                    log_dir / f"issue-{issue_number}" / "wrapper.sync.full.log"
+                role_log_name = CodeagentBackend._ROLE_LOG_NAME.get(role, role)
+                sync_log_path = CodeagentBackend._allocate_sync_log_path(
+                    log_dir, role_log_name, issue_match.group(1)
                 )
-                wrapper_log_path.parent.mkdir(parents=True, exist_ok=True)
-                wrapper_log_path.write_text(f"{stdout_text}\n{stderr_text}")
+                sync_log_path.write_text(f"{stdout_text}\n{stderr_text}")
+                saved_log_path = sync_log_path
 
-        return result
+        return result, saved_log_path
 
     def start_async(
         self,
@@ -413,6 +452,7 @@ class CodeagentBackend:
         dry_run: bool = False,
         session_id: str | None = None,
         cwd: Path | None = None,
+        role: str = "executor",
     ) -> AgentResult:
         """Run codeagent-wrapper synchronously."""
         sync_models_json(options)
@@ -441,11 +481,13 @@ class CodeagentBackend:
                 print("\n=== End ===")
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
+            wrapper_log_path: Path | None = None
             try:
-                result = self._run_subprocess(
+                result, wrapper_log_path = self._run_subprocess(
                     command,
                     project_root=project_root,
                     timeout_seconds=options.timeout_seconds,
+                    role=role,
                 )
 
                 if should_retry_without_session(result, session_id=session_id):
@@ -459,21 +501,24 @@ class CodeagentBackend:
                         "Stored wrapper session is not resumable; "
                         "retrying with a fresh session."
                     )
-                    result = self._run_subprocess(
+                    result, wrapper_log_path = self._run_subprocess(
                         retry_command,
                         project_root=project_root,
                         timeout_seconds=options.timeout_seconds,
+                        role=role,
                     )
 
             except FileNotFoundError:
                 raise AgentExecutionError(
                     f"codeagent-wrapper not found at {DEFAULT_WRAPPER_PATH}. "
-                    "Please ensure it is installed and accessible."
+                    "Please ensure it is installed and accessible.",
+                    log_path=wrapper_log_path,
                 ) from None
             except subprocess.TimeoutExpired:
                 raise AgentExecutionError(
                     f"codeagent-wrapper timed out after {options.timeout_seconds}s. "
-                    "Consider increasing the timeout or splitting the review scope."
+                    "Consider increasing the timeout or splitting the review scope.",
+                    log_path=wrapper_log_path,
                 ) from None
 
             agent_result = AgentResult(
@@ -497,7 +542,7 @@ class CodeagentBackend:
                 if diagnosis:
                     error_msg += f"\n\n{diagnosis}"
 
-                raise AgentExecutionError(error_msg)
+                raise AgentExecutionError(error_msg, log_path=wrapper_log_path)
 
             return agent_result
         finally:

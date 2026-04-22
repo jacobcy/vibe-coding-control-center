@@ -235,6 +235,7 @@ class CodeagentExecutionService:
                 dry_run=command.dry_run,
                 session_id=ctx.session_id,
                 cwd=ctx.execution_cwd,
+                role=command.role,
             )
             if command.dry_run:
                 return CodeagentResult(
@@ -262,6 +263,11 @@ class CodeagentExecutionService:
                     f"{command.role.capitalize()} aborted "
                     f"(status: aborted, reason: {exc})"
                 )
+                from vibe3.exceptions import AgentExecutionError
+
+                abort_refs: dict[str, str] = {"reason": str(exc), "status": "aborted"}
+                if isinstance(exc, AgentExecutionError) and exc.log_path:
+                    abort_refs["log_path"] = str(exc.log_path)
                 persist_execution_lifecycle_event(
                     ctx.store,
                     ctx.branch,
@@ -270,7 +276,7 @@ class CodeagentExecutionService:
                     ctx.actor,
                     abort_msg,
                     session_id=ctx.session_id,
-                    refs={"reason": str(exc), "status": "aborted"},
+                    refs=abort_refs,
                     event_type=f"codeagent_{execution_prefix(command.role)}_aborted",  # type: ignore[arg-type]
                 )
             raise
