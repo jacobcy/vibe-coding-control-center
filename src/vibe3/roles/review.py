@@ -42,7 +42,6 @@ from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
 from vibe3.utils.path_helpers import BranchBoundGitClient
@@ -194,7 +193,7 @@ def _create_minimal_audit_artifact(
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     branch_slug = (branch or "detached").replace("/", "-")
     artifact_path = artifact_dir / f"{branch_slug}-audit-auto-{timestamp}.md"
-    sanitized_content = sanitize_handoff_content(content)
+    sanitized_content = HandoffService().sanitize_handoff_content(content)
     artifact_path.write_text(
         "# Minimal Review Audit\n\n"
         f"VERDICT: {verdict}\n\n"

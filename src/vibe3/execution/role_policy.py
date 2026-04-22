@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable, Literal
 
 if TYPE_CHECKING:
     from vibe3.agents.models import ExecutionRole
-    from vibe3.services.handoff_recorder_unified import HandoffKind
+    from vibe3.models.handoff import HandoffKind
 
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"

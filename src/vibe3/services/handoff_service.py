@@ -1,5 +1,6 @@
 """Handoff service implementation."""
 
+import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,7 +10,13 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import GitError, UserError
+from vibe3.execution.actor_support import (
+    format_agent_actor,
+    resolve_actor_backend_model,
+)
+from vibe3.execution.role_policy import get_optional_kind_actor_key
 from vibe3.models.flow import FlowEvent
+from vibe3.models.handoff import HandoffRecord
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.path_helpers import (
@@ -36,6 +43,47 @@ class HandoffService:
         """
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
+
+    _RESERVED_REF_KEYS = {
+        "ref",
+        "backend",
+        "model",
+        "session_id",
+        "modified_files",
+        "modified_count",
+        "verdict",
+    }
+
+    _AGENT_PROMPT_BLOCK_RE = re.compile(
+        r"<agent-prompt>.*?</agent-prompt>\s*", re.DOTALL
+    )
+
+    def _parse_modified_files(self, content: str) -> list[str]:
+        """Extract modified files from a run artifact body."""
+        match = re.search(
+            r"### Modified Files\s*([\s\S]*?)(?:\n###|\Z)",
+            content,
+            re.IGNORECASE,
+        )
+        if not match:
+            return []
+
+        files_section = match.group(1)
+        file_matches = re.findall(
+            r"^-\s*([^:\]]+)(?::|\])?",
+            files_section,
+            re.MULTILINE,
+        )
+        return [path.strip() for path in file_matches if path.strip()]
+
+    def _parse_review_verdict(self, content: str) -> str | None:
+        """Extract verdict token from review content."""
+        match = re.search(r"VERDICT:\s*(PASS|MAJOR|BLOCK)", content, re.IGNORECASE)
+        return match.group(1).upper() if match else None
+
+    def sanitize_handoff_content(self, content: str) -> str:
+        """Strip prompt-provenance blocks from persisted shared artifacts."""
+        return self._AGENT_PROMPT_BLOCK_RE.sub("", content)
 
     def _get_handoff_dir(self, ensure: bool = True) -> Path:
         """Get handoff directory for current branch.
@@ -426,6 +474,109 @@ class HandoffService:
     def _normalize_ref_value(self, branch: str, ref_value: str) -> str:
         """Prefer worktree-relative refs for files under the branch worktree."""
         return normalize_ref_path(ref_value, branch, self.git_client)
+
+    def record_agent_artifact(self, record: HandoffRecord) -> Path | None:
+        """Persist a plan/run/review artifact and corresponding handoff event.
+
+        This replaces the external record_handoff_unified function.
+        """
+        sanitized_content = self.sanitize_handoff_content(record.content)
+        artifact = self.create_artifact(
+            record.kind,
+            sanitized_content,
+            branch=record.branch,
+        )
+        if artifact is None:
+            return None
+
+        branch, artifact_file = artifact
+        actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=format_agent_actor(record.options),
+        )
+        backend, model = resolve_actor_backend_model(record.options)
+
+        detail, derived_refs = self._build_artifact_detail(
+            record.kind, sanitized_content, artifact_file, record.metadata
+        )
+        normalized_ref = self._normalize_ref_value(branch, str(artifact_file))
+        refs: dict[str, str] = {
+            "ref": normalized_ref,
+            "backend": backend,
+            **derived_refs,
+        }
+        if model:
+            refs["model"] = model
+        if record.session_id:
+            refs["session_id"] = record.session_id
+
+        # Add real log_path to refs when the caller provides it.
+        if record.log_path:
+            normalized_log = self._normalize_ref_value(branch, record.log_path)
+            refs["log_path"] = normalized_log
+
+        flow_state_updates: dict[str, object] = {}
+        actor_key = get_optional_kind_actor_key(record.kind)
+        if actor_key is not None:
+            flow_state_updates[actor_key] = actor
+
+        # Map handoff kind to event type
+        if record.kind == "run":
+            event_type = "handoff_report"
+        else:
+            event_type = f"handoff_{record.kind}"
+
+        self.persist_artifact_event(
+            branch=branch,
+            event_type=event_type,
+            actor=actor,
+            detail=detail,
+            refs=refs,
+            flow_state_updates=flow_state_updates,
+        )
+
+        return artifact_file
+
+    def _build_artifact_detail(
+        self,
+        kind: str,
+        content: str,
+        artifact_file: Path,
+        metadata: dict[str, str] | None = None,
+    ) -> tuple[str, dict[str, str]]:
+        """Build event detail and refs from artifact content."""
+        refs: dict[str, str] = {}
+        detail_parts = [f"{kind.capitalize()} completed: {artifact_file.name}"]
+
+        metadata = metadata or {}
+
+        if kind == "run":
+            modified_files = self._parse_modified_files(content)
+            if modified_files:
+                refs["modified_files"] = ",".join(modified_files)
+                refs["modified_count"] = str(len(modified_files))
+                detail_parts.append(f"Modified {len(modified_files)} files:")
+                for file_path in modified_files[:3]:
+                    detail_parts.append(f"  - {file_path}")
+                if len(modified_files) > 3:
+                    detail_parts.append(f"  ... and {len(modified_files) - 3} more")
+
+        if kind == "review":
+            verdict = self._parse_review_verdict(content) or metadata.get("verdict")
+            if verdict:
+                refs["verdict"] = verdict
+                comment_count = metadata.get("comment_count")
+                if comment_count:
+                    detail_parts.append(f"Verdict: {verdict}, {comment_count} comments")
+                else:
+                    detail_parts.append(f"Verdict: {verdict}")
+
+        for key, value in metadata.items():
+            if key != "comment_count" and key not in self._RESERVED_REF_KEYS:
+                refs[key] = value
+
+        return "\n".join(detail_parts), refs
 
     def record_plan(
         self,

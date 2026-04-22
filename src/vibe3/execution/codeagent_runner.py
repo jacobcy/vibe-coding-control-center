@@ -30,11 +30,9 @@ from vibe3.execution.role_policy import (
     get_role_section,
 )
 from vibe3.execution.session_service import load_session_id
+from vibe3.models.handoff import HandoffRecord
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.handoff_recorder_unified import (
-    HandoffRecord,
-    record_handoff_unified,
-)
+from vibe3.services.handoff_service import HandoffService
 
 __all__ = [
     "ExecutionRole",
@@ -160,7 +158,7 @@ class CodeagentExecutionService:
 
         env_log_path = os.environ.get("VIBE3_LOG_PATH")
 
-        handoff_file = record_handoff_unified(
+        handoff_file = HandoffService().record_agent_artifact(
             HandoffRecord(
                 kind=command.handoff_kind,  # type: ignore[arg-type]
                 content=agent_result.stdout,
