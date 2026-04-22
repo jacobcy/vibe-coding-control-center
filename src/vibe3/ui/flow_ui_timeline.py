@@ -56,6 +56,7 @@ _EVENT_COLOR: dict[str, str] = {
     "handoff_plan": "blue",
     "handoff_run": "blue",
     "handoff_review": "magenta",
+    "handoff_indicate": "cyan bold",
     "manager_completed": "green bold",
     "tmux_manager_started": "dim yellow",
     "codeagent_manager_started": "yellow",

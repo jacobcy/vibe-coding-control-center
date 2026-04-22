@@ -3,7 +3,7 @@
 import typer
 
 from vibe3.commands.handoff_read import list_handoffs, show
-from vibe3.commands.handoff_write import append, audit, init, plan, report
+from vibe3.commands.handoff_write import append, audit, indicate, init, plan, report
 
 app = typer.Typer(
     help="Agent handoff chain and events",
@@ -18,4 +18,5 @@ app.command()(init)
 app.command()(append)
 app.command()(plan)
 app.command()(report)
+app.command()(indicate)
 app.command()(audit)

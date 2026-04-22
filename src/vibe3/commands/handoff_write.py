@@ -158,6 +158,46 @@ def report(
     )
 
 
+def indicate(
+    indicate_ref: Annotated[
+        str, typer.Argument(help="Manager indicate document reference")
+    ],
+    next_step: Annotated[
+        str | None,
+        typer.Option("--next-step", "-n", help="Next step for downstream agents"),
+    ] = None,
+    blocked_by: Annotated[
+        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    ] = None,
+    actor: Annotated[
+        str | None,
+        typer.Option(
+            "--actor",
+            "-a",
+            help=(
+                "Actor identifier (format: backend/model, "
+                "e.g., gemini/gemini-3-flash-preview). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
+        ),
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Record manager indicate handoff (manager directive to downstream agents)."""
+    _record_handoff_reference(
+        command="handoff indicate",
+        ref_label="Indicate",
+        ref_value=indicate_ref,
+        next_step=next_step,
+        blocked_by=blocked_by,
+        actor=actor,
+        trace=trace,
+        method_name="record_indicate",
+    )
+
+
 def audit(
     audit_ref: Annotated[str, typer.Argument(help="Audit document reference")],
     next_step: Annotated[

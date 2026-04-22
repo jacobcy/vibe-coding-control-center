@@ -339,6 +339,7 @@ class HandoffService:
             "plan": "planner_actor",
             "report": "executor_actor",
             "audit": "reviewer_actor",
+            # "indicate" intentionally omitted — manager_actor not in flow state schema
         }
         actor_field = actor_field_by_kind.get(ref_kind.lower())
         if actor_field:
@@ -464,6 +465,20 @@ class HandoffService:
         return self._record_ref(
             "audit", audit_ref, next_step, blocked_by, actor, verdict=verdict
         )
+
+    def record_indicate(
+        self,
+        indicate_ref: str,
+        next_step: str | None = None,
+        blocked_by: str | None = None,
+        actor: str | None = None,
+    ) -> Path:
+        """Record manager indicate handoff reference.
+
+        Used by manager to signal its decision/directive to downstream agents,
+        distinct from executor report (handoff_run) or reviewer audit.
+        """
+        return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)
 
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.
