@@ -1,8 +1,3 @@
-"""Tests for CodeagentBackend - codeagent-wrapper runner.
-
-Tests the core runner functionality with extensible interface design.
-"""
-
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -15,12 +10,15 @@ from vibe3.agents.backends.async_launcher import (
 )
 from vibe3.agents.backends.codeagent import (
     CodeagentBackend,
-    _summarize_backend_output,
 )
 from vibe3.config.settings import AgentPromptConfig, VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
+)
+from vibe3.utils.codeagent_helpers import (
+    build_prompt_file_content,
+    summarize_backend_output,
 )
 
 
@@ -150,20 +148,20 @@ class TestCodeagentBackend:
         )
 
         with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
             return_value=config,
         ):
-            content = CodeagentBackend._build_prompt_file_content("prompt body")
+            content = build_prompt_file_content("prompt body")
 
         assert content.startswith("## Debug Stop Rule\nStop now\n\n---\n\n")
         assert content.endswith("prompt body")
 
     def test_build_prompt_file_content_keeps_prompt_when_notice_empty(self) -> None:
         with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
             return_value=VibeConfig(),
         ):
-            content = CodeagentBackend._build_prompt_file_content("prompt body")
+            content = build_prompt_file_content("prompt body")
 
         assert content == "prompt body"
 
@@ -317,7 +315,7 @@ class TestCodeagentBackend:
 
         with (
             patch(
-                "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+                "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
                 return_value=config,
             ),
             patch("pathlib.Path.home", return_value=tmp_path),
@@ -380,7 +378,7 @@ Traceback (most recent call last):
   File "cli.py", line 1, in <module>
 """
 
-        summary = _summarize_backend_output(stderr, "")
+        summary = summarize_backend_output(stderr, "")
 
         assert "TypeError: undefined is not an object" in summary
         assert "Failed to parse event: plugin loading" in summary
@@ -430,20 +428,16 @@ Traceback (most recent call last):
             stderr="",
         )
 
-        with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
-            return_value=VibeConfig(),
-        ):
-            with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-                mock_run.side_effect = [(invalid_resume, None), (fresh_success, None)]
-                backend = CodeagentBackend()
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
+            mock_run.side_effect = [(invalid_resume, None), (fresh_success, None)]
+            backend = CodeagentBackend()
 
-                result = backend.run(
-                    "prompt body",
-                    AgentOptions(agent="vibe-reviewer"),
-                    task="custom task",
-                    session_id="11111111-1111-1111-1111-111111111111",
-                )
+            result = backend.run(
+                "prompt body",
+                AgentOptions(agent="vibe-reviewer"),
+                task="custom task",
+                session_id="11111111-1111-1111-1111-111111111111",
+            )
 
         assert result.exit_code == 0
         assert result.session_id == "262f0fea-eacb-4223-b842-b5b5097f94e8"
@@ -463,20 +457,16 @@ Traceback (most recent call last):
             stderr="fatal error\n",
         )
 
-        with patch(
-            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
-            return_value=VibeConfig(),
-        ):
-            with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-                mock_run.return_value = (hard_failure, None)
-                backend = CodeagentBackend()
+        with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
+            mock_run.return_value = (hard_failure, None)
+            backend = CodeagentBackend()
 
-                with pytest.raises(AgentExecutionError):
-                    backend.run(
-                        "prompt body",
-                        AgentOptions(agent="vibe-reviewer"),
-                        session_id="11111111-1111-1111-1111-111111111111",
-                    )
+            with pytest.raises(AgentExecutionError):
+                backend.run(
+                    "prompt body",
+                    AgentOptions(agent="vibe-reviewer"),
+                    session_id="11111111-1111-1111-1111-111111111111",
+                )
 
         assert mock_run.call_count == 1
 

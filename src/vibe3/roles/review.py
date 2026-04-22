@@ -41,6 +41,7 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
@@ -73,34 +74,71 @@ REVIEW_BRANCH_RESOLVER = build_task_flow_branch_resolver(
 )
 
 
-def build_review_request(
-    config: OrchestraConfig,
+def build_issue_review_request(
     issue: IssueInfo,
     *,
     branch: str | None = None,
-    repo_path: Path | None = None,
     report_ref: str | None = None,
     actor: str = "orchestra:reviewer",
+    repo_path: Path | None = None,
+    sync: bool = False,
+    config: OrchestraConfig | None = None,
+    session_id: str | None = None,
+    options: Any = None,
+    dry_run: bool = False,
 ) -> ExecutionRequest:
-    """Build the reviewer async execution request for dispatch."""
+    """Consolidated factory for issue review requests (async and sync)."""
     target_branch = branch or f"task/issue-{issue.number}"
+    execution_name = f"vibe3-reviewer-issue-{issue.number}"
+
+    if sync:
+        cfg = config or OrchestraConfig.from_settings()
+        review_config = getattr(cfg, "review", None)
+        review_prompt = review_config.review_prompt if review_config else None
+        task = (
+            review_prompt
+            or f"Review implementation for issue #{issue.number}: {issue.title}"
+        )
+
+        return build_issue_sync_prompt_request(
+            role="reviewer",
+            issue=issue,
+            target_branch=target_branch,
+            prompt=task,
+            options=options,
+            task=task,
+            actor=actor,
+            execution_name=execution_name,
+            session_id=session_id,
+            dry_run=dry_run,
+            worktree_requirement=REVIEWER_ROLE.worktree,
+        )
+
     refs: dict[str, str] = {"issue_number": str(issue.number)}
     if report_ref:
         refs["report_ref"] = report_ref
     command_args = ["review", "--issue", str(issue.number), "--no-async"]
     if report_ref:
         command_args.extend(["--report-ref", report_ref])
+
     return build_issue_async_cli_request(
         role="reviewer",
         issue=issue,
         target_branch=target_branch,
         command_args=command_args,
         actor=actor,
-        execution_name=f"vibe3-reviewer-issue-{issue.number}",
+        execution_name=execution_name,
         refs=refs,
         worktree_requirement=REVIEWER_ROLE.worktree,
         repo_path=repo_path,
     )
+
+
+# Compatibility wrappers
+def build_review_request(
+    config: OrchestraConfig, issue: IssueInfo, **kwargs: Any
+) -> ExecutionRequest:
+    return build_issue_review_request(issue, **kwargs)
 
 
 def build_review_sync_request(
@@ -112,38 +150,22 @@ def build_review_sync_request(
     actor: str,
     dry_run: bool,
 ) -> ExecutionRequest:
-    """Build the reviewer sync execution request."""
-    review_config = getattr(config, "review", None)
-    review_prompt = review_config.review_prompt if review_config else None
-    task = (
-        review_prompt
-        or f"Review implementation for issue #{issue.number}: {issue.title}"
-    )
-
-    return build_issue_sync_prompt_request(
-        role="reviewer",
-        issue=issue,
-        target_branch=branch,
-        prompt=task,
-        options=options,
-        task=task,
-        actor=actor,
-        execution_name=f"vibe3-reviewer-issue-{issue.number}",
+    return build_issue_review_request(
+        issue,
+        branch=branch,
         session_id=session_id,
+        options=options,
+        actor=actor,
         dry_run=dry_run,
-        worktree_requirement=REVIEWER_ROLE.worktree,
+        sync=True,
+        config=config,
     )
 
 
 def _process_review_sync_result(
     *, issue_number: int, branch: str, actor: str, stdout: str
 ) -> None:
-    """Process sync review output and write audit_ref to flow_state.
-
-    This callback is invoked after sync execution completes but before
-    the unified no-op gate takes its after snapshot, allowing the review
-    output to be parsed and audit_ref written into flow state first.
-    """
+    """Process sync review output and write audit_ref to flow_state."""
     finalize_review_output(
         review_output=stdout,
         handoff_file=None,
@@ -156,8 +178,7 @@ REVIEW_SYNC_SPEC = build_issue_sync_spec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
     resolve_branch=REVIEW_BRANCH_RESOLVER,
-    build_async_request=lambda config, issue, actor: build_review_request(
-        config,
+    build_async_request=lambda config, issue, actor: build_issue_review_request(
         issue,
         actor=actor,
     ),
@@ -178,12 +199,6 @@ class ReviewRunResult:
     issue_number: int | None
 
 
-def _build_handoff_service(branch: str | None) -> HandoffService:
-    if not branch:
-        return HandoffService()
-    return HandoffService(git_client=BranchBoundGitClient(branch))
-
-
 def _create_minimal_audit_artifact(
     content: str,
     verdict: str,
@@ -193,7 +208,7 @@ def _create_minimal_audit_artifact(
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     branch_slug = (branch or "detached").replace("/", "-")
     artifact_path = artifact_dir / f"{branch_slug}-audit-auto-{timestamp}.md"
-    sanitized_content = HandoffService().sanitize_handoff_content(content)
+    sanitized_content = ArtifactParser.sanitize_handoff_content(content)
     artifact_path.write_text(
         "# Minimal Review Audit\n\n"
         f"VERDICT: {verdict}\n\n"
@@ -205,16 +220,9 @@ def _create_minimal_audit_artifact(
 
 
 def _resolve_minimal_audit_dir(branch: str | None) -> Path:
-    """Prefer a readable worktree-local docs/reports directory for audit output.
-
-    We prioritize the current execution worktree (where the agent is running)
-    to avoid permission issues if the branch is checked out in a different
-    worktree.
-    """
     git = GitClient()
     worktree_root: Path | None = None
 
-    # 1. Try current worktree (Execution Directory)
     try:
         current_root = git.get_worktree_root()
         if current_root:
@@ -222,22 +230,23 @@ def _resolve_minimal_audit_dir(branch: str | None) -> Path:
     except Exception:
         pass
 
-    # 2. Try target branch worktree
     if worktree_root is None and branch:
         try:
             worktree_root = git.find_worktree_path_for_branch(branch)
         except Exception:
             pass
 
-    # If we found any worktree, use docs/reports within it
     if worktree_root is not None:
         reports_dir = worktree_root / "docs" / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
         return reports_dir
 
-    # 3. Fallback to shared handoff directory
-    handoff_service = _build_handoff_service(branch)
-    return handoff_service.ensure_handoff_dir()
+    handoff_svc = (
+        HandoffService(git_client=BranchBoundGitClient(branch))
+        if branch
+        else HandoffService()
+    )
+    return handoff_svc.storage.ensure_handoff_dir()
 
 
 def _resolve_authoritative_audit_ref(
@@ -304,42 +313,15 @@ def finalize_review_output(
     branch: str | None,
     actor: str,
 ) -> tuple[str, str]:
-    """Finalize review output by confirming audit_ref and writing verdict.
-
-    This is the single authoritative finalizer for every review path
-    (sync, manual pr, manual base). It:
-
-    1. Checks whether an authoritative audit_ref already exists in flow state
-       (meaning the reviewer actively ran ``handoff audit``).
-    2. If no audit_ref exists:
-       - Creates a minimal audit artifact from review output.
-       - Records the event as ``audit_recorded`` (``is_system_auto=True``).
-       - Updates ``audit_ref`` in flow state.
-    3. Parses the VERDICT from the authoritative audit file.
-    4. Calls ``VerdictService.write_verdict()`` to persist ``latest_verdict``
-       and record a ``verdict_recorded`` event.
-
-    Returns:
-        (audit_ref, verdict) tuple.
-    """
+    """Finalize review output by confirming audit_ref and writing verdict."""
     existing_audit_ref = _load_existing_audit_ref(branch)
-
-    # Determine whether reviewer explicitly registered an audit (handoff audit command)
     reviewer_wrote_audit = bool(existing_audit_ref)
 
     audit_ref: str
     if reviewer_wrote_audit:
-        # Reviewer ran `handoff audit <path>` → already recorded as handoff_audit
         audit_ref = existing_audit_ref  # type: ignore[assignment]
-        logger.bind(domain="review", action="finalize").info(
-            f"Using reviewer-written audit_ref: {audit_ref}"
-        )
     else:
-        # System auto-generates minimal audit from stdout
-        # handoff_file takes precedence over stdout if it exists
         if handoff_file and Path(handoff_file).exists():
-            # Reviewer's unified recorder already saved the review artifact.
-            # Promote it to the authoritative audit file.
             audit_ref = handoff_file
         else:
             audit_ref = str(
@@ -349,16 +331,8 @@ def finalize_review_output(
                     branch,
                 )
             )
-        logger.bind(domain="review", action="finalize", audit_ref=audit_ref).info(
-            "System auto-generated minimal audit"
-        )
 
-    # Parse verdict from the final authoritative source.
-    # When reviewer explicitly wrote handoff_audit, the audit FILE is authoritative.
-    # When system auto-generated the audit, stdout is equivalent (it was used to create
-    # the audit), so _resolve_review_verdict with audit_ref fallback is correct.
     if reviewer_wrote_audit:
-        # Prefer the audit file content; fall back to stdout only if file is unreadable
         audit_path = Path(audit_ref)
         audit_content = None
         if audit_path.exists():
@@ -371,12 +345,14 @@ def finalize_review_output(
             audit_ref=audit_ref,
         )
     else:
-        # System-auto path: stdout and audit file are equivalent
         verdict = _resolve_review_verdict(review_output, audit_ref=audit_ref)
 
-    # Write handoff audit + verdict to authoritative sources
     try:
-        handoff_svc = _build_handoff_service(branch)
+        handoff_svc = (
+            HandoffService(git_client=BranchBoundGitClient(branch))
+            if branch
+            else HandoffService()
+        )
         handoff_svc.record_audit(
             audit_ref=audit_ref,
             actor=actor,
@@ -391,6 +367,24 @@ def finalize_review_output(
     return audit_ref, verdict
 
 
+def build_manual_review_request_payload(
+    scope: ReviewScope,
+    *,
+    issue_number: int | None = None,
+    head_branch: str | None = None,
+    inspect_args: list[str],
+    structure_diff: StructureDiff | None = None,
+    inspect_runner: Callable[[list[str]], dict[str, object]] = run_inspect_json,
+) -> tuple[ReviewRequest, int | None, str | None]:
+    """Consolidated factory for manual review request payloads (PR and Base)."""
+    request = ReviewRequest(
+        scope=scope,
+        changed_symbols=changed_symbols(inspect_runner(inspect_args)),
+        structure_diff=structure_diff,
+    )
+    return request, issue_number, head_branch
+
+
 def build_pr_review_request(
     pr_number: int,
     *,
@@ -401,13 +395,13 @@ def build_pr_review_request(
     client = github_client or GitHubClient()
     pr_data = client.get_pr(pr_number)
     linked_issues = parse_linked_issues(pr_data.body) if pr_data else []
-    issue_number = linked_issues[0] if linked_issues else None
-    head_branch = pr_data.head_branch if pr_data else None
-    request = ReviewRequest(
+    return build_manual_review_request_payload(
         scope=ReviewScope.for_pr(pr_number),
-        changed_symbols=changed_symbols(inspect_runner(["pr", str(pr_number)])),
+        issue_number=linked_issues[0] if linked_issues else None,
+        head_branch=pr_data.head_branch if pr_data else None,
+        inspect_args=["pr", str(pr_number)],
+        inspect_runner=inspect_runner,
     )
-    return request, issue_number, head_branch
 
 
 def build_base_review_request(
@@ -419,21 +413,20 @@ def build_base_review_request(
     snapshot_diff_builder: Callable[
         [str, str | None], object | None
     ] = build_snapshot_diff,
-) -> tuple[ReviewRequest, int | None]:
+) -> tuple[ReviewRequest, int | None, str | None]:
     """Build request payload for base-branch review."""
     service = flow_service or FlowService()
     flow = service.get_flow_status(current_branch)
-    issue_number = flow.task_issue_number if flow else None
     raw_diff = snapshot_diff_builder(base_branch, current_branch)
-    structure_diff = (
-        cast(StructureDiff | None, raw_diff) if raw_diff is not None else None
-    )
-    request = ReviewRequest(
+    return build_manual_review_request_payload(
         scope=ReviewScope.for_base(base_branch),
-        changed_symbols=changed_symbols(inspect_runner(["base", base_branch])),
-        structure_diff=structure_diff,
+        issue_number=flow.task_issue_number if flow else None,
+        inspect_args=["base", base_branch],
+        structure_diff=(
+            cast(StructureDiff | None, raw_diff) if raw_diff is not None else None
+        ),
+        inspect_runner=inspect_runner,
     )
-    return request, issue_number
 
 
 def execute_manual_review(

@@ -51,7 +51,7 @@ def init(
         logger.bind(command="handoff init", force=force).info("Initializing handoff")
 
         service = HandoffService()
-        handoff_path = service.ensure_current_handoff(force=force)
+        handoff_path = service.storage.ensure_current_handoff(force=force)
 
         console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
 

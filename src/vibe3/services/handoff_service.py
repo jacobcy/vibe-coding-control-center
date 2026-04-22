@@ -1,7 +1,5 @@
 """Handoff service implementation."""
 
-import re
-import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -9,21 +7,20 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.exceptions import GitError, UserError
 from vibe3.execution.actor_support import (
+    extract_role_from_actor,
     format_agent_actor,
     resolve_actor_backend_model,
 )
 from vibe3.execution.role_policy import get_optional_kind_actor_key
 from vibe3.models.flow import FlowEvent
 from vibe3.models.handoff import HandoffRecord
+from vibe3.models.verdict import VerdictRecord
+from vibe3.services.artifact_parser import ArtifactParser
+from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
-from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.path_helpers import (
-    BranchBoundGitClient,
     GitClientProtocol,
-    get_git_common_dir,
-    normalize_ref_path,
 )
 
 
@@ -35,190 +32,9 @@ class HandoffService:
         store: SQLiteClient | None = None,
         git_client: GitClientProtocol | None = None,
     ) -> None:
-        """Initialize handoff service.
-
-        Args:
-            store: SQLiteClient instance for persistence
-            git_client: GitClient instance for git operations
-        """
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
-
-    _RESERVED_REF_KEYS = {
-        "ref",
-        "backend",
-        "model",
-        "session_id",
-        "modified_files",
-        "modified_count",
-        "verdict",
-    }
-
-    _AGENT_PROMPT_BLOCK_RE = re.compile(
-        r"<agent-prompt>.*?</agent-prompt>\s*", re.DOTALL
-    )
-
-    def _parse_modified_files(self, content: str) -> list[str]:
-        """Extract modified files from a run artifact body."""
-        match = re.search(
-            r"### Modified Files\s*([\s\S]*?)(?:\n###|\Z)",
-            content,
-            re.IGNORECASE,
-        )
-        if not match:
-            return []
-
-        files_section = match.group(1)
-        file_matches = re.findall(
-            r"^-\s*([^:\]]+)(?::|\])?",
-            files_section,
-            re.MULTILINE,
-        )
-        return [path.strip() for path in file_matches if path.strip()]
-
-    def _parse_review_verdict(self, content: str) -> str | None:
-        """Extract verdict token from review content."""
-        match = re.search(r"VERDICT:\s*(PASS|MAJOR|BLOCK)", content, re.IGNORECASE)
-        return match.group(1).upper() if match else None
-
-    def sanitize_handoff_content(self, content: str) -> str:
-        """Strip prompt-provenance blocks from persisted shared artifacts."""
-        return self._AGENT_PROMPT_BLOCK_RE.sub("", content)
-
-    def _get_handoff_dir(self, ensure: bool = True) -> Path:
-        """Get handoff directory for current branch.
-
-        Args:
-            ensure: If True, create directory if it doesn't exist (idempotent)
-
-        Returns:
-            Path to .git/vibe3/handoff/<branch-safe>/
-
-        Raises:
-            SystemError: If directory creation fails due to filesystem issues
-        """
-        git_dir = get_git_common_dir(self.git_client)
-        branch = self.git_client.get_current_branch()
-
-        handoff_dir = get_branch_handoff_dir(git_dir, branch)
-
-        if ensure:
-            try:
-                handoff_dir.mkdir(parents=True, exist_ok=True)
-            except (PermissionError, OSError) as e:
-                raise SystemError(
-                    f"Failed to create handoff directory at {handoff_dir}: {e}"
-                ) from e
-
-        return handoff_dir
-
-    def ensure_handoff_dir(self) -> Path:
-        """Ensure handoff directory exists for current branch (idempotent).
-
-        This is the unified entry point for all handoff directory creation.
-        Safe to call multiple times - will only create if doesn't exist.
-
-        Returns:
-            Path to the handoff directory
-
-        Example:
-            >>> service = HandoffService()
-            >>> handoff_dir = service.ensure_handoff_dir()
-            >>> # Directory now exists, can write files to it
-        """
-        logger.bind(domain="handoff", action="ensure_handoff_dir").info(
-            "Ensuring handoff directory exists"
-        )
-        return self._get_handoff_dir(ensure=True)
-
-    def ensure_current_handoff(self, force: bool = False) -> Path:
-        """Ensure shared current.md exists for current branch.
-
-        Creates the file with a minimal template if it doesn't exist.
-        Returns the existing file unchanged unless force=True.
-
-        This method is idempotent - safe to call multiple times.
-
-        Args:
-            force: Force overwrite if file exists
-
-        Returns:
-            Path to the current.md file
-
-        """
-        logger.bind(
-            domain="handoff", action="ensure_current_handoff", force=force
-        ).info("Ensuring handoff file exists")
-
-        # Ensure directory exists (idempotent)
-        handoff_dir = self.ensure_handoff_dir()
-        branch = self.git_client.get_current_branch()
-        handoff_path = handoff_dir / "current.md"
-
-        if handoff_path.exists():
-            if not force:
-                logger.bind(path=str(handoff_path)).info(
-                    "Handoff file already exists, returning existing file"
-                )
-                return handoff_path
-            # Force overwrite
-            logger.bind(path=str(handoff_path)).info(
-                "Overwriting existing handoff file"
-            )
-
-        # Create minimal template
-        template = _get_handoff_template(branch)
-        handoff_path.write_text(template, encoding="utf-8")
-        logger.bind(path=str(handoff_path)).success("Created handoff file")
-
-        return handoff_path
-
-    def read_current_handoff(self) -> str:
-        """Read shared current.md content for current branch.
-
-        Returns:
-            Content of current.md file
-
-        Raises:
-            UserError: If current.md doesn't exist
-        """
-        logger.bind(domain="handoff", action="read_current_handoff").info(
-            "Reading handoff file"
-        )
-
-        # Get directory path without creating it
-        handoff_dir = self._get_handoff_dir(ensure=False)
-        handoff_path = handoff_dir / "current.md"
-
-        if not handoff_path.exists():
-            raise UserError(
-                message=f"Handoff file not found: {handoff_path}",
-            )
-
-        content = handoff_path.read_text(encoding="utf-8")
-        logger.success("Handoff file read successfully")
-        return content
-
-    def clear_handoff_for_branch(self, branch: str) -> Path:
-        """Delete all handoff files for the given branch.
-
-        This is used when a task scene is explicitly reset and any historical
-        handoff material would otherwise mislead the next manager/planner pass.
-
-        Args:
-            branch: Branch whose handoff directory should be removed
-
-        Returns:
-            The resolved handoff directory path (removed or non-existent)
-        """
-        git_dir = self.git_client.get_git_common_dir()
-        handoff_dir = get_branch_handoff_dir(git_dir, branch)
-        if handoff_dir.exists():
-            shutil.rmtree(handoff_dir)
-            logger.bind(path=str(handoff_dir), branch=branch).info(
-                "Cleared handoff directory for branch"
-            )
-        return handoff_dir
+        self.storage = HandoffStorage(self.git_client)
 
     def get_handoff_events(
         self,
@@ -238,40 +54,6 @@ class HandoffService:
         )
         return [FlowEvent(**event) for event in events_data]
 
-    def create_artifact(
-        self,
-        prefix: str,
-        content: str | None,
-        *,
-        branch: str | None = None,
-    ) -> tuple[str, Path] | None:
-        """Create a timestamped handoff artifact file.
-
-        When ``branch`` is omitted, uses the service's bound git client. When
-        provided, artifact creation is pinned to that branch without requiring
-        callers to write directly against git/common-dir internals.
-        """
-        if branch is None:
-            try:
-                branch = self.git_client.get_current_branch()
-            except GitError:
-                # Git 操作失败（可能不在 git 仓库中，或 git 命令失败）
-                return None
-            artifact_service = self
-        else:
-            artifact_service = HandoffService(
-                store=self.store,
-                git_client=BranchBoundGitClient(branch),
-            )
-
-        handoff_dir = artifact_service.ensure_handoff_dir()
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        artifact_path = handoff_dir / f"{prefix}-{timestamp}.md"
-        if content is not None:
-            artifact_path.write_text(content, encoding="utf-8")
-
-        return branch, artifact_path
-
     def persist_artifact_event(
         self,
         *,
@@ -282,7 +64,6 @@ class HandoffService:
         refs: dict[str, str],
         flow_state_updates: dict[str, object] | None = None,
     ) -> None:
-        """Persist a handoff event and any matching flow-state updates."""
         self.store.add_event(branch, event_type, actor, detail=detail, refs=refs)
         if flow_state_updates:
             self.store.update_flow_state(branch, **flow_state_updates)
@@ -293,43 +74,14 @@ class HandoffService:
         actor: str | None,
         kind: str = "note",
     ) -> Path:
-        """Append a lightweight update block to current.md.
-
-        Args:
-            message: Human-readable update message
-            actor: Actor identifier
-            kind: Lightweight update kind, such as finding/blocker/next/note
-
-        Returns:
-            Path to the current.md file
-        """
+        """Append a lightweight update block to current.md."""
         branch = self.git_client.get_current_branch()
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
             branch,
             explicit_actor=actor,
         )
-        logger.bind(
-            domain="handoff",
-            action="append_current_handoff",
-            actor=effective_actor,
-            kind=kind,
-        ).info("Appending handoff update")
-
-        handoff_path = self.ensure_current_handoff()
-        content = handoff_path.read_text(encoding="utf-8")
-        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-        update_block = f"### {timestamp} | {effective_actor} | {kind}\n{message}\n"
-
-        updates_heading = "## Updates\n"
-        if updates_heading in content:
-            updated = content.rstrip() + "\n\n" + update_block
-        else:
-            updated = content.rstrip() + "\n\n" + updates_heading + "\n" + update_block
-
-        handoff_path.write_text(updated.rstrip() + "\n", encoding="utf-8")
-        logger.bind(path=str(handoff_path)).success("Appended handoff update")
-        return handoff_path
+        return self.storage.append_current_handoff(message, effective_actor, kind)
 
     def _record_ref(
         self,
@@ -363,13 +115,12 @@ class HandoffService:
             explicit_actor=actor,
         )
 
-        # 1. Ensure current.md exists (idempotent)
-        handoff_path = self.ensure_current_handoff()
+        handoff_path = self.storage.ensure_current_handoff()
 
         ref_field = f"{ref_kind.lower()}_ref"
 
-        # 2. Build flow state updates, but defer persistence until file/event
-        #    writes succeed.
+        # Build flow state updates, but defer persistence until file/event
+        # writes succeed.
         flow_updates = {ref_field: ref_value}
         actor_field_by_kind = {
             "plan": "planner_actor",
@@ -385,18 +136,9 @@ class HandoffService:
         if blocked_by:
             flow_updates["blocked_by"] = blocked_by
 
-        # 3. Integrate VerdictService for audit verdicts
+        # Integrate VerdictService for audit verdicts
         if verdict:
-            from vibe3.services.verdict_service import VerdictService
-
-            verdict_svc = VerdictService(
-                store=self.store,
-                git_client=BranchBoundGitClient(branch),
-                handoff_service=self,
-            )
-            from vibe3.models.verdict import VerdictRecord
-
-            role = verdict_svc._extract_role_from_actor(effective_actor)
+            role = extract_role_from_actor(effective_actor)
             record = VerdictRecord(
                 verdict=verdict,  # type: ignore
                 actor=effective_actor,
@@ -408,7 +150,7 @@ class HandoffService:
             )
             flow_updates["latest_verdict"] = record.model_dump_json()
 
-        # 4. Build the update block content.
+        # Build the update block content.
         message = f"verdict: {verdict or 'UNKNOWN'}"
         message += f"\nRecorded {ref_kind} reference: {ref_value}"
         if next_step:
@@ -473,15 +215,15 @@ class HandoffService:
 
     def _normalize_ref_value(self, branch: str, ref_value: str) -> str:
         """Prefer worktree-relative refs for files under the branch worktree."""
-        return normalize_ref_path(ref_value, branch, self.git_client)
+        return self.storage.normalize_ref_value(ref_value, branch)
 
     def record_agent_artifact(self, record: HandoffRecord) -> Path | None:
         """Persist a plan/run/review artifact and corresponding handoff event.
 
         This replaces the external record_handoff_unified function.
         """
-        sanitized_content = self.sanitize_handoff_content(record.content)
-        artifact = self.create_artifact(
+        sanitized_content = ArtifactParser.sanitize_handoff_content(record.content)
+        artifact = self.storage.create_artifact(
             record.kind,
             sanitized_content,
             branch=record.branch,
@@ -497,7 +239,7 @@ class HandoffService:
         )
         backend, model = resolve_actor_backend_model(record.options)
 
-        detail, derived_refs = self._build_artifact_detail(
+        detail, derived_refs = ArtifactParser.build_artifact_detail(
             record.kind, sanitized_content, artifact_file, record.metadata
         )
         normalized_ref = self._normalize_ref_value(branch, str(artifact_file))
@@ -537,46 +279,6 @@ class HandoffService:
         )
 
         return artifact_file
-
-    def _build_artifact_detail(
-        self,
-        kind: str,
-        content: str,
-        artifact_file: Path,
-        metadata: dict[str, str] | None = None,
-    ) -> tuple[str, dict[str, str]]:
-        """Build event detail and refs from artifact content."""
-        refs: dict[str, str] = {}
-        detail_parts = [f"{kind.capitalize()} completed: {artifact_file.name}"]
-
-        metadata = metadata or {}
-
-        if kind == "run":
-            modified_files = self._parse_modified_files(content)
-            if modified_files:
-                refs["modified_files"] = ",".join(modified_files)
-                refs["modified_count"] = str(len(modified_files))
-                detail_parts.append(f"Modified {len(modified_files)} files:")
-                for file_path in modified_files[:3]:
-                    detail_parts.append(f"  - {file_path}")
-                if len(modified_files) > 3:
-                    detail_parts.append(f"  ... and {len(modified_files) - 3} more")
-
-        if kind == "review":
-            verdict = self._parse_review_verdict(content) or metadata.get("verdict")
-            if verdict:
-                refs["verdict"] = verdict
-                comment_count = metadata.get("comment_count")
-                if comment_count:
-                    detail_parts.append(f"Verdict: {verdict}, {comment_count} comments")
-                else:
-                    detail_parts.append(f"Verdict: {verdict}")
-
-        for key, value in metadata.items():
-            if key != "comment_count" and key not in self._RESERVED_REF_KEYS:
-                refs[key] = value
-
-        return "\n".join(detail_parts), refs
 
     def record_plan(
         self,
@@ -656,51 +358,3 @@ class HandoffService:
         return self._record_ref(
             "indicate", indicate_ref, next_step, blocked_by, actor, action=action
         )
-
-
-# ---------------------------------------------------------------------------
-# Template generation (from handoff_template.py)
-# ---------------------------------------------------------------------------
-
-
-def _get_handoff_template(branch: str) -> str:
-    """Get minimal handoff template."""
-    return f"""# Handoff: {branch}
-
-> This is a lightweight handoff file for agent-to-agent communication.
-> It is NOT a source of truth - all authoritative data is in the SQLite store.
-
-## Meta
-
-- Branch: {branch}
-- Updated at: TBD
-- Latest actor: unknown
-
-## Summary
-
-<!-- Brief summary of current state -->
-
-## Findings
-
-<!-- Open findings and observations -->
-
-## Blockers
-
-<!-- Current blockers -->
-
-## Next Actions
-
-<!-- Suggested next actions -->
-
-## Key Files
-
-<!-- Important files for the next agent -->
-
-## Evidence Refs
-
-<!-- Links to plans, reports, PRs, issues, or logs -->
-
-## Updates
-
-<!-- Append-only lightweight updates -->
-"""

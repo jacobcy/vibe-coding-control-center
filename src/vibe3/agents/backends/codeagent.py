@@ -4,12 +4,10 @@ Core execution logic with session and async launching delegated to dedicated mod
 """
 
 import os
-import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Final, cast
+from typing import Final, cast
 
 from loguru import logger
 
@@ -25,114 +23,20 @@ from vibe3.agents.backends.session_manager import (
     extract_session_id,
     should_retry_without_session,
 )
-from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
+from vibe3.utils.codeagent_helpers import (
+    build_prompt_file_content,
+    diagnose_backend_error,
+    prepare_prompt_file,
+    sanitize_task_shell_meta,
+    stream_reader,
+    summarize_backend_output,
+)
 
 DEFAULT_WRAPPER_PATH: Final[Path] = (
     Path.home() / ".claude" / "bin" / "codeagent-wrapper"
 )
-
-# Known backend-internal error patterns with suggested fixes
-KNOWN_BACKEND_ERROR_PATTERNS: Final[tuple[tuple[str, str, str], ...]] = (
-    (
-        "schema._zod.def",
-        "OpenCode Zod schema error",
-        "OpenCode internal schema parsing failed. Try: 1) Update codeagent-wrapper, "
-        "2) Use a different model, 3) Check ~/.codeagent/models.json",
-    ),
-    (
-        "Failed to parse event",
-        "Backend event parsing error",
-        "Backend event parse failed. Try: 1) Use a different model/backend, "
-        "2) Simplify the prompt, 3) Check codeagent-wrapper logs",
-    ),
-    (
-        "completed without agent_message output",
-        "No agent output",
-        "Backend completed but produced no output. Try: 1) Use a different model, "
-        "2) Check if the model supports structured output, 3) Simplify the task",
-    ),
-)
-
-
-def _diagnose_backend_error(output: str) -> str | None:
-    """Diagnose known backend error patterns and return suggested fix.
-
-    Args:
-        output: Combined stdout/stderr from codeagent-wrapper
-
-    Returns:
-        Diagnosis string with title and suggestion, or None if no match.
-    """
-    for pattern, title, suggestion in KNOWN_BACKEND_ERROR_PATTERNS:
-        if pattern in output:
-            return f"[{title}] {suggestion}"
-    return None
-
-
-def _strip_ansi(text: str) -> str:
-    """Remove ANSI escape sequences from backend output."""
-    return re.sub(r"\x1b\[[0-9;]*m", "", text)
-
-
-def _summarize_backend_output(stderr: str, stdout: str) -> str:
-    """Build a short, readable summary from backend stdout/stderr."""
-    raw_output = stderr or stdout
-    if not raw_output.strip():
-        return "(no output)"
-
-    lines = [
-        _strip_ansi(line).strip()
-        for line in raw_output.splitlines()
-        if _strip_ansi(line).strip()
-    ]
-    if not lines:
-        return "(no output)"
-
-    metadata_prefixes = (
-        "[codeagent-wrapper]",
-        "Backend:",
-        "Command:",
-        "PID:",
-        "Log:",
-        "Traceback (most recent call last):",
-    )
-    detail_markers = (
-        "TypeError:",
-        "ValueError:",
-        "RuntimeError:",
-        "Error:",
-        "Exception:",
-        "Failed to parse event",
-        "completed without agent_message output",
-        "Unexpected error:",
-    )
-
-    selected: list[str] = []
-    for line in lines:
-        if line.startswith(metadata_prefixes):
-            continue
-        if line.startswith("at ") or line.startswith("File "):
-            continue
-        if line.startswith("│") or line.startswith("└") or line.startswith("> File "):
-            continue
-        if any(marker in line for marker in detail_markers):
-            selected.append(line)
-
-    if not selected:
-        selected = [
-            line
-            for line in lines
-            if not line.startswith(metadata_prefixes)
-            and not line.startswith("at ")
-            and not line.startswith("File ")
-        ]
-
-    preview = " | ".join(selected[:3]).strip()
-    if not preview:
-        preview = lines[0]
-    return preview[:500]
 
 
 class CodeagentBackend:
@@ -140,68 +44,10 @@ class CodeagentBackend:
 
     @staticmethod
     def has_tmux_session(session_name: str) -> bool:
-        """Check if tmux session exists.
-
-        Args:
-            session_name: Exact tmux session name to check
-
-        Returns:
-            True if session exists, False otherwise
-        """
+        """Check if tmux session exists."""
         from vibe3.agents.backends.async_launcher import has_tmux_session as _has
 
         return _has(session_name)
-
-    @staticmethod
-    def _build_prompt_file_content(prompt: str) -> str:
-        """Apply configured global notice to the prompt file content."""
-        notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()
-        if not notice:
-            return prompt
-        return f"{notice}\n\n---\n\n{prompt}"
-
-    @staticmethod
-    def _prepare_prompt_file(prompt: str) -> Path:
-        """Create temporary prompt file with global notice."""
-        prompt_dir = Path.home() / ".codeagent" / "agents"
-        prompt_dir.mkdir(parents=True, exist_ok=True)
-        prompt_content = CodeagentBackend._build_prompt_file_content(prompt)
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, dir=prompt_dir
-        ) as f:
-            f.write(prompt_content)
-            return Path(f.name)
-
-    @staticmethod
-    def _sanitize_task_shell_meta(task: str) -> str:
-        """Replace shell glob meta characters with safe equivalents.
-
-        Shell glob patterns (*?[]{}) in task arguments may expand unexpectedly
-        when passed through shell layers inside codeagent-wrapper. Replace them
-        with visually similar but non-glob characters to prevent expansion.
-
-        Args:
-            task: Task string that may contain shell meta characters
-
-        Returns:
-            Sanitized task string safe for command-line arguments
-
-        Example:
-            "回收 worktree（do/*）" → "回收 worktree（do/×）"
-        """
-        # Replace glob meta characters with visually similar safe equivalents
-        replacements = {
-            "*": "×",  # Asterisk → multiplication sign (looks similar)
-            "?": "？",  # Question mark → full-width question mark
-            "[": "【",  # Left bracket → full-width lenticular bracket
-            "]": "】",  # Right bracket → full-width lenticular bracket
-            "{": "｛",  # Left brace → full-width brace
-            "}": "｝",  # Right brace → full-width brace
-        }
-        result = task
-        for meta, safe in replacements.items():
-            result = result.replace(meta, safe)
-        return result
 
     @staticmethod
     def _build_command(
@@ -221,17 +67,12 @@ class CodeagentBackend:
             if options.model:
                 command.extend(["--model", options.model])
         else:
-            # Default fallback: vibe-reviewer for code review tasks
             command.extend(["--agent", "vibe-reviewer"])
 
-        # Skip interactive permission prompts so worktree agents can access
-        # shared paths (e.g. main/.git/vibe3/handoff/) without being blocked.
         command.append("--skip-permissions")
-
         command.extend(["--prompt-file", prompt_file_path])
 
-        # Sanitize task for shell meta characters before adding to command
-        safe_task = CodeagentBackend._sanitize_task_shell_meta(task) if task else None
+        safe_task = sanitize_task_shell_meta(task) if task else None
 
         if session_id:
             command.append("resume")
@@ -286,99 +127,9 @@ class CodeagentBackend:
         project_root: str,
         timeout_seconds: int,
         role: str = "executor",
-    ) -> tuple[subprocess.CompletedProcess[str], "Path | None"]:
-        """Run subprocess with streaming output and capture return value.
-
-        Returns (result, sync_log_path) — sync_log_path is None when no
-        issue number is found in the cwd/args (e.g. ad-hoc runs).
-        Streams stdout/stderr to live console while accumulating for return value.
-        """
+    ) -> tuple[subprocess.CompletedProcess[str], Path | None]:
+        """Run subprocess with streaming output and capture return value."""
         import threading
-
-        def _stream_reader(
-            stream: Any,
-            accumulator: list[str],
-            output_file: Any,
-            proc: "subprocess.Popen[str]",
-        ) -> None:
-            """Read from stream in chunks, accumulate, and write to output.
-
-            Filters explicit uv/bootstrap noise lines but otherwise streams
-            immediately so tmux-backed runs stay visible in real time.
-            """
-            import codecs
-
-            recent_text = ""
-            decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
-
-            while True:
-                try:
-                    # Use read1 for real-time streaming (returns whatever is available)
-                    if hasattr(stream, "read1"):
-                        chunk_bytes = stream.read1(4096)
-                    else:
-                        chunk_bytes = stream.read(1)
-                except (OSError, ValueError):
-                    break
-
-                if not chunk_bytes:
-                    break
-
-                chunk = decoder.decode(chunk_bytes)
-                if not chunk:
-                    continue
-
-                recent_text += chunk
-                if len(recent_text) > 4096:
-                    recent_text = recent_text[-2048:]
-
-                is_rate_limit = "429" in recent_text and (
-                    "ServerOverloaded" in recent_text
-                    or "TooManyRequests" in recent_text
-                    or "rate_limit" in recent_text
-                )
-                if is_rate_limit:
-                    logger.warning(
-                        "FATAL: Detected 429 Rate Limit error. "
-                        "Aborting subprocess to prevent infinite retry loop."
-                    )
-                    proc.kill()
-                    break
-
-                if any(
-                    noise in chunk
-                    for noise in (
-                        "[2m",
-                        "Uninstalled",
-                        "Installing wheels",
-                        "Installed 1 package",
-                        "░",
-                        "█",
-                    )
-                ):
-                    continue
-
-                accumulator.append(chunk)
-                output_file.write(chunk)
-                output_file.flush()
-
-            # Finalize decoding (handles any trailing bytes)
-            final_chunk = decoder.decode(b"", final=True)
-            if final_chunk:
-                if not any(
-                    noise in final_chunk
-                    for noise in (
-                        "[2m",
-                        "Uninstalled",
-                        "Installing wheels",
-                        "Installed 1 package",
-                        "░",
-                        "█",
-                    )
-                ):
-                    accumulator.append(final_chunk)
-                    output_file.write(final_chunk)
-                    output_file.flush()
 
         stdout_chunks: list[str] = []
         stderr_chunks: list[str] = []
@@ -388,16 +139,16 @@ class CodeagentBackend:
             cwd=project_root,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            bufsize=0,  # Unbuffered binary pipes
+            bufsize=0,
             text=False,
         )
 
         stdout_thread = threading.Thread(
-            target=_stream_reader,
+            target=stream_reader,
             args=(proc.stdout, stdout_chunks, sys.stdout, proc),
         )
         stderr_thread = threading.Thread(
-            target=_stream_reader,
+            target=stream_reader,
             args=(proc.stderr, stderr_chunks, sys.stderr, proc),
         )
 
@@ -426,7 +177,6 @@ class CodeagentBackend:
             stderr=stderr_text,
         )
 
-        # Save complete wrapper logs for diagnostics (sync execution)
         saved_log_path: Path | None = None
         log_dir = Path(project_root) / "temp" / "logs"
         if "issue-" in project_root or any("issue-" in arg for arg in command):
@@ -464,7 +214,7 @@ class CodeagentBackend:
         """Start codeagent-wrapper in tmux and return the async handle."""
         sync_models_json(options)
 
-        prompt_file_path = self._prepare_prompt_file(prompt)
+        prompt_file_path = prepare_prompt_file(prompt)
         command = self._build_command(
             options,
             str(prompt_file_path),
@@ -498,7 +248,7 @@ class CodeagentBackend:
         sync_models_json(options)
 
         project_root = str(cwd or Path.cwd())
-        prompt_file_path = str(self._prepare_prompt_file(prompt))
+        prompt_file_path = str(prepare_prompt_file(prompt))
 
         try:
             command = self._build_command(
@@ -513,9 +263,7 @@ class CodeagentBackend:
                 print(" ".join(command))
                 if prompt_file_path:
                     print(f"\n=== Prompt File: {prompt_file_path} ===")
-                    # Show complete prompt content (including global_notice)
-                    complete_prompt = self._build_prompt_file_content(prompt)
-                    print(complete_prompt)
+                    print(build_prompt_file_content(prompt))
                 if task:
                     print(f"\n=== Task ===\n{task}")
                 print("\n=== End ===")
@@ -538,8 +286,7 @@ class CodeagentBackend:
                         session_id=None,
                     )
                     logger.bind(domain="agent_execution").warning(
-                        "Stored wrapper session is not resumable; "
-                        "retrying with a fresh session."
+                        "Stored session not resumable; retrying with fresh session."
                     )
                     result, wrapper_log_path = self._run_subprocess(
                         retry_command,
@@ -550,14 +297,12 @@ class CodeagentBackend:
 
             except FileNotFoundError:
                 raise AgentExecutionError(
-                    f"codeagent-wrapper not found at {DEFAULT_WRAPPER_PATH}. "
-                    "Please ensure it is installed and accessible.",
+                    f"codeagent-wrapper not found at {DEFAULT_WRAPPER_PATH}.",
                     log_path=wrapper_log_path,
                 ) from None
             except subprocess.TimeoutExpired:
                 raise AgentExecutionError(
-                    f"codeagent-wrapper timed out after {options.timeout_seconds}s. "
-                    "Consider increasing the timeout or splitting the review scope.",
+                    f"codeagent-wrapper timed out after {options.timeout_seconds}s.",
                     log_path=wrapper_log_path,
                 ) from None
 
@@ -570,14 +315,14 @@ class CodeagentBackend:
 
             if not agent_result.is_success():
                 combined_output = f"{agent_result.stdout}\n{agent_result.stderr}"
-                diagnosis = _diagnose_backend_error(combined_output)
-                stderr_preview = _summarize_backend_output(
+                diagnosis = diagnose_backend_error(combined_output)
+                stderr_preview = summarize_backend_output(
                     agent_result.stderr, agent_result.stdout
                 )
 
                 error_msg = (
-                    f"codeagent-wrapper failed with exit code "
-                    f"{agent_result.exit_code}:\n{stderr_preview}"
+                    f"codeagent-wrapper failed (code {agent_result.exit_code}):\n"
+                    f"{stderr_preview}"
                 )
                 if diagnosis:
                     error_msg += f"\n\n{diagnosis}"

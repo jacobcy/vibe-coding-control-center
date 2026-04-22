@@ -36,6 +36,7 @@ from vibe3.services.orchestra_status_service import (
     format_issue_summary_line,
     is_running_issue,
 )
+from vibe3.utils.label_utils import normalize_labels
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
@@ -133,19 +134,6 @@ def _resolve_governance_material(
     return materials[tick_count % len(materials)]
 
 
-def _normalize_labels(raw_labels: object) -> list[str]:
-    labels: list[str] = []
-    if not isinstance(raw_labels, list):
-        return labels
-    for item in raw_labels:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        if isinstance(name, str) and name:
-            labels.append(name)
-    return labels
-
-
 def _normalize_assignees(raw_assignees: object) -> list[str]:
     assignees: list[str] = []
     if not isinstance(raw_assignees, list):
@@ -188,7 +176,7 @@ def _build_broader_repo_entries(
         if not isinstance(number, int) or not isinstance(title, str):
             continue
 
-        labels = _normalize_labels(item.get("labels"))
+        labels = normalize_labels(item.get("labels"))
         if "supervisor" in labels:
             continue
 

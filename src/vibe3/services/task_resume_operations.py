@@ -178,7 +178,7 @@ class TaskResumeOperations:
                 HandoffService(
                     store=self.flow_service.store,
                     git_client=self.git_client,
-                ).clear_handoff_for_branch(branch)
+                ).storage.clear_handoff_for_branch(branch)
         except Exception as exc:
             logger.bind(
                 domain="resume",

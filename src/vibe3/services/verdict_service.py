@@ -14,9 +14,10 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
+from vibe3.execution.actor_support import extract_role_from_actor
 from vibe3.models.verdict import VerdictRecord
 from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_service import HandoffService
+from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.path_helpers import GitClientProtocol
 
@@ -43,24 +44,22 @@ class VerdictService:
         store: SQLiteClient | None = None,
         git_client: GitClientProtocol | None = None,
         flow_service: FlowService | None = None,
-        handoff_service: HandoffService | None = None,
+        handoff_storage: HandoffStorage | None = None,
     ) -> None:
         """Initialize verdict service.
 
         Args:
             store: SQLiteClient instance for persistence
             git_client: GitClient instance for git operations
-            flow_service: FlowService instance for flow state updates
-            handoff_service: HandoffService instance for handoff chain
+            flow_service: FlowService instance
+            handoff_storage: HandoffStorage instance
         """
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
         self.flow_service = flow_service or FlowService(
             store=self.store, git_client=self.git_client
         )
-        self.handoff_service = handoff_service or HandoffService(
-            store=self.store, git_client=self.git_client
-        )
+        self.storage = handoff_storage or HandoffStorage(self.git_client)
 
     def write_verdict(
         self,
@@ -110,7 +109,7 @@ class VerdictService:
 
         # 3. Determine role (from actor string or default to "agent")
         # Actor format: "role/backend" or "claude/claude-sonnet-4-6"
-        role = self._extract_role_from_actor(actor)
+        role = extract_role_from_actor(actor)
 
         # 4. Create VerdictRecord
         record = VerdictRecord(
@@ -124,7 +123,7 @@ class VerdictService:
         )
 
         # 5. Append to handoff chain (authoritative)
-        self.handoff_service.append_current_handoff(
+        self.storage.append_current_handoff(
             message=record.to_handoff_markdown(),
             actor=actor,
             kind="verdict",
@@ -158,36 +157,22 @@ class VerdictService:
     def get_latest_verdict(self, branch: str) -> VerdictRecord | None:
         """Get latest verdict from flow state.
 
-        This is a quick query from flow state's latest_verdict field.
-        For full verdict history, query handoff events.
-
         Args:
-            branch: Branch name
+            branch: Target branch
 
         Returns:
-            Latest VerdictRecord if exists, None otherwise
+            Latest VerdictRecord or None
         """
-        logger.bind(
-            domain="verdict",
-            action="get_latest",
-            branch=branch,
-        ).info("Getting latest verdict")
-
-        flow_state = self.store.get_flow_state(branch)
-        if not flow_state:
+        state = self.store.get_flow_state(branch)
+        if not state:
             return None
 
-        verdict_data = flow_state.get("latest_verdict")
-        if not verdict_data:
+        verdict_json = state.get("latest_verdict")
+        if not verdict_json:
             return None
 
         try:
-            # Deserialize from JSON string
-            if isinstance(verdict_data, str):
-                data = json.loads(verdict_data)
-            else:
-                # Fallback for legacy dict format
-                data = verdict_data
+            data = json.loads(verdict_json)
             return VerdictRecord(**data)
         except Exception as e:
             logger.bind(
@@ -196,33 +181,3 @@ class VerdictService:
                 branch=branch,
             ).warning(f"Failed to parse verdict data: {e}")
             return None
-
-    def _extract_role_from_actor(self, actor: str) -> str:
-        """Extract role from actor string.
-
-        Actor format examples:
-        - "manager" -> "manager"
-        - "planner" -> "planner"
-        - "reviewer" -> "reviewer"
-        - "executor" -> "executor"
-        - "claude/claude-sonnet-4-6" -> "agent"
-
-        Args:
-            actor: Actor identifier
-
-        Returns:
-            Role string
-        """
-        # Known roles
-        known_roles = {"manager", "planner", "executor", "reviewer"}
-        if actor in known_roles:
-            return actor
-
-        # Role prefix (e.g., "role/backend")
-        if "/" in actor:
-            prefix = actor.split("/", 1)[0]
-            if prefix in known_roles:
-                return prefix
-
-        # Default to "agent"
-        return "agent"

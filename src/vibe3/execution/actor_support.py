@@ -38,3 +38,34 @@ def format_agent_actor(options: AgentOptions) -> str:
     if model:
         return f"{backend}/{model}"
     return backend
+
+
+def extract_role_from_actor(actor: str) -> str:
+    """Extract role from actor string.
+
+    Actor format examples:
+    - "manager" -> "manager"
+    - "planner" -> "planner"
+    - "reviewer" -> "reviewer"
+    - "executor" -> "executor"
+    - "claude/claude-sonnet-4-6" -> "agent"
+
+    Args:
+        actor: Actor identifier
+
+    Returns:
+        Role string
+    """
+    # Known roles
+    known_roles = {"manager", "planner", "executor", "reviewer"}
+    if actor in known_roles:
+        return actor
+
+    # Role prefix (e.g., "role/backend")
+    if "/" in actor:
+        prefix = actor.split("/", 1)[0]
+        if prefix in known_roles:
+            return prefix
+
+    # Default to "agent"
+    return "agent"

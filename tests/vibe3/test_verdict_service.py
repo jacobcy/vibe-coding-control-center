@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.execution.actor_support import extract_role_from_actor
 from vibe3.models.verdict import VerdictRecord
 from vibe3.services.verdict_service import VerdictService
 
@@ -30,8 +31,8 @@ class TestVerdictService:
         return MagicMock()
 
     @pytest.fixture
-    def mock_handoff_service(self) -> MagicMock:
-        """Create mock HandoffService."""
+    def mock_handoff_storage(self) -> MagicMock:
+        """Create mock HandoffStorage."""
         return MagicMock()
 
     @pytest.fixture
@@ -40,14 +41,14 @@ class TestVerdictService:
         mock_store: MagicMock,
         mock_git_client: MagicMock,
         mock_flow_service: MagicMock,
-        mock_handoff_service: MagicMock,
+        mock_handoff_storage: MagicMock,
     ) -> VerdictService:
         """Create VerdictService instance with mocked dependencies."""
         return VerdictService(
             store=mock_store,
             git_client=mock_git_client,
             flow_service=mock_flow_service,
-            handoff_service=mock_handoff_service,
+            handoff_storage=mock_handoff_storage,
         )
 
     def test_write_verdict_success(
@@ -55,7 +56,7 @@ class TestVerdictService:
         verdict_service: VerdictService,
         mock_store: MagicMock,
         mock_git_client: MagicMock,
-        mock_handoff_service: MagicMock,
+        mock_handoff_storage: MagicMock,
     ) -> None:
         """Test writing a verdict successfully."""
         # Setup
@@ -85,7 +86,7 @@ class TestVerdictService:
         assert record.role == "agent"
 
         # Verify handoff was appended
-        mock_handoff_service.append_current_handoff.assert_called_once()
+        mock_handoff_storage.append_current_handoff.assert_called_once()
 
         # Verify flow state was updated
         mock_store.update_flow_state.assert_called_once()
@@ -97,7 +98,7 @@ class TestVerdictService:
         self,
         verdict_service: VerdictService,
         mock_store: MagicMock,
-        mock_handoff_service: MagicMock,
+        mock_handoff_storage: MagicMock,
     ) -> None:
         """Test writing a verdict with manager role."""
         # Setup
@@ -134,7 +135,11 @@ class TestVerdictService:
             "issues": None,
             "flow_branch": "test-branch",
         }
-        mock_store.get_flow_state.return_value = {"latest_verdict": verdict_data}
+        import json
+
+        mock_store.get_flow_state.return_value = {
+            "latest_verdict": json.dumps(verdict_data)
+        }
 
         # Execute
         record = verdict_service.get_latest_verdict("test-branch")
@@ -180,27 +185,24 @@ class TestVerdictService:
         self, verdict_service: VerdictService
     ) -> None:
         """Test extracting role from known role actor."""
-        assert verdict_service._extract_role_from_actor("manager") == "manager"
-        assert verdict_service._extract_role_from_actor("planner") == "planner"
-        assert verdict_service._extract_role_from_actor("executor") == "executor"
-        assert verdict_service._extract_role_from_actor("reviewer") == "reviewer"
+        assert extract_role_from_actor("manager") == "manager"
+        assert extract_role_from_actor("planner") == "planner"
+        assert extract_role_from_actor("executor") == "executor"
+        assert extract_role_from_actor("reviewer") == "reviewer"
 
     def test_extract_role_from_actor_with_prefix(
         self, verdict_service: VerdictService
     ) -> None:
         """Test extracting role from actor with role prefix."""
-        assert verdict_service._extract_role_from_actor("manager/backend") == "manager"
-        assert verdict_service._extract_role_from_actor("reviewer/claude") == "reviewer"
+        assert extract_role_from_actor("manager/backend") == "manager"
+        assert extract_role_from_actor("reviewer/claude") == "reviewer"
 
     def test_extract_role_from_actor_unknown(
         self, verdict_service: VerdictService
     ) -> None:
         """Test extracting role from unknown actor."""
-        assert (
-            verdict_service._extract_role_from_actor("claude/claude-sonnet-4-6")
-            == "agent"
-        )
-        assert verdict_service._extract_role_from_actor("unknown") == "agent"
+        assert extract_role_from_actor("claude/claude-sonnet-4-6") == "agent"
+        assert extract_role_from_actor("unknown") == "agent"
 
 
 class TestVerdictRecord:

@@ -291,12 +291,12 @@ class TestFinalizeReviewOutputVerdictSource:
         svc.record_audit.return_value = Path("/tmp/current.md")
         return svc
 
-    @patch("vibe3.roles.review._build_handoff_service")
+    @patch("vibe3.roles.review.HandoffService")
     @patch("vibe3.roles.review._load_existing_audit_ref")
     def test_reviewer_written_audit_overrides_stdout_verdict(
         self,
         mock_load_audit_ref: MagicMock,
-        mock_build_service: MagicMock,
+        mock_handoff_cls: MagicMock,
         tmp_path: Path,
     ) -> None:
         """当 reviewer 主动执行 `handoff audit`，audit 文件内容与 stdout 不一致时，
@@ -316,7 +316,7 @@ class TestFinalizeReviewOutputVerdictSource:
         # -> audit_ref already in flow state
         mock_load_audit_ref.return_value = str(audit_file)
         mock_handoff_svc = self._make_mock_handoff_service()
-        mock_build_service.return_value = mock_handoff_svc
+        mock_handoff_cls.return_value = mock_handoff_svc
 
         audit_ref, verdict = finalize_review_output(
             review_output=stdout_output,
@@ -339,12 +339,12 @@ class TestFinalizeReviewOutputVerdictSource:
             is_system_auto=False,
         )
 
-    @patch("vibe3.roles.review._build_handoff_service")
+    @patch("vibe3.roles.review.HandoffService")
     @patch("vibe3.roles.review._load_existing_audit_ref")
     def test_system_auto_audit_uses_stdout_verdict(
         self,
         mock_load_audit_ref: MagicMock,
-        mock_build_service: MagicMock,
+        mock_handoff_cls: MagicMock,
         tmp_path: Path,
     ) -> None:
         """当没有 reviewer-written audit（系统 auto 路径），
@@ -361,7 +361,7 @@ class TestFinalizeReviewOutputVerdictSource:
         auto_audit = tmp_path / "auto-audit.md"
         auto_audit.write_text("# Minimal Review Audit\nVERDICT: PASS\n")
         mock_handoff_svc.record_audit.return_value = auto_audit
-        mock_build_service.return_value = mock_handoff_svc
+        mock_handoff_cls.return_value = mock_handoff_svc
 
         with patch(
             "vibe3.roles.review._create_minimal_audit_artifact",
@@ -383,12 +383,12 @@ class TestFinalizeReviewOutputVerdictSource:
             is_system_auto=True,
         )
 
-    @patch("vibe3.roles.review._build_handoff_service")
+    @patch("vibe3.roles.review.HandoffService")
     @patch("vibe3.roles.review._load_existing_audit_ref")
     def test_reviewer_written_audit_unreadable_falls_back_to_stdout(
         self,
         mock_load_audit_ref: MagicMock,
-        mock_build_service: MagicMock,
+        mock_handoff_cls: MagicMock,
         tmp_path: Path,
     ) -> None:
         """即使 reviewer 写了 handoff_audit，但 audit 文件不可读，
@@ -400,7 +400,7 @@ class TestFinalizeReviewOutputVerdictSource:
         non_existent_audit = tmp_path / "missing-audit.md"
         mock_load_audit_ref.return_value = str(non_existent_audit)
         mock_handoff_svc = self._make_mock_handoff_service()
-        mock_build_service.return_value = mock_handoff_svc
+        mock_handoff_cls.return_value = mock_handoff_svc
 
         _, verdict = finalize_review_output(
             review_output=stdout_output,
