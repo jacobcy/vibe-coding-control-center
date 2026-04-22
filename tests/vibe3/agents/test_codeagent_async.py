@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.agents.backends.async_launcher import (
+    build_tmux_log_filter,
     start_async_command,
 )
 from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -14,6 +15,35 @@ from vibe3.models.review_runner import AgentOptions
 
 
 class TestStartAsyncCommand:
+    def test_build_tmux_log_filter_is_valid_for_local_awk(self, tmp_path: Path) -> None:
+        sample = tmp_path / "sample.log"
+        sample.write_text(
+            "noise 1\n"
+            "Uninstalled 1 package in 11ms\n"
+            "Installing wheels...\n"
+            "[codeagent-wrapper]\n"
+            "line one\n",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            ["awk", build_tmux_log_filter("test_session_id"), str(sample)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0
+        assert result.stdout == ("noise 1\n" "[codeagent-wrapper]\n" "line one\n")
+
+    def test_build_tmux_log_filter_filters_known_uv_noise_only(self) -> None:
+        awk_script = build_tmux_log_filter("test_session_id")
+
+        assert "Uninstalled" in awk_script
+        assert "Installing wheels" in awk_script
+        assert "Installed 1 package" in awk_script
+        assert "skip_prompt = 1" in awk_script
+
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:
@@ -293,6 +323,52 @@ class TestStartAsyncCommand:
         assert handle.log_path == (
             log_dir / "orchestra" / "governance" / "scan-20260405-114913-t1.async.log"
         )
+
+    def test_start_async_command_pipe_pane_uses_filtered_log_capture(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+
+        monkeypatch.setattr(
+            "vibe3.agents.backends.async_launcher.default_log_dir",
+            lambda: log_dir,
+        )
+
+        tmux_commands: list[list[str]] = []
+
+        def fake_run(cmd, *args, **kwargs):
+            tmux_commands.append(cmd)
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+        with patch(
+            "vibe3.agents.backends.async_launcher.subprocess.run",
+            side_effect=fake_run,
+        ):
+            handle = start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-run-issue-348",
+            )
+
+        pipe_pane_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "pipe-pane"]
+        )
+        assert str(handle.log_path) in pipe_pane_cmd[-1]
+        assert "Uninstalled" in pipe_pane_cmd[-1]
+        assert "Installing wheels" in pipe_pane_cmd[-1]
+        assert "skip_prompt = 1" in pipe_pane_cmd[-1]
 
 
 class TestRunStreamingAndEdgeCases:

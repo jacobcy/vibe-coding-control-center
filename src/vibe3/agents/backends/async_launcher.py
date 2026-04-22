@@ -33,6 +33,40 @@ class AsyncExecutionHandle:
     prompt_file_path: Path
 
 
+def build_tmux_log_filter(session_id: str) -> str:
+    """Return the awk program used to persist tmux pane output."""
+    awk_script = """
+/<agent-prompt>/ {
+    skip_prompt = 1
+    next
+}
+skip_prompt && /<\\/agent-prompt>/ {
+    skip_prompt = 0
+    next
+}
+skip_prompt {
+    next
+}
+/Uninstalled/ { next }
+/Installing wheels/ { next }
+/Installed 1 package/ { next }
+/\\[2m/ { next }
+/░/ { next }
+/█/ { next }
+/API Error: 429/ || /ServerOverloaded/ || /TooManyRequests/ || /rate_limit/ {
+    print "\\n[vibe3] FATAL: 429 Rate Limit. Aborting to prevent loop."
+    fflush()
+    system("tmux kill-session -t {SESSION_ID}")
+    exit 1
+}
+{
+    print
+    fflush()
+}
+"""
+    return awk_script.replace("{SESSION_ID}", session_id).strip()
+
+
 def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
     """Return tmux session names, optionally filtered by prefix.
 
@@ -312,17 +346,10 @@ def spawn_tmux_command(
             check=False,
         )
 
-    # Pipe pane output to log file so we get persistence without breaking the PTY.
-    # The command runs directly in the tmux PTY, so isatty() is true for the process.
-    # Strip <agent-prompt>...</agent-prompt> blocks: codeagent-wrapper echoes the
-    # prompt body between those tags on stdout, and persisting it pollutes the
-    # repo-local async log (the live tmux pane still shows it).
-    awk_filter = (
-        "/<agent-prompt>/{skip=1;next} "
-        "skip && /<\\/agent-prompt>/{skip=0;next} "
-        "skip{next} "
-        "{print;fflush()}"
-    )
+    # Pipe pane output to a repo-local log without breaking PTY behavior.
+    # Keep the filter deliberately dumb: strip prompt echoes and a few known
+    # uv/bootstrap noise lines, but do not gate on markers or buffer output.
+    awk_filter = build_tmux_log_filter(session_id)
     pipe_cmd = f"awk {shlex.quote(awk_filter)} >> {shlex.quote(str(log_path))}"
     subprocess.run(
         ["tmux", "pipe-pane", "-t", session_id, pipe_cmd],

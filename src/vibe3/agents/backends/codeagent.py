@@ -299,6 +299,7 @@ class CodeagentBackend:
             stream: Any,
             accumulator: list[str],
             output_file: Any,
+            proc: "subprocess.Popen[str]",
         ) -> None:
             """Read from stream in chunks, accumulate, and write to output.
 
@@ -311,6 +312,7 @@ class CodeagentBackend:
 
             found_marker = False
             pre_marker_buffer = ""
+            recent_text = ""
             decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
             while True:
@@ -329,6 +331,23 @@ class CodeagentBackend:
                 chunk = decoder.decode(chunk_bytes)
                 if not chunk:
                     continue
+
+                recent_text += chunk
+                if len(recent_text) > 4096:
+                    recent_text = recent_text[-2048:]
+
+                is_rate_limit = "429" in recent_text and (
+                    "ServerOverloaded" in recent_text
+                    or "TooManyRequests" in recent_text
+                    or "rate_limit" in recent_text
+                )
+                if is_rate_limit:
+                    logger.warning(
+                        "FATAL: Detected 429 Rate Limit error. "
+                        "Aborting subprocess to prevent infinite retry loop."
+                    )
+                    proc.kill()
+                    break
 
                 if not found_marker:
                     pre_marker_buffer += chunk
@@ -378,11 +397,11 @@ class CodeagentBackend:
 
         stdout_thread = threading.Thread(
             target=_stream_reader,
-            args=(proc.stdout, stdout_chunks, sys.stdout),
+            args=(proc.stdout, stdout_chunks, sys.stdout, proc),
         )
         stderr_thread = threading.Thread(
             target=_stream_reader,
-            args=(proc.stderr, stderr_chunks, sys.stderr),
+            args=(proc.stderr, stderr_chunks, sys.stderr, proc),
         )
 
         stdout_thread.start()
