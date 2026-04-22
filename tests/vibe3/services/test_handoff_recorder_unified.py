@@ -86,12 +86,7 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     # session_id is NOT written to flow_state (registry is source of truth)
     assert "planner_session_id" not in kwargs["flow_state_updates"]
     assert "plan_ref" not in kwargs["flow_state_updates"]
-    # Verify log_path is inferred from session_id
-    assert "log_path" in kwargs["refs"]
-    assert (
-        "issue-sess-plan" in kwargs["refs"]["log_path"]
-        or "plan.async.log" in kwargs["refs"]["log_path"]
-    )
+    assert "log_path" not in kwargs["refs"]
 
 
 @patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
@@ -305,3 +300,4 @@ def test_record_handoff_unified_for_indicate_skips_missing_actor_key(
     assert kwargs["refs"]["backend"] == "gemini"
     assert kwargs["refs"]["model"] == "gemini-3-flash-preview"
     assert kwargs["refs"]["next_step"] == "dispatch executor"
+    assert "log_path" not in kwargs["refs"]

@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from vibe3.agents.models import CodeagentResult
 from vibe3.domain.events import IssueFailed
 from vibe3.domain.publisher import EventPublisher
@@ -93,6 +95,44 @@ def test_publish_run_command_failure_emits_issue_failed() -> None:
     assert event.issue_number == 789
     assert "timeout expired" in event.reason
     assert event.actor == "agent:run"
+
+
+def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> None:
+    from types import SimpleNamespace
+
+    from vibe3.roles.run import execute_manual_run
+
+    with (
+        patch("vibe3.roles.run.CodeagentExecutionService") as mock_service_cls,
+        patch(
+            "vibe3.roles.run.make_run_context_builder", return_value=lambda: "prompt"
+        ),
+        patch("vibe3.roles.run.publish_run_command_failure") as mock_publish_failure,
+    ):
+        mock_service_cls.return_value.execute_sync.side_effect = RuntimeError(
+            "backend returned empty result"
+        )
+
+        with pytest.raises(RuntimeError, match="backend returned empty result"):
+            execute_manual_run(
+                config=object(),
+                branch="task/issue-349",
+                issue_number=349,
+                instructions=None,
+                plan_file="docs/plans/issue-349.md",
+                skill=None,
+                summary=SimpleNamespace(mode="plan"),
+                dry_run=False,
+                no_async=True,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        mock_publish_failure.assert_called_once_with(
+            issue_number=349,
+            reason="backend returned empty result",
+        )
 
 
 class TestExecutorFailed:

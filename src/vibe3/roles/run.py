@@ -403,7 +403,16 @@ def execute_manual_run(
         return None
 
     execution_service = CodeagentExecutionService(config)
-    result = execution_service.execute_sync(command)
+    try:
+        result = execution_service.execute_sync(command)
+    except Exception as exc:
+        if not dry_run and no_async and issue_number is not None:
+            publish_run_command_failure(
+                issue_number=issue_number,
+                reason=str(exc) or "Execution aborted",
+            )
+        raise
+
     if not dry_run and no_async and issue_number is not None:
         if result.success:
             publish_run_command_success(

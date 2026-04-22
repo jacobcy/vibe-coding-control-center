@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from vibe3.agents.backends.async_launcher import resolve_async_log_path
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.actor_support import (
     format_agent_actor,
@@ -154,15 +153,9 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
     if record.session_id:
         refs["session_id"] = record.session_id
 
-    # Add log_path to refs if available
-    # Either use explicit log_path or infer from session_id
+    # Add real log_path to refs when the caller provides it.
     if record.log_path:
         refs["log_path"] = record.log_path
-    elif record.session_id:
-        # Infer log_path from session_id pattern
-        log_dir = Path(__file__).resolve().parents[3] / "temp" / "logs"
-        inferred_log_path = resolve_async_log_path(log_dir, record.session_id)
-        refs["log_path"] = str(inferred_log_path)
 
     flow_state_updates: dict[str, object] = {}
     actor_key = get_optional_kind_actor_key(record.kind)
