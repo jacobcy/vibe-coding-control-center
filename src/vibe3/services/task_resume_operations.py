@@ -74,9 +74,16 @@ class TaskResumeOperations:
         # Determine target state based on label_state parameter
         if label_state is not None:
             # --label provided: restore to specified state without deleting worktree
-            target_state = (
-                IssueState.READY if label_state == "ready" else IssueState.HANDOFF
-            )
+            # Convert string state to IssueState enum
+            valid_states = {
+                "ready": IssueState.READY,
+                "claimed": IssueState.CLAIMED,
+                "in-progress": IssueState.IN_PROGRESS,
+                "handoff": IssueState.HANDOFF,
+                "review": IssueState.REVIEW,
+                "merge-ready": IssueState.MERGE_READY,
+            }
+            target_state = valid_states.get(label_state, IssueState.HANDOFF)
 
             # --label: minimal cleanup only. The agent did work but the label
             # wasn't updated correctly, causing a block.  Clear the reason

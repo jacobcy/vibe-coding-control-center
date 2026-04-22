@@ -210,21 +210,16 @@ def resume(
         ),
     ] = False,
     label: Annotated[
-        bool,
+        str | None,
         typer.Option(
             "--label",
-            help="Clear blocked_reason/failed_reason and restore to handoff "
-            "state (no worktree deletion)",
+            metavar="[STATE]",
+            help="Clear blocked_reason/failed_reason and restore to specified state "
+            "WITHOUT deleting worktree/branch. "
+            "STATE can be: ready, claimed, in-progress, handoff, review, merge-ready. "
+            "If --label is provided without value, defaults to 'handoff'.",
         ),
-    ] = False,
-    label_ready: Annotated[
-        bool,
-        typer.Option(
-            "--label-ready",
-            help="Clear blocked_reason/failed_reason and restore to ready "
-            "state (no worktree deletion)",
-        ),
-    ] = False,
+    ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Execute the resume (default dry-run)")
@@ -239,15 +234,31 @@ def resume(
     scene back to ready. Or specify issue numbers directly.
 
     **Label-only mode (no worktree deletion)**:
-    Use --label to clear blocked_reason/failed_reason and restore to
-    handoff state WITHOUT deleting worktree/branch.
-    Use --label-ready to restore to ready state WITHOUT deletion.
-    Without these flags, the original behavior deletes worktree/branch.
+    Use --label [STATE] to clear blocked_reason/failed_reason and restore
+    to specified state WITHOUT deleting worktree/branch.
+    - `--label` (no value) or `--label handoff` → restore to handoff
+    - `--label ready` → restore to ready
+    - `--label claimed` → restore to claimed
+    - `--label in-progress` → restore to in-progress
+    - `--label review` → restore to review
+    - `--label merge-ready` → restore to merge-ready
+    Without --label, the original behavior deletes worktree/branch.
 
     Examples:
-        vibe3 task resume 303 --label -y         # Restore to handoff, keep worktree
-        vibe3 task resume 303 --label-ready -y   # Restore to ready, keep worktree
-        vibe3 task resume 303 -y                 # Delete worktree/branch (original)
+        vibe3 task resume 303 --label -y
+            # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label handoff -y
+            # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label ready -y
+            # Restore to ready, keep worktree
+        vibe3 task resume 303 --label in-progress -y
+            # Restore to in-progress, keep worktree
+        vibe3 task resume 303 --label review -y
+            # Restore to review, keep worktree
+        vibe3 task resume 303 --label merge-ready -y
+            # Restore to merge-ready, keep worktree
+        vibe3 task resume 303 -y
+            # Delete worktree/branch (original)
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -278,18 +289,32 @@ def resume(
         )
         raise typer.Exit(1)
 
-    # Resolve label state from bool flags
-    if label and label_ready:
-        typer.echo(
-            "Error: Cannot specify both --label and --label-ready",
-            err=True,
-        )
-        raise typer.Exit(1)
+    # Resolve label state from parameter
+    valid_states = {
+        "ready",
+        "claimed",
+        "in-progress",
+        "handoff",
+        "review",
+        "merge-ready",
+    }
     effective_label: str | None = None
-    if label_ready:
-        effective_label = "ready"
-    elif label:
-        effective_label = "handoff"
+    if label is not None:
+        # --label provided
+        if label == "":
+            # --label without value (Typer passes empty string)
+            effective_label = "handoff"
+        elif label in valid_states:
+            # --label <state>
+            effective_label = label
+        else:
+            typer.echo(
+                f"Error: Invalid state '{label}'. "
+                f"Must be one of: {', '.join(sorted(valid_states))}.",
+                err=True,
+            )
+            raise typer.Exit(1)
+    # else: label is None → don't specify --label → delete worktree
 
     target_issues: list[int] | None
     candidate_mode = "resumable"
