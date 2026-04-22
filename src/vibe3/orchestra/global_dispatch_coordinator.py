@@ -18,6 +18,7 @@ from loguru import logger
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.utils.label_utils import has_manager_assignee
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
@@ -47,6 +48,9 @@ class GlobalDispatchCoordinator:
             dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
         )
         self._repo = dispatch_services[0].config.repo if dispatch_services else None
+        self._manager_usernames = tuple(
+            dispatch_services[0].config.manager_usernames if dispatch_services else ()
+        )
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
@@ -109,6 +113,14 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: removed #{issue.number} "
                     "from queue (supervisor issue)",
+                )
+                self._frozen_queue.pop(index)
+                continue
+            if not has_manager_assignee(issue.assignees, self._manager_usernames):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue (assignee removed)",
                 )
                 self._frozen_queue.pop(index)
                 continue
@@ -251,6 +263,14 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
                     "from queue (supervisor issue)",
+                )
+                continue
+            if not has_manager_assignee(issue.assignees, self._manager_usernames):
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue (assignee removed)",
                 )
                 continue
 

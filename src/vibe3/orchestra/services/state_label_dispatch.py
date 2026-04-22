@@ -21,6 +21,7 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+from vibe3.utils.label_utils import has_manager_assignee
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -306,6 +307,11 @@ class StateLabelDispatchService(ServiceBase):
                 continue
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
+                continue
+            if not has_manager_assignee(
+                issue.assignees,
+                self.config.manager_usernames,
+            ):
                 continue
 
             # Check for dependencies before proceeding

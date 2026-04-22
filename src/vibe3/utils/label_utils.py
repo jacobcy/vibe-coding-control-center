@@ -27,3 +27,11 @@ def normalize_assignees(raw_assignees: object) -> list[str]:
             if isinstance(login, str) and login:
                 assignees.append(login)
     return assignees
+
+
+def has_manager_assignee(
+    assignees: list[str],
+    manager_usernames: list[str] | tuple[str, ...],
+) -> bool:
+    """Whether issue assignees still include a configured manager username."""
+    return any(assignee in manager_usernames for assignee in assignees)

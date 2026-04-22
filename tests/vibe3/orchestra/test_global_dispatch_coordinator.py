@@ -22,13 +22,19 @@ def make_issue(number: int, priority: int = 5) -> MagicMock:
     return issue
 
 
-def make_issue_info(number: int, state: IssueState) -> IssueInfo:
+def make_issue_info(
+    number: int,
+    state: IssueState,
+    *,
+    assignees: list[str] | None = None,
+    labels: list[str] | None = None,
+) -> IssueInfo:
     return IssueInfo(
         number=number,
         title=f"Issue {number}",
         state=state,
-        labels=[state.to_label()],
-        assignees=[],
+        labels=labels if labels is not None else [state.to_label()],
+        assignees=assignees if assignees is not None else ["manager-bot"],
     )
 
 
@@ -54,6 +60,7 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
     service.config.repo = "owner/repo"
+    service.config.manager_usernames = ["manager-bot"]
     service._github = MagicMock()
     return service
 
@@ -117,6 +124,29 @@ class TestGlobalDispatchCoordinator:
             title=f"Issue {issue_number}",
             state=IssueState.HANDOFF,
             labels=["supervisor", IssueState.HANDOFF.to_label()],
+            assignees=[],
+        )
+
+        await coordinator.coordinate()
+
+        service._emit_dispatch_intent.assert_not_called()
+        assert coordinator._frozen_queue == []
+
+    @pytest.mark.asyncio
+    async def test_issue_without_manager_assignee_removed_from_existing_frozen_queue(
+        self,
+    ) -> None:
+        issue = make_issue(468)
+        service = make_service("handoff-manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=468, collected_state="handoff", waiting_state=None)
+        ]
+        coordinator._load_issue = lambda issue_number: make_issue_info(  # type: ignore[method-assign]
+            issue_number,
+            IssueState.HANDOFF,
             assignees=[],
         )
 

@@ -27,6 +27,7 @@ class TestManagerBlockedIssueNotDispatched:
             "number": 303,
             "title": "Test blocked issue",
             "labels": [{"name": IssueState.BLOCKED.to_label()}],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
 
@@ -34,6 +35,7 @@ class TestManagerBlockedIssueNotDispatched:
             "number": 200,
             "title": "Test ready issue",
             "labels": [{"name": IssueState.READY.to_label()}],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
 
@@ -48,6 +50,7 @@ class TestManagerBlockedIssueNotDispatched:
             # Mock config with max_concurrent_flows
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4  # ← 必须设置
+            mock_config.manager_usernames = ["manager-bot"]
 
             # Mock SessionRegistryService (required)
             mock_registry = Mock()
@@ -77,6 +80,7 @@ class TestManagerBlockedIssueNotDispatched:
             "number": 303,
             "title": "Test blocked issue",
             "labels": [{"name": IssueState.BLOCKED.to_label()}],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
 
@@ -84,6 +88,7 @@ class TestManagerBlockedIssueNotDispatched:
             "number": 201,
             "title": "Test handoff issue",
             "labels": [{"name": IssueState.HANDOFF.to_label()}],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
 
@@ -97,6 +102,7 @@ class TestManagerBlockedIssueNotDispatched:
             # Mock config with max_concurrent_flows
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4  # ← 必须设置
+            mock_config.manager_usernames = ["manager-bot"]
 
             # Mock SessionRegistryService (required)
             mock_registry = Mock()
@@ -128,6 +134,7 @@ class TestManagerBlockedIssueNotDispatched:
                 {"name": "supervisor"},
                 {"name": IssueState.HANDOFF.to_label()},
             ],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
 
@@ -135,6 +142,7 @@ class TestManagerBlockedIssueNotDispatched:
             "number": 201,
             "title": "Normal handoff issue",
             "labels": [{"name": IssueState.HANDOFF.to_label()}],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
 
@@ -147,6 +155,7 @@ class TestManagerBlockedIssueNotDispatched:
 
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4
+            mock_config.manager_usernames = ["manager-bot"]
             mock_registry = Mock()
 
             dispatcher = StateLabelDispatchService(
@@ -162,6 +171,40 @@ class TestManagerBlockedIssueNotDispatched:
 
         assert 467 not in [issue.number for issue in ready_issues]
         assert 201 in [issue.number for issue in ready_issues]
+
+    def test_unassigned_issue_skipped_by_ready_dispatcher(
+        self,
+    ) -> None:
+        """无 manager assignee 的 issue 不应进入 dispatch 队列。"""
+        issue_data = {
+            "number": 204,
+            "title": "Unassigned issue",
+            "labels": [{"name": IssueState.READY.to_label()}],
+            "assignees": [],
+            "state": "open",
+        }
+
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_github_class:
+            mock_github = mock_github_class.return_value
+            mock_github.list_issues.return_value = [issue_data]
+
+            mock_config = Mock()
+            mock_config.max_concurrent_flows = 4
+            mock_config.manager_usernames = ["manager-bot"]
+            mock_registry = Mock()
+
+            dispatcher = StateLabelDispatchService(
+                config=mock_config,
+                github=mock_github,
+                role_def=MANAGER_ROLE,
+                registry=mock_registry,
+            )
+
+            import asyncio
+
+            ready_issues = asyncio.run(dispatcher.collect_ready_issues())
+
+        assert ready_issues == []
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:
