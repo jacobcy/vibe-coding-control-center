@@ -1,10 +1,11 @@
 """Flow UI timeline rendering components."""
 
+from pathlib import Path
 from typing import Any
 
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
+from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
@@ -229,8 +230,16 @@ def render_flow_timeline(
             log_path = (
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
             )
-            if log_path:
-                console.print(f"  [dim]- {log_path}[/]")
+            if log_path and isinstance(log_path, str):
+                log_display = resolve_ref_path(
+                    log_path, state.worktree_root, absolute=True
+                )
+                _log_suffix = (
+                    " [dim yellow](not found)[/]"
+                    if not Path(log_display).exists()
+                    else ""
+                )
+                console.print(f"  [dim]- {log_display}[/]{_log_suffix}")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             # Skip ref if already shown in detail (audit_ref case)
             detail_contains_ref = bool(
@@ -238,8 +247,19 @@ def render_flow_timeline(
                 and isinstance(event.detail, str)
                 and ref in event.detail
             )
-            if ref and not log_path and not detail_contains_ref:
-                console.print(f"  [dim]- {ref}[/]")
+            if (
+                ref
+                and isinstance(ref, str)
+                and not log_path
+                and not detail_contains_ref
+            ):
+                ref_display = resolve_ref_path(ref, state.worktree_root, absolute=True)
+                _ref_suffix = (
+                    " [dim yellow](not found)[/]"
+                    if not Path(ref_display).exists()
+                    else ""
+                )
+                console.print(f"  [dim]- {ref_display}[/]{_ref_suffix}")
         console.print()
 
     if milestone_data:
@@ -263,7 +283,11 @@ def render_flow_timeline(
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
-            console.print(f"  [dim]{label:10}[/]  {val}{actor_str}")
+            display_val = resolve_ref_path(val, state.worktree_root, absolute=True)
+            _missing = (
+                " [dim yellow](not found)[/]" if not Path(display_val).exists() else ""
+            )
+            console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
 
     # Show latest state summary if available
     if state.latest_verdict or state.latest_indicate_action:

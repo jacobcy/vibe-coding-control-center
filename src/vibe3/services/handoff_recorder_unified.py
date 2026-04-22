@@ -143,8 +143,9 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
     )
 
     detail, derived_refs = _build_detail(sanitized_record, artifact_file)
+    normalized_ref = handoff_service._normalize_ref_value(branch, str(artifact_file))
     refs: dict[str, str] = {
-        "ref": str(artifact_file),
+        "ref": normalized_ref,
         "backend": backend,
         **derived_refs,
     }
@@ -155,7 +156,8 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
 
     # Add real log_path to refs when the caller provides it.
     if record.log_path:
-        refs["log_path"] = record.log_path
+        normalized_log = handoff_service._normalize_ref_value(branch, record.log_path)
+        refs["log_path"] = normalized_log
 
     flow_state_updates: dict[str, object] = {}
     actor_key = get_optional_kind_actor_key(record.kind)

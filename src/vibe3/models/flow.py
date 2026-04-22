@@ -271,6 +271,7 @@ class FlowStatusResponse(BaseModel):
     latest_indicate_action: str | None = (
         None  # Latest structured action from manager indicate
     )
+    worktree_root: str | None = None  # NEW: Worktree root path for path resolution
 
     @field_validator("flow_status", mode="before")
     @classmethod
@@ -296,6 +297,7 @@ class FlowStatusResponse(BaseModel):
         issues: list[IssueLink] | None = None,
         pr_number: int | None = None,
         pr_ready: bool | None = None,
+        worktree_root: str | None = None,
     ) -> "FlowStatusResponse":
         """Build a hydrated response from state and links."""
         data = state.model_dump() if isinstance(state, FlowState) else dict(state)
@@ -338,6 +340,7 @@ class FlowStatusResponse(BaseModel):
             execution_completed_at=data.get("execution_completed_at"),
             latest_verdict=data.get("latest_verdict"),
             latest_indicate_action=data.get("latest_indicate_action"),
+            worktree_root=worktree_root,
         )
 
 

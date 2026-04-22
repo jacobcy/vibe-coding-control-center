@@ -156,6 +156,10 @@ class CodeagentExecutionService:
         )
 
         effective_session_id = agent_result.session_id or ctx.session_id
+        import os
+
+        env_log_path = os.environ.get("VIBE3_LOG_PATH")
+
         handoff_file = record_handoff_unified(
             HandoffRecord(
                 kind=command.handoff_kind,  # type: ignore[arg-type]
@@ -164,6 +168,7 @@ class CodeagentExecutionService:
                 session_id=effective_session_id,
                 metadata=command.handoff_metadata,
                 branch=command.branch,
+                log_path=env_log_path,
             )
         )
         if handoff_file:

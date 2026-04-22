@@ -45,4 +45,26 @@ def display_actor(actor: str | None) -> tuple[str, bool]:
     normalized = SignatureService.normalize_actor(actor)
     if normalized is not None:
         return normalized, False
-    return SignatureService.get_worktree_actor(), True
+
+    # Fallback: worktree git user.name
+    try:
+        from vibe3.clients.git_client import GitClient
+
+        name = GitClient().get_config("user.name") or "unknown"
+    except Exception:
+        name = "unknown"
+    return name, True
+
+
+def resolve_ref_path(
+    ref_value: str | None,
+    worktree_root: str | None = None,
+    absolute: bool = False,
+) -> str:
+    """Resolve a reference path for display.
+
+    Redirects to vibe3.utils.path_helpers.resolve_ref_path.
+    """
+    from vibe3.utils.path_helpers import resolve_ref_path as _resolve
+
+    return _resolve(ref_value, worktree_root, absolute=absolute)

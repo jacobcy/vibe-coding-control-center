@@ -217,23 +217,37 @@ def _create_minimal_audit_artifact(
 
 
 def _resolve_minimal_audit_dir(branch: str | None) -> Path:
-    """Prefer a readable worktree-local docs/reports directory for audit output."""
+    """Prefer a readable worktree-local docs/reports directory for audit output.
+
+    We prioritize the current execution worktree (where the agent is running)
+    to avoid permission issues if the branch is checked out in a different
+    worktree.
+    """
     git = GitClient()
     worktree_root: Path | None = None
 
-    if branch:
-        worktree_root = git.find_worktree_path_for_branch(branch)
-
-    if worktree_root is None:
+    # 1. Try current worktree (Execution Directory)
+    try:
         current_root = git.get_worktree_root()
         if current_root:
             worktree_root = Path(current_root)
+    except Exception:
+        pass
 
+    # 2. Try target branch worktree
+    if worktree_root is None and branch:
+        try:
+            worktree_root = git.find_worktree_path_for_branch(branch)
+        except Exception:
+            pass
+
+    # If we found any worktree, use docs/reports within it
     if worktree_root is not None:
         reports_dir = worktree_root / "docs" / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
         return reports_dir
 
+    # 3. Fallback to shared handoff directory
     handoff_service = _build_handoff_service(branch)
     return handoff_service.ensure_handoff_dir()
 

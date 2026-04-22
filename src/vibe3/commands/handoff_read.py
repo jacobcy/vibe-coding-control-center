@@ -20,6 +20,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,
     render_handoff_list,
@@ -177,14 +178,31 @@ def show(
     """Show agent handoff chain and events."""
     with trace_scope(trace, "handoff show", domain="handoff"):
         if artifact is not None:
-            if not artifact.exists():
+            # 1. Try resolving relative to current CWD/Worktree
+            resolved_artifact = artifact
+            service = FlowService()
+
+            if not resolved_artifact.exists():
+                # 2. Try resolving relative to git common dir (shared artifacts)
+                try:
+                    git_common = Path(service.get_git_common_dir())
+                    if git_common:
+                        potential = git_common / artifact
+                        if potential.exists():
+                            resolved_artifact = potential
+                except Exception:
+                    pass
+
+            if not resolved_artifact.exists():
                 typer.echo(f"Error: artifact not found: {artifact}", err=True)
                 raise typer.Exit(1)
-            if not artifact.is_file():
-                typer.echo(f"Error: artifact is not a file: {artifact}", err=True)
+            if not resolved_artifact.is_file():
+                typer.echo(
+                    f"Error: artifact is not a file: {resolved_artifact}", err=True
+                )
                 raise typer.Exit(1)
             try:
-                render_handoff_detail(artifact)
+                render_handoff_detail(resolved_artifact)
             except (OSError, UnicodeDecodeError) as exc:
                 typer.echo(f"Error: failed to read artifact: {exc}", err=True)
                 raise typer.Exit(1)
@@ -290,7 +308,7 @@ def show(
 
         console.print("[bold]--- Recent Handoff Events ---[/]")
         console.print()
-        _render_handoff_events(handoff_events)
+        _render_handoff_events(handoff_events, worktree_root=worktree_root)
 
         # Show current.md updates in log format
         git_dir = service.get_git_common_dir()
@@ -298,7 +316,8 @@ def show(
         current_md = handoff_dir / "current.md"
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
-        console.print(f"  [dim]path[/]  {current_md}")
+        current_md_display = resolve_ref_path(str(current_md))
+        console.print(f"  [dim]path[/]  {current_md_display}")
         console.print()
 
         if current_md.exists():

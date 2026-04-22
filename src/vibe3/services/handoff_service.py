@@ -426,35 +426,9 @@ class HandoffService:
 
     def _normalize_ref_value(self, branch: str, ref_value: str) -> str:
         """Prefer worktree-relative refs for files under the branch worktree."""
-        try:
-            ref_path = Path(ref_value)
-        except (TypeError, ValueError):
-            return ref_value
+        from vibe3.utils.path_helpers import normalize_ref_path
 
-        if not ref_path.is_absolute():
-            return ref_value
-
-        worktree_root: Path | None = None
-        try:
-            worktree_root = self.git_client.find_worktree_path_for_branch(branch)
-        except Exception:
-            worktree_root = None
-
-        if worktree_root is None:
-            try:
-                current_root = self.git_client.get_worktree_root()
-            except Exception:
-                current_root = ""
-            if current_root:
-                worktree_root = Path(current_root)
-
-        if worktree_root is None:
-            return ref_value
-
-        try:
-            return str(ref_path.relative_to(worktree_root))
-        except ValueError:
-            return ref_value
+        return normalize_ref_path(ref_value, branch, self.git_client)
 
     def record_plan(
         self,

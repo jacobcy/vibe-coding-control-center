@@ -70,12 +70,22 @@ class FlowReadMixin:
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
+        # Resolve worktree root for this branch (Execution Directory context)
+        worktree_root = None
+        try:
+            wt_path = self.git_client.find_worktree_path_for_branch(branch)
+            if wt_path:
+                worktree_root = str(wt_path)
+        except Exception:
+            pass
+
         try:
             return FlowStatusResponse.from_state(
                 flow_data,
                 issues=issues,
                 pr_number=pr_number,
                 pr_ready=pr_ready,
+                worktree_root=worktree_root,
             )
         except ValidationError as exc:
             logger.bind(domain="flow", branch=branch).warning(
@@ -105,7 +115,20 @@ class FlowReadMixin:
                 issue_links = self.store.get_issue_links(branch)
                 issues = [IssueLink(**link) for link in issue_links]
 
-                flows.append(FlowStatusResponse.from_state(flow, issues=issues))
+                # Resolve worktree root context
+                worktree_root = None
+                try:
+                    wt_path = self.git_client.find_worktree_path_for_branch(branch)
+                    if wt_path:
+                        worktree_root = str(wt_path)
+                except Exception:
+                    pass
+
+                flows.append(
+                    FlowStatusResponse.from_state(
+                        flow, issues=issues, worktree_root=worktree_root
+                    )
+                )
             except (ValidationError, KeyError) as exc:
                 logger.bind(
                     domain="flow",
