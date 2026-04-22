@@ -89,7 +89,7 @@ def list_handoffs(
     ] = None,
     kind: Annotated[
         str | None,
-        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review"),
+        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review/indicate"),
     ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -103,14 +103,16 @@ def list_handoffs(
         target_branch = branch if branch else flow_service.get_current_branch()
         events = handoff_service.get_handoff_events(target_branch)
 
-        allowed_kinds = {"plan", "run", "review"}
+        allowed_kinds = {"plan", "run", "review", "indicate"}
         filter_kind = kind.lower() if kind else None
         if filter_kind and filter_kind not in allowed_kinds:
-            typer.echo("Error: --kind must be one of: plan, run, review", err=True)
+            typer.echo(
+                "Error: --kind must be one of: plan, run, review, indicate", err=True
+            )
             raise typer.Exit(1)
 
         handoffs: list[dict[str, str]] = []
-        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0}
+        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0, "indicates": 0}
 
         for event in events:
             event_kind = event.event_type.replace("handoff_", "", 1)
@@ -126,6 +128,8 @@ def list_handoffs(
                 stats["runs"] += 1
             elif event_kind == "review":
                 stats["reviews"] += 1
+            elif event_kind == "indicate":
+                stats["indicates"] += 1
 
             handoffs.append(
                 {
