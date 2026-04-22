@@ -11,6 +11,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.agent_resolver import resolve_governance_agent_options
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
@@ -218,7 +219,7 @@ def build_governance_snapshot_context(
     github: GitHubClient | None = None,
 ) -> dict[str, Any]:
     """Convert runtime observations into the governance prompt context dict."""
-    config = config or OrchestraConfig.from_settings()
+    config = config or load_orchestra_config()
     current_material = _resolve_governance_material(config, tick_count)
     material_name = Path(current_material).name
 

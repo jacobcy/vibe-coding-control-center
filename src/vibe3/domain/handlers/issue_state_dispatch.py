@@ -5,9 +5,9 @@ from typing import Callable
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import DomainEvent
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
-from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
 from vibe3.services.issue_failure_service import block_manager_noop_issue
@@ -53,7 +53,7 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
             )
 
         loop = asyncio.get_event_loop()
-        config = OrchestraConfig.from_settings()
+        config = load_orchestra_config()
 
         target_state = (
             IssueState.READY

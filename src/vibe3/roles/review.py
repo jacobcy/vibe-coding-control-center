@@ -23,6 +23,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
@@ -92,7 +93,7 @@ def build_issue_review_request(
     execution_name = f"vibe3-reviewer-issue-{issue.number}"
 
     if sync:
-        cfg = config or OrchestraConfig.from_settings()
+        cfg = config or load_orchestra_config()
         review_config = getattr(cfg, "review", None)
         review_prompt = review_config.review_prompt if review_config else None
         task = (
@@ -506,7 +507,7 @@ def _dispatch_async_manual_review(
         else f"vibe3-reviewer-{request.scope.kind}-{target_id or 'adhoc'}"
     )
     coordinator = ExecutionCoordinator(
-        OrchestraConfig.from_settings(),
+        load_orchestra_config(),
         SQLiteClient(),
     )
     return coordinator.dispatch_execution(

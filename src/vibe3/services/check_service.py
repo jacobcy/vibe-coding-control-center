@@ -9,6 +9,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.check_remote import (
@@ -254,7 +255,6 @@ class CheckService(CheckRemote):
                 return False
 
         from vibe3.execution.flow_dispatch import FlowManager
-        from vibe3.models.orchestra_config import OrchestraConfig
         from vibe3.models.orchestration import IssueInfo
 
         issue = IssueInfo(
@@ -264,7 +264,7 @@ class CheckService(CheckRemote):
             labels=[IssueState.READY.to_label()],
         )
         manager = FlowManager(
-            OrchestraConfig.from_settings(),
+            load_orchestra_config(),
             store=self.store,
             git=self.git_client,
             github=self.github_client,

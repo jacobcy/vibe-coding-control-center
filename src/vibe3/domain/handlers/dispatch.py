@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import (
     ExecutorDispatchIntent,
     PlannerDispatchIntent,
@@ -63,7 +64,7 @@ def _dispatch_role_intent(
     **builder_kwargs: object,
 ) -> None:
     """Dispatch a role intent through role request builder + ExecutionCoordinator."""
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     store = SQLiteClient()
     issue = _load_issue_info(config, issue_number)
 

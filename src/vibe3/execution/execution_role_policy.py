@@ -9,6 +9,7 @@ from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options as resolve_backend_effective_agent_options,
 )
 from vibe3.agents.backends.codeagent_config import sync_models_json
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.review_runner import AgentOptions
 
@@ -45,7 +46,7 @@ class ExecutionRolePolicyService:
     }
 
     def __init__(self, config: OrchestraConfig | None = None) -> None:
-        self._config = config or OrchestraConfig.from_settings()
+        self._config = config or load_orchestra_config()
 
     def resolve_backend(self, role: str) -> str:
         section_name = self._ROLE_CONFIG_MAP.get(role)

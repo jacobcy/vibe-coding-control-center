@@ -13,9 +13,9 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.worktree_context import WorktreeContext
 
 if TYPE_CHECKING:
-    from vibe3.environment.worktree import WorktreeContext
     from vibe3.models.orchestra_config import OrchestraConfig
 
 
@@ -278,8 +278,6 @@ class WorktreePRMixin:
             path=str(wt_path),
         )
         initialize_worktree(self.repo_path, wt_path, reason="issue")
-
-        from vibe3.environment.worktree import WorktreeContext
 
         return WorktreeContext(
             path=wt_path,

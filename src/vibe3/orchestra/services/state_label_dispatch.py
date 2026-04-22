@@ -336,7 +336,7 @@ class StateLabelDispatchService(ServiceBase):
                 continue
 
             # For downstream roles (plan/run/review), we need a branch to exist.
-            branch, flow_state = self._flow_context(issue.number)
+            branch, _ = self._flow_context(issue.number)
             if not branch or not _is_auto_task_branch(branch):
                 # If no branch exists yet, we can't dispatch downstream agents.
                 # This usually means manager hasn't run yet.

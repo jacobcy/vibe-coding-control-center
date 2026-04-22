@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
@@ -69,7 +70,7 @@ class OrchestrationFacade(ServiceBase):
                 here; gating belongs on the authoritative sync execution path.
         """
         self._tick_count = tick_count
-        self._config = config or OrchestraConfig.from_settings()
+        self._config = config or load_orchestra_config()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
         self._dispatch_services = list(dispatch_services or [])

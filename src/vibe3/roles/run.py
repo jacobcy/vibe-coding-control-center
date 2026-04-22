@@ -14,6 +14,7 @@ from vibe3.agents.run_prompt import (
     make_skill_context_builder,
 )
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
@@ -264,7 +265,7 @@ def dispatch_run_command_async(
     if handoff_metadata:
         refs.update({k: str(v) for k, v in handoff_metadata.items()})
     ExecutionCoordinator(
-        OrchestraConfig.from_settings(),
+        load_orchestra_config(),
         SQLiteClient(),
     ).dispatch_execution(
         ExecutionRequest(

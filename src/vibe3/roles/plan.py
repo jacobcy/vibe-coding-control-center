@@ -10,6 +10,7 @@ from vibe3.agents.models import CodeagentResult, create_codeagent_command
 from vibe3.agents.plan_prompt import build_plan_prompt_body, make_plan_context_builder
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
@@ -299,7 +300,7 @@ def execute_spec_plan(
         if cli_args is None:
             raise ValueError("Async plan execution requires explicit cli_args")
         launch = ExecutionCoordinator(
-            OrchestraConfig.from_settings(),
+            load_orchestra_config(),
             SQLiteClient(),
         ).dispatch_execution(
             ExecutionRequest(

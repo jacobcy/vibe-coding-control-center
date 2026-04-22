@@ -243,12 +243,3 @@ class OrchestraConfig(BaseModel):
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
     )
-
-    @classmethod
-    def from_settings(cls) -> "OrchestraConfig":
-        """Load orchestra config from config/settings.yaml."""
-        from vibe3.config.settings import VibeConfig
-
-        settings = VibeConfig.get_defaults()
-        src = settings.orchestra
-        return src.model_copy(deep=True)

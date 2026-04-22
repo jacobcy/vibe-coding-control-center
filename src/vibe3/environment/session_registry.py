@@ -278,12 +278,14 @@ class SessionRegistryService:
 
         try:
             from vibe3.clients.git_client import GitClient
-            from vibe3.environment.worktree import WorktreeContext, WorktreeManager
-            from vibe3.models.orchestra_config import OrchestraConfig
+            from vibe3.environment.worktree import WorktreeManager
+            from vibe3.environment.worktree_context import WorktreeContext
 
             git_common_dir = GitClient().get_git_common_dir()
             repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
-            config = OrchestraConfig.from_settings()
+            from vibe3.config.orchestra_settings import load_orchestra_config
+
+            config = load_orchestra_config()
             context = WorktreeContext(
                 path=repo_root / ".worktrees" / "tmp" / target_id,
                 is_temporary=True,
