@@ -106,24 +106,7 @@ uv run python src/vibe3/cli.py inspect files <file>
 2. 移除的函数/类，是否还有调用者残留
 3. 签名变更是否波及所有调用方
 
-### 2.2 语义理解：`mcp_auggie_codebase-retrieval`
-
-不知道代码在哪、职责边界不清、需要理解实现意图时使用：
-
-```
-# 通过 MCP 工具调用
-mcp_auggie_codebase-retrieval(information_request="<自然语言描述>", directory_path="<项目根路径>")
-```
-
-适合场景：
-- 找负责某项功能的 module
-- 理解 plan / review / run 链路如何拼装
-- 理解配置、命令、service 之间的关系
-- 跨文件语义探索
-
-**不要**拿它代替精确引用分析；涉及"谁调用了谁"时，优先回到 `vibe3 inspect`。
-
-### 2.3 补充：精确字符串查找
+### 2.2 补充：精确字符串查找
 
 只在需要精确字面量时使用 `rg`：
 - 查错误消息、配置 key、prompt 文案
@@ -131,7 +114,7 @@ mcp_auggie_codebase-retrieval(information_request="<自然语言描述>", direct
 
 **不要**把 `rg` 当主分析工具，不替代 AST 分析。
 
-### 2.4 备选：Serena（外部工具）
+### 2.3 备选：Serena（外部工具）
 
 当 `vibe3 inspect` 无法覆盖深度符号级分析时：
 

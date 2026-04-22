@@ -29,7 +29,6 @@
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
-- `mcp_auggie_codebase-retrieval`
 
 ## 任务分型
 

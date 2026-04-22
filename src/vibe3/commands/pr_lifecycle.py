@@ -75,7 +75,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             List[str] | None,
             typer.Option(
                 "--review",
-                help="Request AI review (codex, copilot, auggie, claude)",
+                help="Request AI review (codex, copilot, claude)",
             ),
         ] = None,
     ) -> None:
