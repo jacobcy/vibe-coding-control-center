@@ -78,6 +78,7 @@ def build_supervisor_handoff_payload(
     governance_cfg = config.governance.model_copy(
         update={
             "supervisor_file": config.supervisor_handoff.supervisor_file,
+            "supervisor_files": [],
             "prompt_template": config.supervisor_handoff.prompt_template,
             "include_supervisor_content": True,
             "dry_run": False,

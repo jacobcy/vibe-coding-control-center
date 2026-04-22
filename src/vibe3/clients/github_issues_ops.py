@@ -158,7 +158,7 @@ class IssuesMixin(IssueAdminMixin):
             "--state",
             state,
             "--json",
-            "number,title,state,updatedAt,labels,assignees,milestone",
+            "number,title,body,state,updatedAt,labels,assignees,milestone",
         ]
         if assignee:
             cmd.extend(["--assignee", assignee])
