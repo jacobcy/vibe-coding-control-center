@@ -59,8 +59,8 @@ no matter what. Do not include this section in your response until the very end.
 def build_run_standard_sections(config: VibeConfig) -> list[str]:
     """Run role-level hard-standard sections. All run paths must include these.
 
-    Includes: policy_file, common_rules, run_task, output_format.
-    Does NOT include path-specific content (plan, audit, skill).
+    Includes: policy_file, common_rules, output_format, run_task (common contract).
+    Does NOT include path-specific content (plan, audit, skill, coding_task).
     """
     from vibe3.agents.review_prompt import build_tools_guide_section
 
@@ -87,6 +87,20 @@ def build_run_standard_sections(config: VibeConfig) -> list[str]:
     sections.append(build_run_task_section(run_task))
 
     return sections
+
+
+def build_run_coding_sections(config: VibeConfig) -> list[str]:
+    """Code-execution-specific sections.
+
+    Injected ONLY for plan/flow_plan/lightweight paths.
+    Contains coding_task guidance (write code, tests, follow plan strictly).
+    NOT included in skill or commit paths to avoid instruction conflicts.
+    """
+    run_config = getattr(config, "run", None)
+    coding_task = getattr(run_config, "coding_task", None) if run_config else None
+    if not coding_task:
+        return []
+    return [coding_task]
 
 
 def build_run_prompt_body(
@@ -141,6 +155,9 @@ def build_run_prompt_body(
             f"{audit_content}"
         )
 
+    # Code-execution-specific guidance (plan-mode only — not for skill/commit paths)
+    sections.extend(build_run_coding_sections(config))
+
     # Run role hard-standard sections (shared with all run paths)
     sections.extend(build_run_standard_sections(config))
 
@@ -176,9 +193,9 @@ def make_skill_context_builder(
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for skill execution mode.
 
-    Uses build_run_standard_sections() so the skill agent receives the same
-    role-level hard standards (run_task, output_format, policy, common_rules)
-    as the normal run path.
+    Uses build_run_standard_sections() so the skill agent receives the common
+    contract (output_format, run_task exit step, policy, common_rules).
+    coding_task is intentionally excluded — skills define their own execution guidance.
     """
     cfg = config or VibeConfig.get_defaults()
 

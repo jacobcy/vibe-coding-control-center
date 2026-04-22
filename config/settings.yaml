@@ -501,13 +501,8 @@ run:
     - [ ] No type errors
     - [ ] No lint errors
 
-  # Static: Default run task guidance
-  # Can be overridden via CLI: vibe run execute --message "Skip slow tests"
+  # Static: Common task contract — applies to ALL execution paths (code, commit, skill, etc.)
   run_task: |
-    Follow plan steps strictly, verify each step before proceeding.
-    Write clean code with tests, run verification after changes.
-    Document any deviations with reasons.
-    Follow the repository execution contract.
     The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
     You must write a canonical execution report under `docs/reports/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
@@ -520,6 +515,14 @@ run:
     ```
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
+  # Static: Code execution skill — injected ONLY for plan/flow_plan/lightweight modes
+  # Not included in skill or commit paths to avoid instruction conflicts.
+  coding_task: |
+    Follow plan steps strictly, verify each step before proceeding.
+    Write clean code with tests, run verification after changes.
+    Document any deviations with reasons.
+    Follow the repository execution contract.
 
 
   # Static: Custom run prompt (optional prefix)
