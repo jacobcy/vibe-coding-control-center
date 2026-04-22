@@ -303,15 +303,11 @@ class CodeagentBackend:
         ) -> None:
             """Read from stream in chunks, accumulate, and write to output.
 
-            Filters out uv installation noise by waiting for "-> " marker.
-            All output before the marker is discarded; everything from the
-            first marker onwards is shown and captured. If no marker is found,
-            outputs everything (backward compatibility).
+            Filters explicit uv/bootstrap noise lines but otherwise streams
+            immediately so tmux-backed runs stay visible in real time.
             """
             import codecs
 
-            found_marker = False
-            pre_marker_buffer = ""
             recent_text = ""
             decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
@@ -349,39 +345,40 @@ class CodeagentBackend:
                     proc.kill()
                     break
 
-                if not found_marker:
-                    pre_marker_buffer += chunk
-                    if "-> " in pre_marker_buffer:
-                        found_marker = True
-                        # Find the first instance of the marker
-                        marker_pos = pre_marker_buffer.find("-> ")
-                        # Output everything from the marker onwards
-                        good_stuff = pre_marker_buffer[marker_pos:]
-                        accumulator.append(good_stuff)
-                        output_file.write(good_stuff)
-                        output_file.flush()
-                        pre_marker_buffer = ""  # Clear buffer
-                else:
-                    # After marker found, output everything immediately
-                    accumulator.append(chunk)
-                    output_file.write(chunk)
-                    output_file.flush()
+                if any(
+                    noise in chunk
+                    for noise in (
+                        "[2m",
+                        "Uninstalled",
+                        "Installing wheels",
+                        "Installed 1 package",
+                        "░",
+                        "█",
+                    )
+                ):
+                    continue
+
+                accumulator.append(chunk)
+                output_file.write(chunk)
+                output_file.flush()
 
             # Finalize decoding (handles any trailing bytes)
             final_chunk = decoder.decode(b"", final=True)
             if final_chunk:
-                if not found_marker:
-                    pre_marker_buffer += final_chunk
-                else:
+                if not any(
+                    noise in final_chunk
+                    for noise in (
+                        "[2m",
+                        "Uninstalled",
+                        "Installing wheels",
+                        "Installed 1 package",
+                        "░",
+                        "█",
+                    )
+                ):
                     accumulator.append(final_chunk)
                     output_file.write(final_chunk)
                     output_file.flush()
-
-            # Fallback if no marker was found: output everything we buffered
-            if not found_marker and pre_marker_buffer:
-                accumulator.append(pre_marker_buffer)
-                output_file.write(pre_marker_buffer)
-                output_file.flush()
 
         stdout_chunks: list[str] = []
         stderr_chunks: list[str] = []

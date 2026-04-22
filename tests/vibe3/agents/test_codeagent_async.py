@@ -126,7 +126,7 @@ class TestStartAsyncCommand:
                     stdout="",
                     stderr="no session",
                 )
-            if cmd[:3] == ["tmux", "new-session", "-d"]:
+            if cmd[:2] in (["tmux", "new-session"], ["tmux", "respawn-pane"]):
                 tmux_commands.append(cmd)
                 return subprocess.CompletedProcess(
                     args=cmd,
@@ -166,12 +166,15 @@ class TestStartAsyncCommand:
             )
 
         assert tmux_commands
-        final_cmd = tmux_commands[0]
-        assert "env" in final_cmd
-        assert "VIBE3_ASYNC_CHILD=1" in final_cmd
-        assert "VIBE3_MANAGER_BACKEND=opencode" in final_cmd
-        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in final_cmd
-        assert "src/vibe3/cli.py" in final_cmd
+        respawn_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "respawn-pane"]
+        )
+        payload = respawn_cmd[-1]
+        assert "env" in payload
+        assert "VIBE3_ASYNC_CHILD=1" in payload
+        assert "VIBE3_MANAGER_BACKEND=opencode" in payload
+        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in payload
+        assert "src/vibe3/cli.py" in payload
 
     def test_start_async_command_preserves_path_for_tmux_session(
         self, monkeypatch, tmp_path
@@ -193,7 +196,7 @@ class TestStartAsyncCommand:
                     stdout="",
                     stderr="no session",
                 )
-            if cmd[:3] == ["tmux", "new-session", "-d"]:
+            if cmd[:2] in (["tmux", "new-session"], ["tmux", "respawn-pane"]):
                 tmux_commands.append(cmd)
                 return subprocess.CompletedProcess(
                     args=cmd,
@@ -222,10 +225,13 @@ class TestStartAsyncCommand:
             )
 
         assert tmux_commands
-        final_cmd = tmux_commands[0]
-        assert "env" in final_cmd
-        assert f"PATH={test_path}" in final_cmd
-        assert "VIBE3_ASYNC_CHILD=1" in final_cmd
+        respawn_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "respawn-pane"]
+        )
+        payload = respawn_cmd[-1]
+        assert "env" in payload
+        assert f"PATH={test_path}" in payload
+        assert "VIBE3_ASYNC_CHILD=1" in payload
 
     def test_start_async_command_rejects_duplicate_l3_session(
         self, monkeypatch, tmp_path
@@ -365,10 +371,14 @@ class TestStartAsyncCommand:
         pipe_pane_cmd = next(
             cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "pipe-pane"]
         )
+        respawn_cmd = next(
+            cmd for cmd in tmux_commands if cmd[:2] == ["tmux", "respawn-pane"]
+        )
         assert str(handle.log_path) in pipe_pane_cmd[-1]
         assert "Uninstalled" in pipe_pane_cmd[-1]
         assert "Installing wheels" in pipe_pane_cmd[-1]
         assert "skip_prompt = 1" in pipe_pane_cmd[-1]
+        assert respawn_cmd[-1].startswith("exec ")
 
 
 class TestRunStreamingAndEdgeCases:

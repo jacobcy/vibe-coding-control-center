@@ -72,11 +72,7 @@ class TestCodeagentBackend:
     def test_run_subprocess_filters_installation_noise(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """_run_subprocess filters out uv installation progress noise.
-
-        All output before '-> ' marker is discarded; only output after
-        the marker is shown and captured.
-        """
+        """_run_subprocess filters uv noise but streams other output immediately."""
 
         class FakeStream:
             def __init__(self, chunks: list[bytes]) -> None:
@@ -104,7 +100,7 @@ class TestCodeagentBackend:
                             b"[1/1] vibe3==3.0.0\n"
                         ),
                         b"Installed 1 package in 6ms\n",
-                        b"-> Executing with gemini...\n",
+                        b"normal preface\n",
                         b"[codeagent-wrapper]\n",
                         b"  Backend: gemini\n",
                         b"line one\n",
@@ -132,15 +128,14 @@ class TestCodeagentBackend:
         assert "Installing wheels" not in captured.out
         assert "Installed 1 package" not in captured.out
 
-        # Verify marker itself IS retained (regression fix)
-        assert "-> " in captured.out
-        assert "Executing with gemini...\n" in captured.out
+        # Non-noise output should still stream immediately without marker gating
+        assert "normal preface\n" in captured.out
         assert "[codeagent-wrapper]\n" in captured.out
         assert "Backend: gemini\n" in captured.out
         assert "line one\n" in captured.out
 
-        # Verify complete output after marker captured in return value
-        assert "-> Executing with gemini...\n" in result.stdout
+        # Verify complete non-noise output captured in return value
+        assert "normal preface\n" in result.stdout
         assert "[codeagent-wrapper]\n" in result.stdout
         assert "Backend: gemini\n" in result.stdout
         assert "line one\n" in result.stdout

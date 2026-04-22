@@ -330,14 +330,14 @@ def spawn_tmux_command(
                 + command
             )
 
-    # Launch directly in tmux PTY
-    tmux_args = ["tmux", "new-session", "-d", "-s", session_id]
+    # Start an idle tmux shell first so we can attach pipe-pane before the
+    # real command begins emitting output. Otherwise we can miss the opening
+    # <agent-prompt> marker and leak prompt body into repo-local logs.
+    tmux_args = ["tmux", "new-session", "-d", "-s", session_id, "-c", str(project_root)]
     if keep_alive_seconds > 0:
-        # Use remain-on-exit so pane stays open after process exits
         tmux_args += ["-e", "TMUX_PANE_REMAIN=1"]
-    tmux_args += final_command
 
-    subprocess.run(tmux_args, cwd=project_root, check=True)
+    subprocess.run(tmux_args, check=True)
 
     if keep_alive_seconds > 0:
         # Set remain-on-exit option explicitly as well
@@ -354,6 +354,22 @@ def spawn_tmux_command(
     subprocess.run(
         ["tmux", "pipe-pane", "-t", session_id, pipe_cmd],
         check=False,
+    )
+
+    command_str = f"VIBE3_LOG_PATH={shlex.quote(str(log_path))} exec {
+        shlex.join(final_command)}"
+    subprocess.run(
+        [
+            "tmux",
+            "respawn-pane",
+            "-k",
+            "-t",
+            session_id,
+            "-c",
+            str(project_root),
+            command_str,
+        ],
+        check=True,
     )
 
     return AsyncExecutionHandle(
