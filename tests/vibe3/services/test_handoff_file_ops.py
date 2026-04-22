@@ -382,10 +382,13 @@ class TestHandoffRecordAPIs:
             verdict="PASS",
         )
 
+        from unittest.mock import ANY
+
         mock_store.update_flow_state.assert_called_with(
             "feature/test-branch",
             audit_ref="docs/reports/agent-authored-audit.md",
             reviewer_actor="test-actor",
+            latest_verdict=ANY,
         )
         mock_store.add_event.assert_called_once()
         call_args = mock_store.add_event.call_args
@@ -408,10 +411,13 @@ class TestHandoffRecordAPIs:
             verdict="PASS",
         )
 
+        from unittest.mock import ANY
+
         mock_store.update_flow_state.assert_called_with(
             "feature/test-branch",
             audit_ref="docs/reports/audit.md",
             reviewer_actor="test-actor",
+            latest_verdict=ANY,
         )
         call_args = mock_store.add_event.call_args
         assert call_args[1]["refs"]["ref"] == "docs/reports/audit.md"

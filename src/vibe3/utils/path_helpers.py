@@ -4,18 +4,79 @@ from pathlib import Path
 from typing import Protocol
 
 
-class _GitClientProtocol(Protocol):
+class GitClientProtocol(Protocol):
     """Protocol for git client operations."""
 
     def get_git_common_dir(self) -> str: ...
     def get_worktree_root(self) -> str: ...
     def find_worktree_path_for_branch(self, branch: str) -> Path | None: ...
+    def get_current_branch(self) -> str: ...
+
+
+def get_git_common_dir(git_client: GitClientProtocol | None = None) -> str:
+    """Get the shared git common directory (.git/)."""
+    if git_client is None:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+    try:
+        return git_client.get_git_common_dir()
+    except Exception:
+        return ""
+
+
+def get_worktree_root(git_client: GitClientProtocol | None = None) -> str:
+    """Get the current worktree root."""
+    if git_client is None:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+    try:
+        return git_client.get_worktree_root()
+    except Exception:
+        return ""
+
+
+def find_worktree_path_for_branch(
+    branch: str, git_client: GitClientProtocol | None = None
+) -> Path | None:
+    """Find the worktree path for a specific branch."""
+    if git_client is None:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+    try:
+        return git_client.find_worktree_path_for_branch(branch)
+    except Exception:
+        return None
+
+
+class BranchBoundGitClient:
+    """Git client shim that pins operations to an explicit branch."""
+
+    def __init__(self, branch: str) -> None:
+        from vibe3.clients.git_client import GitClient
+
+        self._branch = branch
+        self._delegate = GitClient()
+
+    def get_current_branch(self) -> str:
+        return self._branch
+
+    def get_git_common_dir(self) -> str:
+        return self._delegate.get_git_common_dir()
+
+    def get_worktree_root(self) -> str:
+        return self._delegate.get_worktree_root()
+
+    def find_worktree_path_for_branch(self, branch: str) -> Path | None:
+        return self._delegate.find_worktree_path_for_branch(branch)
 
 
 def normalize_ref_path(
     ref_value: str,
     branch: str,
-    git_client: _GitClientProtocol | None = None,
+    git_client: GitClientProtocol | None = None,
 ) -> str:
     """Normalize a path for storage in the database.
 

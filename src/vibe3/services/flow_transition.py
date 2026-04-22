@@ -12,13 +12,13 @@ from typing import Self, cast
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_write_mixin import FlowWriteMixin
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.signature_service import SignatureService
+from vibe3.utils.path_helpers import GitClientProtocol
 
 
 class FlowTransitionMixin(FlowWriteMixin):
@@ -28,11 +28,11 @@ class FlowTransitionMixin(FlowWriteMixin):
     - _is_main_branch (protected branch check)
     - create_flow (flow creation)
     - get_flow_status (flow status query)
-    - SAFE_BRANCH_PREFIX constant
+    SAFE_BRANCH_PREFIX constant
     """
 
     store: SQLiteClient
-    git_client: GitClient
+    git_client: GitClientProtocol
     config: VibeConfig
 
     def ensure_flow_for_branch(

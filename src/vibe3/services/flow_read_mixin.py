@@ -1,21 +1,21 @@
 """Flow read operations mixin."""
 
-from typing import Literal, Self, cast
+from typing import Literal, Self
 
 from loguru import logger
 from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
+from vibe3.utils.path_helpers import GitClientProtocol, get_git_common_dir
 
 
 class FlowReadMixin:
     """Mixin providing flow read operations."""
 
     store: SQLiteClient
-    git_client: GitClient
+    git_client: GitClientProtocol
 
     def get_flow_state(self: Self, branch: str) -> FlowState | None:
         """Get flow state for branch.
@@ -150,9 +150,5 @@ class FlowReadMixin:
         return {"state": status, "events": events}
 
     def get_git_common_dir(self: Self) -> str:
-        """Get git common directory path.
-
-        Returns:
-            Path to git common directory
-        """
-        return cast(str, self.git_client.get_git_common_dir())
+        """Get git common directory path."""
+        return get_git_common_dir(self.git_client)

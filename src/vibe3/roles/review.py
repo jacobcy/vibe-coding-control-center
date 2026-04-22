@@ -45,7 +45,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
-from vibe3.services.verdict_service import VerdictService
+from vibe3.utils.path_helpers import BranchBoundGitClient
 
 REVIEWER_ROLE = TriggerableRoleDefinition(
     name="reviewer",
@@ -179,21 +179,10 @@ class ReviewRunResult:
     issue_number: int | None
 
 
-class _BranchBoundGitClient(GitClient):
-    """Git client shim that pins handoff writes to an explicit branch."""
-
-    def __init__(self, branch: str) -> None:
-        super().__init__()
-        self._branch = branch
-
-    def get_current_branch(self) -> str:
-        return self._branch
-
-
 def _build_handoff_service(branch: str | None) -> HandoffService:
     if not branch:
         return HandoffService()
-    return HandoffService(git_client=_BranchBoundGitClient(branch))
+    return HandoffService(git_client=BranchBoundGitClient(branch))
 
 
 def _create_minimal_audit_artifact(
@@ -361,12 +350,6 @@ def finalize_review_output(
                     branch,
                 )
             )
-        # Record as system-auto audit_recorded event
-        _build_handoff_service(branch).record_audit(
-            audit_ref=audit_ref,
-            actor=actor,
-            is_system_auto=True,
-        )
         logger.bind(domain="review", action="finalize", audit_ref=audit_ref).info(
             "System auto-generated minimal audit"
         )
@@ -392,17 +375,18 @@ def finalize_review_output(
         # System-auto path: stdout and audit file are equivalent
         verdict = _resolve_review_verdict(review_output, audit_ref=audit_ref)
 
-    # Write verdict to handoff chain + flow state (verdict_recorded event)
+    # Write handoff audit + verdict to authoritative sources
     try:
-        VerdictService(
-            git_client=_BranchBoundGitClient(branch) if branch else None
-        ).write_verdict(
+        handoff_svc = _build_handoff_service(branch)
+        handoff_svc.record_audit(
+            audit_ref=audit_ref,
+            actor=actor,
             verdict=verdict,  # type: ignore[arg-type]
-            branch=branch,
+            is_system_auto=not reviewer_wrote_audit,
         )
     except Exception as exc:
         logger.bind(domain="review", action="finalize").warning(
-            f"Failed to write verdict: {exc}"
+            f"Failed to record audit handoff: {exc}"
         )
 
     return audit_ref, verdict

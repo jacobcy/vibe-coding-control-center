@@ -1,9 +1,8 @@
 """Handoff service implementation."""
 
 import shutil
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
 
 from loguru import logger
 
@@ -13,35 +12,12 @@ from vibe3.exceptions import GitError, UserError
 from vibe3.models.flow import FlowEvent
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
-
-
-class _GitClientProtocol(Protocol):
-    """Protocol for git client operations."""
-
-    def get_current_branch(self) -> str: ...
-    def get_git_common_dir(self) -> str: ...
-    def get_worktree_root(self) -> str: ...
-    def find_worktree_path_for_branch(self, branch_name: str) -> Path | None: ...
-
-
-class _BranchBoundGitClient:
-    """Git client shim that pins handoff artifact writes to a target branch."""
-
-    def __init__(self, branch: str) -> None:
-        self._branch = branch
-        self._delegate = GitClient()
-
-    def get_current_branch(self) -> str:
-        return self._branch
-
-    def get_git_common_dir(self) -> str:
-        return self._delegate.get_git_common_dir()
-
-    def get_worktree_root(self) -> str:
-        return self._delegate.get_worktree_root()
-
-    def find_worktree_path_for_branch(self, branch_name: str) -> Path | None:
-        return self._delegate.find_worktree_path_for_branch(branch_name)
+from vibe3.utils.path_helpers import (
+    BranchBoundGitClient,
+    GitClientProtocol,
+    get_git_common_dir,
+    normalize_ref_path,
+)
 
 
 class HandoffService:
@@ -50,7 +26,7 @@ class HandoffService:
     def __init__(
         self,
         store: SQLiteClient | None = None,
-        git_client: _GitClientProtocol | None = None,
+        git_client: GitClientProtocol | None = None,
     ) -> None:
         """Initialize handoff service.
 
@@ -73,7 +49,7 @@ class HandoffService:
         Raises:
             SystemError: If directory creation fails due to filesystem issues
         """
-        git_dir = self.git_client.get_git_common_dir()
+        git_dir = get_git_common_dir(self.git_client)
         branch = self.git_client.get_current_branch()
 
         handoff_dir = get_branch_handoff_dir(git_dir, branch)
@@ -128,6 +104,7 @@ class HandoffService:
 
         # Ensure directory exists (idempotent)
         handoff_dir = self.ensure_handoff_dir()
+        branch = self.git_client.get_current_branch()
         handoff_path = handoff_dir / "current.md"
 
         if handoff_path.exists():
@@ -142,7 +119,7 @@ class HandoffService:
             )
 
         # Create minimal template
-        template = self._get_handoff_template()
+        template = _get_handoff_template(branch)
         handoff_path.write_text(template, encoding="utf-8")
         logger.bind(path=str(handoff_path)).success("Created handoff file")
 
@@ -236,7 +213,7 @@ class HandoffService:
         else:
             artifact_service = HandoffService(
                 store=self.store,
-                git_client=_BranchBoundGitClient(branch),
+                git_client=BranchBoundGitClient(branch),
             )
 
         handoff_dir = artifact_service.ensure_handoff_dir()
@@ -359,9 +336,31 @@ class HandoffService:
             flow_updates["next_step"] = next_step
         if blocked_by:
             flow_updates["blocked_by"] = blocked_by
-        # Note: verdict is NOT a flow_state field, only recorded in event_refs
 
-        # 3. Build the update block content.
+        # 3. Integrate VerdictService for audit verdicts
+        if verdict:
+            from vibe3.services.verdict_service import VerdictService
+
+            verdict_svc = VerdictService(
+                store=self.store,
+                git_client=BranchBoundGitClient(branch),
+                handoff_service=self,
+            )
+            from vibe3.models.verdict import VerdictRecord
+
+            role = verdict_svc._extract_role_from_actor(effective_actor)
+            record = VerdictRecord(
+                verdict=verdict,  # type: ignore
+                actor=effective_actor,
+                role=role,
+                timestamp=datetime.now(UTC),
+                reason=next_step or f"Recorded {ref_kind} reference",
+                issues=blocked_by,
+                flow_branch=branch,
+            )
+            flow_updates["latest_verdict"] = record.model_dump_json()
+
+        # 4. Build the update block content.
         message = f"verdict: {verdict or 'UNKNOWN'}"
         message += f"\nRecorded {ref_kind} reference: {ref_value}"
         if next_step:
@@ -369,7 +368,7 @@ class HandoffService:
         if blocked_by:
             message += f"\nBlocked By: {blocked_by}"
 
-        # 4. Update flow state
+        # 5. Update flow state
         self.store.update_flow_state(branch, **flow_updates)
 
         # 4b. For indicate: always persist latest_indicate_action in flow_state.
@@ -380,12 +379,12 @@ class HandoffService:
                 branch, latest_indicate_action=action  # None clears the field
             )
 
-        # 5. Build event refs (include verdict for audit events)
+        # 7. Build event refs (include verdict for audit events)
         event_refs: dict[str, str] = {"ref": ref_value}
         if verdict:
             event_refs["verdict"] = verdict
 
-        # 6. Persist event
+        # 8. Persist event
         # Use "audit_recorded" for audit events (system parsing behavior)
         # Use "handoff_{kind}" for plan/report events (agent handoff behavior)
         event_type = (
@@ -426,8 +425,6 @@ class HandoffService:
 
     def _normalize_ref_value(self, branch: str, ref_value: str) -> str:
         """Prefer worktree-relative refs for files under the branch worktree."""
-        from vibe3.utils.path_helpers import normalize_ref_path
-
         return normalize_ref_path(ref_value, branch, self.git_client)
 
     def record_plan(
@@ -508,15 +505,6 @@ class HandoffService:
         return self._record_ref(
             "indicate", indicate_ref, next_step, blocked_by, actor, action=action
         )
-
-    def _get_handoff_template(self) -> str:
-        """Get minimal handoff template.
-
-        Returns:
-            Template string for new handoff files
-        """
-        branch = self.git_client.get_current_branch()
-        return _get_handoff_template(branch)
 
 
 # ---------------------------------------------------------------------------
