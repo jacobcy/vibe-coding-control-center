@@ -336,7 +336,7 @@ class TestRunStreamingAndEdgeCases:
         mock_result.stderr = ""
 
         with patch.object(
-            CodeagentBackend, "_run_subprocess", return_value=mock_result
+            CodeagentBackend, "_run_subprocess", return_value=(mock_result, None)
         ):
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
@@ -361,7 +361,7 @@ class TestRunStreamingAndEdgeCases:
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
-        mock_run.return_value = mock_result
+        mock_run.return_value = (mock_result, None)
 
         backend = CodeagentBackend()
         result = backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))
@@ -379,7 +379,7 @@ class TestRunStreamingAndEdgeCases:
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
-        mock_run.return_value = mock_result
+        mock_run.return_value = (mock_result, None)
 
         backend = CodeagentBackend()
         backend.run("prompt body", AgentOptions(agent="vibe-reviewer"))

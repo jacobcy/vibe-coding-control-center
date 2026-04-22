@@ -17,7 +17,7 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     mock_cp.returncode = 0
     mock_cp.stdout = "SESSION_ID: 262f0fea-eacb-4223-b842-b5b5097f94e8\nSuccess"
     mock_cp.stderr = ""
-    mock_run.return_value = mock_cp
+    mock_run.return_value = (mock_cp, None)
 
     options = AgentOptions(agent="vibe-planner")
     session_id = "262f0fea-eacb-4223-b842-b5b5097f94e8"
@@ -57,7 +57,7 @@ def test_codeagent_backend_new_session(mock_tempfile, mock_run):
     mock_cp.returncode = 0
     mock_cp.stdout = "SESSION_ID: 12345678-1234-1234-1234-1234567890ab\nSuccess"
     mock_cp.stderr = ""
-    mock_run.return_value = mock_cp
+    mock_run.return_value = (mock_cp, None)
 
     options = AgentOptions(agent="vibe-planner")
 

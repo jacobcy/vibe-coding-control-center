@@ -50,7 +50,7 @@ class TestCodeagentBackend:
                 return self.returncode
 
         with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
-            result = CodeagentBackend._run_subprocess(
+            result, _ = CodeagentBackend._run_subprocess(
                 ["codeagent-wrapper", "run"],
                 project_root=str(tmp_path),
                 timeout_seconds=30,
@@ -105,7 +105,7 @@ class TestCodeagentBackend:
                 return self.returncode
 
         with patch("vibe3.agents.backends.codeagent.subprocess.Popen", FakePopen):
-            result = CodeagentBackend._run_subprocess(
+            result, _ = CodeagentBackend._run_subprocess(
                 ["codeagent-wrapper", "run"],
                 project_root=str(tmp_path),
                 timeout_seconds=30,
@@ -195,7 +195,7 @@ class TestCodeagentBackend:
                 repo_models,
             ),
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(
                 agent="vibe-reviewer",
             )
@@ -234,7 +234,7 @@ class TestCodeagentBackend:
                 repo_models,
             ),
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             result = backend.run("prompt body", AgentOptions(agent="unknown-preset"))
 
@@ -259,7 +259,7 @@ class TestCodeagentBackend:
                 repo_models,
             ),
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
             result = backend.run("prompt body", options)
@@ -279,7 +279,7 @@ class TestCodeagentBackend:
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
@@ -301,10 +301,12 @@ class TestCodeagentBackend:
         )
         captured_prompt: dict[str, str] = {}
 
-        def fake_run_subprocess(command, *, project_root, timeout_seconds):
+        def fake_run_subprocess(
+            command, *, project_root, timeout_seconds, role="executor"
+        ):
             prompt_file = Path(command[command.index("--prompt-file") + 1])
             captured_prompt["content"] = prompt_file.read_text()
-            return mock_result
+            return mock_result, None
 
         with (
             patch(
@@ -332,7 +334,7 @@ class TestCodeagentBackend:
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
@@ -350,7 +352,7 @@ class TestCodeagentBackend:
         mock_result.stderr = "wrapper stderr details\n"
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
 
@@ -394,7 +396,7 @@ Traceback (most recent call last):
             patch.object(CodeagentBackend, "_run_subprocess") as mock_run,
             patch("builtins.print") as mock_print,
         ):
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
 
             with pytest.raises(AgentExecutionError) as exc_info:
@@ -426,7 +428,7 @@ Traceback (most recent call last):
             return_value=VibeConfig(),
         ):
             with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-                mock_run.side_effect = [invalid_resume, fresh_success]
+                mock_run.side_effect = [(invalid_resume, None), (fresh_success, None)]
                 backend = CodeagentBackend()
 
                 result = backend.run(
@@ -459,7 +461,7 @@ Traceback (most recent call last):
             return_value=VibeConfig(),
         ):
             with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-                mock_run.return_value = hard_failure
+                mock_run.return_value = (hard_failure, None)
                 backend = CodeagentBackend()
 
                 with pytest.raises(AgentExecutionError):
@@ -514,7 +516,7 @@ Traceback (most recent call last):
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             options = AgentOptions(agent="vibe-reviewer")
             backend = CodeagentBackend()
             backend.run("my prompt file content", options, task="custom task")
@@ -541,7 +543,7 @@ Traceback (most recent call last):
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
@@ -559,7 +561,7 @@ Traceback (most recent call last):
         mock_result.stderr = ""
 
         with patch.object(CodeagentBackend, "_run_subprocess") as mock_run:
-            mock_run.return_value = mock_result
+            mock_run.return_value = (mock_result, None)
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
