@@ -42,6 +42,11 @@ def get_kind_actor_key(kind: "HandoffKind") -> str:
     return KIND_TO_ACTOR_KEY[kind]
 
 
+def get_optional_kind_actor_key(kind: "HandoffKind") -> str | None:
+    """Get the actor state key for a handoff kind when one exists."""
+    return KIND_TO_ACTOR_KEY.get(kind)
+
+
 # Lazy import to avoid circular dependencies
 def _get_block_functions() -> dict[str, Callable[..., None]]:
     """Get role-specific block functions (lazy import to avoid cycles)."""

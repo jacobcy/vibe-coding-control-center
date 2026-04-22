@@ -11,7 +11,7 @@ from vibe3.execution.actor_support import (
     format_agent_actor,
     resolve_actor_backend_model,
 )
-from vibe3.execution.role_policy import get_kind_actor_key
+from vibe3.execution.role_policy import get_optional_kind_actor_key
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
@@ -164,9 +164,10 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         inferred_log_path = resolve_async_log_path(log_dir, record.session_id)
         refs["log_path"] = str(inferred_log_path)
 
-    flow_state_updates: dict[str, object] = {
-        get_kind_actor_key(record.kind): actor,
-    }
+    flow_state_updates: dict[str, object] = {}
+    actor_key = get_optional_kind_actor_key(record.kind)
+    if actor_key is not None:
+        flow_state_updates[actor_key] = actor
 
     # Map handoff kind to event type
     # - "run"     -> "handoff_report"  (executor output artifact)

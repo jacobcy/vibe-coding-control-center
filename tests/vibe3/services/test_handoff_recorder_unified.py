@@ -277,3 +277,31 @@ def test_record_handoff_unified_review_prefers_sanitized_content_over_metadata(
 
     refs = mock_persist.call_args.kwargs["refs"]
     assert refs["verdict"] == "MAJOR"
+
+
+@patch("vibe3.services.handoff_service.HandoffService.persist_artifact_event")
+@patch("vibe3.services.handoff_service.HandoffService.create_artifact")
+def test_record_handoff_unified_for_indicate_skips_missing_actor_key(
+    mock_create, mock_persist
+) -> None:
+    artifact = Path("/tmp/indicate-2026-03-26T10:00:00.md")
+    mock_create.return_value = ("task/issue-349", artifact)
+
+    result = record_handoff_unified(
+        HandoffRecord(
+            kind="indicate",
+            content="# manager handoff",
+            options=AgentOptions(backend="gemini", model="gemini-3-flash-preview"),
+            session_id="sess-indicate",
+            metadata={"next_step": "dispatch executor"},
+            branch="task/issue-349",
+        )
+    )
+
+    assert result == artifact
+    kwargs = mock_persist.call_args.kwargs
+    assert kwargs["event_type"] == "handoff_indicate"
+    assert kwargs["flow_state_updates"] == {}
+    assert kwargs["refs"]["backend"] == "gemini"
+    assert kwargs["refs"]["model"] == "gemini-3-flash-preview"
+    assert kwargs["refs"]["next_step"] == "dispatch executor"
