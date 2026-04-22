@@ -97,9 +97,6 @@ code_limits:
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
 
       # Roles 层 —— 允许 550-570
-      - path: "src/vibe3/roles/review.py"
-        limit: 570
-        reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/run.py"
         limit: 450
         reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、plan 解析"
