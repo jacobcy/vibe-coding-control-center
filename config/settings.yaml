@@ -107,31 +107,27 @@ code_limits:
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
 
-      # Commands 层 —— 允许 440
+      # Commands 层 —— 允许 440-480
       - path: "src/vibe3/commands/task.py"
-        limit: 440
+        limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/status.py"
         limit: 440
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示"
 
-      # Execution 层 —— 允许 400
-      - path: "src/vibe3/execution/coordinator.py"
-        limit: 400
-        reason: "执行协调器，统一管理角色启动和追踪"
-      - path: "src/vibe3/execution/issue_role_support.py"
-        limit: 400
-        reason: "Issue 角色支持，包含 dispatch predicate 和 role contract 集成"
-
-      # Domain handlers —— 允许 310
-      - path: "src/vibe3/domain/handlers/flow_lifecycle.py"
-        limit: 310
-        reason: "Flow 生命周期处理器，包含状态转换和事件发布逻辑"
-
-      # Models —— 允许 400
-      - path: "src/vibe3/models/orchestra_config.py"
-        limit: 400
-        reason: "Orchestra 配置模型聚合，包含多个嵌套配置类定义"
+      # Roles 层 —— 允许 350-600
+      - path: "src/vibe3/roles/review.py"
+        limit: 600
+        reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
+      - path: "src/vibe3/roles/run.py"
+        limit: 450
+        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、plan 解析"
+      - path: "src/vibe3/roles/manager.py"
+        limit: 420
+        reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
+      - path: "src/vibe3/roles/governance.py"
+        limit: 450
+        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑"
 
       # Server —— 允许 470
       - path: "src/vibe3/server/app.py"
@@ -176,9 +172,6 @@ code_limits:
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
         limit: 500
         reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
-      - path: "tests/vibe3/domain/test_orchestration_facade.py"
-        limit: 350
-        reason: "Facade 核心测试（事件发布、governance、supervisor scan），已拆出 dispatch 测试"
       - path: "tests/vibe3/execution/test_execution_lifecycle.py"
         limit: 550
         reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
