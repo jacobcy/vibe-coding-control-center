@@ -94,9 +94,14 @@ def show(
             try:
                 git_common = Path(service.get_git_common_dir())
                 if git_common:
-                    potential = git_common / artifact
-                    if potential.exists():
-                        resolved_artifact = potential
+                    candidates = [
+                        git_common / artifact,
+                        git_common / "vibe3" / "handoff" / artifact,
+                    ]
+                    for potential in candidates:
+                        if potential.exists():
+                            resolved_artifact = potential
+                            break
             except Exception:
                 pass
 
