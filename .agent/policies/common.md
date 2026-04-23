@@ -10,7 +10,7 @@
 - Python 相关命令必须走 `uv run`，不要直接用 `python` 或 `pip`。
 - 当前主线以 V3 和治理规则为中心；如遇历史 shell 入口，只按兼容现场处理，不把它当默认实现路径。
 - 多 worktree 并行开发时，共享运行时数据位于主仓库 git common dir，也就是主仓库 `.git`，不是当前 worktree 自己的局部 `.git`。
-- 当前 flow 的结构化 handoff 以 `vibe3 handoff show` 为准，不要先读 `.agent/context/task.md`。
+- 当前 flow 的结构化 handoff 以 `vibe3 handoff status` 为准，不要先读 `.agent/context/task.md`。
 - 当前 flow 的共享 handoff 文件路径模式为 `.git/vibe3/handoff/<branch-safe>-<hash>/current.md`。
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
@@ -20,7 +20,7 @@
 开始任何工作（plan/run/review）前，必须先读取当前 flow 的 manager 交接指令：
 
 ```bash
-uv run python src/vibe3/cli.py handoff show $(git branch --show-current)
+uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
 ```
 
 Manager 可能已写入质量审查意见、具体修复要求、重点关注区域等指令。
