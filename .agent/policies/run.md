@@ -21,7 +21,7 @@
 ### 先看影响，再改实现
 
 执行前优先用项目工具确认影响面：
-- `uv run python src/vibe3/cli.py handoff show`
+- `uv run python src/vibe3/cli.py handoff status`
 - `vibe3 inspect symbols`
 - `vibe3 inspect structure`
 - `vibe3 inspect base --json`

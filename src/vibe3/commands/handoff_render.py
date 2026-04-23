@@ -12,6 +12,20 @@ from vibe3.utils.path_helpers import sanitize_event_detail_paths
 # Preview limit for update messages
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
+_HANDOFF_PREFIX = "vibe3/handoff/"
+
+
+def _to_handoff_cmd(path: str) -> str:
+    """Convert a handoff artifact path to a usable CLI command.
+
+    vibe3/handoff/task-xxx/run-yyy.md -> vibe3 handoff show task-xxx/run-yyy.md
+    Other paths are returned as-is (relative path).
+    """
+    if path.startswith(_HANDOFF_PREFIX):
+        key = path[len(_HANDOFF_PREFIX) :]
+        return f"vibe3 handoff show {key}"
+    return path
+
 
 def _render_agent_chain(
     state: FlowState,
@@ -134,25 +148,38 @@ def _render_handoff_events(events: list, worktree_root: str | None = None) -> No
         console.print("[dim]  no handoff events[/]")
         return
 
+    display_names = {
+        "handoff_plan": "Plan Handoff",
+        "handoff_report": "Run Handoff",
+        "handoff_run": "Run Handoff",
+        "handoff_audit": "Audit Handoff",
+        "handoff_indicate": "Manager Handoff",
+        "plan_recorded": "Plan Auto-Recorded",
+        "run_recorded": "Run Auto-Recorded",
+        "audit_recorded": "Audit Auto-Recorded",
+    }
+
     for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
+        event_name = display_names.get(event.event_type, event.event_type)
         console.print(
-            f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{event.actor}[/]"
+            f"[dim]{time_str}[/]  [magenta]{event_name}[/]  [dim]{event.actor}[/]"
         )
         if event.detail:
-            console.print(f"  {
-                sanitize_event_detail_paths(event.detail, event.refs, worktree_root)
-                }")
+            sanitized = sanitize_event_detail_paths(
+                event.detail, event.refs, worktree_root
+            )
+            console.print(f"  {sanitized}")
         if event.refs:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:
                     display_f = resolve_ref_path(f, worktree_root)
-                    console.print(f"  [dim]- {display_f}[/]")
+                    console.print(f"  [dim]- {_to_handoff_cmd(display_f)}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             if ref:
                 display_ref = resolve_ref_path(ref, worktree_root)
-                console.print(f"  [dim]- {display_ref}[/]")
+                console.print(f"  [dim]- {_to_handoff_cmd(display_ref)}[/]")
         console.print()
 
 

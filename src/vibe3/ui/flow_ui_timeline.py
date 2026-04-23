@@ -56,6 +56,8 @@ _EVENT_COLOR: dict[str, str] = {
     "handoff_plan": "blue",
     "handoff_report": "blue",
     "handoff_run": "blue",  # backward-compat: old event type
+    "plan_recorded": "dim blue",
+    "run_recorded": "dim blue",
     "handoff_audit": "magenta bold",  # reviewer-initiated authoritative audit
     "audit_recorded": "magenta",  # legacy: system auto-generated / backward-compat
     "handoff_indicate": "cyan bold",
@@ -70,6 +72,8 @@ _ARTIFACT_EVENT_TYPES = {
     "handoff_plan",
     "handoff_report",
     "handoff_run",
+    "plan_recorded",
+    "run_recorded",
     "handoff_audit",
     "handoff_indicate",
     "audit_recorded",
@@ -95,6 +99,8 @@ def _format_event_type(event_type: str) -> str:
         "reviewer_dispatched": "Reviewer Dispatch",
         # Audit Events — semantic names
         "handoff_audit": "Audit Handoff",  # reviewer-initiated authoritative audit
+        "plan_recorded": "Plan Auto-Recorded",
+        "run_recorded": "Run Auto-Recorded",
         "audit_recorded": "Audit Auto-Recorded",  # system auto-generated
         "handoff_audit_fallback": "Audit Auto-Recorded",  # backward compatibility
     }
@@ -139,12 +145,8 @@ def render_milestone(
                 console.print(f"       [red dim]blocked by: {blocker_str}[/]")
 
 
-def render_flow_timeline(
-    state: FlowStatusResponse,
-    events: list[FlowEvent],
-    milestone_data: dict[str, Any] | None = None,
-    parent_branch: str | None = None,
-) -> None:
+def _render_header(state: FlowStatusResponse, parent_branch: str | None) -> None:
+    """Render flow header with status and metadata."""
     status_str = status_text(state.flow_status).plain
     console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_str})[/]")
     kv("flow_slug", state.flow_slug, 1)
@@ -164,13 +166,16 @@ def render_flow_timeline(
     if state.next_step:
         console.print(f"  [dim]next[/]        {state.next_step}")
 
-    # Filter orchestra placeholders from actor fields
-    def _filter_orchestra_actor(actor: str | None) -> str | None:
-        """Filter out orchestra: placeholder actors."""
-        if actor and actor.startswith("orchestra:"):
-            return None
-        return actor
 
+def _filter_orchestra_actor(actor: str | None) -> str | None:
+    """Filter out orchestra: placeholder actors."""
+    if actor and actor.startswith("orchestra:"):
+        return None
+    return actor
+
+
+def _render_actors(state: FlowStatusResponse) -> None:
+    """Render actor information with orchestra filtering."""
     filtered_initiated_by = _filter_orchestra_actor(state.initiated_by)
     if filtered_initiated_by:
         kv("initiated_by", filtered_initiated_by, 1)
@@ -190,7 +195,9 @@ def render_flow_timeline(
     console.print(f"    [dim]run:[/]     {run_actor}")
     console.print(f"    [dim]review:[/]  {review_actor}")
 
-    # Show blocked/failed reasons if present
+
+def _render_reasons(state: FlowStatusResponse) -> None:
+    """Show blocked/failed reasons if present."""
     if state.blocked_reason:
         console.print()
         console.print(f"  [red bold]blocked_reason:[/] [red]{state.blocked_reason}[/]")
@@ -198,8 +205,55 @@ def render_flow_timeline(
         console.print()
         console.print(f"  [red bold]failed_reason:[/] [red]{state.failed_reason}[/]")
 
-    console.print()
 
+def _render_event_refs(event: FlowEvent, worktree_root: str | None) -> None:
+    """Render event references (files, verdict, log_path, ref)."""
+    if not event.refs or not isinstance(event.refs, dict):
+        return
+
+    # Render files list
+    files = event.refs.get("files")
+    if files and isinstance(files, list):
+        for f in files:
+            console.print(f"  [dim]- {f}[/]")
+
+    # Render verdict with color coding
+    verdict = event.refs.get("verdict")
+    if verdict:
+        verdict_color = (
+            "red"
+            if verdict in ("BLOCK", "FAIL")
+            else "yellow" if verdict == "UNKNOWN" else "green"
+        )
+        console.print(f"  [{verdict_color}]verdict: {verdict}[/]")
+
+    # Render log_path for non-artifact events
+    raw_log_path = event.refs.get("log_path")
+    log_path = raw_log_path if isinstance(raw_log_path, str) else None
+    show_log_path = bool(log_path) and event.event_type not in _ARTIFACT_EVENT_TYPES
+
+    if show_log_path:
+        log_display = resolve_ref_path(log_path, worktree_root, absolute=True)
+        _log_suffix = (
+            " [dim yellow](not found)[/]" if not Path(log_display).exists() else ""
+        )
+        console.print(f"  [dim]- {log_display}[/]{_log_suffix}")
+
+    # Render ref if not already in detail
+    ref = event.refs.get("ref")
+    detail_contains_ref = bool(
+        isinstance(ref, str) and isinstance(event.detail, str) and ref in event.detail
+    )
+    if ref and isinstance(ref, str) and not show_log_path and not detail_contains_ref:
+        ref_display = resolve_ref_path(ref, worktree_root, absolute=True)
+        _ref_suffix = (
+            " [dim yellow](not found)[/]" if not Path(ref_display).exists() else ""
+        )
+        console.print(f"  [dim]- {ref_display}[/]{_ref_suffix}")
+
+
+def _render_timeline(events: list[FlowEvent], worktree_root: str | None) -> None:
+    """Render timeline events with details and references."""
     if not events:
         console.print("[dim]  no events[/]")
         return
@@ -217,74 +271,12 @@ def render_flow_timeline(
         )
         if event.detail:
             console.print(f"  {event.detail}")
-        if event.refs:
-            files = event.refs.get("files") if isinstance(event.refs, dict) else None
-            if files and isinstance(files, list):
-                for f in files:
-                    console.print(f"  [dim]- {f}[/]")
-            verdict = (
-                event.refs.get("verdict") if isinstance(event.refs, dict) else None
-            )
-            if verdict:
-                # Color verdict based on value
-                verdict_color = (
-                    "red"
-                    if verdict in ("BLOCK", "FAIL")
-                    else "yellow" if verdict == "UNKNOWN" else "green"
-                )
-                console.print(f"  [{verdict_color}]verdict: {verdict}[/]")
-            # Historical handoff events may contain runtime metadata like
-            # log_path/session_id. For artifact events, show the artifact ref.
-            raw_log_path = (
-                event.refs.get("log_path") if isinstance(event.refs, dict) else None
-            )
-            log_path = raw_log_path if isinstance(raw_log_path, str) else None
-            show_log_path: bool = (
-                bool(log_path) and event.event_type not in _ARTIFACT_EVENT_TYPES
-            )
-            if show_log_path:
-                log_display = resolve_ref_path(
-                    log_path, state.worktree_root, absolute=True
-                )
-                _log_suffix = (
-                    " [dim yellow](not found)[/]"
-                    if not Path(log_display).exists()
-                    else ""
-                )
-                console.print(f"  [dim]- {log_display}[/]{_log_suffix}")
-            ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            # Skip ref if already shown in detail (audit_ref case)
-            detail_contains_ref = bool(
-                isinstance(ref, str)
-                and isinstance(event.detail, str)
-                and ref in event.detail
-            )
-            if (
-                ref
-                and isinstance(ref, str)
-                and not show_log_path
-                and not detail_contains_ref
-            ):
-                ref_display = resolve_ref_path(ref, state.worktree_root, absolute=True)
-                _ref_suffix = (
-                    " [dim yellow](not found)[/]"
-                    if not Path(ref_display).exists()
-                    else ""
-                )
-                console.print(f"  [dim]- {ref_display}[/]{_ref_suffix}")
+        _render_event_refs(event, worktree_root)
         console.print()
 
-    if milestone_data:
-        ms_title = milestone_data["title"]
-        open_count = int(milestone_data.get("open", 0))
-        closed_count = int(milestone_data.get("closed", 0))
-        total = open_count + closed_count
-        progress = f"{closed_count}/{total} done" if total else "—"
-        console.print(
-            f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
-            "  [dim]→ vibe3 flow show --snapshot[/]"
-        )
 
+def _render_refs(state: FlowStatusResponse) -> None:
+    """Render reference links (spec_ref, plan_ref, report_ref, audit_ref)."""
     refs_shown = False
     for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:
         val = getattr(state, label, None)
@@ -301,16 +293,46 @@ def render_flow_timeline(
             )
             console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
 
-    # Show latest state summary if available
-    if state.latest_verdict:
-        console.print("[bold]--- State ---[/]")
-        v = state.latest_verdict
-        color = {
-            "PASS": "green",
-            "MAJOR": "yellow",
-            "BLOCK": "red",
-        }.get(v.verdict, "cyan")
+
+def _render_state_summary(state: FlowStatusResponse) -> None:
+    """Show latest state summary if available."""
+    if not state.latest_verdict:
+        return
+
+    console.print("[bold]--- State ---[/]")
+    v = state.latest_verdict
+    color = {
+        "PASS": "green",
+        "MAJOR": "yellow",
+        "BLOCK": "red",
+    }.get(v.verdict, "cyan")
+    console.print(f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]")
+
+
+def render_flow_timeline(
+    state: FlowStatusResponse,
+    events: list[FlowEvent],
+    milestone_data: dict[str, Any] | None = None,
+    parent_branch: str | None = None,
+) -> None:
+    """Render complete flow timeline with header, actors, timeline, and refs."""
+    _render_header(state, parent_branch)
+    _render_actors(state)
+    _render_reasons(state)
+    console.print()
+    _render_timeline(events, state.worktree_root)
+
+    if milestone_data:
+        ms_title = milestone_data["title"]
+        open_count = int(milestone_data.get("open", 0))
+        closed_count = int(milestone_data.get("closed", 0))
+        total = open_count + closed_count
+        progress = f"{closed_count}/{total} done" if total else "—"
         console.print(
-            f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+            f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
+            "  [dim]→ vibe3 flow show --snapshot[/]"
         )
+
+    _render_refs(state)
+    _render_state_summary(state)
     console.print()

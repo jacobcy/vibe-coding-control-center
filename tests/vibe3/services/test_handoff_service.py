@@ -122,3 +122,38 @@ def test_get_handoff_events_applies_limit_after_handoff_filter(tmp_path: Path) -
 
     assert len(events) == 1
     assert events[0].event_type == "handoff_report"
+
+
+def test_get_handoff_events_prefers_active_plan_handoff_over_recorded(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-304"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(branch, "plan_recorded", "codex/gpt-5.4", detail="auto plan")
+    store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="plan ready")
+
+    events = service.get_handoff_events(branch)
+
+    assert [event.event_type for event in events] == ["handoff_plan"]
+
+
+def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-304"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(branch, "run_recorded", "codex/gpt-5.4", detail="auto run")
+
+    events = service.get_handoff_events(branch)
+
+    assert [event.event_type for event in events] == ["run_recorded"]

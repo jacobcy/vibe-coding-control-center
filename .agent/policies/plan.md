@@ -25,7 +25,7 @@
 - 判断本次任务属于哪一类改动
 
 优先工具见公共规则；规划阶段通常至少会用到：
-- `uv run python src/vibe3/cli.py handoff show`
+- `uv run python src/vibe3/cli.py handoff status`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`

@@ -1,4 +1,4 @@
-"""Handoff read commands - List and show handoff information."""
+"""Handoff read commands - status and artifact display."""
 
 import json
 from pathlib import Path
@@ -21,11 +21,7 @@ from vibe3.services.handoff_service import HandoffService
 from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
-from vibe3.ui.handoff_ui import (
-    render_handoff_detail,
-    render_handoff_list,
-    render_handoff_summary,
-)
+from vibe3.ui.handoff_ui import render_handoff_detail
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
@@ -83,130 +79,56 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
     return updates
 
 
-def list_handoffs(
-    branch: Annotated[
-        str | None,
-        typer.Option("--branch", "-b", help="Flow/branch to inspect"),
-    ] = None,
-    kind: Annotated[
-        str | None,
-        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review/indicate"),
-    ] = None,
+def show(
+    artifact: Annotated[Path, typer.Argument(help="Shared handoff artifact path")],
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """List handoff events for current or specified branch."""
-    with trace_scope(trace, "handoff list", domain="handoff"):
-        flow_service = FlowService()
-        handoff_service = HandoffService(store=flow_service.store)
+    """Show a shared handoff artifact file."""
+    with trace_scope(trace, "handoff show", domain="handoff"):
+        resolved_artifact = artifact
+        service = FlowService()
 
-        target_branch = branch if branch else flow_service.get_current_branch()
-        events = handoff_service.get_handoff_events(target_branch)
+        if not resolved_artifact.exists():
+            try:
+                git_common = Path(service.get_git_common_dir())
+                if git_common:
+                    candidates = [
+                        git_common / artifact,
+                        git_common / "vibe3" / "handoff" / artifact,
+                    ]
+                    for potential in candidates:
+                        if potential.exists():
+                            resolved_artifact = potential
+                            break
+            except Exception:
+                pass
 
-        allowed_kinds = {"plan", "run", "review", "indicate"}
-        filter_kind = kind.lower() if kind else None
-        if filter_kind and filter_kind not in allowed_kinds:
-            typer.echo(
-                "Error: --kind must be one of: plan, run, review, indicate", err=True
-            )
+        if not resolved_artifact.exists():
+            typer.echo(f"Error: artifact not found: {artifact}", err=True)
+            raise typer.Exit(1)
+        if not resolved_artifact.is_file():
+            typer.echo(f"Error: artifact is not a file: {resolved_artifact}", err=True)
+            raise typer.Exit(1)
+        try:
+            render_handoff_detail(resolved_artifact)
+        except (OSError, UnicodeDecodeError) as exc:
+            typer.echo(f"Error: failed to read artifact: {exc}", err=True)
             raise typer.Exit(1)
 
-        handoffs: list[dict[str, str]] = []
-        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0, "indicates": 0}
 
-        for event in events:
-            # Map event types back to handoff kinds
-            # handoff_plan    -> plan
-            # handoff_report  -> run
-            # handoff_audit   -> review  (reviewer-initiated authoritative audit)
-            # audit_recorded  -> review  (system auto-generated minimal audit, legacy)
-            # handoff_indicate -> indicate
-            event_type_to_kind = {
-                "handoff_plan": "plan",
-                "handoff_report": "run",
-                "handoff_run": "run",  # backward-compat: old event type
-                "handoff_audit": "review",
-                "audit_recorded": "review",  # legacy: system auto-generated
-                # (backward-compat)
-                "handoff_indicate": "indicate",
-            }
-            event_kind = event_type_to_kind.get(event.event_type)
-            if event_kind is None:
-                # Skip non-handoff events
-                continue
-            if filter_kind and event_kind != filter_kind:
-                continue
-
-            stats["total"] += 1
-            if event_kind == "plan":
-                stats["plans"] += 1
-            elif event_kind == "run":
-                stats["runs"] += 1
-            elif event_kind == "review":
-                stats["reviews"] += 1
-            elif event_kind == "indicate":
-                stats["indicates"] += 1
-
-            handoffs.append(
-                {
-                    "timestamp": event.created_at[:19].replace("T", " "),
-                    "kind": event_kind,
-                    "actor": event.actor,
-                    "detail": event.detail or "",
-                }
-            )
-
-        render_handoff_list(target_branch, handoffs)
-        render_handoff_summary(target_branch, stats)
-
-
-def show(
+def status(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
-    artifact: Annotated[
-        Path | None,
-        typer.Option("--artifact", help="Display a handoff artifact file"),
-    ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Show agent handoff chain and events."""
-    with trace_scope(trace, "handoff show", domain="handoff"):
-        if artifact is not None:
-            # 1. Try resolving relative to current CWD/Worktree
-            resolved_artifact = artifact
-            service = FlowService()
-
-            if not resolved_artifact.exists():
-                # 2. Try resolving relative to git common dir (shared artifacts)
-                try:
-                    git_common = Path(service.get_git_common_dir())
-                    if git_common:
-                        potential = git_common / artifact
-                        if potential.exists():
-                            resolved_artifact = potential
-                except Exception:
-                    pass
-
-            if not resolved_artifact.exists():
-                typer.echo(f"Error: artifact not found: {artifact}", err=True)
-                raise typer.Exit(1)
-            if not resolved_artifact.is_file():
-                typer.echo(
-                    f"Error: artifact is not a file: {resolved_artifact}", err=True
-                )
-                raise typer.Exit(1)
-            try:
-                render_handoff_detail(resolved_artifact)
-            except (OSError, UnicodeDecodeError) as exc:
-                typer.echo(f"Error: failed to read artifact: {exc}", err=True)
-                raise typer.Exit(1)
-            return
-
-        logger.bind(command="handoff show", branch=branch).info(
+    """Show current flow handoff status and recent records."""
+    with trace_scope(trace, "handoff status", domain="handoff"):
+        logger.bind(command="handoff status", branch=branch).info(
             "Showing handoff details"
         )
 
@@ -318,7 +240,7 @@ def show(
             console.print("[dim]---[/]")
             console.print(f"[dim]Artifact: {current_md_display}[/]")
             console.print(
-                "[dim]Use `vibe3 handoff show --artifact <path>` "
+                "[dim]Use `vibe3 handoff show <path>` "
                 "to inspect the full shared file[/]"
             )
         else:

@@ -193,6 +193,9 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_global_dispatch_coordinator.py"
         limit: 500
         reason: "Global dispatch coordinator 集成测试，覆盖队列管理、冻结逻辑、状态转换等核心调度场景"
+      - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
+        limit: 480
+        reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数

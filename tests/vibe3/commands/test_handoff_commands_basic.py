@@ -37,10 +37,10 @@ class TestHandoffBasicCommands:
 
     @patch("vibe3.commands.handoff_read.HandoffService")
     @patch("vibe3.commands.handoff_read.FlowService")
-    def test_handoff_show_command(
+    def test_handoff_status_command(
         self, mock_flow_service_class, mock_handoff_service_class
     ):
-        """Test handoff show command shows agent chain and events."""
+        """Test handoff status command shows agent chain and events."""
         mock_flow_service = MagicMock()
         mock_flow_service.get_current_branch.return_value = "feature/test"
         mock_flow_service.get_flow_state.return_value = FlowState(
@@ -59,7 +59,7 @@ class TestHandoffBasicCommands:
         ) as mock_get_dir:
             mock_get_dir.return_value = Path("/path/to/handoff")
             with patch.object(Path, "exists", return_value=False):
-                result = runner.invoke(app, ["handoff", "show"])
+                result = runner.invoke(app, ["handoff", "status"])
 
         assert result.exit_code == 0
         assert "Handoff" in result.output
@@ -68,10 +68,10 @@ class TestHandoffBasicCommands:
 
     @patch("vibe3.commands.handoff_read.HandoffService")
     @patch("vibe3.commands.handoff_read.FlowService")
-    def test_handoff_show_numeric_issue_resolves_branch(
+    def test_handoff_status_numeric_issue_resolves_branch(
         self, mock_flow_service_class, mock_handoff_service_class
     ):
-        """handoff show 436 should resolve to task/dev issue branch."""
+        """handoff status 436 should resolve to task/dev issue branch."""
         mock_flow_service = MagicMock()
         mock_flow_service.get_flow_state.side_effect = lambda branch: (
             FlowState(branch=branch, flow_slug="issue-436", flow_status="active")
@@ -89,7 +89,7 @@ class TestHandoffBasicCommands:
         ) as mock_get_dir:
             mock_get_dir.return_value = Path("/path/to/handoff")
             with patch.object(Path, "exists", return_value=False):
-                result = runner.invoke(app, ["handoff", "show", "436"])
+                result = runner.invoke(app, ["handoff", "status", "436"])
 
         assert result.exit_code == 0
         mock_flow_service.get_flow_state.assert_any_call("task/issue-436")
@@ -97,87 +97,54 @@ class TestHandoffBasicCommands:
             "task/issue-436", limit=5
         )
 
-    @patch("vibe3.commands.handoff_read.render_handoff_summary")
-    @patch("vibe3.commands.handoff_read.render_handoff_list")
-    @patch("vibe3.commands.handoff_read.HandoffService")
-    @patch("vibe3.commands.handoff_read.FlowService")
-    def test_handoff_list_command(
-        self,
-        mock_flow_service_class,
-        mock_handoff_service_class,
-        mock_render_list,
-        mock_render_summary,
-    ):
-        """Test handoff list command renders filtered handoff events."""
-        from vibe3.models.flow import FlowEvent
-
-        mock_flow_service = MagicMock()
-        mock_flow_service.get_current_branch.return_value = "feature/test"
-        mock_flow_service_class.return_value = mock_flow_service
-        mock_handoff_service = MagicMock()
-        mock_handoff_service.get_handoff_events.return_value = [
-            FlowEvent(
-                branch="feature/test",
-                event_type="handoff_plan",
-                actor="planner",
-                detail="Plan completed",
-                created_at="2026-03-26T11:00:00",
-            ),
-            FlowEvent(
-                branch="feature/test",
-                event_type="handoff_report",
-                actor="executor",
-                detail="Run completed",
-                created_at="2026-03-26T11:10:00",
-            ),
-        ]
-        mock_handoff_service_class.return_value = mock_handoff_service
-
-        result = runner.invoke(app, ["handoff", "list", "--kind", "run"])
-
-        assert result.exit_code == 0
-        mock_handoff_service.get_handoff_events.assert_called_once()
-        mock_render_list.assert_called_once()
-        handoffs = mock_render_list.call_args.args[1]
-        assert len(handoffs) == 1
-        assert handoffs[0]["kind"] == "run"
-        mock_render_summary.assert_called_once()
-
-    def test_handoff_list_rejects_invalid_kind(self):
-        """Test handoff list validates kind option."""
-        result = runner.invoke(app, ["handoff", "list", "--kind", "invalid"])
-
-        assert result.exit_code != 0
-        assert "must be one of" in result.output
-
     @patch("vibe3.commands.handoff_read.render_handoff_detail")
     def test_handoff_show_artifact(self, mock_render_detail):
-        """Test handoff show --artifact renders single artifact."""
+        """Test handoff show <artifact> renders single artifact."""
         with runner.isolated_filesystem():
             artifact = Path("artifact.md")
             artifact.write_text("# artifact", encoding="utf-8")
 
-            result = runner.invoke(
-                app, ["handoff", "show", "--artifact", str(artifact)]
-            )
+            result = runner.invoke(app, ["handoff", "show", str(artifact)])
+
+        assert result.exit_code == 0
+        mock_render_detail.assert_called_once()
+
+    @patch("vibe3.commands.handoff_read.render_handoff_detail")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_show_shared_artifact_short_path(
+        self, mock_flow_service_class, mock_render_detail
+    ):
+        """Test handoff show resolves short shared artifact paths."""
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_flow_service_class.return_value = mock_flow_service
+
+        with patch.object(Path, "exists", side_effect=[False, False, True, True]):
+            with patch.object(Path, "is_file", return_value=True):
+                result = runner.invoke(
+                    app,
+                    [
+                        "handoff",
+                        "show",
+                        "task-issue-340-d347bc95/run-2026-04-21T05:19:28.md",
+                    ],
+                )
 
         assert result.exit_code == 0
         mock_render_detail.assert_called_once()
 
     def test_handoff_show_artifact_not_found(self):
-        """Test handoff show --artifact reports missing files."""
-        result = runner.invoke(app, ["handoff", "show", "--artifact", "missing.md"])
+        """Test handoff show <artifact> reports missing files."""
+        result = runner.invoke(app, ["handoff", "show", "missing.md"])
 
         assert result.exit_code != 0
         assert "artifact not found" in result.output.lower()
 
     def test_handoff_show_artifact_rejects_directory(self):
-        """Test handoff show --artifact rejects non-file paths."""
+        """Test handoff show <artifact> rejects non-file paths."""
         with runner.isolated_filesystem():
             Path("artifact_dir").mkdir()
-            result = runner.invoke(
-                app, ["handoff", "show", "--artifact", "artifact_dir"]
-            )
+            result = runner.invoke(app, ["handoff", "show", "artifact_dir"])
 
         assert result.exit_code != 0
         assert "not a file" in result.output.lower()

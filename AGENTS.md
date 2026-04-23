@@ -53,6 +53,12 @@ This project has **two parallel implementations**:
 3. **查看全局状态**: 运行 `uv run python src/vibe3/cli.py status`
 4. **了解执行规则**: 阅读 [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md)
 
+## 🔁 Handoff 命令约定
+
+- `uv run python src/vibe3/cli.py handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
+- `uv run python src/vibe3/cli.py handoff show <artifact-path>`：读取共享 handoff artifact
+- `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取
+
 ## 🤖 Protocol
 
 Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):

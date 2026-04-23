@@ -37,7 +37,7 @@
 ### 3. 项目边界违规
 
 这是本项目特有高优先级项：
-- 是否绕过 `vibe3 handoff show` / 共享 current.md 去假设 handoff 现场
+- 是否绕过 `vibe3 handoff status` / 共享 current.md 去假设 handoff 现场
 - 是否直接改共享状态真源
 - 是否跨 worktree 假设执行
 - 是否在已有 PR 的工作流上继续扩新目标
@@ -71,7 +71,7 @@
 优先依赖项目自己的 AST / impact 能力，而不是只看 diff 表面。
 
 推荐：
-- 用 `uv run python src/vibe3/cli.py handoff show` 查看当前 flow 现场
+- 用 `uv run python src/vibe3/cli.py handoff status` 查看当前 flow 现场
 - 用 `vibe3 inspect base --json` 看分支风险与影响面
 - 用 `vibe3 inspect commit <sha>` 看符号级波及范围
 - 用 `vibe3 inspect symbols <file|file:symbol>` 检查改动点引用关系

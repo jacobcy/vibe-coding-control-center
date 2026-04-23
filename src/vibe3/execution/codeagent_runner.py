@@ -31,6 +31,7 @@ from vibe3.execution.role_policy import (
 )
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
+from vibe3.services.handoff_service import HandoffService
 
 __all__ = [
     "ExecutionRole",
@@ -196,6 +197,31 @@ class CodeagentExecutionService:
                     before_state_label=ctx.before_state_label,
                     repo=getattr(self.config, "repo", None),
                 )
+
+            passive_kind = {"planner": "plan", "executor": "run"}.get(command.role)
+            if passive_kind and agent_result.stdout.strip():
+                ref_field = "plan_ref" if passive_kind == "plan" else "report_ref"
+                flow_state = ctx.store.get_flow_state(ctx.branch)
+                authoritative_ref = flow_state.get(ref_field) if flow_state else None
+                if not authoritative_ref:
+                    try:
+                        handoff_file = HandoffService(
+                            store=ctx.store
+                        ).record_passive_artifact(
+                            kind=passive_kind,
+                            content=agent_result.stdout,
+                            actor=ctx.actor,
+                            metadata=(
+                                {"session_id": effective_session_id}
+                                if effective_session_id
+                                else None
+                            ),
+                            branch=ctx.branch,
+                        )
+                    except Exception as exc:
+                        log.warning(
+                            f"Failed to record passive {passive_kind} artifact: {exc}"
+                        )
 
         return handoff_file
 
