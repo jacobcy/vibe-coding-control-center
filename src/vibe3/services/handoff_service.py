@@ -11,9 +11,7 @@ from vibe3.execution.actor_support import (
     extract_role_from_actor,
 )
 from vibe3.models.flow import FlowEvent
-from vibe3.models.handoff import HandoffRecord
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.path_helpers import (
@@ -171,20 +169,6 @@ class HandoffService:
             ).warning(f"Skipping non-authoritative handoff file append: {exc}")
 
         return handoff_path
-
-    def record_agent_artifact(self, record: HandoffRecord) -> Path | None:
-        """Persist a non-authoritative agent artifact for local observation only."""
-        sanitized_content = ArtifactParser.sanitize_handoff_content(record.content)
-        artifact = self.storage.create_artifact(
-            record.kind,
-            sanitized_content,
-            branch=record.branch,
-        )
-        if artifact is None:
-            return None
-
-        _, artifact_file = artifact
-        return artifact_file
 
     def record_plan(
         self,

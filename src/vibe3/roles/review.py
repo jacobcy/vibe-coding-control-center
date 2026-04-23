@@ -169,7 +169,6 @@ def _process_review_sync_result(
     """Process sync review output and write audit_ref to flow_state."""
     finalize_review_output(
         review_output=stdout,
-        handoff_file=None,
         branch=branch,
         actor=actor,
     )
@@ -250,29 +249,6 @@ def _resolve_minimal_audit_dir(branch: str | None) -> Path:
     return handoff_svc.storage.ensure_handoff_dir()
 
 
-def _resolve_authoritative_audit_ref(
-    handoff_file: str | None,
-    review_output: str,
-    verdict: str | None,
-    branch: str | None,
-    *,
-    existing_audit_ref: str | None = None,
-) -> str:
-    if existing_audit_ref:
-        return existing_audit_ref
-    if handoff_file:
-        handoff_path = Path(handoff_file)
-        if handoff_path.exists():
-            return str(handoff_path)
-    return str(
-        _create_minimal_audit_artifact(
-            review_output,
-            verdict or "UNKNOWN",
-            branch,
-        )
-    )
-
-
 def _load_existing_audit_ref(branch: str | None) -> str | None:
     if not branch:
         return None
@@ -310,7 +286,6 @@ def _resolve_review_verdict(
 def finalize_review_output(
     *,
     review_output: str,
-    handoff_file: str | None,
     branch: str | None,
     actor: str,
 ) -> tuple[str, str]:
@@ -322,16 +297,13 @@ def finalize_review_output(
     if reviewer_wrote_audit:
         audit_ref = existing_audit_ref  # type: ignore[assignment]
     else:
-        if handoff_file and Path(handoff_file).exists():
-            audit_ref = handoff_file
-        else:
-            audit_ref = str(
-                _create_minimal_audit_artifact(
-                    review_output,
-                    _resolve_review_verdict(review_output),
-                    branch,
-                )
+        audit_ref = str(
+            _create_minimal_audit_artifact(
+                review_output,
+                _resolve_review_verdict(review_output),
+                branch,
             )
+        )
 
     if reviewer_wrote_audit:
         audit_path = Path(audit_ref)
@@ -483,7 +455,6 @@ def execute_manual_review(
 
     audit_ref, verdict = finalize_review_output(
         review_output=result.stdout,
-        handoff_file=str(result.handoff_file) if result.handoff_file else None,
         branch=branch,
         actor="agent:review",
     )
