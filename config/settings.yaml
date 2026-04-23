@@ -190,6 +190,9 @@ code_limits:
       - path: "tests/vibe3/roles/test_review.py"
         limit: 450
         reason: "Review 角色测试集，覆盖 request builder、sync/async dispatch、parser 集成等紧密耦合逻辑"
+      - path: "tests/vibe3/orchestra/test_global_dispatch_coordinator.py"
+        limit: 500
+        reason: "Global dispatch coordinator 集成测试，覆盖队列管理、冻结逻辑、状态转换等核心调度场景"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
