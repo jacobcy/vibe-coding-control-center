@@ -350,6 +350,12 @@ class TestGovernanceMaterials:
 
         assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
 
+    def test_roadmap_intake_material_requires_assignee_write(self):
+        """roadmap-intake material should require direct assignee assignment."""
+        content = Path("supervisor/governance/roadmap-intake.md").read_text()
+        assert "直接补齐可执行的 manager assignee" in content
+        assert "明确指派给一个配置中的 manager assignee" in content
+
 
 class TestRoundRobinMaterialSelection:
     """Tests that build_governance_recipe selects material via tick_count % len."""

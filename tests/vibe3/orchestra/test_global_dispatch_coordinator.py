@@ -61,6 +61,7 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service._emit_dispatch_intent = MagicMock()
     service.config.repo = "owner/repo"
     service.config.manager_usernames = ["manager-bot"]
+    service.config.supervisor_handoff.issue_label = "supervisor"
     service._github = MagicMock()
     return service
 
@@ -133,16 +134,39 @@ class TestGlobalDispatchCoordinator:
         assert coordinator._frozen_queue == []
 
     @pytest.mark.asyncio
-    async def test_issue_without_manager_assignee_removed_from_existing_frozen_queue(
+    async def test_ready_issue_no_manager_assignee_removed_from_frozen_queue(
         self,
     ) -> None:
         issue = make_issue(468)
+        service = make_service("manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=468, collected_state="ready", waiting_state=None)
+        ]
+        coordinator._load_issue = lambda issue_number: make_issue_info(  # type: ignore[method-assign]
+            issue_number,
+            IssueState.READY,
+            assignees=[],
+        )
+
+        await coordinator.coordinate()
+
+        service._emit_dispatch_intent.assert_not_called()
+        assert coordinator._frozen_queue == []
+
+    @pytest.mark.asyncio
+    async def test_unassigned_handoff_issue_kept_in_existing_frozen_queue(
+        self,
+    ) -> None:
+        issue = make_issue(469)
         service = make_service("handoff-manager", [issue])
         capacity = make_capacity(remaining=1)
 
         coordinator = GlobalDispatchCoordinator(capacity, [service])
         coordinator._frozen_queue = [
-            QueueEntry(issue_number=468, collected_state="handoff", waiting_state=None)
+            QueueEntry(issue_number=469, collected_state="handoff", waiting_state=None)
         ]
         coordinator._load_issue = lambda issue_number: make_issue_info(  # type: ignore[method-assign]
             issue_number,
@@ -152,8 +176,9 @@ class TestGlobalDispatchCoordinator:
 
         await coordinator.coordinate()
 
-        service._emit_dispatch_intent.assert_not_called()
-        assert coordinator._frozen_queue == []
+        service._emit_dispatch_intent.assert_called_once()
+        assert coordinator._frozen_queue is not None
+        assert coordinator._frozen_queue[0].issue_number == 469
 
     @pytest.mark.asyncio
     async def test_skip_when_capacity_full(self) -> None:

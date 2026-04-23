@@ -51,6 +51,7 @@ class TestManagerBlockedIssueNotDispatched:
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4  # ← 必须设置
             mock_config.manager_usernames = ["manager-bot"]
+            mock_config.supervisor_handoff.issue_label = "supervisor"
 
             # Mock SessionRegistryService (required)
             mock_registry = Mock()
@@ -103,6 +104,7 @@ class TestManagerBlockedIssueNotDispatched:
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4  # ← 必须设置
             mock_config.manager_usernames = ["manager-bot"]
+            mock_config.supervisor_handoff.issue_label = "supervisor"
 
             # Mock SessionRegistryService (required)
             mock_registry = Mock()
@@ -156,6 +158,7 @@ class TestManagerBlockedIssueNotDispatched:
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4
             mock_config.manager_usernames = ["manager-bot"]
+            mock_config.supervisor_handoff.issue_label = "supervisor"
             mock_registry = Mock()
 
             dispatcher = StateLabelDispatchService(
@@ -191,6 +194,7 @@ class TestManagerBlockedIssueNotDispatched:
             mock_config = Mock()
             mock_config.max_concurrent_flows = 4
             mock_config.manager_usernames = ["manager-bot"]
+            mock_config.supervisor_handoff.issue_label = "supervisor"
             mock_registry = Mock()
 
             dispatcher = StateLabelDispatchService(
@@ -205,6 +209,41 @@ class TestManagerBlockedIssueNotDispatched:
             ready_issues = asyncio.run(dispatcher.collect_ready_issues())
 
         assert ready_issues == []
+
+    def test_unassigned_issue_allowed_by_handoff_dispatcher(
+        self,
+    ) -> None:
+        """已进入 handoff 的 issue 不应再受 manager assignee 限制。"""
+        issue_data = {
+            "number": 205,
+            "title": "Unassigned handoff issue",
+            "labels": [{"name": IssueState.HANDOFF.to_label()}],
+            "assignees": [],
+            "state": "open",
+        }
+
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_github_class:
+            mock_github = mock_github_class.return_value
+            mock_github.list_issues.return_value = [issue_data]
+
+            mock_config = Mock()
+            mock_config.max_concurrent_flows = 4
+            mock_config.manager_usernames = ["manager-bot"]
+            mock_config.supervisor_handoff.issue_label = "supervisor"
+            mock_registry = Mock()
+
+            dispatcher = StateLabelDispatchService(
+                config=mock_config,
+                github=mock_github,
+                role_def=HANDOFF_MANAGER_ROLE,
+                registry=mock_registry,
+            )
+
+            import asyncio
+
+            ready_issues = asyncio.run(dispatcher.collect_ready_issues())
+
+        assert [issue.number for issue in ready_issues] == [205]
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:

@@ -53,17 +53,21 @@ def should_skip_from_queue(
     *,
     supervisor_label: str,
     manager_usernames: list[str] | tuple[str, ...],
+    require_manager_assignee: bool = True,
 ) -> bool:
     """Check whether an issue should be skipped from dispatch queue.
 
     Issues are skipped if:
     1. They have the supervisor label (managed by supervisor, not auto-dispatch)
-    2. They don't have a manager assignee (when managers are configured)
+    2. They don't have a manager assignee (when required for this queue stage)
 
     Args:
         issue: Issue information
         supervisor_label: Label name for supervisor issues (from config)
         manager_usernames: List of manager usernames (from config)
+        require_manager_assignee: Whether this queue stage still requires the
+            issue to be assigned to a manager username. Entry-point ready issues
+            do; downstream state-label dispatch does not.
 
     Returns:
         True if issue should be skipped, False otherwise
@@ -73,7 +77,9 @@ def should_skip_from_queue(
         return True
 
     # Skip issues without manager assignee
-    if not has_manager_assignee(issue.assignees, manager_usernames):
+    if require_manager_assignee and not has_manager_assignee(
+        issue.assignees, manager_usernames
+    ):
         return True
 
     return False

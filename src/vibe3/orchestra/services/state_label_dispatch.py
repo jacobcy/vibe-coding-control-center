@@ -313,6 +313,9 @@ class StateLabelDispatchService(ServiceBase):
                 issue,
                 supervisor_label=self.config.supervisor_handoff.issue_label,
                 manager_usernames=self.config.manager_usernames,
+                require_manager_assignee=(
+                    self.role_def.trigger_state == IssueState.READY
+                ),
             ):
                 continue
 

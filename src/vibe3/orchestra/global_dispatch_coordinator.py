@@ -121,6 +121,7 @@ class GlobalDispatchCoordinator:
                 issue,
                 supervisor_label=self._supervisor_label,
                 manager_usernames=self._manager_usernames,
+                require_manager_assignee=(issue.state == IssueState.READY),
             ):
                 append_orchestra_event(
                     "dispatcher",
@@ -266,6 +267,7 @@ class GlobalDispatchCoordinator:
                 issue,
                 supervisor_label=self._supervisor_label,
                 manager_usernames=self._manager_usernames,
+                require_manager_assignee=(issue.state == IssueState.READY),
             ):
                 removed.append(entry)
                 append_orchestra_event(
