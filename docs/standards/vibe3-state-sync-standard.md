@@ -56,6 +56,50 @@ authoritative ref 只在以下条件同时满足时成立：
 - `temp/logs/*.async.log` 只是调试日志，不属于 handoff/ref 真源
 - manager 读取的是当前 flow state 中的 refs，不是根据最新 artifact 文件名反推 ref
 
+### 2.2 路径类型边界
+
+Vibe3 中的路径必须先区分对象类型，再决定如何显示与如何写入。
+
+#### 日志路径
+
+- `log_path` 只表示执行日志
+- 默认位于仓库执行目录下的 `temp/logs/...`
+- 它服务于调试 / 观测，不得登记为 `plan_ref / report_ref / audit_ref`
+- 任何 `*.async.log`、`temp/logs/...`、session wrapper log 都不得被解释为 handoff 文档
+
+#### agent 交接文档路径
+
+- agent 主动产出的 canonical 文档必须位于 agent worktree 内
+- 典型位置是当前 worktree 下的 `docs/plans/...`、`docs/reports/...`
+- `vibe3 handoff plan|report|audit <path>` 登记的 `*_ref` 必须指向这类 worktree 内文档
+- 超出 agent worktree 的路径不得作为 canonical handoff ref，因为这会引发跨现场 / 权限问题
+
+#### 共享 handoff artifact 路径
+
+- `.git/vibe3/handoff/...` 属于共享 handoff store
+- 它只承载共享 buffer / artifact，不承载 canonical agent deliverable ref
+- agent 需要查看这类共享 artifact 时，必须通过 handoff 命令读取，而不是假设自己对 `.git/...` 路径有直接稳定访问能力
+
+### 2.3 review 路径约束与事件区分
+
+review 阶段存在两类写入，它们都必须与 worktree 边界兼容，但事件语义不同：
+
+- agent 主动写入的 review 文档：
+  - 必须位于 agent worktree 内
+  - 通过 `vibe3 handoff audit <path>` 显式登记
+  - 事件类型为 `handoff_audit`
+- 系统被动写入的 review 文档：
+  - 用于最小审计收口 / fallback / 自动登记
+  - 必须优先写到对应 worktree 内，而不是 `temp/` 或 `.git/vibe3/handoff/`
+  - 事件类型为 `audit_recorded`
+
+因此：
+
+- `handoff_audit` 表示 agent 主动交接
+- `audit_recorded` 表示系统被动记录
+- 两者都可以成为 review 观察材料，但语义不能混淆
+- UI 与调试命令必须保留这种事件区分
+
 如果历史描述与当前 GitHub labels 冲突，以当前 labels 为准。
 
 ## 3. 核心原则
@@ -508,6 +552,37 @@ gh issue view <issue-number> --json labels,state
 - `task show <target-branch> --comments`：最新评论与最新人类指示
 - `task status`：全局任务/队列状态（不是单个 `ready` issue 的健康真源）
 - `handoff show <target-branch>`：当前交接材料
+
+### 9.1 `handoff show` 与 `flow show` 的显示职责
+
+两者不是重复入口，而是不同观察面：
+
+- `handoff show` 是 agent / manager / reviewer 的交接入口
+  - 默认显示相对路径
+  - 相对路径以目标 worktree 为基准，避免跨 worktree 复制后失效
+  - 当对象位于 `.git/vibe3/handoff/...` 时，仍通过 handoff 命令负责解析与展示
+- `flow show` 是人类观测入口
+  - 应显示绝对路径
+  - 目标是让人类可以直接打开日志、交接文档、review 文档
+  - 但显示绝对路径不改变对象类型：log 仍是 log，handoff 仍是 handoff
+
+### 9.2 共享 handoff artifact 的命令入口
+
+`.git/vibe3/handoff/...` 下的共享文件不得要求 agent 直接走文件系统路径访问。
+
+必须提供并优先使用命令入口：
+
+```bash
+uv run python src/vibe3/cli.py handoff show <target-branch>
+uv run python src/vibe3/cli.py handoff show --artifact <path>
+```
+
+规则：
+
+- agent 读取共享 handoff store 时，优先使用 `handoff show`
+- `--artifact` 用于读取共享 artifact 或指定 handoff 文件
+- 不要求 agent 直接 `cat .git/vibe3/handoff/...`
+- 这样可以避免 worktree 外路径导致的权限与可见性问题
 
 补充规则：
 

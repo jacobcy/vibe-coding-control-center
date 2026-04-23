@@ -71,6 +71,13 @@ SQLite store 文件位置固定为：
 .git/vibe3/handoff/<branch-safe>/current.md
 ```
 
+路径分类约束：
+
+- 执行日志固定属于 `temp/logs/...`
+- agent 主动交接的 canonical 文档固定属于 agent worktree 内路径
+- `.git/vibe3/handoff/...` 只属于共享 handoff store，不属于 agent canonical deliverable 路径
+- `temp/logs/...` 与 `.git/vibe3/handoff/...` 都不得直接登记为 `plan_ref / report_ref / audit_ref`
+
 补充约束：
 
 - 不提交到 Git
@@ -254,6 +261,13 @@ CREATE TABLE flow_events (
 - `SESSION_ID`
 - 当前阶段的简短总结
 
+共享 handoff buffer 中允许引用：
+
+- worktree 内 canonical 文档的相对路径
+- 共享 artifact 的逻辑引用
+
+但这些引用只用于导航与共享，不自动升级为 authoritative ref
+
 ### 5.2 Forbidden Content
 
 不允许记录：
@@ -323,6 +337,13 @@ CREATE TABLE flow_events (
 - SQLite 只负责责任链补充
 - 若 SQLite 与远端冲突，以远端为准
 
+补充显示约束：
+
+- `handoff show` 面向 agent 交接，默认显示相对路径
+- `flow show` 面向人类观测，显示绝对路径
+- 共享 handoff store 下的文件必须通过命令解析显示，不要求调用方直接访问 `.git/vibe3/handoff/...`
+- 日志与 handoff artifact 必须按对象类型分别渲染，不能因为两者都是“路径”就混为一类
+
 ## 8. Write Rules
 
 允许写入 SQLite 的命令只有：
@@ -338,6 +359,10 @@ CREATE TABLE flow_events (
 - `handoff report` - 记录 report handoff
 - `handoff audit` - 记录 audit handoff
 - `handoff append` - 追加轻量更新到 current.md
+
+**共享 handoff 读取**：
+- `handoff show <branch>` - 读取当前 branch 的共享 handoff 与 refs
+- `handoff show --artifact <path>` - 读取指定共享 artifact / handoff 文件
 
 补充约束：
 
@@ -356,6 +381,15 @@ CREATE TABLE flow_events (
 - 不写远端镜像 JSON
 - 所有写入必须更新 `updated_at`
 - 所有关键写入必须记录一条 `flow_events`
+
+路径与事件原则：
+
+- `plan_ref / report_ref / audit_ref` 必须是 agent worktree 内 canonical 文档
+- `temp/logs/...` 只允许写入 `log_path` 或 runtime session，不允许进入 authoritative ref 字段
+- `.git/vibe3/handoff/...` 只允许作为共享 handoff store / artifact 位置，不允许伪装成 canonical ref
+- review 相关事件必须区分：
+  - `handoff_audit`：agent 主动写入并登记
+  - `audit_recorded`：系统被动写入并登记
 
 ## 9. `vibe check` Contract
 
