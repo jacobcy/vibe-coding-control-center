@@ -204,7 +204,12 @@ class SQLiteFlowStateRepo:
         ).info("Deleted persisted flow records and cache")
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
-        canonical_branch = f"task/issue-{issue_number}"
+        """Get flows linked to an issue with specified role.
+
+        Returns flows ordered by updated_at DESC, branch ASC for stable sorting.
+        Domain-specific priority logic (canonical/active) should be implemented
+        at the service layer, not here.
+        """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -212,15 +217,8 @@ class SQLiteFlowStateRepo:
                 "SELECT f.* FROM flow_state f "
                 "JOIN flow_issue_links l ON f.branch = l.branch "
                 "WHERE l.issue_number = ? AND l.issue_role = ? "
-                "ORDER BY CASE "
-                "WHEN COALESCE(f.flow_status, 'active') = 'active' "
-                "AND f.branch = ? THEN 0 "
-                "WHEN COALESCE(f.flow_status, 'active') = 'active' THEN 1 "
-                "WHEN f.branch = ? THEN 2 "
-                "ELSE 3 END, "
-                "COALESCE(f.updated_at, '') DESC, "
-                "f.branch ASC",
-                (issue_number, role, canonical_branch, canonical_branch),
+                "ORDER BY COALESCE(f.updated_at, '') DESC, f.branch ASC",
+                (issue_number, role),
             )
             flows = [dict(row) for row in cursor.fetchall()]
             logger.bind(

@@ -21,7 +21,7 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
-from vibe3.utils.label_utils import has_manager_assignee
+from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -303,14 +303,16 @@ class StateLabelDispatchService(ServiceBase):
                 continue
             if self.role_def.trigger_state.to_label() not in labels:
                 continue
-            if "supervisor" in labels:
-                continue
+
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
                 continue
-            if not has_manager_assignee(
-                issue.assignees,
-                self.config.manager_usernames,
+
+            # Skip supervisor/assignee-filtered issues
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self.config.supervisor_handoff.issue_label,
+                manager_usernames=self.config.manager_usernames,
             ):
                 continue
 

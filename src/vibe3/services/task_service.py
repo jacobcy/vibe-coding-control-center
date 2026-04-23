@@ -1,7 +1,7 @@
 """Task service implementation."""
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from loguru import logger
 
@@ -68,46 +68,64 @@ class TaskService:
         actor: str | None = None,
     ) -> IssueLink:
         """Link an issue to a flow."""
+        # Normalize branch name to prevent case/space variants
+        normalized_branch = branch.strip()
+
         logger.bind(
             domain="task",
             action="link_issue",
-            branch=branch,
+            branch=normalized_branch,
             issue_number=issue_number,
             role=role,
         ).info("Linking issue to flow")
 
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
-            branch,
+            normalized_branch,
             explicit_actor=actor,
         )
 
-        self.store.add_issue_link(branch, issue_number, role)
+        # CRITICAL: For task role, query existing task flows BEFORE adding new link
+        # to prevent data inconsistency if reclassification fails
+        superseded_flows: list[dict[str, Any]] = []
+        if role == "task":
+            task_flows = self.store.get_flows_by_issue(issue_number, role="task")
+            if isinstance(task_flows, list):
+                superseded_flows = [
+                    flow
+                    for flow in task_flows
+                    if str(flow.get("branch") or "").strip() != normalized_branch
+                ]
+
+        # Now add the new link
+        self.store.add_issue_link(normalized_branch, issue_number, role)
 
         if role == "task":
             # task_issue_number is no longer stored in flow_state.
             # We only update latest_actor to track activity.
             self.store.update_flow_state(
-                branch,
+                normalized_branch,
                 latest_actor=effective_actor,
             )
 
         self.store.add_event(
-            branch,
+            normalized_branch,
             "issue_linked",
             effective_actor,
             f"Issue #{issue_number} linked as {role}",
         )
 
-        if role == "task":
-            self._enforce_single_task_flow(
-                current_branch=branch,
+        # Demote superseded flows AFTER successful link
+        if role == "task" and superseded_flows:
+            self._demote_superseded_flows(
+                superseded_flows=superseded_flows,
+                current_branch=normalized_branch,
                 issue_number=issue_number,
                 actor=effective_actor,
             )
 
         return IssueLink(
-            branch=branch,
+            branch=normalized_branch,
             issue_number=issue_number,
             issue_role=role,
         )
@@ -165,27 +183,21 @@ class TaskService:
             issue_role=new_role,
         )
 
-    def _enforce_single_task_flow(
+    def _demote_superseded_flows(
         self,
         *,
+        superseded_flows: list[dict[str, Any]],
         current_branch: str,
         issue_number: int,
         actor: str,
     ) -> None:
-        task_flows = self.store.get_flows_by_issue(issue_number, role="task")
-        if not isinstance(task_flows, list):
-            return
-        superseded_flows = [
-            flow
-            for flow in task_flows
-            if str(flow.get("branch") or "").strip() != current_branch
-        ]
+        """Demote superseded task flows to related role."""
         if not superseded_flows:
             return
 
         logger.bind(
             domain="task",
-            action="enforce_single_task_flow",
+            action="demote_superseded_flows",
             issue_number=issue_number,
             current_branch=current_branch,
             superseded_count=len(superseded_flows),
@@ -257,18 +269,21 @@ class TaskService:
             ).warning("Failed to remove issue assignees for superseded task flow")
 
         supervisor_label = config.supervisor_handoff.issue_label
-        if not self._get_issue_label_port().add_issue_label(
-            issue_number,
-            supervisor_label,
-        ):
-            logger.bind(
-                domain="task",
-                action="notify_superseded_canonical_flow",
-                issue_number=issue_number,
-                label=supervisor_label,
-            ).warning("Failed to add supervisor label for superseded task flow")
-
+        label_added = False
         try:
+            if not self._get_issue_label_port().add_issue_label(
+                issue_number,
+                supervisor_label,
+            ):
+                logger.bind(
+                    domain="task",
+                    action="notify_superseded_canonical_flow",
+                    issue_number=issue_number,
+                    label=supervisor_label,
+                ).warning("Failed to add supervisor label for superseded task flow")
+                return  # Cannot proceed without supervisor label
+            label_added = True
+
             LabelService(issue_port=self._get_issue_label_port()).set_state(
                 issue_number,
                 IssueState.HANDOFF,
@@ -278,8 +293,23 @@ class TaskService:
                 domain="task",
                 action="notify_superseded_canonical_flow",
                 issue_number=issue_number,
-                state_label=config.supervisor_handoff.handoff_state_label,
-            ).warning(f"Failed to move superseded task issue to handoff: {exc}")
+                error=str(exc),
+            ).exception("Failed to set handoff state for superseded task issue")
+
+            # Rollback supervisor label if state transition failed after label was added
+            if label_added:
+                try:
+                    self._get_issue_label_port().remove_issue_label(
+                        issue_number,
+                        supervisor_label,
+                    )
+                except Exception as rollback_exc:
+                    logger.bind(
+                        domain="task",
+                        action="notify_superseded_canonical_flow_rollback",
+                        issue_number=issue_number,
+                        label=supervisor_label,
+                    ).warning(f"Failed to rollback supervisor label: {rollback_exc}")
 
         pr_state = pr.state.value.lower()
         comment = (
@@ -299,11 +329,12 @@ class TaskService:
     def _get_branch_pr(self, branch: str) -> PRResponse | None:
         try:
             prs = self.github_client.list_prs_for_branch(branch, state="all")
-        except Exception as exc:
+        except GitError as exc:
             logger.bind(
                 domain="task",
                 action="get_branch_pr",
                 branch=branch,
+                error=str(exc),
             ).warning(f"Failed to query PRs for superseded task flow: {exc}")
             return None
         return prs[0] if prs else None
