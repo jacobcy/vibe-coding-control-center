@@ -126,6 +126,7 @@ def run_issue_role_sync(
     issue_number: int,
     dry_run: bool,
     fresh_session: bool,
+    show_prompt: bool,
     spec: IssueRoleSyncSpec,
 ) -> None:
     """Run a role synchronously (direct execution without tmux wrapper).
@@ -141,6 +142,7 @@ def run_issue_role_sync(
     store = SQLiteClient()
     current_branch = GitClient().get_current_branch()
     branch = spec.resolve_branch(store, issue_number, current_branch)
+    flow_state = store.get_flow_state(branch) if branch else None
     session_id = (
         None if fresh_session else load_session_id(spec.role_name, branch=branch)
     )
@@ -154,10 +156,12 @@ def run_issue_role_sync(
         config,
         issue,
         branch,
+        flow_state,
         session_id,
         options,
         actor,
         dry_run,
+        show_prompt,
     )
     sync_result = coordinator.dispatch_execution(sync_request)
 

@@ -72,8 +72,6 @@ def render_task_show(task_result: "TaskShowResult", json_output: bool) -> None:
             "BLOCK": "red",
         }.get(v.verdict, "cyan")
         console.print(f"Verdict: [{color}]{v.verdict}[/] ({v.actor})")
-    if task.latest_indicate_action:
-        console.print(f"Action:  [yellow bold]{task.latest_indicate_action}[/]")
 
 
 def render_task_show_with_milestone(

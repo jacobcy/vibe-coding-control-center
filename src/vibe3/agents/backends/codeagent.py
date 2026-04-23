@@ -243,12 +243,19 @@ class CodeagentBackend:
         session_id: str | None = None,
         cwd: Path | None = None,
         role: str = "executor",
+        show_prompt: bool = False,
+        include_global_notice: bool = True,
+        fallback_prompt: str | None = None,
+        fallback_include_global_notice: bool = True,
+        dry_run_summary: dict[str, object] | None = None,
     ) -> AgentResult:
         """Run codeagent-wrapper synchronously."""
         sync_models_json(options)
 
         project_root = str(cwd or Path.cwd())
-        prompt_file_path = str(prepare_prompt_file(prompt))
+        prompt_file_path = str(
+            prepare_prompt_file(prompt, include_global_notice=include_global_notice)
+        )
 
         try:
             command = self._build_command(
@@ -259,11 +266,19 @@ class CodeagentBackend:
             )
 
             if dry_run:
+                if dry_run_summary:
+                    print("=== Dry Run Summary ===")
+                    for key, value in dry_run_summary.items():
+                        print(f"{key}: {value}")
                 print("=== Command ===")
                 print(" ".join(command))
-                if prompt_file_path:
+                if show_prompt and prompt_file_path:
                     print(f"\n=== Prompt File: {prompt_file_path} ===")
-                    print(build_prompt_file_content(prompt))
+                    print(
+                        build_prompt_file_content(
+                            prompt, include_global_notice=include_global_notice
+                        )
+                    )
                 if task:
                     print(f"\n=== Task ===\n{task}")
                 print("\n=== End ===")
@@ -279,9 +294,17 @@ class CodeagentBackend:
                 )
 
                 if should_retry_without_session(result, session_id=session_id):
+                    retry_prompt_path = prompt_file_path
+                    if fallback_prompt is not None:
+                        retry_prompt_path = str(
+                            prepare_prompt_file(
+                                fallback_prompt,
+                                include_global_notice=fallback_include_global_notice,
+                            )
+                        )
                     retry_command = self._build_command(
                         options,
-                        cast(str, prompt_file_path),
+                        cast(str, retry_prompt_path),
                         task=task,
                         session_id=None,
                     )

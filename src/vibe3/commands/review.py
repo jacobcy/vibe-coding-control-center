@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
+    _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
@@ -50,6 +51,7 @@ def _review_issue_impl(
     trace: bool,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
 ) -> None:
     """Review implementation for an issue via role sync runner."""
     if trace:
@@ -62,6 +64,7 @@ def _review_issue_impl(
             issue_number=issue,
             dry_run=dry_run,
             fresh_session=False,
+            show_prompt=show_prompt,
             spec=REVIEW_SYNC_SPEC,
         )
     else:
@@ -86,6 +89,7 @@ def default(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
     """Review with --issue for orchestra-driven review, or use pr/base subcommands."""
     if ctx.invoked_subcommand is not None:
@@ -97,6 +101,7 @@ def default(
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
+            show_prompt=show_prompt,
         )
         return
     typer.echo(ctx.get_help())
@@ -112,6 +117,7 @@ def issue_command(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
     """Review implementation for a specific issue (orchestra-driven)."""
     _review_issue_impl(
@@ -120,6 +126,7 @@ def issue_command(
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
+        show_prompt=show_prompt,
     )
 
 

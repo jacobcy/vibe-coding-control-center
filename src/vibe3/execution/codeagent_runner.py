@@ -221,6 +221,11 @@ class CodeagentExecutionService:
                 session_id=ctx.session_id,
                 cwd=ctx.execution_cwd,
                 role=command.role,
+                show_prompt=command.show_prompt,
+                include_global_notice=command.include_global_notice,
+                fallback_prompt=command.fallback_prompt,
+                fallback_include_global_notice=command.fallback_include_global_notice,
+                dry_run_summary=command.dry_run_summary,
             )
             if command.dry_run:
                 return CodeagentResult(
@@ -285,6 +290,11 @@ class CodeagentExecutionService:
             resolved_options=request.options,
             actor=request.actor,
             session_id=request.refs.get("session_id"),
+            show_prompt=request.show_prompt,
+            include_global_notice=request.include_global_notice,
+            fallback_prompt=request.fallback_prompt,
+            fallback_include_global_notice=request.fallback_include_global_notice,
+            dry_run_summary=request.dry_run_summary,
             pre_gate_callback=get_role_pre_gate_callback(role),
         )
         return self.execute_sync(command)

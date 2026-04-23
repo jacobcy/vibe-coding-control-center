@@ -125,7 +125,6 @@ class HandoffService:
         actor: str | None,
         verdict: str | None = None,
         audit_is_system_auto: bool = False,
-        action: str | None = None,
     ) -> Path:
         """Internal helper to record a handoff reference."""
         branch = self.git_client.get_current_branch()
@@ -179,11 +178,6 @@ class HandoffService:
             message += f"\nBlocked By: {blocked_by}"
 
         self.store.update_flow_state(branch, **flow_updates)
-
-        if ref_kind.lower() == "indicate":
-            self.store.update_flow_state(
-                branch, latest_indicate_action=action  # None clears the field
-            )
 
         event_refs: dict[str, str] = {"ref": ref_value}
         if verdict:
@@ -269,9 +263,6 @@ class HandoffService:
         next_step: str | None = None,
         blocked_by: str | None = None,
         actor: str | None = None,
-        action: str | None = None,
     ) -> Path:
         """Record manager indicate handoff reference."""
-        return self._record_ref(
-            "indicate", indicate_ref, next_step, blocked_by, actor, action=action
-        )
+        return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)

@@ -52,8 +52,6 @@ def _render_flow_row(
             "BLOCK": "red",
         }.get(v.verdict, "cyan")
         kv("verdict", f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]", 1)
-    if flow.latest_indicate_action:
-        kv("action", f"[yellow bold]{flow.latest_indicate_action}[/]", 1)
     console.print()
 
 
@@ -136,13 +134,6 @@ def render_flow_status(
         console.print(
             f"  [dim]verdict:[/] [{verdict_color}]{v.verdict}[/]" f"  [dim]{v.actor}[/]"
         )
-    # Pending dispatch action — shown when manager wrote indicate --action
-    if status.latest_indicate_action:
-        console.print(
-            f"  [dim]indicate_action:[/] "
-            f"[yellow bold]{status.latest_indicate_action}[/]"
-        )
-        console.print("  [dim](pending executor dispatch)[/]")
 
     from vibe3.services.spec_ref_service import SpecRefService
 

@@ -273,15 +273,6 @@ def show(
                 console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
             console.print()
 
-        # Show pending indicate action (manager dispatch hint)
-        if state.latest_indicate_action:
-            console.print("[bold]## Pending Dispatch[/]")
-            console.print(
-                f"  [cyan]indicate_action:[/] [yellow]{state.latest_indicate_action}[/]"
-                "  [dim](executor will consume on next dispatch)[/]"
-            )
-            console.print()
-
         _render_agent_chain(
             state,
             store=service.store,

@@ -10,13 +10,17 @@ Section builders (build_plan_policy_section, etc.) remain available for direct u
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
+from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.plan import PlanRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+
+PlanPromptMode = Literal["first", "retry"]
 
 
 class PlanContextBuilderError(VibeError):
@@ -121,19 +125,29 @@ Output a structured plan in this format:
 def build_plan_prompt_body(
     request: PlanRequest,
     config: VibeConfig | None = None,
+    mode: PlanPromptMode = "first",
+    context_mode: PromptContextMode = "bootstrap",
 ) -> str:
     """Assemble the plan prompt body from policy, tools guide, task, and output format.
 
     Args:
         request: PlanRequest with scope and task guidance.
         config: VibeConfig instance.
+        mode: Prompt mode. ``retry`` revises an existing plan.
+        context_mode: ``resume`` means an existing session is available, so use
+            the minimal retry prompt instead of re-sending policy/rules context.
 
     Returns:
         Assembled plan prompt body string.
     """
     from vibe3.agents.review_prompt import build_tools_guide_section
 
-    log = logger.bind(domain="plan_context_builder", action="build_plan_prompt_body")
+    log = logger.bind(
+        domain="plan_context_builder",
+        action="build_plan_prompt_body",
+        prompt_mode=mode,
+        context_mode=context_mode,
+    )
     log.info("Building plan prompt body")
 
     if config is None:
@@ -143,14 +157,17 @@ def build_plan_prompt_body(
 
     plan_config = getattr(config, "plan", None)
 
-    if plan_config and hasattr(plan_config, "policy_file"):
-        policy = build_plan_policy_section(plan_config.policy_file)
-        if policy:
-            sections.append(policy)
+    if context_mode == "bootstrap":
+        if plan_config and hasattr(plan_config, "policy_file"):
+            policy = build_plan_policy_section(plan_config.policy_file)
+            if policy:
+                sections.append(policy)
 
-    tools_guide = build_tools_guide_section(getattr(plan_config, "common_rules", None))
-    if tools_guide:
-        sections.append(tools_guide)
+        tools_guide = build_tools_guide_section(
+            getattr(plan_config, "common_rules", None)
+        )
+        if tools_guide:
+            sections.append(tools_guide)
 
     output_format = None
     if plan_config and hasattr(plan_config, "output_format"):
@@ -160,13 +177,20 @@ def build_plan_prompt_body(
 
     # Task section MUST be last so the exit label instruction has recency effect
     plan_task_text = None
-    if plan_config and hasattr(plan_config, "plan_task"):
-        plan_task_text = plan_config.plan_task
-    task = build_plan_task_section(request, plan_task_text)
+    if plan_config:
+        task_key = "retry_task" if mode == "retry" else "plan_task"
+        if hasattr(plan_config, task_key):
+            plan_task_text = getattr(plan_config, task_key)
+    task_request = (
+        request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
+    )
+    task = build_plan_task_section(task_request, plan_task_text)
     sections.append(task)
 
     body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body)).success("Plan prompt body built")
+    log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
+        "Plan prompt body built"
+    )
     return body
 
 

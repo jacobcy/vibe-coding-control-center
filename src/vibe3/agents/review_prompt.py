@@ -13,14 +13,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
 from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
+from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.review import ReviewRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+
+ReviewPromptMode = Literal["first", "retry"]
 
 
 class ContextBuilderError(VibeError):
@@ -170,13 +174,19 @@ Where:
 
 
 def build_review_prompt_body(
-    request: ReviewRequest, config: VibeConfig | None = None
+    request: ReviewRequest,
+    config: VibeConfig | None = None,
+    mode: ReviewPromptMode = "first",
+    context_mode: PromptContextMode = "bootstrap",
 ) -> str:
     """Assemble the review prompt body from policy, tools, analysis, and output format.
 
     Args:
         request: Review request containing scope, symbols, and task.
         config: VibeConfig instance (loads from settings.yaml if None).
+        mode: Prompt mode. ``retry`` revisits an existing review round.
+        context_mode: ``resume`` means an existing session is available, so use
+            the minimal retry prompt instead of re-sending policy/rules context.
 
     Returns:
         Assembled review prompt body string.
@@ -184,7 +194,12 @@ def build_review_prompt_body(
     Raises:
         ContextBuilderError: Build failed.
     """
-    log = logger.bind(domain="context_builder", action="build_review_prompt_body")
+    log = logger.bind(
+        domain="context_builder",
+        action="build_review_prompt_body",
+        prompt_mode=mode,
+        context_mode=context_mode,
+    )
     log.info("Building review prompt body")
 
     if config is None:
@@ -192,32 +207,38 @@ def build_review_prompt_body(
 
     sections: list[str] = []
 
-    policy = build_policy_section(config.review.policy_file)
-    sections.append(policy)
+    if context_mode == "bootstrap":
+        policy = build_policy_section(config.review.policy_file)
+        sections.append(policy)
 
-    tools_guide = build_tools_guide_section(config.review.common_rules)
-    if tools_guide:
-        sections.append(tools_guide)
+        tools_guide = build_tools_guide_section(config.review.common_rules)
+        if tools_guide:
+            sections.append(tools_guide)
 
-    snapshot_diff = build_snapshot_diff_section(request.structure_diff)
-    if snapshot_diff:
-        sections.append(snapshot_diff)
+        snapshot_diff = build_snapshot_diff_section(request.structure_diff)
+        if snapshot_diff:
+            sections.append(snapshot_diff)
 
-    ast_analysis = build_ast_analysis_section(
-        request.changed_symbols, request.symbol_dag
-    )
-    if ast_analysis:
-        sections.append(ast_analysis)
+        ast_analysis = build_ast_analysis_section(
+            request.changed_symbols, request.symbol_dag
+        )
+        if ast_analysis:
+            sections.append(ast_analysis)
 
     output_contract = build_output_contract_section(config.review.output_format)
     sections.append(output_contract)
 
     # Task section MUST be last so the exit label instruction has recency effect
-    task = build_review_task_section(request.task_guidance or config.review.review_task)
+    task_text = (
+        config.review.retry_task if mode == "retry" else config.review.review_task
+    )
+    task = build_review_task_section(task_text)
     sections.append(task)
 
     body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body)).success("Review prompt body built")
+    log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
+        "Review prompt body built"
+    )
     return body
 
 

@@ -197,7 +197,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added latest_verdict column to flow_state"
         )
 
-    # Migration: add latest_indicate_action field for structured executor dispatch
+    # Legacy compatibility: keep old column for existing databases.
+    # New code no longer reads or writes this field.
     if "latest_indicate_action" not in existing:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_indicate_action TEXT")
         logger.bind(external="sqlite", operation="migration").info(

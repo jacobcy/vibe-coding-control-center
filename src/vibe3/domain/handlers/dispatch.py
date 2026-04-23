@@ -118,10 +118,15 @@ def _dispatch_role_intent(
 
 def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
     """Handle PlannerDispatchIntent event via role request builder."""
+    store = SQLiteClient()
+    flow_state = store.get_flow_state(event.branch) if event.branch else None
+    has_plan = bool(flow_state and flow_state.get("plan_ref")) if flow_state else False
+
     logger.bind(
         domain="planner_handler",
         issue_number=event.issue_number,
         branch=event.branch,
+        retry=has_plan,
     ).info("Planner dispatch triggered")
 
     try:
@@ -148,9 +153,8 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     Enriches the neutral dispatch intent with execution-specific context
     (plan_ref, audit_ref, commit_mode) read from flow state.
 
-    commit_mode is now derived from the structured ``latest_indicate_action``
-    field in flow state (written by ``handoff indicate --action commit_pr``).
-    This replaces the previous MERGE_READY_COMMIT free-text sentinel scan.
+    commit_mode is derived from trigger_state: when the executor is dispatched
+    with state/merge-ready, it enters the publish path automatically.
     """
     store = SQLiteClient()
 
@@ -159,19 +163,14 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     plan_ref = str(v) if flow_state and (v := flow_state.get("plan_ref")) else None
     audit_ref = str(v) if flow_state and (v := flow_state.get("audit_ref")) else None
 
-    # Structured action replaces MERGE_READY_COMMIT free-text sentinel.
-    # Values: "fix" (retry), "commit_pr" (run vibe-commit skill)
-    indicate_action = (
-        str(flow_state.get("latest_indicate_action", "")) if flow_state else ""
-    )
-    commit_mode = indicate_action == "commit_pr"
+    # publish path is determined solely by trigger_state == merge-ready
+    commit_mode = event.trigger_state == "merge-ready"
 
     logger.bind(
         domain="executor_handler",
         issue_number=event.issue_number,
         branch=event.branch,
         plan_ref=plan_ref,
-        indicate_action=indicate_action,
         commit_mode=commit_mode,
     ).info("Executor dispatch triggered")
 
@@ -199,19 +198,24 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
 def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
     """Handle ReviewerDispatchIntent event via role request builder.
 
-    Enriches the neutral dispatch intent with report_ref read from flow state.
+    Enriches the neutral dispatch intent with report_ref and retry context
+    read from flow state.
     """
     store = SQLiteClient()
 
     # Read execution context from flow state
     flow_state = store.get_flow_state(event.branch) if event.branch else None
     report_ref = str(v) if flow_state and (v := flow_state.get("report_ref")) else None
+    has_audit = (
+        bool(flow_state and flow_state.get("audit_ref")) if flow_state else False
+    )
 
     logger.bind(
         domain="reviewer_handler",
         issue_number=event.issue_number,
         branch=event.branch,
         report_ref=report_ref,
+        retry=has_audit,
     ).info("Reviewer dispatch triggered")
 
     try:

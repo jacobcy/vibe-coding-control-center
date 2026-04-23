@@ -134,7 +134,6 @@ class GlobalDispatchCoordinator:
             if issue.state in {
                 IssueState.BLOCKED,
                 IssueState.FAILED,
-                IssueState.MERGE_READY,
                 IssueState.DONE,
             }:
                 self._frozen_queue.pop(index)
@@ -214,6 +213,7 @@ class GlobalDispatchCoordinator:
         seen_issue_numbers: set[int] = set()
         for state in (
             IssueState.REVIEW,
+            IssueState.MERGE_READY,
             IssueState.IN_PROGRESS,
             IssueState.CLAIMED,
             IssueState.HANDOFF,

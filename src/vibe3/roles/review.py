@@ -16,12 +16,14 @@ from vibe3.agents.review_parser import (
     parse_codex_review,
 )
 from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
-from vibe3.agents.review_prompt import make_review_context_builder
+from vibe3.agents.review_prompt import (
+    build_review_prompt_body,
+    make_review_context_builder,
+)
 from vibe3.analysis.inspect_output_adapter import changed_symbols
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -35,6 +37,7 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
+from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.execution.role_contracts import REVIEWER_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -86,6 +89,8 @@ def build_issue_review_request(
     session_id: str | None = None,
     options: Any = None,
     dry_run: bool = False,
+    show_prompt: bool = False,
+    flow_state: dict[str, object] | None = None,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
     target_branch = branch or f"task/issue-{issue.number}"
@@ -99,24 +104,70 @@ def build_issue_review_request(
             review_prompt
             or f"Review implementation for issue #{issue.number}: {issue.title}"
         )
+        meta = build_prompt_meta(
+            flow_state,
+            ref_keys=("report_ref", "audit_ref"),
+            retry_ref_keys=("audit_ref",),
+            session_id=session_id,
+            default_mode="first",
+        )
+
+        request = ReviewRequest(
+            scope=ReviewScope.for_base("origin/main"),
+            task_guidance=task,
+        )
+        prompt = build_review_prompt_body(
+            request,
+            VibeConfig.get_defaults(),
+            mode=meta.prompt_mode,  # type: ignore[arg-type]
+            context_mode=meta.context_mode,
+        )
+        fallback_prompt = None
+        if meta.fallback_context_mode is not None:
+            fallback_prompt = build_review_prompt_body(
+                request,
+                VibeConfig.get_defaults(),
+                mode=meta.prompt_mode,  # type: ignore[arg-type]
+                context_mode=meta.fallback_context_mode,
+            )
+        sections = (
+            ["output_format", "retry_task"]
+            if meta.context_mode == "resume"
+            else [
+                "policy_file",
+                "common_rules",
+                "output_format",
+                "retry_task" if meta.prompt_mode == "retry" else "review_task",
+            ]
+        )
+        refs = dict(meta.refs)
+        if report_ref and "report_ref" not in refs:
+            refs["report_ref"] = report_ref
+        dry_run_summary = meta.summary(sections)
 
         return build_issue_sync_prompt_request(
             role="reviewer",
             issue=issue,
             target_branch=target_branch,
-            prompt=task,
+            prompt=prompt,
             options=options,
             task=task,
             actor=actor,
             execution_name=execution_name,
             session_id=session_id,
             dry_run=dry_run,
+            show_prompt=show_prompt,
+            include_global_notice=meta.include_global_notice,
+            fallback_prompt=fallback_prompt,
+            fallback_include_global_notice=True,
+            extra_refs=refs,
+            dry_run_summary=dry_run_summary,
             worktree_requirement=REVIEWER_ROLE.worktree,
         )
 
-    refs: dict[str, str] = {"issue_number": str(issue.number)}
+    async_refs: dict[str, str] = {"issue_number": str(issue.number)}
     if report_ref:
-        refs["report_ref"] = report_ref
+        async_refs["report_ref"] = report_ref
     command_args = ["review", "--issue", str(issue.number), "--no-async"]
     if report_ref:
         command_args.extend(["--report-ref", report_ref])
@@ -128,7 +179,7 @@ def build_issue_review_request(
         command_args=command_args,
         actor=actor,
         execution_name=execution_name,
-        refs=refs,
+        refs=async_refs,
         worktree_requirement=REVIEWER_ROLE.worktree,
         repo_path=repo_path,
     )
@@ -145,18 +196,25 @@ def build_review_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    flow_state = SQLiteClient().get_flow_state(branch) if branch else None
     return build_issue_review_request(
         issue,
         branch=branch,
+        flow_state=flow_state,
         session_id=session_id,
         options=options,
         actor=actor,
         dry_run=dry_run,
+        show_prompt=show_prompt,
         sync=True,
         config=config,
     )
@@ -480,6 +538,8 @@ def _dispatch_async_manual_review(
         if issue_number is not None
         else f"vibe3-reviewer-{request.scope.kind}-{target_id or 'adhoc'}"
     )
+    from vibe3.clients.sqlite_client import SQLiteClient
+
     coordinator = ExecutionCoordinator(
         load_orchestra_config(),
         SQLiteClient(),

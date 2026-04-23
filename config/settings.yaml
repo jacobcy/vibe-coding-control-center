@@ -380,6 +380,16 @@ review:
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
+  retry_task: |
+    This is a retry review round, not a fresh review pass.
+    Reuse the existing session context when available.
+    Read the current authoritative refs yourself before continuing:
+    - `report_ref` for the latest implementation report
+    - `audit_ref` if a previous audit already exists
+    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+    Keep scope focused on verifying whether the previously raised concerns are now resolved.
+    You must still follow the same output format and final state transition contract as a normal review.
+
   # Static: Custom review prompt (optional prefix)
   # Added to beginning of review context if provided
   review_prompt: "/code-review"
@@ -447,6 +457,15 @@ plan:
     ```
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
+  retry_task: |
+    This is a retry planning round, not a fresh planning pass.
+    Reuse the existing session context when available.
+    Read the current authoritative refs yourself before continuing:
+    - `plan_ref` for the previous plan
+    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+    Revise the plan in place based on the latest feedback and current repository state.
+    You must still follow the same output format and final state transition contract as a normal planning round.
 
   # Static: Optional plain-text default task guidance.
   # Slash-prefixed external skill triggers are ignored by vibe3 plan.
@@ -520,9 +539,15 @@ run:
     Document any deviations with reasons.
     Follow the repository execution contract.
 
-  # Static: Fix execution task — injected when manager routes executor with --action fix
-  fix_task: |
-    Treat this run as a focused fix round, not a fresh implementation pass.
+  # Static: Retry execution task — injected for executor retry rounds
+  retry_task: |
+    Treat this run as a focused retry round, not a fresh implementation pass.
+    Reuse the existing session context when available.
+    Read the current authoritative refs yourself before continuing:
+    - `plan_ref` for the current plan
+    - `report_ref` for the latest execution report
+    - `audit_ref` for the latest review findings
+    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
     Read the audit feedback carefully and fix the cited problems first.
     Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
     Explain any audit item you intentionally do not change, with a concrete reason.

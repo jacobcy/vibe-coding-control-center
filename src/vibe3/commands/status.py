@@ -90,11 +90,6 @@ def _render_task_item_details(
             f"             [dim]verdict:[/] "
             f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
         )
-    if flow.latest_indicate_action:
-        console.print(
-            f"             [dim]action:[/] "
-            f"[yellow bold]{flow.latest_indicate_action}[/]"
-        )
     if flow.pr_number:
         pr_ref = (
             f"https://github.com/{config.repo}/pull/{flow.pr_number}"

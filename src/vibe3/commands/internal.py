@@ -37,6 +37,7 @@ def internal_manager_dispatch(
             issue_number=issue,
             dry_run=dry_run,
             fresh_session=fresh_session,
+            show_prompt=False,
             spec=MANAGER_SYNC_SPEC,
         )
     else:
@@ -71,6 +72,7 @@ def internal_apply_dispatch(
             issue_number=issue,
             dry_run=dry_run,
             fresh_session=True,
+            show_prompt=False,
             spec=SUPERVISOR_CLI_SYNC_SPEC,
         )
     else:

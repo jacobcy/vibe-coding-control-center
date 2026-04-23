@@ -40,9 +40,7 @@ class SQLiteFlowStateRepo:
         "execution_pid",
         "execution_started_at",
         "execution_completed_at",
-        "latest_verdict",  # NEW: Latest verdict record (JSON)
-        "latest_indicate_action",  # NEW: Structured action directive from manager
-        # indicate
+        "latest_verdict",  # Latest verdict record (JSON)
     }
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:

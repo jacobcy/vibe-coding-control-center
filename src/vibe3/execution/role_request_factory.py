@@ -60,6 +60,12 @@ def build_role_sync_request(
     session_id: str | None = None,
     actor: str | None = None,
     dry_run: bool = False,
+    show_prompt: bool = False,
+    include_global_notice: bool = True,
+    fallback_prompt: str | None = None,
+    fallback_include_global_notice: bool = True,
+    extra_refs: dict[str, str] | None = None,
+    dry_run_summary: dict[str, Any] | None = None,
 ) -> ExecutionRequest:
     """Unified factory for building role-specific sync prompt requests."""
     actor = actor or f"orchestra:{role}"
@@ -75,5 +81,11 @@ def build_role_sync_request(
         execution_name=f"vibe3-{role}-issue-{issue.number}",
         session_id=session_id,
         dry_run=dry_run,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=fallback_include_global_notice,
+        extra_refs=extra_refs,
+        dry_run_summary=dry_run_summary,
         worktree_requirement=worktree_requirement,
     )

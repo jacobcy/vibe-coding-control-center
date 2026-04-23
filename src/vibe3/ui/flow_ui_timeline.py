@@ -302,20 +302,15 @@ def render_flow_timeline(
             console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
 
     # Show latest state summary if available
-    if state.latest_verdict or state.latest_indicate_action:
+    if state.latest_verdict:
         console.print("[bold]--- State ---[/]")
-        if state.latest_verdict:
-            v = state.latest_verdict
-            color = {
-                "PASS": "green",
-                "MAJOR": "yellow",
-                "BLOCK": "red",
-            }.get(v.verdict, "cyan")
-            console.print(
-                f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
-            )
-        if state.latest_indicate_action:
-            console.print(
-                f"  [dim]action[/]      [yellow bold]{state.latest_indicate_action}[/]"
-            )
+        v = state.latest_verdict
+        color = {
+            "PASS": "green",
+            "MAJOR": "yellow",
+            "BLOCK": "red",
+        }.get(v.verdict, "cyan")
+        console.print(
+            f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+        )
     console.print()
