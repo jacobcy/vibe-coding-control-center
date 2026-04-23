@@ -12,7 +12,6 @@ from loguru import logger
 
 from vibe3.agents.models import create_codeagent_command
 from vibe3.agents.review_parser import (
-    ParsedReview,
     ReviewParserError,
     parse_codex_review,
 )
@@ -435,11 +434,10 @@ def execute_manual_review_sync(
     branch: str | None = None,
     config: VibeConfig | None = None,
     flow_service: FlowService | None = None,
-    review_parser: Callable[[str], ParsedReview] = parse_codex_review,
     context_builder: Callable[..., object] = make_review_context_builder,
 ) -> ReviewRunResult:
     """Execute manual review in sync mode (direct execution)."""
-    _ = flow_service, review_parser
+    _ = flow_service
     cfg = config or VibeConfig.get_defaults()
     log = logger.bind(domain="review", scope=request.scope.kind)
     task = _build_manual_review_task(cfg, instructions, request, pr_number, log)

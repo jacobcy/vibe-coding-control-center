@@ -282,7 +282,13 @@ def execute_spec_plan_async(
     cli_args: list[str],
     config: VibeConfig | None = None,
 ) -> CodeagentResult:
-    """Execute spec plan in async mode (tmux wrapper)."""
+    """Execute spec plan in async mode (tmux wrapper).
+
+    ``request`` and ``config`` are intentionally unused: async mode re-invokes
+    the CLI via ``cli_args`` inside a tmux session, so all configuration is
+    re-resolved from scratch by the child process. Passing a custom ``request``
+    or ``config`` here has no effect.
+    """
     _ = request, config
     launch = ExecutionCoordinator(
         load_orchestra_config(),

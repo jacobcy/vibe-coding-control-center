@@ -43,3 +43,19 @@ def test_classify_task_status_keeps_non_ready_unassigned_in_intake_view() -> Non
         classify_task_status(IssueState.HANDOFF, None)
         == TaskStatusBucket.ASSIGNEE_INTAKE
     )
+
+
+def test_classify_task_status_blocked_maps_to_assignee_intake() -> None:
+    """BLOCKED issues without flow map to Assignee Intake."""
+    assert (
+        classify_task_status(IssueState.BLOCKED, None)
+        == TaskStatusBucket.ASSIGNEE_INTAKE
+    )
+
+
+def test_classify_task_status_failed_maps_to_assignee_intake() -> None:
+    """FAILED issues without flow map to Assignee Intake."""
+    assert (
+        classify_task_status(IssueState.FAILED, None)
+        == TaskStatusBucket.ASSIGNEE_INTAKE
+    )

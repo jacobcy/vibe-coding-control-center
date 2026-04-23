@@ -230,7 +230,7 @@ def status(
                     status_color = "yellow" if is_queued else "green"
                     console.print(
                         f"  #{number:4}  [{status_color}]{status_str:10}[/]"
-                        f"  {title[:48]}..."
+                        f"  {title[:48] + ('...' if len(title) > 48 else '')}"
                     )
                     _render_task_item_details(flow, config, assignee=assignee)
             else:
@@ -261,8 +261,9 @@ def status(
                     metadata_parts.append(f"priority/{priority}")
                     metadata_str = "  ".join(metadata_parts)
 
+                    display_title = title[:48] + "..." if len(title) > 48 else title
                     console.print(
-                        f"  #{number:4}  [cyan]READY     [/]  {title[:48]}..."
+                        f"  #{number:4}  [cyan]READY     [/]  {display_title}"
                     )
                     _render_task_item_details(flow, config, assignee=assignee)
                     console.print(f"             [dim]{metadata_str}[/]")
@@ -276,7 +277,8 @@ def status(
                     title = cast(str, item["title"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
 
-                    console.print(f"  #{number:4}  [red]READY     [/]  {title[:48]}...")
+                    display_title = title[:48] + "..." if len(title) > 48 else title
+                    console.print(f"  #{number:4}  [red]READY     [/]  {display_title}")
                     _render_task_item_details(flow, config)
                     console.print(
                         "             [yellow]missing assignee:[/] "
@@ -308,7 +310,8 @@ def status(
                 state = cast(IssueState, item["state"])
                 status_str = state.value.upper()
 
-                console.print(f"  #{number:4}  [{status_str:10}]  {title[:48]}...")
+                display_title = title[:48] + "..." if len(title) > 48 else title
+                console.print(f"  #{number:4}  [{status_str:10}]  {display_title}")
                 if pr_url:
                     console.print(f"         [cyan]PR: {pr_url}[/]")
         else:

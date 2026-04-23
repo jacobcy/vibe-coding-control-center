@@ -100,16 +100,16 @@ class HandoffService:
             else (worktree_root / ref_path).resolve(strict=False)
         )
 
+        if self._is_log_like_path(resolved):
+            raise UserError(
+                f"{ref_kind}_ref cannot point to execution logs under temp/logs: "
+                f"{ref_value}"
+            )
         git_common = Path(self.git_client.get_git_common_dir()).resolve()
         if resolved.is_relative_to(git_common):
             raise UserError(
                 f"{ref_kind}_ref must point to an agent worktree document, "
                 f"not shared handoff store: {ref_value}"
-            )
-        if self._is_log_like_path(resolved):
-            raise UserError(
-                f"{ref_kind}_ref cannot point to execution logs under temp/logs: "
-                f"{ref_value}"
             )
         if not resolved.is_relative_to(worktree_root):
             raise UserError(

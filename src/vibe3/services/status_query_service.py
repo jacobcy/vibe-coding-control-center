@@ -149,8 +149,7 @@ def sort_ready_issue_dicts(
             None,
         )
         if matching_item:
-            matching_item["queue_rank"] = rank
-            sorted_ready_issues.append(matching_item)
+            sorted_ready_issues.append({**matching_item, "queue_rank": rank})
     return sorted_ready_issues
 
 

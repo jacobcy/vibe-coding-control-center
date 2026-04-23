@@ -239,7 +239,9 @@ def render_flow_timeline(
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
             )
             log_path = raw_log_path if isinstance(raw_log_path, str) else None
-            show_log_path = log_path and event.event_type not in _ARTIFACT_EVENT_TYPES
+            show_log_path: bool = (
+                bool(log_path) and event.event_type not in _ARTIFACT_EVENT_TYPES
+            )
             if show_log_path:
                 log_display = resolve_ref_path(
                     log_path, state.worktree_root, absolute=True

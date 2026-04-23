@@ -45,6 +45,8 @@ def classify_task_status(
         IssueState.HANDOFF,
         IssueState.IN_PROGRESS,
         IssueState.REVIEW,
+        IssueState.BLOCKED,
+        IssueState.FAILED,
     }:
         return TaskStatusBucket.ASSIGNEE_INTAKE
 
