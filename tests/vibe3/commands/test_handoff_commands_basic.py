@@ -109,6 +109,30 @@ class TestHandoffBasicCommands:
         assert result.exit_code == 0
         mock_render_detail.assert_called_once()
 
+    @patch("vibe3.commands.handoff_read.render_handoff_detail")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_show_shared_artifact_short_path(
+        self, mock_flow_service_class, mock_render_detail
+    ):
+        """Test handoff show resolves short shared artifact paths."""
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_flow_service_class.return_value = mock_flow_service
+
+        with patch.object(Path, "exists", side_effect=[False, False, True, True]):
+            with patch.object(Path, "is_file", return_value=True):
+                result = runner.invoke(
+                    app,
+                    [
+                        "handoff",
+                        "show",
+                        "task-issue-340-d347bc95/run-2026-04-21T05:19:28.md",
+                    ],
+                )
+
+        assert result.exit_code == 0
+        mock_render_detail.assert_called_once()
+
     def test_handoff_show_artifact_not_found(self):
         """Test handoff show <artifact> reports missing files."""
         result = runner.invoke(app, ["handoff", "show", "missing.md"])
