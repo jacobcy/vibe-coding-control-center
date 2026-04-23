@@ -56,8 +56,7 @@ _EVENT_COLOR: dict[str, str] = {
     "handoff_plan": "blue",
     "handoff_report": "blue",
     "handoff_run": "blue",  # backward-compat: old event type
-    "handoff_review": "magenta",  # new: reviewer raw output artifact
-    "handoff_audit": "magenta bold",  # new: reviewer-initiated authoritative audit
+    "handoff_audit": "magenta bold",  # reviewer-initiated authoritative audit
     "audit_recorded": "magenta",  # legacy: system auto-generated / backward-compat
     "handoff_indicate": "cyan bold",
     "manager_completed": "green bold",
@@ -65,6 +64,15 @@ _EVENT_COLOR: dict[str, str] = {
     "codeagent_manager_started": "yellow",
     "codeagent_manager_completed": "green",
     "codeagent_manager_aborted": "red",
+}
+
+_ARTIFACT_EVENT_TYPES = {
+    "handoff_plan",
+    "handoff_report",
+    "handoff_run",
+    "handoff_audit",
+    "handoff_indicate",
+    "audit_recorded",
 }
 
 
@@ -85,11 +93,10 @@ def _format_event_type(event_type: str) -> str:
         "planner_dispatched": "Planner Dispatch",
         "executor_dispatched": "Executor Dispatch",
         "reviewer_dispatched": "Reviewer Dispatch",
-        # Audit Events — new semantic names
-        "handoff_review": "Review Output",  # reviewer raw output artifact
-        "handoff_audit": "Audit Recorded",  # reviewer-initiated authoritative audit
-        "audit_recorded": "Audit Recorded",  # system auto-generated / backward-compat
-        "handoff_audit_fallback": "Audit Recorded",  # backward compatibility
+        # Audit Events — semantic names
+        "handoff_audit": "Audit Handoff",  # reviewer-initiated authoritative audit
+        "audit_recorded": "Audit Auto-Recorded",  # system auto-generated
+        "handoff_audit_fallback": "Audit Auto-Recorded",  # backward compatibility
     }
     return display_names.get(event_type, event_type)
 
@@ -226,11 +233,16 @@ def render_flow_timeline(
                     else "yellow" if verdict == "UNKNOWN" else "green"
                 )
                 console.print(f"  [{verdict_color}]verdict: {verdict}[/]")
-            # Priority: log_path > ref for display
-            log_path = (
+            # Historical handoff events may contain runtime metadata like
+            # log_path/session_id. For artifact events, show the artifact ref.
+            raw_log_path = (
                 event.refs.get("log_path") if isinstance(event.refs, dict) else None
             )
-            if log_path and isinstance(log_path, str):
+            log_path = raw_log_path if isinstance(raw_log_path, str) else None
+            show_log_path: bool = (
+                bool(log_path) and event.event_type not in _ARTIFACT_EVENT_TYPES
+            )
+            if show_log_path:
                 log_display = resolve_ref_path(
                     log_path, state.worktree_root, absolute=True
                 )
@@ -250,7 +262,7 @@ def render_flow_timeline(
             if (
                 ref
                 and isinstance(ref, str)
-                and not log_path
+                and not show_log_path
                 and not detail_contains_ref
             ):
                 ref_display = resolve_ref_path(ref, state.worktree_root, absolute=True)
@@ -290,20 +302,15 @@ def render_flow_timeline(
             console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
 
     # Show latest state summary if available
-    if state.latest_verdict or state.latest_indicate_action:
+    if state.latest_verdict:
         console.print("[bold]--- State ---[/]")
-        if state.latest_verdict:
-            v = state.latest_verdict
-            color = {
-                "PASS": "green",
-                "MAJOR": "yellow",
-                "BLOCK": "red",
-            }.get(v.verdict, "cyan")
-            console.print(
-                f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
-            )
-        if state.latest_indicate_action:
-            console.print(
-                f"  [dim]action[/]      [yellow bold]{state.latest_indicate_action}[/]"
-            )
+        v = state.latest_verdict
+        color = {
+            "PASS": "green",
+            "MAJOR": "yellow",
+            "BLOCK": "red",
+        }.get(v.verdict, "cyan")
+        console.print(
+            f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+        )
     console.print()

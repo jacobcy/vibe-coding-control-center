@@ -24,6 +24,11 @@ class ExecutionRequest:
     actor: str = "orchestra:system"
     mode: Literal["sync", "async"] = "async"
     dry_run: bool = False
+    show_prompt: bool = False
+    include_global_notice: bool = True
+    fallback_prompt: Optional[str] = None
+    fallback_include_global_notice: bool = True
+    dry_run_summary: Dict[str, Any] = field(default_factory=dict)
     worktree_requirement: WorktreeRequirement = WorktreeRequirement.NONE
 
 

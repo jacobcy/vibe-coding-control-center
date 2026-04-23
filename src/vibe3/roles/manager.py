@@ -172,12 +172,15 @@ def build_manager_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
     """Build the manager sync execution request."""
+    _ = flow_state
     rendered = render_manager_prompt(config, issue)
     prompt = rendered.rendered_text
     manager_task = (
@@ -199,6 +202,7 @@ def build_manager_sync_request(
         repo_path=repo_root,
         session_id=session_id,
         dry_run=dry_run,
+        show_prompt=show_prompt,
         worktree_requirement=MANAGER_ROLE.worktree,
     )
 

@@ -14,6 +14,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
+from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 
 
@@ -90,7 +91,7 @@ def build_run_standard_sections(config: VibeConfig) -> list[str]:
     return sections
 
 
-RunPromptMode = Literal["coding", "fix"]
+RunPromptMode = Literal["coding", "retry"]
 
 
 def build_run_mode_sections(config: VibeConfig, mode: RunPromptMode) -> list[str]:
@@ -98,7 +99,7 @@ def build_run_mode_sections(config: VibeConfig, mode: RunPromptMode) -> list[str
 
     Injected ONLY for non-skill executor paths.
     - ``coding``: regular implementation round
-    - ``fix``: focused retry/fix round based on prior audit feedback
+    - ``retry``: focused retry round based on prior audit feedback
     NOT included in skill/commit paths to avoid instruction conflicts.
     """
     run_config = getattr(config, "run", None)
@@ -106,8 +107,8 @@ def build_run_mode_sections(config: VibeConfig, mode: RunPromptMode) -> list[str
         return []
 
     section_text: str | None
-    if mode == "fix":
-        section_text = getattr(run_config, "fix_task", None) or getattr(
+    if mode == "retry":
+        section_text = getattr(run_config, "retry_task", None) or getattr(
             run_config, "coding_task", None
         )
     else:
@@ -123,17 +124,18 @@ def build_run_prompt_body(
     config: VibeConfig | None = None,
     audit_file: str | None = None,
     mode: RunPromptMode = "coding",
+    context_mode: PromptContextMode = "bootstrap",
 ) -> str:
     """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
     Args:
         plan_file: Path to plan file (markdown), or None for lightweight mode.
         config: VibeConfig instance.
-        audit_file: Path to previous review audit file. When provided, the run
-            is a retry — review feedback is injected into the prompt so the
-            executor addresses the issues found by the reviewer.
+        audit_file: Path to previous review audit file. Used for request metadata.
         mode: Prompt mode for executor routing. ``coding`` is the default
-            implementation path; ``fix`` is a focused repair path.
+            implementation path; ``retry`` is a focused repair path.
+        context_mode: ``resume`` means an existing session is available, so use
+            the minimal retry prompt instead of re-sending bootstrap context.
 
     Returns:
         Assembled prompt body string.
@@ -142,8 +144,11 @@ def build_run_prompt_body(
         config = VibeConfig.get_defaults()
 
     log = logger.bind(domain="run_context_builder", action="build_run_prompt_body")
-    retry = bool(audit_file)
-    log.info(f"Building run prompt body (retry={retry}, mode={mode})")
+    retry = mode == "retry"
+    log.info(
+        f"Building run prompt body "
+        f"(retry={retry}, mode={mode}, context_mode={context_mode})"
+    )
 
     plan_content = None
     if plan_file:
@@ -151,38 +156,24 @@ def build_run_prompt_body(
             raise FileNotFoundError(f"Plan file not found: {plan_file}")
         plan_content = Path(plan_file).read_text(encoding="utf-8")
 
-    audit_content: str | None = None
-    if audit_file:
-        audit_path = Path(audit_file)
-        if audit_path.exists():
-            audit_content = audit_path.read_text(encoding="utf-8")
-        else:
-            log.warning(f"Audit file not found: {audit_file}")
-
     sections: list[str] = []
 
-    if plan_content:
+    if context_mode == "bootstrap" and plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
-
-    # Retry mode: inject review feedback so executor addresses prior issues
-    if audit_content:
-        sections.append(
-            "## Previous Review Feedback (RETRY)\n\n"
-            "The previous implementation was reviewed and issues were found. "
-            "You MUST address the feedback below before producing new output.\n\n"
-            f"{audit_content}"
-        )
 
     # Mode-specific guidance (not for skill/commit paths)
     sections.extend(build_run_mode_sections(config, mode))
 
-    # Run role hard-standard sections (shared with all run paths)
-    sections.extend(build_run_standard_sections(config))
+    if context_mode == "bootstrap":
+        sections.extend(build_run_standard_sections(config))
+    else:
+        output_format = getattr(getattr(config, "run", None), "output_format", None)
+        sections.append(build_run_output_contract_section(output_format))
 
     body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body), retry=retry, mode=mode).success(
-        "Run prompt body built"
-    )
+    log.bind(
+        body_len=len(body), retry=retry, mode=mode, context_mode=context_mode
+    ).success("Run prompt body built")
     return body
 
 
@@ -192,6 +183,7 @@ def make_run_context_builder(
     prompts_path: Path | None = None,
     audit_file: str | None = None,
     mode: RunPromptMode = "coding",
+    context_mode: PromptContextMode = "bootstrap",
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for plan/flow_plan/lightweight run mode.
 
@@ -202,7 +194,9 @@ def make_run_context_builder(
     return make_context_builder(
         template_key="run.plan",
         body_provider_key="run.context",
-        body_fn=lambda: build_run_prompt_body(plan_file, cfg, audit_file, mode),
+        body_fn=lambda: build_run_prompt_body(
+            plan_file, cfg, audit_file, mode, context_mode
+        ),
         prompts_path=prompts_path,
     )
 

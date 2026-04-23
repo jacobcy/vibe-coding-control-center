@@ -13,10 +13,11 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,
     resolve_roadmap_rank,
+    sort_ready_issues,
 )
 
 if TYPE_CHECKING:
@@ -37,6 +38,38 @@ def _state_from_labels(raw_labels: object) -> IssueState | None:
         if parsed is not None:
             return parsed
     return None
+
+
+def extract_issue_labels(raw_labels: object) -> list[str]:
+    """Extract plain label names from GitHub issue payload."""
+    if not isinstance(raw_labels, list):
+        return []
+    return [
+        label.get("name", "")
+        for label in raw_labels
+        if isinstance(label, dict) and "name" in label
+    ]
+
+
+def extract_milestone_title(raw_milestone: object) -> str | None:
+    """Extract milestone title from GitHub milestone payload."""
+    if isinstance(raw_milestone, dict) and "title" in raw_milestone:
+        title = raw_milestone["title"]
+        if isinstance(title, str) and title.strip():
+            return title
+    return None
+
+
+def extract_queue_metadata(
+    raw_labels: object,
+    raw_milestone: object,
+) -> tuple[list[str], str | None, int, str | None]:
+    """Extract shared queue metadata fields from GitHub payload."""
+    labels = extract_issue_labels(raw_labels)
+    milestone = extract_milestone_title(raw_milestone)
+    priority = resolve_priority(labels)
+    _, roadmap = resolve_roadmap_rank(labels)
+    return labels, milestone, priority, roadmap
 
 
 def issue_priority(state: IssueState) -> tuple[int, str]:
@@ -76,6 +109,48 @@ def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool
 def is_orchestra_managed_flow_branch(branch: str | None) -> bool:
     """Whether a flow branch belongs to orchestra-managed auto task scenes."""
     return isinstance(branch, str) and is_auto_task_branch(branch)
+
+
+def extract_primary_assignee_login(raw_assignees: object) -> str | None:
+    """Extract the primary manager assignee login from GitHub payload."""
+    if not isinstance(raw_assignees, list):
+        return None
+
+    for assignee in raw_assignees:
+        if not isinstance(assignee, dict):
+            continue
+        login = assignee.get("login")
+        if isinstance(login, str) and login.strip():
+            return login.strip()
+    return None
+
+
+def sort_ready_issue_dicts(
+    ready_issues: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Sort READY issue dicts and attach queue ranks."""
+    ready_issue_infos = [
+        IssueInfo(
+            number=cast(int, item["number"]),
+            title=cast(str, item["title"]),
+            state=cast(IssueState | None, item["state"]),
+            labels=cast(list[str], item["labels"]),
+            assignees=[cast(str, item["assignee"])] if item.get("assignee") else [],
+            milestone=cast(str | None, item["milestone"]),
+        )
+        for item in ready_issues
+    ]
+    sorted_ready_infos = sort_ready_issues(ready_issue_infos)
+
+    sorted_ready_issues: list[dict[str, object]] = []
+    for rank, issue_info in enumerate(sorted_ready_infos, start=1):
+        matching_item = next(
+            (item for item in ready_issues if item["number"] == issue_info.number),
+            None,
+        )
+        if matching_item:
+            sorted_ready_issues.append({**matching_item, "queue_rank": rank})
+    return sorted_ready_issues
 
 
 def _select_preferred_issue_flow(
@@ -199,28 +274,18 @@ class StatusQueryService:
                 if flow:
                     blocked_reason = getattr(flow, "blocked_reason", None)
 
-            # Parse queue metadata from labels
-            labels = [
-                label.get("name", "")
-                for label in item.get("labels", [])
-                if isinstance(label, dict) and "name" in label
-            ]
-
-            # Extract milestone from GitHub milestone field
-            milestone = None
-            milestone_data = item.get("milestone")
-            if isinstance(milestone_data, dict) and "title" in milestone_data:
-                milestone = milestone_data["title"]
-
-            # Resolve priority and roadmap
-            priority = resolve_priority(labels)
-            _, roadmap = resolve_roadmap_rank(labels)
+            labels, milestone, priority, roadmap = extract_queue_metadata(
+                item.get("labels"),
+                item.get("milestone"),
+            )
+            assignee = extract_primary_assignee_login(item.get("assignees"))
 
             orchestrated_issues.append(
                 {
                     "number": number,
                     "title": str(item.get("title") or ""),
                     "state": state,
+                    "assignee": assignee,
                     "flow": flow,
                     "queued": number in queued_set,
                     "failed_reason": failed_reason,
@@ -244,38 +309,7 @@ class StatusQueryService:
 
         # Sort ready issues using queue ordering rules and assign real queue ranks
         if ready_issues:
-            from vibe3.models.orchestration import IssueInfo
-            from vibe3.orchestra.queue_ordering import sort_ready_issues
-
-            ready_issue_infos = [
-                IssueInfo(
-                    number=cast(int, item["number"]),
-                    title=cast(str, item["title"]),
-                    state=cast(IssueState | None, item["state"]),
-                    labels=cast(list[str], item["labels"]),
-                    assignees=[],
-                    milestone=cast(str | None, item["milestone"]),
-                )
-                for item in ready_issues
-            ]
-            sorted_ready_infos = sort_ready_issues(ready_issue_infos)
-
-            # Build sorted ready issues with real queue ranks
-            sorted_ready_issues = []
-            for rank, issue_info in enumerate(sorted_ready_infos, start=1):
-                matching_item = next(
-                    (
-                        item
-                        for item in ready_issues
-                        if item["number"] == issue_info.number
-                    ),
-                    None,
-                )
-                if matching_item:
-                    matching_item["queue_rank"] = rank
-                    sorted_ready_issues.append(matching_item)
-
-            ready_issues = sorted_ready_issues
+            ready_issues = sort_ready_issue_dicts(ready_issues)
 
         # Sort other issues by operational urgency
         other_issues.sort(

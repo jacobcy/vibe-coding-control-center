@@ -44,6 +44,7 @@ repos:
     hooks:
       - id: black
         name: Black (Python formatter)
+        language_version: python3.12
         files: ^(src|tests)/.*\.py$
 
   - repo: local

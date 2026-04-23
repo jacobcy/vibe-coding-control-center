@@ -255,8 +255,6 @@ class FlowTransitionMixin(FlowWriteMixin):
             blocked_by=None,
             next_step=None,
             initiated_by=initiator,
-            # Clear dispatch hint to prevent cross-round leakage
-            latest_indicate_action=None,
         )
 
         # Clear cached issue/PR metadata (will be re-initialized for new issue)

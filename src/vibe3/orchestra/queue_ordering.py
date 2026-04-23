@@ -15,7 +15,7 @@ PIPELINE_STAGE_ORDER: dict[str, int] = {
     # Flows with pr_ref are dispatched first (highest priority)
     # These are waiting for manager review after PR creation
     "manager:handoff": 1,  # Has PR, waiting for final review
-    "review:merge-ready": 2,  # Ready to merge, executor will create PR
+    "run:merge-ready": 2,  # Ready to publish, executor will create PR
     "review:review": 3,  # In review execution
     "run:in-progress": 4,  # In execution
     "plan:claimed": 5,  # Waiting for planning

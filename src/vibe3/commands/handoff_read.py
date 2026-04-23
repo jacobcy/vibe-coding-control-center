@@ -119,16 +119,14 @@ def list_handoffs(
             # Map event types back to handoff kinds
             # handoff_plan    -> plan
             # handoff_report  -> run
-            # handoff_review  -> review  (reviewer raw output artifact, new)
-            # handoff_audit   -> review  (reviewer-initiated authoritative audit, new)
+            # handoff_audit   -> review  (reviewer-initiated authoritative audit)
             # audit_recorded  -> review  (system auto-generated minimal audit, legacy)
             # handoff_indicate -> indicate
             event_type_to_kind = {
                 "handoff_plan": "plan",
                 "handoff_report": "run",
                 "handoff_run": "run",  # backward-compat: old event type
-                "handoff_review": "review",  # new: reviewer raw output artifact
-                "handoff_audit": "review",  # new: reviewer-initiated audit
+                "handoff_audit": "review",
                 "audit_recorded": "review",  # legacy: system auto-generated
                 # (backward-compat)
                 "handoff_indicate": "indicate",
@@ -275,15 +273,6 @@ def show(
                 console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
             console.print()
 
-        # Show pending indicate action (manager dispatch hint)
-        if state.latest_indicate_action:
-            console.print("[bold]## Pending Dispatch[/]")
-            console.print(
-                f"  [cyan]indicate_action:[/] [yellow]{state.latest_indicate_action}[/]"
-                "  [dim](executor will consume on next dispatch)[/]"
-            )
-            console.print()
-
         _render_agent_chain(
             state,
             store=service.store,
@@ -327,8 +316,11 @@ def show(
 
             # Show full content hint
             console.print("[dim]---[/]")
-            console.print(f"[dim]Full file: {current_md}[/]")
-            console.print("[dim]Use 'cat' or edit the file to see all sections[/]")
+            console.print(f"[dim]Artifact: {current_md_display}[/]")
+            console.print(
+                "[dim]Use `vibe3 handoff show --artifact <path>` "
+                "to inspect the full shared file[/]"
+            )
         else:
             console.print(
                 "[dim]  (current.md not found — run `vibe3 handoff init` to create)[/]"

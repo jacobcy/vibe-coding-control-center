@@ -41,4 +41,5 @@ class TestReviewContextBuilderUsesAssembler:
         """Manual review execution should now be owned by roles.review."""
         import vibe3.roles.review as mod
 
-        assert hasattr(mod, "execute_manual_review")
+        assert hasattr(mod, "execute_manual_review_async")
+        assert hasattr(mod, "execute_manual_review_sync")

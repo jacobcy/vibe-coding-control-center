@@ -4,7 +4,7 @@ from typing import Any
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
+from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 from vibe3.ui.flow_ui_timeline import (  # noqa: F401
     render_flow_timeline,
     render_milestone,
@@ -52,8 +52,6 @@ def _render_flow_row(
             "BLOCK": "red",
         }.get(v.verdict, "cyan")
         kv("verdict", f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]", 1)
-    if flow.latest_indicate_action:
-        kv("action", f"[yellow bold]{flow.latest_indicate_action}[/]", 1)
     console.print()
 
 
@@ -70,6 +68,7 @@ def render_flow_status(
     pr_data: dict[str, Any] | None = None,
     milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
+    worktree_root: str | None = None,
 ) -> None:
     """flow show — full detail, YAML style."""
     titles = issue_titles or {}
@@ -120,9 +119,12 @@ def render_flow_status(
         ("execute", status.executor_actor, status.report_ref),
         ("review", status.reviewer_actor, status.audit_ref),
     ):
+        ref_display = (
+            resolve_ref_path(ref, worktree_root, absolute=True) if ref else "—"
+        )
         console.print(f"  [dim]{stage}:[/]")
         kv("actor", actor or "—", 2)
-        kv("ref", ref or "—", 2)
+        kv("ref", ref_display, 2)
     # Latest verdict — shown inline under review results
     if status.latest_verdict:
         v = status.latest_verdict
@@ -132,13 +134,6 @@ def render_flow_status(
         console.print(
             f"  [dim]verdict:[/] [{verdict_color}]{v.verdict}[/]" f"  [dim]{v.actor}[/]"
         )
-    # Pending dispatch action — shown when manager wrote indicate --action
-    if status.latest_indicate_action:
-        console.print(
-            f"  [dim]indicate_action:[/] "
-            f"[yellow bold]{status.latest_indicate_action}[/]"
-        )
-        console.print("  [dim](pending executor dispatch)[/]")
 
     from vibe3.services.spec_ref_service import SpecRefService
 

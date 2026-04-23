@@ -7,16 +7,12 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
+from vibe3.exceptions import UserError
 from vibe3.execution.actor_support import (
     extract_role_from_actor,
-    format_agent_actor,
-    resolve_actor_backend_model,
 )
-from vibe3.execution.role_policy import get_optional_kind_actor_key
 from vibe3.models.flow import FlowEvent
-from vibe3.models.handoff import HandoffRecord
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.path_helpers import (
@@ -26,6 +22,16 @@ from vibe3.utils.path_helpers import (
 
 class HandoffService:
     """Service for managing handoff records."""
+
+    _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit"}
+    _HANDOFF_EVENT_TYPES = {
+        "handoff_plan",
+        "handoff_report",
+        "handoff_run",
+        "handoff_audit",
+        "handoff_indicate",
+        "audit_recorded",
+    }
 
     def __init__(
         self,
@@ -44,15 +50,19 @@ class HandoffService:
     ) -> list[FlowEvent]:
         """Return handoff events for a branch from the authoritative store.
 
-        Note: does NOT filter by prefix by default — the caller (handoff_read)
-        is responsible for keeping only known handoff event types via its
-        whitelist map. Filtering here with "handoff_" would silently drop
-        "audit_recorded" events which do not share that prefix.
+        Handoff views should only show explicit handoff artifacts / verdict events.
+        Runtime lifecycle and flow state events belong to `flow show`, not
+        `handoff show`.
         """
-        events_data = self.store.get_events(
-            branch, event_type_prefix=event_type_prefix, limit=limit
-        )
-        return [FlowEvent(**event) for event in events_data]
+        events_data = self.store.get_events(branch, event_type_prefix=event_type_prefix)
+        handoff_events = [
+            FlowEvent(**event)
+            for event in events_data
+            if event["event_type"] in self._HANDOFF_EVENT_TYPES
+        ]
+        if limit is not None:
+            handoff_events = handoff_events[:limit]
+        return handoff_events
 
     def append_current_handoff(
         self,
@@ -69,6 +79,55 @@ class HandoffService:
         )
         return self.storage.append_current_handoff(message, effective_actor, kind)
 
+    def _resolve_branch_worktree_root(self, branch: str) -> Path:
+        worktree_root = self.git_client.find_worktree_path_for_branch(branch)
+        if worktree_root is not None:
+            return worktree_root
+
+        current_root = self.git_client.get_worktree_root()
+        if current_root:
+            return Path(current_root)
+
+        raise UserError("Cannot validate handoff ref without a worktree root")
+
+    @staticmethod
+    def _is_log_like_path(path: Path) -> bool:
+        lowered_parts = [part.lower() for part in path.parts]
+        for idx in range(len(lowered_parts) - 1):
+            if lowered_parts[idx] == "temp" and lowered_parts[idx + 1] == "logs":
+                return True
+        return path.name.endswith(".async.log")
+
+    def _validate_authoritative_ref(
+        self, ref_kind: str, ref_value: str, branch: str
+    ) -> None:
+        if ref_kind.lower() not in self._AUTHORITATIVE_REF_KINDS:
+            return
+
+        worktree_root = self._resolve_branch_worktree_root(branch).resolve()
+        ref_path = Path(ref_value).expanduser()
+        resolved = (
+            ref_path.resolve(strict=False)
+            if ref_path.is_absolute()
+            else (worktree_root / ref_path).resolve(strict=False)
+        )
+
+        if self._is_log_like_path(resolved):
+            raise UserError(
+                f"{ref_kind}_ref cannot point to execution logs under temp/logs: "
+                f"{ref_value}"
+            )
+        git_common = Path(self.git_client.get_git_common_dir()).resolve()
+        if resolved.is_relative_to(git_common):
+            raise UserError(
+                f"{ref_kind}_ref must point to an agent worktree document, "
+                f"not shared handoff store: {ref_value}"
+            )
+        if not resolved.is_relative_to(worktree_root):
+            raise UserError(
+                f"{ref_kind}_ref must stay inside the agent worktree: {ref_value}"
+            )
+
     def _record_ref(
         self,
         ref_kind: str,
@@ -78,10 +137,10 @@ class HandoffService:
         actor: str | None,
         verdict: str | None = None,
         audit_is_system_auto: bool = False,
-        action: str | None = None,
     ) -> Path:
         """Internal helper to record a handoff reference."""
         branch = self.git_client.get_current_branch()
+        self._validate_authoritative_ref(ref_kind, ref_value, branch)
         # Inlined _normalize_ref_value
         ref_value = self.storage.normalize_ref_value(ref_value, branch)
         effective_actor = SignatureService.resolve_for_branch(
@@ -122,19 +181,15 @@ class HandoffService:
             )
             flow_updates["latest_verdict"] = record.model_dump_json()
 
-        message = f"verdict: {verdict or 'UNKNOWN'}"
-        message += f"\nRecorded {ref_kind} reference: {ref_value}"
+        message = f"Recorded {ref_kind} reference: {ref_value}"
+        if verdict:
+            message = f"verdict: {verdict}\n{message}"
         if next_step:
             message += f"\nNext Step: {next_step}"
         if blocked_by:
             message += f"\nBlocked By: {blocked_by}"
 
         self.store.update_flow_state(branch, **flow_updates)
-
-        if ref_kind.lower() == "indicate":
-            self.store.update_flow_state(
-                branch, latest_indicate_action=action  # None clears the field
-            )
 
         event_refs: dict[str, str] = {"ref": ref_value}
         if verdict:
@@ -173,62 +228,6 @@ class HandoffService:
             ).warning(f"Skipping non-authoritative handoff file append: {exc}")
 
         return handoff_path
-
-    def record_agent_artifact(self, record: HandoffRecord) -> Path | None:
-        """Persist a plan/run/review artifact and corresponding handoff event."""
-        sanitized_content = ArtifactParser.sanitize_handoff_content(record.content)
-        artifact = self.storage.create_artifact(
-            record.kind,
-            sanitized_content,
-            branch=record.branch,
-        )
-        if artifact is None:
-            return None
-
-        branch, artifact_file = artifact
-        actor = SignatureService.resolve_for_branch(
-            self.store,
-            branch,
-            explicit_actor=format_agent_actor(record.options),
-        )
-        backend, model = resolve_actor_backend_model(record.options)
-
-        detail, derived_refs = ArtifactParser.build_artifact_detail(
-            record.kind, sanitized_content, artifact_file, record.metadata
-        )
-        # Inlined _normalize_ref_value
-        normalized_ref = self.storage.normalize_ref_value(str(artifact_file), branch)
-        refs: dict[str, str] = {
-            "ref": normalized_ref,
-            "backend": backend,
-            **derived_refs,
-        }
-        if model:
-            refs["model"] = model
-        if record.session_id:
-            refs["session_id"] = record.session_id
-
-        if record.log_path:
-            # Inlined _normalize_ref_value
-            normalized_log = self.storage.normalize_ref_value(record.log_path, branch)
-            refs["log_path"] = normalized_log
-
-        flow_state_updates: dict[str, object] = {}
-        actor_key = get_optional_kind_actor_key(record.kind)
-        if actor_key is not None:
-            flow_state_updates[actor_key] = actor
-
-        if record.kind == "run":
-            event_type = "handoff_report"
-        else:
-            event_type = f"handoff_{record.kind}"
-
-        # Inlined persist_artifact_event
-        self.store.add_event(branch, event_type, actor, detail=detail, refs=refs)
-        if flow_state_updates:
-            self.store.update_flow_state(branch, **flow_state_updates)
-
-        return artifact_file
 
     def record_plan(
         self,
@@ -276,9 +275,6 @@ class HandoffService:
         next_step: str | None = None,
         blocked_by: str | None = None,
         actor: str | None = None,
-        action: str | None = None,
     ) -> Path:
         """Record manager indicate handoff reference."""
-        return self._record_ref(
-            "indicate", indicate_ref, next_step, blocked_by, actor, action=action
-        )
+        return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)

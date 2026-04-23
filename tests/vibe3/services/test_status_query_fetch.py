@@ -18,6 +18,7 @@ class TestStatusQueryServiceFetch:
                 "number": 278,
                 "title": "Handoff sample",
                 "labels": [{"name": "state/handoff"}],
+                "assignees": [{"login": "manager-bot"}],
             },
             {
                 "number": 320,
@@ -57,6 +58,7 @@ class TestStatusQueryServiceFetch:
 
         assert result[1]["number"] == 278
         assert result[1]["state"] == IssueState.HANDOFF
+        assert result[1]["assignee"] == "manager-bot"
         assert result[1]["flow"] is None
 
         assert result[2]["number"] == 372
@@ -95,6 +97,27 @@ class TestStatusQueryServiceFetch:
         result = service.fetch_orchestrated_issues([], queued_set=set())
 
         assert result == []
+
+    def test_fetch_orchestrated_issues_ignores_blank_assignee_login(self) -> None:
+        """Blank assignee login should normalize to None."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 210,
+                "title": "Ready issue with blank assignee",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "   "}],
+            }
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues([], queued_set=set())
+
+        assert len(result) == 1
+        assert result[0]["assignee"] is None
 
     def test_fetch_orchestrated_issues_does_not_require_config_attr(self) -> None:
         """Service should not depend on a missing self.config attribute."""

@@ -16,6 +16,11 @@ class AgentBackend(Protocol):
         dry_run: bool = False,
         session_id: str | None = None,
         cwd: Path | None = None,
+        show_prompt: bool = False,
+        include_global_notice: bool = True,
+        fallback_prompt: str | None = None,
+        fallback_include_global_notice: bool = True,
+        dry_run_summary: dict | None = None,
     ) -> AgentResult:
         """运行 agent。
 

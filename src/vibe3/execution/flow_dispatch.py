@@ -49,12 +49,7 @@ class FlowManager:
         If an issue has a label that triggers dispatch, we need the branch
         context even if the flow was previously marked as aborted or done.
         """
-        flows = self.store.get_flows_by_issue(issue_number, role="task")
-        if not flows:
-            return None
-
-        # Return the first one (IssueFlowService already sorts them by priority/recency)
-        return flows[0]
+        return self.issue_flow_service.find_active_flow(issue_number)
 
     def _is_reusable_auto_flow(
         self, flow: dict[str, object], issue_number: int

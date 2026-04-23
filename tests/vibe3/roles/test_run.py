@@ -124,6 +124,7 @@ def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> No
                 summary=SimpleNamespace(mode="plan"),
                 dry_run=False,
                 no_async=True,
+                show_prompt=False,
                 agent=None,
                 backend=None,
                 model=None,

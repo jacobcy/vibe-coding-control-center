@@ -18,6 +18,7 @@ from loguru import logger
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
@@ -47,6 +48,18 @@ class GlobalDispatchCoordinator:
             dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
         )
         self._repo = dispatch_services[0].config.repo if dispatch_services else None
+        # Union manager_usernames from all services
+        self._manager_usernames = tuple(
+            username
+            for service in dispatch_services
+            for username in service.config.manager_usernames
+        )
+        # Get supervisor_label from first service (should be same for all)
+        self._supervisor_label = (
+            dispatch_services[0].config.supervisor_handoff.issue_label
+            if dispatch_services
+            else "supervisor"
+        )
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
@@ -104,10 +117,23 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=self._manager_usernames,
+                require_manager_assignee=(issue.state == IssueState.READY),
+            ):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue (supervisor or assignee check failed)",
+                )
+                self._frozen_queue.pop(index)
+                continue
+
             if issue.state in {
                 IssueState.BLOCKED,
                 IssueState.FAILED,
-                IssueState.MERGE_READY,
                 IssueState.DONE,
             }:
                 self._frozen_queue.pop(index)
@@ -145,10 +171,6 @@ class GlobalDispatchCoordinator:
                 continue
 
             try:
-                service._emit_dispatch_intent(issue)
-                entry.waiting_state = issue.state.value
-                dispatched_count += 1
-
                 green = "\033[32m"
                 reset = "\033[0m"
                 append_orchestra_event(
@@ -156,6 +178,10 @@ class GlobalDispatchCoordinator:
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
                     f"#{issue.number} ({service.role_def.registry_role})",
                 )
+                service._emit_dispatch_intent(issue)
+                entry.waiting_state = issue.state.value
+                dispatched_count += 1
+
                 logger.bind(
                     domain="global_dispatch",
                     role=service.role_def.registry_role,
@@ -187,6 +213,7 @@ class GlobalDispatchCoordinator:
         seen_issue_numbers: set[int] = set()
         for state in (
             IssueState.REVIEW,
+            IssueState.MERGE_READY,
             IssueState.IN_PROGRESS,
             IssueState.CLAIMED,
             IssueState.HANDOFF,
@@ -234,6 +261,20 @@ class GlobalDispatchCoordinator:
 
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
+                continue
+
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=self._manager_usernames,
+                require_manager_assignee=(issue.state == IssueState.READY),
+            ):
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue (supervisor or assignee check failed)",
+                )
                 continue
 
             current_state = issue.state.value

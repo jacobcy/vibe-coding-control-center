@@ -8,13 +8,14 @@ from vibe3.roles.manager import MANAGER_ROLE
 
 
 def test_manager_collects_ready_issue_without_live_session_gate() -> None:
-    config = OrchestraConfig()
+    config = OrchestraConfig(manager_usernames=["manager-bot"])
     github = MagicMock()
     github.list_issues.return_value = [
         {
             "number": 340,
             "title": "Manager issue",
             "labels": [{"name": IssueState.READY.to_label()}],
+            "assignees": [{"login": "manager-bot"}],
             "state": "open",
         }
     ]

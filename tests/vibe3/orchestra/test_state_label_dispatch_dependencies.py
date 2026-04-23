@@ -14,13 +14,14 @@ class TestDependencyChecking:
 
     def test_issue_without_dependencies_is_ready(self) -> None:
         """Issue without dependencies should be collected as ready."""
-        config = OrchestraConfig()
+        config = OrchestraConfig(manager_usernames=["manager-bot"])
         github = MagicMock()
         github.list_issues.return_value = [
             {
                 "number": 300,
                 "title": "Issue without dependencies",
                 "labels": [{"name": IssueState.READY.to_label()}],
+                "assignees": [{"login": "manager-bot"}],
                 "state": "open",
             }
         ]
@@ -45,13 +46,14 @@ class TestDependencyChecking:
 
     def test_issue_with_unresolved_dependency_marked_waiting(self) -> None:
         """Issue with unresolved dependency should be marked waiting."""
-        config = OrchestraConfig()
+        config = OrchestraConfig(manager_usernames=["manager-bot"])
         github = MagicMock()
         github.list_issues.return_value = [
             {
                 "number": 300,
                 "title": "Issue with dependency",
                 "labels": [{"name": IssueState.READY.to_label()}],
+                "assignees": [{"login": "manager-bot"}],
                 "state": "open",
             }
         ]
@@ -96,13 +98,14 @@ class TestDependencyChecking:
 
     def test_issue_with_satisfied_dependency_is_ready(self) -> None:
         """Issue with satisfied dependency should be collected as ready."""
-        config = OrchestraConfig()
+        config = OrchestraConfig(manager_usernames=["manager-bot"])
         github = MagicMock()
         github.list_issues.return_value = [
             {
                 "number": 300,
                 "title": "Issue with satisfied dependency",
                 "labels": [{"name": IssueState.READY.to_label()}],
+                "assignees": [{"login": "manager-bot"}],
                 "state": "open",
             }
         ]
@@ -138,13 +141,14 @@ class TestDependencyChecking:
 
     def test_issue_with_multiple_dependencies_partial_satisfied(self) -> None:
         """Multiple dependencies, partial satisfied: should remain waiting."""
-        config = OrchestraConfig()
+        config = OrchestraConfig(manager_usernames=["manager-bot"])
         github = MagicMock()
         github.list_issues.return_value = [
             {
                 "number": 300,
                 "title": "Issue with multiple dependencies",
                 "labels": [{"name": IssueState.READY.to_label()}],
+                "assignees": [{"login": "manager-bot"}],
                 "state": "open",
             }
         ]
@@ -195,13 +199,14 @@ class TestDependencyChecking:
 
     def test_issue_with_multiple_dependencies_all_satisfied(self) -> None:
         """Issue with multiple dependencies (all satisfied) should be ready."""
-        config = OrchestraConfig()
+        config = OrchestraConfig(manager_usernames=["manager-bot"])
         github = MagicMock()
         github.list_issues.return_value = [
             {
                 "number": 300,
                 "title": "Issue with multiple satisfied dependencies",
                 "labels": [{"name": IssueState.READY.to_label()}],
+                "assignees": [{"login": "manager-bot"}],
                 "state": "open",
             }
         ]

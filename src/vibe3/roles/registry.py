@@ -18,6 +18,7 @@ from vibe3.roles.review import (
     REVIEWER_ROLE,
 )
 from vibe3.roles.run import (
+    EXECUTOR_PUBLISH_ROLE,
     EXECUTOR_ROLE,
 )
 
@@ -26,6 +27,7 @@ LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
     HANDOFF_MANAGER_ROLE,
     PLANNER_ROLE,
     EXECUTOR_ROLE,
+    EXECUTOR_PUBLISH_ROLE,
     REVIEWER_ROLE,
 )
 
@@ -65,7 +67,7 @@ def build_label_dispatch_event(
         return ExecutorDispatchIntent(
             issue_number=issue.number,
             branch=branch,
-            trigger_state=IssueState.IN_PROGRESS.value,
+            trigger_state=role.trigger_state.value,
         )
     if trigger == "review":
         return ReviewerDispatchIntent(

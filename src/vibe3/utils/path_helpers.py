@@ -212,3 +212,33 @@ def resolve_ref_path(
     except Exception:
         # Fallback: just show the raw value
         return ref_value
+
+
+def sanitize_event_detail_paths(
+    detail: str,
+    event_refs: object,
+    worktree_root: str | None = None,
+) -> str:
+    """Replace path-like refs embedded in event detail with display-safe values."""
+    if not isinstance(event_refs, dict):
+        return detail
+
+    sanitized = detail
+
+    ref = event_refs.get("ref")
+    if isinstance(ref, str):
+        sanitized = sanitized.replace(ref, resolve_ref_path(ref, worktree_root))
+
+    files = event_refs.get("files")
+    if isinstance(files, list):
+        for file_ref in files:
+            if isinstance(file_ref, str):
+                sanitized = sanitized.replace(
+                    file_ref, resolve_ref_path(file_ref, worktree_root)
+                )
+
+    log_path = event_refs.get("log_path")
+    if isinstance(log_path, str):
+        sanitized = sanitized.replace(log_path, Path(log_path).name)
+
+    return sanitized

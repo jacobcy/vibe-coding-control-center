@@ -65,10 +65,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
@@ -120,10 +116,6 @@ class TestExecuteSyncGateIntegration:
                     return_value="agent:plan",
                 ),
                 patch(
-                    "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                    return_value=None,
-                ),
-                patch(
                     "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
                 ) as mock_gate,
             ):
@@ -169,10 +161,6 @@ class TestExecuteSyncGateIntegration:
             patch(
                 "vibe3.execution.codeagent_runner.format_agent_actor",
                 return_value="agent:review",
-            ),
-            patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
             ),
             patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
@@ -227,10 +215,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
@@ -282,10 +266,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
@@ -305,20 +285,14 @@ class TestExecuteSyncGateIntegration:
         )
         mock_gate.assert_called_once()
 
-    def test_execute_sync_runs_handoff_callback_and_noop_gate_in_order(
+    def test_execute_sync_runs_callback_and_noop_gate_in_order(
         self,
     ) -> None:
-        """execute_sync must run handoff -> callback -> gate in that order."""
-        from pathlib import Path
-
+        """execute_sync must run callback -> gate in that order."""
         agent_result = _make_mock_agent_result(stdout="verdict: APPROVE")
         mock_store = _make_mock_store()
 
         events: list[str] = []
-
-        def fake_record(*args, **kwargs) -> Path | None:
-            events.append("handoff")
-            return Path("/tmp/handoff.md")
 
         def fake_callback(**kwargs) -> None:
             events.append("callback")
@@ -353,10 +327,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                side_effect=fake_record,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
                 side_effect=fake_gate,
             ),
@@ -370,4 +340,4 @@ class TestExecuteSyncGateIntegration:
             result = service.execute_sync(command)
 
         assert result.success
-        assert events == ["handoff", "callback", "gate"]
+        assert events == ["callback", "gate"]

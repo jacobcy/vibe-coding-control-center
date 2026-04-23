@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
+from vibe3.orchestra.global_dispatch_coordinator import (
+    GlobalDispatchCoordinator,
+    QueueEntry,
+)
 
 
 def make_issue(number: int, priority: int = 5) -> MagicMock:
@@ -19,13 +22,19 @@ def make_issue(number: int, priority: int = 5) -> MagicMock:
     return issue
 
 
-def make_issue_info(number: int, state: IssueState) -> IssueInfo:
+def make_issue_info(
+    number: int,
+    state: IssueState,
+    *,
+    assignees: list[str] | None = None,
+    labels: list[str] | None = None,
+) -> IssueInfo:
     return IssueInfo(
         number=number,
         title=f"Issue {number}",
         state=state,
-        labels=[state.to_label()],
-        assignees=[],
+        labels=labels if labels is not None else [state.to_label()],
+        assignees=assignees if assignees is not None else ["manager-bot"],
     )
 
 
@@ -51,6 +60,8 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
     service.config.repo = "owner/repo"
+    service.config.manager_usernames = ["manager-bot"]
+    service.config.supervisor_handoff.issue_label = "supervisor"
     service._github = MagicMock()
     return service
 
@@ -98,6 +109,76 @@ class TestGlobalDispatchCoordinator:
         await coordinator.coordinate()
 
         assert service._emit_dispatch_intent.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_supervisor_issue_removed_from_existing_frozen_queue(self) -> None:
+        issue = make_issue(467)
+        service = make_service("handoff-manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=467, collected_state="claimed", waiting_state=None)
+        ]
+        coordinator._load_issue = lambda issue_number: IssueInfo(  # type: ignore[method-assign]
+            number=issue_number,
+            title=f"Issue {issue_number}",
+            state=IssueState.HANDOFF,
+            labels=["supervisor", IssueState.HANDOFF.to_label()],
+            assignees=[],
+        )
+
+        await coordinator.coordinate()
+
+        service._emit_dispatch_intent.assert_not_called()
+        assert coordinator._frozen_queue == []
+
+    @pytest.mark.asyncio
+    async def test_ready_issue_no_manager_assignee_removed_from_frozen_queue(
+        self,
+    ) -> None:
+        issue = make_issue(468)
+        service = make_service("manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=468, collected_state="ready", waiting_state=None)
+        ]
+        coordinator._load_issue = lambda issue_number: make_issue_info(  # type: ignore[method-assign]
+            issue_number,
+            IssueState.READY,
+            assignees=[],
+        )
+
+        await coordinator.coordinate()
+
+        service._emit_dispatch_intent.assert_not_called()
+        assert coordinator._frozen_queue == []
+
+    @pytest.mark.asyncio
+    async def test_unassigned_handoff_issue_kept_in_existing_frozen_queue(
+        self,
+    ) -> None:
+        issue = make_issue(469)
+        service = make_service("handoff-manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=469, collected_state="handoff", waiting_state=None)
+        ]
+        coordinator._load_issue = lambda issue_number: make_issue_info(  # type: ignore[method-assign]
+            issue_number,
+            IssueState.HANDOFF,
+            assignees=[],
+        )
+
+        await coordinator.coordinate()
+
+        service._emit_dispatch_intent.assert_called_once()
+        assert coordinator._frozen_queue is not None
+        assert coordinator._frozen_queue[0].issue_number == 469
 
     @pytest.mark.asyncio
     async def test_skip_when_capacity_full(self) -> None:
@@ -322,4 +403,47 @@ class TestGlobalDispatchCoordinator:
         )
         assert not any(
             "dispatched #303 (planner)" in message for message in normalized_events
+        )
+
+    @pytest.mark.asyncio
+    async def test_logs_dispatch_intent_before_emit_side_effect(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        planner_issue = make_issue(467)
+        planner_svc = make_service("planner", [planner_issue])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [planner_svc])
+        install_issue_loader(coordinator, {467: IssueState.CLAIMED})
+
+        events: list[str] = []
+
+        def capture_event(_category: str, message: str, level: str = "INFO") -> None:
+            _ = level
+            events.append(message)
+
+        def emit_side_effect(_issue: MagicMock) -> None:
+            capture_event(
+                "dispatcher",
+                "planner launch failed for #467: Failed to resolve permanent worktree",
+            )
+
+        planner_svc._emit_dispatch_intent.side_effect = emit_side_effect
+
+        monkeypatch.setattr(
+            "vibe3.orchestra.global_dispatch_coordinator.append_orchestra_event",
+            capture_event,
+        )
+
+        await coordinator.coordinate()
+
+        normalized_events = [
+            re.sub(r"\x1b\[[0-9;]*m", "", message) for message in events
+        ]
+
+        assert normalized_events[0] == (
+            "GlobalDispatchCoordinator: dispatch-intent #467 (planner)"
+        )
+        assert normalized_events[1] == (
+            "planner launch failed for #467: Failed to resolve permanent worktree"
         )

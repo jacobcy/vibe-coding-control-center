@@ -78,6 +78,25 @@ def test_close_issue_success():
         assert client.close_issue(1) is True
 
 
+def test_remove_assignees_success():
+    client = _client()
+    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        assert client.remove_assignees(1, ["alice", "bob"]) is True
+
+        args = mock_run.call_args[0][0]
+        assert "--remove-assignee" in args
+        assert "alice" in args
+        assert "bob" in args
+
+
+def test_remove_assignees_empty_is_noop():
+    client = _client()
+    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
+        assert client.remove_assignees(1, []) is True
+        mock_run.assert_not_called()
+
+
 def test_close_issue_with_comment():
     client = _client()
     with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:

@@ -106,19 +106,23 @@ def summarize_backend_output(stderr: str, stdout: str) -> str:
     return preview[:500]
 
 
-def build_prompt_file_content(prompt: str) -> str:
+def build_prompt_file_content(prompt: str, include_global_notice: bool = True) -> str:
     """Apply configured global notice to the prompt file content."""
+    if not include_global_notice:
+        return prompt
     notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()
     if not notice:
         return prompt
     return f"{notice}\n\n---\n\n{prompt}"
 
 
-def prepare_prompt_file(prompt: str) -> Path:
+def prepare_prompt_file(prompt: str, include_global_notice: bool = True) -> Path:
     """Create temporary prompt file with global notice."""
     prompt_dir = Path.home() / ".codeagent" / "agents"
     prompt_dir.mkdir(parents=True, exist_ok=True)
-    prompt_content = build_prompt_file_content(prompt)
+    prompt_content = build_prompt_file_content(
+        prompt, include_global_notice=include_global_notice
+    )
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", delete=False, dir=prompt_dir
     ) as f:

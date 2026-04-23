@@ -163,6 +163,7 @@ def show(
                     pr_data,
                     milestone_data,
                     parent_branch=parent_branch,
+                    worktree_root=flow_status.worktree_root,
                 )
             return
 

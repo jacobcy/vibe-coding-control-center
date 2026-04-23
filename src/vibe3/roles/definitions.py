@@ -60,6 +60,17 @@ class IssueRoleSyncSpec:
         [OrchestraConfig, IssueInfo, str], ExecutionRequest | None
     ]
     build_sync_request: Callable[
-        [OrchestraConfig, IssueInfo, str, str | None, Any, str, bool], ExecutionRequest
+        [
+            OrchestraConfig,
+            IssueInfo,
+            str,
+            dict[str, object] | None,
+            str | None,
+            Any,
+            str,
+            bool,
+            bool,
+        ],
+        ExecutionRequest,
     ]
     failure_handler: Callable[..., None] | None = None
