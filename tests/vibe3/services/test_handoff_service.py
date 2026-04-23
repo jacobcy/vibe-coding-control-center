@@ -80,3 +80,45 @@ def test_record_report_accepts_worktree_relative_canonical_doc(tmp_path: Path) -
     flow_state = store.get_flow_state("task/issue-304")
     assert flow_state is not None
     assert flow_state["report_ref"] == "docs/reports/issue-304-report.md"
+
+
+def test_get_handoff_events_excludes_non_handoff_runtime_events(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-304"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(branch, "tmux_manager_started", "orchestra:manager")
+    store.add_event(
+        branch, "codeagent_manager_started", "gemini/gemini-3-flash-preview"
+    )
+    store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="plan ready")
+    store.add_event(branch, "audit_recorded", "codex/gpt-5.4", detail="auto audit")
+    store.add_event(branch, "state_transitioned", "codex/gpt-5.4", detail="advanced")
+
+    events = service.get_handoff_events(branch)
+
+    assert [event.event_type for event in events] == [
+        "audit_recorded",
+        "handoff_plan",
+    ]
+
+
+def test_get_handoff_events_applies_limit_after_handoff_filter(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-304"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="oldest handoff")
+    store.add_event(branch, "state_transitioned", "codex/gpt-5.4", detail="noise")
+    store.add_event(branch, "handoff_report", "codex/gpt-5.4", detail="newest handoff")
+
+    events = service.get_handoff_events(branch, limit=1)
+
+    assert len(events) == 1
+    assert events[0].event_type == "handoff_report"

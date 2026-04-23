@@ -24,6 +24,14 @@ class HandoffService:
     """Service for managing handoff records."""
 
     _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit"}
+    _HANDOFF_EVENT_TYPES = {
+        "handoff_plan",
+        "handoff_report",
+        "handoff_run",
+        "handoff_audit",
+        "handoff_indicate",
+        "audit_recorded",
+    }
 
     def __init__(
         self,
@@ -42,15 +50,19 @@ class HandoffService:
     ) -> list[FlowEvent]:
         """Return handoff events for a branch from the authoritative store.
 
-        Note: does NOT filter by prefix by default — the caller (handoff_read)
-        is responsible for keeping only known handoff event types via its
-        whitelist map. Filtering here with "handoff_" would silently drop
-        "audit_recorded" events which do not share that prefix.
+        Handoff views should only show explicit handoff artifacts / verdict events.
+        Runtime lifecycle and flow state events belong to `flow show`, not
+        `handoff show`.
         """
-        events_data = self.store.get_events(
-            branch, event_type_prefix=event_type_prefix, limit=limit
-        )
-        return [FlowEvent(**event) for event in events_data]
+        events_data = self.store.get_events(branch, event_type_prefix=event_type_prefix)
+        handoff_events = [
+            FlowEvent(**event)
+            for event in events_data
+            if event["event_type"] in self._HANDOFF_EVENT_TYPES
+        ]
+        if limit is not None:
+            handoff_events = handoff_events[:limit]
+        return handoff_events
 
     def append_current_handoff(
         self,
