@@ -7,6 +7,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
+from vibe3.exceptions import UserError
 from vibe3.execution.actor_support import (
     extract_role_from_actor,
 )
@@ -21,6 +22,8 @@ from vibe3.utils.path_helpers import (
 
 class HandoffService:
     """Service for managing handoff records."""
+
+    _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit"}
 
     def __init__(
         self,
@@ -64,6 +67,55 @@ class HandoffService:
         )
         return self.storage.append_current_handoff(message, effective_actor, kind)
 
+    def _resolve_branch_worktree_root(self, branch: str) -> Path:
+        worktree_root = self.git_client.find_worktree_path_for_branch(branch)
+        if worktree_root is not None:
+            return worktree_root
+
+        current_root = self.git_client.get_worktree_root()
+        if current_root:
+            return Path(current_root)
+
+        raise UserError("Cannot validate handoff ref without a worktree root")
+
+    @staticmethod
+    def _is_log_like_path(path: Path) -> bool:
+        lowered_parts = [part.lower() for part in path.parts]
+        for idx in range(len(lowered_parts) - 1):
+            if lowered_parts[idx] == "temp" and lowered_parts[idx + 1] == "logs":
+                return True
+        return path.name.endswith(".async.log")
+
+    def _validate_authoritative_ref(
+        self, ref_kind: str, ref_value: str, branch: str
+    ) -> None:
+        if ref_kind.lower() not in self._AUTHORITATIVE_REF_KINDS:
+            return
+
+        worktree_root = self._resolve_branch_worktree_root(branch).resolve()
+        ref_path = Path(ref_value).expanduser()
+        resolved = (
+            ref_path.resolve(strict=False)
+            if ref_path.is_absolute()
+            else (worktree_root / ref_path).resolve(strict=False)
+        )
+
+        git_common = Path(self.git_client.get_git_common_dir()).resolve()
+        if resolved.is_relative_to(git_common):
+            raise UserError(
+                f"{ref_kind}_ref must point to an agent worktree document, "
+                f"not shared handoff store: {ref_value}"
+            )
+        if self._is_log_like_path(resolved):
+            raise UserError(
+                f"{ref_kind}_ref cannot point to execution logs under temp/logs: "
+                f"{ref_value}"
+            )
+        if not resolved.is_relative_to(worktree_root):
+            raise UserError(
+                f"{ref_kind}_ref must stay inside the agent worktree: {ref_value}"
+            )
+
     def _record_ref(
         self,
         ref_kind: str,
@@ -77,6 +129,7 @@ class HandoffService:
     ) -> Path:
         """Internal helper to record a handoff reference."""
         branch = self.git_client.get_current_branch()
+        self._validate_authoritative_ref(ref_kind, ref_value, branch)
         # Inlined _normalize_ref_value
         ref_value = self.storage.normalize_ref_value(ref_value, branch)
         effective_actor = SignatureService.resolve_for_branch(

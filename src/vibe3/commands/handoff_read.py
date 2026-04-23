@@ -325,8 +325,11 @@ def show(
 
             # Show full content hint
             console.print("[dim]---[/]")
-            console.print(f"[dim]Full file: {current_md}[/]")
-            console.print("[dim]Use 'cat' or edit the file to see all sections[/]")
+            console.print(f"[dim]Artifact: {current_md_display}[/]")
+            console.print(
+                "[dim]Use `vibe3 handoff show --artifact <path>` "
+                "to inspect the full shared file[/]"
+            )
         else:
             console.print(
                 "[dim]  (current.md not found — run `vibe3 handoff init` to create)[/]"
