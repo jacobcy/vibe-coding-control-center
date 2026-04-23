@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from vibe3.roles.review import _create_minimal_audit_artifact
+from vibe3.roles.review_helpers import _create_minimal_audit_artifact
 
 
 class TestReviewerFailed:
@@ -159,7 +159,7 @@ class TestReviewerNoOpGate:
 def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
     tmp_path: Path,
 ) -> None:
-    with patch("vibe3.roles.review.GitClient") as mock_git_cls:
+    with patch("vibe3.roles.review_helpers.GitClient") as mock_git_cls:
         mock_git = mock_git_cls.return_value
         mock_git.get_worktree_root.return_value = None
         mock_git.find_worktree_path_for_branch.return_value = tmp_path
@@ -210,8 +210,8 @@ class TestFinalizeReviewOutputVerdictSource:
         svc.record_audit.return_value = Path("/tmp/current.md")
         return svc
 
-    @patch("vibe3.roles.review.HandoffService")
-    @patch("vibe3.roles.review._load_existing_audit_ref")
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
     def test_reviewer_written_audit_overrides_stdout_verdict(
         self,
         mock_load_audit_ref: MagicMock,
@@ -220,7 +220,7 @@ class TestFinalizeReviewOutputVerdictSource:
     ) -> None:
         """当 reviewer 主动执行 `handoff audit`，audit 文件内容与 stdout 不一致时，
         finalize_review_output 必须以 audit 文件为权威来源，不受 stdout 影响。"""
-        from vibe3.roles.review import finalize_review_output
+        from vibe3.roles.review_helpers import finalize_review_output
 
         # reviewer stdout 说 PASS，但主动写的 audit 文件说 BLOCK
         stdout_output = "The implementation looks good\nVERDICT: PASS"
@@ -298,8 +298,8 @@ class TestFinalizeReviewOutputFallbacks:
         svc.record_audit.return_value = Path("/tmp/current.md")
         return svc
 
-    @patch("vibe3.roles.review.HandoffService")
-    @patch("vibe3.roles.review._load_existing_audit_ref")
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
     def test_system_auto_audit_uses_stdout_verdict(
         self,
         mock_load_audit_ref: MagicMock,
@@ -308,7 +308,7 @@ class TestFinalizeReviewOutputFallbacks:
     ) -> None:
         """当没有 reviewer-written audit（系统 auto 路径），
         verdict 来自 stdout（等价于 audit）。"""
-        from vibe3.roles.review import finalize_review_output
+        from vibe3.roles.review_helpers import finalize_review_output
 
         stdout_output = "All checks pass\nVERDICT: PASS"
         mock_load_audit_ref.return_value = None
@@ -320,7 +320,7 @@ class TestFinalizeReviewOutputFallbacks:
         mock_handoff_cls.return_value = mock_handoff_svc
 
         with patch(
-            "vibe3.roles.review._create_minimal_audit_artifact",
+            "vibe3.roles.review_helpers._create_minimal_audit_artifact",
             return_value=auto_audit,
         ):
             _, verdict = finalize_review_output(
@@ -337,8 +337,8 @@ class TestFinalizeReviewOutputFallbacks:
             is_system_auto=True,
         )
 
-    @patch("vibe3.roles.review.HandoffService")
-    @patch("vibe3.roles.review._load_existing_audit_ref")
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
     def test_reviewer_written_audit_unreadable_falls_back_to_stdout(
         self,
         mock_load_audit_ref: MagicMock,
@@ -347,7 +347,7 @@ class TestFinalizeReviewOutputFallbacks:
     ) -> None:
         """即使 reviewer 写了 handoff_audit，但 audit 文件不可读，
         应 fallback 到 stdout 而非崩溃。"""
-        from vibe3.roles.review import finalize_review_output
+        from vibe3.roles.review_helpers import finalize_review_output
 
         stdout_output = "Partial review\nVERDICT: MAJOR"
         non_existent_audit = tmp_path / "missing-audit.md"

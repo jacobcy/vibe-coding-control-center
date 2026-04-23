@@ -101,16 +101,24 @@ code_limits:
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/status.py"
-        limit: 440
+        limit: 460
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示"
+
+      # Services 层 —— 允许 400-500
+      - path: "src/vibe3/services/status_query_service.py"
+        limit: 450
+        reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"
+      - path: "src/vibe3/services/task_service.py"
+        limit: 450
+        reason: "Task 服务聚合，包含状态转换、查询、resume 候选筛选逻辑"
 
       # Roles 层 —— 允许 350-600
       - path: "src/vibe3/roles/review.py"
         limit: 600
         reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
       - path: "src/vibe3/roles/run.py"
-        limit: 450
-        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、plan 解析"
+        limit: 600
+        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、manual run 入口"
       - path: "src/vibe3/roles/manager.py"
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
