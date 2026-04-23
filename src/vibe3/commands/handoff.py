@@ -2,7 +2,7 @@
 
 import typer
 
-from vibe3.commands.handoff_read import list_handoffs, show
+from vibe3.commands.handoff_read import show, status
 from vibe3.commands.handoff_write import (
     append,
     audit,
@@ -20,8 +20,8 @@ app = typer.Typer(
 )
 
 # Register commands
-app.command("list")(list_handoffs)
 app.command()(show)
+app.command()(status)
 app.command()(init)
 app.command()(append)
 app.command()(plan)
