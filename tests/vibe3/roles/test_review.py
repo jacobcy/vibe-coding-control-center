@@ -1,6 +1,7 @@
 """Tests for reviewer role audit artifact helpers."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from vibe3.roles.review import _create_minimal_audit_artifact
@@ -256,6 +257,47 @@ class TestFinalizeReviewOutputVerdictSource:
             is_system_auto=False,
         )
 
+
+def test_build_issue_review_request_retry_resume_provides_bootstrap_fallback() -> None:
+    from vibe3.models.orchestration import IssueInfo
+    from vibe3.roles.review import build_issue_review_request
+
+    issue = IssueInfo(number=301, title="Retry review", labels=[])
+    config = SimpleNamespace(
+        repo="owner/repo",
+        review=SimpleNamespace(review_prompt=None),
+    )
+    flow_state = {
+        "report_ref": "docs/reports/issue-301-report.md",
+        "audit_ref": "docs/reports/issue-301-audit.md",
+    }
+
+    request = build_issue_review_request(
+        issue,
+        branch="task/issue-301",
+        sync=True,
+        config=config,
+        session_id="ses_301",
+        options=object(),
+        dry_run=True,
+        flow_state=flow_state,
+    )
+
+    assert request.refs["report_ref"] == "docs/reports/issue-301-report.md"
+    assert request.refs["audit_ref"] == "docs/reports/issue-301-audit.md"
+    assert request.dry_run_summary["prompt_mode"] == "retry"
+    assert request.dry_run_summary["context_mode"] == "resume"
+    assert request.dry_run_summary["fallback_context_mode"] == "bootstrap"
+    assert request.include_global_notice is False
+    assert request.fallback_prompt is not None
+
+
+class TestFinalizeReviewOutputFallbacks:
+    def _make_mock_handoff_service(self) -> MagicMock:
+        svc = MagicMock()
+        svc.record_audit.return_value = Path("/tmp/current.md")
+        return svc
+
     @patch("vibe3.roles.review.HandoffService")
     @patch("vibe3.roles.review._load_existing_audit_ref")
     def test_system_auto_audit_uses_stdout_verdict(
@@ -269,12 +311,9 @@ class TestFinalizeReviewOutputVerdictSource:
         from vibe3.roles.review import finalize_review_output
 
         stdout_output = "All checks pass\nVERDICT: PASS"
-
-        # No reviewer-written audit → system will create minimal audit from stdout
         mock_load_audit_ref.return_value = None
 
         mock_handoff_svc = self._make_mock_handoff_service()
-        # record_audit returns a path (system auto creates it)
         auto_audit = tmp_path / "auto-audit.md"
         auto_audit.write_text("# Minimal Review Audit\nVERDICT: PASS\n")
         mock_handoff_svc.record_audit.return_value = auto_audit
@@ -290,7 +329,6 @@ class TestFinalizeReviewOutputVerdictSource:
                 actor="claude/claude-sonnet-4-6",
             )
 
-        # System auto path: verdict comes from stdout
         assert verdict == "PASS"
         mock_handoff_svc.record_audit.assert_called_once_with(
             audit_ref=str(auto_audit),
@@ -312,7 +350,6 @@ class TestFinalizeReviewOutputVerdictSource:
         from vibe3.roles.review import finalize_review_output
 
         stdout_output = "Partial review\nVERDICT: MAJOR"
-        # Point to a file that does not exist
         non_existent_audit = tmp_path / "missing-audit.md"
         mock_load_audit_ref.return_value = str(non_existent_audit)
         mock_handoff_svc = self._make_mock_handoff_service()
@@ -324,7 +361,6 @@ class TestFinalizeReviewOutputVerdictSource:
             actor="claude/claude-sonnet-4-6",
         )
 
-        # File missing → fallback to stdout → MAJOR
         assert (
             verdict == "MAJOR"
         ), f"Expected MAJOR fallback from stdout, got {verdict!r}."
