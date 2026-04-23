@@ -14,7 +14,10 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+from vibe3.execution.issue_role_sync_runner import (
+    run_issue_role_async,
+    run_issue_role_sync,
+)
 from vibe3.roles.plan import (
     PLAN_SYNC_SPEC,
     bind_plan_spec,
@@ -47,13 +50,19 @@ def _plan_issue_impl(
 
     _ = instructions, agent, backend, model
 
-    run_issue_role_mode(
-        issue_number=issue,
-        dry_run=dry_run,
-        async_mode=not no_async,
-        fresh_session=False,
-        spec=PLAN_SYNC_SPEC,
-    )
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue,
+            dry_run=dry_run,
+            fresh_session=False,
+            spec=PLAN_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue,
+            dry_run=dry_run,
+            spec=PLAN_SYNC_SPEC,
+        )
 
 
 def _plan_spec_impl(

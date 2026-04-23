@@ -12,7 +12,10 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
-from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+from vibe3.execution.issue_role_sync_runner import (
+    run_issue_role_async,
+    run_issue_role_sync,
+)
 from vibe3.roles.review import (
     REVIEW_SYNC_SPEC,
     build_base_review_request,
@@ -53,13 +56,19 @@ def _review_issue_impl(
 
     _ = report_ref
 
-    run_issue_role_mode(
-        issue_number=issue,
-        dry_run=dry_run,
-        async_mode=not no_async,
-        fresh_session=False,
-        spec=REVIEW_SYNC_SPEC,
-    )
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue,
+            dry_run=dry_run,
+            fresh_session=False,
+            spec=REVIEW_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue,
+            dry_run=dry_run,
+            spec=REVIEW_SYNC_SPEC,
+        )
 
 
 @app.callback(invoke_without_command=True)
