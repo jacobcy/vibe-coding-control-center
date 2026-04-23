@@ -241,12 +241,9 @@ def _resolve_minimal_audit_dir(branch: str | None) -> Path:
         reports_dir.mkdir(parents=True, exist_ok=True)
         return reports_dir
 
-    handoff_svc = (
-        HandoffService(git_client=BranchBoundGitClient(branch))
-        if branch
-        else HandoffService()
-    )
-    return handoff_svc.storage.ensure_handoff_dir()
+    reports_dir = Path.cwd() / "docs" / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    return reports_dir
 
 
 def _load_existing_audit_ref(branch: str | None) -> str | None:

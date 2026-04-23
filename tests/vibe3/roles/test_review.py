@@ -175,6 +175,26 @@ def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
     )
 
 
+def test_create_minimal_audit_artifact_falls_back_to_cwd_reports_dir(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    with patch("vibe3.roles.review.GitClient") as mock_git_cls:
+        mock_git = mock_git_cls.return_value
+        mock_git.get_worktree_root.return_value = None
+        mock_git.find_worktree_path_for_branch.return_value = None
+        artifact_path = _create_minimal_audit_artifact(
+            "Fallback review output",
+            "UNKNOWN",
+            "task/issue-340",
+        )
+
+    assert artifact_path.parent == tmp_path / "docs" / "reports"
+    assert artifact_path.exists()
+
+
 class TestFinalizeReviewOutputVerdictSource:
     """回归测试: finalize_review_output 在不同 audit 来源下正确选择 verdict 来源。
 
