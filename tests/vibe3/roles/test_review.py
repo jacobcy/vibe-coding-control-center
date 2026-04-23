@@ -182,7 +182,7 @@ def test_create_minimal_audit_artifact_falls_back_to_cwd_reports_dir(
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
-    with patch("vibe3.roles.review.GitClient") as mock_git_cls:
+    with patch("vibe3.roles.review_helpers.GitClient") as mock_git_cls:
         mock_git = mock_git_cls.return_value
         mock_git.get_worktree_root.return_value = None
         mock_git.find_worktree_path_for_branch.return_value = None
