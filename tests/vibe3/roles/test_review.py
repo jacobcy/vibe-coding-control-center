@@ -3,13 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from vibe3.roles.review import (
-    _create_minimal_audit_artifact,
-    _resolve_authoritative_audit_ref,
-    _resolve_review_verdict,
-)
+from vibe3.roles.review import _create_minimal_audit_artifact
 
 
 class TestReviewerFailed:
@@ -161,102 +155,6 @@ class TestReviewerNoOpGate:
         mock_block.assert_not_called()
 
 
-class TestReviewerParserErrorTolerance:
-    """场景 5: reviewer 输出格式错误 → audit_ref 仍然写入（容错性）"""
-
-    def test_reviewer_output_written_even_if_parser_fails(
-        self,
-    ) -> None:
-        """即使 parser 失败，audit_ref 也应该写入"""
-        # Setup: reviewer 输出 "LGTM"（不符合 VERDICT 格式）
-
-        mock_output = "LGTM - The implementation looks good"
-        mock_branch = "task/issue-303"
-
-        # Create audit_ref from raw output
-        with patch("vibe3.roles.review._create_minimal_audit_artifact") as mock_create:
-            mock_audit_path = Path("/tmp/audit-auto-2026-04-16T12:30:00Z.md")
-            mock_create.return_value = mock_audit_path
-
-            audit_ref = _resolve_authoritative_audit_ref(
-                handoff_file=None,  # ← 无 handoff file
-                review_output=mock_output,  # ← 直接使用原始输出
-                verdict="UNKNOWN",  # ← parser 失败，verdict 为空
-                branch=mock_branch,
-            )
-
-            # Verify: _create_minimal_audit_artifact called
-            mock_create.assert_called_once_with(
-                mock_output,
-                "UNKNOWN",  # ← verdict 标记为 UNKNOWN
-                mock_branch,
-            )
-
-            # Verify: audit_ref returned
-            assert audit_ref == str(mock_audit_path)
-
-    def test_reviewer_verdict_prefers_stdout_over_audit_file(
-        self, tmp_path: Path
-    ) -> None:
-        audit_path = tmp_path / "audit.md"
-        audit_path.write_text("VERDICT: BLOCK\n", encoding="utf-8")
-
-        verdict = _resolve_review_verdict(
-            review_output="Looks good\nVERDICT: PASS",
-            audit_ref=str(audit_path),
-        )
-
-        assert verdict == "PASS"
-
-    def test_reviewer_verdict_falls_back_to_audit_file_when_stdout_invalid(
-        self, tmp_path: Path
-    ) -> None:
-        audit_path = tmp_path / "audit.md"
-        audit_path.write_text("# Audit\nVERDICT: MAJOR\n", encoding="utf-8")
-
-        verdict = _resolve_review_verdict(
-            review_output="LGTM without parseable verdict",
-            audit_ref=str(audit_path),
-        )
-
-        assert verdict == "MAJOR"
-
-    def test_authoritative_audit_ref_prefers_existing_agent_written_ref(
-        self,
-    ) -> None:
-        with patch("vibe3.roles.review._create_minimal_audit_artifact") as mock_create:
-            audit_ref = _resolve_authoritative_audit_ref(
-                handoff_file=None,
-                review_output="VERDICT: PASS",
-                verdict="PASS",
-                branch="task/issue-303",
-                existing_audit_ref="docs/reports/issue-303-review.md",
-            )
-
-        mock_create.assert_not_called()
-        assert audit_ref == "docs/reports/issue-303-review.md"
-
-    def test_reviewer_parser_error_does_not_raise_exception(
-        self,
-    ) -> None:
-        """Parser 失败时不应该抛异常，而是 verdict=None"""
-        from vibe3.agents.review_parser import ReviewParserError, parse_codex_review
-
-        # Setup: output without VERDICT format
-        invalid_output = "LGTM - looks good"
-
-        # Execute: parser should raise ReviewParserError
-        with pytest.raises(ReviewParserError):
-            parse_codex_review(invalid_output)
-
-        # Expected behavior in actual code:
-        # try:
-        #     review = parse_codex_review(output)
-        #     verdict = review.verdict
-        # except ReviewParserError:
-        #     verdict = None  # ← 不抛异常，继续写 audit_ref
-
-
 def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
     tmp_path: Path,
 ) -> None:
@@ -320,7 +218,6 @@ class TestFinalizeReviewOutputVerdictSource:
 
         audit_ref, verdict = finalize_review_output(
             review_output=stdout_output,
-            handoff_file=None,
             branch="task/issue-42",
             actor="claude/claude-sonnet-4-6",
         )
@@ -369,7 +266,6 @@ class TestFinalizeReviewOutputVerdictSource:
         ):
             _, verdict = finalize_review_output(
                 review_output=stdout_output,
-                handoff_file=None,
                 branch="task/issue-42",
                 actor="claude/claude-sonnet-4-6",
             )
@@ -404,7 +300,6 @@ class TestFinalizeReviewOutputVerdictSource:
 
         _, verdict = finalize_review_output(
             review_output=stdout_output,
-            handoff_file=None,
             branch="task/issue-42",
             actor="claude/claude-sonnet-4-6",
         )
