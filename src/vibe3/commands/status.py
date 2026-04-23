@@ -18,6 +18,10 @@ from vibe3.services.status_query_service import (
     is_auto_task_branch,
     is_canonical_task_branch,
 )
+from vibe3.services.task_status_classifier import (
+    TaskStatusBucket,
+    classify_task_status,
+)
 from vibe3.ui.console import console
 
 AllOption = Annotated[
@@ -50,6 +54,54 @@ def _resolve_server_label(
     if is_valid and pid is not None:
         return "[yellow]unreachable[/]"
     return "[dim]stopped[/]"
+
+
+def _render_task_item_details(
+    flow: FlowStatusResponse | None,
+    config: OrchestraConfig,
+    assignee: str | None = None,
+) -> None:
+    """Render shared task detail lines for task-oriented dashboard sections."""
+    flow_info = (
+        f"[dim]flow:[/] [cyan]{flow.branch}[/]"
+        if flow
+        else "[dim]flow:[/] [dim](none)[/]"
+    )
+    detail_parts = [flow_info]
+    if assignee:
+        detail_parts.append(f"[dim]assignee:[/] [cyan]{assignee}[/]")
+    console.print("             " + "  ".join(detail_parts))
+
+    if not flow:
+        return
+
+    if flow.plan_ref:
+        console.print(f"             [dim]plan:[/] [cyan]{flow.plan_ref}[/]")
+    if flow.report_ref:
+        console.print(f"             [dim]report:[/] [cyan]{flow.report_ref}[/]")
+    if flow.latest_verdict:
+        v = flow.latest_verdict
+        color = {
+            "PASS": "green",
+            "MAJOR": "yellow",
+            "BLOCK": "red",
+        }.get(v.verdict, "cyan")
+        console.print(
+            f"             [dim]verdict:[/] "
+            f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+        )
+    if flow.latest_indicate_action:
+        console.print(
+            f"             [dim]action:[/] "
+            f"[yellow bold]{flow.latest_indicate_action}[/]"
+        )
+    if flow.pr_number:
+        pr_ref = (
+            f"https://github.com/{config.repo}/pull/{flow.pr_number}"
+            if config.repo
+            else f"PR #{flow.pr_number}"
+        )
+        console.print(f"             [dim]PR:[/] [cyan]{pr_ref}[/]")
 
 
 def status(
@@ -144,86 +196,43 @@ def status(
             for item in orchestrated_issues
             if _include_issue_in_task_progress(item)
         ]
+        bucketed_items: dict[TaskStatusBucket, list[dict[str, object]]] = {
+            TaskStatusBucket.ASSIGNEE_INTAKE: [],
+            TaskStatusBucket.READY_QUEUE: [],
+            TaskStatusBucket.READY_ANOMALY: [],
+            TaskStatusBucket.OTHER: [],
+        }
+        for item in task_progress_items:
+            bucket = classify_task_status(
+                cast(IssueState | None, item["state"]),
+                cast(str | None, item.get("assignee")),
+            )
+            bucketed_items[bucket].append(item)
 
         console.print("[bold cyan]Issue Progress:[/]")
 
         if task_progress_items:
-            active_items = [
-                item
-                for item in task_progress_items
-                if cast(IssueState, item["state"])
-                in {
-                    IssueState.CLAIMED,
-                    IssueState.HANDOFF,
-                    IssueState.IN_PROGRESS,
-                    IssueState.REVIEW,
-                }
-            ]
-            ready_items = [
-                item
-                for item in task_progress_items
-                if cast(IssueState, item["state"]) == IssueState.READY
-            ]
+            assignee_items = bucketed_items[TaskStatusBucket.ASSIGNEE_INTAKE]
+            ready_items = bucketed_items[TaskStatusBucket.READY_QUEUE]
+            ready_anomalies = bucketed_items[TaskStatusBucket.READY_ANOMALY]
 
-            console.print("  [bold]Active:[/]")
-            if active_items:
-                for item in active_items:
+            console.print("  [bold]Assignee Intake:[/]")
+            if assignee_items:
+                for item in assignee_items:
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     state = cast(IssueState, item["state"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
                     is_queued = cast(bool, item["queued"])
+                    assignee = cast(str | None, item.get("assignee"))
 
                     status_str = "QUEUED" if is_queued else state.value.upper()
                     status_color = "yellow" if is_queued else "green"
-                    flow_info = (
-                        f"[dim]flow:[/] [cyan]{flow.branch}[/]"
-                        if flow
-                        else "[dim]flow:[/] [dim](none)[/]"
-                    )
                     console.print(
                         f"  #{number:4}  [{status_color}]{status_str:10}[/]"
                         f"  {title[:48]}..."
                     )
-                    console.print(f"             {flow_info}")
-
-                    # Show refs for running tasks (each on separate line)
-                    if flow:
-                        if flow.plan_ref:
-                            plan_msg = (
-                                f"             [dim]plan:[/] [cyan]{flow.plan_ref}[/]"
-                            )
-                            console.print(plan_msg)
-                        if flow.report_ref:
-                            report_msg = (
-                                f"             [dim]report:[/] "
-                                f"[cyan]{flow.report_ref}[/]"
-                            )
-                            console.print(report_msg)
-                        if flow.latest_verdict:
-                            v = flow.latest_verdict
-                            color = {
-                                "PASS": "green",
-                                "MAJOR": "yellow",
-                                "BLOCK": "red",
-                            }.get(v.verdict, "cyan")
-                            console.print(
-                                f"             [dim]verdict:[/] "
-                                f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
-                            )
-                        if flow.latest_indicate_action:
-                            console.print(
-                                f"             [dim]action:[/] "
-                                f"[yellow bold]{flow.latest_indicate_action}[/]"
-                            )
-                        if flow.pr_number:
-                            # Build PR URL from config.repo or use pr_number
-                            pr_ref = (
-                                f"https://github.com/{config.repo}/pull/{flow.pr_number}"
-                                if config.repo
-                                else f"PR #{flow.pr_number}"
-                            )
-                            console.print(f"             [dim]PR:[/] [cyan]{pr_ref}[/]")
+                    _render_task_item_details(flow, config, assignee=assignee)
             else:
                 console.print("  [dim](none)[/]")
 
@@ -233,18 +242,13 @@ def status(
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
+                    assignee = cast(str | None, item.get("assignee"))
 
                     # Queue metadata
                     milestone = cast(str | None, item.get("milestone"))
                     roadmap = cast(str | None, item.get("roadmap"))
                     priority = cast(int, item.get("priority", 0))
                     queue_rank = cast(int | None, item.get("queue_rank"))
-
-                    flow_info = (
-                        f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
-                        if flow
-                        else "  [dim]flow:[/] [dim](none)[/]"
-                    )
 
                     # Format queue metadata
                     metadata_parts: list[str] = []
@@ -260,7 +264,24 @@ def status(
                     console.print(
                         f"  #{number:4}  [cyan]READY     [/]  {title[:48]}..."
                     )
-                    console.print(f"             {flow_info}  [dim]{metadata_str}[/]")
+                    _render_task_item_details(flow, config, assignee=assignee)
+                    console.print(f"             [dim]{metadata_str}[/]")
+            else:
+                console.print("  [dim](none)[/]")
+
+            console.print("\n  [bold]Ready Exceptions:[/]")
+            if ready_anomalies:
+                for item in ready_anomalies:
+                    number = cast(int, item["number"])
+                    title = cast(str, item["title"])
+                    flow = cast(FlowStatusResponse | None, item["flow"])
+
+                    console.print(f"  #{number:4}  [red]READY     [/]  {title[:48]}...")
+                    _render_task_item_details(flow, config)
+                    console.print(
+                        "             [yellow]missing assignee:[/] "
+                        "ready queue historical debt"
+                    )
             else:
                 console.print("  [dim](none)[/]")
         else:

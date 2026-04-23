@@ -12,17 +12,15 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.queue_ordering import (
-    resolve_priority,
-    resolve_roadmap_rank,
-    sort_ready_issues,
-)
+from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
 from vibe3.services.status_query_service import (
+    extract_primary_assignee_login,
+    extract_queue_metadata,
     is_orchestra_managed_flow_branch,
     issue_priority,
+    sort_ready_issue_dicts,
 )
 
 if TYPE_CHECKING:
@@ -209,8 +207,7 @@ class OrchestraStatusService:
                 continue
 
             title = issue.get("title", "")
-            assignees = issue.get("assignees", [])
-            assignee = assignees[0].get("login") if assignees else None
+            assignee = extract_primary_assignee_login(issue.get("assignees"))
 
             # Get state from labels
             state = self._label_service.get_state(number)
@@ -239,26 +236,14 @@ class OrchestraStatusService:
             # Parse blocked_by from issue body
             blocked_by_list = parse_blocked_by(issue.get("body") or "")
 
-            # Parse queue metadata
-            labels = [
-                label.get("name", "")
-                for label in issue.get("labels", [])
-                if isinstance(label, dict) and "name" in label
-            ]
+            labels, milestone, priority, roadmap = extract_queue_metadata(
+                issue.get("labels"),
+                issue.get("milestone"),
+            )
 
             # Skip supervisor issues - handled by supervisor/apply, not manager chain
             if "supervisor" in labels:
                 continue
-
-            # Extract milestone from GitHub milestone field
-            milestone = None
-            milestone_data = issue.get("milestone")
-            if isinstance(milestone_data, dict) and "title" in milestone_data:
-                milestone = milestone_data["title"]
-
-            # Resolve priority and roadmap
-            priority = resolve_priority(labels)
-            _, roadmap = resolve_roadmap_rank(labels)
 
             # Collect issue data
             issue_data = {
@@ -285,30 +270,7 @@ class OrchestraStatusService:
                 other_issues_data.append(issue_data)
 
         # Sort ready issues and assign real queue ranks
-        ready_issue_infos = [
-            IssueInfo(
-                number=data["number"],
-                title=data["title"],
-                state=data["state"],
-                labels=data["labels"],
-                assignees=[data["assignee"]] if data["assignee"] else [],
-                milestone=data["milestone"],
-            )
-            for data in ready_issues_data
-        ]
-        sorted_ready_infos = sort_ready_issues(ready_issue_infos)
-
-        # Create sorted ready issue data with real queue ranks
-        sorted_ready_data = []
-        for rank, issue_info in enumerate(sorted_ready_infos, start=1):
-            # Find matching issue_data
-            matching_data = next(
-                (d for d in ready_issues_data if d["number"] == issue_info.number),
-                None,
-            )
-            if matching_data:
-                matching_data["queue_rank"] = rank
-                sorted_ready_data.append(matching_data)
+        sorted_ready_data = sort_ready_issue_dicts(ready_issues_data)
 
         other_issues_data.sort(
             key=lambda item: (
