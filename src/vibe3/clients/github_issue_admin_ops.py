@@ -1,17 +1,22 @@
 """GitHub issue admin operations mixin."""
 
+from __future__ import annotations
+
 import json
 import subprocess
 from typing import Any, cast
 
 from loguru import logger
 
+# Standard timeout for GitHub CLI API calls (seconds)
+GH_API_TIMEOUT = 30
+
 
 class IssueAdminMixin:
     """Mixin for advanced issue operations used by orchestra."""
 
     def remove_assignees(
-        self: Any,
+        self,
         issue_number: int,
         assignees: list[str],
         repo: str | None = None,
@@ -34,7 +39,9 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(
                 f"Failed to remove assignees from issue #{issue_number}"
@@ -43,7 +50,7 @@ class IssueAdminMixin:
         return True
 
     def list_issues_with_assignees(
-        self: Any,
+        self,
         limit: int = 100,
         repo: str | None = None,
     ) -> list[dict[str, Any]]:
@@ -78,7 +85,9 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(
                 "Failed to list issues with assignees"
@@ -87,7 +96,7 @@ class IssueAdminMixin:
         return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def close_issue(
-        self: Any,
+        self,
         issue_number: int,
         comment: str | None = None,
         repo: str | None = None,
@@ -114,7 +123,9 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(
                 f"Failed to close issue #{issue_number}"
@@ -123,7 +134,7 @@ class IssueAdminMixin:
         return True
 
     def add_comment(
-        self: Any,
+        self,
         issue_number: int,
         body: str,
         repo: str | None = None,
@@ -148,7 +159,9 @@ class IssueAdminMixin:
         if repo:
             cmd.extend(["--repo", repo])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+        )
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(
                 f"Failed to add comment on #{issue_number}"
@@ -157,7 +170,7 @@ class IssueAdminMixin:
         return True
 
     def close_issue_if_open(
-        self: Any,
+        self,
         issue_number: int,
         closing_comment: str | None = None,
         repo: str | None = None,
@@ -183,7 +196,7 @@ class IssueAdminMixin:
 
         # Check if already closed (avoid unnecessary API call)
         try:
-            issue_payload = self.view_issue(issue_number, repo=repo)
+            issue_payload = self.view_issue(issue_number, repo=repo)  # type: ignore[attr-defined]
         except (FileNotFoundError, OSError, RuntimeError) as exc:
             logger.bind(
                 external="github",
@@ -222,7 +235,7 @@ class IssueAdminMixin:
             return "failed"
 
     def get_pr_for_issue(
-        self: Any,
+        self,
         issue_number: int,
         repo: str | None = None,
     ) -> int | None:
@@ -258,7 +271,9 @@ class IssueAdminMixin:
             cmd.extend(["--repo", repo])
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
+            )
             if result.returncode != 0:
                 logger.bind(external="github", error=result.stderr).error(
                     "Failed to list PRs for issue lookup"
