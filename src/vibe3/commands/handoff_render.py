@@ -7,6 +7,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.utils.path_helpers import sanitize_event_detail_paths
 
 # Preview limit for update messages
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
@@ -133,15 +134,15 @@ def _render_handoff_events(events: list, worktree_root: str | None = None) -> No
         console.print("[dim]  no handoff events[/]")
         return
 
-    from vibe3.ui.flow_ui_primitives import resolve_ref_path
-
     for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
         console.print(
             f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{event.actor}[/]"
         )
         if event.detail:
-            console.print(f"  {event.detail}")
+            console.print(f"  {
+                sanitize_event_detail_paths(event.detail, event.refs, worktree_root)
+                }")
         if event.refs:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
