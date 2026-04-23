@@ -30,6 +30,25 @@ def sync_flow_blocked_task_label(store: SQLiteClient, branch: str) -> None:
         )
 
 
+def sync_flow_done_task_label(store: SQLiteClient, branch: str) -> None:
+    """Sync task-role issues in a flow to state/done when flow is done."""
+    issue_links_raw = store.get_issue_links(branch)
+    issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
+    label_service = LabelService()
+    for link in issue_links:
+        if link.get("issue_role") != "task":
+            continue
+        issue_number = link.get("issue_number")
+        if issue_number is None:
+            continue
+        label_service.confirm_issue_state(
+            int(issue_number),
+            IssueState.DONE,
+            actor="flow:done",
+            force=True,
+        )
+
+
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 

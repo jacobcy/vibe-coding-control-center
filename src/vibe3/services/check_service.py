@@ -18,6 +18,8 @@ from vibe3.services.check_remote import (
     requires_handoff,
     resolve_task_issue_number,
 )
+from vibe3.services.flow_block_mixin import sync_flow_done_task_label
+from vibe3.services.flow_pr_state import evaluate_flow_pr_state
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
@@ -132,14 +134,19 @@ class CheckService(CheckRemote):
 
             if prs:
                 pr = prs[0]
-                # Check if PR is closed or merged - auto-complete flow
-                if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                pr_eval = evaluate_flow_pr_state(pr)
+                if pr_eval.can_mark_flow_done:
                     self._mark_flow_done(
                         branch,
-                        f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                        f"PR #{pr_eval.pr_number} is MERGED (detected from GitHub)",
                         cleanup_local_scene=not branch_missing,
                     )
                     return CheckResult(is_valid=True, branch=branch, issues=[])
+                elif pr_eval.is_closed_not_merged:
+                    issues.append(
+                        f"PR #{pr_eval.pr_number} is CLOSED but not merged — "
+                        f"flow cannot auto-complete; consider abandon or manual resolution"
+                    )
         except Exception as e:
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to verify PR status from GitHub: {e}"
@@ -286,6 +293,7 @@ class CheckService(CheckRemote):
             branch=branch,
         ).info(f"Auto-completing flow: {reason}")
         self.store.update_flow_state(branch, flow_status="done")
+        sync_flow_done_task_label(self.store, branch)
         self.store.add_event(
             branch,
             "flow_auto_completed",

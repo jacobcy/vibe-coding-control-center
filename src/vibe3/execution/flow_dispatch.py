@@ -12,7 +12,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.models.pr import PRState
+from vibe3.services.flow_pr_state import evaluate_flow_pr_state
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 from vibe3.services.issue_flow_service import IssueFlowService
@@ -107,7 +107,8 @@ class FlowManager:
         pr_number = self.get_pr_for_issue(issue.number)
         if pr_number:
             pr = self.github.get_pr(pr_number=pr_number)
-            if pr and (pr.state == PRState.MERGED or pr.merged_at):
+            pr_eval = evaluate_flow_pr_state(pr)
+            if pr and pr_eval.is_merged:
                 # Block issue instead of throwing exception
                 # This is a tolerable issue that requires human intervention
                 logger.bind(
