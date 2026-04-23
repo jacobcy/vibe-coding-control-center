@@ -47,7 +47,11 @@ def _patch_spec_runtime(monkeypatch) -> MagicMock:
     )
     mock_execute = MagicMock()
     monkeypatch.setattr(
-        "vibe3.commands.plan.execute_spec_plan",
+        "vibe3.commands.plan.execute_spec_plan_async",
+        mock_execute,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.execute_spec_plan_sync",
         mock_execute,
     )
     return mock_execute

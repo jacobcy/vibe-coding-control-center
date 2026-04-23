@@ -274,16 +274,55 @@ def bind_plan_spec(branch: str, spec_path: str) -> None:
     FlowService().bind_spec(branch, spec_path, "user")
 
 
-def execute_spec_plan(
+def execute_spec_plan_async(
     *,
     request: PlanRequest,
     issue_number: int | None,
     branch: str,
-    async_mode: bool = True,
-    cli_args: list[str] | None = None,
+    cli_args: list[str],
     config: VibeConfig | None = None,
 ) -> CodeagentResult:
-    """Execute spec-mode planning using the shared execution shell."""
+    """Execute spec plan in async mode (tmux wrapper)."""
+    _ = request, config
+    launch = ExecutionCoordinator(
+        load_orchestra_config(),
+        SQLiteClient(),
+    ).dispatch_execution(
+        ExecutionRequest(
+            role="planner",
+            target_branch=branch,
+            target_id=issue_number or 0,
+            execution_name=(
+                f"vibe3-planner-issue-{issue_number}"
+                if issue_number is not None
+                else f"vibe3-planner-{branch.replace('/', '-')}"
+            ),
+            cmd=build_self_invocation(cli_args),
+            cwd=str(Path.cwd()),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=(
+                {"issue_number": str(issue_number)} if issue_number is not None else {}
+            ),
+            actor="agent:plan",
+            mode="async",
+        )
+    )
+    return CodeagentResult(
+        success=launch.launched,
+        stderr=launch.reason or "",
+        tmux_session=launch.tmux_session,
+        log_path=Path(launch.log_path) if launch.log_path else None,
+    )
+
+
+def execute_spec_plan_sync(
+    *,
+    request: PlanRequest,
+    issue_number: int | None,
+    branch: str,
+    config: VibeConfig | None = None,
+) -> CodeagentResult:
+    """Execute spec plan in sync mode (direct execution)."""
     cfg = config or VibeConfig.get_defaults()
     command = create_codeagent_command(
         role="planner",
@@ -295,41 +334,4 @@ def execute_spec_plan(
         cwd=Path.cwd(),
         config=cfg,
     )
-
-    if async_mode:
-        if cli_args is None:
-            raise ValueError("Async plan execution requires explicit cli_args")
-        launch = ExecutionCoordinator(
-            load_orchestra_config(),
-            SQLiteClient(),
-        ).dispatch_execution(
-            ExecutionRequest(
-                role="planner",
-                target_branch=branch,
-                target_id=issue_number or 0,
-                execution_name=(
-                    f"vibe3-planner-issue-{issue_number}"
-                    if issue_number is not None
-                    else f"vibe3-planner-{branch.replace('/', '-')}"
-                ),
-                cmd=build_self_invocation(cli_args),
-                cwd=str(Path.cwd()),
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-                refs=(
-                    {"issue_number": str(issue_number)}
-                    if issue_number is not None
-                    else {}
-                ),
-                actor="agent:plan",
-                mode="async",
-            )
-        )
-        return CodeagentResult(
-            success=launch.launched,
-            stderr=launch.reason or "",
-            tmux_session=launch.tmux_session,
-            log_path=Path(launch.log_path) if launch.log_path else None,
-        )
-
-    result = CodeagentExecutionService(cfg).execute_sync(command)
-    return result
+    return CodeagentExecutionService(cfg).execute_sync(command)

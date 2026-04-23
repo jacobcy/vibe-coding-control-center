@@ -20,7 +20,8 @@ from vibe3.roles.review import (
     REVIEW_SYNC_SPEC,
     build_base_review_request,
     build_pr_review_request,
-    execute_manual_review,
+    execute_manual_review_async,
+    execute_manual_review_sync,
 )
 from vibe3.utils.trace import enable_trace
 
@@ -159,15 +160,23 @@ def pr(
         raise typer.Exit(1)
     branch = head_branch
 
-    result = execute_manual_review(
-        request=request,
-        dry_run=dry_run,
-        instructions=instructions,
-        issue_number=issue_number,
-        pr_number=pr_number,
-        branch=branch,
-        async_mode=not no_async,
-    )
+    if no_async or dry_run or not branch:
+        result = execute_manual_review_sync(
+            request=request,
+            dry_run=dry_run,
+            instructions=instructions,
+            issue_number=issue_number,
+            pr_number=pr_number,
+            branch=branch,
+        )
+    else:
+        result = execute_manual_review_async(
+            request=request,
+            instructions=instructions,
+            issue_number=issue_number,
+            pr_number=pr_number,
+            branch=branch,
+        )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)
@@ -235,14 +244,21 @@ def base(
         resolved_base.base_branch,
         flow_service=flow_service,
     )
-    result = execute_manual_review(
-        request=request,
-        dry_run=dry_run,
-        instructions=instructions,
-        issue_number=issue_number,
-        branch=current_branch,
-        async_mode=not no_async,
-    )
+    if no_async or dry_run:
+        result = execute_manual_review_sync(
+            request=request,
+            dry_run=dry_run,
+            instructions=instructions,
+            issue_number=issue_number,
+            branch=current_branch,
+        )
+    else:
+        result = execute_manual_review_async(
+            request=request,
+            instructions=instructions,
+            issue_number=issue_number,
+            branch=current_branch,
+        )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)

@@ -402,7 +402,33 @@ def build_base_review_request(
     )
 
 
-def execute_manual_review(
+def execute_manual_review_async(
+    *,
+    request: ReviewRequest,
+    instructions: str | None,
+    issue_number: int | None = None,
+    pr_number: int | None = None,
+    branch: str,
+) -> ReviewRunResult:
+    """Execute manual review in async mode (tmux wrapper)."""
+    launch = _dispatch_async_manual_review(
+        request=request,
+        branch=branch,
+        issue_number=issue_number,
+        pr_number=pr_number,
+        instructions=instructions,
+    )
+    if not launch.launched:
+        logger.bind(domain="review").warning(
+            "Async review launch skipped",
+            reason=launch.reason,
+            reason_code=launch.reason_code,
+        )
+        return ReviewRunResult("ERROR", None, issue_number)
+    return ReviewRunResult("ASYNC", None, issue_number)
+
+
+def execute_manual_review_sync(
     *,
     request: ReviewRequest,
     dry_run: bool,
@@ -410,13 +436,13 @@ def execute_manual_review(
     issue_number: int | None = None,
     pr_number: int | None = None,
     branch: str | None = None,
-    async_mode: bool = True,
     config: VibeConfig | None = None,
     flow_service: FlowService | None = None,
     review_parser: Callable[[str], ParsedReview] = parse_codex_review,
     context_builder: Callable[..., object] = make_review_context_builder,
 ) -> ReviewRunResult:
-    """Execute manual review for `review pr` and `review base`."""
+    """Execute manual review in sync mode (direct execution)."""
+    _ = flow_service, review_parser
     cfg = config or VibeConfig.get_defaults()
     log = logger.bind(domain="review", scope=request.scope.kind)
     task = _build_manual_review_task(cfg, instructions, request, pr_number, log)
@@ -432,23 +458,6 @@ def execute_manual_review(
         issue_number=issue_number,
         pre_gate_callback=_process_review_sync_result,
     )
-    if async_mode and not dry_run and branch:
-        launch = _dispatch_async_manual_review(
-            request=request,
-            branch=branch,
-            issue_number=issue_number,
-            pr_number=pr_number,
-            instructions=instructions,
-        )
-        if not launch.launched:
-            logger.bind(domain="review").warning(
-                "Async review launch skipped",
-                reason=launch.reason,
-                reason_code=launch.reason_code,
-            )
-            return ReviewRunResult("ERROR", None, issue_number)
-        return ReviewRunResult("ASYNC", None, issue_number)
-
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
         return ReviewRunResult("DRY_RUN", None, issue_number)
@@ -458,7 +467,6 @@ def execute_manual_review(
         branch=branch,
         actor="agent:review",
     )
-
     return ReviewRunResult(verdict, audit_ref, issue_number)
 
 

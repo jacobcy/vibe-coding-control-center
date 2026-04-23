@@ -21,7 +21,8 @@ from vibe3.execution.issue_role_sync_runner import (
 from vibe3.roles.plan import (
     PLAN_SYNC_SPEC,
     bind_plan_spec,
-    execute_spec_plan,
+    execute_spec_plan_async,
+    execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
 from vibe3.utils.trace import enable_trace
@@ -105,19 +106,25 @@ def _plan_spec_impl(
             err=True,
         )
 
-    execute_spec_plan(
-        request=spec_input.request,
-        issue_number=issue_number,
-        branch=branch,
-        async_mode=not no_async,
-        cli_args=[
-            "plan",
-            "spec",
-            *(["--file", str(file)] if file else []),
-            *(["--msg", msg] if msg else []),
-            *([instructions] if instructions else []),
-        ],
-    )
+    if no_async:
+        execute_spec_plan_sync(
+            request=spec_input.request,
+            issue_number=issue_number,
+            branch=branch,
+        )
+    else:
+        execute_spec_plan_async(
+            request=spec_input.request,
+            issue_number=issue_number,
+            branch=branch,
+            cli_args=[
+                "plan",
+                "spec",
+                *(["--file", str(file)] if file else []),
+                *(["--msg", msg] if msg else []),
+                *([instructions] if instructions else []),
+            ],
+        )
 
 
 @app.callback(invoke_without_command=True)
