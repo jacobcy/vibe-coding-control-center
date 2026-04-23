@@ -4,7 +4,7 @@ from typing import Any
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
+from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 from vibe3.ui.flow_ui_timeline import (  # noqa: F401
     render_flow_timeline,
     render_milestone,
@@ -70,6 +70,7 @@ def render_flow_status(
     pr_data: dict[str, Any] | None = None,
     milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
+    worktree_root: str | None = None,
 ) -> None:
     """flow show — full detail, YAML style."""
     titles = issue_titles or {}
@@ -120,9 +121,12 @@ def render_flow_status(
         ("execute", status.executor_actor, status.report_ref),
         ("review", status.reviewer_actor, status.audit_ref),
     ):
+        ref_display = (
+            resolve_ref_path(ref, worktree_root, absolute=True) if ref else "—"
+        )
         console.print(f"  [dim]{stage}:[/]")
         kv("actor", actor or "—", 2)
-        kv("ref", ref or "—", 2)
+        kv("ref", ref_display, 2)
     # Latest verdict — shown inline under review results
     if status.latest_verdict:
         v = status.latest_verdict
