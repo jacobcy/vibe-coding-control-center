@@ -27,7 +27,7 @@ def build(
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
-    """Build a structure snapshot from current codebase.
+    """Build a structure snapshot from current codebase (in-memory, not saved).
 
     The snapshot captures:
     - File structure (LOC, functions, dependencies)
@@ -35,11 +35,48 @@ def build(
     - Dependency graph
     - Quality metrics
 
-    This is the canonical structure entrypoint; use `snapshot show` for review.
+    This command only builds the snapshot in memory. Use `snapshot save` to persist.
 
     Examples:
         vibe3 snapshot build
         vibe3 snapshot build --json
+    """
+    if trace:
+        enable_trace()
+
+    try:
+        snapshot = snapshot_service.build_snapshot()
+
+        if json_out:
+            typer.echo(snapshot.model_dump_json(indent=2))
+        else:
+            typer.echo(f"✓ Snapshot built: {snapshot.snapshot_id}")
+            typer.echo(f"  Branch: {snapshot.branch}")
+            typer.echo(f"  Commit: {snapshot.commit_short}")
+            typer.echo(f"  Files: {snapshot.metrics.total_files}")
+            typer.echo(f"  Total LOC: {snapshot.metrics.total_loc}")
+            typer.echo(f"  Functions: {snapshot.metrics.total_functions}")
+            typer.echo(
+                "\n  [yellow]Tip:[/yellow] "
+                "Use `snapshot save` to persist this snapshot"
+            )
+    except snapshot_service.SnapshotError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
+def save(
+    json_out: _JSON_OPT = False,
+    trace: _TRACE_OPT = False,
+) -> None:
+    """Build and persist a structure snapshot from current codebase.
+
+    This is the canonical command for creating and saving a snapshot to disk.
+
+    Examples:
+        vibe3 snapshot save
+        vibe3 snapshot save --json
     """
     if trace:
         enable_trace()
@@ -51,7 +88,7 @@ def build(
         if json_out:
             typer.echo(snapshot.model_dump_json(indent=2))
         else:
-            typer.echo(f"✓ Snapshot built: {snapshot.snapshot_id}")
+            typer.echo(f"✓ Snapshot saved: {snapshot.snapshot_id}")
             typer.echo(f"  Branch: {snapshot.branch}")
             typer.echo(f"  Commit: {snapshot.commit_short}")
             typer.echo(f"  Files: {snapshot.metrics.total_files}")
@@ -66,26 +103,29 @@ def build(
 @app.command(name="list")
 def list_snapshots(
     json_out: _JSON_OPT = False,
+    include_baselines: Annotated[
+        bool,
+        typer.Option("--include-baselines", help="Include auto-saved baselines"),
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """List all available snapshots.
 
     Examples:
         vibe3 snapshot list
+        vibe3 snapshot list --include-baselines
     """
     if trace:
         enable_trace()
 
-    ids = snapshot_service.list_snapshots()
+    ids = snapshot_service.list_snapshots(include_baselines=include_baselines)
 
     if json_out:
         typer.echo(json.dumps({"snapshots": ids}, indent=2))
     else:
         typer.echo("=== Available Snapshots ===")
         if not ids:
-            typer.echo(
-                "  No snapshots found. Use 'vibe3 snapshot build' to create one."
-            )
+            typer.echo("  No snapshots found. Use 'vibe3 snapshot save' to create one.")
         else:
             for i, sid in enumerate(ids, 1):
                 typer.echo(f"  {i}. {sid}")
@@ -95,28 +135,51 @@ def list_snapshots(
 def show(
     snapshot_id: Annotated[
         str | None,
-        typer.Argument(help="Snapshot ID to show (default: latest)"),
+        typer.Argument(help="Snapshot ID to show (default: current live structure)"),
+    ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Show baseline for specific branch"),
     ] = None,
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Show snapshot details.
 
+    By default (no arguments), builds and shows the current live structure.
+    If snapshot_id is provided, shows a saved snapshot.
+    If --branch is provided, shows the saved baseline for that branch.
+
     Examples:
-        vibe3 snapshot show                  # Show latest snapshot
-        vibe3 snapshot show <snapshot-id>   # Show specific snapshot
+        vibe3 snapshot show                  # Show current live structure
+        vibe3 snapshot show <snapshot-id>   # Show specific saved snapshot
+        vibe3 snapshot show --branch main   # Show baseline for 'main' branch
         vibe3 snapshot show --json
     """
     if trace:
         enable_trace()
 
     try:
-        snapshot = snapshot_service.load_snapshot(snapshot_id)
+        if branch:
+            # Load baseline for specific branch
+            snapshot = snapshot_service.load_branch_baseline(branch)
+            if not snapshot:
+                typer.echo(f"No baseline found for branch: {branch}", err=True)
+                raise typer.Exit(1)
+            title = f"=== Baseline: {snapshot.snapshot_id} (branch: {branch}) ==="
+        elif snapshot_id is None:
+            # Build current live snapshot (don't save)
+            snapshot = snapshot_service.build_snapshot()
+            title = "=== Current Live Structure ==="
+        else:
+            # Load saved snapshot
+            snapshot = snapshot_service.load_snapshot(snapshot_id)
+            title = f"=== Snapshot: {snapshot.snapshot_id} ==="
 
         if json_out:
             typer.echo(snapshot.model_dump_json(indent=2))
         else:
-            typer.echo(f"=== Snapshot: {snapshot.snapshot_id} ===")
+            typer.echo(title)
             typer.echo(f"  Branch: {snapshot.branch}")
             typer.echo(f"  Commit: {snapshot.commit}")
             typer.echo(f"  Created: {snapshot.created_at}")
@@ -140,25 +203,53 @@ def show(
 @app.command()
 def diff(
     baseline: Annotated[
-        str,
-        typer.Argument(help="Baseline snapshot ID (use 'latest' for most recent)"),
-    ],
+        str | None,
+        typer.Argument(help="Baseline snapshot ID (default: current branch baseline)"),
+    ] = None,
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Compare current codebase with a baseline snapshot.
 
+    If no baseline is specified, defaults to the auto-saved baseline for the
+    current branch. This gives the net structural change since the last
+    flow completion (PR merge or auto-complete).
+
     Examples:
+        vibe3 snapshot diff                  # Compare with current branch baseline
         vibe3 snapshot diff <snapshot-id>    # Compare with specific snapshot
         vibe3 snapshot diff latest           # Compare with latest snapshot
     """
+    from vibe3.clients.git_client import GitClient
+
     if trace:
         enable_trace()
 
     try:
-        baseline_snapshot = snapshot_service.load_snapshot(
-            None if baseline == "latest" else baseline
-        )
+        # Get baseline snapshot
+        if baseline is None:
+            # Default: use branch baseline
+            git = GitClient()
+            current_branch = git.get_current_branch()
+            baseline_snapshot = snapshot_service.load_branch_baseline(current_branch)
+            if not baseline_snapshot:
+                typer.echo(
+                    f"No baseline found for current branch '{current_branch}'.\n"
+                    "Either:\n"
+                    "  - Specify a baseline snapshot ID: vibe3 snapshot diff <id>\n"
+                    "  - Create a baseline by completing the flow "
+                    "(PR merge/auto-complete)\n",
+                    err=True,
+                )
+                raise typer.Exit(1)
+        elif baseline == "latest":
+            # Load latest snapshot
+            baseline_snapshot = snapshot_service.load_snapshot(None)
+        else:
+            # Load specified snapshot
+            baseline_snapshot = snapshot_service.load_snapshot(baseline)
+
+        # Build current snapshot
         current_snapshot = snapshot_service.build_snapshot()
         result = compute_diff(baseline_snapshot, current_snapshot)
 
@@ -167,7 +258,9 @@ def diff(
         else:
             typer.echo("=== Structure Diff ===")
             typer.echo(f"  Baseline: {result.baseline_id}")
+            typer.echo(f"  Baseline branch: {result.baseline_branch}")
             typer.echo(f"  Current:  {result.current_id}")
+            typer.echo(f"  Current branch: {result.current_branch}")
             typer.echo("\n  Summary:")
             typer.echo(
                 f"    Files: +{result.summary.files_added} "
