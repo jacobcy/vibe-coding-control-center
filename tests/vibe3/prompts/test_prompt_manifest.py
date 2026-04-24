@@ -155,7 +155,9 @@ recipes:
         error_msg = str(e)
         assert "demo.recipe" in error_msg
         assert "default" in error_msg
-        assert "demo.other" in error_msg
+        # Error message no longer includes available_providers (security)
+        # That info is now logged separately
+        assert "demo.missing" in error_msg
         assert "demo.missing" in error_msg
     else:
         pytest.fail("Expected KeyError was not raised")

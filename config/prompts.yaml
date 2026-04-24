@@ -1,14 +1,36 @@
 # AI Prompts 配置
-# 用于 AI 文案辅助能力（如 pr create --ai）
-# 用户可自定义 Prompts 模板
+#
+# 本文件保存“prompt 文本”和“prompt 模板”，但不总是负责装配顺序。
+# 目前分为四类：
+#
+# 1. AI suggestion templates
+#    pr.title_suggestion / pr.body_suggestion
+#    由 AISuggestionClient 直接读取，用于生成短文本建议，不是 codeagent 角色 prompt。
+#
+# 2. Codeagent global notice
+#    agent_prompt.global_notice
+#    由 create_codeagent_command 注入所有 codeagent prompt 顶部。
+#
+# 3. Orchestra / manager templates
+#    orchestra.*
+#    由 governance / supervisor / manager 调度链使用，属于治理 prompt。
+#
+# 4. Role prompt materials and templates
+#    run / plan / review
+#    保存角色 prompt 的模板和材料文本。section 装配由 config/prompt-recipes.yaml 控制。
 #
 # =============================================================================
 # Prompt Assembly Layer - Recipe Schema and Variable Source Kinds
 # =============================================================================
 #
-# vibe3 使用统一 Prompt Assembly 层：模板文本和实际 prompt 文案保留在本文件；
-# 较新的角色 prompt 逐步通过 config/prompt-recipes.yaml 声明 section 组成，
-# Python 代码只选择运行时 variant。
+# vibe3 正在收敛到统一 Prompt Assembly 层：
+# - config/prompts.yaml：保存模板文本和实际 prompt 文案。
+# - config/prompt-recipes.yaml：声明角色 prompt section 组成和顺序。
+# - Python 代码：读取运行时状态并选择 recipe variant。
+#
+# 当前迁移状态：
+# - run.* / plan.* / review.*：运行时已读取 config/prompt-recipes.yaml。
+# - pr.* / orchestra.*：不是角色 prompt recipe，不走 prompt-recipes.yaml。
 #
 # Variable source kinds（变量来源类型）:
 #   literal   - 字面量值（直接写死）
@@ -45,8 +67,13 @@
 #   的 context_builder= 参数接收。
 # =============================================================================
 
-# Agent Prompt 全局说明
-# 会置顶注入到所有 codeagent prompt 文件中
+# =============================================================================
+# Codeagent Global Notice
+# =============================================================================
+#
+# 作用：所有 codeagent prompt 的全局前缀，强调跨角色硬规则。
+# 使用方：src/vibe3/utils/codeagent_helpers.py
+# 注意：retry/resume 场景可由 PromptMeta.include_global_notice 决定是否注入。
 agent_prompt:
   global_notice: |
     ## Handoff 写入规则
@@ -66,27 +93,16 @@ agent_prompt:
     ## Time out Rule
     你有一个小时的时间来完成任务，如果你无法完成，请在时间窗口内通过issue或handoff记录你已完成的工作或findings，并在deadline前exit()，等待人工或后续任务接手。时间耗尽，你的工作空间会被Cancel，可能导致系统中断。
 
-flow:
-  slug_suggestion:
-    system: |
-      You are an assistant that generates concise flow slugs.
-      A flow slug is a short kebab-case identifier for a development task.
-      Rules:
-      - Use English words only
-      - Use kebab-case (lowercase with hyphens)
-      - Maximum 4 words
-      - Be descriptive but concise
-      - No verbs like "add", "create", "implement" - focus on the feature/topic
-
-    user: |
-      Issue Title: {issue_title}
-
-      {issue_body}
-
-      Generate 3 flow slug suggestions (kebab-case).
-      Each suggestion should be on a separate line.
-      Do not include numbers, bullets, or explanations.
-
+# =============================================================================
+# AI Suggestion Templates
+# =============================================================================
+#
+# 这些模板由 src/vibe3/clients/ai_suggestion_client.py 直接读取。
+# 它们只生成辅助文案，不会派发 codeagent，不参与 role prompt 装配。
+#
+# pr.title_suggestion / pr.body_suggestion
+#   用途：根据 commits / changed_files 生成 PR 标题和正文建议。
+#   典型入口：pr create --ai。
 pr:
   title_suggestion:
     system: |
@@ -130,6 +146,21 @@ pr:
 
       Use markdown format. Do not include code blocks in the body.
 
+# =============================================================================
+# Orchestra / Manager Templates
+# =============================================================================
+#
+# 这些模板服务于治理和调度，不是 planner/executor/reviewer 的角色 prompt。
+# 使用方通常通过 PromptAssembler + config/settings.yaml 中的 prompt_template 选择。
+#
+# orchestra.governance.plan
+#   supervisor 驱动的 issue pool 治理扫描 prompt。
+#
+# orchestra.supervisor.apply
+#   针对某个 supervisor 材料的 apply prompt，不进入治理巡检。
+#
+# orchestra.assignee_dispatch.manager
+#   manager 状态控制器 prompt，用于检查 scene / issue comments / refs 并做状态决策。
 orchestra:
   governance:
     # Selected by config/settings.yaml -> orchestra.governance.prompt_template
@@ -233,6 +264,20 @@ orchestra:
       你当前是 manager 状态控制器，不是实现 agent。
       你的工作是检查 state、scene、issue comments、handoff refs，然后决定是否 comment、写 handoff、修改 labels，或停止。
 
+# =============================================================================
+# Role Prompt Materials: Executor / Run
+# =============================================================================
+#
+# 运行时状态：已由 config/prompt-recipes.yaml 装配。
+# 模板：
+# - run.plan：executor 常规 plan/flow_plan/lightweight 模式的外层模板。
+# - run.skill：skill execution 模式的外层模板。
+#
+# 材料：
+# - output_format：普通执行报告格式。对 run 来说是输出形状约束，不是状态流转必需项。
+# - run_task：executor exit contract。包含 ref 读取、canonical report、handoff report、label transition。
+# - coding_task：首次/常规执行指导，只用于 coding bootstrap。
+# - retry_task：retry 执行指导；resume 时与 exit contract 搭配，避免重塞完整初始化上下文。
 run:
   # Template for plan/flow_plan/lightweight execution mode.
   # Variable: {run_prompt_body} - fully assembled prompt body from run_context_builder.
@@ -241,7 +286,8 @@ run:
   # Variable: {skill_content} - raw content of the skill's SKILL.md file.
   skill: "{skill_content}"
 
-  # Static: Output format requirements
+  # Static: output shape guidance.
+  # Included by run recipes where helpful, but less authoritative than run_task.
   output_format: |
     The execution report should follow this structure:
 
@@ -261,7 +307,10 @@ run:
     - [ ] No type errors
     - [ ] No lint errors
 
-  # Static: Common task contract — applies to ALL execution paths (code, commit, skill, etc.)
+  # Static: executor exit contract.
+  # Recipe section name: run.exit_contract
+  # Must be repeated in every executor path that is expected to produce report_ref
+  # and move issue state forward.
   run_task: |
     The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
     You must write a canonical execution report under `docs/reports/` in the current worktree.
@@ -276,7 +325,9 @@ run:
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
-  # Static: Code execution skill — injected ONLY for plan/flow_plan/lightweight modes
+  # Static: coding-mode guidance.
+  # Recipe section name: run.coding_task
+  # Injected only for plan/flow_plan/lightweight executor modes.
   # Not included in skill or commit paths to avoid instruction conflicts.
   coding_task: |
     Follow plan steps strictly, verify each step before proceeding.
@@ -284,7 +335,9 @@ run:
     Document any deviations with reasons.
     Follow the repository execution contract.
 
-  # Static: Retry execution task — injected for executor retry rounds
+  # Static: retry-mode guidance.
+  # Recipe section name: run.retry_task
+  # Injected for executor retry rounds.
   retry_task: |
     Treat this run as a focused retry round, not a fresh implementation pass.
     Reuse the existing session context when available.
@@ -300,14 +353,24 @@ run:
     Follow the repository execution contract.
 
   # Static: Custom run prompt (optional prefix)
-  run_prompt: "/executing-plan"
+  run_prompt: "execute the plan, report the result, and move the issue forward"
 
+# =============================================================================
+# Role Prompt Materials: Planner / Plan
+# =============================================================================
+#
+# 运行时状态：由 config/prompt-recipes.yaml -> plan.default 装配。
+#
+# 材料语义：
+# - output_format：计划文档形状建议。对 plan 来说有帮助，但不如 exit contract 关键。
+# - plan_task：planner exit contract + planning guidance。包含 canonical plan、handoff plan、label transition。
+# - retry_task：retry planning guidance。迁移到 recipe 后应与 plan.exit_contract 搭配。
 plan:
   # Template for plan command (task / spec modes).
   # Variable: {plan_prompt_body} - fully assembled prompt body from plan_context_builder.
   default: "{plan_prompt_body}"
 
-  # Static: Output format requirements
+  # Static: output shape guidance.
   output_format: |
     The plan should follow this structure:
 
@@ -326,7 +389,8 @@ plan:
     - Risk 1 and mitigation
     - Risk 2 and mitigation
 
-  # Static: Default plan task guidance
+  # Static: planner exit contract plus default planning guidance.
+  # Target recipe section name: plan.exit_contract
   # Can be overridden via CLI: vibe3 plan --issue 42
   plan_task: |
     Analyze requirements and identify affected files using inspect tools.
@@ -346,6 +410,8 @@ plan:
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
+  # Static: retry planning guidance.
+  # Target recipe section name: plan.retry_task
   retry_task: |
     This is a retry planning round, not a fresh planning pass.
     Reuse the existing session context when available.
@@ -357,14 +423,27 @@ plan:
 
   # Static: Optional plain-text default task guidance.
   # Slash-prefixed external skill triggers are ignored by vibe3 plan.
-  plan_prompt: ""
+  plan_prompt: "make execution plan and move the issue forward"
 
+# =============================================================================
+# Role Prompt Materials: Reviewer / Review
+# =============================================================================
+#
+# 运行时状态：由 config/prompt-recipes.yaml -> review.default 装配。
+#
+# 材料语义：
+# - output_format：review verdict contract。对 review 来说非常重要，每轮都应强调。
+# - review_task：reviewer exit contract + review guidance。包含 verdict/audit_ref/label transition。
+# - retry_task：retry review guidance。迁移到 recipe 后应与 review.output_format
+#   和 review.exit_contract 搭配。
 review:
   # Template for review command (pr / base modes).
   # Variable: {review_prompt_body} - fully assembled prompt body from context_builder.
   default: "{review_prompt_body}"
 
-  # Static: Output format requirements (VERDICT contract)
+  # Static: review verdict output contract.
+  # Target recipe section name: review.output_format
+  # Unlike plan/run output shape guidance, this is a hard behavioral contract.
   output_format: |
     The first line must be exactly:
     VERDICT: PASS | MAJOR | BLOCK
@@ -380,7 +459,8 @@ review:
     - MAJOR: Issues found that should be addressed before merge
     - BLOCK: Critical issues that must be fixed before merge
 
-  # Static: Default review task guidance
+  # Static: reviewer exit contract plus default review guidance.
+  # Target recipe section name: review.exit_contract
   # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
   review_task: |
     Review only changed code, focus on correctness, regression, and security.
@@ -408,6 +488,8 @@ review:
     Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
     WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
 
+  # Static: retry review guidance.
+  # Target recipe section name: review.retry_task
   retry_task: |
     This is a retry review round, not a fresh review pass.
     Reuse the existing session context when available.
@@ -420,4 +502,4 @@ review:
 
   # Static: Custom review prompt (optional prefix)
   # Added to beginning of review context if provided
-  review_prompt: "/code-review"
+  review_prompt: "review changes, make verification and move the issue forward"

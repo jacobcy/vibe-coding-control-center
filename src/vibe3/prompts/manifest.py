@@ -115,12 +115,17 @@ class PromptManifest:
         for section_key in variant_def.sections:
             provider = providers.get(section_key)
             if provider is None:
-                available = list(providers.keys())
+                logger.bind(
+                    domain="prompt_manifest",
+                    recipe=recipe_key,
+                    variant=variant_key,
+                    missing_section=section_key,
+                    available_providers=list(providers.keys()),
+                ).error("Prompt section provider not registered")
                 raise KeyError(
-                    f"Prompt section provider not registered: {section_key}\n"
-                    f"  Recipe: {recipe_key}\n"
-                    f"  Variant: {variant_key}\n"
-                    f"  Available providers: {available}"
+                    f"Prompt section provider not registered: {section_key}. "
+                    f"Check configuration for recipe '{recipe_key}' "
+                    f"variant '{variant_key}'."
                 )
             value = provider()
             if value:
@@ -144,7 +149,8 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        with path.open(encoding="utf-8") as stream:
+            raw = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         logger.bind(domain="prompt_manifest", path=str(path)).warning(
             f"Invalid YAML in prompt manifest: {exc}"

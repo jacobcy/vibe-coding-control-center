@@ -1,7 +1,7 @@
 # Prompts
 
-Prompt 模板组装层，加载模板、解析变量、记录 provenance，并逐步把角色
-prompt 的装配顺序从 Python 代码迁移到配置文件。
+Prompt 模板组装层，加载模板、解析变量、记录 provenance，并从配置文件
+读取角色 prompt 的装配顺序。
 
 ## 职责
 
@@ -29,8 +29,7 @@ prompt 的装配顺序从 Python 代码迁移到配置文件。
 
 `config/prompts.yaml` 保留实际 prompt 文本、模板和说明。
 `config/prompt-recipes.yaml` 回答“某个 prompt variant 使用哪些 section、什么顺序”。
-当前 `run.*` 已由 recipe 驱动；`plan.*` / `review.*` 先记录目标装配形态，
-待对应 builder 迁移后再成为运行时真源。
+当前 `run.*` / `plan.*` / `review.*` 均由 recipe 驱动。
 
 ## 依赖关系
 

@@ -7,7 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.plan_prompt import build_plan_prompt_body, make_plan_context_builder
+from vibe3.agents.plan_prompt import (
+    build_plan_prompt_body,
+    describe_plan_sections,
+    make_plan_context_builder,
+)
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
@@ -139,15 +143,9 @@ def build_plan_prompt(
             mode=meta.prompt_mode,  # type: ignore[arg-type]
             context_mode=meta.fallback_context_mode,
         )
-    sections = (
-        ["output_format", "retry_task"]
-        if meta.context_mode == "resume"
-        else [
-            "policy_file",
-            "common_rules",
-            "output_format",
-            "retry_task" if meta.prompt_mode == "retry" else "plan_task",
-        ]
+    sections = describe_plan_sections(
+        meta.prompt_mode,  # type: ignore[arg-type]
+        meta.context_mode,
     )
     summary = meta.summary(sections)
     return prompt, meta.refs, summary, meta.include_global_notice, fallback_prompt
