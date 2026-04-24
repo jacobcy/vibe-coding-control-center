@@ -30,10 +30,9 @@
 #   - PromptContextBuilder.last_result 保存 PromptRenderResult（含 provenance）
 #   - 上层命令可读取 last_result.provenance 展示变量来源
 #
-# 验证工具:
-#   vibe3 prompt check run.plan               # 检查模板 key 是否存在，列出所需变量
-#   vibe3 prompt check run.plan --json        # 输出 JSON
-#   vibe3 prompt check --list                 # 列出所有已知模板 key
+# 运行时验证:
+#   使用 plan/run/review 的 --dry-run 查看实际 prompt 路由、section 和 refs。
+#   完整 prompt 预览应跟随运行时命令，而不是维护独立的 prompt 验证入口。
 #
 # 迁移说明（Legacy context builders）:
 #   旧函数 build_run_context / build_plan_context / build_review_context 已删除。
