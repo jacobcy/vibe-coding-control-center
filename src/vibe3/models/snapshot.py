@@ -1,7 +1,7 @@
 """Snapshot models for structure analysis."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -67,6 +67,7 @@ class StructureSnapshot(BaseModel):
     modules: list[ModuleSnapshot] = Field(default_factory=list)
     dependencies: list[DependencyEdge] = Field(default_factory=list)
     metrics: StructureMetrics = Field(default_factory=StructureMetrics)
+    baseline_for: Optional[str] = None
 
     @classmethod
     def generate_id(
