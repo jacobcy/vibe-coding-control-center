@@ -72,6 +72,9 @@ class PRMixin:
         # Determine ci_passed: check statusCheckRollup
         status_rollup = data.get("statusCheckRollup")
         ci_passed = status_rollup == "SUCCESS" if status_rollup else False
+        ci_status = (
+            str(status_rollup).lower() if isinstance(status_rollup, str) else None
+        )
 
         return PRResponse(
             number=int(data["number"]),
@@ -84,6 +87,7 @@ class PRMixin:
             draft=bool(data.get("isDraft", False)),
             is_ready=is_ready,
             ci_passed=ci_passed,
+            ci_status=ci_status,
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),
@@ -167,6 +171,7 @@ class PRMixin:
                     draft=pr_data.get("isDraft", False),
                     is_ready=not pr_data.get("isDraft", False),
                     ci_passed=False,
+                    ci_status=None,
                     created_at=None,
                     updated_at=None,
                     merged_at=pr_data.get("mergedAt"),
