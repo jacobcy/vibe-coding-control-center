@@ -110,25 +110,67 @@ class TestHandoffBasicCommands:
         mock_render_detail.assert_called_once()
 
     @patch("vibe3.commands.handoff_read.render_handoff_detail")
-    @patch("vibe3.commands.handoff_read.FlowService")
-    def test_handoff_show_shared_artifact_short_path(
-        self, mock_flow_service_class, mock_render_detail
+    @patch("vibe3.commands.handoff_read.GitClient")
+    def test_handoff_show_shared_artifact_at_prefix(
+        self, mock_git_client_class, mock_render_detail, tmp_path
     ):
-        """Test handoff show resolves short shared artifact paths."""
-        mock_flow_service = MagicMock()
-        mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
-        mock_flow_service_class.return_value = mock_flow_service
+        """Test handoff show @key resolves shared artifact via @ prefix."""
+        artifact = (
+            tmp_path
+            / "vibe3"
+            / "handoff"
+            / "task-issue-340-d347bc95"
+            / "run-2026-04-21T05:19:28.md"
+        )
+        artifact.parent.mkdir(parents=True)
+        artifact.write_text("# artifact", encoding="utf-8")
 
-        with patch.object(Path, "exists", side_effect=[False, False, True, True]):
-            with patch.object(Path, "is_file", return_value=True):
-                result = runner.invoke(
-                    app,
-                    [
-                        "handoff",
-                        "show",
-                        "task-issue-340-d347bc95/run-2026-04-21T05:19:28.md",
-                    ],
-                )
+        mock_git = MagicMock()
+        mock_git.get_git_common_dir.return_value = str(tmp_path)
+        mock_git.get_worktree_root.return_value = str(tmp_path)
+        mock_git.find_worktree_path_for_branch.return_value = None
+        mock_git_client_class.return_value = mock_git
+
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "show",
+                "@task-issue-340-d347bc95/run-2026-04-21T05:19:28.md",
+            ],
+        )
+
+        assert result.exit_code == 0
+        mock_render_detail.assert_called_once()
+
+    @patch("vibe3.commands.handoff_read.render_handoff_detail")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    @patch("vibe3.commands.handoff_read.GitClient")
+    def test_handoff_show_branch_numeric_id_resolves(
+        self, mock_git_cls, mock_flow_cls, mock_render_detail, tmp_path
+    ):
+        """Test handoff show --branch <id> resolves numeric ID."""
+        branch_wt = tmp_path / "wt-branch"
+        ref_file = branch_wt / "docs" / "report.md"
+        ref_file.parent.mkdir(parents=True)
+        ref_file.write_text("content")
+
+        mock_flow = MagicMock()
+        mock_flow.get_flow_state.side_effect = lambda b: (
+            {"branch": b} if b == "task/issue-304" else None
+        )
+        mock_flow_cls.return_value = mock_flow
+
+        mock_git = MagicMock()
+        mock_git.get_git_common_dir.return_value = str(tmp_path / ".git")
+        mock_git.get_worktree_root.return_value = str(tmp_path / "wt-main")
+        mock_git.find_worktree_path_for_branch.return_value = branch_wt
+        mock_git_cls.return_value = mock_git
+
+        result = runner.invoke(
+            app,
+            ["handoff", "show", "--branch", "304", "docs/report.md"],
+        )
 
         assert result.exit_code == 0
         mock_render_detail.assert_called_once()

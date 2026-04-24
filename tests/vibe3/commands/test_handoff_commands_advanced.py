@@ -77,9 +77,15 @@ class TestHandoffAdvancedCommands:
             _to_handoff_cmd("docs/plans/test-plan.md")
             == "vibe3 handoff show docs/plans/test-plan.md"
         )
+        # Shared artifacts get @ prefix
         assert (
             _to_handoff_cmd("vibe3/handoff/task-123/current.md")
-            == "vibe3 handoff show task-123/current.md"
+            == "vibe3 handoff show @task-123/current.md"
+        )
+        # Canonical ref with branch uses --branch flag
+        assert (
+            _to_handoff_cmd("docs/plans/test-plan.md", branch="task/issue-123")
+            == "vibe3 handoff show --branch task/issue-123 docs/plans/test-plan.md"
         )
 
     @patch("vibe3.commands.handoff_read._render_updates_log")
@@ -133,7 +139,7 @@ class TestHandoffAdvancedCommands:
             result = runner.invoke(app, ["handoff", "status", "task/issue-467"])
 
         assert result.exit_code == 0
-        assert "vibe3 handoff show task-issue-467/current.md" in result.output
+        assert "vibe3 handoff show @task-issue-467/current.md" in result.output
 
     @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_append_command(self, mock_service_class):

@@ -266,27 +266,32 @@ def resolve_handoff_target(
 
     # Namespace 2: relative path → worktree canonical ref
     if branch:
+        # Strict mode: when branch is explicitly given, only resolve within
+        # that branch's worktree. Never fall back to current worktree or CWD,
+        # as that would silently return a file from the wrong flow.
         wt_path = find_worktree_path_for_branch(branch, git_client)
-        if wt_path:
-            resolved = wt_path / target
-            if resolved.exists():
-                return resolved
+        if wt_path is None:
+            raise FileNotFoundError(f"No worktree found for branch '{branch}'")
+        resolved = wt_path / target
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"Artifact not found in branch '{branch}' worktree: {target}"
+            )
+        return resolved
 
-    # Fallback: current worktree
+    # No branch specified: try current worktree then CWD
     current_root = get_worktree_root(git_client)
     if current_root:
         resolved = Path(current_root) / target
         if resolved.exists():
             return resolved
 
-    # Last try: git common dir (for vibe3/handoff/... stored refs without @)
-    git_common = get_git_common_dir(git_client)
-    if git_common:
-        resolved = Path(git_common) / target
-        if resolved.exists():
-            return resolved
+    # Also try CWD (handles cases where CWD differs from worktree root)
+    cwd_resolved = Path.cwd() / target
+    if cwd_resolved.exists():
+        return cwd_resolved
 
-    raise FileNotFoundError(f"Cannot resolve handoff target: {target}")
+    raise FileNotFoundError(f"Artifact not found: {target}")
 
 
 def is_shared_handoff_ref(ref_value: str) -> bool:

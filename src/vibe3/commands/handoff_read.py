@@ -1,13 +1,13 @@
 """Handoff read commands - status and artifact display."""
 
 import json
-from pathlib import Path
 from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
@@ -81,33 +81,38 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
 
 
 def show(
-    artifact: Annotated[Path, typer.Argument(help="Shared handoff artifact path")],
+    target: Annotated[
+        str,
+        typer.Argument(help="Handoff target: @key, relative/path, or /abs/path"),
+    ],
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch for canonical ref resolution"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Show a shared handoff artifact file."""
+    """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
+    from vibe3.utils.path_helpers import resolve_handoff_target
+
     with trace_scope(trace, "handoff show", domain="handoff"):
-        resolved_artifact = artifact
-        service = FlowService()
-
-        if not resolved_artifact.exists():
+        # Resolve numeric issue ID → canonical branch name before path lookup
+        resolved_branch: str | None = None
+        if branch is not None:
             try:
-                git_common = Path(service.get_git_common_dir())
-                if git_common:
-                    candidates = [
-                        git_common / artifact,
-                        git_common / "vibe3" / "handoff" / artifact,
-                    ]
-                    for potential in candidates:
-                        if potential.exists():
-                            resolved_artifact = potential
-                            break
-            except Exception:
-                pass
-
-        if not resolved_artifact.exists():
-            typer.echo(f"Error: artifact not found: {artifact}", err=True)
+                resolved_branch = (
+                    resolve_issue_branch_input(branch, FlowService()) or branch
+                )
+            except RuntimeError as exc:
+                typer.echo(f"Error: {exc}", err=True)
+                raise typer.Exit(1)
+        try:
+            resolved_artifact = resolve_handoff_target(
+                target, resolved_branch, git_client=GitClient()
+            )
+        except FileNotFoundError as exc:
+            typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(1)
         if not resolved_artifact.is_file():
             typer.echo(f"Error: artifact is not a file: {resolved_artifact}", err=True)
@@ -220,7 +225,9 @@ def status(
 
         console.print("[bold]--- Recent Handoff Events ---[/]")
         console.print()
-        _render_handoff_events(handoff_events, worktree_root=worktree_root)
+        _render_handoff_events(
+            handoff_events, worktree_root=worktree_root, branch=target_branch
+        )
 
         # Show current.md updates in log format
         git_dir = service.get_git_common_dir()
@@ -229,7 +236,9 @@ def status(
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
         current_md_display = resolve_ref_path(str(current_md))
-        console.print(f"  [dim]path[/]  {_to_handoff_cmd(current_md_display)}")
+        console.print(
+            f"  [dim]path[/]  {_to_handoff_cmd(current_md_display, target_branch)}"
+        )
         console.print()
 
         if current_md.exists():
@@ -239,10 +248,12 @@ def status(
 
             # Show full content hint
             console.print("[dim]---[/]")
-            console.print(f"[dim]Artifact: {_to_handoff_cmd(current_md_display)}[/]")
+            artifact_cmd = _to_handoff_cmd(current_md_display, target_branch)
+            console.print(f"[dim]Artifact: {artifact_cmd}[/]")
             console.print(
-                "[dim]Use `vibe3 handoff show <path>` "
-                "to inspect refs and artifact files through the unified reader[/]"
+                "[dim]Use `vibe3 handoff show @key` or "
+                "`vibe3 handoff show --branch <branch> <ref>` "
+                "to inspect artifacts through the unified reader[/]"
             )
         else:
             console.print(
