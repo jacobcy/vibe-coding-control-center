@@ -311,6 +311,28 @@ def to_display_target(ref_value: str) -> str:
     return ref_value
 
 
+def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
+    """Convert a display-form ref path to a ``vibe3 handoff show`` command.
+
+    Call ``resolve_ref_path(abs_path, worktree_root)`` first to strip the
+    worktree prefix before passing the result here.
+
+    Shared artifacts (``vibe3/handoff/...``) get the ``@`` prefix form.
+    Canonical worktree refs (``docs/reports/...``, ``docs/plans/...``) get
+    ``--branch <branch>`` when branch is known.
+    Other relative paths and absolute paths are returned as-is (not handoff artifacts).
+    """
+    if is_shared_handoff_ref(path):
+        return f"vibe3 handoff show {to_display_target(path)}"
+    # Only treat docs/reports and docs/plans as handoff artifacts
+    if path.startswith("docs/reports/") or path.startswith("docs/plans/"):
+        if branch:
+            return f"vibe3 handoff show --branch {branch} {path}"
+        return f"vibe3 handoff show {path}"
+    # Non-handoff paths (temp/logs, etc.) return as-is
+    return path
+
+
 def sanitize_event_detail_paths(
     detail: str,
     event_refs: object,

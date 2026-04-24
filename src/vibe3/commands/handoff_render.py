@@ -8,29 +8,15 @@ from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils.path_helpers import (
-    is_shared_handoff_ref,
+    ref_to_handoff_cmd,
     sanitize_event_detail_paths,
-    to_display_target,
 )
 
 # Preview limit for update messages
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
 
-def _to_handoff_cmd(path: str, branch: str | None = None) -> str:
-    """Convert a stored ref path to a usable ``vibe3 handoff show`` command.
-
-    Shared artifacts (vibe3/handoff/...) get the ``@`` prefix display form.
-    Canonical worktree refs get ``--branch <branch>`` when branch is known.
-    Absolute paths are returned as-is (debug fallback).
-    """
-    if is_shared_handoff_ref(path):
-        return f"vibe3 handoff show {to_display_target(path)}"
-    if path and not path.startswith("/"):
-        if branch:
-            return f"vibe3 handoff show --branch {branch} {path}"
-        return f"vibe3 handoff show {path}"
-    return path
+_to_handoff_cmd = ref_to_handoff_cmd
 
 
 def _render_agent_chain(

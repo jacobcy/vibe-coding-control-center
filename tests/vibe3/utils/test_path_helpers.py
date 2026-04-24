@@ -5,6 +5,7 @@ import pytest
 
 from vibe3.utils.path_helpers import (
     is_shared_handoff_ref,
+    ref_to_handoff_cmd,
     resolve_handoff_target,
     sanitize_event_detail_paths,
     to_display_target,
@@ -71,6 +72,57 @@ def test_to_display_target_returns_as_is_for_canonical_ref() -> None:
 def test_to_display_target_returns_as_is_for_absolute_path() -> None:
     path = "/abs/path/to/file.md"
     assert to_display_target(path) == path
+
+
+# --- ref_to_handoff_cmd ---
+
+
+def test_ref_to_handoff_cmd_shared_artifact_with_at_prefix() -> None:
+    """Shared artifacts get @ prefix format."""
+    path = "vibe3/handoff/task-476/run-1.md"
+    result = ref_to_handoff_cmd(path, branch=None)
+    assert result == "vibe3 handoff show @task-476/run-1.md"
+
+
+def test_ref_to_handoff_cmd_docs_reports_with_branch() -> None:
+    """Docs reports with branch get --branch format."""
+    path = "docs/reports/audit.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-476")
+    assert result == "vibe3 handoff show --branch task/issue-476 docs/reports/audit.md"
+
+
+def test_ref_to_handoff_cmd_docs_plans_with_branch() -> None:
+    """Docs plans with branch get --branch format."""
+    path = "docs/plans/plan.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-476")
+    assert result == "vibe3 handoff show --branch task/issue-476 docs/plans/plan.md"
+
+
+def test_ref_to_handoff_cmd_docs_without_branch() -> None:
+    """Docs refs without branch get plain format."""
+    path = "docs/reports/audit.md"
+    result = ref_to_handoff_cmd(path, branch=None)
+    assert result == "vibe3 handoff show docs/reports/audit.md"
+
+
+def test_ref_to_handoff_cmd_non_handoff_path() -> None:
+    """Non-handoff paths (temp/logs, etc.) return as-is."""
+    path = "temp/logs/debug.log"
+    result = ref_to_handoff_cmd(path, branch="task/issue-476")
+    assert result == "temp/logs/debug.log"
+
+
+def test_ref_to_handoff_cmd_absolute_path() -> None:
+    """Absolute paths return as-is."""
+    path = "/abs/path/to/file.md"
+    result = ref_to_handoff_cmd(path, branch="task/issue-476")
+    assert result == "/abs/path/to/file.md"
+
+
+def test_ref_to_handoff_cmd_empty_string() -> None:
+    """Empty string returns as-is."""
+    result = ref_to_handoff_cmd("", branch="task/issue-476")
+    assert result == ""
 
 
 # --- resolve_handoff_target ---

@@ -97,6 +97,17 @@ class TestHandoffBasicCommands:
             "task/issue-436", limit=5
         )
 
+    def test_handoff_show_without_target_shows_help(self):
+        """Test handoff show without target displays help message."""
+        result = runner.invoke(app, ["handoff", "show"])
+
+        assert result.exit_code == 0
+        assert "Usage: vibe3 handoff show <target>" in result.output
+        assert "@key" in result.output
+        assert "relative/path" in result.output
+        assert "/abs/path" in result.output
+        assert "Examples:" in result.output
+
     @patch("vibe3.commands.handoff_read.render_handoff_detail")
     def test_handoff_show_artifact(self, mock_render_detail):
         """Test handoff show <artifact> renders single artifact."""

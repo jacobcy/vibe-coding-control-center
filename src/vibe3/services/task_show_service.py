@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
@@ -126,19 +126,25 @@ class TaskShowService:
             raise RuntimeError(f"unable to resolve current branch ({exc})") from exc
 
     @staticmethod
-    def _summarize_text(text: str, *, limit: int = 50) -> str:
-        parts: list[str] = []
+    def _summarize_text(text: str, *, limit: int = 1200) -> str:
+        result: list[str] = []
+        prev_blank = False
         for line in text.splitlines():
             stripped = line.strip()
             if not stripped or stripped in {"---", "```"}:
+                if result and not prev_blank:
+                    result.append("")
+                    prev_blank = True
                 continue
             stripped = re.sub(r"^#{1,6}\s*", "", stripped)
             stripped = re.sub(r"^[-*+]\s*", "", stripped)
             stripped = re.sub(r"^\d+\.\s*", "", stripped)
             if stripped:
-                parts.append(stripped)
-
-        collapsed = re.sub(r"\s+", " ", " ".join(parts)).strip()
+                result.append(stripped)
+                prev_blank = False
+        while result and result[-1] == "":
+            result.pop()
+        collapsed = "\n".join(result)
         if not collapsed:
             return ""
         if len(collapsed) <= limit:
@@ -303,7 +309,7 @@ class TaskShowService:
                 issue_state = str(issue.get("state") or "").strip() or None
                 comments_raw = issue.get("comments")
                 comments: list[dict[str, Any]] = (
-                    comments_raw  # type: ignore[assignment]
+                    cast(list[dict[str, Any]], comments_raw)
                     if isinstance(comments_raw, list)
                     else []
                 )

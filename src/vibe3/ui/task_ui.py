@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 
 from vibe3.services.task_service import is_human_comment
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 if TYPE_CHECKING:
     from vibe3.services.task_service import TaskShowResult
@@ -80,9 +82,13 @@ def render_task_show(
 
     if task_result.latest_ref:
         latest_ref = task_result.latest_ref
+        worktree_root = task.worktree_root if hasattr(task, "worktree_root") else None
+        display_ref = resolve_ref_path(latest_ref.ref, worktree_root)
+        ref_cmd = ref_to_handoff_cmd(display_ref, task.branch)
         console.print("\n[bold]Latest Work[/]")
-        console.print(f"Ref:     {latest_ref.kind}  {latest_ref.ref}")
-        console.print(f"Summary: {latest_ref.summary}")
+        console.print(f"Ref:     {latest_ref.kind}  {ref_cmd}")
+        console.print("Summary:")
+        console.print(latest_ref.summary)
 
     instruction = task_result.latest_human_instruction or task_result.latest_comment
     if instruction:
@@ -93,7 +99,8 @@ def render_task_show(
         )
         console.print(f"\n[bold]{label}[/]")
         console.print(f"Author:  {instruction.author}")
-        console.print(f"Summary: {instruction.body}")
+        console.print("Summary:")
+        console.print(instruction.body)
 
     if task_result.pr_summary:
         pr = task_result.pr_summary

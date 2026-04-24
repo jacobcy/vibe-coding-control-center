@@ -1,7 +1,7 @@
 """Handoff read commands - status and artifact display."""
 
 import json
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from loguru import logger
@@ -27,7 +27,9 @@ from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
-def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict]:
+def _get_live_sessions_for_branch(
+    store: SQLiteClient, branch: str
+) -> list[dict[str, Any]]:
     """Return truly live runtime sessions from the registry for a given branch.
 
     This function confirms tmux liveness for each session, unlike
@@ -80,11 +82,32 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
     return updates
 
 
+_HANDOFF_SHOW_HELP = """\
+Usage: vibe3 handoff show <target> [--branch <branch>]
+
+Show a handoff artifact by target reference.
+
+Target formats:
+  @key               Shared artifact key (e.g. @task-476/run-1.md)
+  relative/path      Canonical worktree ref; requires --branch <branch>
+  /abs/path          Absolute filesystem path (debug fallback)
+
+Examples:
+  vibe3 handoff show @task-476/run-1.md
+  vibe3 handoff show --branch task/issue-476 docs/reports/audit.md
+  vibe3 handoff show /abs/path/to/artifact.md
+
+See also:
+  vibe3 handoff status          Show current flow handoff chain
+  vibe3 handoff append "<msg>"  Append a handoff record
+"""
+
+
 def show(
     target: Annotated[
-        str,
+        str | None,
         typer.Argument(help="Handoff target: @key, relative/path, or /abs/path"),
-    ],
+    ] = None,
     branch: Annotated[
         str | None,
         typer.Option("--branch", help="Branch for canonical ref resolution"),
@@ -95,6 +118,10 @@ def show(
 ) -> None:
     """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
     from vibe3.utils.path_helpers import resolve_handoff_target
+
+    if target is None:
+        typer.echo(_HANDOFF_SHOW_HELP)
+        raise typer.Exit(0)
 
     with trace_scope(trace, "handoff show", domain="handoff"):
         # Resolve numeric issue ID → canonical branch name before path lookup
@@ -235,7 +262,9 @@ def status(
         current_md = handoff_dir / "current.md"
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
-        current_md_display = resolve_ref_path(str(current_md))
+        current_md_display = resolve_ref_path(
+            str(current_md), worktree_root=worktree_root
+        )
         console.print(
             f"  [dim]path[/]  {_to_handoff_cmd(current_md_display, target_branch)}"
         )

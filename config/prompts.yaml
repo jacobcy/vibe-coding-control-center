@@ -80,7 +80,8 @@ agent_prompt:
     不要直接访问或编辑主仓库的 `.git/vibe3/handoff/` 目录（该路径在 worktree 中会触发 external_directory 权限拒绝）。
     所有 handoff 操作必须通过 CLI 命令完成：
     - 追加记录：`uv run python src/vibe3/cli.py handoff append "<内容>"`
-    - 读取记录：`uv run python src/vibe3/cli.py handoff show`
+    - 读取记录：`uv run python src/vibe3/cli.py handoff show @key`（需要指定 target，例如 `@task-476/run-1.md`）
+    - 查看当前 flow 状态：`uv run python src/vibe3/cli.py handoff status`
 
     ## Debug Stop Rule
     当前项目处于调试过程中。
@@ -264,6 +265,11 @@ orchestra:
       你当前是 manager 状态控制器，不是实现 agent。
       你的工作是检查 state、scene、issue comments、handoff refs，然后决定是否 comment、写 handoff、修改 labels，或停止。
 
+      ## 快速场景读取命令
+      - 读取当前任务上下文：`uv run python src/vibe3/cli.py task show`
+      - 读取 handoff 状态：`uv run python src/vibe3/cli.py handoff status`
+      - 读取 handoff artifact：`uv run python src/vibe3/cli.py handoff show @key`
+
 # =============================================================================
 # Role Prompt Materials: Executor / Run
 # =============================================================================
@@ -330,6 +336,10 @@ run:
   # Injected only for plan/flow_plan/lightweight executor modes.
   # Not included in skill or commit paths to avoid instruction conflicts.
   coding_task: |
+    Before starting, read the current task context:
+    `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest plan ref, and next step.
+    Use `--comments` flag to load the latest human instruction in full.
+
     Follow plan steps strictly, verify each step before proceeding.
     Write clean code with tests, run verification after changes.
     Document any deviations with reasons.
@@ -393,6 +403,10 @@ plan:
   # Target recipe section name: plan.exit_contract
   # Can be overridden via CLI: vibe3 plan --issue 42
   plan_task: |
+    Before starting, read the current task context:
+    `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest ref, and next step.
+    Use `--comments` flag to load the latest human instruction in full.
+
     Analyze requirements and identify affected files using inspect tools.
     Design minimal changes with clear implementation steps.
     Document risks and breaking changes upfront.
@@ -463,6 +477,10 @@ review:
   # Target recipe section name: review.exit_contract
   # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
   review_task: |
+    Before starting, read the current task context:
+    `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest report ref, and verdict.
+    Use `--comments` flag to load the latest human instruction in full.
+
     Review only changed code, focus on correctness, regression, and security.
     Use AST analysis to understand impact scope.
     Prioritize actionable findings with clear severity.
