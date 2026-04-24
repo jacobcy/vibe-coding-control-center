@@ -250,25 +250,55 @@ orchestra:
       不要进入 governance 周期巡检模式，也不要切换到 run / plan / review 执行模式。
 
 
-  assignee_dispatch:
-    # Template for the manager task instructions.
-    # Available template variables:
-    # - {issue_number}
-    # - {issue_title}
-    # - {supervisor_content}
-    manager: |
-      {supervisor_content}
+# =============================================================================
+# Role Prompt Materials: Manager
+# =============================================================================
+#
+# 运行时状态：由 config/prompt-recipes.yaml -> manager.default 装配。
+#
+# 材料语义：
+# - supervisor_content：supervisor/manager.md 文件内容（动态加载）。
+# - target：manager 目标和职责定义。
+# - quick_commands：快速场景读取命令（task show、handoff status 等），
+#   帮助 agent 快速获取当前 issue/flow/task 状态，无需解析完整 prompt。
+# - retry_task：retry 模式下的简短指导。
+#
+# 注意：issue_number 和 issue_title 通过 `task show` 命令获取，无需变量替换。
+manager:
+  # Dynamic: supervisor file content (loaded at runtime)
+  # Section name: manager.supervisor_content
+  # Source: config.assignee_dispatch.supervisor_file (e.g., supervisor/manager.md)
 
-      ## Manager Target
-      Manage issue #{issue_number}: {issue_title}
+  # Static: manager target and role definition
+  # NOTE: No variable substitution needed - agent gets issue info from task show
+  target: |
+    ## Manager Target
 
-      你当前是 manager 状态控制器，不是实现 agent。
-      你的工作是检查 state、scene、issue comments、handoff refs，然后决定是否 comment、写 handoff、修改 labels，或停止。
+    你当前是 manager 状态控制器，不是实现 agent。
+    你的工作是检查 state、scene、issue comments、handoff refs，然后决定是否 comment、写 handoff、修改 labels，或停止。
 
-      ## 快速场景读取命令
-      - 读取当前任务上下文：`uv run python src/vibe3/cli.py task show`
-      - 读取 handoff 状态：`uv run python src/vibe3/cli.py handoff status`
-      - 读取 handoff artifact：`uv run python src/vibe3/cli.py handoff show @key`
+  # Static: quick scene commands for efficient state reading
+  # These commands help agent quickly access current issue/flow/task context
+  # without needing to parse the full prompt or guess the issue number.
+  quick_commands: |
+    ## 快速场景读取命令
+    - 读取当前任务上下文（issue、flow、task、branch）：`uv run python src/vibe3/cli.py task show`
+    - 读取 handoff 状态：`uv run python src/vibe3/cli.py handoff status`
+    - 读取 handoff artifact：`uv run python src/vibe3/cli.py handoff show @key`
+
+  # Static: retry-mode guidance for manager.
+  # Used when session_id is present (resume mode).
+  # Recipe section name: manager.retry_task
+  retry_task: |
+    This is a retry manager round, reusing existing session context.
+
+    ## Quick Scene Commands
+    - Read current task context (issue/flow/task/branch): `uv run python src/vibe3/cli.py task show`
+    - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
+    - Read handoff artifact: `uv run python src/vibe3/cli.py handoff show @key`
+
+    Focus on the current state and make the necessary decisions.
+    Do not re-read the full supervisor content unless needed.
 
 # =============================================================================
 # Role Prompt Materials: Executor / Run

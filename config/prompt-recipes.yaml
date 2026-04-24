@@ -1,16 +1,15 @@
 # Prompt Assembly Recipes
 #
-# 本文件只描述“角色 prompt 的 section 装配顺序”，不保存 prompt 正文。
+# 本文件只描述”角色 prompt 的 section 装配顺序”，不保存 prompt 正文。
 # prompt 正文和模板在 config/prompts.yaml。
 #
 # 重要边界：
-# - 这里只覆盖 planner / executor / reviewer 这类 role prompt。
+# - 这里覆盖 manager / planner / executor / reviewer 这类 role prompt。
 # - pr.title_suggestion、pr.body_suggestion 是 AI 文案建议模板，
 #   由 AISuggestionClient 直接使用，不属于本装配表。
-# - orchestra.* 是治理/manager 模板，也不属于本装配表。
 #
 # 运行时迁移状态：
-# - run.* / plan.* / review.* 已经由对应 agents/*_prompt.py 读取本文件。
+# - manager.* / run.* / plan.* / review.* 已经由对应 agents/*_prompt.py 读取本文件。
 #
 # section 命名约定：
 # - *.policy：角色 policy 文件内容。
@@ -20,6 +19,26 @@
 # - *.exit_contract：每轮都应强调的收尾契约，通常包含 canonical ref 注册和 label transition。
 
 recipes:
+  # Manager role assembly.
+  #
+  # Design intent:
+  # - bootstrap includes full supervisor_content for first dispatch.
+  # - retry.resume avoids re-sending full supervisor_content and keeps only
+  #   retry guidance plus quick scene commands.
+  manager.default:
+    template_key: assignee_dispatch.manager
+    description: Manager prompt assembly target.
+    variants:
+      first.bootstrap:
+        sections:
+          - manager.supervisor_content
+          - manager.target
+          - manager.quick_commands
+
+      retry.resume:
+        sections:
+          - manager.retry_task
+
   # Executor role, plan/flow_plan/lightweight modes.
   #
   # Variant selection:
