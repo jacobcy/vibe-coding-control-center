@@ -212,7 +212,7 @@ def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> No
         worktree_root=str(tmp_path),
     )
 
-    summary = service._select_latest_ref("task/issue-501", flow)
+    summary = service._show_service._select_latest_ref("task/issue-501", flow)
 
     assert summary is not None
     assert summary.kind == "report"
