@@ -214,6 +214,98 @@ def resolve_ref_path(
         return ref_value
 
 
+_SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
+
+
+def resolve_handoff_target(
+    target: str,
+    branch: str | None = None,
+    git_client: GitClientProtocol | None = None,
+) -> Path:
+    """Resolve a handoff show target into an absolute file path.
+
+    Three namespaces:
+
+    1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+       The ``@`` is stripped and the remainder is joined to the handoff dir.
+       ``branch`` is ignored for shared artifacts.
+
+    2. ``relative/path`` → canonical worktree ref.
+       Resolved against the target branch's worktree root (or current worktree
+       when ``branch`` is None).
+
+    3. ``/abs/path`` → absolute path passthrough (debug fallback).
+
+    Raises:
+        FileNotFoundError: If the resolved path does not exist.
+    """
+    if git_client is None:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+
+    # Namespace 1: @ prefix → shared handoff store
+    if target.startswith("@"):
+        key = target[1:]
+        git_common = get_git_common_dir(git_client)
+        if not git_common:
+            raise FileNotFoundError(
+                f"Cannot resolve shared artifact without git common dir: {target}"
+            )
+        resolved = Path(git_common) / "vibe3" / "handoff" / key
+        if not resolved.exists():
+            raise FileNotFoundError(f"Shared artifact not found: {target}")
+        return resolved
+
+    # Namespace 3: absolute path → passthrough
+    target_path = Path(target)
+    if target_path.is_absolute():
+        if not target_path.exists():
+            raise FileNotFoundError(f"File not found: {target}")
+        return target_path
+
+    # Namespace 2: relative path → worktree canonical ref
+    if branch:
+        wt_path = find_worktree_path_for_branch(branch, git_client)
+        if wt_path:
+            resolved = wt_path / target
+            if resolved.exists():
+                return resolved
+
+    # Fallback: current worktree
+    current_root = get_worktree_root(git_client)
+    if current_root:
+        resolved = Path(current_root) / target
+        if resolved.exists():
+            return resolved
+
+    # Last try: git common dir (for vibe3/handoff/... stored refs without @)
+    git_common = get_git_common_dir(git_client)
+    if git_common:
+        resolved = Path(git_common) / target
+        if resolved.exists():
+            return resolved
+
+    raise FileNotFoundError(f"Cannot resolve handoff target: {target}")
+
+
+def is_shared_handoff_ref(ref_value: str) -> bool:
+    """Return True if the stored ref points to a shared handoff artifact."""
+    return ref_value.startswith(_SHARED_HANDOFF_PREFIX)
+
+
+def to_display_target(ref_value: str) -> str:
+    """Convert a stored ref value to a display target for ``handoff show``.
+
+    ``vibe3/handoff/task-xxx/run.md`` → ``@task-xxx/run.md``
+    Other relative paths → returned as-is (canonical worktree ref).
+    Absolute paths → returned as-is.
+    """
+    if ref_value.startswith(_SHARED_HANDOFF_PREFIX):
+        return "@" + ref_value[len(_SHARED_HANDOFF_PREFIX) :]
+    return ref_value
+
+
 def sanitize_event_detail_paths(
     detail: str,
     event_refs: object,

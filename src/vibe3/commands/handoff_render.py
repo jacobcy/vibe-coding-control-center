@@ -19,11 +19,14 @@ def _to_handoff_cmd(path: str) -> str:
     """Convert a handoff artifact path to a usable CLI command.
 
     vibe3/handoff/task-xxx/run-yyy.md -> vibe3 handoff show task-xxx/run-yyy.md
-    Other paths are returned as-is (relative path).
+    Relative worktree refs also go through ``vibe3 handoff show`` so callers can
+    read refs through one stable entrypoint instead of direct file tools.
     """
     if path.startswith(_HANDOFF_PREFIX):
         key = path[len(_HANDOFF_PREFIX) :]
         return f"vibe3 handoff show {key}"
+    if path and not path.startswith("/"):
+        return f"vibe3 handoff show {path}"
     return path
 
 

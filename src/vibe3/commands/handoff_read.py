@@ -14,6 +14,7 @@ from vibe3.commands.handoff_render import (
     _render_agent_chain,
     _render_handoff_events,
     _render_updates_log,
+    _to_handoff_cmd,
 )
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
@@ -228,7 +229,7 @@ def status(
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
         current_md_display = resolve_ref_path(str(current_md))
-        console.print(f"  [dim]path[/]  {current_md_display}")
+        console.print(f"  [dim]path[/]  {_to_handoff_cmd(current_md_display)}")
         console.print()
 
         if current_md.exists():
@@ -238,10 +239,10 @@ def status(
 
             # Show full content hint
             console.print("[dim]---[/]")
-            console.print(f"[dim]Artifact: {current_md_display}[/]")
+            console.print(f"[dim]Artifact: {_to_handoff_cmd(current_md_display)}[/]")
             console.print(
                 "[dim]Use `vibe3 handoff show <path>` "
-                "to inspect the full shared file[/]"
+                "to inspect refs and artifact files through the unified reader[/]"
             )
         else:
             console.print(

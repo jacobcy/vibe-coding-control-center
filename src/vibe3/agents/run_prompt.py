@@ -20,10 +20,21 @@ from vibe3.prompts.context_builder import PromptContextBuilder, make_context_bui
 
 def build_run_task_section(task_text: str | None) -> str:
     """Build execution task section."""
+    ref_access_guidance = (
+        "## Reference Access\n\n"
+        "- Treat `plan_ref`, `report_ref`, and `audit_ref` as handoff refs.\n"
+        "- Read those refs via `uv run python src/vibe3/cli.py handoff show <ref>`.\n"
+        "- Do not call file-reading tools directly on those ref paths, "
+        "even if they look local.\n"
+        "- This unified reader works for both shared handoff artifacts "
+        "and current worktree files.\n"
+    )
     if task_text:
-        return f"## Execution Task\n{task_text}"
+        return f"{ref_access_guidance}\n## Execution Task\n{task_text}"
 
-    return """## Execution Task
+    return f"""{ref_access_guidance}
+
+## Execution Task
 
 - Execute the implementation plan
 - Make the necessary code changes
