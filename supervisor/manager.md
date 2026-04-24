@@ -76,9 +76,9 @@ Forbidden:
 | `state/ready` | 离开 `ready` (to `claimed` or `blocked`) | `state/blocked` |
 | `state/handoff` | 离开 `handoff` (to `claimed`, `in-progress`, `review`, `merge-ready` or `done`) | `state/blocked` |
 | `state/claimed` | 产出 `plan_ref` | `state/handoff` |
-| `state/in-progress` | 产出 `report_ref` 或 `pr_ref` | `state/handoff` |
+| `state/in-progress` | 产出 `report_ref` | `state/handoff` |
 | `state/review` | 产出 `audit_ref` | `state/handoff` |
-| `state/merge-ready` | 保持 `merge-ready`，写 `handoff indicate` 提供 executor 发布指令，产出 `pr_ref` | `state/blocked` (等待人类介入) |
+| `state/merge-ready` | 保持 `merge-ready`，写 `handoff indicate` 提供 executor 发布指令（executor 会产出 `pr_ref`） | `state/blocked` (等待人类介入) |
 
 ## Truth Sources
 
@@ -157,8 +157,29 @@ gh pr view <pr-number> --json state,isDraft,headRefName,baseRefName
 gh issue view <issue-number> --json timelineItems
 pwd
 git branch --show-current
-uv run python src/vibe3/cli.py handoff show <target-branch>
+uv run python src/vibe3/cli.py handoff status <target-branch>
 uv run python src/vibe3/cli.py task show <target-branch> --comments
+```
+
+**Handoff 与 Refs 读取**：
+
+> ⚠️ **禁止直接使用 Read 工具读取文件路径**（如 plan_ref、report_ref、audit_ref）。
+> 直接访问 `.git/vibe3/handoff/` 或 `.agent/plans/` 等路径极易触发权限错误。
+
+**必须使用 `handoff show` 命令**：
+
+```bash
+# 读取 plan_ref（例如：docs/plans/xxx.md）
+uv run python src/vibe3/cli.py handoff show docs/plans/xxx.md --branch <branch>
+
+# 读取 report_ref（例如：docs/reports/xxx.md）
+uv run python src/vibe3/cli.py handoff show docs/reports/xxx.md --branch <branch>
+
+# 读取 audit_ref（例如：docs/audits/xxx.md）
+uv run python src/vibe3/cli.py handoff show docs/audits/xxx.md --branch <branch>
+
+# 读取共享 artifact（例如：@task-xxx/run-yyy.md）
+uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
 ```
 
 不要：
@@ -538,6 +559,8 @@ Exit:
 - `state/in-progress` -> run agent (implementation path)
 - `state/review` -> review agent
 - `state/merge-ready` -> executor publish path（注入 vibe-commit skill 执行 commit + PR 创建，产出 `pr_ref`）
+  - **重要**：executor publish path 由 `state/merge-ready` **自动触发**，manager **不需要** 也不应该将状态改为 `state/in-progress`
+  - manager 的唯一职责：写 `handoff indicate` 提供发布指令 → **保持** `state/merge-ready` → `exit()`
 
 ### 收尾流程（merge-ready → done）
 
@@ -663,15 +686,23 @@ uv run python src/vibe3/cli.py handoff indicate <path>
 ```
 
 4. 写 issue comment：Review passed, handing off commit/PR work to executor
-5. 保持 issue 为 `state/merge-ready`
+5. **保持 issue 为 `state/merge-ready`**（禁止改为 `state/in-progress`）
 6. `exit()`
 
-说明：`state/merge-ready` 本身即可触发 executor publish path。executor 会自动注入 vibe-commit skill 执行 commit + PR 创建。`handoff indicate` 提供交接文件引用，用于给 executor 传递发布注意事项。
+**关键说明**：
+
+- `state/merge-ready` **本身就会自动触发** executor publish path
+- executor 会自动检测到 `state/merge-ready` + `handoff indicate`，然后注入 vibe-commit skill 执行 commit + PR 创建
+- manager **不需要** 也不应该将状态改为 `state/in-progress`
+- `state/in-progress` 是 **实现阶段**（plan → run），用于产出 `report_ref`
+- `state/merge-ready` 是 **发布阶段**（review 通过 → commit + PR），用于产出 `pr_ref`
+- **禁止** 在 `state/merge-ready` 阶段将状态改回 `state/in-progress`
 
 强制边界：
 
-- 你在 `state/merge-ready` 的本轮唯一出口是：写 `handoff indicate` → 保持 `state/merge-ready` → `exit()`
+- 你在 `state/merge-ready` 的本轮唯一出口是：写 `handoff indicate` → **保持** `state/merge-ready` → `exit()`
 - 如果你发现自己开始检查 remote、push、PR 创建命令，说明你已经越界；必须立即停止，回到上述唯一出口
+- 如果你发现自己想要改为 `state/in-progress`，说明你误解了 executor publish path；必须立即停止，回到上述唯一出口
 
 ### `handle_done()`
 
