@@ -1,0 +1,98 @@
+# Prompt Assembly Recipes
+#
+# 本文件是“装配表”：每个角色/入口选择哪些材料，以及材料顺序。
+# roles/ 中的 Python 代码只负责根据运行时状态选择 recipe variant。
+
+recipes:
+  run.plan:
+    template_key: run.plan
+    description: Executor prompt for plan-based implementation or retry work.
+    variants:
+      coding.bootstrap:
+        sections:
+          - run.plan_ref
+          - run.coding_task
+          - run.policy
+          - common.rules
+          - run.output_format
+          - run.exit_contract
+
+      retry.bootstrap:
+        sections:
+          - run.plan_ref
+          - run.retry_task
+          - run.policy
+          - common.rules
+          - run.output_format
+          - run.exit_contract
+
+      retry.resume:
+        sections:
+          - run.retry_task
+          - run.exit_contract
+
+  run.skill:
+    template_key: run.skill
+    description: Executor prompt for skill-driven work.
+    variants:
+      default:
+        sections:
+          - run.skill_content
+          - run.exit_contract
+
+  # Planned normalization targets. These entries document the desired assembly
+  # shape for planner/reviewer, but current code still assembles them in
+  # src/vibe3/agents/plan_prompt.py and src/vibe3/agents/review_prompt.py.
+  # Do not treat them as runtime truth until those builders are migrated.
+  plan.default:
+    template_key: plan.default
+    description: Planner prompt assembly target.
+    variants:
+      first.bootstrap:
+        sections:
+          - plan.policy
+          - common.rules
+          - plan.output_format
+          - plan.exit_contract
+
+      retry.bootstrap:
+        sections:
+          - plan.policy
+          - common.rules
+          - plan.output_format
+          - plan.retry_task
+          - plan.exit_contract
+
+      retry.resume:
+        sections:
+          - plan.retry_task
+          - plan.exit_contract
+
+  review.default:
+    template_key: review.default
+    description: Reviewer prompt assembly target.
+    variants:
+      first.bootstrap:
+        sections:
+          - review.policy
+          - common.rules
+          - review.snapshot_diff
+          - review.ast_analysis
+          - review.output_format
+          - review.exit_contract
+
+      retry.bootstrap:
+        sections:
+          - review.policy
+          - common.rules
+          - review.snapshot_diff
+          - review.ast_analysis
+          - review.output_format
+          - review.retry_task
+          - review.exit_contract
+
+      retry.resume:
+        sections:
+          - review.output_format
+          - review.retry_task
+          - review.exit_contract

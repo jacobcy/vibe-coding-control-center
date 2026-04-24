@@ -10,6 +10,7 @@ from typing import Any
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
 from vibe3.agents.run_prompt import (
     RunPromptMode,
+    describe_run_plan_sections,
     make_run_context_builder,
     make_skill_context_builder,
 )
@@ -136,17 +137,9 @@ def build_run_sync_request(
     task = (
         run_prompt or f"Execute implementation for issue #{issue.number}: {issue.title}"
     )
-    summary_sections = (
-        ["output_format", "retry_task"]
-        if meta.context_mode == "resume"
-        else [
-            "plan",
-            "policy_file",
-            "common_rules",
-            "output_format",
-            "run_task",
-            "retry_task" if meta.prompt_mode == "retry" else "coding_task",
-        ]
+    summary_sections = describe_run_plan_sections(
+        meta.prompt_mode,  # type: ignore[arg-type]
+        meta.context_mode,
     )
     refs = dict(meta.refs)
     plan_ref = refs.get("plan_ref")
@@ -452,16 +445,7 @@ def execute_manual_run(
             refs=refs_for_summary,
         )
     dry_run_summary = meta.summary(
-        ["output_format", "retry_task"]
-        if prompt_mode == "retry" and context_mode == "resume"
-        else [
-            "plan",
-            "policy_file",
-            "common_rules",
-            "output_format",
-            "run_task",
-            "retry_task" if prompt_mode == "retry" else "coding_task",
-        ]
+        describe_run_plan_sections(prompt_mode, context_mode)
     )
     fallback_prompt = None
     if prompt_mode == "retry" and context_mode == "resume":

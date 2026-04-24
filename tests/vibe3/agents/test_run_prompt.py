@@ -93,9 +93,7 @@ def test_build_run_prompt_body_retry_resume_mode_is_minimal(tmp_path: Path) -> N
     )
 
     assert "focused retry round" in context
-    assert "## Output format requirements" in context
     assert "## Implementation Plan" not in context
-    assert "## Execution Task" not in context
 
 
 def test_build_run_output_contract_section_keeps_output_contract_only() -> None:

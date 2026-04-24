@@ -6,8 +6,9 @@
 # Prompt Assembly Layer - Recipe Schema and Variable Source Kinds
 # =============================================================================
 #
-# vibe3 使用统一 Prompt Assembly 层：每个命令通过 PromptRecipe 声明模板和变量来源，
-# PromptAssembler 负责解析、校验、渲染，并输出 PromptRenderResult（含 provenance）。
+# vibe3 使用统一 Prompt Assembly 层：模板文本和实际 prompt 文案保留在本文件；
+# 较新的角色 prompt 逐步通过 config/prompt-recipes.yaml 声明 section 组成，
+# Python 代码只选择运行时 variant。
 #
 # Variable source kinds（变量来源类型）:
 #   literal   - 字面量值（直接写死）
@@ -16,7 +17,7 @@
 #   command   - 执行子命令并捕获 stdout
 #   provider  - 调用 ProviderRegistry 中注册的 Python callable
 #
-# Recipe 示例（在 Python 代码中构造）:
+# 变量级 Recipe 示例（旧路径，在 Python 代码中构造）:
 #   PromptRecipe(
 #     template_key="orchestra.assignee_dispatch.manager",
 #     variables={

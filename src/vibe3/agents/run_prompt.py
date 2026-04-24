@@ -16,6 +16,7 @@ from loguru import logger
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+from vibe3.prompts.manifest import PromptManifest, PromptProvider
 
 
 def build_run_task_section(task_text: str | None) -> str:
@@ -130,6 +131,83 @@ def build_run_mode_sections(config: VibeConfig, mode: RunPromptMode) -> list[str
     return [section_text]
 
 
+def _build_run_prompt_providers(
+    config: VibeConfig,
+    plan_content: str | None = None,
+    skill_content: str | None = None,
+) -> dict[str, PromptProvider]:
+    """Build providers used by config/prompt-recipes.yaml run sections.
+
+    Note: Imports review_prompt inline to avoid circular dependency at module level.
+    If review_prompt ever needs to import run_prompt, extract shared helpers
+    (e.g., build_tools_guide_section) to a common module like prompts/sections.py.
+    """
+    from vibe3.agents.review_prompt import build_tools_guide_section
+
+    run_config = getattr(config, "run", None)
+
+    def plan_ref() -> str | None:
+        if not plan_content:
+            return None
+        return f"## Implementation Plan\n\n{plan_content}"
+
+    def run_policy() -> str | None:
+        if not run_config or not hasattr(run_config, "policy_file"):
+            return None
+        policy_path = run_config.policy_file
+        if policy_path and Path(policy_path).exists():
+            return Path(policy_path).read_text(encoding="utf-8")
+        return None
+
+    def mode_task(selected_mode: RunPromptMode) -> str | None:
+        if not run_config:
+            return None
+        if selected_mode == "retry":
+            return getattr(run_config, "retry_task", None) or getattr(
+                run_config, "coding_task", None
+            )
+        return getattr(run_config, "coding_task", None)
+
+    return {
+        "run.plan_ref": plan_ref,
+        "run.skill_content": lambda: skill_content,
+        "run.coding_task": lambda: mode_task("coding"),
+        "run.retry_task": lambda: mode_task("retry"),
+        "run.policy": run_policy,
+        "common.rules": lambda: build_tools_guide_section(
+            getattr(run_config, "common_rules", None)
+        ),
+        "run.output_format": lambda: build_run_output_contract_section(
+            getattr(run_config, "output_format", None) if run_config else None
+        ),
+        "run.exit_contract": lambda: build_run_task_section(
+            getattr(run_config, "run_task", None) if run_config else None
+        ),
+        # Backward-compatible alias for local recipe overrides.
+        "run.task": lambda: build_run_task_section(
+            getattr(run_config, "run_task", None) if run_config else None
+        ),
+    }
+
+
+def _run_plan_variant(mode: RunPromptMode, context_mode: PromptContextMode) -> str:
+    """Map runtime run state to a prompt recipe variant."""
+    if context_mode == "resume":
+        return f"{mode}.resume"
+    return f"{mode}.bootstrap"
+
+
+def describe_run_plan_sections(
+    mode: RunPromptMode,
+    context_mode: PromptContextMode,
+) -> list[str]:
+    """Return configured run.plan section keys for dry-run summaries."""
+    variant = _run_plan_variant(mode, context_mode)
+    return list(
+        PromptManifest.load_default().recipe("run.plan").variant(variant).sections
+    )
+
+
 def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
@@ -167,21 +245,11 @@ def build_run_prompt_body(
             raise FileNotFoundError(f"Plan file not found: {plan_file}")
         plan_content = Path(plan_file).read_text(encoding="utf-8")
 
-    sections: list[str] = []
-
-    if context_mode == "bootstrap" and plan_content:
-        sections.append(f"## Implementation Plan\n\n{plan_content}")
-
-    # Mode-specific guidance (not for skill/commit paths)
-    sections.extend(build_run_mode_sections(config, mode))
-
-    if context_mode == "bootstrap":
-        sections.extend(build_run_standard_sections(config))
-    else:
-        output_format = getattr(getattr(config, "run", None), "output_format", None)
-        sections.append(build_run_output_contract_section(output_format))
-
-    body = "\n\n---\n\n".join(sections)
+    body = PromptManifest.load_default().render_sections(
+        recipe_key="run.plan",
+        variant_key=_run_plan_variant(mode, context_mode),
+        providers=_build_run_prompt_providers(config, plan_content),
+    )
     log.bind(
         body_len=len(body), retry=retry, mode=mode, context_mode=context_mode
     ).success("Run prompt body built")
@@ -226,8 +294,11 @@ def make_skill_context_builder(
     cfg = config or VibeConfig.get_defaults()
 
     def build() -> str:
-        all_sections = [skill_content] + build_run_standard_sections(cfg)
-        return "\n\n---\n\n".join(s for s in all_sections if s)
+        return PromptManifest.load_default().render_sections(
+            recipe_key="run.skill",
+            variant_key="default",
+            providers=_build_run_prompt_providers(cfg, skill_content=skill_content),
+        )
 
     return make_context_builder(
         template_key="run.skill",
