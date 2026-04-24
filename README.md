@@ -1,6 +1,6 @@
 # Vibe Center 3.0
 
-Vibe Center 是一个面向 AI 协作开发的编排工具箱。它保留 V2 Shell 能力层，也提供 V3 Python 运行时，目标不是替代 `git` 和 `gh`，而是把本地 execution scene、agent handoff、runtime observation 和 skill governance 收敛到一套清晰边界里。
+Vibe Center 3.0 的主系统是 V3 Python 运行时。V2 Shell 仍保留环境工具和兼容能力，但不再是默认的语义中心。项目目标不是替代 `git` 和 `gh`，而是把本地 execution scene、agent handoff、runtime observation 和 skill governance 收敛到一套清晰边界里。
 
 ## 当前语义
 
@@ -27,6 +27,9 @@ V2 保留环境工具和基础 shell 能力：
 
 V3 是当前的本地运行时与协作主系统，核心能力包括：
 
+- `uv run python src/vibe3/cli.py status`
+- `uv run python src/vibe3/cli.py flow show`
+- `uv run python src/vibe3/cli.py handoff show`
 - `flow update` / `flow bind` / `flow show` / `flow status`
 - `status` 全局总览
 - `handoff` 本地协作增强
@@ -36,23 +39,26 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 ## 快速开始
 
 ```bash
-# 1. 全局安装；会同步基础文件，并自动对当前项目补跑一次 init
+# 1. 先看 V3 运行时状态
+uv run python src/vibe3/cli.py status
+
+# 2. 全局安装；会同步基础文件，并自动对当前项目补跑一次 init
 zsh scripts/install.sh
 
-# 2. 重新加载 shell
+# 3. 重新加载 shell
 source ~/.zshrc   # 或你的实际 shell rc
 
-# 3. 启动 Claude / Codex / Gemini 等工具后，优先用引导式入口
+# 4. 启动 Claude / Codex / Gemini 等工具后，优先用引导式入口
 /vibe-onboard
 
-# 4. 或手工检查
+# 5. 或手工检查
 vibe doctor
 vibe keys check
 
-# 5. 手动编辑密钥文件
+# 6. 手动编辑密钥文件
 $EDITOR ~/.vibe/keys.env
 
-# 6. 检查 skills / 能力体系
+# 7. 检查 skills / 能力体系
 vibe skills check
 /vibe-skills-manager
 ```
@@ -123,8 +129,8 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 
 ### Tier 1: Capability Layer
 
-- V2: `bin/`, `lib/`, `config/`
 - V3: `src/vibe3/`
+- V2: `bin/`, `lib/`, `config/`
 
 这一层只负责能力，不负责隐藏 workflow。
 
