@@ -7,7 +7,7 @@
 #
 # Uses only the Python standard library so it can run before uv sync.
 #
-# Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
+# Code paths (defined in config/loc_limits.yaml:code_limits.code_paths.v3_python):
 #   - src/vibe3/ (including orchestra modules)
 #
 # Note: scripts/ NOT included in total LOC (checked separately for single-file limits only)
