@@ -660,9 +660,11 @@ class TaskService:
             if isinstance(issue, dict):
                 issue_title = str(issue.get("title") or "").strip() or None
                 issue_state = str(issue.get("state") or "").strip() or None
-                comments_raw = issue.get("comments") or []
+                comments_raw = issue.get("comments")
                 comments: list[dict[str, Any]] = (
-                    comments_raw if isinstance(comments_raw, list) else []
+                    comments_raw  # type: ignore[assignment]
+                    if isinstance(comments_raw, list)
+                    else []
                 )
                 latest_comment = self._build_comment_summary(
                     comments[-1] if comments else None

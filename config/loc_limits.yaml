@@ -1,0 +1,174 @@
+# Vibe Center LOC 限制配置
+# 定义文档和代码的行数限制及例外清单
+
+# 文本量控制
+doc_limits:
+  single_file_loc:
+    default: 500           # 单文件默认限制（所有类型）
+    max: 800              # 单文件最大限制（所有类型）
+
+# 代码量控制
+code_limits:
+  single_file_loc:
+    default: 300           # 单文件默认限制（所有类型）
+    max: 400              # 单文件最大限制（所有类型）
+
+    # 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
+    # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
+    exceptions:
+      # 核心业务聚合 —— 允许 600
+      - path: "src/vibe3/services/flow_service.py"
+        limit: 600
+        reason: "核心状态机聚合，吸收 flow_query_mixin"
+      - path: "src/vibe3/services/pr_service.py"
+        limit: 600
+        reason: "PR 生命周期聚合"
+      - path: "src/vibe3/services/check_service.py"
+        limit: 600
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
+      - path: "src/vibe3/services/issue_failure_service.py"
+        limit: 600
+        reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
+      - path: "src/vibe3/services/task_resume_operations.py"
+        limit: 450
+        reason: "Task resume 操作聚合，包含 reset、label resume 等内聚操作"
+      - path: "src/vibe3/services/handoff_service.py"
+        limit: 500
+        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"
+
+      # Clients 聚合 —— 允许 500
+      - path: "src/vibe3/clients/git_client.py"
+        limit: 500
+        reason: "Git 门面聚合"
+      - path: "src/vibe3/clients/github_pr_ops.py"
+        limit: 500
+        reason: "GitHub PR 操作与查询聚合"
+      - path: "src/vibe3/clients/sqlite_client.py"
+        limit: 650
+        reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
+
+      # Commands 层 —— 允许 440-480
+      - path: "src/vibe3/commands/task.py"
+        limit: 480
+        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
+      - path: "src/vibe3/commands/status.py"
+        limit: 460
+        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示"
+
+      # Services 层 —— 允许 400-500
+      - path: "src/vibe3/services/status_query_service.py"
+        limit: 450
+        reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"
+      - path: "src/vibe3/services/task_service.py"
+        limit: 450
+        reason: "Task 服务聚合，包含状态转换、查询、resume 候选筛选逻辑"
+
+      # Roles 层 —— 允许 350-600
+      - path: "src/vibe3/roles/review.py"
+        limit: 600
+        reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
+      - path: "src/vibe3/roles/run.py"
+        limit: 600
+        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、manual run 入口"
+      - path: "src/vibe3/roles/manager.py"
+        limit: 420
+        reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
+      - path: "src/vibe3/roles/governance.py"
+        limit: 450
+        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑"
+
+      # Server —— 允许 470
+      - path: "src/vibe3/server/app.py"
+        limit: 470
+        reason: "Orchestra CLI 入口聚合，职责单一"
+      - path: "src/vibe3/server/registry.py"
+        limit: 420
+        reason: "Orchestra PID/tmux 管理，多进程协调辅助函数共生"
+
+      # Shell / 脚本兼容入口
+      - path: "lib/alias/worktree.sh"
+        limit: 500
+        reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
+      - path: "lib/keys_support.sh"
+        limit: 500
+        reason: "Keys 工具函数集合（trim、plugin scope hint 等），职责单一但函数较多"
+      - path: "scripts/tsu.sh"
+        limit: 900
+        reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
+
+      # 基础设施核心模块
+      - path: "src/vibe3/environment/worktree.py"
+        limit: 600
+        reason: "Worktree lifecycle management"
+      - path: "src/vibe3/environment/session_registry.py"
+        limit: 470
+        reason: "Session 生命周期聚合，包含状态对账、容量统计、活跃检查等紧密耦合逻辑"
+      - path: "src/vibe3/agents/backends/codeagent.py"
+        limit: 610
+        reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
+      - path: "src/vibe3/agents/backends/async_launcher.py"
+        limit: 470
+        reason: "Async launcher 工具类，包含 tmux 会话管理、日志路径分配、Codex 噪声过滤、wrapper 脚本启动四个高内聚模块"
+      - path: "src/vibe3/services/orchestra_status_service.py"
+        limit: 450
+        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
+      - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
+        limit: 450
+        reason: "State label dispatch 服务，包含依赖检查、状态查询、事件发射等紧密耦合的调度逻辑"
+
+      # 强耦合测试例外
+      - path: "tests/vibe3/agents/test_codeagent_backend.py"
+        limit: 600
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建等紧密耦合逻辑"
+      - path: "tests/vibe3/agents/test_codeagent_async.py"
+        limit: 500
+        reason: "Codeagent async 执行测试集，覆盖异步启动、日志收集、错误处理等场景，共享 fixture"
+      - path: "tests/vibe3/agents/test_codeagent_config.py"
+        limit: 500
+        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
+      - path: "tests/vibe3/execution/test_execution_lifecycle.py"
+        limit: 550
+        reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
+      - path: "tests/vibe3/execution/test_coordinator.py"
+        limit: 600
+        reason: "Coordinator 核心测试，12 个测试函数围绕调度逻辑（async/sync dispatch、capacity、error handling），共享 mock_dependencies fixture，拆分收益低"
+      - path: "tests/vibe3/environment/test_worktree_branch_from_pr.py"
+        limit: 450
+        reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
+      - path: "tests/vibe3/roles/test_governance.py"
+        limit: 500
+        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景"
+      - path: "tests/vibe3/roles/test_review.py"
+        limit: 450
+        reason: "Review 角色测试集，覆盖 request builder、sync/async dispatch、parser 集成等紧密耦合逻辑"
+      - path: "tests/vibe3/orchestra/test_global_dispatch_coordinator.py"
+        limit: 500
+        reason: "Global dispatch coordinator 集成测试，覆盖队列管理、冻结逻辑、状态转换等核心调度场景"
+      - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
+        limit: 480
+        reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
+
+  total_file_loc:
+    v2_shell: 3000         # Shell 核心代码总行数
+    v3_python: 45000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
+
+  # 统计口径（路径定义）
+  code_paths:
+    v2_shell:              # Shell 核心代码路径
+      - "lib/"
+      - "lib3/"
+      - "bin/vibe"
+    v3_python:             # Python 核心代码路径
+      - "src/vibe3/"
+
+  scripts_paths:
+    v2_shell:              # Shell 工具脚本路径
+      - "scripts/"
+    v3_python:             # Python 工具脚本路径
+      - "scripts/"
+
+  test_paths:
+    v2_shell:              # Shell 测试路径
+      - "tests/vibe2/"
+    v3_python:             # Python 测试路径
+      - "tests/vibe3/"

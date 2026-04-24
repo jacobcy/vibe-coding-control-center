@@ -45,6 +45,27 @@
 #   的 context_builder= 参数接收。
 # =============================================================================
 
+# Agent Prompt 全局说明
+# 会置顶注入到所有 codeagent prompt 文件中
+agent_prompt:
+  global_notice: |
+    ## Handoff 写入规则
+    不要直接访问或编辑主仓库的 `.git/vibe3/handoff/` 目录（该路径在 worktree 中会触发 external_directory 权限拒绝）。
+    所有 handoff 操作必须通过 CLI 命令完成：
+    - 追加记录：`uv run python src/vibe3/cli.py handoff append "<内容>"`
+    - 读取记录：`uv run python src/vibe3/cli.py handoff show`
+
+    ## Debug Stop Rule
+    当前项目处于调试过程中。
+    如果任何工具重试两次后仍然报错，并且该错误会导致任务无法完成，必须停止当前任务。
+    不要继续尝试其他替代方法。
+    请改为：
+    1. 通过 issue 或 handoff 明确记录失败现象、已尝试步骤和阻塞原因。
+    2. 结束当前任务，等待人工或后续任务接手。
+
+    ## Time out Rule
+    你有一个小时的时间来完成任务，如果你无法完成，请在时间窗口内通过issue或handoff记录你已完成的工作或findings，并在deadline前exit()，等待人工或后续任务接手。时间耗尽，你的工作空间会被Cancel，可能导致系统中断。
+
 flow:
   slug_suggestion:
     system: |
@@ -220,12 +241,183 @@ run:
   # Variable: {skill_content} - raw content of the skill's SKILL.md file.
   skill: "{skill_content}"
 
+  # Static: Output format requirements
+  output_format: |
+    The execution report should follow this structure:
+
+    ## Summary
+    Brief description of what was implemented.
+
+    ## Changes Made
+    - file/path/one.py: What was changed and why
+    - file/path/two.py: What was changed and why
+
+    ## Tests
+    - test_one.py: What is being tested
+    - test_two.py: What is being tested
+
+    ## Verification
+    - [ ] All tests pass
+    - [ ] No type errors
+    - [ ] No lint errors
+
+  # Static: Common task contract — applies to ALL execution paths (code, commit, skill, etc.)
+  run_task: |
+    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
+    You must write a canonical execution report under `docs/reports/` in the current worktree.
+    After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
+    Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/in-progress"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
+  # Static: Code execution skill — injected ONLY for plan/flow_plan/lightweight modes
+  # Not included in skill or commit paths to avoid instruction conflicts.
+  coding_task: |
+    Follow plan steps strictly, verify each step before proceeding.
+    Write clean code with tests, run verification after changes.
+    Document any deviations with reasons.
+    Follow the repository execution contract.
+
+  # Static: Retry execution task — injected for executor retry rounds
+  retry_task: |
+    Treat this run as a focused retry round, not a fresh implementation pass.
+    Reuse the existing session context when available.
+    Read the current authoritative refs yourself before continuing:
+    - `plan_ref` for the current plan
+    - `report_ref` for the latest execution report
+    - `audit_ref` for the latest review findings
+    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+    Read the audit feedback carefully and fix the cited problems first.
+    Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
+    Explain any audit item you intentionally do not change, with a concrete reason.
+    Re-run the most relevant verification for the reported failures before exit.
+    Follow the repository execution contract.
+
+  # Static: Custom run prompt (optional prefix)
+  run_prompt: "/executing-plan"
+
 plan:
   # Template for plan command (task / spec modes).
   # Variable: {plan_prompt_body} - fully assembled prompt body from plan_context_builder.
   default: "{plan_prompt_body}"
 
+  # Static: Output format requirements
+  output_format: |
+    The plan should follow this structure:
+
+    ## Summary
+    Brief description of the implementation approach.
+
+    ## Changes
+    - file/path/one.py: Description of changes
+    - file/path/two.py: Description of changes
+
+    ## Implementation Steps
+    1. Step one with details
+    2. Step two with details
+
+    ## Risks & Considerations
+    - Risk 1 and mitigation
+    - Risk 2 and mitigation
+
+  # Static: Default plan task guidance
+  # Can be overridden via CLI: vibe3 plan --issue 42
+  plan_task: |
+    Analyze requirements and identify affected files using inspect tools.
+    Design minimal changes with clear implementation steps.
+    Document risks and breaking changes upfront.
+    Follow the repository planning contract.
+    The auto-saved planner artifact is only for shared handoff or audit and is not the authoritative `plan_ref`.
+    You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
+    After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
+    Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/claimed"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
+  retry_task: |
+    This is a retry planning round, not a fresh planning pass.
+    Reuse the existing session context when available.
+    Read the current authoritative refs yourself before continuing:
+    - `plan_ref` for the previous plan
+    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+    Revise the plan in place based on the latest feedback and current repository state.
+    You must still follow the same output format and final state transition contract as a normal planning round.
+
+  # Static: Optional plain-text default task guidance.
+  # Slash-prefixed external skill triggers are ignored by vibe3 plan.
+  plan_prompt: ""
+
 review:
   # Template for review command (pr / base modes).
   # Variable: {review_prompt_body} - fully assembled prompt body from context_builder.
   default: "{review_prompt_body}"
+
+  # Static: Output format requirements (VERDICT contract)
+  output_format: |
+    The first line must be exactly:
+    VERDICT: PASS | MAJOR | BLOCK
+
+    Each finding should follow this format:
+    path/to/file.py:42 [MAJOR] concise issue description
+
+    The final line must repeat the same `VERDICT:`:
+    VERDICT: PASS | MAJOR | BLOCK
+
+    Where:
+    - PASS: No significant issues found
+    - MAJOR: Issues found that should be addressed before merge
+    - BLOCK: Critical issues that must be fixed before merge
+
+  # Static: Default review task guidance
+  # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
+  review_task: |
+    Review only changed code, focus on correctness, regression, and security.
+    Use AST analysis to understand impact scope.
+    Prioritize actionable findings with clear severity.
+    Follow the repository review contract.
+    You must directly output the review result in stdout.
+    The first line must be exactly `VERDICT: PASS | MAJOR | BLOCK`.
+    The final line must repeat the same `VERDICT:` line.
+    Keep `VERDICT` and `audit_ref` separate: verdict is the conclusion, audit_ref is the detailed report.
+    You must explicitly record your final conclusion with
+    `uv run python src/vibe3/cli.py handoff verdict <PASS|MAJOR|BLOCK>`.
+    You should write a canonical audit report under `docs/reports/` in the current worktree
+    and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
+    Use a repository-relative path such as `docs/reports/issue-123-audit-report.md`.
+    If you do not explicitly run `handoff audit`, the system may save a minimal fallback audit_ref
+    from your reviewer output, but that is only a minimal safety net and not your primary path.
+    Do not rely on manager to reconstruct your verdict unless you truly cannot produce a valid one.
+
+    ### MANDATORY EXIT STEP — you MUST do this before exit():
+    Run this command to change the issue state label:
+    ```bash
+    gh issue edit <ISSUE_NUMBER> --add-label "state/handoff" --remove-label "state/review"
+    ```
+    Replace `<ISSUE_NUMBER>` with the actual issue number (check your branch name, e.g. `task/issue-476-*` means issue #476).
+    WARNING: If you skip this step, the no-op gate will BLOCK this issue and the pipeline will stall.
+
+  retry_task: |
+    This is a retry review round, not a fresh review pass.
+    Reuse the existing session context when available.
+    Read the current authoritative refs yourself before continuing:
+    - `report_ref` for the latest implementation report
+    - `audit_ref` if a previous audit already exists
+    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+    Keep scope focused on verifying whether the previously raised concerns are now resolved.
+    You must still follow the same output format and final state transition contract as a normal review.
+
+  # Static: Custom review prompt (optional prefix)
+  # Added to beginning of review context if provided
+  review_prompt: "/code-review"
