@@ -285,6 +285,14 @@ class CheckService(CheckRemote):
             action="auto_complete_flow",
             branch=branch,
         ).info(f"Auto-completing flow: {reason}")
+        # Auto-save baseline snapshot on flow auto-complete
+        try:
+            from vibe3.analysis import snapshot_service
+
+            snapshot_service.save_branch_baseline(branch)
+        except Exception as e:
+            logger.warning(f"Failed to save branch baseline on auto-complete: {e}")
+
         self.store.update_flow_state(branch, flow_status="done")
         self.store.add_event(
             branch,
