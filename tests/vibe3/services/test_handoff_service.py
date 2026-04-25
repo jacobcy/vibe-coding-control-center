@@ -124,9 +124,14 @@ def test_get_handoff_events_applies_limit_after_handoff_filter(tmp_path: Path) -
     assert events[0].event_type == "handoff_report"
 
 
-def test_get_handoff_events_prefers_active_plan_handoff_over_recorded(
+def test_get_handoff_events_includes_both_active_and_passive_events(
     tmp_path: Path,
 ) -> None:
+    """Both active (handoff_*) and passive (*_recorded) events should be shown.
+
+    Passive events serve as fallback records when active writes fail,
+    so they should not be filtered out even when active events exist.
+    """
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     branch = "task/issue-304"
     service = HandoffService(
@@ -139,7 +144,8 @@ def test_get_handoff_events_prefers_active_plan_handoff_over_recorded(
 
     events = service.get_handoff_events(branch)
 
-    assert [event.event_type for event in events] == ["handoff_plan"]
+    # Both events should be present (order: newest first)
+    assert [event.event_type for event in events] == ["handoff_plan", "plan_recorded"]
 
 
 def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(

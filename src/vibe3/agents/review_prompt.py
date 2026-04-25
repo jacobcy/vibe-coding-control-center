@@ -23,6 +23,7 @@ from vibe3.exceptions import VibeError
 from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.review import ReviewRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+from vibe3.prompts.manifest import PromptManifest, PromptProvider
 
 ReviewPromptMode = Literal["first", "retry"]
 
@@ -173,6 +174,54 @@ Where:
 - BLOCK: Critical issues that must be fixed before merge"""
 
 
+def _review_variant(mode: ReviewPromptMode, context_mode: PromptContextMode) -> str:
+    if context_mode == "resume":
+        return f"{mode}.resume"
+    return f"{mode}.bootstrap"
+
+
+def describe_review_sections(
+    mode: ReviewPromptMode,
+    context_mode: PromptContextMode,
+) -> list[str]:
+    """Return configured review.default section keys for dry-run summaries."""
+    variant = _review_variant(mode, context_mode)
+    return list(
+        PromptManifest.load_default().recipe("review.default").variant(variant).sections
+    )
+
+
+def _build_review_prompt_providers(
+    request: ReviewRequest,
+    config: VibeConfig,
+) -> dict[str, PromptProvider]:
+    """Build providers used by config/prompt-recipes.yaml review sections."""
+
+    def review_retry_task() -> str | None:
+        return getattr(config.review, "retry_task", None)
+
+    def review_exit_contract() -> str:
+        return build_review_task_section(config.review.review_task)
+
+    return {
+        "review.policy": lambda: build_policy_section(config.review.policy_file),
+        "common.rules": lambda: build_tools_guide_section(config.review.common_rules),
+        "review.snapshot_diff": lambda: build_snapshot_diff_section(
+            request.structure_diff
+        ),
+        "review.ast_analysis": lambda: build_ast_analysis_section(
+            request.changed_symbols, request.symbol_dag
+        ),
+        "review.output_format": lambda: build_output_contract_section(
+            config.review.output_format
+        ),
+        "review.retry_task": review_retry_task,
+        "review.exit_contract": review_exit_contract,
+        # Backward-compatible alias for local recipe overrides.
+        "review.task": review_exit_contract,
+    }
+
+
 def build_review_prompt_body(
     request: ReviewRequest,
     config: VibeConfig | None = None,
@@ -205,37 +254,11 @@ def build_review_prompt_body(
     if config is None:
         config = VibeConfig.get_defaults()
 
-    sections: list[str] = []
-
-    if context_mode == "bootstrap":
-        policy = build_policy_section(config.review.policy_file)
-        sections.append(policy)
-
-        tools_guide = build_tools_guide_section(config.review.common_rules)
-        if tools_guide:
-            sections.append(tools_guide)
-
-        snapshot_diff = build_snapshot_diff_section(request.structure_diff)
-        if snapshot_diff:
-            sections.append(snapshot_diff)
-
-        ast_analysis = build_ast_analysis_section(
-            request.changed_symbols, request.symbol_dag
-        )
-        if ast_analysis:
-            sections.append(ast_analysis)
-
-    output_contract = build_output_contract_section(config.review.output_format)
-    sections.append(output_contract)
-
-    # Task section MUST be last so the exit label instruction has recency effect
-    task_text = (
-        config.review.retry_task if mode == "retry" else config.review.review_task
+    body = PromptManifest.load_default().render_sections(
+        recipe_key="review.default",
+        variant_key=_review_variant(mode, context_mode),
+        providers=_build_review_prompt_providers(request, config),
     )
-    task = build_review_task_section(task_text)
-    sections.append(task)
-
-    body = "\n\n---\n\n".join(sections)
     log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
         "Review prompt body built"
     )

@@ -91,6 +91,8 @@ uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor
 使用规则：
 - 这类记录不要混进 plan、review、run 的主体输出里，更不要塞进最终交付摘要里冒充正式结论。
 
+
+
 ## 高价值场景
 
 ### 修改实现前

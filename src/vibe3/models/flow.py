@@ -284,6 +284,26 @@ class FlowStatusResponse(BaseModel):
         """Migrate legacy execution status values for status responses."""
         return _migrate_execution_status_value(v)
 
+    @field_validator("latest_verdict", mode="before")
+    @classmethod
+    def parse_verdict_record(
+        cls, v: str | dict[str, object] | None
+    ) -> VerdictRecord | None:
+        """Parse verdict record from JSON string or dict for status responses."""
+        if v is None:
+            return None
+        if isinstance(v, VerdictRecord):
+            return v
+        if isinstance(v, str):
+            try:
+                data = json.loads(v)
+                return VerdictRecord(**data)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if isinstance(v, dict):
+            return VerdictRecord(**v)  # type: ignore[arg-type]
+        return None
+
     @classmethod
     def from_state(
         cls,

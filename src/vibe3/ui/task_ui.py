@@ -3,31 +3,24 @@
 import json
 from typing import TYPE_CHECKING
 
-from vibe3.clients.github_issues_ops import MilestoneContext
+from vibe3.services.task_service import is_human_comment
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui import render_milestone
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 if TYPE_CHECKING:
     from vibe3.services.task_service import TaskShowResult
 
 
-def render_task_milestone(
-    task_issue_number: int, milestone_data: dict | MilestoneContext
+def build_task_show_payload(task_result: "TaskShowResult") -> dict[str, object]:
+    """Build a single JSON payload for task show."""
+    return task_result.to_payload()
+
+
+def render_task_show(
+    task_result: "TaskShowResult",
+    json_output: bool,
 ) -> None:
-    """Render milestone orchestration context for a task."""
-    if isinstance(milestone_data, MilestoneContext):
-        milestone_data = {
-            "number": milestone_data.number,
-            "title": milestone_data.title,
-            "open": milestone_data.open_count,
-            "closed": milestone_data.closed_count,
-            "issues": milestone_data.issues,
-            "task_issue": milestone_data.task_issue_number,
-        }
-    render_milestone(milestone_data, task_issue_number)
-
-
-def render_task_show(task_result: "TaskShowResult", json_output: bool) -> None:
     """Render task show output.
 
     Args:
@@ -40,14 +33,28 @@ def render_task_show(task_result: "TaskShowResult", json_output: bool) -> None:
 
     task = task_result.local_task
     if json_output:
-        console.print(json.dumps(task.model_dump(), indent=2, default=str))
+        console.print(
+            json.dumps(
+                build_task_show_payload(task_result),
+                indent=2,
+                default=str,
+            ),
+            markup=False,
+            highlight=False,
+            soft_wrap=True,
+        )
         return
 
+    console.print("[bold]Current Task[/]")
     console.print(f"Branch: {task.branch}")
     console.print(f"Flow:   {task.flow_slug} ({task.flow_status})")
-
     if task.task_issue_number:
-        console.print(f"Task Issue: #{task.task_issue_number}")
+        title_suffix = f"  {task_result.issue_title}" if task_result.issue_title else ""
+        console.print(f"Task:   #{task.task_issue_number}{title_suffix}")
+    elif task_result.issue_title:
+        console.print(f"Task:   {task_result.issue_title}")
+    if task_result.issue_state:
+        console.print(f"Issue:  {str(task_result.issue_state).lower()}")
     if task_result.related_issue_numbers:
         console.print(
             "Related Issue(s): "
@@ -60,10 +67,6 @@ def render_task_show(task_result: "TaskShowResult", json_output: bool) -> None:
         )
     if task.spec_ref:
         console.print(f"Spec Ref: {task.spec_ref}")
-    if task.next_step:
-        console.print(f"Next Step: {task.next_step}")
-    if task.blocked_by:
-        console.print(f"Blocked By: {task.blocked_by}")
     if task.latest_verdict:
         v = task.latest_verdict
         color = {
@@ -72,18 +75,73 @@ def render_task_show(task_result: "TaskShowResult", json_output: bool) -> None:
             "BLOCK": "red",
         }.get(v.verdict, "cyan")
         console.print(f"Verdict: [{color}]{v.verdict}[/] ({v.actor})")
+    if task.next_step:
+        console.print(f"Next Step: {task.next_step}")
+    if task.blocked_by:
+        console.print(f"Blocked By: {task.blocked_by}")
+
+    if task_result.latest_ref:
+        latest_ref = task_result.latest_ref
+        worktree_root = task.worktree_root if hasattr(task, "worktree_root") else None
+        display_ref = resolve_ref_path(latest_ref.ref, worktree_root)
+        ref_cmd = ref_to_handoff_cmd(display_ref, task.branch)
+        console.print("\n[bold]Latest Work[/]")
+        console.print(f"Ref:     {latest_ref.kind}  {ref_cmd}")
+        console.print("Summary:")
+        console.print(latest_ref.summary)
+
+    instruction = task_result.latest_human_instruction or task_result.latest_comment
+    if instruction:
+        label = (
+            "Latest Instruction"
+            if task_result.latest_human_instruction is not None
+            else "Latest Comment"
+        )
+        console.print(f"\n[bold]{label}[/]")
+        console.print(f"Author:  {instruction.author}")
+        console.print("Summary:")
+        console.print(instruction.body)
+
+    if task_result.pr_summary:
+        pr = task_result.pr_summary
+        draft_suffix = " draft" if pr.draft else ""
+        console.print("\n[bold]PR / CI[/]")
+        console.print(f"PR:      #{pr.number}  {pr.state}{draft_suffix}  {pr.title}")
+        if pr.checks:
+            console.print(f"Checks:  {pr.checks}")
+        console.print(f"URL:     {pr.url}")
 
 
-def render_task_show_with_milestone(
-    task_result: "TaskShowResult",
-    milestone_ctx: MilestoneContext | None,
-    json_output: bool,
-) -> None:
-    """Render task show output with milestone context."""
-    render_task_show(task_result, json_output)
+def render_task_comments(issue: dict[str, object]) -> None:
+    """Render full latest comments for comment-focused inspection."""
+    comments = issue.get("comments") or []
+    if not isinstance(comments, list):
+        comments = []
 
-    if not json_output and milestone_ctx and task_result.local_task:
-        task_issue = task_result.local_task.task_issue_number
-        if task_issue:
-            console.print("\n[bold]Orchestration Context (Milestone)[/]")
-            render_task_milestone(task_issue, milestone_ctx)
+    latest_comment = comments[-1] if comments else None
+    latest_human = next(
+        (
+            comment
+            for comment in reversed(comments)
+            if isinstance(comment, dict) and is_human_comment(comment)
+        ),
+        None,
+    )
+
+    console.print("\n[bold]Latest Comment[/]")
+    if isinstance(latest_comment, dict):
+        author = str((latest_comment.get("author") or {}).get("login") or "unknown")
+        console.print(f"Author:  {author}")
+        body = str(latest_comment.get("body") or "").strip()
+        console.print(body or "(empty)")
+    else:
+        console.print("(no comments)")
+
+    console.print("\n[bold]Latest Human Instruction[/]")
+    if isinstance(latest_human, dict):
+        author = str((latest_human.get("author") or {}).get("login") or "unknown")
+        console.print(f"Author:  {author}")
+        body = str(latest_human.get("body") or "").strip()
+        console.print(body or "(empty)")
+    else:
+        console.print("(no human comments)")

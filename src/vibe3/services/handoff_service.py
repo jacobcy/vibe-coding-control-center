@@ -35,16 +35,6 @@ class HandoffService:
         "run_recorded",
         "audit_recorded",
     }
-    _ACTIVE_EVENT_TYPES = {
-        "plan": {"handoff_plan"},
-        "run": {"handoff_report", "handoff_run"},
-        "audit": {"handoff_audit"},
-    }
-    _PASSIVE_EVENT_TYPES = {
-        "plan": {"plan_recorded"},
-        "run": {"run_recorded"},
-        "audit": {"audit_recorded"},
-    }
 
     def __init__(
         self,
@@ -66,35 +56,20 @@ class HandoffService:
         Handoff views should only show explicit handoff artifacts / verdict events.
         Runtime lifecycle and flow state events belong to `flow show`, not
         `handoff status`.
+
+        Note: Both active events (handoff_plan/run/audit) and passive events
+        (*_recorded) are included. Passive events serve as fallback records when
+        active writes fail, so they should not be filtered out.
         """
         events_data = self.store.get_events(branch, event_type_prefix=event_type_prefix)
-        all_handoff_events = [
+        handoff_events = [
             FlowEvent(**event)
             for event in events_data
             if event["event_type"] in self._HANDOFF_EVENT_TYPES
         ]
-        handoff_events = self._prefer_authoritative_events(all_handoff_events)
         if limit is not None:
             handoff_events = handoff_events[:limit]
         return handoff_events
-
-    def _prefer_authoritative_events(self, events: list[FlowEvent]) -> list[FlowEvent]:
-        active_present = {
-            kind
-            for kind, active_types in self._ACTIVE_EVENT_TYPES.items()
-            if any(event.event_type in active_types for event in events)
-        }
-
-        filtered: list[FlowEvent] = []
-        for event in events:
-            suppress = False
-            for kind, passive_types in self._PASSIVE_EVENT_TYPES.items():
-                if event.event_type in passive_types and kind in active_present:
-                    suppress = True
-                    break
-            if not suppress:
-                filtered.append(event)
-        return filtered
 
     def append_current_handoff(
         self,

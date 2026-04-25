@@ -1,6 +1,5 @@
 """Task service implementation."""
 
-from dataclasses import dataclass
 from typing import Any, Literal
 
 from loguru import logger
@@ -17,27 +16,24 @@ from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.services.task_show_service import (
+    TaskCommentSummary,
+    TaskPRSummary,
+    TaskRefSummary,
+    TaskShowResult,
+    TaskShowService,
+    is_human_comment,
+)
 
-
-@dataclass
-class TaskListRow:
-    """UI-friendly task list row."""
-
-    branch: str
-    flow_slug: str
-    flow_status: str
-    task_issue_number: int | None
-
-
-@dataclass
-class TaskShowResult:
-    """Task show query result with local context."""
-
-    branch: str
-    local_task: FlowStatusResponse | None = None
-    related_issue_numbers: list[int] | None = None
-    dependency_issue_numbers: list[int] | None = None
+__all__ = [
+    "TaskService",
+    "TaskShowService",
+    "TaskShowResult",
+    "TaskRefSummary",
+    "TaskCommentSummary",
+    "TaskPRSummary",
+    "is_human_comment",
+]
 
 
 class TaskService:
@@ -53,6 +49,11 @@ class TaskService:
         self.store = SQLiteClient() if store is None else store
         self._flow_service = FlowService(store=self.store)
         self.github_client = GitHubClient() if github_client is None else github_client
+        self._show_service = TaskShowService(
+            store=self.store,
+            flow_service=self._flow_service,
+            github_client=self.github_client,
+        )
         self._issue_label_port = issue_label_port
         self._orchestra_config = orchestra_config
 
@@ -366,57 +367,12 @@ class TaskService:
         Returns:
             Issue dict, "network_error" string, or None if not found
         """
-        return self.github_client.view_issue(issue_number)
-
-    # ------------------------------------------------------------------
-    # Task query operations (merged from task_usecase.py)
-    # ------------------------------------------------------------------
-
-    def list_task_rows(self) -> list[TaskListRow]:
-        """List local tasks as UI-oriented rows."""
-        task_flows = [
-            flow for flow in self._flow_service.list_flows() if flow.task_issue_number
-        ]
-        rows: list[TaskListRow] = []
-        for task_flow in task_flows:
-            rows.append(
-                TaskListRow(
-                    branch=task_flow.branch,
-                    flow_slug=task_flow.flow_slug,
-                    flow_status=task_flow.flow_status,
-                    task_issue_number=task_flow.task_issue_number,
-                )
-            )
-        return rows
+        return self._show_service.fetch_issue_with_comments(issue_number)
 
     def resolve_branch(self, branch: str | None = None) -> str:
         """Resolve explicit or current branch for task commands."""
-        if branch:
-            return resolve_issue_branch_input(branch, self._flow_service) or branch
-        try:
-            return self._flow_service.get_current_branch()
-        except GitError as exc:
-            raise RuntimeError(f"unable to resolve current branch ({exc})") from exc
+        return self._show_service.resolve_branch(branch)
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state."""
-        target_branch = self.resolve_branch(branch)
-        local_task = self.get_task(target_branch)
-
-        issue_links = self.store.get_issue_links(target_branch)
-        related_issue_numbers = [
-            link["issue_number"]
-            for link in issue_links
-            if link["issue_role"] == "related"
-        ]
-        dependency_issue_numbers = [
-            link["issue_number"]
-            for link in issue_links
-            if link["issue_role"] == "dependency"
-        ]
-        return TaskShowResult(
-            branch=target_branch,
-            local_task=local_task,
-            related_issue_numbers=related_issue_numbers,
-            dependency_issue_numbers=dependency_issue_numbers,
-        )
+        return self._show_service.show_task(branch)

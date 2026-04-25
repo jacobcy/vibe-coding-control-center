@@ -1,5 +1,7 @@
 """Tests for flow model migrations."""
 
+import json
+
 from vibe3.models.flow import FlowState, FlowStatusResponse, IssueLink
 
 
@@ -147,3 +149,23 @@ class TestExecutionStatusMigration:
             planner_status="completed",
         )
         assert response.planner_status == "done"
+
+    def test_flow_status_response_parses_latest_verdict_json(self):
+        response = FlowStatusResponse(
+            branch="test-branch",
+            flow_slug="test",
+            flow_status="active",
+            latest_verdict=json.dumps(
+                {
+                    "verdict": "PASS",
+                    "actor": "claude/sonnet",
+                    "role": "agent",
+                    "timestamp": "2026-04-24T00:36:44.005186Z",
+                    "reason": "Recorded audit reference",
+                    "issues": None,
+                    "flow_branch": "test-branch",
+                }
+            ),
+        )
+        assert response.latest_verdict is not None
+        assert response.latest_verdict.verdict == "PASS"

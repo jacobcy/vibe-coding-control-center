@@ -9,6 +9,7 @@ from vibe3.ui.flow_ui_timeline import (  # noqa: F401
     render_flow_timeline,
     render_milestone,
 )
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 
 def _render_flow_row(
@@ -119,12 +120,14 @@ def render_flow_status(
         ("execute", status.executor_actor, status.report_ref),
         ("review", status.reviewer_actor, status.audit_ref),
     ):
-        ref_display = (
-            resolve_ref_path(ref, worktree_root, absolute=True) if ref else "—"
-        )
+        if ref:
+            ref_display = resolve_ref_path(ref, worktree_root)
+            ref_cmd = ref_to_handoff_cmd(ref_display, status.branch)
+        else:
+            ref_cmd = "—"
         console.print(f"  [dim]{stage}:[/]")
         kv("actor", actor or "—", 2)
-        kv("ref", ref_display, 2)
+        kv("ref", ref_cmd, 2)
     # Latest verdict — shown inline under review results
     if status.latest_verdict:
         v = status.latest_verdict

@@ -401,8 +401,16 @@ class TestExecuteSyncGateIntegration:
         mock_handoff.record_passive_artifact.assert_called_once()
         assert result.handoff_file == "shared/run.md"
 
-    def test_executor_skips_passive_run_artifact_when_report_ref_exists(self) -> None:
-        """Executor should not record passive shared artifact when report_ref exists."""
+    def test_executor_records_passive_run_when_no_active_handoff_even_if_ref_exists(
+        self,
+    ) -> None:
+        """Executor should record passive artifact when no active handoff this round.
+
+        New logic: Passive recording triggers when handoff_file is None
+        (no active handoff), regardless of whether authoritative ref exists.
+        This ensures every execution round is recorded, even if authoritative
+        ref was set by previous rounds.
+        """
         agent_result = _make_mock_agent_result(stdout="run output")
         mock_store = _make_mock_store()
         mock_store.get_flow_state.return_value = {"report_ref": "docs/reports/run.md"}
@@ -447,5 +455,5 @@ class TestExecuteSyncGateIntegration:
             result = service.execute_sync(command)
 
         assert result.success
-        mock_handoff_cls.return_value.record_passive_artifact.assert_not_called()
-        assert result.handoff_file is None
+        # New logic: passive recording happens because no active handoff occurred
+        mock_handoff_cls.return_value.record_passive_artifact.assert_called_once()

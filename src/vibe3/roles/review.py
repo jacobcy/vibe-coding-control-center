@@ -12,6 +12,7 @@ from vibe3.agents.models import create_codeagent_command
 from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.agents.review_prompt import (
     build_review_prompt_body,
+    describe_review_sections,
     make_review_context_builder,
 )
 from vibe3.analysis.inspect_output_adapter import changed_symbols
@@ -124,15 +125,9 @@ def build_issue_review_request(
                 mode=meta.prompt_mode,  # type: ignore[arg-type]
                 context_mode=meta.fallback_context_mode,
             )
-        sections = (
-            ["output_format", "retry_task"]
-            if meta.context_mode == "resume"
-            else [
-                "policy_file",
-                "common_rules",
-                "output_format",
-                "retry_task" if meta.prompt_mode == "retry" else "review_task",
-            ]
+        sections = describe_review_sections(
+            meta.prompt_mode,  # type: ignore[arg-type]
+            meta.context_mode,
         )
         refs = dict(meta.refs)
         if report_ref and "report_ref" not in refs:

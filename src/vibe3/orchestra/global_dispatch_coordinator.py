@@ -139,27 +139,9 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
-            # NEW: Check if remote state changed since collection. If changed,
-            # move to end of queue to let others go first and re-evaluate later.
-            if entry.collected_state and issue.state.value != entry.collected_state:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: #{issue.number} state changed "
-                    f"({entry.collected_state} -> {issue.state.value}), "
-                    "moving to end of queue",
-                )
-                logger.bind(
-                    domain="global_dispatch",
-                    issue=issue.number,
-                ).info(
-                    f"Issue #{issue.number} state changed from "
-                    f"{entry.collected_state} to {issue.state.value}, moving to end"
-                )
-                self._frozen_queue.pop(index)
-                entry.collected_state = issue.state.value
-                self._frozen_queue.append(entry)
-                # Do NOT increment index because current item was popped
-                continue
+            # Update collected_state to current state for tracking
+            # No longer "avoid" state changes - assignee check is sufficient
+            entry.collected_state = issue.state.value
 
             if entry.waiting_state is not None:
                 index += 1

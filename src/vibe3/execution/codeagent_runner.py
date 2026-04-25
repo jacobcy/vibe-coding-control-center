@@ -199,29 +199,26 @@ class CodeagentExecutionService:
                 )
 
             passive_kind = {"planner": "plan", "executor": "run"}.get(command.role)
-            if passive_kind and agent_result.stdout.strip():
-                ref_field = "plan_ref" if passive_kind == "plan" else "report_ref"
-                flow_state = ctx.store.get_flow_state(ctx.branch)
-                authoritative_ref = flow_state.get(ref_field) if flow_state else None
-                if not authoritative_ref:
-                    try:
-                        handoff_file = HandoffService(
-                            store=ctx.store
-                        ).record_passive_artifact(
-                            kind=passive_kind,
-                            content=agent_result.stdout,
-                            actor=ctx.actor,
-                            metadata=(
-                                {"session_id": effective_session_id}
-                                if effective_session_id
-                                else None
-                            ),
-                            branch=ctx.branch,
-                        )
-                    except Exception as exc:
-                        log.warning(
-                            f"Failed to record passive {passive_kind} artifact: {exc}"
-                        )
+            # Passive recording: record if NO active handoff happened this round
+            if passive_kind and agent_result.stdout.strip() and handoff_file is None:
+                try:
+                    handoff_file = HandoffService(
+                        store=ctx.store
+                    ).record_passive_artifact(
+                        kind=passive_kind,
+                        content=agent_result.stdout,
+                        actor=ctx.actor,
+                        metadata=(
+                            {"session_id": effective_session_id}
+                            if effective_session_id
+                            else None
+                        ),
+                        branch=ctx.branch,
+                    )
+                except Exception as exc:
+                    log.warning(
+                        f"Failed to record passive {passive_kind} artifact: {exc}"
+                    )
 
         return handoff_file
 

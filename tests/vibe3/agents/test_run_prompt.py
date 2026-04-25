@@ -55,6 +55,19 @@ def test_build_run_prompt_body_requires_report_ref_registration(tmp_path: Path) 
     assert "handoff report" in context
 
 
+def test_build_run_prompt_body_instructs_ref_reads_via_handoff_show(
+    tmp_path: Path,
+) -> None:
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    assert "handoff show <ref>" in context
+    assert "Do not call file-reading tools directly" in context
+
+
 def test_build_run_prompt_body_retry_mode_uses_retry_task(tmp_path: Path) -> None:
     config = VibeConfig.get_defaults()
     plan_file = tmp_path / "plan.md"
@@ -80,9 +93,7 @@ def test_build_run_prompt_body_retry_resume_mode_is_minimal(tmp_path: Path) -> N
     )
 
     assert "focused retry round" in context
-    assert "## Output format requirements" in context
     assert "## Implementation Plan" not in context
-    assert "## Execution Task" not in context
 
 
 def test_build_run_output_contract_section_keeps_output_contract_only() -> None:

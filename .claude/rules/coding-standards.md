@@ -58,7 +58,14 @@
 
 - 不在终端直接喷大体量内容；优先摘要、截断、过滤。
 - 跨会话记忆使用 `claude-memory` MCP 工具：被动记忆通过 hooks 自动捕获 observations（`search`、`get_observations` 查询）；主动记忆通过 `build_corpus` 创建知识库，`prime_corpus` + `query_corpus` 查询。不使用 `.agent/context/memory.md`。
-- 当前 flow handoff 通过 `vibe3 handoff show` 读取，通过 `vibe3 handoff append` 写入。
+- 当前 flow handoff 通过 `vibe3 handoff show <target>` 读取，通过 `vibe3 handoff append` 写入。
+  - `<target>` 支持三种命名空间：
+    - `@key` — 共享 artifact（`.git/vibe3/handoff/` 下，忽略 `--branch`）
+    - `relative/path` — canonical worktree ref，需用 `--branch <branch>` 指定目标 branch
+    - `/abs/path` — 绝对路径（调试 fallback）
+  - **禁止** 直接用 `read_file` / `cat` 访问 `.git/vibe3/handoff/...` 路径
+  - 读取共享 artifact: `vibe3 handoff show @task-xxx/run-yyy.md`
+  - 读取 plan_ref/report_ref: `vibe3 handoff show --branch task/issue-467 docs/reports/audit.md`
 - 跨 worktree 共享状态写入 `.git/vibe/`（位于主仓库 git common dir）。
 - 不在项目根目录随意落临时文件。
 - 仓库相关的临时脚本、调试输出、scratch 文件统一放 `temp/`，便于追踪并由清理流程统一处理。

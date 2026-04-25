@@ -6,6 +6,7 @@ from typing import Any
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
@@ -66,17 +67,6 @@ _EVENT_COLOR: dict[str, str] = {
     "codeagent_manager_started": "yellow",
     "codeagent_manager_completed": "green",
     "codeagent_manager_aborted": "red",
-}
-
-_ARTIFACT_EVENT_TYPES = {
-    "handoff_plan",
-    "handoff_report",
-    "handoff_run",
-    "plan_recorded",
-    "run_recorded",
-    "handoff_audit",
-    "handoff_indicate",
-    "audit_recorded",
 }
 
 
@@ -227,29 +217,20 @@ def _render_event_refs(event: FlowEvent, worktree_root: str | None) -> None:
         )
         console.print(f"  [{verdict_color}]verdict: {verdict}[/]")
 
-    # Render log_path for non-artifact events
-    raw_log_path = event.refs.get("log_path")
-    log_path = raw_log_path if isinstance(raw_log_path, str) else None
-    show_log_path = bool(log_path) and event.event_type not in _ARTIFACT_EVENT_TYPES
-
-    if show_log_path:
-        log_display = resolve_ref_path(log_path, worktree_root, absolute=True)
-        _log_suffix = (
-            " [dim yellow](not found)[/]" if not Path(log_display).exists() else ""
-        )
-        console.print(f"  [dim]- {log_display}[/]{_log_suffix}")
+    # Do not render log_path for temp/logs (tmux debug logs, not actionable)
 
     # Render ref if not already in detail
     ref = event.refs.get("ref")
     detail_contains_ref = bool(
         isinstance(ref, str) and isinstance(event.detail, str) and ref in event.detail
     )
-    if ref and isinstance(ref, str) and not show_log_path and not detail_contains_ref:
-        ref_display = resolve_ref_path(ref, worktree_root, absolute=True)
+    if ref and isinstance(ref, str) and not detail_contains_ref:
+        ref_display = resolve_ref_path(ref, worktree_root)
+        ref_cmd = ref_to_handoff_cmd(ref_display, None)
         _ref_suffix = (
             " [dim yellow](not found)[/]" if not Path(ref_display).exists() else ""
         )
-        console.print(f"  [dim]- {ref_display}[/]{_ref_suffix}")
+        console.print(f"  [dim]- {ref_cmd}[/]{_ref_suffix}")
 
 
 def _render_timeline(events: list[FlowEvent], worktree_root: str | None) -> None:
@@ -287,11 +268,12 @@ def _render_refs(state: FlowStatusResponse) -> None:
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
-            display_val = resolve_ref_path(val, state.worktree_root, absolute=True)
+            display_val = resolve_ref_path(val, state.worktree_root)
+            ref_cmd = ref_to_handoff_cmd(display_val, state.branch)
             _missing = (
                 " [dim yellow](not found)[/]" if not Path(display_val).exists() else ""
             )
-            console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
+            console.print(f"  [dim]{label:10}[/]  {ref_cmd}{actor_str}{_missing}")
 
 
 def _render_state_summary(state: FlowStatusResponse) -> None:
