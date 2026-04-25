@@ -199,16 +199,98 @@ def render_flows_status_dashboard(
     pr_map: dict[str, dict[str, object]] | None = None,
     worktree_map: dict[str, str] | None = None,
 ) -> None:
-    """flow status dashboard — YAML style with remote title and PR status."""
+    """Flow status dashboard — classified by branch type and state.
+
+    Classifies flows into categories:
+    1. Auto Tasks: task/issue-N or dev/issue-N branches (automated)
+    2. Issue Bound: Manual branches with issue binding
+    3. Manual: Manual branches without issue binding
+
+    Groups by state within each category:
+    - Active: Normal active flows
+    - Blocked: Flows with blocked_by
+    - Done/Aborted/Stale: Completed flows
+    """
+    from vibe3.services.flow_classifier import (
+        FlowCategory,
+        FlowState,
+        classify_flow,
+        get_flow_state,
+    )
+
     pr_map = pr_map or {}
     worktree_map = worktree_map or {}
+
+    # Classify and group flows
+    categorized: dict[FlowCategory, dict[FlowState, list[FlowStatusResponse]]] = {
+        FlowCategory.AUTO_TASK: {},
+        FlowCategory.ISSUE_BOUND: {},
+        FlowCategory.MANUAL: {},
+    }
+
     for flow in flows:
-        task_num = flow.task_issue_number
-        title = titles.get(task_num, "—") if task_num else "—"
-        worktree = worktree_map.get(flow.branch)
-        _render_flow_row(
-            flow, title, pr_data=pr_map.get(flow.branch), worktree=worktree
-        )
+        category = classify_flow(flow)
+        state = get_flow_state(flow)
+
+        if state not in categorized[category]:
+            categorized[category][state] = []
+
+        categorized[category][state].append(flow)
+
+    # Render by category
+    def render_category(
+        category: FlowCategory,
+        label: str,
+        state_flows: dict[FlowState, list[FlowStatusResponse]],
+    ) -> None:
+        """Render a category with state grouping."""
+        if not state_flows:
+            return
+
+        console.print(f"\n[bold]{label}[/]")
+
+        # Order states for display
+        state_order = [
+            FlowState.ACTIVE,
+            FlowState.BLOCKED,
+            FlowState.DONE,
+            FlowState.STALE,
+            FlowState.ABORTED,
+        ]
+
+        for state in state_order:
+            flows_in_state = state_flows.get(state, [])
+            if not flows_in_state:
+                continue
+
+            # State header (only if non-active or multiple states)
+            if state != FlowState.ACTIVE or len(state_flows) > 1:
+                state_label = state.value.upper()
+                console.print(f"  [dim]{state_label}:[/]")
+
+            # Render flows in this state
+            for flow in flows_in_state:
+                task_num = flow.task_issue_number
+                title = titles.get(task_num, "—") if task_num else "—"
+                worktree = worktree_map.get(flow.branch)
+                _render_flow_row(
+                    flow, title, pr_data=pr_map.get(flow.branch), worktree=worktree
+                )
+
+    # Render categories in order
+    render_category(
+        FlowCategory.AUTO_TASK,
+        "Active Tasks (automated)",
+        categorized[FlowCategory.AUTO_TASK],
+    )
+    render_category(
+        FlowCategory.ISSUE_BOUND,
+        "Issue-Bound Branches",
+        categorized[FlowCategory.ISSUE_BOUND],
+    )
+    render_category(
+        FlowCategory.MANUAL, "Manual Branches", categorized[FlowCategory.MANUAL]
+    )
 
 
 def render_error(message: str) -> None:
