@@ -217,12 +217,12 @@ def resume(
     }
     effective_label: str | None = None
     if label is not None:
-        # --label provided
+        # --label flag is present
         if label == "":
-            # --label without value (Typer passes empty string)
+            # --label provided without explicit value -> trigger inference in service
             effective_label = ""
         elif label in valid_states:
-            # --label <state>
+            # --label <state> provided
             effective_label = label
         else:
             typer.echo(

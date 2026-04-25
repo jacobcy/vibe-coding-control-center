@@ -100,19 +100,14 @@ class StateLabelDispatchService(ServiceBase):
     async def collect_ready_issues(self) -> list[IssueInfo]:
         """Scan and return ready issues without dispatching.
 
-        This method is for GlobalDispatchCoordinator to collect issues for
-        capacity-aware dispatch. Capacity checking is done by coordinator.
-
-        **Dependency Handling**:
-        Issues with unresolved dependencies are marked as 'waiting' and excluded
-        from the ready list. Only issues without dependencies or with all
-        dependencies satisfied are returned as ready.
+        Also polls state/blocked issues to perform automatic unblocking.
 
         Returns:
-            Filtered and sorted ready issues list (excluding waiting issues)
+            Filtered and sorted ready issues list.
         """
         async with self._dispatch_guard:
-            raw_issues = await asyncio.get_event_loop().run_in_executor(
+            # Poll issues matching this role's trigger state
+            trigger_issues = await asyncio.get_event_loop().run_in_executor(
                 self._executor,
                 lambda: self._github.list_issues(
                     limit=100,
@@ -122,6 +117,23 @@ class StateLabelDispatchService(ServiceBase):
                     label=self.role_def.trigger_state.to_label(),
                 ),
             )
+            # ALSO poll blocked issues for this dispatcher to perform patrol
+            blocked_issues = await asyncio.get_event_loop().run_in_executor(
+                self._executor,
+                lambda: self._github.list_issues(
+                    limit=100,
+                    state="open",
+                    assignee=None,
+                    repo=self.config.repo,
+                    label=IssueState.BLOCKED.to_label(),
+                ),
+            )
+
+            # Merge and deduplicate
+            raw_issues_map = {item["number"]: item for item in trigger_issues}
+            for item in blocked_issues:
+                raw_issues_map[item["number"]] = item
+            raw_issues = list(raw_issues_map.values())
 
             ready = self._select_ready_issues(raw_issues)
 
@@ -283,7 +295,7 @@ class StateLabelDispatchService(ServiceBase):
                 append_orchestra_event(
                     "dispatcher",
                     f"{self.service_name} skip #{issue.number}: "
-                    "remote is blocked but local flow state missing",
+                    "local flow state missing but remote is blocked",
                 )
                 return False
             # For manager entry point on new issues
@@ -322,8 +334,10 @@ class StateLabelDispatchService(ServiceBase):
                     try:
                         label_port = GhIssueLabelPort(repo=self.config.repo)
                         label_port.add_issue_label(issue.number, "state/blocked")
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.bind(domain="orchestra").warning(
+                            f"Failed to add state/blocked for #{issue.number}: {exc}"
+                        )
                 self._store.add_event(
                     branch,
                     "flow_blocked",
@@ -338,6 +352,7 @@ class StateLabelDispatchService(ServiceBase):
         fs_obj = FlowState.model_validate(flow_state)
         target_label = infer_resume_label(fs_obj)
 
+        unblocked = False
         if flow_state.get("blocked_by_issue"):
             dep_issue = flow_state.get("blocked_by_issue")
             source_pr = None
@@ -364,6 +379,7 @@ class StateLabelDispatchService(ServiceBase):
                 detail=f"Dependencies satisfied, target: {target_label.value}",
                 refs=refs if refs else None,
             )
+            unblocked = True
 
         if IssueState.BLOCKED.to_label() in labels:
             try:
@@ -371,20 +387,17 @@ class StateLabelDispatchService(ServiceBase):
                 label_port.remove_issue_label(issue.number, "state/blocked")
                 if target_label.to_label() not in labels:
                     label_port.add_issue_label(issue.number, target_label.to_label())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.bind(domain="orchestra").warning(
+                    f"Failed to sync unblocked labels for #{issue.number}: {exc}"
+                )
+            unblocked = True
 
-        # Return True if the current dispatcher is the correct one for the target label
-        if target_label == self.role_def.trigger_state:
-            # Special case: BLOCKED_ROLE should never dispatch
-            if self.role_def.trigger_name == "blocked":
-                return False
-            return True
-
-        # If it needs unblock but the target label doesn't match this dispatcher,
-        # return False so the *other* dispatcher will pick it up on the next tick.
-        # But wait, if we are the correct dispatcher, we should process it.
-        # If no unblock happened, just check if the label matches our trigger state.
-        if self.role_def.trigger_name == "blocked":
+        # H3: If we just unblocked, skip dispatch in this tick.
+        # This allows the unblocked labels to propagate and avoids
+        # race conditions/ambiguous dispatcher states.
+        if unblocked:
             return False
+
+        # If no unblock happened, just check if the label matches our trigger state.
         return self.role_def.trigger_state.to_label() in labels

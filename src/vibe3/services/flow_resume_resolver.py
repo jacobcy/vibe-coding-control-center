@@ -15,6 +15,13 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
     1. Qualify gate automatic unblock (determining target label)
     2. `vibe3 task resume --label` (without explicit value)
 
+    Priority Rules (High to Low):
+    1. pr_ref exists -> HANDOFF (Code is ready for delivery)
+    2. audit_ref exists -> IN_PROGRESS or HANDOFF (Based on verdict)
+    3. report_ref exists -> REVIEW (Code is written, needs review)
+    4. plan_ref exists -> IN_PROGRESS (Plan exists, needs execution)
+    5. default -> CLAIMED (Start fresh)
+
     Args:
         flow_state: The current local state of the flow
 

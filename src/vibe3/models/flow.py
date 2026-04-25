@@ -22,7 +22,7 @@ class MainBranchProtectedError(Exception):
 ExecutionStatus = Literal["pending", "running", "done", "crashed", "aborted"]
 
 
-def _migrate_flow_status_value(v: str) -> str:
+def _migrate_flow_status_value(v: str | None) -> str | None:
     """Normalize legacy flow status values."""
     if v == "idle":
         return "active"
@@ -30,6 +30,8 @@ def _migrate_flow_status_value(v: str) -> str:
         return "stale"
     if v == "merged":
         return "done"
+    if v == "waiting":
+        return "blocked"
     return v
 
 
@@ -96,13 +98,8 @@ class FlowState(BaseModel):
     @field_validator("flow_status", mode="before")
     @classmethod
     def migrate_flow_status(cls, v: str) -> str:
-        """Migrate legacy flow status values.
-
-        - idle -> active (default state)
-        - missing -> stale (inactive state)
-        - merged -> done (completed state)
-        """
-        return _migrate_flow_status_value(v)
+        """Migrate legacy flow status values."""
+        return str(_migrate_flow_status_value(v))
 
     @field_validator(
         "planner_status",
@@ -269,7 +266,7 @@ class FlowStatusResponse(BaseModel):
     @classmethod
     def migrate_flow_status(cls, v: str) -> str:
         """Migrate legacy flow status values for status responses."""
-        return _migrate_flow_status_value(v)
+        return str(_migrate_flow_status_value(v))
 
     @field_validator(
         "planner_status",
