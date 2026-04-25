@@ -277,7 +277,7 @@ def status(
                 if flow.task_issue_number and flow.branch in branch_titles:
                     titles[flow.task_issue_number] = branch_titles[flow.branch]
 
-        # Build PR and worktree maps via projection service
+        # Batch fetch all PRs (1 API call instead of N)
         pr_map: dict[str, dict[str, object]] = {}
         worktree_map: dict[str, str] = {}
         try:
@@ -298,14 +298,17 @@ def status(
         except Exception:
             pass
 
-        for flow in flows:
-            try:
-                # Check current branch PR
-                prs = projection_service.pr_service.github_client.list_prs_for_branch(
-                    flow.branch
-                )
-                if prs:
-                    pr = prs[0]
+        # Batch query all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = projection_service.pr_service.github_client.list_all_prs(
+                state="open"
+            )
+            branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+
+            # Build PR map using cached dictionary (0 API calls)
+            for flow in flows:
+                pr = branch_to_pr.get(flow.branch)
+                if pr:
                     pr_map[flow.branch] = {
                         "number": pr.number,
                         "title": pr.title,
@@ -314,8 +317,8 @@ def status(
                         "url": pr.url,
                         "worktree": worktree_map.get(flow.branch),
                     }
-            except Exception:
-                pass
+        except Exception as exc:
+            logger.bind(domain="flow").warning(f"Failed to fetch PRs: {exc}")
 
         if net_err:
             render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")

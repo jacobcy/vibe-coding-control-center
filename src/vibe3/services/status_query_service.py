@@ -262,6 +262,14 @@ class StatusQueryService:
         # Use cache service for titles (cache-first)
         branch_titles, _ = self.title_cache.get_titles_with_fallback(branches)
 
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = self.github.list_all_prs(state="open")
+            branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        except Exception as exc:
+            logger.bind(domain="status").warning(f"Failed to fetch PRs: {exc}")
+            branch_to_pr = {}
+
         for item in raw_issues:
             number = item.get("number")
             if not isinstance(number, int):
@@ -308,6 +316,15 @@ class StatusQueryService:
                 # Fallback to API title
                 title = str(item.get("title") or "")
 
+            # Get PR data from batch query
+            pr_number = None
+            pr_state = None
+            if flow:
+                pr = branch_to_pr.get(flow.branch)
+                if pr:
+                    pr_number = pr.number
+                    pr_state = pr.state.value
+
             orchestrated_issues.append(
                 {
                     "number": number,
@@ -319,6 +336,9 @@ class StatusQueryService:
                     "failed_reason": failed_reason,
                     "blocked_by": blocked_by,
                     "blocked_reason": blocked_reason,
+                    # PR data
+                    "pr_number": pr_number,
+                    "pr_state": pr_state,
                     # Queue metadata
                     "milestone": milestone,
                     "roadmap": roadmap,
