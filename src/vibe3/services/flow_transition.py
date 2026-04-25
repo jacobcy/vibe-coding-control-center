@@ -128,6 +128,18 @@ class FlowTransitionMixin(FlowWriteMixin):
         ]
         effective_issue_number = task_issues[0] if task_issues else issue_number
 
+        # Ensure cache entry exists with issue number before updating title
+        # This must happen BEFORE title update so update_title() can preserve
+        # the issue number
+        if not self.store.get_flow_context_cache(branch):
+            self.store.upsert_flow_context_cache(
+                branch=branch,
+                task_issue_number=effective_issue_number,
+                issue_title=None,
+                pr_number=None,
+                pr_title=None,
+            )
+
         # Try to fetch issue title from GitHub and update cache
         if effective_issue_number:
             try:
@@ -158,16 +170,6 @@ class FlowTransitionMixin(FlowWriteMixin):
                     issue_number=effective_issue_number,
                     error=str(e),
                 ).warning("Failed to fetch issue title from GitHub")
-
-        # Ensure cache entry exists (even if no title)
-        if not self.store.get_flow_context_cache(branch):
-            self.store.upsert_flow_context_cache(
-                branch=branch,
-                task_issue_number=effective_issue_number,
-                issue_title=None,
-                pr_number=None,
-                pr_title=None,
-            )
 
     def resolve_flow_name(self: Self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.
