@@ -5,10 +5,7 @@ from typing import Any
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
-from vibe3.ui.flow_ui_timeline import (  # noqa: F401
-    render_flow_timeline,
-    render_milestone,
-)
+from vibe3.ui.flow_ui_timeline import render_flow_timeline  # noqa: F401
 from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 
@@ -79,7 +76,6 @@ def render_flow_status(
     status: FlowStatusResponse,
     issue_titles: dict[int, str] | None = None,
     pr_data: dict[str, Any] | None = None,
-    milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
     worktree_root: str | None = None,
 ) -> None:
@@ -176,8 +172,6 @@ def render_flow_status(
     console.print(f"    [dim]run:[/] {status.executor_actor or '—'}")
     console.print(f"    [dim]review:[/] {status.reviewer_actor or '—'}")
 
-    if milestone_data:
-        render_milestone(milestone_data, status.task_issue_number)
     execution_statuses = [
         ("planner", status.planner_status),
         ("executor", status.executor_status),

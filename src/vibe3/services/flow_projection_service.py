@@ -149,32 +149,3 @@ class FlowProjectionService:
                 issue_titles[n] = branch_titles[branch]
 
         return issue_titles, net_err
-
-    def get_milestone_data(self, issue_number: int) -> dict[str, Any] | None:
-        """Get milestone data for an issue."""
-        try:
-            issue = self.github_client.view_issue(issue_number)
-            if isinstance(issue, dict):
-                milestone = issue.get("milestone")
-                if milestone and isinstance(milestone, dict):
-                    m_number = milestone.get("number")
-                    if m_number:
-                        all_issues = self.github_client.get_milestone_issues(m_number)
-                        open_issues = [
-                            i for i in all_issues if i.get("state") == "open"
-                        ]
-                        closed_issues = [
-                            i for i in all_issues if i.get("state") == "closed"
-                        ]
-                        return {
-                            "title": milestone.get("title"),
-                            "number": m_number,
-                            "state": milestone.get("state"),
-                            "open": len(open_issues),
-                            "closed": len(closed_issues),
-                            "issues": all_issues,
-                            "task_issue": issue,
-                        }
-        except Exception:
-            pass
-        return None

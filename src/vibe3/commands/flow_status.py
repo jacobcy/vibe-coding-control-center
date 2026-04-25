@@ -133,11 +133,6 @@ def show(
                 issue_titles, network_error = projection_service.get_issue_titles(
                     list(issue_numbers)
                 )
-                milestone_data = None
-                if flow_status.task_issue_number and not network_error:
-                    milestone_data = projection_service.get_milestone_data(
-                        flow_status.task_issue_number
-                    )
 
                 # Build PR data from projection
                 pr_data = None
@@ -161,7 +156,6 @@ def show(
                     flow_status,
                     issue_titles,
                     pr_data,
-                    milestone_data,
                     parent_branch=parent_branch,
                     worktree_root=flow_status.worktree_root,
                 )
@@ -179,17 +173,10 @@ def show(
             }
             typer.echo(json.dumps(json_data, indent=2, default=str))
         else:
-            milestone_data = None
-            task_issue = timeline["state"].task_issue_number
-            if task_issue:
-                projection_service = FlowProjectionService()
-                milestone_data = projection_service.get_milestone_data(task_issue)
-
             parent_branch = find_parent_branch(target_branch)
             render_flow_timeline(
                 timeline["state"],
                 timeline["events"],
-                milestone_data,
                 parent_branch=parent_branch,
             )
             if timeline["state"].task_issue_number is None:
