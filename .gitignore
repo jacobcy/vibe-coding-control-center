@@ -41,6 +41,7 @@ vibe-init-test*
 .venv/
 .tox/
 .nox/
+.python-version
 
 # Build & distribution
 dist/
