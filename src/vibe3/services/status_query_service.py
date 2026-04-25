@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,
@@ -22,6 +23,7 @@ from vibe3.orchestra.queue_ordering import (
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
+    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
 
 def _state_from_labels(raw_labels: object) -> IssueState | None:
@@ -192,10 +194,23 @@ class StatusQueryService:
         github_client: GitHubClient | None = None,
         git_client: GitClient | None = None,
         repo: str | None = None,
+        title_cache: IssueTitleCacheService | None = None,
+        store: SQLiteClient | None = None,
     ) -> None:
         self.github = github_client or GitHubClient()
         self.git = git_client or GitClient()
         self.repo = repo
+        self.store = store or SQLiteClient()
+        self._title_cache = title_cache
+
+    @property
+    def title_cache(self) -> IssueTitleCacheService:
+        """Lazy-initialized title cache service."""
+        if self._title_cache is None:
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            self._title_cache = IssueTitleCacheService(self.store, self.github)
+        return self._title_cache
 
     def fetch_orchestrated_issues(
         self,
@@ -241,6 +256,12 @@ class StatusQueryService:
             logger.bind(domain="status").warning(f"Failed to fetch issues: {exc}")
             raw_issues = []
 
+        # Collect all branches from flows for cache lookup
+        branches = [flow.branch for flow in flows if flow.branch]
+
+        # Use cache service for titles (cache-first)
+        branch_titles, _ = self.title_cache.get_titles_with_fallback(branches)
+
         for item in raw_issues:
             number = item.get("number")
             if not isinstance(number, int):
@@ -280,10 +301,17 @@ class StatusQueryService:
             )
             assignee = extract_primary_assignee_login(item.get("assignees"))
 
+            # Get title from cache (using branch) or fall back to API title
+            if flow:
+                title = branch_titles.get(flow.branch) or str(item.get("title") or "")
+            else:
+                # Fallback to API title
+                title = str(item.get("title") or "")
+
             orchestrated_issues.append(
                 {
                     "number": number,
-                    "title": str(item.get("title") or ""),
+                    "title": title,
                     "state": state,
                     "assignee": assignee,
                     "flow": flow,

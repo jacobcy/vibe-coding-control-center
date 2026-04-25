@@ -128,30 +128,46 @@ class FlowTransitionMixin(FlowWriteMixin):
         ]
         effective_issue_number = task_issues[0] if task_issues else issue_number
 
-        # Try to fetch issue title from GitHub
-        issue_title = None
-        try:
-            gh = GitHubClient()
-            issue_data = gh.view_issue(effective_issue_number)
-            if isinstance(issue_data, dict):
-                issue_title = issue_data.get("title")
-        except Exception as e:
-            logger.bind(
-                domain="flow",
-                action="init_issue_context",
-                branch=branch,
-                issue_number=effective_issue_number,
-                error=str(e),
-            ).warning("Failed to fetch issue title from GitHub")
+        # Try to fetch issue title from GitHub and update cache
+        if effective_issue_number:
+            try:
+                gh = GitHubClient()
+                issue_data = gh.view_issue(effective_issue_number)
+                if isinstance(issue_data, dict):
+                    issue_title = issue_data.get("title")
+                    if issue_title:
+                        # Use IssueTitleCacheService to update cache
+                        from vibe3.services.issue_title_cache_service import (
+                            IssueTitleCacheService,
+                        )
 
-        # Initialize cache with issue number and title (if available)
-        self.store.upsert_flow_context_cache(
-            branch=branch,
-            task_issue_number=effective_issue_number,
-            issue_title=issue_title,  # May be None if GitHub failed
-            pr_number=None,
-            pr_title=None,
-        )
+                        title_cache = IssueTitleCacheService(self.store, gh)
+                        title_cache.update_title(branch, issue_title)
+
+                        logger.bind(
+                            domain="flow",
+                            action="init_issue_context",
+                            branch=branch,
+                            issue_number=effective_issue_number,
+                        ).debug("Initialized issue title cache")
+            except Exception as e:
+                logger.bind(
+                    domain="flow",
+                    action="init_issue_context",
+                    branch=branch,
+                    issue_number=effective_issue_number,
+                    error=str(e),
+                ).warning("Failed to fetch issue title from GitHub")
+
+        # Ensure cache entry exists (even if no title)
+        if not self.store.get_flow_context_cache(branch):
+            self.store.upsert_flow_context_cache(
+                branch=branch,
+                task_issue_number=effective_issue_number,
+                issue_title=None,
+                pr_number=None,
+                pr_title=None,
+            )
 
     def resolve_flow_name(self: Self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.

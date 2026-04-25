@@ -259,8 +259,23 @@ def status(
                 )
                 titles.update(extra_titles)
         else:
-            # Server not running, fetch from GitHub API
-            titles, net_err = projection_service.get_issue_titles(list(issue_numbers))
+            # Server not running, use cache service directly with real branches
+            # Collect actual branches from flows (not guessing canonical_branch_name)
+            branches = [flow.branch for flow in flows if flow.branch]
+
+            # Get titles using cache service (branch-based, cache-first)
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            title_cache = IssueTitleCacheService(
+                store=projection_service.store,
+                github_client=projection_service.github_client,
+            )
+            branch_titles, net_err = title_cache.get_titles_with_fallback(branches)
+
+            # Build issue_number -> title mapping from branch_titles
+            for flow in flows:
+                if flow.task_issue_number and flow.branch in branch_titles:
+                    titles[flow.task_issue_number] = branch_titles[flow.branch]
 
         # Build PR and worktree maps via projection service
         pr_map: dict[str, dict[str, object]] = {}

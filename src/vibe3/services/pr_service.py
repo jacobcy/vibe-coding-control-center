@@ -378,16 +378,12 @@ class PRService:
             pr_ref=pr.url,  # Write PR URL as proof of PR creation
         )
 
-        # Update PR context cache with latest PR info
-        # Get existing cache or create new entry
-        existing_cache = self.store.get_flow_context_cache(pr.head_branch)
+        # Update PR context cache with latest PR info using IssueTitleCacheService
+        from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
-        self.store.upsert_flow_context_cache(
+        title_cache = IssueTitleCacheService(self.store)
+        title_cache.update_pr(
             branch=pr.head_branch,
-            task_issue_number=(
-                existing_cache.get("task_issue_number") if existing_cache else None
-            ),
-            issue_title=existing_cache.get("issue_title") if existing_cache else None,
             pr_number=pr.number,
             pr_title=pr.title,
         )
