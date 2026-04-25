@@ -18,42 +18,54 @@ def _render_flow_row(
     pr_data: dict[str, object] | None = None,
     worktree: str | None = None,
 ) -> None:
+    """Render flow row in task-status style.
+
+    Compact format:
+    - With worktree: Show issue#, title, PR, worktree on separate lines
+    - Without worktree: Show only branch and issue# (minimal)
+    """
+    has_worktree = bool(worktree)
+
+    # Line 1: Branch and state
     status_str = status_text(flow.flow_status).plain
-    console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_str})[/]")
-    kv("flow_slug", flow.flow_slug, 1)
-    task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
-    kv("task_issue", task_str, 1)
-    if title is not None:
-        kv("title", title, 1)
-    if worktree:
-        kv("worktree", worktree, 1)
-    if flow.initiated_by:
-        kv("initiated_by", flow.initiated_by, 1)
-    # Always show actor — fallback to worktree identity when flow has no signature
-    _actor, _fallback = display_actor(flow.latest_actor)
-    _suffix = " [dim](worktree)[/]" if _fallback else ""
-    kv("latest", f"{_actor}{_suffix}", 1)
+    console.print(f"  [cyan]{flow.branch}[/]  [dim]({status_str})[/]")
+
+    # Line 2: Issue and title
+    if flow.task_issue_number:
+        issue_str = f"#{flow.task_issue_number}"
+        title_str = f"  {title}" if title else ""
+        console.print(f"    [dim]issue:[/] {issue_str}{title_str}")
+
+    # Line 3: PR (if exists)
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()
-        title = str(pr_data.get("title", ""))
-        title_suffix = f"  {title}" if title else ""
+        pr_title = str(pr_data.get("title", ""))
+        title_suffix = f"  {pr_title}" if pr_title else ""
         console.print(
-            f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
+            f"    [dim]PR:[/] #{pr_data['number']}{draft_tag}"
             f"  [dim]{state}[/]{title_suffix}"
         )
-        # Remove redundant worktree display since it's already shown above
     elif flow.pr_number:
-        kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
-    if flow.latest_verdict:
+        console.print(f"    [dim]PR:[/] #{flow.pr_number}  [dim](offline)[/]")
+
+    # Line 4: Worktree (if exists)
+    if has_worktree:
+        console.print(f"    [dim]worktree:[/] {worktree}")
+
+    # Add verdict for active flows with worktree
+    if has_worktree and flow.latest_verdict:
         v = flow.latest_verdict
         color = {
             "PASS": "green",
             "MAJOR": "yellow",
             "BLOCK": "red",
         }.get(v.verdict, "cyan")
-        kv("verdict", f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]", 1)
-    console.print()
+        console.print(
+            f"    [dim]verdict:[/] [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+        )
+
+    console.print()  # Empty line between flows
 
 
 def render_flow_created(flow: FlowStatusResponse, task_id: str | None = None) -> None:
