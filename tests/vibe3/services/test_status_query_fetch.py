@@ -147,7 +147,7 @@ class TestStatusQueryServiceFetch:
         assert result[0]["state"] == IssueState.HANDOFF
 
     def test_fetch_orchestrated_issues_extracts_failed_reason(self) -> None:
-        """FAILED issues should carry a human-readable error reason."""
+        """FAILED issues should carry failed_reason from flow state."""
         github = MagicMock()
         github.list_issues.return_value = [
             {
@@ -156,22 +156,20 @@ class TestStatusQueryServiceFetch:
                 "labels": [{"name": "state/failed"}],
             }
         ]
-        github.view_issue.return_value = {
-            "comments": [
-                {
-                    "body": (
-                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
-                        "原因:quota exhausted"
-                    ),
-                }
-            ]
-        }
 
         git = MagicMock()
         git._run.return_value = ""
 
+        # Create flow with failed_reason
+        flow = MagicMock(spec=FlowStatusResponse)
+        flow.branch = "task/issue-439"
+        flow.task_issue_number = 439
+        flow.failed_reason = "quota exhausted"
+
         service = StatusQueryService(github_client=github, git_client=git)
-        result = service.fetch_orchestrated_issues([], queued_set=set())
+        result = service.fetch_orchestrated_issues(
+            [flow], queued_set=set(), stale_flows=[]
+        )
 
         assert len(result) == 1
         assert result[0]["state"] == IssueState.FAILED
@@ -180,7 +178,7 @@ class TestStatusQueryServiceFetch:
     def test_fetch_orchestrated_issues_ignores_recovery_comments_for_failed_reason(
         self,
     ) -> None:
-        """FAILED reason ignores recovery comments, prefers failure reports."""
+        """FAILED reason comes from flow state, not GitHub comments."""
         github = MagicMock()
         github.list_issues.return_value = [
             {
@@ -189,28 +187,20 @@ class TestStatusQueryServiceFetch:
                 "labels": [{"name": "state/failed"}],
             }
         ]
-        github.view_issue.return_value = {
-            "comments": [
-                {
-                    "body": (
-                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
-                        "原因:quota exhausted"
-                    ),
-                },
-                {
-                    "body": (
-                        "[recovery] 已从 state/failed 恢复到 state/handoff。\n\n"
-                        "原因:manual relabel"
-                    ),
-                },
-            ]
-        }
 
         git = MagicMock()
         git._run.return_value = ""
 
+        # Create flow with failed_reason (ignores GitHub comments now)
+        flow = MagicMock(spec=FlowStatusResponse)
+        flow.branch = "task/issue-439"
+        flow.task_issue_number = 439
+        flow.failed_reason = "quota exhausted"
+
         service = StatusQueryService(github_client=github, git_client=git)
-        result = service.fetch_orchestrated_issues([], queued_set=set())
+        result = service.fetch_orchestrated_issues(
+            [flow], queued_set=set(), stale_flows=[]
+        )
 
         assert result[0]["failed_reason"] == "quota exhausted"
 
