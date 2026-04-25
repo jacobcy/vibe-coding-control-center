@@ -80,7 +80,6 @@ class FlowState(BaseModel):
         "stale",
         "aborted",
         "merged",
-        "waiting",  # NEW: waiting for dependencies
     ] = "active"
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
@@ -238,7 +237,6 @@ class FlowStatusResponse(BaseModel):
         "stale",
         "aborted",
         "merged",
-        "waiting",  # NEW: waiting for dependencies
     ]
     task_issue_number: int | None = None
     pr_number: int | None = None

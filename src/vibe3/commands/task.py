@@ -220,7 +220,7 @@ def resume(
         # --label provided
         if label == "":
             # --label without value (Typer passes empty string)
-            effective_label = "handoff"
+            effective_label = ""
         elif label in valid_states:
             # --label <state>
             effective_label = label

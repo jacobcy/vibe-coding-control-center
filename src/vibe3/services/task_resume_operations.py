@@ -75,15 +75,29 @@ class TaskResumeOperations:
         if label_state is not None:
             # --label provided: restore to specified state without deleting worktree
             # Convert string state to IssueState enum
-            valid_states = {
-                "ready": IssueState.READY,
-                "claimed": IssueState.CLAIMED,
-                "in-progress": IssueState.IN_PROGRESS,
-                "handoff": IssueState.HANDOFF,
-                "review": IssueState.REVIEW,
-                "merge-ready": IssueState.MERGE_READY,
-            }
-            target_state = valid_states.get(label_state, IssueState.HANDOFF)
+            if not label_state:
+                from vibe3.models.flow import FlowState
+                from vibe3.services.flow_resume_resolver import infer_resume_label
+
+                fs_dict = (
+                    self.flow_service.store.get_flow_state(branch)
+                    if isinstance(branch, str)
+                    else None
+                )
+                if fs_dict:
+                    target_state = infer_resume_label(FlowState.model_validate(fs_dict))
+                else:
+                    target_state = IssueState.CLAIMED
+            else:
+                valid_states = {
+                    "ready": IssueState.READY,
+                    "claimed": IssueState.CLAIMED,
+                    "in-progress": IssueState.IN_PROGRESS,
+                    "handoff": IssueState.HANDOFF,
+                    "review": IssueState.REVIEW,
+                    "merge-ready": IssueState.MERGE_READY,
+                }
+                target_state = valid_states.get(label_state, IssueState.CLAIMED)
 
             # --label: minimal cleanup only. The agent did work but the label
             # wasn't updated correctly, causing a block.  Clear the reason

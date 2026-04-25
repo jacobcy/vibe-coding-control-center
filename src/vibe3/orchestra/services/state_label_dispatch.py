@@ -21,6 +21,7 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+from vibe3.services.flow_resume_resolver import infer_resume_label
 from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
@@ -181,13 +182,10 @@ class StateLabelDispatchService(ServiceBase):
             return [row[0] for row in cursor.fetchall()]
 
     def _is_dependency_satisfied(self, dep_issue_number: int) -> bool:
-        """Check if dependency issue has completed (PR created).
+        """Check if dependency issue has completed.
 
         A dependency is satisfied when:
-        - Local flow has a PR ref (primary truth source)
-        - Issue is closed
-        - Issue has state/done or state/merged label
-        - Issue body/comments mention PR reference
+        - Issue is closed (Done or Aborted)
 
         Args:
             dep_issue_number: The dependency issue number to check
@@ -195,20 +193,7 @@ class StateLabelDispatchService(ServiceBase):
         Returns:
             True if dependency is satisfied, False otherwise
         """
-        # Check local flow state first — this is the primary truth source.
-        # Covers scenarios: (a) PR already exists, flow enters waiting later;
-        # (b) service restart missed events.
-        dep_flows = self._store.get_flows_by_issue(dep_issue_number, role="task")
-        for dep_flow in dep_flows:
-            pr_ref = dep_flow.get("pr_ref")
-            if pr_ref and str(pr_ref).strip():
-                return True
-            pr_number = dep_flow.get("pr_number")
-            if pr_number:
-                return True
-
         payload = self._github.view_issue(dep_issue_number, repo=self.config.repo)
-
         if not isinstance(payload, dict):
             return False
 
@@ -217,98 +202,54 @@ class StateLabelDispatchService(ServiceBase):
         if state == "closed":
             return True  # Issue closed → dependency satisfied
 
-        # Check for PR reference (completion marker)
-        labels = _normalize_labels(payload.get("labels"))
-        if "state/done" in labels or "state/merged" in labels:
-            return True  # Task completed with PR
-
-        # Check for PR in issue body or comments
-        body = payload.get("body", "")
-        if isinstance(body, str):
-            if "pull request" in body.lower() or "pr #" in body.lower():
-                return True  # PR mentioned → likely completed
-
-        return False  # Dependency not yet satisfied
-
-    def _mark_issue_waiting(
-        self, issue_number: int, unresolved_deps: list[int]
-    ) -> None:
-        """Mark issue as waiting for dependencies.
-
-        Updates flow_status to waiting, sets blocked_by_issue, records event,
-        and syncs GitHub label.
-
-        Args:
-            issue_number: The issue number to mark as waiting
-            unresolved_deps: List of unresolved dependency issue numbers
-        """
-        flows = self._store.get_flows_by_issue(issue_number, role="task")
-        if not flows:
-            return
-
-        branch = str(flows[0].get("branch") or "").strip()
-        if not branch:
-            return
-
-        # Update flow_status to waiting
-        self._store.update_flow_state(
-            branch,
-            flow_status="waiting",
-            blocked_by_issue=unresolved_deps[0],  # Primary dependency
-            blocked_reason=f"Waiting for dependencies: #{unresolved_deps}",
-        )
-
-        # Add event
-        self._store.add_event(
-            branch,
-            "dependency_waiting",
-            "orchestra:dispatcher",
-            detail=f"Waiting for dependencies: {unresolved_deps}",
-            refs={"dependencies": [str(d) for d in unresolved_deps]},
-        )
-
-        # Sync GitHub label (use state/blocked for waiting)
-        try:
-            label_port = GhIssueLabelPort(repo=self.config.repo)
-            label_port.add_issue_label(issue_number, "state/blocked")
-        except Exception as exc:
-            logger.bind(
-                domain="orchestra",
-                dispatcher=self.service_name,
-                issue=issue_number,
-            ).warning(f"Failed to add state/blocked label: {exc}")
+        return False
 
     def _select_ready_issues(
         self, raw_issues: list[dict[str, object]]
     ) -> list[IssueInfo]:
-        """Select ready issues, checking for unresolved dependencies.
-
-        Issues with dependencies are marked as 'waiting' and excluded from
-        the ready list. Only issues without dependencies or with all
-        dependencies satisfied are returned.
+        """Select ready issues by passing them through the Qualify Gate.
 
         Args:
             raw_issues: Raw issue payloads from GitHub
 
         Returns:
-            Filtered and sorted ready issues (excluding waiting)
+            Filtered and sorted ready issues
         """
         selected: list[IssueInfo] = []
         for item in raw_issues:
             labels = _normalize_labels(item.get("labels"))
-            if IssueState.BLOCKED.to_label() in labels:
+
+            # Untracked state: ignore issues with no state labels
+            if not any(lbl.startswith("state/") for lbl in labels):
                 continue
-            # Skip failed issues - they should not be auto-dispatched
+
+            # Skip failed issues
             if IssueState.FAILED.to_label() in labels:
-                continue
-            if self.role_def.trigger_state.to_label() not in labels:
                 continue
 
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
                 continue
 
-            # Skip supervisor/assignee-filtered issues
+            branch, flow_state = self._flow_context(issue.number)
+
+            # Qualify Gate
+            if not self._run_qualify_gate(issue, branch, flow_state, labels):
+                continue
+
+            # Role-specific branch existence requirements
+            if self.role_def.trigger_name != "manager":
+                if not branch or not _is_auto_task_branch(branch):
+                    continue
+                if not self._flow_manager.git.branch_exists(branch):
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"{self.service_name} skip #{issue.number}: "
+                        f"branch '{branch}' not found in git",
+                    )
+                    continue
+
+            # Verify assignee/supervisor filters
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self.config.supervisor_handoff.issue_label,
@@ -319,51 +260,131 @@ class StateLabelDispatchService(ServiceBase):
             ):
                 continue
 
-            # Check for dependencies before proceeding
-            dependencies = self._get_issue_dependencies(issue.number)
-            if dependencies:
-                # Has dependencies → check if all are satisfied
-                unresolved = [
-                    d for d in dependencies if not self._is_dependency_satisfied(d)
-                ]
+            selected.append(issue)
 
-                if unresolved:
-                    # Move to waiting state (not ready)
-                    self._mark_issue_waiting(issue.number, unresolved)
-                    logger.bind(
-                        domain="orchestra",
-                        dispatcher=self.service_name,
-                        issue=issue.number,
-                    ).info(
-                        f"Issue #{issue.number} has unresolved dependencies: "
-                        f"{unresolved}"
-                    )
-                    continue
+        return sort_ready_issues(selected)
 
-            # No dependencies OR all satisfied → proceed with ready check
-            if self.role_def.trigger_name == "manager":
-                # Manager is the entry point. If the trigger label is present,
-                # keep the issue in the frozen queue and let the coordinator
-                # decide when to fire the next hop.
-                selected.append(issue)
-                continue
+    def _run_qualify_gate(
+        self,
+        issue: IssueInfo,
+        branch: str,
+        flow_state: dict[str, object] | None,
+        labels: list[str],
+    ) -> bool:
+        """Run the Qualify Gate for an issue to resolve dependencies and blocking.
 
-            # For downstream roles (plan/run/review), we need a branch to exist.
-            branch, _ = self._flow_context(issue.number)
-            if not branch or not _is_auto_task_branch(branch):
-                # If no branch exists yet, we can't dispatch downstream agents.
-                # This usually means manager hasn't run yet.
-                continue
-
-            # Verify the git branch actually exists, not just a stale flow record.
-            # A flow may reference a branch that was deleted (aborted/cleaned up).
-            if not self._flow_manager.git.branch_exists(branch):
+        Returns:
+            True if the issue passes the gate and should be dispatched by
+            THIS dispatcher.
+        """
+        if not flow_state:
+            if IssueState.BLOCKED.to_label() in labels:
+                # Local state missing but remote is blocked -> skip
                 append_orchestra_event(
                     "dispatcher",
                     f"{self.service_name} skip #{issue.number}: "
-                    f"branch '{branch}' not found in git",
+                    "remote is blocked but local flow state missing",
                 )
-                continue
+                return False
+            # For manager entry point on new issues
+            return self.role_def.trigger_state.to_label() in labels
 
-            selected.append(issue)
-        return sort_ready_issues(selected)
+        # Step 1: Check manual block
+        blocked_reason = flow_state.get("blocked_reason")
+        if blocked_reason and str(blocked_reason).strip():
+            # Missing remote blocked label but locally blocked manually
+            if IssueState.BLOCKED.to_label() not in labels:
+                try:
+                    label_port = GhIssueLabelPort(repo=self.config.repo)
+                    label_port.add_issue_label(issue.number, "state/blocked")
+                except Exception as exc:
+                    logger.bind(domain="orchestra").warning(
+                        f"Failed to add state/blocked: {exc}"
+                    )
+            return False
+
+        # Step 2: Check dependency block
+        dependencies = self._get_issue_dependencies(issue.number)
+        unresolved = []
+        if dependencies:
+            unresolved = [
+                d for d in dependencies if not self._is_dependency_satisfied(d)
+            ]
+
+        if unresolved:
+            if not flow_state.get("blocked_by_issue"):
+                self._store.update_flow_state(
+                    branch,
+                    flow_status="blocked",
+                    blocked_by_issue=unresolved[0],
+                )
+                if IssueState.BLOCKED.to_label() not in labels:
+                    try:
+                        label_port = GhIssueLabelPort(repo=self.config.repo)
+                        label_port.add_issue_label(issue.number, "state/blocked")
+                    except Exception:
+                        pass
+                self._store.add_event(
+                    branch,
+                    "flow_blocked",
+                    "orchestra:dispatcher",
+                    detail="Blocked by unresolved dependencies",
+                )
+            return False
+
+        # Step 3: Automatic unblock and dispatch
+        from vibe3.models.flow import FlowState
+
+        fs_obj = FlowState.model_validate(flow_state)
+        target_label = infer_resume_label(fs_obj)
+
+        if flow_state.get("blocked_by_issue"):
+            dep_issue = flow_state.get("blocked_by_issue")
+            source_pr = None
+            if isinstance(dep_issue, int):
+                dep_flows = self._store.get_flows_by_issue(dep_issue, role="task")
+                for df in dep_flows:
+                    if df.get("pr_number"):
+                        source_pr = df.get("pr_number")
+                        break
+
+            refs = {}
+            if source_pr:
+                refs["source_pr"] = str(source_pr)
+
+            self._store.update_flow_state(
+                branch,
+                flow_status=target_label.value,
+                blocked_by_issue=None,
+            )
+            self._store.add_event(
+                branch,
+                "flow_unblocked",
+                "orchestra:dispatcher",
+                detail=f"Dependencies satisfied, target: {target_label.value}",
+                refs=refs if refs else None,
+            )
+
+        if IssueState.BLOCKED.to_label() in labels:
+            try:
+                label_port = GhIssueLabelPort(repo=self.config.repo)
+                label_port.remove_issue_label(issue.number, "state/blocked")
+                if target_label.to_label() not in labels:
+                    label_port.add_issue_label(issue.number, target_label.to_label())
+            except Exception:
+                pass
+
+        # Return True if the current dispatcher is the correct one for the target label
+        if target_label == self.role_def.trigger_state:
+            # Special case: BLOCKED_ROLE should never dispatch
+            if self.role_def.trigger_name == "blocked":
+                return False
+            return True
+
+        # If it needs unblock but the target label doesn't match this dispatcher,
+        # return False so the *other* dispatcher will pick it up on the next tick.
+        # But wait, if we are the correct dispatcher, we should process it.
+        # If no unblock happened, just check if the label matches our trigger state.
+        if self.role_def.trigger_name == "blocked":
+            return False
+        return self.role_def.trigger_state.to_label() in labels

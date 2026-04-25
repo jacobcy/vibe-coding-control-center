@@ -13,7 +13,6 @@ _STATUS_COLOR: dict[str, str] = {
     "active": "green",
     "done": "dim",
     "blocked": "red",  # Execution blocked (internal issue, needs manual intervention)
-    "waiting": "yellow",  # Waiting for dependencies (external, auto-recoverable)
     "stale": "yellow",
 }
 

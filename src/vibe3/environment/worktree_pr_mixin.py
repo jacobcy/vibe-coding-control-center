@@ -47,7 +47,7 @@ class WorktreePRMixin:
             vibe3_dir = git_common_dir / "vibe3"
             db_path = str(vibe3_dir / "handoff.db")
             store = SQLiteClient(db_path=db_path)
-            events = store.get_events(flow_branch, event_type="dependency_wake_up")
+            events = store.get_events(flow_branch, event_type="flow_unblocked")
         except Exception:
             # Failed to access SQLite store (e.g. in test temp directory)
             # Return None, fall back to default behavior

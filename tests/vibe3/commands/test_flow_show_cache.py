@@ -26,7 +26,7 @@ def test_flow_projection_uses_cached_issue_title() -> None:
         )
 
         # Mock GitHub client
-        with patch("vibe3.services.flow_projection_service.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
             mock_gh_instance = MagicMock()
             mock_gh_instance.view_issue.return_value = None  # Should not be called
             mock_gh.return_value = mock_gh_instance
@@ -54,7 +54,7 @@ def test_flow_projection_falls_back_to_github_on_cache_miss() -> None:
         store.add_issue_link("task/issue-999", 999, "task")
 
         # Mock GitHub client
-        with patch("vibe3.services.flow_projection_service.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
             mock_gh_instance = MagicMock()
             mock_gh_instance.view_issue.return_value = {
                 "number": 999,
@@ -84,7 +84,7 @@ def test_flow_projection_returns_empty_on_github_failure() -> None:
         store.add_issue_link("task/issue-404", 404, "task")
 
         # Mock GitHub client to fail
-        with patch("vibe3.services.flow_projection_service.GitHubClient") as mock_gh:
+        with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
             mock_gh_instance = MagicMock()
             mock_gh_instance.view_issue.side_effect = Exception("GitHub error")
             mock_gh.return_value = mock_gh_instance

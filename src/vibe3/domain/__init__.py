@@ -9,8 +9,6 @@ Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
 
 from vibe3.domain.events import (
-    # L3 Dependency Events
-    DependencySatisfied,
     # Base
     DomainEvent,
     # L3 Flow Lifecycle Events
@@ -66,8 +64,6 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueStateChanged",
     "IssueFailed",
-    # L3 Dependency Events
-    "DependencySatisfied",
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
