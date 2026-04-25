@@ -6,7 +6,6 @@ a thin rendering layer.
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, cast
 
 from loguru import logger
@@ -282,11 +281,10 @@ class StatusQueryService:
             flow = issue_to_flow.get(number)
             if flow and not is_orchestra_managed_flow_branch(flow.branch):
                 continue
-            failed_reason = (
-                self._extract_failed_reason(number)
-                if state == IssueState.FAILED
-                else None
-            )
+            # Get failed_reason from flow state (avoid GitHub API call)
+            failed_reason = None
+            if state == IssueState.FAILED and flow:
+                failed_reason = getattr(flow, "failed_reason", None)
 
             # Parse blocked_by from issue body
             blocked_by = None
@@ -369,43 +367,6 @@ class StatusQueryService:
 
         # Combine: ready issues first (sorted with real ranks), then others
         return ready_issues + other_issues
-
-    def _extract_failed_reason(self, issue_number: int) -> str | None:
-        """Extract a compact failure reason from issue comments."""
-        issue = self.github.view_issue(issue_number, repo=self.repo)
-        if not isinstance(issue, dict):
-            return None
-
-        comments = issue.get("comments")
-        if not isinstance(comments, list):
-            return None
-
-        for comment in reversed(comments):
-            if not isinstance(comment, dict):
-                continue
-            body = comment.get("body")
-            if not isinstance(body, str):
-                continue
-
-            body_lower = body.lower()
-            if (
-                "[resume]" in body_lower
-                or "[recovery]" in body_lower
-                or "继续到 state/handoff" in body
-                or "恢复到 state/handoff" in body
-            ):
-                continue
-
-            match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)
-            if match:
-                reason = match.group(1).strip()
-                if reason:
-                    return reason.split("\n")[0].strip()
-
-            if "failed" in body_lower or "error" in body_lower:
-                return body.strip().split("\n")[0][:100]
-
-        return None
 
     def fetch_worktree_map(self) -> dict[str, str]:
         """Get worktree branch-to-directory mapping.
