@@ -13,7 +13,7 @@ from vibe3.services.check_service import CheckResult, CheckService
 class ExecuteCheckResult:
     """Result of command-level check execution."""
 
-    mode: Literal["default", "init", "all", "fix", "fix_all"]
+    mode: Literal["default", "init", "all", "fix", "fix_all", "clean_branch"]
     success: bool
     summary: str
     details: dict = field(default_factory=dict)
@@ -21,11 +21,14 @@ class ExecuteCheckResult:
 
 def execute_check_mode(
     service: CheckService,
-    mode: Literal["default", "init", "all", "fix", "fix_all"] = "default",
+    mode: Literal[
+        "default", "init", "all", "fix", "fix_all", "clean_branch"
+    ] = "default",
     *,
     branch: str | None = None,
 ) -> ExecuteCheckResult:
-    """Run command-oriented check modes using CheckService primitives."""
+    """Run command-oriented check modes
+    using CheckService primitives."""
     if mode == "init":
         init_result: InitResult = service.init_remote_index()
         summary = (
@@ -41,6 +44,16 @@ def execute_check_mode(
                 if init_result.unresolvable
                 else {}
             ),
+        )
+
+    if mode == "clean_branch":
+        # Check and clean residual branches for done/aborted flows
+        result = service.clean_residual_branches()
+        return ExecuteCheckResult(
+            mode="clean_branch",
+            success=True,
+            summary=str(result["summary"]),
+            details=result,
         )
 
     if mode == "all":

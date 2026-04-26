@@ -128,7 +128,7 @@ def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> Non
     shown = len(recent_comments)
     console.print(f"\n[bold]Recent Comments (last {shown} of {total})[/]\n")
 
-    for comment in recent_comments:
+    for idx, comment in enumerate(recent_comments):
         if not isinstance(comment, dict):
             continue
 
@@ -152,8 +152,10 @@ def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> Non
             # Bug 4: Human comments label
             console.print(f"[bold cyan]\\[user:{login}][/bold cyan]")
 
-        # Truncate long comments
-        if len(body) > 300:
+        # Only truncate if NOT the last comment (most recent)
+        # Last comment should be shown in full for agent context
+        is_last = idx == len(recent_comments) - 1
+        if not is_last and len(body) > 300:
             body = body[:300] + "..."
 
         console.print(body)

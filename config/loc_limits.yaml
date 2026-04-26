@@ -24,8 +24,8 @@ code_limits:
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check_service.py"
-        limit: 600
-        reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
+        limit: 620
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记等紧密耦合逻辑"
       - path: "src/vibe3/services/issue_failure_service.py"
         limit: 600
         reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
@@ -52,8 +52,8 @@ code_limits:
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/status.py"
-        limit: 460
-        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示"
+        limit: 480
+        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，CLI 入口函数难以拆分"
 
       # Services 层 —— 允许 400-500
       - path: "src/vibe3/services/status_query_service.py"

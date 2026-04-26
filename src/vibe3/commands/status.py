@@ -404,16 +404,25 @@ def status(
                 console.print("  [dim](none)[/]")
 
         # 3. Local scene context (tracked flows + worktrees)
+        # Only show active/blocked/stale flows in Scenes sections
+        # done/aborted flows are shown separately in Completed/Aborted section
         worktree_map = query_service.fetch_worktree_map()
 
         if flows:
-            auto_flows = [
+            # Filter out done/aborted for Scenes display
+            active_flows = [
                 flow
                 for flow in flows
+                if getattr(flow, "flow_status", "active")
+                not in {"done", "aborted", "merged"}
+            ]
+            auto_flows = [
+                flow
+                for flow in active_flows
                 if is_auto_task_branch(flow.branch) and flow.branch in worktree_map
             ]
             manual_flows = [
-                flow for flow in flows if not is_auto_task_branch(flow.branch)
+                flow for flow in active_flows if not is_auto_task_branch(flow.branch)
             ]
 
             console.print("\n[bold cyan]Auto Task Scenes:[/]")

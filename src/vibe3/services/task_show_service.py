@@ -144,15 +144,24 @@ class TaskShowService:
         return collapsed[:limit].rstrip() + "..."
 
     def _build_comment_summary(
-        self, comment: dict[str, Any] | None
+        self, comment: dict[str, Any] | None, *, full_body: bool = False
     ) -> TaskCommentSummary | None:
+        """Build comment summary.
+
+        Args:
+            comment: Comment dict from GitHub API
+            full_body: If True, return full body without truncation.
+                       If False (default), summarize to 1200 chars.
+        """
         if not comment:
             return None
 
         author = str((comment.get("author") or {}).get("login") or "unknown").strip()
-        body = self._summarize_text(str(comment.get("body") or "").strip())
+        body = str(comment.get("body") or "").strip()
         if not body:
             return None
+        if not full_body:
+            body = self._summarize_text(body)
         return TaskCommentSummary(
             author=author or "unknown",
             body=body,
@@ -306,7 +315,7 @@ class TaskShowService:
                     else []
                 )
                 latest_comment = self._build_comment_summary(
-                    comments[-1] if comments else None
+                    comments[-1] if comments else None, full_body=True
                 )
                 latest_human_instruction = self._build_comment_summary(
                     next(
@@ -316,7 +325,8 @@ class TaskShowService:
                             if is_human_comment(comment)
                         ),
                         None,
-                    )
+                    ),
+                    full_body=True,
                 )
 
         return TaskShowResult(
