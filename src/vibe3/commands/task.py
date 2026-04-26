@@ -180,6 +180,11 @@ def resume(
     if trace:
         setup_logging(verbose=2)
 
+    # Register EDA event handlers (resume publishes IssueStateChanged events)
+    from vibe3.domain.handlers import register_event_handlers
+
+    register_event_handlers()
+
     # Validate arguments
     selected_modes = [failed, blocked, all_tasks]
     has_flag = any(selected_modes)
@@ -279,6 +284,22 @@ def resume(
             typer.echo(f"No {state_name} issues found.")
             return
 
+    # Progress callback for verbose output
+    def progress_callback(
+        issue_number: int, branch: str | None, step: str, status: str
+    ) -> None:
+        prefix = f"  #{issue_number}"
+        if branch:
+            prefix += f" [{branch}]"
+        if status == "done":
+            typer.echo(f"{prefix} ✓ {step}")
+        elif status == "failed":
+            typer.echo(f"{prefix} ✗ {step}", err=True)
+        else:
+            typer.echo(f"{prefix} → {step}")
+
+    # Execute resume
+    if has_flag and candidate_mode == "resumable":
         result = usecase.resume_issues(
             issue_numbers=issue_numbers,
             reason=reason,
@@ -287,6 +308,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
+            progress_callback=progress_callback if yes else None,
         )
     else:
         # Original logic for --all or explicit issue numbers
@@ -298,6 +320,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
+            progress_callback=progress_callback if yes else None,
         )
 
     if not yes and has_flag and not result.get("candidates"):

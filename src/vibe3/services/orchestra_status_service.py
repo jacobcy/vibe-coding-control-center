@@ -101,6 +101,23 @@ def is_running_issue(entry: IssueStatusEntry) -> bool:
     return entry.has_flow or entry.has_worktree or entry.has_pr
 
 
+def _extract_state_from_labels(labels: list) -> IssueState | None:
+    """Extract state from issue labels without API call.
+
+    Args:
+        labels: List of label dicts from GitHub issue response
+
+    Returns:
+        IssueState if state/* label found, None otherwise
+    """
+    for label in labels:
+        name = label.get("name", "") if isinstance(label, dict) else str(label)
+        state = IssueState.from_label(name)
+        if state:
+            return state
+    return None
+
+
 class OrchestraStatusService:
     """Aggregate read-only status from multiple data sources.
 
@@ -209,8 +226,9 @@ class OrchestraStatusService:
             title = issue.get("title", "")
             assignee = extract_primary_assignee_login(issue.get("assignees"))
 
-            # Get state from labels
-            state = self._label_service.get_state(number)
+            # Get state from issue labels (already fetched in list_issues)
+            # Avoid N+1 API calls by not calling get_state() per issue
+            state = _extract_state_from_labels(issue.get("labels", []))
 
             # Check flow
             flow = self._orchestrator.get_flow_for_issue(number)

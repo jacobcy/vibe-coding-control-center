@@ -6,7 +6,7 @@ managing flow states during resume operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
@@ -23,6 +23,10 @@ if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
     from vibe3.services.label_service import LabelService
+
+
+# Type alias for progress callback: (issue_number, branch, step, status) -> None
+ProgressCallback = Callable[[int, str | None, str, str], None]
 
 
 class TaskResumeOperations:
@@ -52,6 +56,7 @@ class TaskResumeOperations:
         reason: str,
         worktree_path: str | None = None,
         label_state: str | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state.
 
@@ -64,9 +69,16 @@ class TaskResumeOperations:
             worktree_path: Optional worktree path (for optimization)
             label_state: Optional state to restore (None=delete worktree,
                 empty/"handoff"=restore to handoff, "ready"=restore to ready)
+            progress_callback: Optional callback for progress updates.
+                Signature: (issue_number: int, branch: str | None, step: str,
+                    status: str) -> None
         """
         branch = getattr(flow, "branch", None) if flow else None
         previous_state = self.label_service.get_state(issue_number)
+
+        def emit_progress(step: str, status: str = "running") -> None:
+            if progress_callback:
+                progress_callback(issue_number, branch, step, status)
 
         # Determine target state based on label_state parameter
         if label_state is not None:
@@ -101,8 +113,10 @@ class TaskResumeOperations:
             # fields so the next dispatch picks it up; the flow record, refs,
             # and worktree are all valid and should be preserved.
             if isinstance(branch, str):
+                emit_progress(f"clearing reasons for branch {branch}")
                 self._clear_flow_reasons(branch, resume_kind)
 
+            emit_progress(f"setting issue state to {target_state.value}")
             # Restore issue to target state
             self.label_service.confirm_issue_state(
                 issue_number,
@@ -119,23 +133,28 @@ class TaskResumeOperations:
                 repo=repo,
                 reason=reason,
             )
+            emit_progress("label resume done", status="done")
 
             # DO NOT call reset_task_scene (keep worktree)
         else:
             # Original logic: delete worktree/branch for full rebuild
+            emit_progress("full rebuild mode")
             if resume_kind == "failed":
+                emit_progress("clearing failed state")
                 resume_failed_issue_to_ready(
                     issue_number=issue_number,
                     repo=repo,
                     reason=reason,
                 )
             elif resume_kind == "blocked":
+                emit_progress("clearing blocked state")
                 resume_blocked_issue_to_ready(
                     issue_number=issue_number,
                     repo=repo,
                     reason=reason,
                 )
             else:
+                emit_progress("setting issue state to ready")
                 self.label_service.confirm_issue_state(
                     issue_number,
                     IssueState.READY,
@@ -145,8 +164,11 @@ class TaskResumeOperations:
 
             if isinstance(branch, str):
                 try:
+                    emit_progress(f"resetting task scene for branch {branch}")
                     self.reset_task_scene(branch, worktree_path=worktree_path)
+                    emit_progress("task scene reset done", status="done")
                 except Exception as exc:
+                    emit_progress(f"scene reset failed: {exc}", status="failed")
                     self.restore_issue_state(
                         issue_number=issue_number,
                         previous_state=previous_state,
@@ -154,6 +176,8 @@ class TaskResumeOperations:
                         failure_reason=str(exc),
                     )
                     raise
+            else:
+                emit_progress("no branch to reset, done", status="done")
 
     def reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
         """Delete the stale task scene so the next run starts from scratch.

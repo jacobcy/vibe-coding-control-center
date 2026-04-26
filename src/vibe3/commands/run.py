@@ -68,6 +68,11 @@ def run_command(
     if trace:
         enable_trace()
 
+    # Register EDA event handlers for run command (may publish events)
+    from vibe3.domain.handlers import register_event_handlers
+
+    register_event_handlers()
+
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
     flow = flow_service.get_flow_status(branch)

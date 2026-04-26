@@ -106,11 +106,6 @@ def main_callback(
     ctx.meta["verbose"] = verbose
     setup_logging(verbose=verbose)
 
-    # Register domain event handlers
-    from vibe3.domain.handlers import register_event_handlers
-
-    register_event_handlers()
-
 
 @app.command(name="run")
 def run_command(
