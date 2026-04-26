@@ -59,11 +59,11 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
     )
 
     assert hook_exception is not None
-    assert (
-        hook_exception.limit
-        == exceptions["src/vibe3/services/check_service.py"].limit
-        == 600
-    )
+    # Verify both configs have the same limit (sync check)
+    expected_path = "src/vibe3/services/check_service.py"
+    assert hook_exception.limit == exceptions[expected_path].limit
+    # Verify the limit is reasonable (updated from 600 to 620 after refactoring)
+    assert hook_exception.limit == 620
     assert exceptions["src/vibe3/roles/review.py"].reason != ""
 
 
