@@ -229,11 +229,11 @@ class IssueInfo(BaseModel):
                 title=str(payload.get("title", "")),
                 state=state,
                 labels=labels,
-                assignees=[a["login"] for a in payload.get("assignees", [])],
+                assignees=[a["login"] for a in (payload.get("assignees") or [])],
                 url=payload.get("html_url") or payload.get("url"),
                 milestone=milestone,
             )
-        except (KeyError, ValueError) as exc:
+        except Exception as exc:
             logger.bind(domain="orchestra").warning(
                 f"Cannot parse issue payload: {exc}"
             )

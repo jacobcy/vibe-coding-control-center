@@ -287,3 +287,196 @@ class TestGlobalDispatchCoordinator:
         await coordinator.coordinate()
 
         assert manager_svc._emit_dispatch_intent.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_backfill_no_config_returns_empty(self) -> None:
+        """Test backfill returns empty when no config is available."""
+        service = make_service("manager", [])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [service])
+
+        result = await coordinator._backfill_manager_assigned_issues()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_backfill_config_without_manager_usernames(self) -> None:
+        """Test backfill handles config without manager_usernames attribute."""
+        from unittest.mock import MagicMock
+
+        # Create a config object without manager_usernames attribute
+        mock_config = MagicMock(spec=[])  # Empty spec means no attributes
+        service = make_service("manager", [])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [service], config=mock_config)
+
+        # Should not crash, should return empty list
+        result = await coordinator._backfill_manager_assigned_issues()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_backfill_deduplicates_across_managers(self) -> None:
+        """Test backfill deduplicates issues assigned to multiple managers."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        # Create mock github that returns same issue for two managers
+        mock_github = MagicMock()
+        mock_github.list_issues.side_effect = [
+            [{"number": 1, "title": "Issue 1", "state": "open", "labels": []}],
+            [{"number": 1, "title": "Issue 1", "state": "open", "labels": []}],
+        ]
+
+        # Create service with mock github and config
+        service = make_service("manager", [])
+        service._github = mock_github
+        service.config.repo = "owner/repo"
+
+        # Create config with two manager usernames
+        config = OrchestraConfig(manager_usernames=["manager1", "manager2"])
+
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [service], config=config)
+        # Override _github for this test
+        coordinator._github = mock_github
+
+        result = await coordinator._backfill_manager_assigned_issues()
+        assert len(result) == 1
+        assert result[0].number == 1
+        # Should have queried both usernames
+        assert mock_github.list_issues.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_backfill_filters_out_blocked_issues(self) -> None:
+        """Test backfill filters out issues with blocked/failed labels."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 1,
+                "title": "Issue 1",
+                "state": "open",
+                "labels": [{"name": "state/blocked"}],
+            },
+            {
+                "number": 2,
+                "title": "Issue 2",
+                "state": "open",
+                "labels": [{"name": "state/failed"}],
+            },
+            {"number": 3, "title": "Issue 3", "state": "open", "labels": []},
+        ]
+
+        service = make_service("manager", [])
+        service._github = mock_github
+        service.config.repo = "owner/repo"
+
+        config = OrchestraConfig(manager_usernames=["manager"])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [service], config=config)
+        coordinator._github = mock_github
+
+        result = await coordinator._backfill_manager_assigned_issues()
+        assert len(result) == 1
+        assert result[0].number == 3
+
+    @pytest.mark.asyncio
+    async def test_backfill_filters_out_existing_flows(self) -> None:
+        """Test backfill filters out issues that already have a flow."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {"number": 1, "title": "Issue 1", "state": "open", "labels": []},
+            {"number": 2, "title": "Issue 2", "state": "open", "labels": []},
+        ]
+
+        service = make_service("manager", [])
+        service._github = mock_github
+        service.config.repo = "owner/repo"
+        # Mock get_flows_by_issue - issue 1 has a flow, issue 2 doesn't
+        mock_store = MagicMock()
+        mock_store.get_flows_by_issue.side_effect = lambda issue_num, **kwargs: (
+            [{"branch": "task/issue-1"}] if issue_num == 1 else []
+        )
+        service._store = mock_store
+
+        config = OrchestraConfig(manager_usernames=["manager"])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(capacity, [service], config=config)
+        coordinator._github = mock_github
+
+        result = await coordinator._backfill_manager_assigned_issues()
+        assert len(result) == 1
+        assert result[0].number == 2
+
+    @pytest.mark.asyncio
+    async def test_backfill_integrates_with_frozen_queue(self) -> None:
+        """Test backfill integrates with frozen queue collection and deduplicates."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        # Backfill finds issue 1
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {"number": 1, "title": "Backfilled Issue", "state": "open", "labels": []},
+        ]
+
+        manager_service = make_service(
+            "manager", [make_issue_info(2, IssueState.READY)]
+        )
+        manager_service._github = mock_github
+        manager_service.config.repo = "owner/repo"
+
+        config = OrchestraConfig(manager_usernames=["manager"])
+        capacity = make_capacity(remaining=2)
+        coordinator = GlobalDispatchCoordinator(
+            capacity, [manager_service], config=config
+        )
+        coordinator._github = mock_github
+
+        queue = await coordinator._collect_frozen_queue()
+        # Should have both backfilled issue 1 and label-based issue 2
+        assert len(queue) == 2
+        issue_numbers = [entry.issue_number for entry in queue]
+        assert 1 in issue_numbers
+        assert 2 in issue_numbers
+        # Backfill comes first
+        assert queue[0].issue_number == 1
+
+    @pytest.mark.asyncio
+    async def test_backfill_skips_duplicates_in_frozen_queue(self) -> None:
+        """Test backfill doesn't add duplicates when issue is already found by label."""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestra_config import OrchestraConfig
+
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {"number": 1, "title": "Issue 1", "state": "open", "labels": []},
+        ]
+
+        # Issue 1 is already returned by label-based collect
+        manager_service = make_service(
+            "manager", [make_issue_info(1, IssueState.READY)]
+        )
+        manager_service._github = mock_github
+        manager_service.config.repo = "owner/repo"
+
+        config = OrchestraConfig(manager_usernames=["manager"])
+        capacity = make_capacity(remaining=1)
+        coordinator = GlobalDispatchCoordinator(
+            capacity, [manager_service], config=config
+        )
+        coordinator._github = mock_github
+
+        queue = await coordinator._collect_frozen_queue()
+        # Should have only one entry for issue 1
+        assert len(queue) == 1
+        assert queue[0].issue_number == 1

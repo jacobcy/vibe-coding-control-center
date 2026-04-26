@@ -10,6 +10,8 @@ Queue rule:
 
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -20,6 +22,7 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 
 if TYPE_CHECKING:
+    from vibe3.models.orchestra_config import OrchestraConfig
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
 
@@ -38,6 +41,7 @@ class GlobalDispatchCoordinator:
         self,
         capacity: CapacityService,
         dispatch_services: list[StateLabelDispatchService],
+        config: "OrchestraConfig | None" = None,
     ) -> None:
         self._capacity = capacity
         self._dispatch_services = dispatch_services
@@ -46,6 +50,11 @@ class GlobalDispatchCoordinator:
             dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
         )
         self._repo = dispatch_services[0].config.repo if dispatch_services else None
+        self._config = (
+            config
+            if config is not None
+            else (dispatch_services[0].config if dispatch_services else None)
+        )
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
@@ -60,24 +69,8 @@ class GlobalDispatchCoordinator:
 
         self._promote_progressed_entries()
 
-        import subprocess
-
-        try:
-            result = subprocess.run(
-                ["tmux", "list-sessions"],
-                capture_output=True,
-                text=True,
-                timeout=1,
-            )
-            vibe3_count = len(
-                [line for line in result.stdout.splitlines() if "vibe3-" in line]
-            )
-            live_worker_count = max(0, vibe3_count - 1)
-            max_capacity = self._capacity.config.max_concurrent_flows
-            available_slots = max(0, max_capacity - live_worker_count)
-        except Exception:
-            status = self._capacity.get_capacity_status("manager")
-            available_slots = status["remaining"]
+        status = self._capacity.get_capacity_status("manager")
+        available_slots = status["remaining"]
 
         if available_slots <= 0:
             append_orchestra_event(
@@ -157,10 +150,193 @@ class GlobalDispatchCoordinator:
                 f"{dispatched_count}{reset}",
             )
 
+    async def _backfill_manager_assigned_issues(self) -> list[IssueInfo]:
+        """Backfill issues already assigned to manager usernames but not yet labeled.
+
+        This reconciles the frozen queue with GitHub's current assignee state when
+        the service restarts after being offline. Issues assigned to manager
+        usernames are candidate for manager dispatch even if they don't have
+        the state/ready label yet.
+
+        Returns:
+            List of filtered candidate issues ready for dispatch
+        """
+        if self._github is None or self._config is None:
+            return []
+
+        # Handle case where config doesn't have manager_usernames attribute
+        # For example: old mocks/tests that predate this feature
+        manager_usernames = getattr(self._config, "manager_usernames", [])
+        if not manager_usernames:
+            return []
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: backfill starting for "
+            f"{len(manager_usernames)} manager username(s)",
+        )
+
+        # Get executor for blocking GitHub API calls - max_workers must be > 0
+        max_workers = max(1, len(manager_usernames))
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+
+        async def query_user(username: str) -> list[dict[str, object]]:
+            return await asyncio.get_event_loop().run_in_executor(
+                executor,
+                lambda: self._github.list_issues(  # type: ignore[union-attr]
+                    limit=50,
+                    state="open",
+                    assignee=username,
+                    repo=self._repo,
+                ),
+            )
+
+        # Query all manager usernames in parallel
+        tasks = [query_user(username) for username in manager_usernames]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect all issues, deduplicate by issue number
+        seen_issue_numbers: set[int] = set()
+        all_issues: list[IssueInfo] = []
+
+        total_found = 0
+        for result in results:
+            if isinstance(result, Exception):
+                logger.bind(domain="global_dispatch").error(
+                    f"Backfill query failed: {result}"
+                )
+                continue
+
+            if not isinstance(result, list):
+                continue
+
+            # Type narrowing: result must be list[dict[str, object]] here
+            result_list: list[dict[str, object]] = result
+            total_found += len(result_list)
+            for item in result_list:
+                raw_number = item.get("number", 0)
+                if isinstance(raw_number, (int, str)):
+                    issue_number = int(raw_number)
+                else:
+                    issue_number = 0
+                if issue_number == 0 or issue_number in seen_issue_numbers:
+                    continue
+
+                # Parse issue from GitHub payload
+                issue = IssueInfo.from_github_payload(item)
+                if issue is None:
+                    continue
+
+                seen_issue_numbers.add(issue_number)
+                all_issues.append(issue)
+
+        # Apply filtering: already has flow, unresolved dependencies, blocked/failed
+        if not self._dispatch_services:
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: backfill found {len(all_issues)} "
+                f"unique issues among {total_found} total, but no dispatch services "
+                f"available for filtering",
+            )
+            return []
+
+        # Get the manager service for dependency checking - we need the store
+        manager_service = next(
+            (
+                s
+                for s in self._dispatch_services
+                if s.role_def.trigger_state == IssueState.READY
+            ),
+            None,
+        )
+
+        filtered: list[IssueInfo] = []
+        filtered_out = {
+            "has_flow": 0,
+            "blocked": 0,
+            "failed": 0,
+            "dependency_unsatisfied": 0,
+        }
+
+        for issue in all_issues:
+            # Check for blocked/failed labels
+            if IssueState.BLOCKED.to_label() in issue.labels:
+                filtered_out["blocked"] += 1
+                continue
+            if IssueState.FAILED.to_label() in issue.labels:
+                filtered_out["failed"] += 1
+                continue
+
+            # Check if issue already has a flow - skip if yes
+            has_flow = False
+            if manager_service is not None:
+                # Check flows using manager service's store
+                flows = manager_service._store.get_flows_by_issue(
+                    issue.number, role="task"
+                )
+                if flows and any(str(flow.get("branch", "")).strip() for flow in flows):
+                    has_flow = True
+
+            if has_flow:
+                filtered_out["has_flow"] += 1
+                continue
+
+            # Check dependencies if we have manager service
+            if manager_service is not None:
+                dependencies = manager_service._get_issue_dependencies(issue.number)
+                if dependencies:
+                    unresolved = [
+                        d
+                        for d in dependencies
+                        if not manager_service._is_dependency_satisfied(d)
+                    ]
+                    if unresolved:
+                        filtered_out["dependency_unsatisfied"] += 1
+                        # Mark as blocked if there are unresolved dependencies
+                        if len(unresolved) > 0 and hasattr(
+                            manager_service, "_mark_issue_waiting"
+                        ):
+                            manager_service._mark_issue_waiting(
+                                issue.number, unresolved
+                            )
+                        continue
+
+            filtered.append(issue)
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: backfill complete - found {len(all_issues)} "
+            f"unique issues, {len(filtered)} passed filters. Filtered out: "
+            f"has_flow={filtered_out['has_flow']}, blocked={filtered_out['blocked']}, "
+            f"failed={filtered_out['failed']}, "
+            f"dependency_unsatisfied={filtered_out['dependency_unsatisfied']}",
+        )
+
+        executor.shutdown(wait=False, cancel_futures=True)
+        return filtered
+
     async def _collect_frozen_queue(self) -> list[QueueEntry]:
-        """Collect a new frozen queue only when the current one is empty."""
+        """Collect a new frozen queue only when the current one is empty.
+
+        Backfill is run first to pick up any issues already assigned to managers
+        that were assigned while the service was offline. Then label-based
+        collection runs, with deduplication across both sources.
+        """
         queue: list[QueueEntry] = []
         seen_issue_numbers: set[int] = set()
+
+        # Step 1: Backfill manager-assigned issues (runs first to ensure prioritization)
+        try:
+            backfill_issues = await self._backfill_manager_assigned_issues()
+            for issue in backfill_issues:
+                if issue.number in seen_issue_numbers:
+                    continue
+                seen_issue_numbers.add(issue.number)
+                queue.append(QueueEntry(issue_number=issue.number))
+        except Exception as exc:
+            logger.bind(domain="global_dispatch").error(f"Backfill failed: {exc}")
+
+        # Step 2: Collect from state-label based services
         for state in (
             IssueState.REVIEW,
             IssueState.IN_PROGRESS,
@@ -183,6 +359,7 @@ class GlobalDispatchCoordinator:
                     domain="global_dispatch",
                     state=state.value,
                 ).error(f"collect_ready_issues failed for {state.value}: {exc}")
+
         return queue
 
     def _promote_progressed_entries(self) -> None:
@@ -205,6 +382,7 @@ class GlobalDispatchCoordinator:
 
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
+                retained.append(entry)
                 continue
 
             current_state = issue.state.value
