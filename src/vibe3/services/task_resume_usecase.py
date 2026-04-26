@@ -6,7 +6,7 @@ whether they are in failed or blocked state.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from loguru import logger
 
@@ -23,6 +23,10 @@ from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
+
+
+# Type alias for progress callback: (issue_number, branch, step, status) -> None
+ProgressCallback = Callable[[int, str | None, str, str], None]
 
 
 def _format_resume_failure_reason(exc: Exception) -> str:
@@ -77,7 +81,7 @@ class TaskResumeUsecase:
         repo: str | None = None,
         candidate_mode: str = "resumable",
         label_state: str | None = None,
-        progress_callback: object = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         """Resume failed or blocked issues.
 
@@ -91,7 +95,9 @@ class TaskResumeUsecase:
             candidate_mode: Candidate selection mode ("resumable" or "all_task")
             label_state: Optional state to restore (None=delete worktree,
                 "handoff"/"ready"=keep worktree)
-            progress_callback: Optional callback(issue_number, branch, step, status)
+            progress_callback: Optional callback for progress updates.
+                Signature: (issue_number: int, branch: str | None, step: str,
+                    status: str) -> None
 
         Returns:
             Dict with:

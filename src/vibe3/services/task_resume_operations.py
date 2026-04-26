@@ -6,7 +6,7 @@ managing flow states during resume operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
@@ -23,6 +23,10 @@ if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
     from vibe3.services.label_service import LabelService
+
+
+# Type alias for progress callback: (issue_number, branch, step, status) -> None
+ProgressCallback = Callable[[int, str | None, str, str], None]
 
 
 class TaskResumeOperations:
@@ -52,7 +56,7 @@ class TaskResumeOperations:
         reason: str,
         worktree_path: str | None = None,
         label_state: str | None = None,
-        progress_callback: object = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state.
 
@@ -65,13 +69,15 @@ class TaskResumeOperations:
             worktree_path: Optional worktree path (for optimization)
             label_state: Optional state to restore (None=delete worktree,
                 empty/"handoff"=restore to handoff, "ready"=restore to ready)
-            progress_callback: Optional callback for progress updates
+            progress_callback: Optional callback for progress updates.
+                Signature: (issue_number: int, branch: str | None, step: str,
+                    status: str) -> None
         """
         branch = getattr(flow, "branch", None) if flow else None
         previous_state = self.label_service.get_state(issue_number)
 
         def emit_progress(step: str, status: str = "running") -> None:
-            if progress_callback and hasattr(progress_callback, "__call__"):
+            if progress_callback:
                 progress_callback(issue_number, branch, step, status)
 
         # Determine target state based on label_state parameter
