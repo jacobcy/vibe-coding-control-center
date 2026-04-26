@@ -1,4 +1,19 @@
-# Vibe3 开发指南
+# Deprecated: docs/DEVELOPMENT.md
+
+状态：Deprecated
+
+本文件保留为历史入口，新的开发指南请阅读 [DEVELOPER.md](../DEVELOPER.md)。
+
+以下 V3 运行时要点已并入 `DEVELOPER.md`：
+
+- V3 开发优先使用 `uv run python src/vibe3/cli.py ...`
+- flow 以 branch 为主键，按需自动创建
+- 容量限制按 live worker session 计算
+- `flow` / `handoff` / `status` 是 V3 的常用现场入口
+
+---
+
+## 历史内容（已弃用）
 
 ## 快速开始
 
