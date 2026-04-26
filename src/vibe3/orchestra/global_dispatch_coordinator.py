@@ -174,7 +174,11 @@ class GlobalDispatchCoordinator:
                     f"#{issue.number} ({service.role_def.registry_role})",
                 )
                 service._emit_dispatch_intent(issue)
-                entry.waiting_state = issue.state.value
+                # For BLOCKED issues, waiting_state must track the TARGET state
+                # (qualify gate already changed GitHub labels to target_state).
+                # Using issue.state.value ("blocked") cause _promote_progressed_entries
+                # to detect a false state change and re-dispatch on the next tick.
+                entry.waiting_state = entry.collected_state
                 dispatched_count += 1
 
                 logger.bind(
