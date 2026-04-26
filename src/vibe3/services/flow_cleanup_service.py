@@ -128,7 +128,28 @@ class FlowCleanupService:
         if terminate_sessions and self.issue_flow_service.is_task_branch(branch):
             self._terminate_task_sessions(branch)
 
-        # Step 2: Remove worktree
+        # Step 2-5: Clean physical resources
+        self._remove_worktree(branch, results)
+        self._delete_local_branch(branch, results)
+        if include_remote:
+            self._delete_remote_branch(branch, results)
+        self._clear_handoff(branch, results)
+
+        # Step 6: Handle flow record based on keep_flow_record parameter
+        self._handle_flow_record(branch, keep_flow_record, results)
+
+        success_count = sum(1 for v in results.values() if v)
+        logger.bind(
+            domain="cleanup",
+            branch=branch,
+            success_count=success_count,
+            total_steps=len(results),
+        ).info(f"Flow scene cleanup completed ({success_count}/{len(results)} steps)")
+
+        return results
+
+    def _remove_worktree(self, branch: str, results: dict[str, bool]) -> None:
+        """Remove worktree if exists."""
         try:
             worktree_path = self.git_client.find_worktree_path_for_branch(branch)
             if worktree_path:
@@ -140,7 +161,8 @@ class FlowCleanupService:
             )
             results["worktree"] = False
 
-        # Step 3: Delete local branch
+    def _delete_local_branch(self, branch: str, results: dict[str, bool]) -> None:
+        """Delete local branch if exists."""
         try:
             if self.git_client.branch_exists(branch):
                 self.git_client.delete_branch(branch, force=True, skip_if_worktree=True)
@@ -153,21 +175,22 @@ class FlowCleanupService:
             )
             results["local_branch"] = False
 
-        # Step 4: Delete remote branch
-        if include_remote:
-            try:
-                if self._has_remote_branch(branch):
-                    self.git_client.delete_remote_branch(branch)
-                    logger.bind(domain="cleanup", branch=branch).debug(
-                        "Deleted remote branch"
-                    )
-            except Exception as exc:
-                logger.bind(domain="cleanup", branch=branch).warning(
-                    f"Failed to delete remote branch: {exc}"
+    def _delete_remote_branch(self, branch: str, results: dict[str, bool]) -> None:
+        """Delete remote branch if exists."""
+        try:
+            if self._has_remote_branch(branch):
+                self.git_client.delete_remote_branch(branch)
+                logger.bind(domain="cleanup", branch=branch).debug(
+                    "Deleted remote branch"
                 )
-                results["remote_branch"] = False
+        except Exception as exc:
+            logger.bind(domain="cleanup", branch=branch).warning(
+                f"Failed to delete remote branch: {exc}"
+            )
+            results["remote_branch"] = False
 
-        # Step 5: Clear handoff files
+    def _clear_handoff(self, branch: str, results: dict[str, bool]) -> None:
+        """Clear handoff files for the branch."""
         try:
             from vibe3.services.handoff_service import HandoffService
 
@@ -181,15 +204,16 @@ class FlowCleanupService:
             )
             results["handoff"] = False
 
-        # Step 6: Handle flow record based on keep_flow_record parameter
+    def _handle_flow_record(
+        self, branch: str, keep_flow_record: bool, results: dict[str, bool]
+    ) -> None:
+        """Handle flow record deletion or preservation."""
         if keep_flow_record:
-            # Keep flow record as completion history (for done/merged flows)
             logger.bind(domain="cleanup", branch=branch).info(
                 "Keeping flow record as completion history"
             )
             results["flow_record"] = True
         else:
-            # Delete flow record (for aborted flows - allows issue to restart)
             try:
                 self.flow_service.delete_flow(branch)
                 logger.bind(domain="cleanup", branch=branch).info("Deleted flow record")
@@ -198,16 +222,6 @@ class FlowCleanupService:
                     f"Failed to delete flow record: {exc}"
                 )
                 results["flow_record"] = False
-
-        success_count = sum(1 for v in results.values() if v)
-        logger.bind(
-            domain="cleanup",
-            branch=branch,
-            success_count=success_count,
-            total_steps=len(results),
-        ).info(f"Flow scene cleanup completed ({success_count}/{len(results)} steps)")
-
-        return results
 
     def _has_remote_branch(self, branch: str) -> bool:
         """Check if remote branch exists."""

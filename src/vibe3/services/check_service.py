@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Check service implementation for verifying handoff store consistency."""
 
 from __future__ import annotations
@@ -49,10 +48,10 @@ class FixResult:
 class CheckService(CheckRemote):
     """Service for verifying handoff store consistency and auto-fixing issues."""
 
-    # Terminal flow statuses that indicate completed flows
-    TERMINAL_FLOW_STATUSES = ("done", "aborted", "merged")
     # Flow statuses that should be skipped for handoff/ref checks
     INACTIVE_FLOW_STATUSES = ("done", "aborted", "stale")
+    # Threshold for orphaned flow detection (commits behind main)
+    ORPHAN_FLOW_BEHIND_THRESHOLD = 100
 
     def __init__(
         self,
@@ -116,36 +115,6 @@ class CheckService(CheckRemote):
             return int(output.strip()) if output.strip() else None
         except Exception:
             return None
-
-    def _has_local_branch(self, branch: str) -> bool:
-        """Check if local branch exists."""
-        try:
-            output = self.git_client._run(["branch", "--list", branch])
-            return bool(output.strip())
-        except Exception:
-            return False
-
-    def _has_remote_branch(self, branch: str) -> bool:
-        """Check if remote branch exists."""
-        try:
-            remote_output = self.git_client._run(
-                ["branch", "-r", "--list", f"origin/{branch}"]
-            )
-            return bool(remote_output.strip())
-        except Exception:
-            return False
-
-    def _check_branch_resources(self, branch: str) -> tuple[bool, bool, bool]:
-        """Check if branch has local, remote, and worktree resources.
-
-        Returns:
-            Tuple of (has_local, has_remote, has_worktree)
-        """
-        return (
-            self._has_local_branch(branch),
-            self._has_remote_branch(branch),
-            self._has_worktree(branch),
-        )
 
     def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
         """Handle closed/merged PR by marking flow done.
@@ -288,14 +257,17 @@ class CheckService(CheckRemote):
         ):
             try:
                 behind_count = self._count_commits_behind_main(branch)
-                if behind_count and behind_count > 100:
+                if behind_count and behind_count > self.ORPHAN_FLOW_BEHIND_THRESHOLD:
                     self._mark_flow_aborted(
                         branch,
-                        f"Orphaned flow '{branch}' is {behind_count} commits behind main",
+                        f"Orphaned flow '{branch}' is {behind_count} "
+                        "commits behind main",
                     )
                     return CheckResult(is_valid=True, branch=branch, issues=[])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.bind(domain="check", branch=branch).debug(
+                    f"Could not count commits behind main: {exc}"
+                )
 
         # Handle empty active ready flow
         if (
@@ -330,7 +302,8 @@ class CheckService(CheckRemote):
                         # Provide actionable suggestion for damaged flow
                         issues.append(
                             f"{ref_field} file not found: {ref_value}. "
-                            f"Suggestion: Run 'vibe3 task resume --blocked {task_issue}' to reset."
+                            f"Suggestion: Run 'vibe3 task resume --blocked "
+                            f"{task_issue}' to reset."
                         )
 
         # shared current.md
@@ -347,45 +320,6 @@ class CheckService(CheckRemote):
             "Check completed"
         )
         return CheckResult(is_valid=is_valid, issues=issues, branch=branch)
-
-    def _cleanup_local_scene(self, branch: str, *, force_delete: bool) -> None:
-        """Best-effort cleanup of worktree, local branch, and remote branch.
-
-        Checks existence before attempting deletion to avoid noisy warnings.
-        Uses extracted helper methods for consistency.
-        """
-        # 1. Clean up worktree
-        if self._has_worktree(branch):
-            try:
-                worktree_path = self.git_client.find_worktree_path_for_branch(branch)
-                if worktree_path:
-                    self.git_client.remove_worktree(worktree_path, force=True)
-            except Exception as exc:
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to remove worktree during local scene cleanup: {exc}"
-                )
-
-        # 2. Clean up local branch
-        if self._has_local_branch(branch):
-            try:
-                self.git_client.delete_branch(
-                    branch,
-                    force=force_delete,
-                    skip_if_worktree=True,
-                )
-            except Exception as exc:
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to delete branch during local scene cleanup: {exc}"
-                )
-
-        # 3. Clean up remote branch
-        if self._has_remote_branch(branch):
-            try:
-                self.git_client.delete_remote_branch(branch)
-            except Exception as exc:
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to delete remote branch during local scene cleanup: {exc}"
-                )
 
     def _rebuild_stale_ready_flow(
         self,
@@ -531,7 +465,10 @@ class CheckService(CheckRemote):
 
         unfixed = [i for i in issues if i not in fixed]
         if unfixed:
-            hint = "  Some issues cannot be auto-fixed. Try 'vibe3 check --init' or check manually."
+            hint = (
+                "  Some issues cannot be auto-fixed. "
+                "Try 'vibe3 check --init' or check manually."
+            )
             error = (
                 "Could not auto-fix:\n"
                 + "\n".join(f"  - {i}" for i in unfixed)
@@ -566,109 +503,3 @@ class CheckService(CheckRemote):
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to update PR cache: {e}"
             )
-
-    def clean_residual_branches(self) -> dict[str, object]:
-        """Check and clean residual branches for terminal flows.
-
-        Different handling based on flow status:
-        - done/merged: Clean physical resources, keep flow record as history
-        - aborted: Clean everything including flow record (allows issue to restart)
-
-        Returns:
-            Dict with summary and details of cleaned branches.
-        """
-        from vibe3.services.flow_cleanup_service import FlowCleanupService
-
-        logger.bind(domain="check", action="clean_residual").info(
-            "Checking for residual branches"
-        )
-
-        # Get all terminal flows (done/aborted/merged)
-        all_flows = self.store.get_all_flows()
-        terminal_flows = [
-            f for f in all_flows if f.get("flow_status") in self.TERMINAL_FLOW_STATUSES
-        ]
-
-        cleanup_service = FlowCleanupService(
-            git_client=self.git_client,
-            store=self.store,
-        )
-
-        cleaned: list[str] = []
-        kept_records: list[str] = []
-        removed_invalid: list[str] = []
-        failed: list[str] = []
-
-        for flow in terminal_flows:
-            branch = flow["branch"]
-            flow_status = flow.get("flow_status", "")
-
-            # Remove invalid branch records (e.g., HEAD)
-            if branch == "HEAD" or branch.startswith("HEAD"):
-                try:
-                    self.store.delete_flow(branch)
-                    removed_invalid.append(branch)
-                    logger.bind(domain="check", branch=branch).info(
-                        "Removed invalid flow record"
-                    )
-                except Exception as exc:
-                    logger.bind(domain="check", branch=branch).warning(
-                        f"Failed to remove invalid flow record: {exc}"
-                    )
-                continue
-
-            # Determine whether to keep flow record based on status
-            # done/merged: keep record as history (issue is closed)
-            # aborted: delete record (issue may still be open, allow restart)
-            keep_flow_record = flow_status in ("done", "merged")
-
-            # Use unified cleanup service
-            try:
-                results = cleanup_service.cleanup_flow_scene(
-                    branch,
-                    include_remote=True,
-                    terminate_sessions=True,
-                    keep_flow_record=keep_flow_record,
-                )
-
-                # Track results
-                if keep_flow_record:
-                    # done/merged: success if physical resources cleaned
-                    if results.get("worktree", False) or results.get(
-                        "local_branch", False
-                    ):
-                        kept_records.append(branch)
-                        logger.bind(domain="check", branch=branch).info(
-                            "Cleaned done/merged flow resources, kept record"
-                        )
-                else:
-                    # aborted: success if flow record deleted
-                    if results.get("flow_record", False):
-                        cleaned.append(branch)
-                        logger.bind(domain="check", branch=branch).info(
-                            "Cleaned aborted flow completely"
-                        )
-                    else:
-                        failed.append(f"{branch}: flow record deletion failed")
-            except Exception as exc:
-                failed.append(f"{branch}: {exc}")
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to clean terminal flow resources: {exc}"
-                )
-
-        summary = f"Cleaned {len(cleaned)} aborted flows"
-        if kept_records:
-            summary += f", preserved {len(kept_records)} done/merged records"
-        if removed_invalid:
-            summary += f", removed {len(removed_invalid)} invalid records"
-        if failed:
-            summary += f", failed {len(failed)}"
-
-        return {
-            "summary": summary,
-            "cleaned": cleaned,
-            "kept_records": kept_records,
-            "removed_invalid": removed_invalid,
-            "failed": failed,
-            "total_flows_checked": len(terminal_flows),
-        }
