@@ -133,11 +133,6 @@ def show(
                 issue_titles, network_error = projection_service.get_issue_titles(
                     list(issue_numbers)
                 )
-                milestone_data = None
-                if flow_status.task_issue_number and not network_error:
-                    milestone_data = projection_service.get_milestone_data(
-                        flow_status.task_issue_number
-                    )
 
                 # Build PR data from projection
                 pr_data = None
@@ -161,8 +156,8 @@ def show(
                     flow_status,
                     issue_titles,
                     pr_data,
-                    milestone_data,
                     parent_branch=parent_branch,
+                    worktree_root=flow_status.worktree_root,
                 )
             return
 
@@ -178,17 +173,10 @@ def show(
             }
             typer.echo(json.dumps(json_data, indent=2, default=str))
         else:
-            milestone_data = None
-            task_issue = timeline["state"].task_issue_number
-            if task_issue:
-                projection_service = FlowProjectionService()
-                milestone_data = projection_service.get_milestone_data(task_issue)
-
             parent_branch = find_parent_branch(target_branch)
             render_flow_timeline(
                 timeline["state"],
                 timeline["events"],
-                milestone_data,
                 parent_branch=parent_branch,
             )
             if timeline["state"].task_issue_number is None:
@@ -258,10 +246,25 @@ def status(
                 )
                 titles.update(extra_titles)
         else:
-            # Server not running, fetch from GitHub API
-            titles, net_err = projection_service.get_issue_titles(list(issue_numbers))
+            # Server not running, use cache service directly with real branches
+            # Collect actual branches from flows (not guessing canonical_branch_name)
+            branches = [flow.branch for flow in flows if flow.branch]
 
-        # Build PR and worktree maps via projection service
+            # Get titles using cache service (branch-based, cache-first)
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            title_cache = IssueTitleCacheService(
+                store=projection_service.store,
+                github_client=projection_service.github_client,
+            )
+            branch_titles, net_err = title_cache.get_titles_with_fallback(branches)
+
+            # Build issue_number -> title mapping from branch_titles
+            for flow in flows:
+                if flow.task_issue_number and flow.branch in branch_titles:
+                    titles[flow.task_issue_number] = branch_titles[flow.branch]
+
+        # Batch fetch all PRs (1 API call instead of N)
         pr_map: dict[str, dict[str, object]] = {}
         worktree_map: dict[str, str] = {}
         try:
@@ -282,14 +285,17 @@ def status(
         except Exception:
             pass
 
-        for flow in flows:
-            try:
-                # Check current branch PR
-                prs = projection_service.pr_service.github_client.list_prs_for_branch(
-                    flow.branch
-                )
-                if prs:
-                    pr = prs[0]
+        # Batch query all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = projection_service.pr_service.github_client.list_all_prs(
+                state="open"
+            )
+            branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+
+            # Build PR map using cached dictionary (0 API calls)
+            for flow in flows:
+                pr = branch_to_pr.get(flow.branch)
+                if pr:
                     pr_map[flow.branch] = {
                         "number": pr.number,
                         "title": pr.title,
@@ -298,8 +304,8 @@ def status(
                         "url": pr.url,
                         "worktree": worktree_map.get(flow.branch),
                     }
-            except Exception:
-                pass
+        except Exception as exc:
+            logger.bind(domain="flow").warning(f"Failed to fetch PRs: {exc}")
 
         if net_err:
             render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")

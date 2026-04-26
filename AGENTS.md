@@ -44,7 +44,7 @@ This project has **two parallel implementations**:
 - **V3 (Python)**: `src/vibe3/` (see [.agent/rules/python-standards.md](.agent/rules/python-standards.md))
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`
-- **Shared state truth**: `.git/vibe3/`（位于主仓库 git common dir，即最顶层 `.git`）
+- **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
 
 ## 🚀 Quick Start
 
@@ -52,6 +52,12 @@ This project has **two parallel implementations**:
 2. **检查当前 flow**: 运行 `uv run python src/vibe3/cli.py flow show`
 3. **查看全局状态**: 运行 `uv run python src/vibe3/cli.py status`
 4. **了解执行规则**: 阅读 [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md)
+
+## 🔁 Handoff 命令约定
+
+- `uv run python src/vibe3/cli.py handoff status [branch]`：查看当前 flow 或指定 branch 的 handoff 现场
+- `uv run python src/vibe3/cli.py handoff show <artifact-path>`：读取共享 handoff artifact
+- `handoff show` 不再用于状态总览；遇到 `vibe3/handoff/...` 这类共享路径时，应通过 `handoff show <path>` 读取
 
 ## 🤖 Protocol
 

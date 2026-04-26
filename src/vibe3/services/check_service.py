@@ -1,8 +1,11 @@
 # ruff: noqa: E501
 """Check service implementation for verifying handoff store consistency."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -20,6 +23,9 @@ from vibe3.services.check_remote import (
     resolve_task_issue_number,
 )
 from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+if TYPE_CHECKING:
+    from vibe3.models.pr import PRResponse
 
 
 @dataclass
@@ -61,6 +67,15 @@ class CheckService(CheckRemote):
         """Verify current branch flow consistency."""
         logger.bind(domain="check", action="verify").info("Verifying flow consistency")
         branch = self.git_client.get_current_branch()
+
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = self.github_client.list_all_prs(state="all")
+            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        except Exception as exc:
+            logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
+            self._branch_to_pr = {}
+
         return self._check_branch(branch)
 
     def _has_worktree(self, branch: str) -> bool:
@@ -123,47 +138,59 @@ class CheckService(CheckRemote):
         if len(task_issues) > 1:
             issues.append(f"Multiple task issues for branch '{branch}'")
 
-        # PR verification (Remote-first)
-        try:
-            prs = self.github_client.list_prs_for_branch(branch)
-            if not prs:
-                # Check merged/closed to catch stale flows
-                all_prs = self.github_client.list_prs_for_branch(branch, state="all")
-                prs = [p for p in all_prs if p.state != PRState.OPEN]
-
-            if prs:
-                pr = prs[0]
-                # Check if PR is closed or merged - auto-complete flow
-                if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                    self._mark_flow_done(
-                        branch,
-                        f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                        cleanup_local_scene=not branch_missing,
+        # PR verification (Remote-first) - use cached PR data
+        pr = self._branch_to_pr.get(branch)
+        if pr:
+            # Check if PR is closed or merged - auto-complete flow
+            if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                self._mark_flow_done(
+                    branch,
+                    f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                    cleanup_local_scene=not branch_missing,
+                )
+                # Write cache: update PR title
+                self._update_pr_cache(branch, pr)
+                return CheckResult(is_valid=True, branch=branch, issues=[])
+        else:
+            # No PR found in cache, try API as fallback
+            try:
+                prs = self.github_client.list_prs_for_branch(branch)
+                if not prs:
+                    # Check merged/closed to catch stale flows
+                    all_prs = self.github_client.list_prs_for_branch(
+                        branch, state="all"
                     )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-        except Exception as e:
-            logger.bind(domain="check", branch=branch).warning(
-                f"Failed to verify PR status from GitHub: {e}"
-            )
-            # Cannot verify PR status when GitHub API fails
-            # TODO: Check cache service when implemented to provide offline PR number
-            issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
+                    prs = [p for p in all_prs if p.state != PRState.OPEN]
+
+                if prs:
+                    pr = prs[0]
+                    # Check if PR is closed or merged - auto-complete flow
+                    if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                        self._mark_flow_done(
+                            branch,
+                            f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                            cleanup_local_scene=not branch_missing,
+                        )
+                        # Write cache: update PR title
+                        self._update_pr_cache(branch, pr)
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+            except Exception as e:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to verify PR status from GitHub: {e}"
+                )
+                issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
         # Auto-complete when task issue is closed (and no open PR found)
         if task_issue_closed:
-            try:
-                open_prs = self.github_client.list_prs_for_branch(branch)
-                if not open_prs:
-                    self._mark_flow_done(
-                        branch,
-                        f"Task issue #{task_issue} is CLOSED (no open PR found)",
-                        cleanup_local_scene=not branch_missing,
-                    )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-            except Exception as e:
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to check for open PRs after task issue closed: {e}"
+            # Use cached PR data instead of API call
+            pr = self._branch_to_pr.get(branch)
+            if not pr or pr.state != PRState.OPEN:
+                self._mark_flow_done(
+                    branch,
+                    f"Task issue #{task_issue} is CLOSED (no open PR found)",
+                    cleanup_local_scene=not branch_missing,
                 )
+                return CheckResult(is_valid=True, branch=branch, issues=[])
 
         flow_status = flow_data.get("flow_status", "active")
         if (
@@ -365,3 +392,30 @@ class CheckService(CheckRemote):
             )
             return FixResult(success=False, error=error)
         return FixResult(success=True, applied=fixed)
+
+    def _update_pr_cache(self, branch: str, pr: "PRResponse") -> None:
+        """Update PR cache when check discovers changes.
+
+        This is a write operation: check command updates cache
+        when it discovers PR state changes.
+
+        Args:
+            branch: Branch name
+            pr: PR response object with title and number
+        """
+        try:
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            title_cache = IssueTitleCacheService(self.store, self.github_client)
+            title_cache.update_pr(
+                branch=branch,
+                pr_number=pr.number,
+                pr_title=pr.title,
+            )
+            logger.bind(domain="check", branch=branch).info(
+                f"Updated PR cache: #{pr.number} - {pr.title}"
+            )
+        except Exception as e:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to update PR cache: {e}"
+            )

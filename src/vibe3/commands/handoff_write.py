@@ -185,26 +185,13 @@ def indicate(
             ),
         ),
     ] = None,
-    action: Annotated[
-        str | None,
-        typer.Option(
-            "--action",
-            help=(
-                "Structured action directive for executor dispatch. "
-                "Valid values: fix (retry execution), commit_pr "
-                "(run vibe-commit skill). "
-                "Written to latest_indicate_action in flow state."
-            ),
-        ),
-    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
     """Record manager indicate handoff (manager directive to downstream agents).
 
-    Use --action fix to signal executor should retry with audit feedback.
-    Use --action commit_pr to signal executor should run vibe-commit skill.
+    Provide a structured handoff file reference for downstream agent context.
     """
     _record_handoff_reference(
         command="handoff indicate",
@@ -215,7 +202,6 @@ def indicate(
         actor=actor,
         trace=trace,
         method_name="record_indicate",
-        action=action,
     )
 
 

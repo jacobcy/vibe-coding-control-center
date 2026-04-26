@@ -99,6 +99,7 @@ class PRResponse(BaseModel):
     draft: bool = Field(False, description="Is draft PR")
     is_ready: bool = Field(False, description="Is ready for review (not draft)")
     ci_passed: bool = Field(False, description="CI checks passed")
+    ci_status: Optional[str] = Field(None, description="Raw CI status rollup")
     created_at: Optional[datetime] = Field(None, description="Created at")
     updated_at: Optional[datetime] = Field(None, description="Updated at")
     merged_at: Optional[datetime] = Field(None, description="Merged at")

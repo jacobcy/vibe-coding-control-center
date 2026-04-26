@@ -65,10 +65,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
@@ -120,10 +116,6 @@ class TestExecuteSyncGateIntegration:
                     return_value="agent:plan",
                 ),
                 patch(
-                    "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                    return_value=None,
-                ),
-                patch(
                     "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
                 ) as mock_gate,
             ):
@@ -169,10 +161,6 @@ class TestExecuteSyncGateIntegration:
             patch(
                 "vibe3.execution.codeagent_runner.format_agent_actor",
                 return_value="agent:review",
-            ),
-            patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
             ),
             patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
@@ -227,10 +215,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:plan",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
@@ -282,10 +266,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                return_value=None,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
@@ -305,20 +285,14 @@ class TestExecuteSyncGateIntegration:
         )
         mock_gate.assert_called_once()
 
-    def test_execute_sync_runs_handoff_callback_and_noop_gate_in_order(
+    def test_execute_sync_runs_callback_and_noop_gate_in_order(
         self,
     ) -> None:
-        """execute_sync must run handoff -> callback -> gate in that order."""
-        from pathlib import Path
-
+        """execute_sync must run callback -> gate in that order."""
         agent_result = _make_mock_agent_result(stdout="verdict: APPROVE")
         mock_store = _make_mock_store()
 
         events: list[str] = []
-
-        def fake_record(*args, **kwargs) -> Path | None:
-            events.append("handoff")
-            return Path("/tmp/handoff.md")
 
         def fake_callback(**kwargs) -> None:
             events.append("callback")
@@ -353,10 +327,6 @@ class TestExecuteSyncGateIntegration:
                 return_value="agent:review",
             ),
             patch(
-                "vibe3.services.handoff_service.HandoffService.record_agent_artifact",
-                side_effect=fake_record,
-            ),
-            patch(
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate",
                 side_effect=fake_gate,
             ),
@@ -370,4 +340,120 @@ class TestExecuteSyncGateIntegration:
             result = service.execute_sync(command)
 
         assert result.success
-        assert events == ["handoff", "callback", "gate"]
+        assert events == ["callback", "gate"]
+
+    def test_executor_records_passive_run_artifact_when_report_ref_missing(
+        self,
+    ) -> None:
+        """Executor should auto-record shared run artifact for manager visibility."""
+        agent_result = _make_mock_agent_result(
+            stdout="### Modified Files\n- src/demo.py\n"
+        )
+        mock_store = _make_mock_store()
+        mock_store.get_flow_state.return_value = {}
+
+        command = CodeagentCommand(
+            role="executor",
+            context_builder=lambda: "run prompt",
+            branch="task/issue-42",
+            issue_number=42,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:run",
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
+            ) as mock_gate,
+            patch(
+                "vibe3.execution.codeagent_runner.HandoffService"
+            ) as mock_handoff_cls,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/in-progress"
+            )
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+            mock_handoff = MagicMock()
+            mock_handoff.record_passive_artifact.return_value = "shared/run.md"
+            mock_handoff_cls.return_value = mock_handoff
+
+            service = CodeagentExecutionService()
+            result = service.execute_sync(command)
+
+        assert result.success
+        mock_gate.assert_called_once()
+        mock_handoff.record_passive_artifact.assert_called_once()
+        assert result.handoff_file == "shared/run.md"
+
+    def test_executor_records_passive_run_when_no_active_handoff_even_if_ref_exists(
+        self,
+    ) -> None:
+        """Executor should record passive artifact when no active handoff this round.
+
+        New logic: Passive recording triggers when handoff_file is None
+        (no active handoff), regardless of whether authoritative ref exists.
+        This ensures every execution round is recorded, even if authoritative
+        ref was set by previous rounds.
+        """
+        agent_result = _make_mock_agent_result(stdout="run output")
+        mock_store = _make_mock_store()
+        mock_store.get_flow_state.return_value = {"report_ref": "docs/reports/run.md"}
+
+        command = CodeagentCommand(
+            role="executor",
+            context_builder=lambda: "run prompt",
+            branch="task/issue-42",
+            issue_number=42,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:run",
+            ),
+            patch("vibe3.execution.codeagent_runner.apply_unified_noop_gate"),
+            patch(
+                "vibe3.execution.codeagent_runner.HandoffService"
+            ) as mock_handoff_cls,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/in-progress"
+            )
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+
+            service = CodeagentExecutionService()
+            result = service.execute_sync(command)
+
+        assert result.success
+        # New logic: passive recording happens because no active handoff occurred
+        mock_handoff_cls.return_value.record_passive_artifact.assert_called_once()

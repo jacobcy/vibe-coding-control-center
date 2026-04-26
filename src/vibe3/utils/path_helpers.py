@@ -212,3 +212,152 @@ def resolve_ref_path(
     except Exception:
         # Fallback: just show the raw value
         return ref_value
+
+
+_SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
+
+
+def resolve_handoff_target(
+    target: str,
+    branch: str | None = None,
+    git_client: GitClientProtocol | None = None,
+) -> Path:
+    """Resolve a handoff show target into an absolute file path.
+
+    Three namespaces:
+
+    1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+       The ``@`` is stripped and the remainder is joined to the handoff dir.
+       ``branch`` is ignored for shared artifacts.
+
+    2. ``relative/path`` → canonical worktree ref.
+       Resolved against the target branch's worktree root (or current worktree
+       when ``branch`` is None).
+
+    3. ``/abs/path`` → absolute path passthrough (debug fallback).
+
+    Raises:
+        FileNotFoundError: If the resolved path does not exist.
+    """
+    if git_client is None:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+
+    # Namespace 1: @ prefix → shared handoff store
+    if target.startswith("@"):
+        key = target[1:]
+        git_common = get_git_common_dir(git_client)
+        if not git_common:
+            raise FileNotFoundError(
+                f"Cannot resolve shared artifact without git common dir: {target}"
+            )
+        resolved = Path(git_common) / "vibe3" / "handoff" / key
+        if not resolved.exists():
+            raise FileNotFoundError(f"Shared artifact not found: {target}")
+        return resolved
+
+    # Namespace 3: absolute path → passthrough
+    target_path = Path(target)
+    if target_path.is_absolute():
+        if not target_path.exists():
+            raise FileNotFoundError(f"File not found: {target}")
+        return target_path
+
+    # Namespace 2: relative path → worktree canonical ref
+    if branch:
+        # Strict mode: when branch is explicitly given, only resolve within
+        # that branch's worktree. Never fall back to current worktree or CWD,
+        # as that would silently return a file from the wrong flow.
+        wt_path = find_worktree_path_for_branch(branch, git_client)
+        if wt_path is None:
+            raise FileNotFoundError(f"No worktree found for branch '{branch}'")
+        resolved = wt_path / target
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"Artifact not found in branch '{branch}' worktree: {target}"
+            )
+        return resolved
+
+    # No branch specified: try current worktree then CWD
+    current_root = get_worktree_root(git_client)
+    if current_root:
+        resolved = Path(current_root) / target
+        if resolved.exists():
+            return resolved
+
+    # Also try CWD (handles cases where CWD differs from worktree root)
+    cwd_resolved = Path.cwd() / target
+    if cwd_resolved.exists():
+        return cwd_resolved
+
+    raise FileNotFoundError(f"Artifact not found: {target}")
+
+
+def is_shared_handoff_ref(ref_value: str) -> bool:
+    """Return True if the stored ref points to a shared handoff artifact."""
+    return ref_value.startswith(_SHARED_HANDOFF_PREFIX)
+
+
+def to_display_target(ref_value: str) -> str:
+    """Convert a stored ref value to a display target for ``handoff show``.
+
+    ``vibe3/handoff/task-xxx/run.md`` → ``@task-xxx/run.md``
+    Other relative paths → returned as-is (canonical worktree ref).
+    Absolute paths → returned as-is.
+    """
+    if ref_value.startswith(_SHARED_HANDOFF_PREFIX):
+        return "@" + ref_value[len(_SHARED_HANDOFF_PREFIX) :]
+    return ref_value
+
+
+def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
+    """Convert a display-form ref path to a ``vibe3 handoff show`` command.
+
+    Call ``resolve_ref_path(abs_path, worktree_root)`` first to strip the
+    worktree prefix before passing the result here.
+
+    Shared artifacts (``vibe3/handoff/...``) get the ``@`` prefix form.
+    Canonical worktree refs (``docs/reports/...``, ``docs/plans/...``) get
+    ``--branch <branch>`` when branch is known.
+    Other relative paths and absolute paths are returned as-is (not handoff artifacts).
+    """
+    if is_shared_handoff_ref(path):
+        return f"vibe3 handoff show {to_display_target(path)}"
+    # Only treat docs/reports and docs/plans as handoff artifacts
+    if path.startswith("docs/reports/") or path.startswith("docs/plans/"):
+        if branch:
+            return f"vibe3 handoff show --branch {branch} {path}"
+        return f"vibe3 handoff show {path}"
+    # Non-handoff paths (temp/logs, etc.) return as-is
+    return path
+
+
+def sanitize_event_detail_paths(
+    detail: str,
+    event_refs: object,
+    worktree_root: str | None = None,
+) -> str:
+    """Replace path-like refs embedded in event detail with display-safe values."""
+    if not isinstance(event_refs, dict):
+        return detail
+
+    sanitized = detail
+
+    ref = event_refs.get("ref")
+    if isinstance(ref, str):
+        sanitized = sanitized.replace(ref, resolve_ref_path(ref, worktree_root))
+
+    files = event_refs.get("files")
+    if isinstance(files, list):
+        for file_ref in files:
+            if isinstance(file_ref, str):
+                sanitized = sanitized.replace(
+                    file_ref, resolve_ref_path(file_ref, worktree_root)
+                )
+
+    log_path = event_refs.get("log_path")
+    if isinstance(log_path, str):
+        sanitized = sanitized.replace(log_path, Path(log_path).name)
+
+    return sanitized

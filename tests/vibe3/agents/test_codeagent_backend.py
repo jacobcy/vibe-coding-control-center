@@ -165,6 +165,21 @@ class TestCodeagentBackend:
 
         assert content == "prompt body"
 
+    def test_build_prompt_file_content_can_skip_global_notice(self) -> None:
+        config = VibeConfig(
+            agent_prompt=AgentPromptConfig(global_notice="## Debug Stop Rule\nStop now")
+        )
+
+        with patch(
+            "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
+            return_value=config,
+        ):
+            content = build_prompt_file_content(
+                "prompt body", include_global_notice=False
+            )
+
+        assert content == "prompt body"
+
     def test_default_log_dir_uses_env_override(self, monkeypatch) -> None:
         """Async log dir should honor orchestra-provided override."""
         monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", "/tmp/orchestra-logs")

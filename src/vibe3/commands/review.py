@@ -8,16 +8,21 @@ from loguru import logger
 from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
+    _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
-from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+from vibe3.execution.issue_role_sync_runner import (
+    run_issue_role_async,
+    run_issue_role_sync,
+)
 from vibe3.roles.review import (
     REVIEW_SYNC_SPEC,
     build_base_review_request,
     build_pr_review_request,
-    execute_manual_review,
+    execute_manual_review_async,
+    execute_manual_review_sync,
 )
 from vibe3.utils.trace import enable_trace
 
@@ -46,6 +51,7 @@ def _review_issue_impl(
     trace: bool,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
 ) -> None:
     """Review implementation for an issue via role sync runner."""
     if trace:
@@ -53,13 +59,20 @@ def _review_issue_impl(
 
     _ = report_ref
 
-    run_issue_role_mode(
-        issue_number=issue,
-        dry_run=dry_run,
-        async_mode=not no_async,
-        fresh_session=False,
-        spec=REVIEW_SYNC_SPEC,
-    )
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue,
+            dry_run=dry_run,
+            fresh_session=False,
+            show_prompt=show_prompt,
+            spec=REVIEW_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue,
+            dry_run=dry_run,
+            spec=REVIEW_SYNC_SPEC,
+        )
 
 
 @app.callback(invoke_without_command=True)
@@ -76,6 +89,7 @@ def default(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
     """Review with --issue for orchestra-driven review, or use pr/base subcommands."""
     if ctx.invoked_subcommand is not None:
@@ -87,6 +101,7 @@ def default(
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
+            show_prompt=show_prompt,
         )
         return
     typer.echo(ctx.get_help())
@@ -102,6 +117,7 @@ def issue_command(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
     """Review implementation for a specific issue (orchestra-driven)."""
     _review_issue_impl(
@@ -110,6 +126,7 @@ def issue_command(
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
+        show_prompt=show_prompt,
     )
 
 
@@ -150,15 +167,23 @@ def pr(
         raise typer.Exit(1)
     branch = head_branch
 
-    result = execute_manual_review(
-        request=request,
-        dry_run=dry_run,
-        instructions=instructions,
-        issue_number=issue_number,
-        pr_number=pr_number,
-        branch=branch,
-        async_mode=not no_async,
-    )
+    if no_async or dry_run or not branch:
+        result = execute_manual_review_sync(
+            request=request,
+            dry_run=dry_run,
+            instructions=instructions,
+            issue_number=issue_number,
+            pr_number=pr_number,
+            branch=branch,
+        )
+    else:
+        result = execute_manual_review_async(
+            request=request,
+            instructions=instructions,
+            issue_number=issue_number,
+            pr_number=pr_number,
+            branch=branch,
+        )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)
@@ -226,14 +251,21 @@ def base(
         resolved_base.base_branch,
         flow_service=flow_service,
     )
-    result = execute_manual_review(
-        request=request,
-        dry_run=dry_run,
-        instructions=instructions,
-        issue_number=issue_number,
-        branch=current_branch,
-        async_mode=not no_async,
-    )
+    if no_async or dry_run:
+        result = execute_manual_review_sync(
+            request=request,
+            dry_run=dry_run,
+            instructions=instructions,
+            issue_number=issue_number,
+            branch=current_branch,
+        )
+    else:
+        result = execute_manual_review_async(
+            request=request,
+            instructions=instructions,
+            issue_number=issue_number,
+            branch=current_branch,
+        )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)

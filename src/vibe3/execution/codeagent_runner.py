@@ -30,7 +30,6 @@ from vibe3.execution.role_policy import (
     get_role_section,
 )
 from vibe3.execution.session_service import load_session_id
-from vibe3.models.handoff import HandoffRecord
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 
@@ -154,23 +153,7 @@ class CodeagentExecutionService:
         )
 
         effective_session_id = agent_result.session_id or ctx.session_id
-        import os
-
-        env_log_path = os.environ.get("VIBE3_LOG_PATH")
-
-        handoff_file = HandoffService().record_agent_artifact(
-            HandoffRecord(
-                kind=command.handoff_kind,  # type: ignore[arg-type]
-                content=agent_result.stdout,
-                options=ctx.options,
-                session_id=effective_session_id,
-                metadata=command.handoff_metadata,
-                branch=command.branch,
-                log_path=env_log_path,
-            )
-        )
-        if handoff_file:
-            echo(f"-> {command.handoff_kind.capitalize()} saved: {handoff_file}")
+        handoff_file = None
 
         if ctx.branch and ctx.store:
             persist_execution_lifecycle_event(
@@ -215,6 +198,28 @@ class CodeagentExecutionService:
                     repo=getattr(self.config, "repo", None),
                 )
 
+            passive_kind = {"planner": "plan", "executor": "run"}.get(command.role)
+            # Passive recording: record if NO active handoff happened this round
+            if passive_kind and agent_result.stdout.strip() and handoff_file is None:
+                try:
+                    handoff_file = HandoffService(
+                        store=ctx.store
+                    ).record_passive_artifact(
+                        kind=passive_kind,
+                        content=agent_result.stdout,
+                        actor=ctx.actor,
+                        metadata=(
+                            {"session_id": effective_session_id}
+                            if effective_session_id
+                            else None
+                        ),
+                        branch=ctx.branch,
+                    )
+                except Exception as exc:
+                    log.warning(
+                        f"Failed to record passive {passive_kind} artifact: {exc}"
+                    )
+
         return handoff_file
 
     def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
@@ -239,6 +244,11 @@ class CodeagentExecutionService:
                 session_id=ctx.session_id,
                 cwd=ctx.execution_cwd,
                 role=command.role,
+                show_prompt=command.show_prompt,
+                include_global_notice=command.include_global_notice,
+                fallback_prompt=command.fallback_prompt,
+                fallback_include_global_notice=command.fallback_include_global_notice,
+                dry_run_summary=command.dry_run_summary,
             )
             if command.dry_run:
                 return CodeagentResult(
@@ -303,6 +313,11 @@ class CodeagentExecutionService:
             resolved_options=request.options,
             actor=request.actor,
             session_id=request.refs.get("session_id"),
+            show_prompt=request.show_prompt,
+            include_global_notice=request.include_global_notice,
+            fallback_prompt=request.fallback_prompt,
+            fallback_include_global_notice=request.fallback_include_global_notice,
+            dry_run_summary=request.dry_run_summary,
             pre_gate_callback=get_role_pre_gate_callback(role),
         )
         return self.execute_sync(command)

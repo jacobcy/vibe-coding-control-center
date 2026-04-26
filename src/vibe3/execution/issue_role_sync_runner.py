@@ -48,29 +48,17 @@ def _load_issue_info(config: OrchestraConfig, issue_number: int) -> IssueInfo:
     return IssueInfo(number=issue_number, title=title, labels=labels)
 
 
-def run_issue_role_mode(
+def run_issue_role_async(
     *,
     issue_number: int,
     dry_run: bool,
-    async_mode: bool,
-    fresh_session: bool,
     spec: IssueRoleSyncSpec,
 ) -> None:
-    """Run a role using a shared issue-scoped sync/async shell.
+    """Run a role asynchronously via tmux wrapper.
 
-    Two execution paths diverge here
-    (see docs/standards/vibe3-execution-paths-standard.md):
-
-    Container-outside path (async_mode=False):
-      orchestra process runs the agent synchronously, waits for completion.
-      Worker roles still enter codeagent_runner via ExecutionCoordinator, so
-      the same lifecycle / handoff / pre-gate / no-op shell is used.
-
-    Container-inside path (async_mode=True):
-      orchestra launches a tmux session and returns immediately.
-      The tmux child then re-enters the normal sync path locally.
-      `VIBE3_ASYNC_CHILD` only bypasses outer duplicate/capacity guards; the
-      sync shell itself stays unchanged.
+    Launches tmux session and returns immediately.
+    The tmux child then re-enters the sync execution path locally.
+    See docs/standards/vibe3-execution-paths-standard.md.
     """
     config = load_orchestra_config()
     issue = _load_issue_info(config, issue_number)
@@ -78,9 +66,6 @@ def run_issue_role_mode(
     store = SQLiteClient()
     current_branch = GitClient().get_current_branch()
     branch = spec.resolve_branch(store, issue_number, current_branch)
-    session_id = (
-        None if fresh_session else load_session_id(spec.role_name, branch=branch)
-    )
 
     options = spec.resolve_options(config)
     actor = format_agent_actor(options)
@@ -88,12 +73,12 @@ def run_issue_role_mode(
     coordinator = ExecutionCoordinator(config, store, backend)
 
     # Early capacity check to avoid wasteful request preparation
-    if async_mode and not dry_run:
+    if not dry_run:
         if not coordinator.capacity.can_dispatch(spec.role_name):
             typer.echo(f"{spec.role_name} dispatch queued: Capacity full")
             return
 
-    if async_mode and not dry_run:
+    if not dry_run:
         request = spec.build_async_request(config, issue, actor)
         if request is None:
             if spec.failure_handler is not None:
@@ -133,14 +118,50 @@ def run_issue_role_mode(
                 )
             raise typer.Exit(1) from exc
 
+    typer.echo(f"-> {spec.role_name} run: issue #{issue_number} (async dry-run)")
+
+
+def run_issue_role_sync(
+    *,
+    issue_number: int,
+    dry_run: bool,
+    fresh_session: bool,
+    show_prompt: bool,
+    spec: IssueRoleSyncSpec,
+) -> None:
+    """Run a role synchronously (direct execution without tmux wrapper).
+
+    Orchestrated process runs the agent synchronously and waits for completion.
+    Worker roles still enter codeagent_runner via ExecutionCoordinator, so
+    the same lifecycle / handoff / pre-gate / no-op shell is used.
+    See docs/standards/vibe3-execution-paths-standard.md.
+    """
+    config = load_orchestra_config()
+    issue = _load_issue_info(config, issue_number)
+
+    store = SQLiteClient()
+    current_branch = GitClient().get_current_branch()
+    branch = spec.resolve_branch(store, issue_number, current_branch)
+    flow_state = store.get_flow_state(branch) if branch else None
+    session_id = (
+        None if fresh_session else load_session_id(spec.role_name, branch=branch)
+    )
+
+    options = spec.resolve_options(config)
+    actor = format_agent_actor(options)
+    backend = CodeagentBackend()
+    coordinator = ExecutionCoordinator(config, store, backend)
+
     sync_request = spec.build_sync_request(
         config,
         issue,
         branch,
+        flow_state,
         session_id,
         options,
         actor,
         dry_run,
+        show_prompt,
     )
     sync_result = coordinator.dispatch_execution(sync_request)
 

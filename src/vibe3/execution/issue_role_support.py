@@ -177,12 +177,20 @@ def build_issue_sync_prompt_request(
     session_id: str | None = None,
     repo_path: Path | None = None,
     dry_run: bool = False,
+    show_prompt: bool = False,
+    include_global_notice: bool = True,
+    fallback_prompt: str | None = None,
+    fallback_include_global_notice: bool = True,
+    extra_refs: dict[str, str] | None = None,
+    dry_run_summary: dict[str, Any] | None = None,
 ) -> ExecutionRequest:
     """Build a generic sync prompt-based request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
     refs = {"task": task}
     if session_id:
         refs["session_id"] = session_id
+    if extra_refs:
+        refs.update(extra_refs)
     return ExecutionRequest(
         role=role,
         target_branch=target_branch,
@@ -196,6 +204,11 @@ def build_issue_sync_prompt_request(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=fallback_include_global_notice,
+        dry_run_summary=dry_run_summary or {},
         worktree_requirement=worktree_requirement,
     )
 
@@ -221,7 +234,18 @@ def build_issue_sync_spec(
     resolve_branch: Callable[[SQLiteClient, int, str], str],
     build_async_request: Callable[[Any, IssueInfo, str], ExecutionRequest | None],
     build_sync_request: Callable[
-        [Any, IssueInfo, str, str | None, Any, str, bool], ExecutionRequest
+        [
+            Any,
+            IssueInfo,
+            str,
+            dict[str, object] | None,
+            str | None,
+            Any,
+            str,
+            bool,
+            bool,
+        ],
+        ExecutionRequest,
     ],
     failure_handler: Callable[..., None],
 ) -> IssueRoleSyncSpec:

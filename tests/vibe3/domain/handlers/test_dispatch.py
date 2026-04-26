@@ -119,7 +119,7 @@ class TestExecutorDispatchHandler:
             "labels": [],
         }
 
-        # Mock flow_state with plan_ref and no indicate_action (normal fix path)
+        # Mock flow_state with plan_ref (normal implementation path)
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {"plan_ref": "plan.md"}
         mock_sqlite_cls.return_value = mock_store
@@ -148,7 +148,7 @@ class TestExecutorDispatchHandler:
         mock_store.get_flow_state.assert_called_once_with("task/issue-42")
 
         # Verify request builder was called with plan_ref from flow_state
-        # and commit_mode=False (no indicate_action=commit_pr in flow_state)
+        # and commit_mode=False (trigger_state is in-progress, not merge-ready)
         mock_build_request.assert_called_once()
         call_kwargs = mock_build_request.call_args
         assert call_kwargs[1].get("branch") == "task/issue-42"
@@ -162,7 +162,7 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
-    def test_executor_dispatch_commit_pr_from_indicate_action(
+    def test_executor_dispatch_publish_path_from_merge_ready(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
@@ -170,7 +170,7 @@ class TestExecutorDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
-        """commit_mode=True when flow_state.latest_indicate_action == 'commit_pr'."""
+        """commit_mode=True when trigger_state == 'merge-ready'."""
         from vibe3.domain.handlers.dispatch import handle_executor_dispatch_intent
 
         config = MagicMock(dry_run=False, repo="owner/repo")
@@ -181,11 +181,9 @@ class TestExecutorDispatchHandler:
             "labels": [],
         }
 
-        # Simulate manager having written handoff indicate --action commit_pr
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {
             "plan_ref": "plan.md",
-            "latest_indicate_action": "commit_pr",
         }
         mock_sqlite_cls.return_value = mock_store
 
@@ -200,16 +198,16 @@ class TestExecutorDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
+        # merge-ready trigger_state drives commit_mode
         handle_executor_dispatch_intent(
             ExecutorDispatched(
                 issue_number=42,
                 branch="task/issue-42",
-                trigger_state="in-progress",
+                trigger_state="merge-ready",
             )
         )
 
         call_kwargs = mock_build_request.call_args
-        # commit_mode must be True when latest_indicate_action == "commit_pr"
         assert call_kwargs[1].get("commit_mode") is True
 
 

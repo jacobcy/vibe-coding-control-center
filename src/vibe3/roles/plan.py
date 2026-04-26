@@ -7,9 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.plan_prompt import build_plan_prompt_body, make_plan_context_builder
+from vibe3.agents.plan_prompt import (
+    build_plan_prompt_body,
+    describe_plan_sections,
+    make_plan_context_builder,
+)
 from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -21,6 +24,7 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
+from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.execution.role_contracts import PLANNER_GATE_CONFIG
 from vibe3.execution.role_request_factory import (
     build_role_async_request,
@@ -105,14 +109,46 @@ def build_plan_prompt(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
-) -> str:
-    """Build the plan prompt body for an issue."""
+    flow_state: dict[str, object] | None,
+    session_id: str | None = None,
+) -> tuple[str, dict[str, str], dict[str, object], bool, str | None]:
+    """Build the plan prompt body for an issue.
+
+    Returns prompt plus refs/summary/global-notice decision for sync execution.
+    """
     guidance = _build_plan_task_guidance(config, issue, branch)
+    meta = build_prompt_meta(
+        flow_state,
+        ref_keys=("plan_ref",),
+        retry_ref_keys=("plan_ref",),
+        session_id=session_id,
+        default_mode="first",
+    )
+
     plan_request = PlanRequest(
         scope=PlanScope.for_task(issue.number),
         task_guidance=guidance,
     )
-    return build_plan_prompt_body(plan_request, VibeConfig.get_defaults())
+    prompt = build_plan_prompt_body(
+        plan_request,
+        VibeConfig.get_defaults(),
+        mode=meta.prompt_mode,  # type: ignore[arg-type]
+        context_mode=meta.context_mode,
+    )
+    fallback_prompt = None
+    if meta.fallback_context_mode is not None:
+        fallback_prompt = build_plan_prompt_body(
+            plan_request,
+            VibeConfig.get_defaults(),
+            mode=meta.prompt_mode,  # type: ignore[arg-type]
+            context_mode=meta.fallback_context_mode,
+        )
+    sections = describe_plan_sections(
+        meta.prompt_mode,  # type: ignore[arg-type]
+        meta.context_mode,
+    )
+    summary = meta.summary(sections)
+    return prompt, meta.refs, summary, meta.include_global_notice, fallback_prompt
 
 
 def build_plan_request(
@@ -140,13 +176,24 @@ def build_plan_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
     """Build the planner sync execution request."""
-    prompt = build_plan_prompt(config, issue, branch)
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    flow_state = SQLiteClient().get_flow_state(branch) if branch else None
+    (
+        prompt,
+        extra_refs,
+        dry_run_summary,
+        include_global_notice,
+        fallback_prompt,
+    ) = build_plan_prompt(config, issue, branch, flow_state, session_id=session_id)
     task = f"Create implementation plan for issue #{issue.number}: {issue.title}"
 
     return build_role_sync_request(
@@ -161,6 +208,12 @@ def build_plan_sync_request(
         session_id=session_id,
         actor=actor,
         dry_run=dry_run,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=True,
+        extra_refs=extra_refs,
+        dry_run_summary=dry_run_summary,
     )
 
 
@@ -274,16 +327,63 @@ def bind_plan_spec(branch: str, spec_path: str) -> None:
     FlowService().bind_spec(branch, spec_path, "user")
 
 
-def execute_spec_plan(
+def execute_spec_plan_async(
     *,
     request: PlanRequest,
     issue_number: int | None,
     branch: str,
-    async_mode: bool = True,
-    cli_args: list[str] | None = None,
+    cli_args: list[str],
     config: VibeConfig | None = None,
 ) -> CodeagentResult:
-    """Execute spec-mode planning using the shared execution shell."""
+    """Execute spec plan in async mode (tmux wrapper).
+
+    ``request`` and ``config`` are intentionally unused: async mode re-invokes
+    the CLI via ``cli_args`` inside a tmux session, so all configuration is
+    re-resolved from scratch by the child process. Passing a custom ``request``
+    or ``config`` here has no effect.
+    """
+    _ = request, config
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    launch = ExecutionCoordinator(
+        load_orchestra_config(),
+        SQLiteClient(),
+    ).dispatch_execution(
+        ExecutionRequest(
+            role="planner",
+            target_branch=branch,
+            target_id=issue_number or 0,
+            execution_name=(
+                f"vibe3-planner-issue-{issue_number}"
+                if issue_number is not None
+                else f"vibe3-planner-{branch.replace('/', '-')}"
+            ),
+            cmd=build_self_invocation(cli_args),
+            cwd=str(Path.cwd()),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=(
+                {"issue_number": str(issue_number)} if issue_number is not None else {}
+            ),
+            actor="agent:plan",
+            mode="async",
+        )
+    )
+    return CodeagentResult(
+        success=launch.launched,
+        stderr=launch.reason or "",
+        tmux_session=launch.tmux_session,
+        log_path=Path(launch.log_path) if launch.log_path else None,
+    )
+
+
+def execute_spec_plan_sync(
+    *,
+    request: PlanRequest,
+    issue_number: int | None,
+    branch: str,
+    config: VibeConfig | None = None,
+) -> CodeagentResult:
+    """Execute spec plan in sync mode (direct execution)."""
     cfg = config or VibeConfig.get_defaults()
     command = create_codeagent_command(
         role="planner",
@@ -295,41 +395,4 @@ def execute_spec_plan(
         cwd=Path.cwd(),
         config=cfg,
     )
-
-    if async_mode:
-        if cli_args is None:
-            raise ValueError("Async plan execution requires explicit cli_args")
-        launch = ExecutionCoordinator(
-            load_orchestra_config(),
-            SQLiteClient(),
-        ).dispatch_execution(
-            ExecutionRequest(
-                role="planner",
-                target_branch=branch,
-                target_id=issue_number or 0,
-                execution_name=(
-                    f"vibe3-planner-issue-{issue_number}"
-                    if issue_number is not None
-                    else f"vibe3-planner-{branch.replace('/', '-')}"
-                ),
-                cmd=build_self_invocation(cli_args),
-                cwd=str(Path.cwd()),
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-                refs=(
-                    {"issue_number": str(issue_number)}
-                    if issue_number is not None
-                    else {}
-                ),
-                actor="agent:plan",
-                mode="async",
-            )
-        )
-        return CodeagentResult(
-            success=launch.launched,
-            stderr=launch.reason or "",
-            tmux_session=launch.tmux_session,
-            log_path=Path(launch.log_path) if launch.log_path else None,
-        )
-
-    result = CodeagentExecutionService(cfg).execute_sync(command)
-    return result
+    return CodeagentExecutionService(cfg).execute_sync(command)

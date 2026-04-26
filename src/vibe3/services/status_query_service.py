@@ -6,21 +6,23 @@ a thin rendering layer.
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,
     resolve_roadmap_rank,
+    sort_ready_issues,
 )
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
+    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
 
 def _state_from_labels(raw_labels: object) -> IssueState | None:
@@ -37,6 +39,38 @@ def _state_from_labels(raw_labels: object) -> IssueState | None:
         if parsed is not None:
             return parsed
     return None
+
+
+def extract_issue_labels(raw_labels: object) -> list[str]:
+    """Extract plain label names from GitHub issue payload."""
+    if not isinstance(raw_labels, list):
+        return []
+    return [
+        label.get("name", "")
+        for label in raw_labels
+        if isinstance(label, dict) and "name" in label
+    ]
+
+
+def extract_milestone_title(raw_milestone: object) -> str | None:
+    """Extract milestone title from GitHub milestone payload."""
+    if isinstance(raw_milestone, dict) and "title" in raw_milestone:
+        title = raw_milestone["title"]
+        if isinstance(title, str) and title.strip():
+            return title
+    return None
+
+
+def extract_queue_metadata(
+    raw_labels: object,
+    raw_milestone: object,
+) -> tuple[list[str], str | None, int, str | None]:
+    """Extract shared queue metadata fields from GitHub payload."""
+    labels = extract_issue_labels(raw_labels)
+    milestone = extract_milestone_title(raw_milestone)
+    priority = resolve_priority(labels)
+    _, roadmap = resolve_roadmap_rank(labels)
+    return labels, milestone, priority, roadmap
 
 
 def issue_priority(state: IssueState) -> tuple[int, str]:
@@ -78,6 +112,48 @@ def is_orchestra_managed_flow_branch(branch: str | None) -> bool:
     return isinstance(branch, str) and is_auto_task_branch(branch)
 
 
+def extract_primary_assignee_login(raw_assignees: object) -> str | None:
+    """Extract the primary manager assignee login from GitHub payload."""
+    if not isinstance(raw_assignees, list):
+        return None
+
+    for assignee in raw_assignees:
+        if not isinstance(assignee, dict):
+            continue
+        login = assignee.get("login")
+        if isinstance(login, str) and login.strip():
+            return login.strip()
+    return None
+
+
+def sort_ready_issue_dicts(
+    ready_issues: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Sort READY issue dicts and attach queue ranks."""
+    ready_issue_infos = [
+        IssueInfo(
+            number=cast(int, item["number"]),
+            title=cast(str, item["title"]),
+            state=cast(IssueState | None, item["state"]),
+            labels=cast(list[str], item["labels"]),
+            assignees=[cast(str, item["assignee"])] if item.get("assignee") else [],
+            milestone=cast(str | None, item["milestone"]),
+        )
+        for item in ready_issues
+    ]
+    sorted_ready_infos = sort_ready_issues(ready_issue_infos)
+
+    sorted_ready_issues: list[dict[str, object]] = []
+    for rank, issue_info in enumerate(sorted_ready_infos, start=1):
+        matching_item = next(
+            (item for item in ready_issues if item["number"] == issue_info.number),
+            None,
+        )
+        if matching_item:
+            sorted_ready_issues.append({**matching_item, "queue_rank": rank})
+    return sorted_ready_issues
+
+
 def _select_preferred_issue_flow(
     existing: FlowStatusResponse | None,
     candidate: FlowStatusResponse,
@@ -117,10 +193,23 @@ class StatusQueryService:
         github_client: GitHubClient | None = None,
         git_client: GitClient | None = None,
         repo: str | None = None,
+        title_cache: IssueTitleCacheService | None = None,
+        store: SQLiteClient | None = None,
     ) -> None:
         self.github = github_client or GitHubClient()
         self.git = git_client or GitClient()
         self.repo = repo
+        self.store = store or SQLiteClient()
+        self._title_cache = title_cache
+
+    @property
+    def title_cache(self) -> IssueTitleCacheService:
+        """Lazy-initialized title cache service."""
+        if self._title_cache is None:
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            self._title_cache = IssueTitleCacheService(self.store, self.github)
+        return self._title_cache
 
     def fetch_orchestrated_issues(
         self,
@@ -166,6 +255,20 @@ class StatusQueryService:
             logger.bind(domain="status").warning(f"Failed to fetch issues: {exc}")
             raw_issues = []
 
+        # Collect all branches from flows for cache lookup
+        branches = [flow.branch for flow in flows if flow.branch]
+
+        # Use cache service for titles (cache-first)
+        branch_titles, _ = self.title_cache.get_titles_with_fallback(branches)
+
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = self.github.list_all_prs(state="open")
+            branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        except Exception as exc:
+            logger.bind(domain="status").warning(f"Failed to fetch PRs: {exc}")
+            branch_to_pr = {}
+
         for item in raw_issues:
             number = item.get("number")
             if not isinstance(number, int):
@@ -173,59 +276,62 @@ class StatusQueryService:
             state = _state_from_labels(item.get("labels"))
             if state is None:
                 continue
-            if state == IssueState.DONE:
-                continue
+            # Note: IssueState.DONE is no longer skipped here.
+            # It will be filtered at the UI layer or grouped into PR section.
             flow = issue_to_flow.get(number)
             if flow and not is_orchestra_managed_flow_branch(flow.branch):
                 continue
-            failed_reason = (
-                self._extract_failed_reason(number)
-                if state == IssueState.FAILED
-                else None
-            )
+            # Get failed_reason from flow state (avoid GitHub API call)
+            failed_reason = None
+            if state == IssueState.FAILED and flow:
+                failed_reason = getattr(flow, "failed_reason", None)
 
-            # Parse blocked_by from issue body
+            # Get blocked_by and blocked_reason from flow state
             blocked_by = None
             blocked_reason = None
-            if state == IssueState.BLOCKED:
-                from vibe3.clients.github_issues_ops import parse_blocked_by
+            if state == IssueState.BLOCKED and flow:
+                # Read from database instead of parsing issue body
+                blocked_by_issue = getattr(flow, "blocked_by_issue", None)
+                if blocked_by_issue:
+                    blocked_by = (blocked_by_issue,)
+                blocked_reason = getattr(flow, "blocked_reason", None)
 
-                body = str(item.get("body") or "")
-                blocked_by_nums = parse_blocked_by(body)
-                if blocked_by_nums:
-                    blocked_by = tuple(blocked_by_nums)
+            labels, milestone, priority, roadmap = extract_queue_metadata(
+                item.get("labels"),
+                item.get("milestone"),
+            )
+            assignee = extract_primary_assignee_login(item.get("assignees"))
 
-                # Get blocked_reason from flow state if available
-                if flow:
-                    blocked_reason = getattr(flow, "blocked_reason", None)
+            # Get title from cache (using branch) or fall back to API title
+            if flow:
+                title = branch_titles.get(flow.branch) or str(item.get("title") or "")
+            else:
+                # Fallback to API title
+                title = str(item.get("title") or "")
 
-            # Parse queue metadata from labels
-            labels = [
-                label.get("name", "")
-                for label in item.get("labels", [])
-                if isinstance(label, dict) and "name" in label
-            ]
-
-            # Extract milestone from GitHub milestone field
-            milestone = None
-            milestone_data = item.get("milestone")
-            if isinstance(milestone_data, dict) and "title" in milestone_data:
-                milestone = milestone_data["title"]
-
-            # Resolve priority and roadmap
-            priority = resolve_priority(labels)
-            _, roadmap = resolve_roadmap_rank(labels)
+            # Get PR data from batch query
+            pr_number = None
+            pr_state = None
+            if flow:
+                pr = branch_to_pr.get(flow.branch)
+                if pr:
+                    pr_number = pr.number
+                    pr_state = pr.state.value
 
             orchestrated_issues.append(
                 {
                     "number": number,
-                    "title": str(item.get("title") or ""),
+                    "title": title,
                     "state": state,
+                    "assignee": assignee,
                     "flow": flow,
                     "queued": number in queued_set,
                     "failed_reason": failed_reason,
                     "blocked_by": blocked_by,
                     "blocked_reason": blocked_reason,
+                    # PR data
+                    "pr_number": pr_number,
+                    "pr_state": pr_state,
                     # Queue metadata
                     "milestone": milestone,
                     "roadmap": roadmap,
@@ -244,38 +350,7 @@ class StatusQueryService:
 
         # Sort ready issues using queue ordering rules and assign real queue ranks
         if ready_issues:
-            from vibe3.models.orchestration import IssueInfo
-            from vibe3.orchestra.queue_ordering import sort_ready_issues
-
-            ready_issue_infos = [
-                IssueInfo(
-                    number=cast(int, item["number"]),
-                    title=cast(str, item["title"]),
-                    state=cast(IssueState | None, item["state"]),
-                    labels=cast(list[str], item["labels"]),
-                    assignees=[],
-                    milestone=cast(str | None, item["milestone"]),
-                )
-                for item in ready_issues
-            ]
-            sorted_ready_infos = sort_ready_issues(ready_issue_infos)
-
-            # Build sorted ready issues with real queue ranks
-            sorted_ready_issues = []
-            for rank, issue_info in enumerate(sorted_ready_infos, start=1):
-                matching_item = next(
-                    (
-                        item
-                        for item in ready_issues
-                        if item["number"] == issue_info.number
-                    ),
-                    None,
-                )
-                if matching_item:
-                    matching_item["queue_rank"] = rank
-                    sorted_ready_issues.append(matching_item)
-
-            ready_issues = sorted_ready_issues
+            ready_issues = sort_ready_issue_dicts(ready_issues)
 
         # Sort other issues by operational urgency
         other_issues.sort(
@@ -287,43 +362,6 @@ class StatusQueryService:
 
         # Combine: ready issues first (sorted with real ranks), then others
         return ready_issues + other_issues
-
-    def _extract_failed_reason(self, issue_number: int) -> str | None:
-        """Extract a compact failure reason from issue comments."""
-        issue = self.github.view_issue(issue_number, repo=self.repo)
-        if not isinstance(issue, dict):
-            return None
-
-        comments = issue.get("comments")
-        if not isinstance(comments, list):
-            return None
-
-        for comment in reversed(comments):
-            if not isinstance(comment, dict):
-                continue
-            body = comment.get("body")
-            if not isinstance(body, str):
-                continue
-
-            body_lower = body.lower()
-            if (
-                "[resume]" in body_lower
-                or "[recovery]" in body_lower
-                or "继续到 state/handoff" in body
-                or "恢复到 state/handoff" in body
-            ):
-                continue
-
-            match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)
-            if match:
-                reason = match.group(1).strip()
-                if reason:
-                    return reason.split("\n")[0].strip()
-
-            if "failed" in body_lower or "error" in body_lower:
-                return body.strip().split("\n")[0][:100]
-
-        return None
 
     def fetch_worktree_map(self) -> dict[str, str]:
         """Get worktree branch-to-directory mapping.

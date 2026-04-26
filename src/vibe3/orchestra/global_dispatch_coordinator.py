@@ -18,6 +18,7 @@ from loguru import logger
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
@@ -47,6 +48,18 @@ class GlobalDispatchCoordinator:
             dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
         )
         self._repo = dispatch_services[0].config.repo if dispatch_services else None
+        # Union manager_usernames from all services
+        self._manager_usernames = tuple(
+            username
+            for service in dispatch_services
+            for username in service.config.manager_usernames
+        )
+        # Get supervisor_label from first service (should be same for all)
+        self._supervisor_label = (
+            dispatch_services[0].config.supervisor_handoff.issue_label
+            if dispatch_services
+            else "supervisor"
+        )
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
@@ -104,51 +117,55 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
-            if issue.state in {
-                IssueState.BLOCKED,
-                IssueState.FAILED,
-                IssueState.MERGE_READY,
-                IssueState.DONE,
-            }:
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=self._manager_usernames,
+                require_manager_assignee=(issue.state == IssueState.READY),
+            ):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{issue.number} "
+                    "from queue (supervisor or assignee check failed)",
+                )
                 self._frozen_queue.pop(index)
                 continue
 
-            # NEW: Check if remote state changed since collection. If changed,
-            # move to end of queue to let others go first and re-evaluate later.
-            if entry.collected_state and issue.state.value != entry.collected_state:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: #{issue.number} state changed "
-                    f"({entry.collected_state} -> {issue.state.value}), "
-                    "moving to end of queue",
-                )
-                logger.bind(
-                    domain="global_dispatch",
-                    issue=issue.number,
-                ).info(
-                    f"Issue #{issue.number} state changed from "
-                    f"{entry.collected_state} to {issue.state.value}, moving to end"
-                )
+            if issue.state in {IssueState.FAILED, IssueState.DONE}:
                 self._frozen_queue.pop(index)
-                entry.collected_state = issue.state.value
-                self._frozen_queue.append(entry)
-                # Do NOT increment index because current item was popped
                 continue
+
+            # Update collected_state to current state for tracking
+            # No longer "avoid" state changes - assignee check is sufficient
+            entry.collected_state = issue.state.value
 
             if entry.waiting_state is not None:
                 index += 1
                 continue
 
-            service = self._find_service_for_state(issue.state)
-            if service is None:
-                self._frozen_queue.pop(index)
-                continue
+            # For BLOCKED issues: run qualify gate at intent time (lazy evaluation)
+            if issue.state == IssueState.BLOCKED:
+                blocked_service = self._find_service_for_state(IssueState.BLOCKED)
+                if blocked_service is None:
+                    self._frozen_queue.pop(index)
+                    continue
+                target_state = blocked_service.qualify_blocked_issue(issue)
+                if target_state is None:
+                    # Still blocked — remove from frozen queue, re-collected next tick
+                    self._frozen_queue.pop(index)
+                    continue
+                service = self._find_service_for_state(target_state)
+                if service is None:
+                    self._frozen_queue.pop(index)
+                    continue
+                entry.collected_state = target_state.value
+            else:
+                service = self._find_service_for_state(issue.state)
+                if service is None:
+                    self._frozen_queue.pop(index)
+                    continue
 
             try:
-                service._emit_dispatch_intent(issue)
-                entry.waiting_state = issue.state.value
-                dispatched_count += 1
-
                 green = "\033[32m"
                 reset = "\033[0m"
                 append_orchestra_event(
@@ -156,6 +173,14 @@ class GlobalDispatchCoordinator:
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
                     f"#{issue.number} ({service.role_def.registry_role})",
                 )
+                service._emit_dispatch_intent(issue)
+                # For BLOCKED issues, waiting_state must track the TARGET state
+                # (qualify gate already changed GitHub labels to target_state).
+                # Using issue.state.value ("blocked") cause _promote_progressed_entries
+                # to detect a false state change and re-dispatch on the next tick.
+                entry.waiting_state = entry.collected_state
+                dispatched_count += 1
+
                 logger.bind(
                     domain="global_dispatch",
                     role=service.role_def.registry_role,
@@ -187,9 +212,11 @@ class GlobalDispatchCoordinator:
         seen_issue_numbers: set[int] = set()
         for state in (
             IssueState.REVIEW,
+            IssueState.MERGE_READY,
             IssueState.IN_PROGRESS,
             IssueState.CLAIMED,
             IssueState.HANDOFF,
+            IssueState.BLOCKED,  # Qualify gate runs at intent time
             IssueState.READY,
         ):
             service = self._find_service_for_state(state)
@@ -234,6 +261,20 @@ class GlobalDispatchCoordinator:
 
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
+                continue
+
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=self._manager_usernames,
+                require_manager_assignee=(issue.state == IssueState.READY),
+            ):
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                    "from queue (supervisor or assignee check failed)",
+                )
                 continue
 
             current_state = issue.state.value

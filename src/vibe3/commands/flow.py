@@ -213,6 +213,8 @@ def bind(
             links = []
             for ref in refs:
                 issue_number = parse_issue_number(ref)
+
+                # Create the persistent link in flow_issue_links (Source of Truth)
                 link = task_service.link_issue(
                     target_branch,
                     issue_number,
@@ -220,6 +222,13 @@ def bind(
                     actor=None,
                 )
                 links.append(link)
+
+                # If it's a dependency, trigger the block side-effects
+                # (label & display field)
+                if role == "dependency":
+                    flow_service.block_flow(
+                        target_branch, blocked_by_issue=issue_number, actor=None
+                    )
 
             if json_output:
                 if len(links) == 1:

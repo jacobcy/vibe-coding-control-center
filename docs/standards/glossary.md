@@ -213,12 +213,11 @@ related_docs:
 `flow_status` 定义了 flow 当前的执行状态，各状态语义：
 
 - **`active`**：flow 正常执行中，准备就绪或正在处理
-- **`waiting`**：flow 等待**外部依赖满足**，依赖完成后会自动唤醒；这是**可自动恢复**的等待状态
-  - 触发条件：flow 有未满足的依赖 issue，orchestra 会将其标记为 waiting
-  - 唤醒条件：所有依赖 issue 创建 PR 后，自动触发 `DependencySatisfied` 事件唤醒 flow
-  - 和 `blocked` 区别：`waiting` 是等待外部依赖（可自动恢复），`blocked` 是内部执行阻塞（需人工介入）
-- **`blocked`**：flow 执行被内部问题阻塞，需要人工介入才能恢复
-  - 不会自动唤醒，必须人工 resume
+- **`blocked`**：flow 被阻塞（手动锁定或依赖未满足）。
+  - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。
+  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。
+  - 判定标准：依赖项在 GitHub 上进入 `closed` 终态即视为满足。
+  - 自动巡逻：Orchestra 会主动拉取该状态任务进入“资格门”校验，满足条件后自动解套并智能恢复到正确阶段。
 - **`failed`**：flow 执行失败，需要人工修复或放弃
 - **`done`**：flow 执行完成，所有任务已办结
 - **`stale`**：flow 长期未活动，被系统标记为休眠
@@ -230,11 +229,12 @@ related_docs:
 - 正式术语：`dependency` (issue role)
 - 别称：依赖 issue
 - 定义：在 `flow_issue_links` 表中，`issue_role = 'dependency'` 表示该 issue 是当前 flow 所依赖的前置任务。
-- 语义：当前 flow 必须等待所有依赖 issue 完成（PR created）才能开始执行。
+- 语义：当前 flow 必须等待所有依赖 issue 完成（GitHub `issue.state == "closed"`）才能开始执行。
 - 机制：
-  - 依赖未满足 → flow 标记为 `waiting`
-  - 所有依赖满足 → flow 自动从 `waiting` 唤醒为 `active`
-  - 被唤醒 flow 的 worktree 默认从依赖的 PR 分支创建，确保代码基于最新依赖
+  - 依赖未满足 → flow 标记为 `blocked`。
+  - 自动巡逻：Orchestra 每轮轮询时会检查依赖 Issue 状态。
+  - 自动恢复：所有依赖满足后，Orchestra 自动移除阻塞，推断并恢复到正确状态。
+  - 继承分支：解封 flow 的 worktree 默认从依赖的 PR 分支创建，确保代码基于最新依赖。
 
 ### 3.5 `pr`
 

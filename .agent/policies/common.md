@@ -10,7 +10,7 @@
 - Python 相关命令必须走 `uv run`，不要直接用 `python` 或 `pip`。
 - 当前主线以 V3 和治理规则为中心；如遇历史 shell 入口，只按兼容现场处理，不把它当默认实现路径。
 - 多 worktree 并行开发时，共享运行时数据位于主仓库 git common dir，也就是主仓库 `.git`，不是当前 worktree 自己的局部 `.git`。
-- 当前 flow 的结构化 handoff 以 `vibe3 handoff show` 为准，不要先读 `.agent/context/task.md`。
+- 当前 flow 的结构化 handoff 以 `vibe3 handoff status` 为准，不要先读 `.agent/context/task.md`。
 - 当前 flow 的共享 handoff 文件路径模式为 `.git/vibe3/handoff/<branch-safe>-<hash>/current.md`。
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
@@ -20,7 +20,7 @@
 开始任何工作（plan/run/review）前，必须先读取当前 flow 的 manager 交接指令：
 
 ```bash
-uv run python src/vibe3/cli.py handoff show $(git branch --show-current)
+uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
 ```
 
 Manager 可能已写入质量审查意见、具体修复要求、重点关注区域等指令。
@@ -90,6 +90,64 @@ uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor
 
 使用规则：
 - 这类记录不要混进 plan、review、run 的主体输出里，更不要塞进最终交付摘要里冒充正式结论。
+
+## Comment vs Handoff Contract
+
+Issue / PR 评论和 handoff 是两条互补但不可替换的通道。
+
+### 何时用 issue / PR comment
+
+适合需要**外部可见性**的内容：
+- 阶段性里程碑通报（plan 完成、run 完成、review 裁决）
+- 需要人类介入的 blocker（凭证缺失、依赖未就绪、范围争议）
+- 跨角色协作公告（人类、其他 agent、PR reviewer 都可能看到）
+- 与 GitHub issue / PR 状态机直接相关的事件
+
+### 何时用 handoff append
+
+适合 **agent 之间的内部交接**：
+- 执行过程中的 finding、临时观察、调试线索
+- 仅供下一步 agent 消费的上下文
+- 不需要人类即刻知晓的次要信息
+- 与当前 flow 主体输出无直接关联但需要留痕的事项
+
+判断准则：**看一眼 issue 评论区就需要知道的事 → comment；只有同 flow 内的下一个 agent 需要的事 → handoff append**。
+
+### 强制 marker 格式
+
+所有 agent 写出的 issue / PR comment 必须以角色 marker 开头（行首，方括号包裹）。
+
+| 角色 | Marker | 适用场景 |
+|------|--------|---------|
+| manager | `[manager]` | 状态切换、质量审核、调度通报 |
+| planner | `[plan]` | plan 完成、范围澄清、需求确认 |
+| executor | `[run]` | run 完成、阻塞汇报、执行结论 |
+| reviewer | `[review]` | review 裁决、追问、合并建议 |
+| resume | `[resume]` | 任务恢复时的现场说明 |
+| governance | `[governance]` / `[governance suggest]` | 治理建议、自动恢复、 routing |
+| apply / supervisor | `[apply]` / `[orchestra]` | 治理执行、编排公告 |
+
+格式约束：
+- marker 必须出现在评论第一行行首，前面只允许空白字符。
+- marker 与正文之间至少一个空格或换行。
+- 不要用 marker 装饰非自动化评论；marker 一旦出现，系统会按 agent 评论处理。
+- 未来 agent 若使用人类账号发布 comment，marker 是唯一可靠的"我是 agent"信号；缺失即被识别为人类指令。
+
+不合规示例（会被人类指令解析器误读）：
+```
+✗ "Manager: moving to in-progress"        # 无 marker，会被识别为人类
+✗ "请尽快合并 [manager]"                  # marker 不在行首
+✗ "评论里嵌入 [run] 字样作引用"           # 装饰性使用，会触发 agent 过滤
+```
+
+合规示例：
+```
+✓ "[manager] Moved issue to In-Progress; planner queued."
+✓ "[run] Implementation complete. Tests: pytest=PASS, mypy=PASS."
+✓ "[review] MAJOR: handoff contract broken — see findings #1, #3."
+```
+
+
 
 ## 高价值场景
 

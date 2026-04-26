@@ -98,7 +98,7 @@ def _parse_settings(path: Path) -> tuple[dict[str, str], dict[str, list[str]], d
     return scalars, string_lists, object_lists
 
 
-def load_loc_settings(config_path: str = "config/settings.yaml") -> LocSettings:
+def load_loc_settings(config_path: str = "config/loc_limits.yaml") -> LocSettings:
     scalars, string_lists, object_lists = _parse_settings(Path(config_path))
     exceptions = tuple(
         LocException(

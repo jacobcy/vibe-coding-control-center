@@ -7,7 +7,10 @@
 4. 正常推进 → 不干预（agent 改状态）
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
+
+import pytest
 
 
 class TestPlannerFailed:
@@ -100,14 +103,11 @@ class TestPlannerBlockedNoStateChange:
 class TestPlannerSuccessStateChanged:
     """场景 4: planner 正常推进 → 不干预"""
 
+    @pytest.mark.skip(reason="Placeholder until planner success behavior is asserted")
     def test_planner_success_no_forced_handoff_event(
         self,
     ) -> None:
         """Planner 正常推进 → 不应该强制转 HANDOFF"""
-        # This test verifies that planner success does NOT force HANDOFF
-        # The actual implementation will be fixed to remove confirm_role_handoff
-        # For now, we document the expected behavior
-        pass  # ← Placeholder: 实际修复后添加详细测试
 
 
 class TestPlannerNoOpGate:
@@ -174,3 +174,31 @@ class TestPlannerNoOpGate:
             )
 
         mock_block.assert_not_called()
+
+
+def test_build_plan_prompt_retry_resume_provides_bootstrap_fallback() -> None:
+    from vibe3.models.orchestration import IssueInfo
+    from vibe3.roles.plan import build_plan_prompt
+
+    config = SimpleNamespace(repo="owner/repo")
+    issue = IssueInfo(number=123, title="Retry planning", labels=[])
+    flow_state = {"plan_ref": "docs/plans/issue-123-plan.md"}
+
+    with patch("vibe3.roles.plan._build_plan_task_guidance", return_value=None):
+        prompt, refs, summary, include_notice, fallback_prompt = build_plan_prompt(
+            config,
+            issue,
+            "task/issue-123",
+            flow_state,
+            session_id="ses_123",
+        )
+
+    assert refs == {"plan_ref": "docs/plans/issue-123-plan.md"}
+    assert summary["prompt_mode"] == "retry"
+    assert summary["context_mode"] == "resume"
+    assert summary["fallback_context_mode"] == "bootstrap"
+    assert include_notice is False
+    assert fallback_prompt is not None
+    assert "policy" not in prompt.lower()
+    assert "handoff plan" in prompt
+    assert "## Output format requirements" in fallback_prompt

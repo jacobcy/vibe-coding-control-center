@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, cast
 
@@ -11,18 +9,15 @@ import typer
 from loguru import logger
 
 from vibe3.agents.models import create_codeagent_command
-from vibe3.agents.review_parser import (
-    ParsedReview,
-    ReviewParserError,
-    parse_codex_review,
-)
 from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
-from vibe3.agents.review_prompt import make_review_context_builder
+from vibe3.agents.review_prompt import (
+    build_review_prompt_body,
+    describe_review_sections,
+    make_review_context_builder,
+)
 from vibe3.analysis.inspect_output_adapter import changed_symbols
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -36,17 +31,19 @@ from vibe3.execution.issue_role_support import (
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
+from vibe3.execution.prompt_meta import build_prompt_meta
 from vibe3.execution.role_contracts import REVIEWER_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.services.artifact_parser import ArtifactParser
+from vibe3.roles.review_helpers import (
+    ReviewRunResult,
+    finalize_review_output,
+)
 from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
-from vibe3.utils.path_helpers import BranchBoundGitClient
 
 REVIEWER_ROLE = TriggerableRoleDefinition(
     name="reviewer",
@@ -87,6 +84,8 @@ def build_issue_review_request(
     session_id: str | None = None,
     options: Any = None,
     dry_run: bool = False,
+    show_prompt: bool = False,
+    flow_state: dict[str, object] | None = None,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
     target_branch = branch or f"task/issue-{issue.number}"
@@ -100,24 +99,64 @@ def build_issue_review_request(
             review_prompt
             or f"Review implementation for issue #{issue.number}: {issue.title}"
         )
+        meta = build_prompt_meta(
+            flow_state,
+            ref_keys=("report_ref", "audit_ref"),
+            retry_ref_keys=("audit_ref",),
+            session_id=session_id,
+            default_mode="first",
+        )
+
+        request = ReviewRequest(
+            scope=ReviewScope.for_base("origin/main"),
+            task_guidance=task,
+        )
+        prompt = build_review_prompt_body(
+            request,
+            VibeConfig.get_defaults(),
+            mode=meta.prompt_mode,  # type: ignore[arg-type]
+            context_mode=meta.context_mode,
+        )
+        fallback_prompt = None
+        if meta.fallback_context_mode is not None:
+            fallback_prompt = build_review_prompt_body(
+                request,
+                VibeConfig.get_defaults(),
+                mode=meta.prompt_mode,  # type: ignore[arg-type]
+                context_mode=meta.fallback_context_mode,
+            )
+        sections = describe_review_sections(
+            meta.prompt_mode,  # type: ignore[arg-type]
+            meta.context_mode,
+        )
+        refs = dict(meta.refs)
+        if report_ref and "report_ref" not in refs:
+            refs["report_ref"] = report_ref
+        dry_run_summary = meta.summary(sections)
 
         return build_issue_sync_prompt_request(
             role="reviewer",
             issue=issue,
             target_branch=target_branch,
-            prompt=task,
+            prompt=prompt,
             options=options,
             task=task,
             actor=actor,
             execution_name=execution_name,
             session_id=session_id,
             dry_run=dry_run,
+            show_prompt=show_prompt,
+            include_global_notice=meta.include_global_notice,
+            fallback_prompt=fallback_prompt,
+            fallback_include_global_notice=True,
+            extra_refs=refs,
+            dry_run_summary=dry_run_summary,
             worktree_requirement=REVIEWER_ROLE.worktree,
         )
 
-    refs: dict[str, str] = {"issue_number": str(issue.number)}
+    async_refs: dict[str, str] = {"issue_number": str(issue.number)}
     if report_ref:
-        refs["report_ref"] = report_ref
+        async_refs["report_ref"] = report_ref
     command_args = ["review", "--issue", str(issue.number), "--no-async"]
     if report_ref:
         command_args.extend(["--report-ref", report_ref])
@@ -129,7 +168,7 @@ def build_issue_review_request(
         command_args=command_args,
         actor=actor,
         execution_name=execution_name,
-        refs=refs,
+        refs=async_refs,
         worktree_requirement=REVIEWER_ROLE.worktree,
         repo_path=repo_path,
     )
@@ -146,18 +185,25 @@ def build_review_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    flow_state = SQLiteClient().get_flow_state(branch) if branch else None
     return build_issue_review_request(
         issue,
         branch=branch,
+        flow_state=flow_state,
         session_id=session_id,
         options=options,
         actor=actor,
         dry_run=dry_run,
+        show_prompt=show_prompt,
         sync=True,
         config=config,
     )
@@ -169,7 +215,6 @@ def _process_review_sync_result(
     """Process sync review output and write audit_ref to flow_state."""
     finalize_review_output(
         review_output=stdout,
-        handoff_file=None,
         branch=branch,
         actor=actor,
     )
@@ -189,183 +234,6 @@ REVIEW_SYNC_SPEC = build_issue_sync_spec(
         reason=reason,
     ),
 )
-
-
-@dataclass
-class ReviewRunResult:
-    """Structured result for command-facing review output."""
-
-    verdict: str
-    handoff_file: str | None
-    issue_number: int | None
-
-
-def _create_minimal_audit_artifact(
-    content: str,
-    verdict: str,
-    branch: str | None,
-) -> Path:
-    artifact_dir = _resolve_minimal_audit_dir(branch)
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    branch_slug = (branch or "detached").replace("/", "-")
-    artifact_path = artifact_dir / f"{branch_slug}-audit-auto-{timestamp}.md"
-    sanitized_content = ArtifactParser.sanitize_handoff_content(content)
-    artifact_path.write_text(
-        "# Minimal Review Audit\n\n"
-        f"VERDICT: {verdict}\n\n"
-        "## Review Output\n\n"
-        f"{sanitized_content.rstrip()}\n",
-        encoding="utf-8",
-    )
-    return artifact_path
-
-
-def _resolve_minimal_audit_dir(branch: str | None) -> Path:
-    git = GitClient()
-    worktree_root: Path | None = None
-
-    try:
-        current_root = git.get_worktree_root()
-        if current_root:
-            worktree_root = Path(current_root)
-    except Exception:
-        pass
-
-    if worktree_root is None and branch:
-        try:
-            worktree_root = git.find_worktree_path_for_branch(branch)
-        except Exception:
-            pass
-
-    if worktree_root is not None:
-        reports_dir = worktree_root / "docs" / "reports"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        return reports_dir
-
-    handoff_svc = (
-        HandoffService(git_client=BranchBoundGitClient(branch))
-        if branch
-        else HandoffService()
-    )
-    return handoff_svc.storage.ensure_handoff_dir()
-
-
-def _resolve_authoritative_audit_ref(
-    handoff_file: str | None,
-    review_output: str,
-    verdict: str | None,
-    branch: str | None,
-    *,
-    existing_audit_ref: str | None = None,
-) -> str:
-    if existing_audit_ref:
-        return existing_audit_ref
-    if handoff_file:
-        handoff_path = Path(handoff_file)
-        if handoff_path.exists():
-            return str(handoff_path)
-    return str(
-        _create_minimal_audit_artifact(
-            review_output,
-            verdict or "UNKNOWN",
-            branch,
-        )
-    )
-
-
-def _load_existing_audit_ref(branch: str | None) -> str | None:
-    if not branch:
-        return None
-    flow = FlowService().get_flow_status(branch)
-    if flow and flow.audit_ref:
-        return flow.audit_ref
-    return None
-
-
-def _resolve_review_verdict(
-    review_output: str,
-    *,
-    audit_ref: str | None = None,
-) -> str:
-    from vibe3.utils.constants import VERDICT_UNKNOWN
-
-    try:
-        review = parse_codex_review(review_output)
-        return review.verdict
-    except ReviewParserError:
-        pass
-
-    if audit_ref:
-        audit_path = Path(audit_ref)
-        if audit_path.exists():
-            try:
-                review = parse_codex_review(audit_path.read_text(encoding="utf-8"))
-                return review.verdict
-            except (OSError, ReviewParserError):
-                pass
-
-    return VERDICT_UNKNOWN
-
-
-def finalize_review_output(
-    *,
-    review_output: str,
-    handoff_file: str | None,
-    branch: str | None,
-    actor: str,
-) -> tuple[str, str]:
-    """Finalize review output by confirming audit_ref and writing verdict."""
-    existing_audit_ref = _load_existing_audit_ref(branch)
-    reviewer_wrote_audit = bool(existing_audit_ref)
-
-    audit_ref: str
-    if reviewer_wrote_audit:
-        audit_ref = existing_audit_ref  # type: ignore[assignment]
-    else:
-        if handoff_file and Path(handoff_file).exists():
-            audit_ref = handoff_file
-        else:
-            audit_ref = str(
-                _create_minimal_audit_artifact(
-                    review_output,
-                    _resolve_review_verdict(review_output),
-                    branch,
-                )
-            )
-
-    if reviewer_wrote_audit:
-        audit_path = Path(audit_ref)
-        audit_content = None
-        if audit_path.exists():
-            try:
-                audit_content = audit_path.read_text(encoding="utf-8")
-            except OSError:
-                pass
-        verdict = _resolve_review_verdict(
-            audit_content or review_output,
-            audit_ref=audit_ref,
-        )
-    else:
-        verdict = _resolve_review_verdict(review_output, audit_ref=audit_ref)
-
-    try:
-        handoff_svc = (
-            HandoffService(git_client=BranchBoundGitClient(branch))
-            if branch
-            else HandoffService()
-        )
-        handoff_svc.record_audit(
-            audit_ref=audit_ref,
-            actor=actor,
-            verdict=verdict,  # type: ignore[arg-type]
-            is_system_auto=not reviewer_wrote_audit,
-        )
-    except Exception as exc:
-        logger.bind(domain="review", action="finalize").warning(
-            f"Failed to record audit handoff: {exc}"
-        )
-
-    return audit_ref, verdict
 
 
 def build_manual_review_request_payload(
@@ -430,7 +298,33 @@ def build_base_review_request(
     )
 
 
-def execute_manual_review(
+def execute_manual_review_async(
+    *,
+    request: ReviewRequest,
+    instructions: str | None,
+    issue_number: int | None = None,
+    pr_number: int | None = None,
+    branch: str,
+) -> ReviewRunResult:
+    """Execute manual review in async mode (tmux wrapper)."""
+    launch = _dispatch_async_manual_review(
+        request=request,
+        branch=branch,
+        issue_number=issue_number,
+        pr_number=pr_number,
+        instructions=instructions,
+    )
+    if not launch.launched:
+        logger.bind(domain="review").warning(
+            "Async review launch skipped",
+            reason=launch.reason,
+            reason_code=launch.reason_code,
+        )
+        return ReviewRunResult("ERROR", None, issue_number)
+    return ReviewRunResult("ASYNC", None, issue_number)
+
+
+def execute_manual_review_sync(
     *,
     request: ReviewRequest,
     dry_run: bool,
@@ -438,13 +332,12 @@ def execute_manual_review(
     issue_number: int | None = None,
     pr_number: int | None = None,
     branch: str | None = None,
-    async_mode: bool = True,
     config: VibeConfig | None = None,
     flow_service: FlowService | None = None,
-    review_parser: Callable[[str], ParsedReview] = parse_codex_review,
     context_builder: Callable[..., object] = make_review_context_builder,
 ) -> ReviewRunResult:
-    """Execute manual review for `review pr` and `review base`."""
+    """Execute manual review in sync mode (direct execution)."""
+    _ = flow_service
     cfg = config or VibeConfig.get_defaults()
     log = logger.bind(domain="review", scope=request.scope.kind)
     task = _build_manual_review_task(cfg, instructions, request, pr_number, log)
@@ -460,34 +353,15 @@ def execute_manual_review(
         issue_number=issue_number,
         pre_gate_callback=_process_review_sync_result,
     )
-    if async_mode and not dry_run and branch:
-        launch = _dispatch_async_manual_review(
-            request=request,
-            branch=branch,
-            issue_number=issue_number,
-            pr_number=pr_number,
-            instructions=instructions,
-        )
-        if not launch.launched:
-            logger.bind(domain="review").warning(
-                "Async review launch skipped",
-                reason=launch.reason,
-                reason_code=launch.reason_code,
-            )
-            return ReviewRunResult("ERROR", None, issue_number)
-        return ReviewRunResult("ASYNC", None, issue_number)
-
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
         return ReviewRunResult("DRY_RUN", None, issue_number)
 
     audit_ref, verdict = finalize_review_output(
         review_output=result.stdout,
-        handoff_file=str(result.handoff_file) if result.handoff_file else None,
         branch=branch,
         actor="agent:review",
     )
-
     return ReviewRunResult(verdict, audit_ref, issue_number)
 
 
@@ -506,6 +380,8 @@ def _dispatch_async_manual_review(
         if issue_number is not None
         else f"vibe3-reviewer-{request.scope.kind}-{target_id or 'adhoc'}"
     )
+    from vibe3.clients.sqlite_client import SQLiteClient
+
     coordinator = ExecutionCoordinator(
         load_orchestra_config(),
         SQLiteClient(),

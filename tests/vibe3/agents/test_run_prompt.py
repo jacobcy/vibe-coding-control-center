@@ -55,15 +55,45 @@ def test_build_run_prompt_body_requires_report_ref_registration(tmp_path: Path) 
     assert "handoff report" in context
 
 
-def test_build_run_prompt_body_fix_mode_uses_fix_task(tmp_path: Path) -> None:
+def test_build_run_prompt_body_instructs_ref_reads_via_handoff_show(
+    tmp_path: Path,
+) -> None:
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    assert "handoff show <ref>" in context
+    assert "Do not call file-reading tools directly" in context
+
+
+def test_build_run_prompt_body_retry_mode_uses_retry_task(tmp_path: Path) -> None:
     config = VibeConfig.get_defaults()
     plan_file = tmp_path / "plan.md"
     plan_file.write_text("## Summary\nFix round\n", encoding="utf-8")
 
-    context = build_run_prompt_body(str(plan_file), config, mode="fix")
+    context = build_run_prompt_body(str(plan_file), config, mode="retry")
 
-    assert "focused fix round" in context
+    assert "focused retry round" in context
     assert "Follow plan steps strictly" not in context
+
+
+def test_build_run_prompt_body_retry_resume_mode_is_minimal(tmp_path: Path) -> None:
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nRetry round\n", encoding="utf-8")
+
+    context = build_run_prompt_body(
+        str(plan_file),
+        config,
+        audit_file=str(tmp_path / "audit.md"),
+        mode="retry",
+        context_mode="resume",
+    )
+
+    assert "focused retry round" in context
+    assert "## Implementation Plan" not in context
 
 
 def test_build_run_output_contract_section_keeps_output_contract_only() -> None:

@@ -113,6 +113,18 @@ _CREATE_FLOW_CONTEXT_CACHE = """
 """
 
 
+_CLEAN_STALE_VERDICT_LINES_SQL = """
+    UPDATE flow_events
+    SET detail = CASE
+        WHEN instr(detail, char(10)) > 0
+            THEN substr(detail, instr(detail, char(10)) + 1)
+        ELSE REPLACE(detail, 'verdict: UNKNOWN', '')
+    END
+    WHERE event_type IN ('handoff_plan', 'handoff_report', 'handoff_run')
+      AND detail LIKE 'verdict: UNKNOWN%'
+"""
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
     # Enable WAL mode so concurrent readers (CLI, orchestra, tmux agents)
@@ -197,7 +209,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added latest_verdict column to flow_state"
         )
 
-    # Migration: add latest_indicate_action field for structured executor dispatch
+    # Legacy compatibility: keep old column for existing databases.
+    # New code no longer reads or writes this field.
     if "latest_indicate_action" not in existing:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_indicate_action TEXT")
         logger.bind(external="sqlite", operation="migration").info(
@@ -246,6 +259,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
     }
     if "refs" not in event_columns:
         cursor.execute("ALTER TABLE flow_events ADD COLUMN refs TEXT")
+
+    before_changes = conn.total_changes
+    cursor.execute(_CLEAN_STALE_VERDICT_LINES_SQL)
+    cleaned = conn.total_changes - before_changes
+    if cleaned:
+        logger.bind(external="sqlite", operation="migration").info(
+            f"Cleaned stale plan/run verdict lines from {cleaned} flow_events rows"
+        )
 
     # Normalize legacy issue_role values from the old classification view.
     cursor.execute(

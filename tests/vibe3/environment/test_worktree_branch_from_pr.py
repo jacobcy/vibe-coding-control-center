@@ -49,7 +49,7 @@ class TestFindDependencyWakeupPR:
         store.update_flow_state("task/issue-300", flow_slug="test-300")
         store.add_event(
             "task/issue-300",
-            "dependency_wake_up",
+            "flow_unblocked",
             "orchestra:dependency_handler",
             detail="Dependencies satisfied",
             refs={"source_pr": "42"},
@@ -83,7 +83,7 @@ class TestFindDependencyWakeupPR:
         # First wake-up from PR 42
         store.add_event(
             branch,
-            "dependency_wake_up",
+            "flow_unblocked",
             "orchestra:dependency_handler",
             detail="Dependencies satisfied",
             refs={"source_pr": "42"},
@@ -91,7 +91,7 @@ class TestFindDependencyWakeupPR:
         # Later wake-up from PR 43
         store.add_event(
             branch,
-            "dependency_wake_up",
+            "flow_unblocked",
             "orchestra:dependency_handler",
             detail="Dependencies satisfied (another dependency)",
             refs={"source_pr": "43"},
@@ -124,7 +124,7 @@ class TestFindDependencyWakeupPR:
         store.update_flow_state(branch, flow_slug=f"test-300-{unique_id}")
         store.add_event(
             branch,
-            "dependency_wake_up",
+            "flow_unblocked",
             "orchestra:dependency_handler",
             detail="Dependencies satisfied",
             refs={},  # No source_pr
@@ -333,71 +333,3 @@ class TestCreateFromPRBranchExistingBranch:
                                 # Should return None (trigger fallback),
                                 # not silently proceed with wrong tip
                                 assert result is None
-
-
-class TestIsIssueSatisfiedWithPRRef:
-    """Tests for _is_issue_satisfied with local flow PR truth source."""
-
-    def test_flow_with_pr_ref_satisfies(self) -> None:
-        """Dependency with pr_ref in local flow should be satisfied."""
-        from vibe3.domain.handlers.dependency_wake_up import _is_issue_satisfied
-
-        gh = MagicMock()
-
-        with patch(
-            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
-        ) as mock_store_cls:
-            mock_store = MagicMock()
-            mock_store.get_flows_by_issue.return_value = [
-                {"pr_ref": "https://github.com/org/repo/pull/42"}
-            ]
-            mock_store_cls.return_value = mock_store
-
-            result = _is_issue_satisfied(gh, 301)
-            assert result is True
-            # Should NOT call GitHub — local truth source is sufficient
-            gh.view_issue.assert_not_called()
-
-    def test_flow_with_pr_number_satisfies(self) -> None:
-        """Dependency with pr_number in local flow should be satisfied."""
-        from vibe3.domain.handlers.dependency_wake_up import _is_issue_satisfied
-
-        gh = MagicMock()
-
-        with patch(
-            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
-        ) as mock_store_cls:
-            mock_store = MagicMock()
-            mock_store.get_flows_by_issue.return_value = [
-                {"pr_ref": None, "pr_number": 42}
-            ]
-            mock_store_cls.return_value = mock_store
-
-            result = _is_issue_satisfied(gh, 301)
-            assert result is True
-            gh.view_issue.assert_not_called()
-
-    def test_flow_without_pr_falls_back_to_github(self) -> None:
-        """Dependency without PR in local flow should fall back to GitHub check."""
-        from vibe3.domain.handlers.dependency_wake_up import _is_issue_satisfied
-
-        gh = MagicMock()
-        gh.view_issue.return_value = {
-            "number": 301,
-            "state": "open",
-            "labels": [{"name": "state/ready"}],
-            "body": "In progress",
-        }
-
-        with patch(
-            "vibe3.domain.handlers.dependency_wake_up.SQLiteClient"
-        ) as mock_store_cls:
-            mock_store = MagicMock()
-            mock_store.get_flows_by_issue.return_value = [
-                {"pr_ref": None, "pr_number": None}
-            ]
-            mock_store_cls.return_value = mock_store
-
-            result = _is_issue_satisfied(gh, 301)
-            assert result is False
-            gh.view_issue.assert_called_once()

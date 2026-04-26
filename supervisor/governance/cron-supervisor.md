@@ -93,6 +93,20 @@ Forbidden:
 - `supervisor`
 - `state/handoff`
 
+## Comment Contract
+
+任何写入 issue 的评论必须遵循 marker 规则：
+
+- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
+- Marker 与正文之间至少一个空格或换行
+- 不要用人话代替 marker（"Cron Supervisor 派单"无法被人类指令解析器识别）
+- 派单类 routing 评论建议用 `[governance suggest]`，明确表达"这是建议而非强制结论"
+
+合规示例：
+```
+[governance suggest] Routed 3 stale docs to supervisor issue #482; see scope below.
+```
+
 ## Output Contract
 
 输出至少包含：

@@ -22,7 +22,7 @@ class MainBranchProtectedError(Exception):
 ExecutionStatus = Literal["pending", "running", "done", "crashed", "aborted"]
 
 
-def _migrate_flow_status_value(v: str) -> str:
+def _migrate_flow_status_value(v: str | None) -> str | None:
     """Normalize legacy flow status values."""
     if v == "idle":
         return "active"
@@ -30,6 +30,8 @@ def _migrate_flow_status_value(v: str) -> str:
         return "stale"
     if v == "merged":
         return "done"
+    if v == "waiting":
+        return "blocked"
     return v
 
 
@@ -80,7 +82,6 @@ class FlowState(BaseModel):
         "stale",
         "aborted",
         "merged",
-        "waiting",  # NEW: waiting for dependencies
     ] = "active"
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
@@ -91,22 +92,14 @@ class FlowState(BaseModel):
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None  # Latest verdict for quick query
-    latest_indicate_action: str | None = (
-        None  # Latest structured action from manager indicate
-    )
 
     model_config = {"extra": "ignore"}
 
     @field_validator("flow_status", mode="before")
     @classmethod
     def migrate_flow_status(cls, v: str) -> str:
-        """Migrate legacy flow status values.
-
-        - idle -> active (default state)
-        - missing -> stale (inactive state)
-        - merged -> done (completed state)
-        """
-        return _migrate_flow_status_value(v)
+        """Migrate legacy flow status values."""
+        return str(_migrate_flow_status_value(v))
 
     @field_validator(
         "planner_status",
@@ -241,10 +234,10 @@ class FlowStatusResponse(BaseModel):
         "stale",
         "aborted",
         "merged",
-        "waiting",  # NEW: waiting for dependencies
     ]
     task_issue_number: int | None = None
     pr_number: int | None = None
+    pr_ref: str | None = None  # PR URL as proof of PR creation
     pr_ready_for_review: bool = False
     spec_ref: str | None = None
     plan_ref: str | None = None
@@ -268,16 +261,13 @@ class FlowStatusResponse(BaseModel):
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None
-    latest_indicate_action: str | None = (
-        None  # Latest structured action from manager indicate
-    )
     worktree_root: str | None = None  # NEW: Worktree root path for path resolution
 
     @field_validator("flow_status", mode="before")
     @classmethod
     def migrate_flow_status(cls, v: str) -> str:
         """Migrate legacy flow status values for status responses."""
-        return _migrate_flow_status_value(v)
+        return str(_migrate_flow_status_value(v))
 
     @field_validator(
         "planner_status",
@@ -289,6 +279,26 @@ class FlowStatusResponse(BaseModel):
     def migrate_execution_status(cls, v: str | None) -> str | None:
         """Migrate legacy execution status values for status responses."""
         return _migrate_execution_status_value(v)
+
+    @field_validator("latest_verdict", mode="before")
+    @classmethod
+    def parse_verdict_record(
+        cls, v: str | dict[str, object] | None
+    ) -> VerdictRecord | None:
+        """Parse verdict record from JSON string or dict for status responses."""
+        if v is None:
+            return None
+        if isinstance(v, VerdictRecord):
+            return v
+        if isinstance(v, str):
+            try:
+                data = json.loads(v)
+                return VerdictRecord(**data)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if isinstance(v, dict):
+            return VerdictRecord(**v)  # type: ignore[arg-type]
+        return None
 
     @classmethod
     def from_state(
@@ -312,6 +322,7 @@ class FlowStatusResponse(BaseModel):
             flow_status=data.get("flow_status", "active"),
             task_issue_number=resolved_task_issue_number,
             pr_number=pr_number if pr_number is not None else data.get("pr_number"),
+            pr_ref=data.get("pr_ref"),
             pr_ready_for_review=(
                 pr_ready
                 if pr_ready is not None
@@ -339,7 +350,6 @@ class FlowStatusResponse(BaseModel):
             execution_started_at=data.get("execution_started_at"),
             execution_completed_at=data.get("execution_completed_at"),
             latest_verdict=data.get("latest_verdict"),
-            latest_indicate_action=data.get("latest_indicate_action"),
             worktree_root=worktree_root,
         )
 
