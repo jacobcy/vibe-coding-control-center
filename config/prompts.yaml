@@ -381,11 +381,24 @@ run:
   retry_task: |
     Treat this run as a focused retry round, not a fresh implementation pass.
     Reuse the existing session context when available.
-    Read the current authoritative refs yourself before continuing:
-    - `plan_ref` for the current plan
-    - `report_ref` for the latest execution report
-    - `audit_ref` for the latest review findings
-    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+
+    ## Quick Scene Commands
+    - Read current task context: `uv run python src/vibe3/cli.py task show`
+    - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
+    - Read handoff artifact: `uv run python src/vibe3/cli.py handoff show @key`
+    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show --branch <branch-name>`
+
+    ## Read Manager Instructions
+    **IMPORTANT**: Manager may have appended specific fix instructions in handoff.
+    Run `uv run python src/vibe3/cli.py handoff show --branch <current-branch>` to read manager's instructions.
+    Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
+
+    ## Read Authoritative Refs via CLI
+    Read refs via `handoff show` command (NOT direct file path to avoid permission errors):
+    - `uv run python src/vibe3/cli.py handoff show <plan_ref>` — current plan
+    - `uv run python src/vibe3/cli.py handoff show <report_ref>` — latest execution report
+    - `uv run python src/vibe3/cli.py handoff show <audit_ref>` — review findings
+
     Read the audit feedback carefully and fix the cited problems first.
     Keep scope tight: do not expand the change unless required to resolve the reported issues safely.
     Explain any audit item you intentionally do not change, with a concrete reason.
@@ -459,9 +472,21 @@ plan:
   retry_task: |
     This is a retry planning round, not a fresh planning pass.
     Reuse the existing session context when available.
-    Read the current authoritative refs yourself before continuing:
-    - `plan_ref` for the previous plan
-    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+
+    ## Quick Scene Commands
+    - Read current task context: `uv run python src/vibe3/cli.py task show`
+    - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
+    - Read handoff artifact: `uv run python src/vibe3/cli.py handoff show @key`
+    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show --branch <branch-name>`
+
+    ## Read Manager Instructions
+    **IMPORTANT**: Manager may have appended specific instructions in handoff.
+    Run `uv run python src/vibe3/cli.py handoff show --branch <current-branch>` to read manager's instructions.
+    Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
+
+    ## Read Authoritative Refs via CLI
+    Read `plan_ref` via: `uv run python src/vibe3/cli.py handoff show <plan_ref>`
+
     Revise the plan in place based on the latest feedback and current repository state.
     You must still follow the same output format and final state transition contract as a normal planning round.
 
@@ -541,10 +566,23 @@ review:
   retry_task: |
     This is a retry review round, not a fresh review pass.
     Reuse the existing session context when available.
-    Read the current authoritative refs yourself before continuing:
-    - `report_ref` for the latest implementation report
-    - `audit_ref` if a previous audit already exists
-    If manager has appended handoff notes or an indicate file, read them and follow the latest instructions.
+
+    ## Quick Scene Commands
+    - Read current task context: `uv run python src/vibe3/cli.py task show`
+    - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
+    - Read handoff artifact: `uv run python src/vibe3/cli.py handoff show @key`
+    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show --branch <branch-name>`
+
+    ## Read Manager Instructions
+    **IMPORTANT**: Manager may have appended specific instructions in handoff.
+    Run `uv run python src/vibe3/cli.py handoff show --branch <current-branch>` to read manager's instructions.
+    Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
+
+    ## Read Authoritative Refs via CLI
+    Read refs via `handoff show` command (NOT direct file path to avoid permission errors):
+    - `uv run python src/vibe3/cli.py handoff show <report_ref>` — latest implementation report
+    - `uv run python src/vibe3/cli.py handoff show <audit_ref>` — previous audit if exists
+
     Keep scope focused on verifying whether the previously raised concerns are now resolved.
     You must still follow the same output format and final state transition contract as a normal review.
 

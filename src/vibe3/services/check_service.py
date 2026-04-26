@@ -361,6 +361,14 @@ class CheckService(CheckRemote):
             statuses = [status] if isinstance(status, str) else status
             all_flows = [f for f in all_flows if f.get("flow_status") in statuses]
 
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = self.github_client.list_all_prs(state="all")
+            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        except Exception as exc:
+            logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
+            self._branch_to_pr = {}
+
         results = []
         for flow in all_flows:
             results.append(self._check_branch(flow["branch"]))
