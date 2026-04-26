@@ -131,6 +131,28 @@ class CheckService(CheckRemote):
             self._has_worktree(branch),
         )
 
+    def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
+        """Handle closed/merged PR by marking flow done.
+
+        Returns CheckResult if PR is closed/merged, None otherwise.
+        """
+        if pr.state not in (PRState.CLOSED, PRState.MERGED) and not pr.merged_at:
+            return None
+
+        suggestions = self._mark_flow_done(
+            branch,
+            f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+        )
+        self._update_pr_cache(branch, pr)
+
+        result_issues: list[str] = []
+        if suggestions.get("issue_to_close"):
+            result_issues.append(
+                f"Suggestion: Issue #{suggestions['issue_to_close']} is still OPEN. "
+                "Consider closing it."
+            )
+        return CheckResult(is_valid=True, branch=branch, issues=result_issues)
+
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
         issues: list[str] = []
@@ -188,21 +210,9 @@ class CheckService(CheckRemote):
         # PR verification (Remote-first) - use cached PR data
         pr = self._branch_to_pr.get(branch)
         if pr:
-            # Check if PR is closed or merged - auto-complete flow
-            if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                suggestions = self._mark_flow_done(
-                    branch,
-                    f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                )
-                # Write cache: update PR title
-                self._update_pr_cache(branch, pr)
-                # Report issue close suggestion
-                result_issues: list[str] = []
-                if suggestions.get("issue_to_close"):
-                    result_issues.append(
-                        f"Suggestion: Issue #{suggestions['issue_to_close']} is still OPEN. Consider closing it."
-                    )
-                return CheckResult(is_valid=True, branch=branch, issues=result_issues)
+            result = self._handle_closed_pr(branch, pr)
+            if result:
+                return result
         else:
             # No PR found in cache, try API as fallback
             try:
@@ -215,24 +225,9 @@ class CheckService(CheckRemote):
                     prs = [p for p in all_prs if p.state != PRState.OPEN]
 
                 if prs:
-                    pr = prs[0]
-                    # Check if PR is closed or merged - auto-complete flow
-                    if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                        suggestions = self._mark_flow_done(
-                            branch,
-                            f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                        )
-                        # Write cache: update PR title
-                        self._update_pr_cache(branch, pr)
-                        # Report issue close suggestion
-                        result_issues = []
-                        if suggestions.get("issue_to_close"):
-                            result_issues.append(
-                                f"Suggestion: Issue #{suggestions['issue_to_close']} is still OPEN. Consider closing it."
-                            )
-                        return CheckResult(
-                            is_valid=True, branch=branch, issues=result_issues
-                        )
+                    result = self._handle_closed_pr(branch, prs[0])
+                    if result:
+                        return result
             except Exception as e:
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to verify PR status from GitHub: {e}"
@@ -241,35 +236,34 @@ class CheckService(CheckRemote):
 
         # Auto-abort when task issue is closed (no open PR found)
         # Semantic: Issue closed without PR = task cancelled/aborted
-        if task_issue_closed:
-            # Use cached PR data instead of API call
-            pr = self._branch_to_pr.get(branch)
-            if not pr or pr.state != PRState.OPEN:
-                self._mark_flow_aborted(
-                    branch,
-                    f"Task issue #{task_issue} is CLOSED (no open PR found)",
-                )
-                # Branch cleanup is deferred to --clean-branch
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+        cached_pr = self._branch_to_pr.get(branch)
+        if task_issue_closed and (not cached_pr or cached_pr.state != PRState.OPEN):
+            self._mark_flow_aborted(
+                branch, f"Task issue #{task_issue} is CLOSED (no open PR found)"
+            )
+            return CheckResult(is_valid=True, branch=branch, issues=[])
 
         flow_status = flow_data.get("flow_status", "active")
+
+        # Handle stale ready flow rebuild
         if (
             flow_status == "stale"
             and branch.startswith("task/issue-")
             and orchestration_state == IssueState.READY
+            and self._rebuild_stale_ready_flow(
+                branch, task_issue=task_issue, issue_payload=issue_payload
+            )
         ):
-            if self._rebuild_stale_ready_flow(
-                branch,
-                task_issue=task_issue,
-                issue_payload=issue_payload,
-            ):
-                return CheckResult(is_valid=True, branch=branch, issues=[])
-
-        if branch_missing:
-            reason = f"Branch '{branch}' no longer exists locally"
-            self._mark_flow_aborted(branch, reason)
             return CheckResult(is_valid=True, branch=branch, issues=[])
 
+        # Handle missing local branch
+        if branch_missing:
+            self._mark_flow_aborted(
+                branch, f"Branch '{branch}' no longer exists locally"
+            )
+            return CheckResult(is_valid=True, branch=branch, issues=[])
+
+        # Handle empty active ready flow
         if (
             flow_status == "active"
             and branch.startswith("task/issue-")
@@ -278,8 +272,7 @@ class CheckService(CheckRemote):
             and not self._has_worktree(branch)
         ):
             self._mark_flow_stale(
-                branch,
-                f"Issue #{task_issue} remains state/ready with no active scene",
+                branch, f"Issue #{task_issue} remains state/ready with no active scene"
             )
             return CheckResult(is_valid=True, branch=branch, issues=[])
 
@@ -393,6 +386,28 @@ class CheckService(CheckRemote):
         manager.create_flow_for_issue(issue)
         return True
 
+    def _mark_flow_status(
+        self,
+        branch: str,
+        status: str,
+        reason: str,
+        event_type: str,
+        action: str,
+    ) -> None:
+        """Generic method to mark flow status and record event."""
+        logger.bind(
+            domain="check",
+            action=action,
+            branch=branch,
+        ).info(f"{action}: {reason}")
+        self.store.update_flow_state(branch, flow_status=status)
+        self.store.add_event(
+            branch,
+            event_type,
+            "system",
+            f"Flow auto-{status}: {reason}",
+        )
+
     def _mark_flow_done(
         self,
         branch: str,
@@ -406,17 +421,8 @@ class CheckService(CheckRemote):
         Returns:
             Dict with suggestions, e.g., {"issue_to_close": 123}
         """
-        logger.bind(
-            domain="check",
-            action="auto_complete_flow",
-            branch=branch,
-        ).info(f"Auto-completing flow: {reason}")
-        self.store.update_flow_state(branch, flow_status="done")
-        self.store.add_event(
-            branch,
-            "flow_auto_completed",
-            "system",
-            f"Flow auto-completed: {reason}",
+        self._mark_flow_status(
+            branch, "done", reason, "flow_auto_completed", "auto_complete_flow"
         )
 
         # Check if linked issue is still open
@@ -438,32 +444,14 @@ class CheckService(CheckRemote):
 
     def _mark_flow_aborted(self, branch: str, reason: str) -> None:
         """Mark a flow as aborted and record the event."""
-        logger.bind(
-            domain="check",
-            action="auto_abort_flow",
-            branch=branch,
-        ).info(f"Auto-aborting flow: {reason}")
-        self.store.update_flow_state(branch, flow_status="aborted")
-        self.store.add_event(
-            branch,
-            "flow_auto_aborted",
-            "system",
-            f"Flow auto-aborted: {reason}",
+        self._mark_flow_status(
+            branch, "aborted", reason, "flow_auto_aborted", "auto_abort_flow"
         )
 
     def _mark_flow_stale(self, branch: str, reason: str) -> None:
         """Mark an empty active flow as stale and record the event."""
-        logger.bind(
-            domain="check",
-            action="auto_stale_flow",
-            branch=branch,
-        ).info(f"Auto-staling flow: {reason}")
-        self.store.update_flow_state(branch, flow_status="stale")
-        self.store.add_event(
-            branch,
-            "flow_auto_staled",
-            "system",
-            f"Flow auto-staled: {reason}",
+        self._mark_flow_status(
+            branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
 
     def verify_all_flows(
