@@ -101,6 +101,22 @@ class CheckService(CheckRemote):
         except Exception:
             return False
 
+    def _count_commits_behind_main(self, branch: str) -> int | None:
+        """Count how many commits the branch is behind origin/main.
+
+        Returns None if cannot determine (e.g., no common ancestor).
+        """
+        try:
+            # Fetch origin/main to get latest
+            self.git_client._run(["fetch", "origin", "main", "--quiet"])
+            # Count commits in origin/main not in branch
+            output = self.git_client._run(
+                ["rev-list", "--count", f"{branch}..origin/main"]
+            )
+            return int(output.strip()) if output.strip() else None
+        except Exception:
+            return None
+
     def _has_local_branch(self, branch: str) -> bool:
         """Check if local branch exists."""
         try:
@@ -262,6 +278,24 @@ class CheckService(CheckRemote):
                 branch, f"Branch '{branch}' no longer exists locally"
             )
             return CheckResult(is_valid=True, branch=branch, issues=[])
+
+        # Handle orphaned active flow: no task issue + no worktree + stale
+        # Only clean up flows that have no issue binding and are significantly behind
+        if (
+            flow_status == "active"
+            and not task_issue
+            and not self._has_worktree(branch)
+        ):
+            try:
+                behind_count = self._count_commits_behind_main(branch)
+                if behind_count and behind_count > 100:
+                    self._mark_flow_aborted(
+                        branch,
+                        f"Orphaned flow '{branch}' is {behind_count} commits behind main",
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+            except Exception:
+                pass
 
         # Handle empty active ready flow
         if (
