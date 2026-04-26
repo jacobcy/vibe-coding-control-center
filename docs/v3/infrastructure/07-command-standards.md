@@ -9,7 +9,6 @@ related_docs:
   - docs/v3/infrastructure/02-architecture.md
   - docs/v3/infrastructure/03-coding-standards.md
   - docs/v3/infrastructure/05-logging.md
-  - docs/v3/trace/references/command-debug-design.md
   - docs/v3/infrastructure/08-command-quick-ref.md
 ---
 
@@ -66,7 +65,7 @@ vibe3                          ← 全局层（Global）
 - 不加任何参数 → 显示帮助（`no_args_is_help=True`）
 - 命令组本身不执行逻辑，只路由到子命令
 
-### 子命令层（`flow new` / `inspect pr` / `review pr` 等）
+### 子命令层（`flow update` / `inspect pr` / `review pr` 等）
 
 | 参数 | 短选项 | 长选项 | 类型 | 默认值 | 用途 |
 |------|--------|--------|------|--------|------|
