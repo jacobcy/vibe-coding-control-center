@@ -38,9 +38,6 @@ def show(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
-    comments: Annotated[
-        bool, typer.Option("--comments", help="Show full latest comments after summary")
-    ] = False,
 ) -> None:
     """Show a quick current-task summary for humans and agents.
 
@@ -71,7 +68,8 @@ def show(
 
         render_task_show(task_result, json_output)
 
-        if comments and issue_number and not json_output:
+        # Always show recent comments (if issue exists and not json output)
+        if issue_number and not json_output:
             issue = task_svc.fetch_issue_with_comments(issue_number)
             if issue == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
@@ -217,12 +215,12 @@ def resume(
     }
     effective_label: str | None = None
     if label is not None:
-        # --label provided
+        # --label flag is present
         if label == "":
-            # --label without value (Typer passes empty string)
-            effective_label = "handoff"
+            # --label provided without explicit value -> trigger inference in service
+            effective_label = ""
         elif label in valid_states:
-            # --label <state>
+            # --label <state> provided
             effective_label = label
         else:
             typer.echo(

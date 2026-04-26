@@ -35,6 +35,7 @@ class TestDependencyChecking:
             role_def=MANAGER_ROLE,
         )
         service._store = store
+        service._flow_context = MagicMock(return_value=("", None))  # Mock _flow_context
 
         issues = asyncio.run(service.collect_ready_issues())
 
@@ -75,6 +76,16 @@ class TestDependencyChecking:
             role_def=MANAGER_ROLE,
         )
         service._store = store
+        service._flow_context = MagicMock(
+            return_value=(
+                "task/issue-300",
+                {
+                    "branch": "task/issue-300",
+                    "flow_slug": "test",
+                    "blocked_by_issue": None,
+                },
+            )
+        )
 
         # Mock _get_issue_dependencies to return [301]
         with patch.object(service, "_get_issue_dependencies", return_value=[301]):
@@ -83,17 +94,16 @@ class TestDependencyChecking:
             # Should NOT collect this issue (it's waiting)
             assert len(issues) == 0
 
-            # Should mark as waiting
+            # Should mark as waiting (now blocked)
             store.update_flow_state.assert_called_once()
             call_kwargs = store.update_flow_state.call_args[1]
-            assert call_kwargs["flow_status"] == "waiting"
+            assert call_kwargs["flow_status"] == "blocked"
             assert call_kwargs["blocked_by_issue"] == 301
-            assert "Waiting for dependencies" in call_kwargs["blocked_reason"]
 
             # Should add event
             store.add_event.assert_called_once()
             call_args = store.add_event.call_args[0]
-            assert call_args[1] == "dependency_waiting"
+            assert call_args[1] == "flow_blocked"
             assert call_args[2] == "orchestra:dispatcher"
 
     def test_issue_with_satisfied_dependency_is_ready(self) -> None:
@@ -127,6 +137,16 @@ class TestDependencyChecking:
             role_def=MANAGER_ROLE,
         )
         service._store = store
+        service._flow_context = MagicMock(
+            return_value=(
+                "task/issue-300",
+                {
+                    "branch": "task/issue-300",
+                    "flow_slug": "test",
+                    "blocked_by_issue": None,
+                },
+            )
+        )
 
         # Mock _get_issue_dependencies to return [301]
         with patch.object(service, "_get_issue_dependencies", return_value=[301]):
@@ -162,6 +182,16 @@ class TestDependencyChecking:
             role_def=MANAGER_ROLE,
         )
         service._store = store
+        service._flow_context = MagicMock(
+            return_value=(
+                "task/issue-300",
+                {
+                    "branch": "task/issue-300",
+                    "flow_slug": "test",
+                    "blocked_by_issue": None,
+                },
+            )
+        )
 
         # Mock _get_issue_dependencies to return [301, 302]
         with patch.object(service, "_get_issue_dependencies", return_value=[301, 302]):
@@ -193,7 +223,7 @@ class TestDependencyChecking:
             # Should mark as waiting
             store.update_flow_state.assert_called_once()
             call_kwargs = store.update_flow_state.call_args[1]
-            assert call_kwargs["flow_status"] == "waiting"
+            assert call_kwargs["flow_status"] == "blocked"
             # Primary dependency should be first unresolved
             assert call_kwargs["blocked_by_issue"] == 302
 
@@ -220,6 +250,16 @@ class TestDependencyChecking:
             role_def=MANAGER_ROLE,
         )
         service._store = store
+        service._flow_context = MagicMock(
+            return_value=(
+                "task/issue-300",
+                {
+                    "branch": "task/issue-300",
+                    "flow_slug": "test",
+                    "blocked_by_issue": None,
+                },
+            )
+        )
 
         # Mock _get_issue_dependencies to return [301, 302]
         with patch.object(service, "_get_issue_dependencies", return_value=[301, 302]):
@@ -268,12 +308,12 @@ class TestDependencySatisfactionCheck:
         assert result is True
 
     def test_issue_with_state_done_label_satisfies(self) -> None:
-        """Issue with state/done label should be considered satisfied."""
+        """Closed issue with state/done label satisfies dependency."""
         config = OrchestraConfig()
         github = MagicMock()
         github.view_issue.return_value = {
             "number": 301,
-            "state": "open",
+            "state": "closed",
             "labels": [{"name": "state/done"}],
             "body": "No PR reference in body",
         }
@@ -288,12 +328,12 @@ class TestDependencySatisfactionCheck:
         assert result is True
 
     def test_issue_with_state_merged_label_satisfies(self) -> None:
-        """Issue with state/merged label should be considered satisfied."""
+        """Closed issue with state/merged label satisfies dependency."""
         config = OrchestraConfig()
         github = MagicMock()
         github.view_issue.return_value = {
             "number": 301,
-            "state": "open",
+            "state": "closed",
             "labels": [{"name": "state/merged"}],
             "body": "No PR reference in body",
         }
@@ -307,8 +347,11 @@ class TestDependencySatisfactionCheck:
         result = service._is_dependency_satisfied(301)
         assert result is True
 
-    def test_issue_with_pr_mention_in_body_satisfies(self) -> None:
-        """Issue mentioning PR in body should be considered satisfied."""
+    def test_issue_with_pr_mention_in_body_does_not_satisfy(self) -> None:
+        """Open issue with PR mention in body does NOT satisfy dependency.
+
+        Only issue.state == 'closed' is the truth source for dependency satisfaction.
+        """
         config = OrchestraConfig()
         github = MagicMock()
         github.view_issue.return_value = {
@@ -325,7 +368,7 @@ class TestDependencySatisfactionCheck:
         )
 
         result = service._is_dependency_satisfied(301)
-        assert result is True
+        assert result is False
 
     def test_open_issue_without_pr_does_not_satisfy(self) -> None:
         """Open issue without PR reference should NOT be considered satisfied."""

@@ -15,17 +15,9 @@ from vibe3.models.pr import PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.utils.comment_utils import is_human_comment
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.utils.path_helpers import resolve_ref_path
-
-
-def is_human_comment(comment: dict[str, Any]) -> bool:
-    """Return True if the comment author is a human (not a bot or linear)."""
-    author = comment.get("author") or {}
-    login = str(author.get("login") or "").strip().lower()
-    if not login:
-        return True
-    return login != "linear" and not login.endswith("[bot]")
 
 
 @dataclass

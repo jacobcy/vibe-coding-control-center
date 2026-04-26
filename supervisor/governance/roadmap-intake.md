@@ -91,6 +91,20 @@ Forbidden:
 6. 对不适合纳入的对象记录简短原因
 7. 输出结论后停止
 
+## Comment Contract
+
+任何 intake 类 routing 评论必须遵循 marker 规则：
+
+- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
+- intake 决策建议用 `[governance suggest]`，因为本材料只产出 routing 信号、不做强制结论
+- 不要把 intake 说明嵌入到自由文本中而不带 marker；缺失 marker 会被人类指令解析器误读为人类指令
+
+合规示例：
+```
+[governance suggest] Intake: assigned to @alice (manager-pool); scope=bugfix.
+[governance suggest] Skipped: needs human scope confirmation before automation.
+```
+
 ## Output Contract
 
 输出至少包含：

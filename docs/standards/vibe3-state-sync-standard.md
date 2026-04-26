@@ -236,13 +236,20 @@ handoff 不代替 issue comment。
 含义：
 
 - 当前 issue 暂不应继续推进
-- 需要额外条件、依赖修复、或人类决策
+- 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`）
+- 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue）
 
 典型动作：
 
-- comment 当前 blocker
-- 如有必要，补充 handoff
-- 等待人类或上游条件变化
+- **主动巡逻**：Orchestra Dispatcher 会主动拉取该状态的 Issue 执行 Qualify Gate 校验。
+- **自动解套**：当所有依赖 Issue 均到达 `closed` 终态且无手动 `blocked_reason` 时，系统自动解除阻塞。
+- **智能恢复**：解封后，系统利用 `FlowResumeResolver` 根据本地 `pr_ref / audit_ref / report_ref / plan_ref` 自动推断并恢复到正确的目标状态（不限于 `state/ready`）。
+
+关键规则：
+
+- 依赖完成的唯一判据是 GitHub `issue.state == "closed"`。
+- 解封后，Orchestra 保证 Label 变更先于 Intent 派发。
+- 如果解封目标状态已有活动的 Agent Session，不会重复派发。
 
 ### `state/failed`
 

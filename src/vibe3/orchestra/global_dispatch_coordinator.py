@@ -131,11 +131,7 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
-            if issue.state in {
-                IssueState.BLOCKED,
-                IssueState.FAILED,
-                IssueState.DONE,
-            }:
+            if issue.state in {IssueState.FAILED, IssueState.DONE}:
                 self._frozen_queue.pop(index)
                 continue
 
@@ -147,10 +143,27 @@ class GlobalDispatchCoordinator:
                 index += 1
                 continue
 
-            service = self._find_service_for_state(issue.state)
-            if service is None:
-                self._frozen_queue.pop(index)
-                continue
+            # For BLOCKED issues: run qualify gate at intent time (lazy evaluation)
+            if issue.state == IssueState.BLOCKED:
+                blocked_service = self._find_service_for_state(IssueState.BLOCKED)
+                if blocked_service is None:
+                    self._frozen_queue.pop(index)
+                    continue
+                target_state = blocked_service.qualify_blocked_issue(issue)
+                if target_state is None:
+                    # Still blocked — remove from frozen queue, re-collected next tick
+                    self._frozen_queue.pop(index)
+                    continue
+                service = self._find_service_for_state(target_state)
+                if service is None:
+                    self._frozen_queue.pop(index)
+                    continue
+                entry.collected_state = target_state.value
+            else:
+                service = self._find_service_for_state(issue.state)
+                if service is None:
+                    self._frozen_queue.pop(index)
+                    continue
 
             try:
                 green = "\033[32m"
@@ -161,7 +174,11 @@ class GlobalDispatchCoordinator:
                     f"#{issue.number} ({service.role_def.registry_role})",
                 )
                 service._emit_dispatch_intent(issue)
-                entry.waiting_state = issue.state.value
+                # For BLOCKED issues, waiting_state must track the TARGET state
+                # (qualify gate already changed GitHub labels to target_state).
+                # Using issue.state.value ("blocked") cause _promote_progressed_entries
+                # to detect a false state change and re-dispatch on the next tick.
+                entry.waiting_state = entry.collected_state
                 dispatched_count += 1
 
                 logger.bind(
@@ -199,6 +216,7 @@ class GlobalDispatchCoordinator:
             IssueState.IN_PROGRESS,
             IssueState.CLAIMED,
             IssueState.HANDOFF,
+            IssueState.BLOCKED,  # Qualify gate runs at intent time
             IssueState.READY,
         ):
             service = self._find_service_for_state(state)

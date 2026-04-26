@@ -72,6 +72,15 @@ class AssigneeDispatchConfig(BaseModel):
         default=True,
         description="Whether to include supervisor file content in the manager prompt",
     )
+    token_env: str | None = Field(
+        default="VIBE_MANAGER_GITHUB_TOKEN",
+        description=(
+            "Environment variable name for manager-specific GitHub token. "
+            "If set and the env var exists, its value will be injected into "
+            "ExecutionRequest.env['GH_TOKEN'], enabling role isolation. "
+            "If None or the env var is not set, falls back to global GH_TOKEN."
+        ),
+    )
 
 
 class PRReviewDispatchConfig(BaseModel):

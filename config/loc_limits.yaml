@@ -41,8 +41,8 @@ code_limits:
         limit: 500
         reason: "Git 门面聚合"
       - path: "src/vibe3/clients/github_pr_ops.py"
-        limit: 500
-        reason: "GitHub PR 操作与查询聚合"
+        limit: 530
+        reason: "GitHub PR 操作与查询聚合（日志和错误处理对生产环境必要）"
       - path: "src/vibe3/clients/sqlite_client.py"
         limit: 650
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"

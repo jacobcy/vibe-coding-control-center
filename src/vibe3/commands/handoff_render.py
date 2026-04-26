@@ -3,10 +3,13 @@
 Pure functions for rendering agent chains, handoff events, and updates log.
 """
 
+import re
+
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.utils.constants import AUTOMATED_MARKERS
 from vibe3.utils.path_helpers import (
     ref_to_handoff_cmd,
     sanitize_event_detail_paths,
@@ -71,6 +74,7 @@ def _render_agent_chain(
                         capture_output=True,
                         text=True,
                         check=True,
+                        timeout=10,
                     )
                     import json
 
@@ -158,14 +162,31 @@ def _render_handoff_events(
     for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
         event_name = display_names.get(event.event_type, event.event_type)
-        console.print(
-            f"[dim]{time_str}[/]  [magenta]{event_name}[/]  [dim]{event.actor}[/]"
+
+        # Bug 9: Label manager handoffs vs human ones
+        actor_label = f"[dim]{event.actor}[/]"
+        is_manager = (
+            event.event_type == "handoff_indicate"
+            or "manager" in str(event.actor).lower()
         )
+
+        if is_manager:
+            actor_label = f"[bold yellow]\\[manager][/bold yellow] {actor_label}"
+
+        console.print(f"[dim]{time_str}[/]  [magenta]{event_name}[/]  {actor_label}")
+
         if event.detail:
             sanitized = sanitize_event_detail_paths(
                 event.detail, event.refs, worktree_root
             )
-            console.print(f"  {sanitized}")
+            # Add color for manager details if they start with marker
+            display_detail = sanitized
+            escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
+            pattern = r"^(\s*|#{1,6}\s*)(" + "|".join(escaped_markers) + ")"
+            if re.match(pattern, sanitized, re.IGNORECASE):
+                display_detail = f"[yellow]{sanitized}[/]"
+
+            console.print(f"  {display_detail}")
         if event.refs:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):

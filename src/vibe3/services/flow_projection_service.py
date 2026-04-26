@@ -1,9 +1,9 @@
 """Flow projection service combining local and remote data."""
 
-from dataclasses import dataclass
-from typing import Any
+from __future__ import annotations
 
-from loguru import logger
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
@@ -11,6 +11,9 @@ from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.services.task_service import TaskService
+
+if TYPE_CHECKING:
+    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
 
 @dataclass
@@ -61,12 +64,23 @@ class FlowProjectionService:
         pr_service: PRService | None = None,
         github_client: GitHubClient | None = None,
         store: SQLiteClient | None = None,
+        title_cache: IssueTitleCacheService | None = None,
     ) -> None:
         self.flow_service = flow_service or FlowService()
         self.task_service = task_service or TaskService()
         self.pr_service = pr_service or PRService()
         self.github_client = github_client or GitHubClient()
         self.store = store or SQLiteClient()
+        self._title_cache = title_cache
+
+    @property
+    def title_cache(self) -> IssueTitleCacheService:
+        """Lazy-initialized title cache service."""
+        if self._title_cache is None:
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            self._title_cache = IssueTitleCacheService(self.store, self.github_client)
+        return self._title_cache
 
     def get_projection(
         self, branch: str, include_remote: bool = True
@@ -97,125 +111,41 @@ class FlowProjectionService:
         return projection
 
     def get_issue_titles(self, issue_numbers: list[int]) -> tuple[dict[int, str], bool]:
-        """Fetch titles for a list of issues with cache optimization.
+        """Fetch titles for a list of issues.
 
-        Uses cache-first strategy: checks local cache before calling GitHub API.
-        Only calls GitHub for cache misses and updates cache with fetched titles.
+        NOTE: This method is used by commands, but we need to convert issue_numbers
+        to branches first using IssueFlowService.
 
         Returns:
-            Tuple of (titles_dict, has_network_error)
+            Tuple of (issue_number -> title dict, had_network_error)
         """
-        titles: dict[int, str] = {}
-        network_error = False
+        from vibe3.services.issue_flow_service import IssueFlowService
 
-        # Group issue numbers by branch to check cache
-        # Build mapping: issue_number -> list of branches with this issue as task
-        issue_to_branches: dict[int, list[str]] = {}
+        issue_flow = IssueFlowService(self.store)
+
+        # Convert issue_numbers to branches
+        # Priority: use actual flow branch (could be dev/issue-N) over canonical guess
+        issue_to_branch: dict[int, str] = {}
+        branches: list[str] = []
         for n in issue_numbers:
-            # Find branches that have this issue as task_issue_number
-            # Note: This requires querying all flows, which may be expensive
-            # Alternative: direct cache lookup by constructing branch names
-            # For issue-N pattern, likely branches are task/issue-N or dev/issue-N
-            possible_branches = [f"task/issue-{n}", f"dev/issue-{n}"]
-            issue_to_branches[n] = possible_branches
-
-        # Check cache for each issue
-        cache_misses: list[int] = []
-        for n in issue_numbers:
-            cached_title = None
-            # Try each possible branch pattern
-            for branch in issue_to_branches[n]:
-                cache = self.store.get_flow_context_cache(branch)
-                if cache and cache.get("task_issue_number") == n:
-                    cached_title = cache.get("issue_title")
-                    if cached_title:
-                        break  # Found cached title
-
-            if cached_title:
-                titles[n] = cached_title
-                logger.bind(
-                    domain="flow_projection",
-                    action="get_issue_titles",
-                    issue_number=n,
-                    source="cache",
-                ).debug(f"Using cached title for issue #{n}")
+            # Try to find actual flow branch first
+            flow_state = issue_flow.find_active_flow(n)
+            if flow_state and flow_state.get("branch"):
+                branch = str(flow_state["branch"])
             else:
-                cache_misses.append(n)
+                # Fallback to canonical branch name
+                branch = issue_flow.canonical_branch_name(n)
 
-        # Fetch missing titles from GitHub
-        if cache_misses:
-            logger.bind(
-                domain="flow_projection",
-                action="get_issue_titles",
-                cache_misses=cache_misses,
-            ).debug(f"Fetching {len(cache_misses)} issues from GitHub")
+            issue_to_branch[n] = branch
+            branches.append(branch)
 
-            for n in cache_misses:
-                try:
-                    issue = self.github_client.view_issue(n)
-                    if isinstance(issue, dict):
-                        fetched_title = issue.get("title", f"Issue #{n}")
-                        titles[n] = fetched_title
+        # Get titles using cache service (branch-based)
+        branch_titles, net_err = self.title_cache.get_titles_with_fallback(branches)
 
-                        # Update cache for all associated branches
-                        for branch in issue_to_branches[n]:
-                            existing_cache = self.store.get_flow_context_cache(branch)
-                            if existing_cache:
-                                # Update existing cache entry with title
-                                self.store.upsert_flow_context_cache(
-                                    branch=branch,
-                                    task_issue_number=existing_cache.get(
-                                        "task_issue_number"
-                                    ),
-                                    issue_title=fetched_title,
-                                    pr_number=existing_cache.get("pr_number"),
-                                    pr_title=existing_cache.get("pr_title"),
-                                )
-                                logger.bind(
-                                    domain="flow_projection",
-                                    action="get_issue_titles",
-                                    issue_number=n,
-                                    branch=branch,
-                                ).debug("Updated cache with fetched title")
+        # Convert back to issue_number -> title mapping
+        issue_titles: dict[int, str] = {}
+        for n, branch in issue_to_branch.items():
+            if branch in branch_titles:
+                issue_titles[n] = branch_titles[branch]
 
-                    elif issue == "network_error":
-                        network_error = True
-                except Exception as e:
-                    network_error = True
-                    logger.bind(
-                        domain="flow_projection",
-                        action="get_issue_titles",
-                        issue_number=n,
-                        error=str(e),
-                    ).warning(f"Failed to fetch issue #{n} from GitHub")
-
-        return titles, network_error
-
-    def get_milestone_data(self, issue_number: int) -> dict[str, Any] | None:
-        """Get milestone data for an issue."""
-        try:
-            issue = self.github_client.view_issue(issue_number)
-            if isinstance(issue, dict):
-                milestone = issue.get("milestone")
-                if milestone and isinstance(milestone, dict):
-                    m_number = milestone.get("number")
-                    if m_number:
-                        all_issues = self.github_client.get_milestone_issues(m_number)
-                        open_issues = [
-                            i for i in all_issues if i.get("state") == "open"
-                        ]
-                        closed_issues = [
-                            i for i in all_issues if i.get("state") == "closed"
-                        ]
-                        return {
-                            "title": milestone.get("title"),
-                            "number": m_number,
-                            "state": milestone.get("state"),
-                            "open": len(open_issues),
-                            "closed": len(closed_issues),
-                            "issues": all_issues,
-                            "task_issue": issue,
-                        }
-        except Exception:
-            pass
-        return None
+        return issue_titles, net_err

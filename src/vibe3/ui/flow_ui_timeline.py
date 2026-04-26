@@ -1,7 +1,6 @@
 """Flow UI timeline rendering components."""
 
 from pathlib import Path
-from typing import Any
 
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
@@ -95,44 +94,6 @@ def _format_event_type(event_type: str) -> str:
         "handoff_audit_fallback": "Audit Auto-Recorded",  # backward compatibility
     }
     return display_names.get(event_type, event_type)
-
-
-def render_milestone(
-    milestone_data: "dict[str, Any]", current_issue: "int | None" = None
-) -> None:
-    from vibe3.clients.github_issues_ops import parse_blocked_by
-
-    ms_title = milestone_data["title"]
-    open_count = int(milestone_data.get("open", 0))
-    closed_count = int(milestone_data.get("closed", 0))
-    total = open_count + closed_count
-    progress = f"{closed_count}/{total} done" if total else "0 issues"
-    console.print(f"\n[bold]--- Milestone: {ms_title} [{progress}] ---[/]")
-    issues: list[dict[str, Any]] = list(milestone_data.get("issues") or [])
-    for item in sorted(issues, key=lambda x: int(x["number"])):
-        n = int(item["number"])
-        state = str(item.get("state", "open")).upper()
-        title = str(item.get("title", ""))
-        labels = [lb["name"] for lb in (item.get("labels") or [])]
-        is_blocked = "status/blocked" in labels
-        is_done = state == "CLOSED"
-
-        if is_done:
-            icon = "[green]x[/]"
-        elif is_blocked:
-            icon = "[red]![/]"
-        else:
-            icon = "[ ]"
-
-        current = "  [dim]<- this flow[/]" if n == current_issue else ""
-        console.print(f"  {icon}  [dim]#{n}[/]  {title}{current}")
-
-        if is_blocked:
-            body = str(item.get("body") or "")
-            blockers = parse_blocked_by(body)
-            if blockers:
-                blocker_str = "  ".join(f"#{b}" for b in blockers)
-                console.print(f"       [red dim]blocked by: {blocker_str}[/]")
 
 
 def _render_header(state: FlowStatusResponse, parent_branch: str | None) -> None:
@@ -294,7 +255,6 @@ def _render_state_summary(state: FlowStatusResponse) -> None:
 def render_flow_timeline(
     state: FlowStatusResponse,
     events: list[FlowEvent],
-    milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
 ) -> None:
     """Render complete flow timeline with header, actors, timeline, and refs."""
@@ -303,17 +263,6 @@ def render_flow_timeline(
     _render_reasons(state)
     console.print()
     _render_timeline(events, state.worktree_root)
-
-    if milestone_data:
-        ms_title = milestone_data["title"]
-        open_count = int(milestone_data.get("open", 0))
-        closed_count = int(milestone_data.get("closed", 0))
-        total = open_count + closed_count
-        progress = f"{closed_count}/{total} done" if total else "—"
-        console.print(
-            f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
-            "  [dim]→ vibe3 flow show --snapshot[/]"
-        )
 
     _render_refs(state)
     _render_state_summary(state)

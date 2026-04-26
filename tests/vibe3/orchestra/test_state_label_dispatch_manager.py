@@ -25,7 +25,7 @@ def test_manager_collects_ready_issue_without_live_session_gate() -> None:
         github=github,
         role_def=MANAGER_ROLE,
     )
+    service._flow_context = MagicMock(return_value=("", None))
 
     issues = asyncio.run(service.collect_ready_issues())
-
     assert [issue.number for issue in issues] == [340]
