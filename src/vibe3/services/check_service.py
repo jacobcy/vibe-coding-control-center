@@ -72,7 +72,9 @@ class CheckService(CheckRemote):
         try:
             all_prs = self.github_client.list_all_prs(state="all")
             self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
+            # OSError: subprocess/gh CLI failures
+            # ValueError: JSON parsing errors
             logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
             self._branch_to_pr = {}
 
@@ -365,7 +367,9 @@ class CheckService(CheckRemote):
         try:
             all_prs = self.github_client.list_all_prs(state="all")
             self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
+            # OSError: subprocess/gh CLI failures
+            # ValueError: JSON parsing errors
             logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
             self._branch_to_pr = {}
 
