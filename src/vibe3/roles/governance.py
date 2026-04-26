@@ -10,6 +10,8 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.agent_resolver import resolve_governance_agent_options
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
@@ -30,10 +32,12 @@ from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
 from vibe3.services.orchestra_status_service import (
+    IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
     is_running_issue,
 )
+from vibe3.utils.label_utils import normalize_assignees, normalize_labels
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",
@@ -50,6 +54,8 @@ GOVERNANCE_TASK_PROMPT = (
 
 # Runtime variable keys that come from the snapshot (resolved as providers).
 _GOVERNANCE_RUNTIME_VARS = (
+    "issue_scope_name",
+    "scope_note",
     "server_status",
     "active_count",
     "active_flows",
@@ -66,9 +72,18 @@ _GOVERNANCE_RUNTIME_VARS = (
 )
 
 
-def build_governance_snapshot_context(snapshot: Any) -> dict[str, Any]:
-    """Convert an OrchestraSnapshot into the prompt context dict."""
-    active_entries = snapshot.active_issues
+def _build_issue_context(
+    active_entries: tuple[Any, ...],
+    *,
+    server_running: bool,
+    active_flows: int,
+    active_worktrees: int,
+    queued_issues: tuple[int, ...],
+    circuit_breaker_state: str,
+    circuit_breaker_failures: int,
+    issue_scope_name: str,
+    scope_note: str,
+) -> dict[str, Any]:
     active_count = len(active_entries)
     running_entries = tuple(
         entry for entry in active_entries if is_running_issue(entry)
@@ -94,20 +109,163 @@ def build_governance_snapshot_context(snapshot: Any) -> dict[str, Any]:
         else ""
     )
     return {
-        "server_status": "running" if snapshot.server_running else "stopped",
+        "issue_scope_name": issue_scope_name,
+        "scope_note": scope_note,
+        "server_status": "running" if server_running else "stopped",
         "active_count": active_count,
-        "active_flows": snapshot.active_flows,
-        "active_worktrees": snapshot.active_worktrees,
+        "active_flows": active_flows,
+        "active_worktrees": active_worktrees,
         "running_issue_count": len(running_entries),
-        "queued_issue_count": len(snapshot.queued_issues),
+        "queued_issue_count": len(queued_issues),
         "suggested_issue_count": len(suggested_entries),
-        "circuit_breaker_state": snapshot.circuit_breaker_state,
-        "circuit_breaker_failures": snapshot.circuit_breaker_failures,
+        "circuit_breaker_state": circuit_breaker_state,
+        "circuit_breaker_failures": circuit_breaker_failures,
         "issue_list": issue_list,
         "running_issue_details": running_issue_details,
         "suggested_issue_details": suggested_issue_details,
         "truncated_note": truncated_note,
     }
+
+
+def _resolve_governance_material(
+    config: OrchestraConfig,
+    tick_count: int,
+) -> str:
+    materials = config.governance.get_supervisor_materials()
+    return materials[tick_count % len(materials)]
+
+
+def _is_doc_candidate(title: str, body: str, labels: list[str]) -> bool:
+    if any(label in {"type/docs", "scope/documentation"} for label in labels):
+        return True
+    normalized_title = title.lower()
+    keywords = ("doc", "docs", "documentation", "readme", "文档", "说明")
+    return any(keyword in normalized_title for keyword in keywords)
+
+
+def _build_broader_repo_entries(
+    config: OrchestraConfig,
+    *,
+    current_material: str,
+    github: GitHubClient | None = None,
+) -> tuple[Any, ...]:
+    github = github or GitHubClient()
+    raw_issues = github.list_issues(
+        limit=100,
+        state="open",
+        assignee=None,
+        repo=config.repo,
+    )
+    material_name = Path(current_material).name
+    entries: list[Any] = []
+    for item in raw_issues:
+        number = item.get("number")
+        title = item.get("title")
+        if not isinstance(number, int) or not isinstance(title, str):
+            continue
+
+        labels = normalize_labels(item.get("labels"))
+        if "supervisor" in labels:
+            continue
+
+        assignees = normalize_assignees(item.get("assignees"))
+        is_assignee_issue = any(
+            assignee in config.manager_usernames for assignee in assignees
+        )
+
+        if material_name == "roadmap-intake.md" and is_assignee_issue:
+            continue
+
+        body = str(item.get("body") or "")
+        if material_name == "cron-supervisor.md":
+            if is_assignee_issue or not _is_doc_candidate(title, body, labels):
+                continue
+
+        issue = IssueStatusEntry(
+            number=number,
+            title=title,
+            state=None,
+            assignee=assignees[0] if assignees else None,
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        entries.append(issue)
+    return tuple(entries)
+
+
+def build_governance_snapshot_context(
+    snapshot: Any,
+    *,
+    config: OrchestraConfig | None = None,
+    tick_count: int = 0,
+    github: GitHubClient | None = None,
+) -> dict[str, Any]:
+    """Convert runtime observations into the governance prompt context dict."""
+    config = config or load_orchestra_config()
+    current_material = _resolve_governance_material(config, tick_count)
+    material_name = Path(current_material).name
+
+    if material_name == "roadmap-intake.md":
+        broader_entries = _build_broader_repo_entries(
+            config,
+            current_material=current_material,
+            github=github,
+        )
+        return _build_issue_context(
+            broader_entries,
+            server_running=snapshot.server_running,
+            active_flows=snapshot.active_flows,
+            active_worktrees=snapshot.active_worktrees,
+            queued_issues=snapshot.queued_issues,
+            circuit_breaker_state=snapshot.circuit_breaker_state,
+            circuit_breaker_failures=snapshot.circuit_breaker_failures,
+            issue_scope_name="broader repo issue pool",
+            scope_note=(
+                "以下候选来自 broader repo issue pool；"
+                "目标是识别适合自动化纳入 assignee issue pool 的对象。"
+            ),
+        )
+
+    if material_name == "cron-supervisor.md":
+        broader_entries = _build_broader_repo_entries(
+            config,
+            current_material=current_material,
+            github=github,
+        )
+        return _build_issue_context(
+            broader_entries,
+            server_running=snapshot.server_running,
+            active_flows=snapshot.active_flows,
+            active_worktrees=snapshot.active_worktrees,
+            queued_issues=snapshot.queued_issues,
+            circuit_breaker_state=snapshot.circuit_breaker_state,
+            circuit_breaker_failures=snapshot.circuit_breaker_failures,
+            issue_scope_name="broader repo docs scope",
+            scope_note=(
+                "以下候选来自 broader repo 文档范围；"
+                "目标是挑选最多 5 个需要语义对齐的过时文档对象。"
+            ),
+        )
+
+    return _build_issue_context(
+        tuple(snapshot.active_issues),
+        server_running=snapshot.server_running,
+        active_flows=snapshot.active_flows,
+        active_worktrees=snapshot.active_worktrees,
+        queued_issues=snapshot.queued_issues,
+        circuit_breaker_state=snapshot.circuit_breaker_state,
+        circuit_breaker_failures=snapshot.circuit_breaker_failures,
+        issue_scope_name="assignee issue pool",
+        scope_note=(
+            "以下均为 assignee issue pool 内的建议；"
+            "最终仍需结合 flow / worktree / PR 现场判断。"
+        ),
+    )
 
 
 def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
@@ -124,19 +282,23 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
     return registry
 
 
-def build_governance_recipe(config: OrchestraConfig) -> PromptRecipe:
+def build_governance_recipe(
+    config: OrchestraConfig, tick_count: int = 0
+) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
+    materials = config.governance.get_supervisor_materials()
+    current_material = materials[tick_count % len(materials)]
     supervisor_content_source = (
         PromptVariableSource(
             kind=VariableSourceKind.FILE,
-            path=config.governance.supervisor_file,
+            path=current_material,
         )
         if config.governance.include_supervisor_content
         else PromptVariableSource(kind=VariableSourceKind.LITERAL, value="")
     )
     variables: dict[str, PromptVariableSource] = {
         "supervisor_name": PromptVariableSource(
-            kind=VariableSourceKind.LITERAL, value=config.governance.supervisor_file
+            kind=VariableSourceKind.LITERAL, value=current_material
         ),
         "supervisor_content": supervisor_content_source,
     }
@@ -155,10 +317,11 @@ def render_governance_prompt(
     config: OrchestraConfig,
     snapshot_context: dict[str, Any],
     prompts_path: Path | None = None,
+    tick_count: int = 0,
 ) -> PromptRenderResult:
     """Render governance plan from snapshot context via PromptAssembler."""
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
-    recipe = build_governance_recipe(config)
+    recipe = build_governance_recipe(config, tick_count=tick_count)
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
     return assembler.render(recipe, runtime_context=snapshot_context)
@@ -194,17 +357,24 @@ def build_governance_request(
         append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
         return None
 
-    snapshot_context = build_governance_snapshot_context(snapshot)
-    render_result = render_governance_prompt(config, snapshot_context, prompts_path)
+    snapshot_context = build_governance_snapshot_context(
+        snapshot,
+        config=config,
+        tick_count=tick_count,
+    )
+    render_result = render_governance_prompt(
+        config, snapshot_context, prompts_path, tick_count=tick_count
+    )
     plan_content = render_result.rendered_text
+    current_material = _resolve_governance_material(config, tick_count)
 
     if config.governance.dry_run:
         root = repo_path or resolve_orchestra_repo_root()
-        dry_run_plan_path = _write_dry_run_plan(root, plan_content)
+        dry_run_plan_path = _write_dry_run_plan(root, plan_content, current_material)
         log.info("Dry run: governance plan prepared")
         log.info(f"Dry run plan file: {dry_run_plan_path}")
         append_governance_event(
-            f"dry-run plan written: {dry_run_plan_path}",
+            f"dry-run plan written ({current_material}): {dry_run_plan_path}",
             repo_root=root,
         )
         return None
@@ -213,7 +383,7 @@ def build_governance_request(
 
     root = repo_path or resolve_orchestra_repo_root()
     append_governance_event(
-        f"dispatching governance scan tick={tick_count}",
+        f"dispatching governance scan tick={tick_count} material={current_material}",
         repo_root=root,
     )
 
@@ -231,13 +401,18 @@ def build_governance_request(
     )
 
 
-def _write_dry_run_plan(repo_path: Path, plan_content: str) -> Path:
+def _write_dry_run_plan(
+    repo_path: Path, plan_content: str, current_material: str | None = None
+) -> Path:
     """Write governance dry-run plan to a temp file."""
     output_dir = governance_dry_run_dir(repo_path)
+    material_slug = (
+        Path(current_material).stem.replace("-", "_") if current_material else "unknown"
+    )
     with tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".md",
-        prefix="governance_dry_run_",
+        prefix=f"governance_dry_run_{material_slug}_",
         dir=output_dir,
         delete=False,
     ) as handle:

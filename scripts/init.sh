@@ -116,7 +116,7 @@ if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
 else
   # Fallback: install superpowers for current supported non-Claude agents
   echo "📦 Installing Superpowers (fallback)..."
-  npx skills add obra/superpowers -g --agent antigravity codex kiro -y
+  npx skills add obra/superpowers -g --agent codex gemini-cli opencode github-copilot qoder codebuddy trae-cn -y
 fi
 
 # ── 2. Initialize OpenSpec ────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ echo "📦 Initializing OpenSpec..."
 if [[ -d "openspec/specs" || -f "openspec/config.yaml" ]]; then
   echo "✅ OpenSpec already initialized"
 elif command -v openspec &> /dev/null; then
-  openspec init --tools antigravity,claude,codex,trae
+  openspec init --tools claude,codex,opencode,qoder,codebuddy,trae
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping.\033[0m"
   echo "   Install via: pnpm add -g @openspec/tools"
@@ -137,8 +137,11 @@ echo "🔗 Creating symlinks for local skills..."
 _symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".kiro/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".gemini/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".copilot/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".qoder/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".codebuddy/skills" "identity" "dir"
 
 #  Symlink workflows
 echo "🔗 Creating symlinks for workflows..."

@@ -83,14 +83,16 @@ class StateTransition(BaseModel):
 #     ▼  ▼
 #   IN_PROGRESS          REVIEW            MERGE_READY
 #     │  ▲                 │  ▲               │
-#     │  │ [C] no report   │  │ [C] no audit  │ [M] write MERGE_READY_COMMIT
-#     │  │  → BLOCKED      │  │  → BLOCKED    │     → IN_PROGRESS (commit mode)
-#     │  │                 │  │               │
-#     │  └─────────────────┘  └──── HANDOFF   │
-#     │                         ▲             │
-#     │                         │ pr_ref      │
-#     │                         │             ▼
-#     └──── HANDOFF ◄──── IN_PROGRESS (commit: PR created)
+#     │  │ [C] no report   │  │ [C] no audit  │ [M] write indicate
+#     │  │  → BLOCKED      │  │  → BLOCKED    │     keep MERGE_READY
+#     │  │                 │  │               │  executor publish path
+#     │  └─────────────────┘  └──── HANDOFF   │  auto-injects vibe-commit
+#     │                         ▲  ▲          │
+#     │                         │  │          ▼
+#     │                         │  └── MERGE_READY (pr_ref created)
+#     │                         │ pr_ref
+#     │                         │
+#     └──── HANDOFF ◄──────────┘  (manager reviews PR → DONE)
 #              │
 #              │ [M] review pr_ref → DONE
 #              ▼
@@ -123,7 +125,10 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.HANDOFF, IssueState.REVIEW),
     (IssueState.REVIEW, IssueState.HANDOFF),
     (IssueState.HANDOFF, IssueState.MERGE_READY),
-    (IssueState.MERGE_READY, IssueState.IN_PROGRESS),  # executor commits + PR
+    (
+        IssueState.MERGE_READY,
+        IssueState.HANDOFF,
+    ),  # executor publish completes → manager reviews PR
     (IssueState.HANDOFF, IssueState.DONE),  # manager concludes after PR review
     # Side paths (→ blocked)
     (IssueState.READY, IssueState.BLOCKED),

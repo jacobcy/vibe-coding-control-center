@@ -190,10 +190,8 @@ def show(
             typer.echo(f"    Functions: {snapshot.metrics.total_functions}")
             typer.echo(f"    Python files: {snapshot.metrics.python_files}")
             typer.echo(f"\n  Modules ({len(snapshot.modules)}):")
-            for m in snapshot.modules[:10]:
+            for m in snapshot.modules:
                 typer.echo(f"    {m.module}: {m.file_count} files, {m.total_loc} LOC")
-            if len(snapshot.modules) > 10:
-                typer.echo(f"    ... and {len(snapshot.modules) - 10} more")
 
     except snapshot_service.SnapshotNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)

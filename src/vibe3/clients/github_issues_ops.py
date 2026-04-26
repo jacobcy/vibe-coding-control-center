@@ -158,7 +158,7 @@ class IssuesMixin(IssueAdminMixin):
             "--state",
             state,
             "--json",
-            "number,title,state,updatedAt,labels,assignees,milestone",
+            "number,title,body,state,updatedAt,labels,assignees,milestone",
         ]
         if assignee:
             cmd.extend(["--assignee", assignee])
@@ -201,7 +201,7 @@ class IssuesMixin(IssueAdminMixin):
             "view",
             str(issue_number),
             "--json",
-            "number,title,body,state,updatedAt,labels,comments,milestone",
+            "number,title,body,state,updatedAt,labels,comments,milestone,assignees",
         ]
         if repo:
             cmd.extend(["--repo", repo])

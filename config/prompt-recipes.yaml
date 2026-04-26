@@ -1,0 +1,146 @@
+# Prompt Assembly Recipes
+#
+# 本文件只描述”角色 prompt 的 section 装配顺序”，不保存 prompt 正文。
+# prompt 正文和模板在 config/prompts.yaml。
+#
+# 重要边界：
+# - 这里覆盖 manager / planner / executor / reviewer 这类 role prompt。
+# - pr.title_suggestion、pr.body_suggestion 是 AI 文案建议模板，
+#   由 AISuggestionClient 直接使用，不属于本装配表。
+#
+# 运行时迁移状态：
+# - manager.* / run.* / plan.* / review.* 已经由对应 agents/*_prompt.py 读取本文件。
+#
+# section 命名约定：
+# - *.policy：角色 policy 文件内容。
+# - common.rules：共享 agent 规则。
+# - *.output_format：输出形状/格式要求。review 的 output_format 是 verdict 硬契约。
+# - *.retry_task：retry 场景指导。
+# - *.exit_contract：每轮都应强调的收尾契约，通常包含 canonical ref 注册和 label transition。
+
+recipes:
+  # Manager role assembly.
+  #
+  # Design intent:
+  # - bootstrap includes full supervisor_content for first dispatch.
+  # - retry.resume avoids re-sending full supervisor_content and keeps only
+  #   retry guidance plus quick scene commands.
+  manager.default:
+    template_key: assignee_dispatch.manager
+    description: Manager prompt assembly target.
+    variants:
+      first.bootstrap:
+        sections:
+          - manager.supervisor_content
+          - manager.target
+          - manager.quick_commands
+
+      retry.resume:
+        sections:
+          - manager.retry_task
+
+  # Executor role, plan/flow_plan/lightweight modes.
+  #
+  # Variant selection:
+  # - coding.bootstrap：首次/常规执行，没有 report_ref/audit_ref retry 语义。
+  # - retry.bootstrap：有 retry refs，但没有可复用 executor session，需要完整上下文。
+  # - retry.resume：有 retry refs 且已有 session，只补 retry 指令和 exit contract。
+  run.plan:
+    template_key: run.plan
+    description: Executor prompt for plan-based implementation or retry work.
+    variants:
+      coding.bootstrap:
+        sections:
+          - run.plan_ref
+          - run.coding_task
+          - run.policy
+          - common.rules
+          - run.output_format
+          - run.exit_contract
+
+      retry.bootstrap:
+        sections:
+          - run.plan_ref
+          - run.retry_task
+          - run.policy
+          - common.rules
+          - run.output_format
+          - run.exit_contract
+
+      retry.resume:
+        sections:
+          - run.retry_task
+          - run.exit_contract
+
+  run.skill:
+    template_key: run.skill
+    description: Executor prompt for skill-driven work.
+    variants:
+      default:
+        sections:
+          - run.skill_content
+          - run.exit_contract
+
+  # Planner role assembly.
+  #
+  # Design intent:
+  # - bootstrap includes policy/common rules/output shape/exit contract.
+  # - retry.resume avoids re-sending policy/common/output shape and keeps only
+  #   retry guidance plus plan.exit_contract.
+  plan.default:
+    template_key: plan.default
+    description: Planner prompt assembly target.
+    variants:
+      first.bootstrap:
+        sections:
+          - plan.policy
+          - common.rules
+          - plan.output_format
+          - plan.exit_contract
+
+      retry.bootstrap:
+        sections:
+          - plan.policy
+          - common.rules
+          - plan.output_format
+          - plan.retry_task
+          - plan.exit_contract
+
+      retry.resume:
+        sections:
+          - plan.retry_task
+          - plan.exit_contract
+
+  # Reviewer role assembly.
+  #
+  # Design intent:
+  # - review.output_format is kept even in retry.resume because VERDICT is a hard contract.
+  # - review.exit_contract is kept every round for verdict/audit_ref/label transition.
+  review.default:
+    template_key: review.default
+    description: Reviewer prompt assembly target.
+    variants:
+      first.bootstrap:
+        sections:
+          - review.policy
+          - common.rules
+          - review.snapshot_diff
+          - review.ast_analysis
+          - review.output_format
+          - review.exit_contract
+
+      retry.bootstrap:
+        sections:
+          - review.policy
+          - common.rules
+          - review.snapshot_diff
+          - review.ast_analysis
+          - review.output_format
+          - review.retry_task
+          - review.exit_contract
+
+      retry.resume:
+        sections:
+          - review.output_format
+          - review.retry_task
+          - review.exit_contract

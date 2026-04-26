@@ -173,37 +173,45 @@ class PRService:
         )
 
         if not pr.draft:
-            self._sync_pr_flow_state(pr, actor=effective_actor)
-            try:
-                self.briefing_service.publish_briefing(
-                    pr_number, requested_reviewers=requested_reviewers
-                )
-            except Exception as e:
-                logger.bind(pr_number=pr_number).warning(
-                    f"Briefing update failed (PR still ready): {e}"
-                )
-            # Request AI review if specified
-            if requested_reviewers:
-                try:
-                    self.github_client.request_ai_review(pr_number, requested_reviewers)
-                except Exception as e:
-                    logger.bind(pr_number=pr_number).warning(
-                        f"Review request failed (PR still ready): {e}"
-                    )
-            logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
+            self._finalize_pr_ready(
+                pr_number,
+                effective_actor,
+                requested_reviewers,
+                pr_for_sync=pr,
+                is_already_ready=True,
+            )
             return pr
 
         updated_pr = self.github_client.mark_ready(pr_number)
-        branch = pr.head_branch
-        self._sync_pr_flow_state(updated_pr, actor=effective_actor)
+        self._finalize_pr_ready(
+            pr_number,
+            effective_actor,
+            requested_reviewers,
+            pr_for_sync=updated_pr,
+            is_already_ready=False,
+        )
+        return updated_pr
+
+    def _finalize_pr_ready(
+        self,
+        pr_number: int,
+        actor: str,
+        requested_reviewers: list[str] | None = None,
+        *,
+        pr_for_sync: PRResponse,
+        is_already_ready: bool = False,
+    ) -> None:
+        """Finalize PR ready state: sync, briefing, and AI reviews."""
+        self._sync_pr_flow_state(pr_for_sync, actor=actor)
 
         try:
             self.briefing_service.publish_briefing(
                 pr_number, requested_reviewers=requested_reviewers
             )
         except Exception as e:
+            action = "update" if is_already_ready else "publication"
             logger.bind(pr_number=pr_number).warning(
-                f"Briefing publication failed (PR marked ready): {e}"
+                f"Briefing {action} failed (PR ready): {e}"
             )
 
         # Request AI review if specified
@@ -212,18 +220,19 @@ class PRService:
                 self.github_client.request_ai_review(pr_number, requested_reviewers)
             except Exception as e:
                 logger.bind(pr_number=pr_number).warning(
-                    f"Review request failed (PR marked ready): {e}"
+                    f"AI review request failed (PR ready): {e}"
                 )
 
-        self.store.add_event(
-            branch,
-            "pr_ready",
-            effective_actor,
-            f"PR #{pr_number} marked as ready for review",
-        )
-
-        logger.bind(pr_number=pr_number).success("PR marked as ready")
-        return updated_pr
+        if is_already_ready:
+            logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
+        else:
+            self.store.add_event(
+                pr_for_sync.head_branch,
+                "pr_ready",
+                actor,
+                f"PR #{pr_number} marked as ready for review",
+            )
+            logger.bind(pr_number=pr_number).success("PR marked as ready")
 
     def sync_pr_state_from_remote(
         self, pr: PRResponse, actor: str | None = None
@@ -368,16 +377,12 @@ class PRService:
             pr_ref=pr.url,  # Write PR URL as proof of PR creation
         )
 
-        # Update PR context cache with latest PR info
-        # Get existing cache or create new entry
-        existing_cache = self.store.get_flow_context_cache(pr.head_branch)
+        # Update PR context cache with latest PR info using IssueTitleCacheService
+        from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
-        self.store.upsert_flow_context_cache(
+        title_cache = IssueTitleCacheService(self.store)
+        title_cache.update_pr(
             branch=pr.head_branch,
-            task_issue_number=(
-                existing_cache.get("task_issue_number") if existing_cache else None
-            ),
-            issue_title=existing_cache.get("issue_title") if existing_cache else None,
             pr_number=pr.number,
             pr_title=pr.title,
         )

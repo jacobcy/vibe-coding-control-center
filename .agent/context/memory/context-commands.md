@@ -19,7 +19,7 @@
 
 ### /continue
 - **用途**: 新会话开始时恢复上下文
-- **读取**: `vibe3 handoff show`，claude-memory MCP 工具（`search`、`get_observations`）
+- **读取**: `vibe3 handoff status`，claude-memory MCP 工具（`search`、`get_observations`）
 - **触发**: 手动 `/continue`
 
 ### /check

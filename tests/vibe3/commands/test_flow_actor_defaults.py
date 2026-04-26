@@ -71,8 +71,8 @@ def test_flow_bind_accepts_dependency_role(flow_service_cls, task_service_cls) -
     result = runner.invoke(app, ["bind", "248", "--role", "dependency"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/set-default-flow", 248, "dependency", actor=None
+    flow_service.block_flow.assert_called_once_with(
+        "task/set-default-flow", blocked_by_issue=248, actor=None
     )
 
 
@@ -88,25 +88,10 @@ def test_flow_bind_supports_multiple_dependency_issues(
 
     task_service = MagicMock()
     task_service_cls.return_value = task_service
-    task_service.link_issue.side_effect = [
-        MagicMock(
-            issue_number=248, issue_role="dependency", branch="task/set-default-flow"
-        ),
-        MagicMock(
-            issue_number=249, issue_role="dependency", branch="task/set-default-flow"
-        ),
-    ]
 
     result = runner.invoke(app, ["bind", "248", "249", "--role", "dependency"])
 
     assert result.exit_code == 0
-    assert task_service.link_issue.call_args_list[0].args == (
-        "task/set-default-flow",
-        248,
-        "dependency",
-    )
-    assert task_service.link_issue.call_args_list[1].args == (
-        "task/set-default-flow",
-        249,
-        "dependency",
-    )
+    assert flow_service.block_flow.call_count == 2
+    assert flow_service.block_flow.call_args_list[0].kwargs["blocked_by_issue"] == 248
+    assert flow_service.block_flow.call_args_list[1].kwargs["blocked_by_issue"] == 249

@@ -70,8 +70,8 @@ def execute_check_mode(
         fixed_count = 0
         failed: list[str] = []
         for check_result in invalid_fix:
-            fix_result = service.auto_fix_branch(
-                check_result.branch, check_result.issues
+            fix_result = service.auto_fix(
+                check_result.issues, branch=check_result.branch
             )
             if fix_result.success:
                 fixed_count += 1

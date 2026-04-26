@@ -63,6 +63,7 @@ L3_AGENT_ROLES: Final[frozenset[str]] = frozenset({"manager", "plan", "run", "re
 # State change events — always recorded after role execution completes
 EVENT_STATE_TRANSITIONED: Final[str] = "state_transitioned"
 EVENT_STATE_UNCHANGED: Final[str] = "state_unchanged"
+EVENT_CANNOT_VERIFY_REMOTE_STATE: Final[str] = "cannot_verify_remote_state"
 
 # =============================================================================
 # Flow State Ref Fields
@@ -75,3 +76,30 @@ FIELD_VERDICT: Final[str] = "verdict"
 VERDICT_PASS: Final[str] = "PASS"
 VERDICT_FAIL: Final[str] = "FAIL"
 VERDICT_UNKNOWN: Final[str] = "UNKNOWN"
+
+# =============================================================================
+# Automation Markers (GitHub Comments & Handoffs)
+# =============================================================================
+
+# Markers used to identify automated system comments.
+# Any comment starting with these markers is considered non-human
+# (line-start match) and filtered from human instruction streams.
+AUTOMATED_MARKERS: Final[tuple[str, ...]] = (
+    "[manager]",
+    "[resume]",
+    "[plan]",
+    "[run]",
+    "[review]",
+    "[apply]",
+    "[orchestra]",
+    "[handoff]",
+    "[governance suggest]",
+    "[governance auto-recover]",
+    "[governance apply]",
+    "[governance]",
+)
+
+# Generic agent marker pattern for fallback identification
+# Matches: [agent], [agent:planner], [agent:executor], [agent:custom-role]
+# Does NOT match: [agent discussion], [agent:123] (numeric suffix)
+GENERIC_AGENT_MARKER_PATTERN: Final[str] = r"\[agent(?::[a-zA-Z][a-zA-Z0-9_-]*)?\]"

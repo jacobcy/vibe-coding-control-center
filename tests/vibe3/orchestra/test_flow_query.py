@@ -33,6 +33,23 @@ class TestFlowQuery:
         assert flow is not None
         assert flow["branch"] == "task/test"
 
+    def test_get_flow_for_issue_prefers_active_canonical_flow(self):
+        config = OrchestraConfig()
+        manager = FlowManager(config)
+
+        with patch.object(
+            manager.store,
+            "get_flows_by_issue",
+            return_value=[
+                {"branch": "debug/vibe-server-fix", "flow_status": "done"},
+                {"branch": "task/issue-467", "flow_status": "active"},
+            ],
+        ):
+            flow = manager.get_flow_for_issue(467)
+
+        assert flow is not None
+        assert flow["branch"] == "task/issue-467"
+
     def test_get_flow_for_issue_returns_none(self):
         config = OrchestraConfig()
         manager = FlowManager(config)

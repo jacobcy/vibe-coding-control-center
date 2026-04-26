@@ -5,14 +5,15 @@ from typing import Callable
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import DomainEvent
-from vibe3.domain.events.flow_lifecycle import ManagerDispatched
-from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
+from vibe3.services.issue_failure_service import block_manager_noop_issue
 
 
-def handle_manager_dispatched(event: ManagerDispatched) -> None:
+def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
     """Dispatch manager from an authoritative dispatch-intent event."""
     if event.actor == "human:resume":
         logger.bind(
@@ -38,8 +39,21 @@ def handle_manager_dispatched(event: ManagerDispatched) -> None:
     ).info("Manager dispatch intent received, scheduling async dispatch")
 
     async def _do_dispatch() -> None:
+        def _block_for_noop(reason: str) -> None:
+            logger.bind(
+                domain="issue_state_dispatch_handler",
+                role="manager",
+                issue_number=event.issue_number,
+            ).error(reason)
+            block_manager_noop_issue(
+                issue_number=event.issue_number,
+                repo=None,
+                reason=reason,
+                actor="agent:manager",
+            )
+
         loop = asyncio.get_event_loop()
-        config = OrchestraConfig.from_settings()
+        config = load_orchestra_config()
 
         target_state = (
             IssueState.READY
@@ -62,32 +76,23 @@ def handle_manager_dispatched(event: ManagerDispatched) -> None:
             )
 
             if issue_data is None or isinstance(issue_data, str):
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                    error="issue_not_found",
-                ).error("Failed to fetch issue details from GitHub")
+                _block_for_noop(
+                    "Failed to fetch issue details from GitHub for manager dispatch"
+                )
                 return
 
             issue_info = IssueInfo.from_github_payload(issue_data)
             if issue_info is None:
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                    error="invalid_issue_data",
-                ).error("Failed to parse issue data from GitHub response")
+                _block_for_noop(
+                    "Failed to parse issue data from GitHub"
+                    " response for manager dispatch"
+                )
                 return
 
             issue_info.state = target_state
 
         if issue_info is None:
-            logger.bind(
-                domain="issue_state_dispatch_handler",
-                role="manager",
-                issue_number=event.issue_number,
-            ).error("Issue info is None, cannot dispatch role")
+            _block_for_noop("Issue info is None, cannot dispatch manager role")
             return
 
         from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -111,11 +116,7 @@ def handle_manager_dispatched(event: ManagerDispatched) -> None:
             )
 
             if request is None:
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                ).error("Failed to prepare role execution request")
+                _block_for_noop("Failed to prepare role execution request")
                 return
 
             result = await loop.run_in_executor(
@@ -164,9 +165,15 @@ def register_issue_state_dispatch_handlers() -> None:
 
     from vibe3.domain.publisher import subscribe
 
+    # Subscribe to new event name
+    subscribe(
+        "ManagerDispatchIntent",
+        cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
+    )
+    # Backward compatibility: subscribe to old event name
     subscribe(
         "ManagerDispatched",
-        cast(Callable[[DomainEvent], None], handle_manager_dispatched),
+        cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
     )
 
     logger.bind(domain="events").info("Issue-state role dispatch handlers registered")

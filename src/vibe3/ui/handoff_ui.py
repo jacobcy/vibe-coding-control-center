@@ -40,3 +40,5 @@ def render_handoff_summary(branch: str, stats: dict[str, int]) -> None:
     console.print(f"  Plans: {stats.get('plans', 0)}")
     console.print(f"  Runs: {stats.get('runs', 0)}")
     console.print(f"  Reviews: {stats.get('reviews', 0)}")
+    if stats.get("indicates", 0):
+        console.print(f"  Indicates: {stats.get('indicates', 0)}")

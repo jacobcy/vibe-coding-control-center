@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from vibe3.domain.events import (
-    ExecutorDispatched,
-    ManagerDispatched,
-    PlannerDispatched,
-    ReviewerDispatched,
+    ExecutorDispatchIntent,
+    ManagerDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
 )
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
@@ -18,7 +18,16 @@ from vibe3.roles.review import (
     REVIEWER_ROLE,
 )
 from vibe3.roles.run import (
+    EXECUTOR_PUBLISH_ROLE,
     EXECUTOR_ROLE,
+)
+
+BLOCKED_ROLE = TriggerableRoleDefinition(
+    name="qualify-gate-unblocker",
+    registry_role="none",
+    worktree="none",  # type: ignore[arg-type]
+    trigger_name="blocked",
+    trigger_state=IssueState.BLOCKED,
 )
 
 LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
@@ -26,7 +35,9 @@ LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
     HANDOFF_MANAGER_ROLE,
     PLANNER_ROLE,
     EXECUTOR_ROLE,
+    EXECUTOR_PUBLISH_ROLE,
     REVIEWER_ROLE,
+    BLOCKED_ROLE,
 )
 
 
@@ -35,7 +46,12 @@ def build_label_dispatch_event(
     issue: IssueInfo,
     *,
     branch: str,
-) -> ManagerDispatched | PlannerDispatched | ExecutorDispatched | ReviewerDispatched:
+) -> (
+    ManagerDispatchIntent
+    | PlannerDispatchIntent
+    | ExecutorDispatchIntent
+    | ReviewerDispatchIntent
+):
     """Build the authoritative domain event for a label-triggered role.
 
     Dispatch layer emits neutral intents only -- no execution-specific
@@ -43,27 +59,30 @@ def build_label_dispatch_event(
     the request before calling the role builder.
     """
     trigger = role.trigger_name
+    if trigger == "blocked":
+        # Should not be dispatched directly; handled entirely within qualify gate
+        raise ValueError("BLOCKED_ROLE cannot be dispatched directly")
     if trigger == "manager":
-        return ManagerDispatched(
+        return ManagerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=role.trigger_state.value,
             issue_title=issue.title if issue.title else None,
         )
     if trigger == "plan":
-        return PlannerDispatched(
+        return PlannerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.CLAIMED.value,
         )
     if trigger == "run":
-        return ExecutorDispatched(
+        return ExecutorDispatchIntent(
             issue_number=issue.number,
             branch=branch,
-            trigger_state=IssueState.IN_PROGRESS.value,
+            trigger_state=role.trigger_state.value,
         )
     if trigger == "review":
-        return ReviewerDispatched(
+        return ReviewerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.REVIEW.value,

@@ -166,9 +166,9 @@ class GitClient:
         """Check whether any worktree already has this branch checked out."""
         return _is_branch_occupied_by_worktree(self._run, branch_name)
 
-    def find_worktree_path_for_branch(self, branch_name: str) -> Path | None:
-        """Find worktree path whose checked-out branch matches ``branch_name``."""
-        return _find_worktree_path_for_branch(self._run, branch_name)
+    def find_worktree_path_for_branch(self, branch: str) -> Path | None:
+        """Find worktree path whose checked-out branch matches ``branch``."""
+        return _find_worktree_path_for_branch(self._run, branch)
 
     def get_worktrees_for_branch(self, branch_name: str) -> list[str]:
         """Return paths of worktrees that have the given branch checked out."""

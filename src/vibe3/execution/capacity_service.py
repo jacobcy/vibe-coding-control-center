@@ -69,6 +69,9 @@ class CapacityService:
         Returns:
             True if capacity available, False if full
         """
+        if role == "governance":
+            return True
+
         active_count = self._registry.count_live_worker_sessions()
         max_capacity = self.config.max_concurrent_flows
         remaining = max(0, max_capacity - active_count)

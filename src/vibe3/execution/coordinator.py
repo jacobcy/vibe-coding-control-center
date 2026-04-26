@@ -1,11 +1,13 @@
 """Unified execution coordinator."""
 
 import os
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Optional
 
 from loguru import logger
+from typer import echo
 
 from vibe3.agents.backends.async_launcher import start_async_command
 from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -18,6 +20,7 @@ from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.execution_lifecycle import execution_prefix
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.logging import append_orchestra_event
 
 
 class ExecutionCoordinator:
@@ -141,10 +144,9 @@ class ExecutionCoordinator:
         execution lifecycle.
 
         Simple dispatch model:
-        1. Check for existing live session -> skip duplicate
-        2. Check capacity -> skip if full
-        3. Reserve runtime_session for async wrappers
-        4. Launch execution
+        1. Check capacity -> skip if full
+        2. Reserve runtime_session for async wrappers
+        3. Launch execution
         """
         logger.bind(
             domain="execution_coordinator",
@@ -163,29 +165,7 @@ class ExecutionCoordinator:
         )
         runtime_session_id: int | None = None
 
-        # 1. Check for existing truly live session (starting or running with live tmux)
-        # to prevent duplicate launches if multiple dispatchers fire concurrently.
-        if request.target_branch and not is_async_child_sync:
-            live_sessions = self.registry.get_truly_live_sessions_for_target(
-                role=request.role,
-                branch=request.target_branch,
-                target_id=str(request.target_id),
-            )
-            if live_sessions:
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                    branch=request.target_branch,
-                ).info(f"Already running for {request.role}, skipping duplicate")
-                return ExecutionLaunchResult(
-                    launched=False,
-                    skipped=True,
-                    reason=f"Execution already running for {request.role}",
-                    reason_code="already_running",
-                )
-
-        # 2. Check capacity
+        # 1. Check capacity
         # Async child sync: outer wrapper already reserved capacity and registered
         # the runtime_session; child must not re-check or it double-counts itself.
         if not is_async_child_sync:
@@ -196,8 +176,38 @@ class ExecutionCoordinator:
                     reason_code="capacity_full",
                 )
 
+            # 1b. Dispatch dedup: skip if a live session already exists for
+            # the same role + branch + target. This prevents the same issue
+            # from spawning concurrent duplicate executions.
+            if request.target_branch:
+                target_type, runtime_target_id = self._resolve_runtime_target(request)
+                live = self.registry.get_truly_live_sessions_for_target(
+                    role=request.role,
+                    branch=request.target_branch,
+                    target_id=runtime_target_id,
+                )
+                if live:
+                    logger.bind(
+                        domain="execution_coordinator",
+                        role=request.role,
+                        target_branch=request.target_branch,
+                        target_id=runtime_target_id,
+                        live_count=len(live),
+                    ).info(
+                        f"Skipping duplicate dispatch for {request.role} "
+                        f"on {request.target_branch}"
+                    )
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        reason=(
+                            f"Live session already exists for "
+                            f"{request.role}/{request.target_branch}"
+                        ),
+                        reason_code="duplicate_dispatch",
+                    )
+
         try:
-            # 3. Launch
+            # 2. Launch
             cwd_path = self._resolve_cwd(request)
             env = request.env or dict(os.environ)
 
@@ -225,6 +235,14 @@ class ExecutionCoordinator:
                     keep_alive = int(request.refs.get("keep_alive_seconds", "0"))
                     task = request.refs.get("task")
                     session_id = request.refs.get("session_id")
+
+                    # Print execution marker before async execution
+                    # This marker is used to filter out uv installation noise
+                    backend_info = (
+                        request.options.backend or request.options.agent or "agent"
+                    )
+                    echo(f"-> Executing with {backend_info}...")
+
                     handle = self.backend.start_async(
                         prompt=request.prompt,
                         options=request.options,
@@ -288,6 +306,11 @@ class ExecutionCoordinator:
                         stdout=result.stdout,
                     )
                 error_msg = result.stderr or "Execution failed"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{request.role} sync execution failed for #{request.target_id}: "
+                    f"{error_msg}",
+                )
                 return ExecutionLaunchResult(
                     launched=False,
                     reason=error_msg,
@@ -297,16 +320,34 @@ class ExecutionCoordinator:
                 raise ValueError(f"Unknown mode: {request.mode}")
 
         except Exception as exc:
+            error_msg = self._format_launch_error(exc)
             if request.mode == "async" and runtime_session_id is not None:
                 self.registry.mark_failed(runtime_session_id)
+            append_orchestra_event(
+                "dispatcher",
+                f"{request.role} launch failed for #{request.target_id}: {error_msg}",
+            )
             logger.bind(
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
-            ).error(f"Execution launch failed: {exc}")
+            ).error(f"Execution launch failed: {error_msg}")
 
             return ExecutionLaunchResult(
                 launched=False,
-                reason=str(exc),
+                reason=error_msg,
                 reason_code="launch_failed",
             )
+
+    @staticmethod
+    def _format_launch_error(exc: Exception) -> str:
+        """Add context for known launch-failure patterns."""
+        error_msg = str(exc)
+        match = re.search(r"Tmux session '([^']+)' already exists", error_msg)
+        if match:
+            session_name = match.group(1)
+            return (
+                f"{error_msg} (previous session still alive: {session_name}; "
+                "launch skipped to avoid duplicate worker)"
+            )
+        return error_msg

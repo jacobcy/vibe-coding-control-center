@@ -17,90 +17,6 @@ class TestAISuggestionClient:
             client = AISuggestionClient(config, prompts_path=tmp_path / "prompts.yaml")
             assert client.ai_client is not None
 
-    def test_suggest_flow_slug_without_api_key_returns_none(
-        self, tmp_path: Path
-    ) -> None:
-        config = AIConfig(api_key_env="OPENAI_API_KEY")
-        client = AISuggestionClient(config, prompts_path=tmp_path / "prompts.yaml")
-        result = client.suggest_flow_slug("Add feature", "Description")
-        assert result is None
-
-    def test_suggest_flow_slug_success(self, tmp_path: Path) -> None:
-        prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
-flow:
-  slug_suggestion:
-    system: "You are a helpful assistant."
-    user: "Issue: {issue_title}"
-""")
-
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(api_key_env="OPENAI_API_KEY")
-            with patch.object(AIClient, "generate_text") as mock_generate:
-                mock_generate.return_value = "feature-name\nanother-name\nthird-name"
-                client = AISuggestionClient(config, prompts_path=prompts_file)
-                result = client.suggest_flow_slug("Add feature X")
-
-                assert result == ["feature-name", "another-name", "third-name"]
-                mock_generate.assert_called_once()
-
-    def test_suggest_flow_slug_with_body(self, tmp_path: Path) -> None:
-        prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
-flow:
-  slug_suggestion:
-    system: "You are a helpful assistant."
-    user: "Issue: {issue_title}\n\n{issue_body}"
-""")
-
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(api_key_env="OPENAI_API_KEY")
-            with patch.object(AIClient, "generate_text") as mock_generate:
-                mock_generate.return_value = "slug-name"
-                client = AISuggestionClient(config, prompts_path=prompts_file)
-                result = client.suggest_flow_slug("Title", "Body content")
-
-                assert result == ["slug-name"]
-                call_args = mock_generate.call_args
-                assert "Title" in call_args[0][1]
-                assert "Body content" in call_args[0][1]
-
-    def test_suggest_flow_slug_empty_result_returns_none(self, tmp_path: Path) -> None:
-        prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
-flow:
-  slug_suggestion:
-    system: "You are a helpful assistant."
-    user: "Issue: {issue_title}"
-""")
-
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(api_key_env="OPENAI_API_KEY")
-            with patch.object(AIClient, "generate_text") as mock_generate:
-                mock_generate.return_value = ""
-                client = AISuggestionClient(config, prompts_path=prompts_file)
-                result = client.suggest_flow_slug("Title")
-
-                assert result is None
-
-    def test_suggest_flow_slug_api_fails_returns_none(self, tmp_path: Path) -> None:
-        prompts_file = tmp_path / "prompts.yaml"
-        prompts_file.write_text("""
-flow:
-  slug_suggestion:
-    system: "You are a helpful assistant."
-    user: "Issue: {issue_title}"
-""")
-
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(api_key_env="OPENAI_API_KEY")
-            with patch.object(AIClient, "generate_text") as mock_generate:
-                mock_generate.return_value = None
-                client = AISuggestionClient(config, prompts_path=prompts_file)
-                result = client.suggest_flow_slug("Title")
-
-                assert result is None
-
     def test_suggest_pr_content_without_api_key_returns_none(
         self, tmp_path: Path
     ) -> None:
@@ -211,7 +127,6 @@ pr:
             client = AISuggestionClient(config, prompts_path=prompts_file)
 
             assert client.ai_client is not None
-            assert "flow" in client.prompts
             assert "pr" in client.prompts
 
     def test_invalid_yaml_uses_defaults(self, tmp_path: Path) -> None:
@@ -222,5 +137,4 @@ pr:
             config = AIConfig(api_key_env="OPENAI_API_KEY")
             client = AISuggestionClient(config, prompts_path=prompts_file)
 
-            assert "flow" in client.prompts
             assert "pr" in client.prompts

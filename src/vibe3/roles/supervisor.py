@@ -78,6 +78,7 @@ def build_supervisor_handoff_payload(
     governance_cfg = config.governance.model_copy(
         update={
             "supervisor_file": config.supervisor_handoff.supervisor_file,
+            "supervisor_files": [],
             "prompt_template": config.supervisor_handoff.prompt_template,
             "include_supervisor_content": True,
             "dry_run": False,
@@ -208,13 +209,17 @@ def build_supervisor_cli_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
     """Build sync execution request for CLI-driven supervisor apply."""
     import os
+
+    _ = flow_state
 
     prompt, _, task = build_supervisor_handoff_payload(
         config,
@@ -237,6 +242,7 @@ def build_supervisor_cli_sync_request(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
+        show_prompt=show_prompt,
         worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
     )
 

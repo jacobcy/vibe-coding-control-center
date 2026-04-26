@@ -72,6 +72,16 @@ def test_can_dispatch_exact_boundary(
         assert service.can_dispatch("manager") is True
 
 
+def test_governance_bypasses_worker_capacity_pool(
+    service: CapacityService,
+) -> None:
+    """Governance should not be blocked by the worker capacity pool."""
+    with patch.object(
+        service._registry, "count_live_worker_sessions", return_value=999
+    ):
+        assert service.can_dispatch("governance") is True
+
+
 # --- get_capacity_status ---
 
 
