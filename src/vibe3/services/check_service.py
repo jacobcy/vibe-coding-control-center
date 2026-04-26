@@ -49,6 +49,11 @@ class FixResult:
 class CheckService(CheckRemote):
     """Service for verifying handoff store consistency and auto-fixing issues."""
 
+    # Terminal flow statuses that indicate completed flows
+    TERMINAL_FLOW_STATUSES = ("done", "aborted", "merged")
+    # Active flow statuses that should be checked
+    ACTIVE_FLOW_STATUSES = ("active", "stale")
+
     def __init__(
         self,
         store: SQLiteClient | None = None,
@@ -58,6 +63,23 @@ class CheckService(CheckRemote):
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
+        self._branch_to_pr: dict[str, PRResponse] = {}
+
+    def _initialize_pr_cache(self) -> None:
+        """Initialize PR cache with batch fetch (1 API call instead of N).
+
+        Safe to call multiple times - only fetches once.
+        """
+        if self._branch_to_pr:
+            return  # Already initialized
+        try:
+            all_prs = self.github_client.list_all_prs(state="all")
+            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        except (OSError, ValueError) as exc:
+            # OSError: subprocess/gh CLI failures
+            # ValueError: JSON parsing errors
+            logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
+            self._branch_to_pr = {}
 
     # ------------------------------------------------------------------
     # Core Logic
@@ -69,14 +91,7 @@ class CheckService(CheckRemote):
         branch = self.git_client.get_current_branch()
 
         # Batch fetch all PRs (optimization: 1 call instead of N)
-        try:
-            all_prs = self.github_client.list_all_prs(state="all")
-            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
-        except (OSError, ValueError) as exc:
-            # OSError: subprocess/gh CLI failures
-            # ValueError: JSON parsing errors
-            logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
-            self._branch_to_pr = {}
+        self._initialize_pr_cache()
 
         return self._check_branch(branch)
 
@@ -85,6 +100,36 @@ class CheckService(CheckRemote):
             return self.git_client.find_worktree_path_for_branch(branch) is not None
         except Exception:
             return False
+
+    def _has_local_branch(self, branch: str) -> bool:
+        """Check if local branch exists."""
+        try:
+            output = self.git_client._run(["branch", "--list", branch])
+            return bool(output.strip())
+        except Exception:
+            return False
+
+    def _has_remote_branch(self, branch: str) -> bool:
+        """Check if remote branch exists."""
+        try:
+            remote_output = self.git_client._run(
+                ["branch", "-r", "--list", f"origin/{branch}"]
+            )
+            return bool(remote_output.strip())
+        except Exception:
+            return False
+
+    def _check_branch_resources(self, branch: str) -> tuple[bool, bool, bool]:
+        """Check if branch has local, remote, and worktree resources.
+
+        Returns:
+            Tuple of (has_local, has_remote, has_worktree)
+        """
+        return (
+            self._has_local_branch(branch),
+            self._has_remote_branch(branch),
+            self._has_worktree(branch),
+        )
 
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
@@ -145,14 +190,19 @@ class CheckService(CheckRemote):
         if pr:
             # Check if PR is closed or merged - auto-complete flow
             if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                self._mark_flow_done(
+                suggestions = self._mark_flow_done(
                     branch,
                     f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                    cleanup_local_scene=not branch_missing,
                 )
                 # Write cache: update PR title
                 self._update_pr_cache(branch, pr)
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+                # Report issue close suggestion
+                result_issues: list[str] = []
+                if suggestions.get("issue_to_close"):
+                    result_issues.append(
+                        f"Suggestion: Issue #{suggestions['issue_to_close']} is still OPEN. Consider closing it."
+                    )
+                return CheckResult(is_valid=True, branch=branch, issues=result_issues)
         else:
             # No PR found in cache, try API as fallback
             try:
@@ -168,30 +218,38 @@ class CheckService(CheckRemote):
                     pr = prs[0]
                     # Check if PR is closed or merged - auto-complete flow
                     if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                        self._mark_flow_done(
+                        suggestions = self._mark_flow_done(
                             branch,
                             f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                            cleanup_local_scene=not branch_missing,
                         )
                         # Write cache: update PR title
                         self._update_pr_cache(branch, pr)
-                        return CheckResult(is_valid=True, branch=branch, issues=[])
+                        # Report issue close suggestion
+                        result_issues = []
+                        if suggestions.get("issue_to_close"):
+                            result_issues.append(
+                                f"Suggestion: Issue #{suggestions['issue_to_close']} is still OPEN. Consider closing it."
+                            )
+                        return CheckResult(
+                            is_valid=True, branch=branch, issues=result_issues
+                        )
             except Exception as e:
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to verify PR status from GitHub: {e}"
                 )
                 issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
-        # Auto-complete when task issue is closed (and no open PR found)
+        # Auto-abort when task issue is closed (no open PR found)
+        # Semantic: Issue closed without PR = task cancelled/aborted
         if task_issue_closed:
             # Use cached PR data instead of API call
             pr = self._branch_to_pr.get(branch)
             if not pr or pr.state != PRState.OPEN:
-                self._mark_flow_done(
+                self._mark_flow_aborted(
                     branch,
                     f"Task issue #{task_issue} is CLOSED (no open PR found)",
-                    cleanup_local_scene=not branch_missing,
                 )
+                # Branch cleanup is deferred to --clean-branch
                 return CheckResult(is_valid=True, branch=branch, issues=[])
 
         flow_status = flow_data.get("flow_status", "active")
@@ -264,24 +322,44 @@ class CheckService(CheckRemote):
         return CheckResult(is_valid=is_valid, issues=issues, branch=branch)
 
     def _cleanup_local_scene(self, branch: str, *, force_delete: bool) -> None:
-        """Best-effort cleanup of worktree and local branch for a converged flow."""
-        worktree_path = self.git_client.find_worktree_path_for_branch(branch)
-        if worktree_path is not None:
-            try:
-                self.git_client.remove_worktree(worktree_path, force=True)
-            except Exception as exc:
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to remove worktree during local scene cleanup: {exc}"
-                )
+        """Best-effort cleanup of worktree, local branch, and remote branch.
+
+        Checks existence before attempting deletion to avoid noisy warnings.
+        """
+        # 1. Clean up worktree (check existence first)
         try:
-            self.git_client.delete_branch(
-                branch,
-                force=force_delete,
-                skip_if_worktree=True,
+            worktree_path = self.git_client.find_worktree_path_for_branch(branch)
+            if worktree_path is not None:
+                self.git_client.remove_worktree(worktree_path, force=True)
+        except Exception as exc:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to remove worktree during local scene cleanup: {exc}"
             )
+
+        # 2. Clean up local branch (check existence first)
+        try:
+            output = self.git_client._run(["branch", "--list", branch])
+            if output.strip():
+                self.git_client.delete_branch(
+                    branch,
+                    force=force_delete,
+                    skip_if_worktree=True,
+                )
         except Exception as exc:
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to delete branch during local scene cleanup: {exc}"
+            )
+
+        # 3. Clean up remote branch (check existence first)
+        try:
+            remote_output = self.git_client._run(
+                ["branch", "-r", "--list", f"origin/{branch}"]
+            )
+            if remote_output.strip():
+                self.git_client.delete_remote_branch(branch)
+        except Exception as exc:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to delete remote branch during local scene cleanup: {exc}"
             )
 
     def _rebuild_stale_ready_flow(
@@ -321,10 +399,15 @@ class CheckService(CheckRemote):
         self,
         branch: str,
         reason: str,
-        *,
-        cleanup_local_scene: bool = True,
-    ) -> None:
-        """Mark a flow as done and record the event."""
+    ) -> dict[str, int | None]:
+        """Mark a flow as done and record the event.
+
+        Note: Branch cleanup is deferred to 'vibe3 check --clean-branch'.
+        This keeps check fast and allows code reuse.
+
+        Returns:
+            Dict with suggestions, e.g., {"issue_to_close": 123}
+        """
         logger.bind(
             domain="check",
             action="auto_complete_flow",
@@ -337,8 +420,26 @@ class CheckService(CheckRemote):
             "system",
             f"Flow auto-completed: {reason}",
         )
-        if cleanup_local_scene:
-            self._cleanup_local_scene(branch, force_delete=True)
+        # Branch cleanup is deferred to --clean-branch for performance and code reuse
+        # if cleanup_local_scene:
+        #     self._cleanup_local_scene(branch, force_delete=True)
+
+        # Check if linked issue is still open
+        suggestions: dict[str, int | None] = {"issue_to_close": None}
+        issue_links = self.store.get_issue_links(branch)
+        task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
+        if task_issues:
+            task_issue = task_issues[0]["issue_number"]
+            issue = self.github_client.view_issue(task_issue)
+            # view_issue() can return dict, None, or "network_error" string
+            if (
+                issue
+                and isinstance(issue, dict)
+                and str(issue.get("state", "")).upper() != "CLOSED"
+            ):
+                suggestions["issue_to_close"] = task_issue
+
+        return suggestions
 
     def _mark_flow_aborted(self, branch: str, reason: str) -> None:
         """Mark a flow as aborted and record the event."""
@@ -375,28 +476,12 @@ class CheckService(CheckRemote):
     ) -> list[CheckResult]:
         """Run consistency checks for flows in the store."""
         # Initialize PR cache (optimization: 1 API call instead of N)
-        if not hasattr(self, "_branch_to_pr"):
-            try:
-                all_prs = self.github_client.list_all_prs(state="all")
-                self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
-            except Exception as exc:
-                logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
-                self._branch_to_pr = {}
+        self._initialize_pr_cache()
 
         all_flows = self.store.get_all_flows()
         if status:
             statuses = [status] if isinstance(status, str) else status
             all_flows = [f for f in all_flows if f.get("flow_status") in statuses]
-
-        # Batch fetch all PRs (optimization: 1 call instead of N)
-        try:
-            all_prs = self.github_client.list_all_prs(state="all")
-            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
-        except (OSError, ValueError) as exc:
-            # OSError: subprocess/gh CLI failures
-            # ValueError: JSON parsing errors
-            logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
-            self._branch_to_pr = {}
 
         results = []
         for flow in all_flows:
@@ -456,3 +541,80 @@ class CheckService(CheckRemote):
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to update PR cache: {e}"
             )
+
+    def clean_residual_branches(self) -> dict[str, object]:
+        """Check and clean residual branches for done/aborted flows.
+
+        Flows marked as done/aborted should have their branches cleaned.
+        This method uses the shared _cleanup_local_scene() method which
+        checks existence before deletion.
+
+        Performance optimization: Batch check resources to minimize git calls.
+
+        Returns:
+            Dict with summary and details of cleaned branches.
+        """
+        logger.bind(domain="check", action="clean_residual").info(
+            "Checking for residual branches"
+        )
+
+        # Get all done/aborted flows
+        all_flows = self.store.get_all_flows()
+        terminal_flows = [
+            f for f in all_flows if f.get("flow_status") in self.TERMINAL_FLOW_STATUSES
+        ]
+
+        cleaned: list[str] = []
+        removed_invalid: list[str] = []
+        failed: list[str] = []
+
+        for flow in terminal_flows:
+            branch = flow["branch"]
+
+            # Remove invalid branch records (e.g., HEAD)
+            if branch == "HEAD" or branch.startswith("HEAD"):
+                try:
+                    self.store.delete_flow(branch)
+                    removed_invalid.append(branch)
+                    logger.bind(domain="check", branch=branch).info(
+                        "Removed invalid flow record"
+                    )
+                except Exception as exc:
+                    logger.bind(domain="check", branch=branch).warning(
+                        f"Failed to remove invalid flow record: {exc}"
+                    )
+                continue
+
+            # Check if there's anything to clean (using extracted helper)
+            try:
+                has_local, has_remote, has_worktree = self._check_branch_resources(
+                    branch
+                )
+
+                if not (has_local or has_remote or has_worktree):
+                    continue  # Nothing to clean
+
+                self._cleanup_local_scene(branch, force_delete=True)
+                cleaned.append(branch)
+                logger.bind(domain="check", branch=branch).info(
+                    "Cleaned residual resources"
+                )
+            except Exception as exc:
+                failed.append(f"{branch}: {exc}")
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to clean residual resources: {exc}"
+                )
+
+        summary = f"Cleaned {len(cleaned)} flows"
+        if removed_invalid:
+            summary += f", removed {len(removed_invalid)} invalid records"
+        if failed:
+            summary += f", failed {len(failed)}"
+
+        return {
+            "summary": summary,
+            "cleaned": cleaned,
+            "removed_invalid": removed_invalid,
+            "failed": failed,
+            "total_flows_checked": len(terminal_flows),
+        }

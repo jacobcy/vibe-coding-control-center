@@ -80,11 +80,8 @@ class TestMergedPRHandling:
         )
         mock_store.add_event.assert_called_once()
         assert mock_store.add_event.call_args[0][1] == "flow_auto_completed"
-        check_service.git_client.delete_branch.assert_called_once_with(
-            "feature/test-branch",
-            force=True,
-            skip_if_worktree=True,
-        )
+        # Branch cleanup is now deferred to --clean-branch
+        check_service.git_client.delete_branch.assert_not_called()
 
     def test_missing_local_branch_with_merged_pr_still_marks_done(
         self, check_service, mock_store, mock_github_client
@@ -119,7 +116,7 @@ class TestMergedPRHandling:
     def test_merged_cleanup_still_attempts_branch_delete_when_worktree_cleanup_fails(
         self, check_service, mock_store, mock_github_client
     ):
-        """Done convergence tries branch cleanup if worktree removal fails."""
+        """Done flow marks status without immediate cleanup (deferred)."""
         mock_store.get_flow_state.return_value = {
             "branch": "feature/test-branch",
         }
@@ -137,19 +134,13 @@ class TestMergedPRHandling:
         )
         mock_github_client.list_prs_for_branch.return_value = [pr]
         check_service.git_client.find_worktree_path_for_branch.return_value = "/tmp/wt"
-        check_service.git_client.remove_worktree.side_effect = RuntimeError("bad wt")
 
         result = check_service.verify_current_flow()
 
         assert result.is_valid
-        check_service.git_client.remove_worktree.assert_called_once_with(
-            "/tmp/wt", force=True
-        )
-        check_service.git_client.delete_branch.assert_called_once_with(
-            "feature/test-branch",
-            force=True,
-            skip_if_worktree=True,
-        )
+        # Branch cleanup is now deferred to --clean-branch
+        check_service.git_client.remove_worktree.assert_not_called()
+        check_service.git_client.delete_branch.assert_not_called()
 
 
 class TestStaleFlowHandling:
@@ -281,3 +272,83 @@ class TestAutoFix:
         assert not result.success
         assert result.error is not None
         assert "--init" in result.error
+
+
+class TestCleanResidualBranches:
+    """Tests for clean_residual_branches method."""
+
+    def test_clean_residual_branches_removes_done_flow_branches(
+        self, check_service, mock_store, mock_git_client
+    ):
+        """Should clean branches for done/aborted flows."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/done-branch", "flow_status": "done"},
+            {"branch": "feature/active-branch", "flow_status": "active"},
+        ]
+        # Simulate local branch exists for done branch
+        mock_git_client._run.return_value = "feature/done-branch"
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = check_service.clean_residual_branches()
+
+        assert "feature/done-branch" in result["cleaned"]
+        assert len(result["cleaned"]) == 1
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_skips_when_no_resources(
+        self, check_service, mock_store, mock_git_client
+    ):
+        """Should skip when no local/remote/worktree exists."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/done-branch", "flow_status": "done"},
+        ]
+        # Simulate no resources exist
+        mock_git_client._run.return_value = ""
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = check_service.clean_residual_branches()
+
+        assert len(result["cleaned"]) == 0
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_removes_invalid_records(
+        self, check_service, mock_store, mock_git_client
+    ):
+        """Should remove HEAD records from database."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "HEAD", "flow_status": "done"},
+            {"branch": "HEAD~1", "flow_status": "aborted"},
+        ]
+
+        result = check_service.clean_residual_branches()
+
+        assert len(result["removed_invalid"]) == 2
+        assert mock_store.delete_flow.call_count == 2
+
+    def test_clean_residual_branches_handles_partial_failures(
+        self, check_service, mock_store, mock_git_client
+    ):
+        """Should continue cleaning even if some fail."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/branch-1", "flow_status": "done"},
+            {"branch": "feature/branch-2", "flow_status": "done"},
+        ]
+        # First branch succeeds, second fails
+        call_count = [0]
+
+        def mock_run(cmd):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                return "feature/branch-1"  # First call for branch-1
+            elif call_count[0] <= 2:
+                raise RuntimeError("git error")  # First call for branch-2 fails
+            return ""  # Subsequent calls
+
+        mock_git_client._run.side_effect = mock_run
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = check_service.clean_residual_branches()
+
+        # Should have some result despite failures
+        assert "failed" in result
+        assert result["total_flows_checked"] == 2

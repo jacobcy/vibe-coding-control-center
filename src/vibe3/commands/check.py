@@ -16,7 +16,7 @@ app = typer.Typer(
 
 
 def _emit_check_details(
-    mode: Literal["init", "fix_all"],
+    mode: Literal["init", "fix_all", "clean_branch"],
     details: dict[str, Any],
     *,
     fix_requested: bool,
@@ -42,6 +42,18 @@ def _emit_check_details(
             typer.echo(f"  Failed: {f}", err=True)
         return
 
+    if mode == "clean_branch":
+        cleaned = details.get("cleaned") or []
+        removed_invalid = details.get("removed_invalid") or []
+        failed = details.get("failed") or []
+        if cleaned:
+            typer.echo(f"  Cleaned: {', '.join(cleaned)}")
+        if removed_invalid:
+            typer.echo(f"  Removed invalid records: {', '.join(removed_invalid)}")
+        for f in failed:
+            typer.echo(f"  Failed: {f}", err=True)
+        return
+
 
 @app.callback(invoke_without_command=True)
 def check(
@@ -54,6 +66,17 @@ def check(
                 "Scan merged PRs on GitHub and back-fill missing task_issue_number "
                 "for all flows. Requires network. Writes to local store. "
                 "Safe to re-run (skips flows that already have task_issue_number)."
+            ),
+        ),
+    ] = False,
+    clean_branch: Annotated[
+        bool,
+        typer.Option(
+            "--clean-branch",
+            help=(
+                "Check and clean residual branches for done/aborted flows. "
+                "Use this to remove local/remote branches that should have been "
+                "cleaned when the flow was marked done or aborted."
             ),
         ),
     ] = False,
@@ -70,9 +93,20 @@ def check(
 
     [green]vibe3 check --init[/green]  Scan merged PRs + GitHub items,
                          back-fill task_issue_number for all flows.
+
+    [green]vibe3 check --clean-branch[/green]  Clean residual branches
+                         for done/aborted flows.
     """
     if trace:
         setup_logging(verbose=2)
+
+    # Mutual exclusion check
+    if init and clean_branch:
+        typer.echo(
+            "Error: --init and --clean-branch are mutually exclusive options.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
     trace_ctx = trace_context(command="check", domain="check") if trace else None
     if trace_ctx:
@@ -80,10 +114,16 @@ def check(
 
     try:
         service = CheckService()
-        mode: Literal["init", "fix_all"] = "init" if init else "fix_all"
-
-        if mode == "init":
+        mode: Literal["init", "fix_all", "clean_branch"]
+        if init:
+            mode = "init"
             typer.echo("Scanning merged PRs to back-fill task_issue_number...")
+        elif clean_branch:
+            mode = "clean_branch"
+            typer.echo("Checking for residual branches (done/aborted flows)...")
+        else:
+            mode = "fix_all"
+
         result = execute_check_mode(service, mode)
 
         if result.success:
@@ -93,6 +133,13 @@ def check(
             typer.echo(f"✗ {result.summary}", err=True)
             _emit_check_details(mode, result.details, fix_requested=True)
             raise typer.Exit(code=1)
+
+        # Hint for clean-branch after regular check
+        if mode == "fix_all":
+            typer.echo(
+                "\n  [dim]Hint: To clean residual branches for done/aborted flows, "
+                "use 'vibe3 check --clean-branch'[/]"
+            )
     finally:
         if trace_ctx:
             trace_ctx.__exit__(None, None, None)
