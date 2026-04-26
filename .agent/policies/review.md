@@ -101,10 +101,20 @@
 - 或输出契约被破坏，导致链路不可安全消费
 - 或关键验证失败
 
+## Comment Contract（Review 角色）
+
+详细规则见 [common.md → Comment vs Handoff Contract](common.md)，本节只补充 review 特有要求。
+
+- 何时写 comment：review 裁决（PASS / MAJOR / BLOCK）外发、需要 PR 作者修复的明确请求、合并/回退建议。
+- 何时改用 handoff append：审查中的次要观察、不阻塞当前裁决的待跟进事项、给下一轮 reviewer 的上下文。
+- Marker：所有 review 阶段的 issue / PR comment 必须以行首 `[review]` 开头。
+- 内容要求：verdict + 可操作的 findings 摘要（指向 PR review 的行内评论或 handoff 详情）。
+- 禁止：把 verdict 写成自由文本而不带 marker；用 comment 罗列大量风格类建议（这类内容应保留在 PR review 的行内评论）。
+
 ## 输出要求
 
 - 先给 findings，再给 verdict。
 - 只写可操作问题。
-- 问题描述必须指出为什么这是问题，而不只是说“建议更好”。
+- 问题描述必须指出为什么这是问题，而不只是说”建议更好”。
 - 若无问题，明确写无发现，不要编造建议凑数。
 - 输出格式遵循当前审查链路约定的结构化合同。

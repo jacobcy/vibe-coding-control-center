@@ -86,6 +86,16 @@
 - 不要把计划阶段该做的重新分析全部拖到执行阶段。
 - 不要把与当前任务无关的优化混进提交。
 
+## Comment Contract（Run 角色）
+
+详细规则见 [common.md → Comment vs Handoff Contract](common.md)，本节只补充 run 特有要求。
+
+- 何时写 comment：run 完成（实现 + 验证）后的对外结论、阻塞需要人类介入、PR 状态变化通报。
+- 何时改用 handoff append：执行中的 finding、调试线索、未影响最终交付的过程记录。
+- Marker：所有 run 阶段的 issue / PR comment 必须以行首 `[run]` 开头。
+- 内容要求：一句话结论 + 真实验证证据（命令、测试输出、关键 diff 引用）+ 是否偏离 plan。
+- 禁止：用 comment 替代 handoff 写过程笔记；不带 marker 直接 `gh issue comment`。
+
 ## 输出提醒
 
 - 结果面向交付，不面向表演。

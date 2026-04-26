@@ -252,9 +252,13 @@ Inputs:
 
 Steps:
 
-1. 读取当前 issue comments
-2. 识别最新人类指示（署名为人类用户，不含 `[governance suggest]` 标记）
-3. 识别最新 governance 建议（署名为 `[governance suggest]`）
+1. 读取当前 issue comments。
+2. **Bug 7: 识别最新人类指示**：
+   - 必须是真实人类账号署名（非 bot 且不在 `manager_usernames` 中）。
+   - **必须不含** `[manager]`、`[governance]` 等自动化前缀。
+   - 忽略历史中无前缀的自动化状态报告（通常由旧版 manager 产生）。
+3. **识别最新 governance 建议**：
+   - 署名为 `[governance suggest]` 或含 `[governance]` 标记。
 4. 读取当前 labels/state
 5. 核查当前 issue / flow / task / branch / worktree / session
 6. 读取 handoff 与 refs
@@ -641,12 +645,17 @@ Allowed:
 Steps:
 
 1. 谓词检查：确保当前 scene 健康
-2. 检查 `report_ref` 是否已产出
-3. 如果 `report_ref` 已产出（常规执行完毕）：
+2. **Bug 8**: 检查 `pr_ref` 是否已提前产出。
+   - 如果 `pr_ref` 已存在但当前为 `in-progress`（非预期链路）：
+     - 记录 WARNING 告知 identity 混乱或执行器状态异常
+     - 转回 `state/handoff` 进入 PR 审核分支
+     - `exit()`
+3. 检查 `report_ref` 是否已产出
+4. 如果 `report_ref` 已产出（常规执行完毕）：
    - 转回 `state/handoff`
    - comment 当前 issue 说明实现阶段结束，进入审核准备
    - `exit()`
-4. 如果 `report_ref` 尚未产出且执行中没有新事实：
+5. 如果 `report_ref` 尚未产出且执行中没有新事实：
    - 不重复长 comment
    - `exit()`
 
@@ -783,6 +792,8 @@ Steps:
 3. `exit()`
 
 ## Comment Contract
+
+**重要（Bug 10）**：所有正式 issue comment **必须**以 `[manager]` 前缀开头（详见 [Permission Contract](./governance.yaml) 与物理隔离规范），以便系统准确识别自动化评论与人类指令。
 
 如果写正式 comment，至少包含：
 

@@ -204,7 +204,11 @@ vibe_doctor() {
                 local expected_usernames
                 expected_usernames=$(grep -A 10 "manager_usernames:" "$VIBE_ROOT/config/settings.yaml" 2>/dev/null | grep -E '^\s*-\s+"' | sed 's/.*"\([^"]*\)".*/\1/' | tr '\n' ' ')
 
-                if [ -n "$expected_usernames" ] && [[ ! " $expected_usernames " =~ " $manager_username " ]]; then
+                if [ -z "$expected_usernames" ]; then
+                    # Bug 6: Warn if token is set but whitelist is empty
+                    printf "  ${YELLOW}!${NC} %-15s Token set but manager_usernames is empty\n" "Manager Token"
+                    echo "      建议：在 settings.yaml 的 manager_usernames 中加入 '$manager_username'"
+                elif [[ ! " $expected_usernames " =~ " $manager_username " ]]; then
                     printf "  ${YELLOW}!${NC} %-15s Identity mismatch (expected: %s, got: %s)\n" \
                         "Manager Token" "$(echo $expected_usernames | tr ' ' ',')" "$manager_username"
                     echo "      建议：检查 VIBE_MANAGER_GITHUB_TOKEN 是否配置了正确的 Bot 账号"
@@ -217,8 +221,10 @@ vibe_doctor() {
             fi
         fi
     else
-        printf "  ${CYAN}○${NC} %-15s Not configured (optional)\n" "Manager Token"
-        echo "      如需启用 Manager 身份隔离，运行: vibe keys set VIBE_MANAGER_GITHUB_TOKEN"
+        # Bug 5: Warn that fallback to user token occurs
+        printf "  ${CYAN}○${NC} %-15s Not configured (using user fallback)\n" "Manager Token"
+        echo "      ${YELLOW}⚠${NC} 警告：Manager 将使用人类身份发评论，双层防护降级为单层（仅靠 marker 过滤）"
+        echo "      建议：配置专用 Bot 账号以实现物理隔离：vibe keys set VIBE_MANAGER_GITHUB_TOKEN"
     fi
     echo ""
 

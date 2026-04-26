@@ -16,6 +16,7 @@ from vibe3.models.pr import PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.utils.constants import AUTOMATED_MARKERS, GENERIC_AGENT_MARKER_PATTERN
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.utils.path_helpers import resolve_ref_path
 
@@ -27,15 +28,21 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
     - Linear bot (linear)
     - GitHub bots (login ends with [bot])
     - Manager bot (configured in orchestra.bot_username or manager_usernames)
-    - Automated system comments (identified by [marker] prefix)
+    - Automated system comments (identified by [marker] prefix at start of line)
 
-    Markers that indicate automated comments:
+    Markers that indicate automated comments
+    (see vibe3.utils.constants.AUTOMATED_MARKERS):
     - [manager]: Manager agent reports
     - [resume]: Task resume operations
-    - [plan]: Plan phase completion
-    - [run]: Run phase completion
-    - [Orchestra]: Orchestra system messages
+    - [plan]: Plan phase completion / scope clarification
+    - [run]: Run phase completion / blocker
+    - [review]: Review verdict / merge guidance
+    - [apply]: Governance apply executor results
+    - [orchestra]: Orchestra system messages
     - [handoff]: Handoff operations
+    - [governance], [governance suggest], [governance auto-recover],
+      [governance apply]: Governance routing
+    - [agent], [agent:<role>]: Generic agent fallback markers
 
     These markers prevent automated systems from interpreting their own
     status reports as new human instructions.
@@ -48,17 +55,20 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
         return True
 
     # Filter by content: automated markers indicate non-human comments
-    # These are system-generated status reports, not human instructions
-    automated_markers = [
-        "[manager]",
-        "[resume]",
-        "[plan]",
-        "[run]",
-        "[Orchestra]",
-        "[handoff]",
-    ]
-    if any(marker in body for marker in automated_markers):
-        return False
+    # Bug 1: Use regex to match marker at start of line (including whitespace)
+    # to avoid false positives in human discussion or quotes.
+    if body:
+        # Build pattern like: ^\s*(\[manager\]|\[resume\]|...)
+        escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
+        pattern = r"^\s*(" + "|".join(escaped_markers) + ")"
+        if re.match(pattern, body, re.IGNORECASE):
+            return False
+
+        # Fallback: generic [agent] / [agent:<role>] pattern
+        # Matches markers not in the explicit whitelist
+        generic_pattern = r"^\s*" + GENERIC_AGENT_MARKER_PATTERN
+        if re.match(generic_pattern, body, re.IGNORECASE):
+            return False
 
     # Filter standard bots
     if login == "linear" or login.endswith("[bot]"):
@@ -78,7 +88,7 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
             if login in manager_logins:
                 return False
     except Exception:
-        # If config load fails, continue with standard bot filtering
+        # Config load failed; continue with standard bot filtering
         pass
 
     return True

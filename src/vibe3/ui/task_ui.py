@@ -1,10 +1,12 @@
 """Task UI rendering."""
 
 import json
+import re
 from typing import TYPE_CHECKING
 
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.utils.constants import AUTOMATED_MARKERS
 from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 if TYPE_CHECKING:
@@ -131,27 +133,24 @@ def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> Non
             continue
 
         body = str(comment.get("body") or "").strip()
+        author = comment.get("author") or {}
+        login = str(author.get("login") or "unknown").strip()
 
-        # Find automation marker if present
+        # Find automation marker if present (Bug 1: must be at start of line)
         marker = None
-        markers = [
-            "[manager]",
-            "[resume]",
-            "[plan]",
-            "[run]",
-            "[Orchestra]",
-            "[handoff]",
-        ]
-        for m in markers:
-            if m in body:
-                marker = m
-                break
+        escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
+        pattern = r"^\s*(" + "|".join(escaped_markers) + ")"
+        match = re.match(pattern, body, re.IGNORECASE)
+        if match:
+            marker = match.group(1)
 
-        # Display with label (only for automated comments)
+        # Display with label
         if marker:
             label = marker.strip("[]")
             console.print(f"[bold yellow]\\[{label}][/bold yellow]")
-        # No label for human comments (no author to avoid confusion)
+        else:
+            # Bug 4: Human comments label
+            console.print(f"[bold cyan]\\[user:{login}][/bold cyan]")
 
         # Truncate long comments
         if len(body) > 300:

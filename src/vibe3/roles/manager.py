@@ -121,6 +121,12 @@ def build_manager_request(
             logger.bind(domain="manager", issue_number=issue.number).info(
                 f"Using manager-specific token from {token_env_name}"
             )
+        else:
+            # Bug 5: Log warning about fallback to user identity
+            logger.bind(domain="manager", issue_number=issue.number).warning(
+                f"Manager token {config.assignee_dispatch.token_env} not set. "
+                "Falling back to user identity (GH_TOKEN). Isolation is degraded."
+            )
 
     # Inject manager backend/model if not already set
     if not env.get("VIBE3_MANAGER_BACKEND"):
@@ -134,7 +140,9 @@ def build_manager_request(
             if options.model:
                 env["VIBE3_MANAGER_MODEL"] = options.model
         except Exception:
-            pass
+            logger.bind(domain="manager", issue_number=issue.number).debug(
+                "Failed to resolve manager agent options, using defaults"
+            )
 
     request = build_issue_async_cli_request(
         role="manager",
