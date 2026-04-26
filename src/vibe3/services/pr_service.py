@@ -268,6 +268,14 @@ class PRService:
         merged_pr = self.github_client.merge_pr(pr_number)
 
         branch = pr.head_branch
+        # Auto-save baseline snapshot on PR merge
+        try:
+            from vibe3.analysis import snapshot_service
+
+            snapshot_service.save_branch_baseline(branch)
+        except Exception as e:
+            logger.warning(f"Failed to save branch baseline on merge: {e}")
+
         self.store.update_flow_state(
             branch,
             flow_status="done",
