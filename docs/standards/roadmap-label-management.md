@@ -16,7 +16,7 @@
 - 如何为新 issue 分配标签？（操作步骤）
 - 如何管理版本生命周期？（版本开始/进行中/结束）
 - 如何进行脏数据清洗和标准化？（第一层审查）
-- 如何将 issue 转化为 vibe-task？（与 orchestra 的边界）
+- 如何为 issue 绑定执行入口？（flow bind 的语义）
 
 **本文档不回答的问题**:
 - 有哪些标签？→ 见 [github-labels-reference.md](github-labels-reference.md)
@@ -193,19 +193,20 @@ gh issue edit <issue_number> --milestone "Phase 1: 基础设施"
 - 一个 issue 只能有一个 Milestone
 - Milestone 与 `roadmap/*` 标签配合使用
 
-#### Step 5: 转化为 vibe-task
+#### Step 5: 绑定执行入口
 
-将有效 issue 转化为 vibe-task：
+将 issue 绑定到 flow，正式进入 **Manager 主开发链**：
 
 ```bash
-# 添加 vibe-task 标签
-gh issue edit <issue_number> --add-label "vibe-task"
-
-# 绑定到 Flow（如果需要开始执行）
+# 绑定到 Flow（开始执行）
 uv run python src/vibe3/cli.py flow bind <issue_number>
+# 自动镜像 vibe-task 标签（副作用，不作为真源）
 ```
 
-**注意**：转化为 vibe-task 后，编排职责将移交给 Orchestra，由 Orchestra 决定 flow 完成几个 task，还是一个 flow 只完成一个 task 的一部分。
+**注意**：
+- `flow bind` 是 issue 进入执行现场的正式绑定入口。
+- `vibe-task` 与 `state/*` 标签是由绑定和执行状态自动镜像的副作用，**不建议作为手工主入口**。
+- 一旦绑定，issue 进入 manager 主执行闭环，由 Manager/Plan/Run/Review 推进。
 
 ### 3.2 版本管理流程
 
@@ -255,21 +256,18 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 
 3. **更新 issue 状态**
    ```bash
-   # 开始执行
-   gh issue edit 123 --add-label "state/in-progress"
-   
-   # 被阻塞
-   gh issue edit 123 --add-label "state/blocked"
+   # 开始执行：优先通过 flow bind / manager 主链推进
+   uv run python src/vibe3/cli.py flow bind 123
+
+   # 如需查看运行状态，优先检查 flow 状态
+   uv run python src/vibe3/cli.py flow show --issue 123
    ```
 
 #### 版本结束
 
 1. **更新 issues 状态**
    ```bash
-   # 标记已完成的 issues
-   gh issue edit 123 --add-label "state/done"
-   
-   # 关闭 issue
+   # PR 合并或确认终态后关闭 issue
    gh issue close 123
    ```
 
@@ -329,7 +327,7 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 - 一个 issue 应该同时有 `type/*` 和 `priority/*` 标签
 - `roadmap/p0` 通常配合 `priority/high` 使用
 - `roadmap/rfc` 可以没有 `priority/*` 标签
-- 执行中的 issue 应该有 `vibe-task` 和 `state/*` 标签
+- flow 绑定的 issue 会自动镜像 `vibe-task` 标签；执行状态以 flow 状态为准
 
 ---
 
@@ -430,7 +428,7 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 
 ### 7.2 状态自动更新
 
-当 issue 状态变化时，自动更新 `state/*` 标签：
+当 assignee issue 的 flow 状态变化时，可自动镜像 `state/*` 标签：
 
 - 开始执行 → `state/in-progress`
 - 被阻塞 → `state/blocked`

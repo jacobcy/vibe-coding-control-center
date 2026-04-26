@@ -19,7 +19,7 @@ tags: [workflow, vibe, context, resume]
 1. 回复用户：`我会先确认当前执行代理身份，再委托 vibe-continue skill 加载任务与记忆上下文。`
 2. 必要时读取 shell 上下文，例如当前 agent 身份与当前现场事实。
 3. 委托 `skills/vibe-continue/SKILL.md` 处理：
-   - 运行 `vibe3 handoff show`
+   - 运行 `vibe3 handoff status`
    - 读取相关 memory
    - 输出 backlog 和当前治理阶段
 4. 返回恢复结果，并等待用户指示下一步。

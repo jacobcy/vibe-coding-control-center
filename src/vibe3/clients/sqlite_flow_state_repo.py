@@ -40,6 +40,7 @@ class SQLiteFlowStateRepo:
         "execution_pid",
         "execution_started_at",
         "execution_completed_at",
+        "latest_verdict",  # Latest verdict record (JSON)
     }
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
@@ -105,6 +106,33 @@ class SQLiteFlowStateRepo:
                 issue=issue_number,
                 role=role,
             ).debug("Added issue link")
+
+    def update_issue_link_role(
+        self,
+        branch: str,
+        issue_number: int,
+        old_role: str,
+        new_role: str,
+    ) -> bool:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_issue_links SET issue_role = ? "
+                "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
+                (new_role, branch, issue_number, old_role),
+            )
+            conn.commit()
+            updated = cursor.rowcount > 0
+            logger.bind(
+                external="sqlite",
+                operation="update_issue_link_role",
+                branch=branch,
+                issue=issue_number,
+                old_role=old_role,
+                new_role=new_role,
+                updated=updated,
+            ).debug("Updated issue link role")
+            return updated
 
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
         with sqlite3.connect(self.db_path) as conn:
@@ -174,13 +202,20 @@ class SQLiteFlowStateRepo:
         ).info("Deleted persisted flow records and cache")
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
+        """Get flows linked to an issue with specified role.
+
+        Returns flows ordered by updated_at DESC, branch ASC for stable sorting.
+        Domain-specific priority logic (canonical/active) should be implemented
+        at the service layer, not here.
+        """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT f.* FROM flow_state f "
                 "JOIN flow_issue_links l ON f.branch = l.branch "
-                "WHERE l.issue_number = ? AND l.issue_role = ?",
+                "WHERE l.issue_number = ? AND l.issue_role = ? "
+                "ORDER BY COALESCE(f.updated_at, '') DESC, f.branch ASC",
                 (issue_number, role),
             )
             flows = [dict(row) for row in cursor.fetchall()]

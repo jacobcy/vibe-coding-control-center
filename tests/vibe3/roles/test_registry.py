@@ -1,10 +1,10 @@
 """Tests for role registry dispatch helpers."""
 
 from vibe3.domain.events import (
-    ExecutorDispatched,
-    ManagerDispatched,
-    PlannerDispatched,
-    ReviewerDispatched,
+    ExecutorDispatchIntent,
+    ManagerDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
 )
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import MANAGER_ROLE
@@ -31,7 +31,7 @@ def test_build_label_dispatch_event_for_manager():
         branch="task/issue-42",
     )
 
-    assert isinstance(event, ManagerDispatched)
+    assert isinstance(event, ManagerDispatchIntent)
     assert event.issue_number == 42
     assert event.branch == "task/issue-42"
     assert event.trigger_state == IssueState.READY.value
@@ -44,7 +44,7 @@ def test_build_label_dispatch_event_for_plan():
         branch="task/issue-42",
     )
 
-    assert isinstance(event, PlannerDispatched)
+    assert isinstance(event, PlannerDispatchIntent)
     assert event.branch == "task/issue-42"
     assert event.trigger_state == IssueState.CLAIMED.value
 
@@ -56,7 +56,7 @@ def test_build_label_dispatch_event_for_run():
         branch="task/issue-42",
     )
 
-    assert isinstance(event, ExecutorDispatched)
+    assert isinstance(event, ExecutorDispatchIntent)
     assert event.trigger_state == IssueState.IN_PROGRESS.value
     # Executor-specific context is NOT on the dispatch intent
     assert not hasattr(event, "plan_ref")
@@ -70,7 +70,7 @@ def test_build_label_dispatch_event_for_review():
         branch="task/issue-42",
     )
 
-    assert isinstance(event, ReviewerDispatched)
+    assert isinstance(event, ReviewerDispatchIntent)
     assert event.trigger_state == IssueState.REVIEW.value
     # Reviewer-specific context is NOT on the dispatch intent
     assert not hasattr(event, "report_ref")

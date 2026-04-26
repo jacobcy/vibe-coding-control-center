@@ -4,6 +4,7 @@ Extracted from orchestra/serve_utils.py.
 """
 
 import os
+import shlex
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -26,22 +27,13 @@ from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchServ
 from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.server.webhook_utils import make_webhook_router
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
-
-
-def _resolve_dispatcher_repo_root(
-    config: OrchestraConfig,
-    launch_cwd: Path | None = None,
-) -> Path:
-    """Resolve the worktree root used for dispatcher-managed auto scenes."""
-    _ = config
-    _ = launch_cwd
-    return resolve_orchestra_repo_root().resolve()
 
 
 def _resolve_dispatcher_models_root(
@@ -71,7 +63,6 @@ def _build_server_with_launch_cwd(
 ) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.server.app import make_webhook_router
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
@@ -147,6 +138,7 @@ def _build_server_with_launch_cwd(
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
     facade = OrchestrationFacade(
+        config=config,
         dispatch_services=dispatch_services,
         capacity=shared_capacity,
         failed_gate=failed_gate,
@@ -339,16 +331,31 @@ def _build_async_serve_command(
 
 
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
-    """Start serve command in tmux session."""
+    """Start serve command in tmux session with streaming output."""
     session_name = ORCHESTRA_TMUX_SESSION
     launch_cwd = Path.cwd()
     cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
+
+    # Use async_launcher's streaming output logic
+    log_path = orchestra_events_log_path(launch_cwd)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
     try:
         subprocess.run(
-            ["tmux", "new-session", "-d", "-s", session_name, "--"] + cmd,
+            ["tmux", "new-session", "-d", "-s", session_name, *cmd],
             check=True,
             capture_output=True,
             text=True,
+        )
+        subprocess.run(
+            [
+                "tmux",
+                "pipe-pane",
+                "-t",
+                session_name,
+                f"cat >> {shlex.quote(str(log_path))}",
+            ],
+            check=False,
         )
     except FileNotFoundError:
         return False, "tmux not found, cannot start --async serve mode"

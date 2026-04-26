@@ -25,7 +25,6 @@ CLI 子命令实现层，每个文件对应一个 `vibe3 <cmd>` 子命令。
 | status | status.py | 全局状态面板 |
 | check | check.py | 环境检查 |
 | roadmap | roadmap.py | 版本路线图 |
-| prompt | prompt_check.py | Prompt 调试 |
 
 ## 依赖关系
 

@@ -39,7 +39,19 @@ def raise_gh_pr_error(
 
 
 class GitHubClientBase:
-    """Base class for GitHub client operations."""
+    """Base class for GitHub client operations.
+
+    Token Management:
+        This class does NOT manage tokens explicitly. Instead, it relies on
+        environment variable injection at the execution layer:
+
+        1. Role builder injects token into ExecutionRequest.env["GH_TOKEN"]
+        2. tmux session receives the environment variables
+        3. All subprocess.run(["gh", ...]) automatically inherit GH_TOKEN
+
+        This design keeps the client simple and leverages Unix process environment
+        inheritance, making token isolation transparent to the client code.
+    """
 
     def check_auth(self) -> bool:
         """Check if authenticated to GitHub."""

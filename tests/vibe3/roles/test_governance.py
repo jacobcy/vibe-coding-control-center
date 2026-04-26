@@ -51,8 +51,9 @@ class TestBuildSnapshotContext:
 
     def test_empty_issues(self):
         snapshot = _make_snapshot()
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["server_status"] == "running"
+        assert ctx["issue_scope_name"] == "assignee issue pool"
         assert ctx["active_count"] == 0
         assert ctx["running_issue_count"] == 0
         assert ctx["suggested_issue_count"] == 0
@@ -93,7 +94,7 @@ class TestBuildSnapshotContext:
             active_flows=1,
             active_worktrees=1,
         )
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["active_count"] == 2
         assert ctx["running_issue_count"] == 1
         assert ctx["suggested_issue_count"] == 1
@@ -102,7 +103,7 @@ class TestBuildSnapshotContext:
 
     def test_server_stopped(self):
         snapshot = _make_snapshot(server_running=False)
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["server_status"] == "stopped"
 
     def test_truncation_note(self):
@@ -123,8 +124,86 @@ class TestBuildSnapshotContext:
             for i in range(25)
         )
         snapshot = _make_snapshot(active_issues=issues)
-        ctx = build_governance_snapshot_context(snapshot)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert "已截断" in ctx["truncated_note"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_roadmap_intake_uses_broader_repo_candidates(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        config = _make_config(
+            governance=dict(
+                supervisor_files=[
+                    "supervisor/governance/assignee-pool.md",
+                    "supervisor/governance/roadmap-intake.md",
+                ]
+            )
+        )
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 101,
+                "title": "fix: small bug",
+                "body": "clear repro steps",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            },
+            {
+                "number": 102,
+                "title": "already in pool",
+                "body": "",
+                "assignees": [{"login": "vibe-manager-agent"}],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert ctx["active_count"] == 1
+        assert "#101" in ctx["suggested_issue_details"]
+        assert "#102" not in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_cron_supervisor_filters_to_docs_candidates(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        config = _make_config(
+            governance=dict(
+                supervisor_files=[
+                    "supervisor/governance/assignee-pool.md",
+                    "supervisor/governance/cron-supervisor.md",
+                ]
+            )
+        )
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 201,
+                "title": "docs: align README",
+                "body": "documentation drift",
+                "assignees": [],
+                "labels": [{"name": "type/docs"}],
+                "milestone": None,
+            },
+            {
+                "number": 202,
+                "title": "feat: real feature",
+                "body": "not docs",
+                "assignees": [],
+                "labels": [{"name": "type/feature"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo docs scope"
+        assert ctx["active_count"] == 1
+        assert "#201" in ctx["suggested_issue_details"]
+        assert "#202" not in ctx["suggested_issue_details"]
 
 
 class TestBuildGovernanceRecipe:
@@ -141,7 +220,7 @@ class TestBuildGovernanceRecipe:
         config = _make_config(
             governance=dict(
                 include_supervisor_content=True,
-                supervisor_file="supervisor/orchestra.md",
+                supervisor_file="supervisor/governance/assignee-pool.md",
             ),
         )
         recipe = build_governance_recipe(config)
@@ -149,7 +228,7 @@ class TestBuildGovernanceRecipe:
 
         src = recipe.variables["supervisor_content"]
         assert src.kind == VariableSourceKind.FILE
-        assert src.path == "supervisor/orchestra.md"
+        assert src.path == "supervisor/governance/assignee-pool.md"
 
     def test_supervisor_content_literal_when_disabled(self):
         config = _make_config(
@@ -176,7 +255,9 @@ class TestRenderGovernancePrompt:
         config = _make_config()
         ctx = build_governance_snapshot_context(_make_snapshot())
         result = render_governance_prompt(config, ctx, prompts_path)
-        assert "Supervisor=supervisor/orchestra.md" in result.rendered_text
+        assert (
+            "Supervisor=supervisor/governance/assignee-pool.md" in result.rendered_text
+        )
         assert "Status=running" in result.rendered_text
 
 
@@ -226,6 +307,131 @@ class TestBuildExecutionName:
         name = build_governance_execution_name(7)
         assert name.startswith("vibe3-governance-scan-")
         assert name.endswith("-t7")
+
+
+class TestGovernanceMaterials:
+    """Tests for GovernanceConfig.get_supervisor_materials."""
+
+    def test_get_supervisor_materials_multi(self):
+        """governance 在多材料配置下按 tick 轮换."""
+        from vibe3.models.orchestra_config import GovernanceConfig
+
+        cfg = GovernanceConfig(
+            supervisor_files=[
+                "supervisor/governance/assignee-pool.md",
+                "supervisor/governance/roadmap-intake.md",
+            ]
+        )
+        materials = cfg.get_supervisor_materials()
+        assert materials == [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+        ]
+
+    def test_get_supervisor_materials_single_fallback(self):
+        """旧 supervisor_file 单文件配置仍能工作."""
+        from vibe3.models.orchestra_config import GovernanceConfig
+
+        cfg = GovernanceConfig(supervisor_file="supervisor/governance/assignee-pool.md")
+        materials = cfg.get_supervisor_materials()
+        assert materials == ["supervisor/governance/assignee-pool.md"]
+
+    def test_default_supervisor_file(self):
+        """GovernanceConfig 默认 supervisor_file 是 assignee-pool.md."""
+        from vibe3.models.orchestra_config import GovernanceConfig
+
+        cfg = GovernanceConfig()
+        assert cfg.supervisor_file == "supervisor/governance/assignee-pool.md"
+
+    def test_governance_worktree_requirement_is_none(self):
+        """governance 默认 worktree requirement 仍为 NONE."""
+        from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+        from vibe3.roles.definitions import WorktreeRequirement
+
+        assert GOVERNANCE_GATE_CONFIG == WorktreeRequirement.NONE
+
+    def test_roadmap_intake_material_requires_assignee_write(self):
+        """roadmap-intake material should require direct assignee assignment."""
+        content = Path("supervisor/governance/roadmap-intake.md").read_text()
+        assert "直接补齐可执行的 manager assignee" in content
+        assert "明确指派给一个配置中的 manager assignee" in content
+
+
+class TestRoundRobinMaterialSelection:
+    """Tests that build_governance_recipe selects material via tick_count % len."""
+
+    def _cfg_with_files(self, files: list[str]) -> OrchestraConfig:
+        return _make_config(governance=dict(supervisor_files=files))
+
+    def test_tick_0_selects_first(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=0)
+        assert recipe.variables["supervisor_name"].value == files[0]
+
+    def test_tick_1_selects_second(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=1)
+        assert recipe.variables["supervisor_name"].value == files[1]
+
+    def test_tick_wraps_around(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=2)
+        assert recipe.variables["supervisor_name"].value == files[0]
+
+    def test_large_tick_uses_modulo(self):
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
+        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=7)
+        assert recipe.variables["supervisor_name"].value == files[7 % 3]
+
+    def test_single_file_always_selected(self):
+        files = ["supervisor/governance/assignee-pool.md"]
+        for tick in (0, 1, 99):
+            recipe = build_governance_recipe(
+                self._cfg_with_files(files), tick_count=tick
+            )
+            assert recipe.variables["supervisor_name"].value == files[0]
+
+    def test_build_governance_request_uses_round_robin(self):
+        """build_governance_request picks the correct material per tick."""
+        from unittest.mock import patch
+
+        files = [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+        ]
+        config = _make_config(governance=dict(supervisor_files=files))
+        snapshot = _make_snapshot()
+        with (
+            patch("vibe3.roles.governance.resolve_governance_options") as mock_opts,
+            patch("vibe3.roles.governance.GitHubClient") as mock_github_cls,
+        ):
+            mock_opts.return_value = MagicMock()
+            mock_github = MagicMock()
+            mock_github.list_issues.return_value = []
+            mock_github_cls.return_value = mock_github
+            req_tick0 = build_governance_request(config, 0, snapshot)
+            req_tick1 = build_governance_request(config, 1, snapshot)
+        # Both should produce valid requests (circuit breaker closed, dry_run=False)
+        assert req_tick0 is not None
+        assert req_tick1 is not None
+        # Execution names reflect different ticks
+        assert req_tick0.execution_name.endswith("-t0")
+        assert req_tick1.execution_name.endswith("-t1")
 
 
 class TestGovernanceRoleDefinition:

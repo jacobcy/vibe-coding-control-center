@@ -88,9 +88,9 @@ class TestTransitionRules:
     def test_allowed_transitions_count(self):
         """Test that we have expected number of allowed transitions.
 
-        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF (2 transitions)
-        Added: MERGE_READY→IN_PROGRESS (commit+PR), HANDOFF→DONE (manager concludes)
-        Replaced: MERGE_READY→DONE (now goes through commit+PR flow)
+        Removed: MERGE_READY→IN_PROGRESS (executor stays in merge-ready for publish)
+        Added: MERGE_READY→HANDOFF (executor publish completes → manager reviews PR)
+        Kept: HANDOFF→DONE (manager concludes after PR review)
         """
         assert len(ALLOWED_TRANSITIONS) == 22
 
@@ -103,7 +103,7 @@ class TestTransitionRules:
         assert (IssueState.HANDOFF, IssueState.REVIEW) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.MERGE_READY) in ALLOWED_TRANSITIONS
-        assert (IssueState.MERGE_READY, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
+        assert (IssueState.MERGE_READY, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.DONE) in ALLOWED_TRANSITIONS
 
     def test_side_path_transitions_allowed(self):
@@ -135,10 +135,10 @@ class TestTransitionRules:
 
     def test_closure_path_transitions_allowed(self):
         """Test that closure path transitions are allowed."""
-        # MERGE_READY -> IN_PROGRESS (commit+PR), HANDOFF -> DONE (manager concludes)
-        assert (IssueState.MERGE_READY, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
+        # MERGE_READY -> HANDOFF (executor publish → manager reviews PR)
+        assert (IssueState.MERGE_READY, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.DONE) in ALLOWED_TRANSITIONS
-        # Direct MERGE_READY -> DONE no longer allowed (goes through commit+PR flow)
+        # Direct MERGE_READY -> DONE not allowed (goes through publish→handoff→done)
         assert (IssueState.MERGE_READY, IssueState.DONE) not in ALLOWED_TRANSITIONS
         assert (IssueState.READY, IssueState.DONE) not in ALLOWED_TRANSITIONS
 

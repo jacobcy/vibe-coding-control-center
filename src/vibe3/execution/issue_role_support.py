@@ -17,25 +17,44 @@ from vibe3.roles.definitions import IssueRoleSyncSpec
 
 
 def resolve_orchestra_repo_root() -> Path:
-    """Resolve the active repo root for orchestra self-invocation.
+    """Resolve the main repository root for orchestra operations.
 
-    Prefer the current worktree root so async/sync self-invocations execute the
-    same checked-out code the operator is running. Fall back to the shared git
-    common dir parent only when worktree resolution is unavailable.
+    Prioritize git common dir to ensure:
+    1. Worktrees are created under main repo's .worktrees (not nested)
+    2. Shared state (.git/vibe3/) is consistently accessed from main repo
+    3. All orchestra operations reference the canonical repository root
+
+    Fallback to current worktree root only when git common dir is unavailable,
+    and finally to cwd if all git resolution fails.
     """
-    try:
-        worktree_root = GitClient().get_worktree_root()
-        if worktree_root:
-            return Path(worktree_root)
-    except Exception:
-        pass
     try:
         git_common_dir = GitClient().get_git_common_dir()
         if git_common_dir:
             return Path(git_common_dir).parent
     except Exception:
         pass
+    try:
+        worktree_root = GitClient().get_worktree_root()
+        if worktree_root:
+            return Path(worktree_root)
+    except Exception:
+        pass
     return Path.cwd()
+
+
+def resolve_async_cli_project_root(repo_path: Path | None = None) -> Path:
+    """Resolve the code/project root used by async child self-invocation.
+
+    Rules:
+    - If `VIBE3_REPO_MODELS_ROOT` is set, use it. This is the debug-mode override
+      from `vibe3 serve start --debug`, and points at the current worktree code.
+    - Otherwise, use the provided repo_path / orchestra root, which defaults to
+      the main repository root in normal serve mode.
+    """
+    override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
+    if override_root:
+        return Path(override_root).expanduser().resolve()
+    return (repo_path or resolve_orchestra_repo_root()).resolve()
 
 
 def resolve_task_flow_branch(
@@ -117,6 +136,7 @@ def build_issue_async_cli_request(
 ) -> ExecutionRequest:
     """Build a generic async self-invocation request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
+    command_root = resolve_async_cli_project_root(root)
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
     return ExecutionRequest(
@@ -128,10 +148,10 @@ def build_issue_async_cli_request(
             "uv",
             "run",
             "--project",
-            str(root),
+            str(command_root),
             "python",
             "-I",
-            str((root / "src" / "vibe3" / "cli.py").resolve()),
+            str((command_root / "src" / "vibe3" / "cli.py").resolve()),
             *command_args,
         ],
         repo_path=str(root),
@@ -157,12 +177,20 @@ def build_issue_sync_prompt_request(
     session_id: str | None = None,
     repo_path: Path | None = None,
     dry_run: bool = False,
+    show_prompt: bool = False,
+    include_global_notice: bool = True,
+    fallback_prompt: str | None = None,
+    fallback_include_global_notice: bool = True,
+    extra_refs: dict[str, str] | None = None,
+    dry_run_summary: dict[str, Any] | None = None,
 ) -> ExecutionRequest:
     """Build a generic sync prompt-based request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
     refs = {"task": task}
     if session_id:
         refs["session_id"] = session_id
+    if extra_refs:
+        refs.update(extra_refs)
     return ExecutionRequest(
         role=role,
         target_branch=target_branch,
@@ -176,6 +204,11 @@ def build_issue_sync_prompt_request(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=fallback_include_global_notice,
+        dry_run_summary=dry_run_summary or {},
         worktree_requirement=worktree_requirement,
     )
 
@@ -201,7 +234,18 @@ def build_issue_sync_spec(
     resolve_branch: Callable[[SQLiteClient, int, str], str],
     build_async_request: Callable[[Any, IssueInfo, str], ExecutionRequest | None],
     build_sync_request: Callable[
-        [Any, IssueInfo, str, str | None, Any, str, bool], ExecutionRequest
+        [
+            Any,
+            IssueInfo,
+            str,
+            dict[str, object] | None,
+            str | None,
+            Any,
+            str,
+            bool,
+            bool,
+        ],
+        ExecutionRequest,
     ],
     failure_handler: Callable[..., None],
 ) -> IssueRoleSyncSpec:

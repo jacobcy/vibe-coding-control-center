@@ -105,6 +105,7 @@ class TestBuildSupervisorHandoffPayload:
         call_args = mock_render.call_args
         handoff_config = call_args[0][0]
         assert handoff_config.governance.supervisor_file == "supervisor/apply.md"
+        assert handoff_config.governance.supervisor_files == []
         assert handoff_config.governance.prompt_template == "orchestra.supervisor.apply"
         assert handoff_config.governance.include_supervisor_content is True
         assert handoff_config.governance.dry_run is False

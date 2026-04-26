@@ -157,7 +157,30 @@ class GitHubClientProtocol(Protocol):
     def list_prs_for_branch(
         self, branch: str, *, state: str | None = None
     ) -> list[PRResponse]:
-        """List PRs for a specific branch."""
+        """List PRs for a specific branch.
+
+        Args:
+            branch: Branch name to query
+            state: Optional PR state filter
+
+        Returns:
+            List of PR responses
+        """
+        ...
+
+    def list_all_prs(self, state: str = "open", limit: int = 100) -> list[PRResponse]:
+        """List all PRs in repository (batch query).
+
+        Batch query optimization: fetch all PRs in one API call
+        instead of N calls for N branches.
+
+        Args:
+            state: PR state filter (open, closed, merged, all)
+            limit: Maximum number of PRs to return
+
+        Returns:
+            List of PR responses
+        """
         ...
 
     def list_pr_comments(self, pr_number: int) -> list[dict[str, Any]]:

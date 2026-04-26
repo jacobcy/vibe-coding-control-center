@@ -3,45 +3,23 @@
 Pure functions for rendering agent chains, handoff events, and updates log.
 """
 
-from pathlib import Path
+import re
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.utils.constants import AUTOMATED_MARKERS
+from vibe3.utils.path_helpers import (
+    ref_to_handoff_cmd,
+    sanitize_event_detail_paths,
+)
 
 # Preview limit for update messages
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
 
-def _resolve_ref_path(ref_value: str | None, worktree_root: str | None) -> str:
-    """Resolve ref path to relative path if within worktree.
-
-    Args:
-        ref_value: Absolute or relative ref path (may be None)
-        worktree_root: Worktree root path for resolution
-
-    Returns:
-        Relative path or original value if not resolvable
-    """
-    if not ref_value or not worktree_root:
-        return ""
-
-    try:
-        ref_path = Path(ref_value)
-        root_path = Path(worktree_root)
-
-        # If ref is within worktree, return relative path
-        if ref_path.is_absolute() and str(ref_path).startswith(str(root_path)):
-            return str(ref_path.relative_to(root_path))
-        elif not ref_path.is_absolute():
-            # Already relative, just return as-is
-            return str(ref_path)
-        else:
-            # Absolute path outside worktree - just show filename
-            return ref_path.name
-    except Exception:
-        # Fallback: just show the raw value
-        return ref_value
+_to_handoff_cmd = ref_to_handoff_cmd
 
 
 def _render_agent_chain(
@@ -96,6 +74,7 @@ def _render_agent_chain(
                         capture_output=True,
                         text=True,
                         check=True,
+                        timeout=10,
                     )
                     import json
 
@@ -135,7 +114,7 @@ def _render_agent_chain(
             console.print(f"  [dim]{label}[/]  [dim](pending)[/]")
         else:
             # Normal ref display (plan_ref, report_ref, audit_ref)
-            display_val = _resolve_ref_path(val, worktree_root)
+            display_val = resolve_ref_path(val, worktree_root)
             if display_val:
                 label_line = f"  [dim]{label}[/]{actor_str}"
                 console.print(label_line)
@@ -159,27 +138,65 @@ def _render_agent_chain(
             )
 
 
-def _render_handoff_events(events: list) -> None:
+def _render_handoff_events(
+    events: list,
+    worktree_root: str | None = None,
+    branch: str | None = None,
+) -> None:
     """Render handoff events in reverse chronological order."""
     if not events:
         console.print("[dim]  no handoff events[/]")
         return
 
+    display_names = {
+        "handoff_plan": "Plan Handoff",
+        "handoff_report": "Run Handoff",
+        "handoff_run": "Run Handoff",
+        "handoff_audit": "Audit Handoff",
+        "handoff_indicate": "Manager Handoff",
+        "plan_recorded": "Plan Auto-Recorded",
+        "run_recorded": "Run Auto-Recorded",
+        "audit_recorded": "Audit Auto-Recorded",
+    }
+
     for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
-        console.print(
-            f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{event.actor}[/]"
+        event_name = display_names.get(event.event_type, event.event_type)
+
+        # Bug 9: Label manager handoffs vs human ones
+        actor_label = f"[dim]{event.actor}[/]"
+        is_manager = (
+            event.event_type == "handoff_indicate"
+            or "manager" in str(event.actor).lower()
         )
+
+        if is_manager:
+            actor_label = f"[bold yellow]\\[manager][/bold yellow] {actor_label}"
+
+        console.print(f"[dim]{time_str}[/]  [magenta]{event_name}[/]  {actor_label}")
+
         if event.detail:
-            console.print(f"  {event.detail}")
+            sanitized = sanitize_event_detail_paths(
+                event.detail, event.refs, worktree_root
+            )
+            # Add color for manager details if they start with marker
+            display_detail = sanitized
+            escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
+            pattern = r"^(\s*|#{1,6}\s*)(" + "|".join(escaped_markers) + ")"
+            if re.match(pattern, sanitized, re.IGNORECASE):
+                display_detail = f"[yellow]{sanitized}[/]"
+
+            console.print(f"  {display_detail}")
         if event.refs:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:
-                    console.print(f"  [dim]- {f}[/]")
+                    display_f = resolve_ref_path(f, worktree_root)
+                    console.print(f"  [dim]- {_to_handoff_cmd(display_f, branch)}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             if ref:
-                console.print(f"  [dim]- {ref}[/]")
+                display_ref = resolve_ref_path(ref, worktree_root)
+                console.print(f"  [dim]- {_to_handoff_cmd(display_ref, branch)}[/]")
         console.print()
 
 

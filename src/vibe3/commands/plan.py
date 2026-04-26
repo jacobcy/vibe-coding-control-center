@@ -11,14 +11,19 @@ from vibe3.commands.command_options import (
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
+    _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+from vibe3.execution.issue_role_sync_runner import (
+    run_issue_role_async,
+    run_issue_role_sync,
+)
 from vibe3.roles.plan import (
     PLAN_SYNC_SPEC,
     bind_plan_spec,
-    execute_spec_plan,
+    execute_spec_plan_async,
+    execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
 from vibe3.utils.trace import enable_trace
@@ -37,6 +42,7 @@ def _plan_issue_impl(
     trace: bool,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
     agent: str | None,
     backend: str | None,
     model: str | None,
@@ -47,13 +53,20 @@ def _plan_issue_impl(
 
     _ = instructions, agent, backend, model
 
-    run_issue_role_mode(
-        issue_number=issue,
-        dry_run=dry_run,
-        async_mode=not no_async,
-        fresh_session=False,
-        spec=PLAN_SYNC_SPEC,
-    )
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue,
+            dry_run=dry_run,
+            fresh_session=False,
+            show_prompt=show_prompt,
+            spec=PLAN_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue,
+            dry_run=dry_run,
+            spec=PLAN_SYNC_SPEC,
+        )
 
 
 def _plan_spec_impl(
@@ -96,19 +109,25 @@ def _plan_spec_impl(
             err=True,
         )
 
-    execute_spec_plan(
-        request=spec_input.request,
-        issue_number=issue_number,
-        branch=branch,
-        async_mode=not no_async,
-        cli_args=[
-            "plan",
-            "spec",
-            *(["--file", str(file)] if file else []),
-            *(["--msg", msg] if msg else []),
-            *([instructions] if instructions else []),
-        ],
-    )
+    if no_async:
+        execute_spec_plan_sync(
+            request=spec_input.request,
+            issue_number=issue_number,
+            branch=branch,
+        )
+    else:
+        execute_spec_plan_async(
+            request=spec_input.request,
+            issue_number=issue_number,
+            branch=branch,
+            cli_args=[
+                "plan",
+                "spec",
+                *(["--file", str(file)] if file else []),
+                *(["--msg", msg] if msg else []),
+                *([instructions] if instructions else []),
+            ],
+        )
 
 
 @app.callback(invoke_without_command=True)
@@ -135,6 +154,7 @@ def default(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -151,6 +171,7 @@ def default(
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
+            show_prompt=show_prompt,
             agent=agent,
             backend=backend,
             model=model,
@@ -187,6 +208,7 @@ def issue_command(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -197,6 +219,7 @@ def issue_command(
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
+        show_prompt=show_prompt,
         agent=agent,
         backend=backend,
         model=model,

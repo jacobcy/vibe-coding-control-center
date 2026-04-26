@@ -75,6 +75,40 @@ class TestIssueFlowServiceBranchNaming:
 class TestIssueFlowServiceFlowLookup:
     """Tests for issue-to-flow mapping."""
 
+    def test_store_get_flows_by_issue_orders_active_canonical_first(self) -> None:
+        """Should return active canonical flow before older done debug flows."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from vibe3.clients.sqlite_client import SQLiteClient
+
+            db_path = Path(tmpdir) / "test.db"
+            store = SQLiteClient(db_path=str(db_path))
+
+            debug_branch = "debug/vibe-server-fix"
+            canonical_branch = "task/issue-467"
+
+            store.update_flow_state(
+                debug_branch,
+                flow_slug="debug-vibe-server-fix",
+                flow_status="done",
+                updated_at="2026-04-17T11:17:54.494008",
+            )
+            store.update_flow_state(
+                canonical_branch,
+                flow_slug="issue-467",
+                flow_status="active",
+                updated_at="2026-04-23T05:49:26.084364",
+            )
+
+            store.add_issue_link(debug_branch, 467, "task")
+            store.add_issue_link(canonical_branch, 467, "task")
+
+            flows = store.get_flows_by_issue(467, role="task")
+
+            assert [flow["branch"] for flow in flows] == [
+                canonical_branch,
+                debug_branch,
+            ]
+
     def test_find_active_flow_prefers_canonical(self) -> None:
         """Should prioritize active canonical flow."""
         with tempfile.TemporaryDirectory() as tmpdir:

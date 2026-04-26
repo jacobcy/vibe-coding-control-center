@@ -22,9 +22,7 @@ from vibe3.commands import (
     internal,
     plan,
     pr,
-    prompt_check,
     review,
-    roadmap,
     run,
     snapshot,
     status,
@@ -58,7 +56,6 @@ app = typer.Typer(
 # Register subcommands
 app.add_typer(flow.app, name="flow")
 app.add_typer(task.app, name="task")
-app.add_typer(roadmap.app, name="roadmap")
 app.add_typer(plan.app, name="plan")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
@@ -67,7 +64,6 @@ app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
-app.add_typer(prompt_check.app, name="prompt")
 app.add_typer(internal.app, name="internal")
 
 
@@ -141,9 +137,13 @@ def run_command(
     ] = False,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Print command and prompt without executing"),
+        typer.Option(
+            "--dry-run",
+            help="Print command and prompt summary without executing",
+        ),
     ] = False,
     no_async: run._ASYNC_OPT = False,
+    show_prompt: run._SHOW_PROMPT_OPT = False,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -175,6 +175,7 @@ def run_command(
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
+        show_prompt=show_prompt,
         agent=agent,
         backend=backend,
         model=model,

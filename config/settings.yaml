@@ -29,191 +29,6 @@ ai:
   model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
   timeout: 30                 # 超时秒数
 
-# Agent Prompt 全局说明
-# 会置顶注入到所有 codeagent prompt 文件中
-agent_prompt:
-  global_notice: |
-    ## Handoff 写入规则
-    不要直接访问或编辑主仓库的 `.git/vibe3/handoff/` 目录（该路径在 worktree 中会触发 external_directory 权限拒绝）。
-    所有 handoff 操作必须通过 CLI 命令完成：
-    - 追加记录：`uv run python src/vibe3/cli.py handoff append "<内容>"`
-    - 读取记录：`uv run python src/vibe3/cli.py handoff show`
-
-    ## Debug Stop Rule
-    当前项目处于调试过程中。
-    如果任何工具重试两次后仍然报错，并且该错误会导致任务无法完成，必须停止当前任务。
-    不要继续尝试其他替代方法。
-    请改为：
-    1. 通过 issue 或 handoff 明确记录失败现象、已尝试步骤和阻塞原因。
-    2. 结束当前任务，等待人工或后续任务接手。
-
-    ## Time out Rule
-    你有一个小时的时间来完成任务，如果你无法完成，请在时间窗口内通过issue或handoff记录你已完成的工作或findings，并在deadline前exit()，等待人工或后续任务接手。时间耗尽，你的工作空间会被Cancel，可能导致系统中断。
-
-# 文本量控制
-doc_limits:
-  single_file_loc:
-    default: 500           # 单文件默认限制（所有类型）
-    max: 800              # 单文件最大限制（所有类型）
-
-# 代码量控制
-code_limits:
-  single_file_loc:
-    default: 300           # 单文件默认限制（所有类型）
-    max: 400              # 单文件最大限制（所有类型）
-
-# 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
-    # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
-    exceptions:
-      # 核心业务聚合 —— 允许 600
-      - path: "src/vibe3/services/flow_service.py"
-        limit: 600
-        reason: "核心状态机聚合，吸收 flow_query_mixin"
-      - path: "src/vibe3/services/pr_service.py"
-        limit: 600
-        reason: "PR 生命周期聚合"
-      - path: "src/vibe3/services/check_service.py"
-        limit: 600
-        reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
-      - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 600
-        reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
-      - path: "src/vibe3/services/task_resume_operations.py"
-        limit: 450
-        reason: "Task resume 操作聚合，包含 reset、label resume 等内聚操作"
-      - path: "src/vibe3/services/handoff_service.py"
-        limit: 500
-        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"
-
-      # Clients 聚合 —— 允许 500
-      - path: "src/vibe3/clients/git_client.py"
-        limit: 500
-        reason: "Git 门面聚合"
-      - path: "src/vibe3/clients/github_pr_ops.py"
-        limit: 500
-        reason: "GitHub PR 操作与查询聚合"
-      - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 650
-        reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
-
-      # Roles 层 —— 允许 550-570
-      - path: "src/vibe3/roles/review.py"
-        limit: 570
-        reason: "Reviewer 角色聚合，包含 request builder、sync/async dispatch、parser 集成"
-      - path: "src/vibe3/roles/run.py"
-        limit: 450
-        reason: "Executor 角色聚合，包含 request builder、sync/async dispatch、plan 解析"
-      - path: "src/vibe3/roles/manager.py"
-        limit: 420
-        reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
-      - path: "src/vibe3/roles/plan.py"
-        limit: 330
-        reason: "Planner 角色聚合，包含 request builder 和 dispatch 逻辑"
-
-      # Commands 层 —— 允许 440
-      - path: "src/vibe3/commands/task.py"
-        limit: 440
-        reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
-
-      # Execution 层 —— 允许 400
-      - path: "src/vibe3/execution/coordinator.py"
-        limit: 400
-        reason: "执行协调器，统一管理角色启动和追踪"
-      - path: "src/vibe3/execution/issue_role_support.py"
-        limit: 400
-        reason: "Issue 角色支持，包含 dispatch predicate 和 role contract 集成"
-
-      # Domain handlers —— 允许 310
-      - path: "src/vibe3/domain/handlers/flow_lifecycle.py"
-        limit: 310
-        reason: "Flow 生命周期处理器，包含状态转换和事件发布逻辑"
-
-      # Models —— 允许 400
-      - path: "src/vibe3/models/orchestra_config.py"
-        limit: 400
-        reason: "Orchestra 配置模型聚合，包含多个嵌套配置类定义"
-
-      # Server —— 允许 470
-      - path: "src/vibe3/server/app.py"
-        limit: 470
-        reason: "Orchestra CLI 入口聚合，职责单一"
-      - path: "src/vibe3/server/registry.py"
-        limit: 420
-        reason: "Orchestra PID/tmux 管理，多进程协调辅助函数共生"
-
-      # Shell / 脚本兼容入口
-      - path: "lib/alias/worktree.sh"
-        limit: 500
-        reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
-      - path: "lib/keys_support.sh"
-        limit: 500
-        reason: "Keys 工具函数集合（trim、plugin scope hint 等），职责单一但函数较多"
-      - path: "scripts/tsu.sh"
-        limit: 900
-        reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
-
-      # 基础设施核心模块
-      - path: "src/vibe3/environment/worktree.py"
-        limit: 600
-        reason: "Worktree lifecycle management"
-      - path: "src/vibe3/environment/session_registry.py"
-        limit: 470
-        reason: "Session 生命周期聚合，包含状态对账、容量统计、活跃检查等紧密耦合逻辑"
-      - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 610
-        reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
-      - path: "src/vibe3/agents/backends/async_launcher.py"
-        limit: 470
-        reason: "Async launcher 工具类，包含 tmux 会话管理、日志路径分配、Codex 噪声过滤、wrapper 脚本启动四个高内聚模块"
-      - path: "src/vibe3/services/orchestra_status_service.py"
-        limit: 450
-        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
-
-      # 强耦合测试例外
-      - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 500
-        reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
-      - path: "tests/vibe3/domain/test_orchestration_facade.py"
-        limit: 450
-        reason: "单一测试类，刚超限，拆分收益低"
-      - path: "tests/vibe3/execution/test_execution_lifecycle.py"
-        limit: 550
-        reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
-      - path: "tests/vibe3/agents/test_codeagent_config.py"
-        limit: 450
-        reason: "Codeagent config 测试集，覆盖 preset 解析、fallback、migration 场景，逻辑清晰且符合测试最佳实践"
-      - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
-        limit: 500
-        reason: "Gate 核心测试，两个测试类围绕统一执行壳 gate/callback 逻辑，共享 fixture，拆分收益低"
-      - path: "tests/vibe3/execution/test_coordinator.py"
-        limit: 450
-        reason: "Coordinator 核心测试，25 个测试函数围绕调度逻辑，共享 mock_dependencies fixture，拆分收益低"
-
-  total_file_loc:
-    v2_shell: 3000         # Shell 核心代码总行数
-    v3_python: 40000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
-
-  # 统计口径（路径定义）
-  code_paths:
-    v2_shell:              # Shell 核心代码路径
-      - "lib/"
-      - "lib3/"
-      - "bin/vibe"
-    v3_python:             # Python 核心代码路径
-      - "src/vibe3/"
-
-  scripts_paths:
-    v2_shell:              # Shell 工具脚本路径
-      - "scripts/"
-    v3_python:             # Python 工具脚本路径
-      - "scripts/"
-
-  test_paths:
-    v2_shell:              # Shell 测试路径
-      - "tests/vibe2/"
-    v3_python:             # Python 测试路径
-      - "tests/vibe3/"
-
 # 审核范围（适配 vibe-center 实际结构）
 # 用于判断改动文件是否属于关键路径或公开 API
 review_scope:
@@ -342,34 +157,7 @@ review:
     model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
-  # Static: Output format requirements (VERDICT contract)
-  output_format: |
-    Each finding should follow this format:
-    path/to/file.py:42 [MAJOR] concise issue description
 
-    The final line must be:
-    VERDICT: PASS | MAJOR | BLOCK
-
-    Where:
-    - PASS: No significant issues found
-    - MAJOR: Issues found that should be addressed before merge
-    - BLOCK: Critical issues that must be fixed before merge
-
-  # Static: Default review task guidance
-  # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
-  review_task: |
-    Review only changed code, focus on correctness, regression, and security.
-    Use AST analysis to understand impact scope.
-    Prioritize actionable findings with clear severity.
-    Follow the repository review contract.
-    The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
-    If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
-    and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
-    <important> you must change the issue label to state/handoff before exit(), or this flow will be blocked.
-
-  # Static: Custom review prompt (optional prefix)
-  # Added to beginning of review context if provided
-  review_prompt: "/code-review"
 
 # Plan command configuration
 # Plan Configuration
@@ -396,43 +184,6 @@ plan:
     model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
-  # Static: Output format requirements
-  output_format: |
-    The plan should follow this structure:
-
-    ## Summary
-    Brief description of the implementation approach.
-
-    ## Changes
-    - file/path/one.py: Description of changes
-    - file/path/two.py: Description of changes
-
-    ## Implementation Steps
-    1. Step one with details
-    2. Step two with details
-
-    ## Risks & Considerations
-    - Risk 1 and mitigation
-    - Risk 2 and mitigation
-
-  # Static: Default plan task guidance
-  # Can be overridden via CLI: vibe3 plan --issue 42
-  plan_task: |
-    Analyze requirements and identify affected files using inspect tools.
-    Design minimal changes with clear implementation steps.
-    Document risks and breaking changes upfront.
-    Follow the repository planning contract.
-    The auto-saved planner artifact is only for shared handoff or audit and is not the authoritative `plan_ref`.
-    You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
-    After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
-    Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
-    <important> you must change the issue label to state/handoff before exit()
-    If you do not register `plan_ref` and change issue label, the planner run is treated as no-op and the issue is moved to `state/blocked`.
-
-  # Static: Optional plain-text default task guidance.
-  # Slash-prefixed external skill triggers are ignored by vibe3 plan.
-  plan_prompt: ""
-
 # Run command configuration
 # Run Configuration
 # =====================
@@ -458,43 +209,6 @@ run:
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
-  # Static: Output format requirements
-  output_format: |
-    The execution report should follow this structure:
-
-    ## Summary
-    Brief description of what was implemented.
-
-    ## Changes Made
-    - file/path/one.py: What was changed and why
-    - file/path/two.py: What was changed and why
-
-    ## Tests
-    - test_one.py: What is being tested
-    - test_two.py: What is being tested
-
-    ## Verification
-    - [ ] All tests pass
-    - [ ] No type errors
-    - [ ] No lint errors
-
-  # Static: Default run task guidance
-  # Can be overridden via CLI: vibe run execute --message "Skip slow tests"
-  run_task: |
-    Follow plan steps strictly, verify each step before proceeding.
-    Write clean code with tests, run verification after changes.
-    Document any deviations with reasons.
-    Follow the repository execution contract.
-    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
-    You must write a canonical execution report under `docs/reports/` in the current worktree.
-    After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
-    Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
-    <important> you must change the issue label to state/handoff before exit()
-    If you do not register `report_ref` and change label, the executor run is treated as no-op and the issue is moved to `state/blocked`.
-
-
-  # Static: Custom run prompt (optional prefix)
-  run_prompt: "/executing-plan"
 
 # Orchestra Configuration
 # =======================
@@ -571,9 +285,13 @@ orchestra:
   # Governance prompt composition
   governance:
     enabled: true
-    interval_ticks: 1
+    interval_ticks: 4
     # Supervisor file source: supervisor/<name>.md
-    supervisor_file: "supervisor/orchestra.md"
+    supervisor_file: "supervisor/governance/assignee-pool.md"
+    supervisor_files:
+      - "supervisor/governance/assignee-pool.md"
+      - "supervisor/governance/roadmap-intake.md"
+      - "supervisor/governance/cron-supervisor.md"
     # Template selector: config/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
     # Whether to inline the supervisor file into the composed governance prompt

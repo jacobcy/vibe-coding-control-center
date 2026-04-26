@@ -308,12 +308,45 @@ class TaskResumeCandidates:
             issue_number = getattr(flow, "task_issue_number", None)
             if not isinstance(issue_number, int):
                 continue
+
+            # Filter out completed/aborted/merged flows
+            flow_status = getattr(flow, "flow_status", None)
+            if flow_status in {"done", "aborted", "merged"}:
+                logger.bind(
+                    domain="resume",
+                    action="skip_completed_flow",
+                    issue_number=issue_number,
+                    flow_status=flow_status,
+                ).debug(f"Skipping {flow_status} flow for issue #{issue_number}")
+                continue
+
+            # Filter out flows with PR (factually complete)
+            pr_ref = getattr(flow, "pr_ref", None)
+            if isinstance(pr_ref, str) and pr_ref:
+                logger.bind(
+                    domain="resume",
+                    action="skip_pr_flow",
+                    issue_number=issue_number,
+                    pr_ref=pr_ref,
+                ).debug(f"Skipping flow with PR {pr_ref} for issue #{issue_number}")
+                continue
+
+            # Validate issue exists and get current state
+            current_state = self.label_service.get_state(issue_number)
+            if current_state is None:
+                # Issue doesn't exist or labels missing, skip
+                logger.bind(
+                    domain="resume",
+                    action="skip_nonexistent_issue",
+                    issue_number=issue_number,
+                ).debug(f"Skipping issue #{issue_number} without valid state labels")
+                continue
+
             issue = issue_details.get(issue_number, {})
             candidate = {
                 "number": issue_number,
                 "title": str(issue.get("title") or ""),
-                "state": issue.get("state")
-                or self.label_service.get_state(issue_number),
+                "state": current_state,  # Use validated state
                 "flow": flow,
             }
             candidate["resume_kind"] = "all"

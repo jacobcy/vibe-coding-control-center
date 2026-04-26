@@ -1,34 +1,35 @@
-"""Handoff read commands - List and show handoff information."""
+"""Handoff read commands - status and artifact display."""
 
 import json
-from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
     _render_agent_chain,
     _render_handoff_events,
     _render_updates_log,
+    _to_handoff_cmd,
 )
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
-from vibe3.ui.handoff_ui import (
-    render_handoff_detail,
-    render_handoff_list,
-    render_handoff_summary,
-)
+from vibe3.ui.flow_ui_primitives import resolve_ref_path
+from vibe3.ui.handoff_ui import render_handoff_detail
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
-def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict]:
+def _get_live_sessions_for_branch(
+    store: SQLiteClient, branch: str
+) -> list[dict[str, Any]]:
     """Return truly live runtime sessions from the registry for a given branch.
 
     This function confirms tmux liveness for each session, unlike
@@ -81,93 +82,86 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
     return updates
 
 
-def list_handoffs(
+_HANDOFF_SHOW_HELP = """\
+Usage: vibe3 handoff show <target> [--branch <branch>]
+
+Show a handoff artifact by target reference.
+
+Target formats:
+  @key               Shared artifact key (e.g. @task-476/run-1.md)
+  relative/path      Canonical worktree ref; requires --branch <branch>
+  /abs/path          Absolute filesystem path (debug fallback)
+
+Examples:
+  vibe3 handoff show @task-476/run-1.md
+  vibe3 handoff show --branch task/issue-476 docs/reports/audit.md
+  vibe3 handoff show /abs/path/to/artifact.md
+
+See also:
+  vibe3 handoff status          Show current flow handoff chain
+  vibe3 handoff append "<msg>"  Append a handoff record
+"""
+
+
+def show(
+    target: Annotated[
+        str | None,
+        typer.Argument(help="Handoff target: @key, relative/path, or /abs/path"),
+    ] = None,
     branch: Annotated[
         str | None,
-        typer.Option("--branch", "-b", help="Flow/branch to inspect"),
-    ] = None,
-    kind: Annotated[
-        str | None,
-        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review"),
+        typer.Option("--branch", help="Branch for canonical ref resolution"),
     ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """List handoff events for current or specified branch."""
-    with trace_scope(trace, "handoff list", domain="handoff"):
-        flow_service = FlowService()
-        handoff_service = HandoffService(store=flow_service.store)
+    """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
+    from vibe3.utils.path_helpers import resolve_handoff_target
 
-        target_branch = branch if branch else flow_service.get_current_branch()
-        events = handoff_service.get_handoff_events(target_branch)
+    if target is None:
+        typer.echo(_HANDOFF_SHOW_HELP)
+        raise typer.Exit(0)
 
-        allowed_kinds = {"plan", "run", "review"}
-        filter_kind = kind.lower() if kind else None
-        if filter_kind and filter_kind not in allowed_kinds:
-            typer.echo("Error: --kind must be one of: plan, run, review", err=True)
+    with trace_scope(trace, "handoff show", domain="handoff"):
+        # Resolve numeric issue ID → canonical branch name before path lookup
+        resolved_branch: str | None = None
+        if branch is not None:
+            try:
+                resolved_branch = (
+                    resolve_issue_branch_input(branch, FlowService()) or branch
+                )
+            except RuntimeError as exc:
+                typer.echo(f"Error: {exc}", err=True)
+                raise typer.Exit(1)
+        try:
+            resolved_artifact = resolve_handoff_target(
+                target, resolved_branch, git_client=GitClient()
+            )
+        except FileNotFoundError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(1)
+        if not resolved_artifact.is_file():
+            typer.echo(f"Error: artifact is not a file: {resolved_artifact}", err=True)
+            raise typer.Exit(1)
+        try:
+            render_handoff_detail(resolved_artifact)
+        except (OSError, UnicodeDecodeError) as exc:
+            typer.echo(f"Error: failed to read artifact: {exc}", err=True)
             raise typer.Exit(1)
 
-        handoffs: list[dict[str, str]] = []
-        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0}
 
-        for event in events:
-            event_kind = event.event_type.replace("handoff_", "", 1)
-            if event_kind not in allowed_kinds:
-                continue
-            if filter_kind and event_kind != filter_kind:
-                continue
-
-            stats["total"] += 1
-            if event_kind == "plan":
-                stats["plans"] += 1
-            elif event_kind == "run":
-                stats["runs"] += 1
-            elif event_kind == "review":
-                stats["reviews"] += 1
-
-            handoffs.append(
-                {
-                    "timestamp": event.created_at[:19].replace("T", " "),
-                    "kind": event_kind,
-                    "actor": event.actor,
-                    "detail": event.detail or "",
-                }
-            )
-
-        render_handoff_list(target_branch, handoffs)
-        render_handoff_summary(target_branch, stats)
-
-
-def show(
+def status(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
-    artifact: Annotated[
-        Path | None,
-        typer.Option("--artifact", help="Display a handoff artifact file"),
-    ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Show agent handoff chain and events."""
-    with trace_scope(trace, "handoff show", domain="handoff"):
-        if artifact is not None:
-            if not artifact.exists():
-                typer.echo(f"Error: artifact not found: {artifact}", err=True)
-                raise typer.Exit(1)
-            if not artifact.is_file():
-                typer.echo(f"Error: artifact is not a file: {artifact}", err=True)
-                raise typer.Exit(1)
-            try:
-                render_handoff_detail(artifact)
-            except (OSError, UnicodeDecodeError) as exc:
-                typer.echo(f"Error: failed to read artifact: {exc}", err=True)
-                raise typer.Exit(1)
-            return
-
-        logger.bind(command="handoff show", branch=branch).info(
+    """Show current flow handoff status and recent records."""
+    with trace_scope(trace, "handoff status", domain="handoff"):
+        logger.bind(command="handoff status", branch=branch).info(
             "Showing handoff details"
         )
 
@@ -217,6 +211,23 @@ def show(
             console.print(f"[dim]worktree: {worktree_root}[/]")
         console.print()
 
+        # Show latest verdict at the top
+        verdict_service = VerdictService(store=service.store)
+        latest_verdict = verdict_service.get_latest_verdict(target_branch)
+        if latest_verdict:
+            console.print("[bold]## Latest Verdict[/]")
+            console.print(f"  [cyan]verdict:[/] {latest_verdict.verdict}")
+            console.print(f"  [cyan]actor:[/] {latest_verdict.actor}")
+            console.print(f"  [cyan]role:[/] {latest_verdict.role}")
+            console.print(
+                f"  [cyan]timestamp:[/] {latest_verdict.timestamp.isoformat()}"
+            )
+            if latest_verdict.reason:
+                console.print(f"  [cyan]reason:[/] {latest_verdict.reason}")
+            if latest_verdict.issues:
+                console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
+            console.print()
+
         _render_agent_chain(
             state,
             store=service.store,
@@ -241,7 +252,9 @@ def show(
 
         console.print("[bold]--- Recent Handoff Events ---[/]")
         console.print()
-        _render_handoff_events(handoff_events)
+        _render_handoff_events(
+            handoff_events, worktree_root=worktree_root, branch=target_branch
+        )
 
         # Show current.md updates in log format
         git_dir = service.get_git_common_dir()
@@ -249,7 +262,12 @@ def show(
         current_md = handoff_dir / "current.md"
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
-        console.print(f"  [dim]path[/]  {current_md}")
+        current_md_display = resolve_ref_path(
+            str(current_md), worktree_root=worktree_root
+        )
+        console.print(
+            f"  [dim]path[/]  {_to_handoff_cmd(current_md_display, target_branch)}"
+        )
         console.print()
 
         if current_md.exists():
@@ -259,8 +277,13 @@ def show(
 
             # Show full content hint
             console.print("[dim]---[/]")
-            console.print(f"[dim]Full file: {current_md}[/]")
-            console.print("[dim]Use 'cat' or edit the file to see all sections[/]")
+            artifact_cmd = _to_handoff_cmd(current_md_display, target_branch)
+            console.print(f"[dim]Artifact: {artifact_cmd}[/]")
+            console.print(
+                "[dim]Use `vibe3 handoff show @key` or "
+                "`vibe3 handoff show --branch <branch> <ref>` "
+                "to inspect artifacts through the unified reader[/]"
+            )
         else:
             console.print(
                 "[dim]  (current.md not found — run `vibe3 handoff init` to create)[/]"

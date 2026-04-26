@@ -139,7 +139,7 @@ class CommentMixin:
 
         Args:
             pr_number: PR number
-            reviewers: List of reviewer names (codex, copilot, auggie, claude)
+            reviewers: List of reviewer names (codex, copilot, claude)
 
         Returns:
             Comment URL if successful, None if failed

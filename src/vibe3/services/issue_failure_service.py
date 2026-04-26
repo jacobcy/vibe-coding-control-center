@@ -12,6 +12,17 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
+from vibe3.utils.label_utils import normalize_labels
+
+_ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
+
+
+def _get_issue_flow_service() -> IssueFlowService:
+    """Return cached IssueFlowService instance."""
+    global _ISSUE_FLOW_SERVICE_CACHE
+    if _ISSUE_FLOW_SERVICE_CACHE is None:
+        _ISSUE_FLOW_SERVICE_CACHE = IssueFlowService()
+    return _ISSUE_FLOW_SERVICE_CACHE
 
 
 def _ensure_flow_state_for_issue(
@@ -20,24 +31,9 @@ def _ensure_flow_state_for_issue(
     reason: str,
     actor: str,
 ) -> None:
-    """Record block/fail reason on the flow for observability.
-
-    GitHub labels/comments are the source of truth for issue state.
-    This helper only writes supplementary reason fields to the flow record
-    for display purposes — it does NOT change flow_status.
-
-    Args:
-        issue_number: GitHub issue number
-        action: "block" or "fail"
-        reason: Block/fail reason text (recorded as blocked_reason/failed_reason)
-        actor: Actor performing the action
-
-    Note:
-        Flow write failures do not block GitHub sync. This ensures user
-        visibility even when flow persistence fails.
-    """
+    """Record block/fail reason on the flow for observability."""
     try:
-        issue_flow_service = IssueFlowService()
+        issue_flow_service = _get_issue_flow_service()
         store = issue_flow_service.store
 
         # Find any flow for this issue (active or otherwise)
@@ -49,7 +45,7 @@ def _ensure_flow_state_for_issue(
         if not branch:
             return
 
-        # Write flow event for observability (smart search can query this)
+        # Write flow event for observability
         event_type = f"{action}ed"  # "blocked" or "failed"
         store.add_event(
             branch,
@@ -59,8 +55,7 @@ def _ensure_flow_state_for_issue(
             refs={"issue": str(issue_number), "action": action},
         )
 
-        # Record reason as display-only field; do NOT change flow_status.
-        # GitHub labels are the SSOT for issue state.
+        # Record reason as display-only field
         if action == "block":
             store.update_flow_state(branch, blocked_reason=reason, latest_actor=actor)
         elif action == "fail":
@@ -73,35 +68,18 @@ def _ensure_flow_state_for_issue(
             ).warning(f"Unknown action: {action}")
 
     except Exception as e:
-        # Non-blocking: reason recording failure should not affect GitHub sync
         logger.bind(
             domain="flow",
             action="ensure_flow_state",
             issue_number=issue_number,
             error=str(e),
-        ).warning(
-            f"Flow reason recording failed for issue #{issue_number} "
-            f"(non-blocking, GitHub sync continues)"
-        )
+        ).warning(f"Flow reason recording failed for issue #{issue_number}")
 
 
 _TERMINAL_LABELS = {
     IssueState.FAILED.to_label(),
     IssueState.BLOCKED.to_label(),
 }
-
-
-def _normalize_labels(raw_labels: object) -> list[str]:
-    """Extract label names from GitHub issue payload labels field."""
-    if not isinstance(raw_labels, list):
-        return []
-    result: list[str] = []
-    for item in raw_labels:
-        if isinstance(item, dict):
-            name = item.get("name")
-            if isinstance(name, str):
-                result.append(name)
-    return result
 
 
 def _issue_has_terminal_label(
@@ -113,7 +91,7 @@ def _issue_has_terminal_label(
     payload = github.view_issue(issue_number, repo=repo)
     if not isinstance(payload, dict):
         return False
-    labels = _normalize_labels(payload.get("labels"))
+    labels = normalize_labels(payload.get("labels"))
     return any(lb in _TERMINAL_LABELS for lb in labels)
 
 
@@ -129,16 +107,7 @@ def _transition_issue_state(
     dedupe_reason: str | None = None,
     skip_if_terminal: bool = False,
 ) -> bool:
-    """Apply optional comment side effect, then transition the issue state.
-
-    Args:
-        skip_if_terminal: When True, check current issue labels and skip
-            the transition if the issue is already in a terminal state
-            (failed, blocked, or closed). Returns False if skipped.
-
-    Returns:
-        True if transition was applied, False if skipped.
-    """
+    """Apply optional comment side effect, then transition the issue state."""
     github = GitHubClient()
     if skip_if_terminal and _issue_has_terminal_label(github, issue_number, repo):
         logger.bind(
@@ -146,10 +115,7 @@ def _transition_issue_state(
             action="transition_skipped",
             issue_number=issue_number,
             to_state=to_state.value,
-        ).info(
-            f"Skipping transition to {to_state.value} for #{issue_number}: "
-            "already in terminal state"
-        )
+        ).info(f"Skipping transition for #{issue_number}: terminal state")
         return False
 
     if comment:
@@ -204,21 +170,32 @@ _ROLE_MISSING_REF_COPY = {
     "review": "审查未产出可交接的 audit 结果，缺失 authoritative",
 }
 
+_ROLE_DEFAULT_ACTOR = {
+    "review": "agent:review",
+    "plan": "agent:plan",
+    "run": "agent:run",
+    "manager": "agent:manager",
+}
 
-def fail_reviewer_issue(
+_ROLE_MAP = {
+    "executor": "run",
+    "reviewer": "review",
+    "planner": "plan",
+}
+
+
+def fail_issue(
     *,
     issue_number: int,
     reason: str,
-    actor: str = "agent:review",
+    role: str,
+    actor: str | None = None,
 ) -> None:
-    """Fail a reviewer issue with comment and state transition.
+    """Generic fail issue handler."""
+    # Normalize role names
+    role = _ROLE_MAP.get(role, role)
+    actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
 
-    Args:
-        issue_number: GitHub issue number
-        reason: Failure reason to include in comment
-        actor: Actor performing the transition (defaults to "agent:review")
-    """
-    # Write to flow (source of truth) before GitHub sync
     _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
 
     _transition_issue_state(
@@ -226,207 +203,35 @@ def fail_reviewer_issue(
         to_state=IssueState.FAILED,
         actor=actor,
         force=True,
-        comment=_build_failure_comment("review", reason),
+        comment=_build_failure_comment(role, reason),
         dedupe_latest_comment=True,
     )
 
 
-def fail_planner_issue(
+def block_issue(
     *,
     issue_number: int,
     reason: str,
-    actor: str = "agent:plan",
+    role: str,
+    actor: str | None = None,
+    repo: str | None = None,
+    is_noop: bool = False,
 ) -> None:
-    """Fail a planner issue with comment and state transition.
+    """Generic block issue handler."""
+    role = _ROLE_MAP.get(role, role)
+    actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
 
-    Args:
-        issue_number: GitHub issue number
-        reason: Failure reason to include in comment
-        actor: Actor performing the transition (defaults to "agent:plan")
-    """
-    # Write to flow (source of truth) before GitHub sync
-    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
-
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.FAILED,
-        actor=actor,
-        force=True,
-        comment=_build_failure_comment("plan", reason),
-        dedupe_latest_comment=True,
-    )
-
-
-def fail_executor_issue(
-    *,
-    issue_number: int,
-    reason: str,
-    actor: str,
-) -> None:
-    """Fail an executor issue with comment and state transition.
-
-    Args:
-        issue_number: GitHub issue number
-        reason: Failure reason to include in comment
-        actor: Actor performing the transition (e.g., "agent:executor")
-    """
-    # Write to flow (source of truth) before GitHub sync
-    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
-
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.FAILED,
-        actor=actor,
-        force=True,
-        comment=_build_failure_comment("run", reason),
-        dedupe_latest_comment=True,
-    )
-
-
-def fail_manager_issue(
-    *,
-    issue_number: int,
-    reason: str,
-    actor: str = "agent:manager",
-) -> None:
-    """Fail a manager issue with comment and state transition.
-
-    Args:
-        issue_number: GitHub issue number
-        reason: Failure reason to include in comment
-        actor: Actor performing the transition (defaults to "agent:manager")
-    """
-    # Write to flow (source of truth) before GitHub sync
-    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
-
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.FAILED,
-        actor=actor,
-        force=True,
-        comment=_build_failure_comment("manager", reason),
-        dedupe_latest_comment=True,
-    )
-
-
-def resume_failed_issue_to_ready(
-    *,
-    issue_number: int,
-    repo: str | None,
-    reason: str,
-    actor: str = "human:resume",
-) -> None:
-    """Resume a failed issue back to ready for fresh manager entry.
-
-    Args:
-        issue_number: GitHub issue number
-        repo: Repository (owner/repo format, optional)
-        reason: Resume reason to include in comment
-        actor: Actor performing the resume
-    """
-    # Write to flow (source of truth) before GitHub sync
-    issue_flow_service = IssueFlowService()
-    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
-    if flows:
-        branch = str(flows[0].get("branch") or "").strip()
-        if branch:
-            # Record resume event
-            issue_flow_service.store.add_event(
-                branch,
-                "resumed",
-                actor,
-                detail=f"Resumed from failed to ready: {reason}",
-                refs={
-                    "issue": str(issue_number),
-                    "from_state": "failed",
-                    "to_state": "ready",
-                },
-            )
-
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.READY,
-        actor=actor,
-        force=True,
-        repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_resume_comment(
-            header="[resume] 已从 state/failed 继续到 state/ready。",
-            detail="将重新进入 manager 标准入口。",
-            reason=reason,
-        ),
-    )
-
-
-def resume_blocked_issue_to_ready(
-    *,
-    issue_number: int,
-    repo: str | None,
-    reason: str,
-    actor: str = "human:resume",
-) -> None:
-    """Resume a blocked issue back to ready after blockage resolved.
-
-    Args:
-        issue_number: GitHub issue number
-        repo: Repository (owner/repo format, optional)
-        reason: Resume reason to include in comment
-        actor: Actor performing the resume
-    """
-    # Write to flow (source of truth) before GitHub sync
-    issue_flow_service = IssueFlowService()
-    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
-    if flows:
-        branch = str(flows[0].get("branch") or "").strip()
-        if branch:
-            # Record resume event
-            issue_flow_service.store.add_event(
-                branch,
-                "resumed",
-                actor,
-                detail=f"Resumed from blocked to ready: {reason}",
-                refs={
-                    "issue": str(issue_number),
-                    "from_state": "blocked",
-                    "to_state": "ready",
-                },
-            )
-
-    _transition_issue_state(
-        issue_number=issue_number,
-        to_state=IssueState.READY,
-        actor=actor,
-        force=True,
-        repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_resume_comment(
-            header="[resume] 已从 state/blocked 恢复到 state/ready。",
-            detail="阻塞已解除,准备继续执行。",
-            reason=reason,
-        ),
-    )
-
-
-def block_manager_noop_issue(
-    *,
-    issue_number: int,
-    repo: str | None,
-    reason: str,
-    actor: str,
-) -> None:
-    """Block a manager issue that made no progress.
-
-    Adds block comment if not already present, and transitions
-    issue to blocked state.
-
-    Args:
-        issue_number: GitHub issue number
-        repo: Repository (owner/repo format, optional)
-        reason: Block reason to include in comment
-        actor: Actor performing the transition
-    """
-    # Write to flow (source of truth) before GitHub sync
     _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
+
+    if is_noop:
+        ref_names = {"plan": "plan_ref", "run": "report_ref", "review": "audit_ref"}
+        ref_name = ref_names.get(role)
+        if ref_name:
+            comment = _build_missing_ref_comment(role, ref_name, reason)
+        else:
+            comment = f"[{role}] 无法推进,已切换为 state/blocked。\n\n原因:{reason}"
+    else:
+        comment = f"[{role}] 已切换为 state/blocked。\n\n原因:{reason}"
 
     _transition_issue_state(
         issue_number=issue_number,
@@ -434,9 +239,96 @@ def block_manager_noop_issue(
         actor=actor,
         force=True,
         repo=repo,
-        dedupe_reason=reason,
-        comment=f"[manager] 无法推进,已切换为 state/blocked。\n\n原因:{reason}",
+        dedupe_reason=reason if not is_noop else None,
+        dedupe_latest_comment=is_noop,
+        comment=comment,
         skip_if_terminal=True,
+    )
+
+
+def resume_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    from_state: str,  # "failed" or "blocked"
+    repo: str | None = None,
+    actor: str = "human:resume",
+) -> None:
+    """Generic resume issue handler."""
+    # Write to flow (source of truth) before GitHub sync
+    issue_flow_service = _get_issue_flow_service()
+    flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
+    if flows:
+        branch = str(flows[0].get("branch") or "").strip()
+        if branch:
+            issue_flow_service.store.add_event(
+                branch,
+                "resumed",
+                actor,
+                detail=f"Resumed from {from_state} to ready: {reason}",
+                refs={
+                    "issue": str(issue_number),
+                    "from_state": from_state,
+                    "to_state": "ready",
+                },
+            )
+
+    action_text = "恢复" if from_state == "blocked" else "继续"
+    header = f"[resume] 已从 state/{from_state} {action_text}到 state/ready。"
+    detail = (
+        "阻塞已解除,准备继续执行。"
+        if from_state == "blocked"
+        else "将重新进入 manager 标准入口。"
+    )
+
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.READY,
+        actor=actor,
+        force=True,
+        repo=repo,
+        dedupe_latest_comment=True,
+        comment=_build_resume_comment(
+            header=header,
+            detail=detail,
+            reason=reason,
+        ),
+    )
+
+
+# Backward compatibility wrappers (can be removed later if all callers updated)
+def fail_reviewer_issue(
+    *, issue_number: int, reason: str, actor: str = "agent:review"
+) -> None:
+    fail_issue(issue_number=issue_number, reason=reason, role="review", actor=actor)
+
+
+def fail_planner_issue(
+    *, issue_number: int, reason: str, actor: str = "agent:plan"
+) -> None:
+    fail_issue(issue_number=issue_number, reason=reason, role="plan", actor=actor)
+
+
+def fail_executor_issue(*, issue_number: int, reason: str, actor: str) -> None:
+    fail_issue(issue_number=issue_number, reason=reason, role="run", actor=actor)
+
+
+def fail_manager_issue(
+    *, issue_number: int, reason: str, actor: str = "agent:manager"
+) -> None:
+    fail_issue(issue_number=issue_number, reason=reason, role="manager", actor=actor)
+
+
+def block_manager_noop_issue(
+    *, issue_number: int, repo: str | None, reason: str, actor: str
+) -> None:
+    block_issue(
+        issue_number=issue_number,
+        reason=reason,
+        role="manager",
+        actor=actor,
+        repo=repo,
+        is_noop=True,
     )
 
 
@@ -447,56 +339,26 @@ def block_planner_noop_issue(
     actor: str = "agent:plan",
     repo: str | None = None,
 ) -> None:
-    """Block a planner issue when no authoritative plan_ref was produced.
-
-    Args:
-        issue_number: GitHub issue number
-        reason: Reason for blocking
-        actor: Actor performing the block
-        repo: Repository (owner/repo format, optional)
-    """
-    # Write to flow (source of truth) before GitHub sync
-    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
-
-    _transition_issue_state(
+    block_issue(
         issue_number=issue_number,
-        to_state=IssueState.BLOCKED,
+        reason=reason,
+        role="plan",
         actor=actor,
-        force=True,
         repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_missing_ref_comment("plan", "plan_ref", reason),
-        skip_if_terminal=True,
+        is_noop=True,
     )
 
 
 def block_executor_noop_issue(
-    *,
-    issue_number: int,
-    reason: str,
-    actor: str = "agent:run",
-    repo: str | None = None,
+    *, issue_number: int, reason: str, actor: str = "agent:run", repo: str | None = None
 ) -> None:
-    """Block an executor issue when no authoritative report_ref was produced.
-
-    Args:
-        issue_number: GitHub issue number
-        reason: Reason for blocking
-        actor: Actor performing the block
-        repo: Repository (owner/repo format, optional)
-    """
-    # Write to flow (source of truth) before GitHub sync
-    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
-
-    _transition_issue_state(
+    block_issue(
         issue_number=issue_number,
-        to_state=IssueState.BLOCKED,
+        reason=reason,
+        role="run",
         actor=actor,
-        force=True,
         repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_missing_ref_comment("run", "report_ref", reason),
-        skip_if_terminal=True,
+        is_noop=True,
     )
 
 
@@ -507,39 +369,42 @@ def block_reviewer_noop_issue(
     actor: str = "agent:review",
     repo: str | None = None,
 ) -> None:
-    """Block a reviewer issue when no authoritative audit_ref was produced.
-
-    Args:
-        issue_number: GitHub issue number
-        reason: Reason for blocking
-        actor: Actor performing the block
-        repo: Repository (owner/repo format, optional)
-    """
-    # Write to flow (source of truth) before GitHub sync
-    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
-
-    _transition_issue_state(
+    block_issue(
         issue_number=issue_number,
-        to_state=IssueState.BLOCKED,
+        reason=reason,
+        role="review",
         actor=actor,
-        force=True,
         repo=repo,
-        dedupe_latest_comment=True,
-        comment=_build_missing_ref_comment("review", "audit_ref", reason),
-        skip_if_terminal=True,
+        is_noop=True,
+    )
+
+
+def resume_failed_issue_to_ready(
+    *, issue_number: int, repo: str | None, reason: str, actor: str = "human:resume"
+) -> None:
+    resume_issue(
+        issue_number=issue_number,
+        reason=reason,
+        from_state="failed",
+        repo=repo,
+        actor=actor,
+    )
+
+
+def resume_blocked_issue_to_ready(
+    *, issue_number: int, repo: str | None, reason: str, actor: str = "human:resume"
+) -> None:
+    resume_issue(
+        issue_number=issue_number,
+        reason=reason,
+        from_state="blocked",
+        repo=repo,
+        actor=actor,
     )
 
 
 def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -> bool:
-    """Check if issue already has a block comment with this reason.
-
-    Args:
-        issue_payload: GitHub issue payload
-        reason: Reason string to search for
-
-    Returns:
-        True if matching block comment exists
-    """
+    """Check if issue already has a block comment with this reason."""
     comments = issue_payload.get("comments")
     if not isinstance(comments, list):
         return False
@@ -553,11 +418,7 @@ def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -
 
 
 def _build_resume_comment(*, header: str, detail: str, reason: str) -> str:
-    """Build a stable resume comment body.
-
-    When reason is empty, omit the reason section so repeated manual retries can be
-    deduplicated using the exact same comment body.
-    """
+    """Build a stable resume comment body."""
     body = f"{header}\n\n{detail}"
     normalized_reason = reason.strip()
     if normalized_reason:

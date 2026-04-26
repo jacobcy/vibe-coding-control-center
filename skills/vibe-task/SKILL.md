@@ -22,8 +22,8 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 对象约束：
 
-- 用户主链：`repo issue -> flow -> plan/spec -> commit -> PR -> done`
-- 内部桥接链：`repo issue -> task -> flow`
+- 用户主链：`GitHub issue -> flow -> plan/spec -> commit -> PR -> done`
+- 内部桥接链：`GitHub issue -> task (via flow_issue_links) -> flow`
 - 任何判断都必须先读 shell 输出，再做语义分析
 
 **Announce at start:**

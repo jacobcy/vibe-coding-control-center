@@ -12,7 +12,7 @@ from vibe3.execution.session_service import SessionRole
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
-TriggerName = Literal["manager", "plan", "run", "review"]
+TriggerName = Literal["manager", "plan", "run", "review", "blocked"]
 
 
 @dataclass(frozen=True)
@@ -60,6 +60,17 @@ class IssueRoleSyncSpec:
         [OrchestraConfig, IssueInfo, str], ExecutionRequest | None
     ]
     build_sync_request: Callable[
-        [OrchestraConfig, IssueInfo, str, str | None, Any, str, bool], ExecutionRequest
+        [
+            OrchestraConfig,
+            IssueInfo,
+            str,
+            dict[str, object] | None,
+            str | None,
+            Any,
+            str,
+            bool,
+            bool,
+        ],
+        ExecutionRequest,
     ]
     failure_handler: Callable[..., None] | None = None

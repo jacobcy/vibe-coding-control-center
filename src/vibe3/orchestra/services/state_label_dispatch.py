@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_labels import GhIssueLabelPort
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -20,6 +21,8 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+from vibe3.services.flow_resume_resolver import infer_resume_label
+from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -97,11 +100,11 @@ class StateLabelDispatchService(ServiceBase):
     async def collect_ready_issues(self) -> list[IssueInfo]:
         """Scan and return ready issues without dispatching.
 
-        This method is for GlobalDispatchCoordinator to collect issues for
-        capacity-aware dispatch. Capacity checking is done by coordinator.
+        BLOCKED_ROLE collects blocked issues without a qualify gate;
+        the gate runs at intent time in GlobalDispatchCoordinator.
 
         Returns:
-            Filtered and sorted ready issues list
+            Filtered and sorted ready issues list.
         """
         async with self._dispatch_guard:
             raw_issues = await asyncio.get_event_loop().run_in_executor(
@@ -123,54 +126,6 @@ class StateLabelDispatchService(ServiceBase):
             )
             return ready
 
-    async def on_tick(self) -> None:
-        """Periodic scan and async dispatch for the configured trigger state.
-
-        **DEPRECATED**: This method bypasses capacity checks and should not be
-        called directly. Use GlobalDispatchCoordinator.coordinate() instead,
-        which properly checks capacity before emitting dispatch intents.
-
-        This method is kept for backward compatibility but will raise a warning
-        if called outside of GlobalDispatchCoordinator context.
-        """
-        import warnings
-
-        warnings.warn(
-            f"{self.service_name}.on_tick() is deprecated: "
-            "bypasses capacity checks. Use GlobalDispatchCoordinator instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        ready = await self.collect_ready_issues()
-
-        for issue in ready:
-            try:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} emitting dispatch-intent event "
-                    f"for #{issue.number}",
-                    level="DEBUG",
-                )
-                self._emit_dispatch_intent(issue)
-
-                logger.bind(
-                    domain="orchestra",
-                    trigger=self.role_def.trigger_name,
-                    issue=issue.number,
-                ).debug("Dispatch-intent event emitted, handler will dispatch")
-            except Exception as exc:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} failed to emit event "
-                    f"for #{issue.number}: {exc}",
-                )
-                logger.bind(
-                    domain="orchestra",
-                    trigger=self.role_def.trigger_name,
-                    issue=issue.number,
-                ).warning(f"State dispatch failed: {exc}")
-
     def _emit_dispatch_intent(self, issue: IssueInfo) -> None:
         from vibe3.domain import publish
         from vibe3.roles.registry import build_label_dispatch_event
@@ -191,86 +146,257 @@ class StateLabelDispatchService(ServiceBase):
             return "", None
         return branch, self._store.get_flow_state(branch)
 
+    def _get_issue_dependencies(self, issue_number: int) -> list[int]:
+        """Get dependency issue numbers from flow_issue_links.
+
+        Args:
+            issue_number: The issue number to check for dependencies
+
+        Returns:
+            List of dependency issue numbers (empty if no dependencies)
+        """
+        # Query flows where this issue is task role
+        flows = self._store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return []
+
+        branch = str(flows[0].get("branch") or "").strip()
+        if not branch:
+            return []
+
+        # Query dependency links for this branch
+        import sqlite3
+
+        with sqlite3.connect(self._store.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT issue_number FROM flow_issue_links "
+                "WHERE branch = ? AND issue_role = 'dependency'",
+                (branch,),
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def _is_dependency_satisfied(self, dep_issue_number: int) -> bool:
+        """Check if dependency issue has completed.
+
+        A dependency is satisfied when:
+        - Issue is closed (Done or Aborted)
+
+        Args:
+            dep_issue_number: The dependency issue number to check
+
+        Returns:
+            True if dependency is satisfied, False otherwise
+        """
+        payload = self._github.view_issue(dep_issue_number, repo=self.config.repo)
+        if not isinstance(payload, dict):
+            return False
+
+        # Check issue state
+        state = payload.get("state")
+        if state == "closed":
+            return True  # Issue closed → dependency satisfied
+
+        return False
+
     def _select_ready_issues(
         self, raw_issues: list[dict[str, object]]
     ) -> list[IssueInfo]:
+        """Select ready issues by passing them through the Qualify Gate.
+
+        Args:
+            raw_issues: Raw issue payloads from GitHub
+
+        Returns:
+            Filtered and sorted ready issues
+        """
         selected: list[IssueInfo] = []
         for item in raw_issues:
             labels = _normalize_labels(item.get("labels"))
-            if IssueState.BLOCKED.to_label() in labels:
+
+            # Untracked state: ignore issues with no state labels
+            if not any(lbl.startswith("state/") for lbl in labels):
                 continue
-            # Skip failed issues - they should not be auto-dispatched
+
+            # Skip failed issues
             if IssueState.FAILED.to_label() in labels:
                 continue
-            if self.role_def.trigger_state.to_label() not in labels:
-                continue
+
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
                 continue
-            if self.role_def.trigger_name == "manager":
-                # Manager is the entry point. Always dispatch if the label is present,
-                # unless there's already a live session (handled in _should_dispatch).
-                # We don't skip if branch/flow_state is missing because Manager
-                # is responsible for creating them.
-                branch, flow_state = self._flow_context(issue.number)
-                if not self._should_dispatch(issue.number, flow_state):
-                    continue
+
+            # BLOCKED_ROLE: collect all candidates without qualify gate.
+            # Gate runs at intent time in GlobalDispatchCoordinator.
+            if self.role_def.trigger_name == "blocked":
                 selected.append(issue)
                 continue
 
-            # For downstream roles (plan/run/review), we need a branch to exist.
             branch, flow_state = self._flow_context(issue.number)
-            if not branch or not _is_auto_task_branch(branch):
-                # If no branch exists yet, we can't dispatch downstream agents.
-                # This usually means manager hasn't run yet.
+
+            # Qualify Gate — returns target state or None if blocked
+            target = self._run_qualify_gate(issue, branch, flow_state, labels)
+            if target is None or target != self.role_def.trigger_state:
                 continue
 
-            # Verify the git branch actually exists, not just a stale flow record.
-            # A flow may reference a branch that was deleted (aborted/cleaned up).
-            if not self._flow_manager.git.branch_exists(branch):
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} skip #{issue.number}: "
-                    f"branch '{branch}' not found in git",
-                )
-                continue
+            # Role-specific branch existence requirements
+            if self.role_def.trigger_name != "manager":
+                if not branch or not _is_auto_task_branch(branch):
+                    continue
+                if not self._flow_manager.git.branch_exists(branch):
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"{self.service_name} skip #{issue.number}: "
+                        f"branch '{branch}' not found in git",
+                    )
+                    continue
 
-            if not self._should_dispatch(issue.number, flow_state):
+            # Verify assignee/supervisor filters
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self.config.supervisor_handoff.issue_label,
+                manager_usernames=self.config.manager_usernames,
+                require_manager_assignee=(
+                    self.role_def.trigger_state == IssueState.READY
+                ),
+            ):
                 continue
 
             selected.append(issue)
+
         return sort_ready_issues(selected)
 
-    def _should_dispatch(
+    def _run_qualify_gate(
         self,
-        issue_number: int,
+        issue: IssueInfo,
+        branch: str,
         flow_state: dict[str, object] | None,
-    ) -> bool:
-        """Use role definition's dispatch_predicate with registry liveness check.
+        labels: list[str],
+    ) -> IssueState | None:
+        """Run the Qualify Gate for an issue to resolve dependencies and blocking.
 
-        Registry provides accurate liveness verification:
-        - Real-time tmux session verification
-        - Orphan detection (stale sessions > 60s)
-        - Grace period for recent starting sessions
-
-        Simplified: delegate all liveness checking to registry,
-        removing redundant flow_state.status_field check.
+        Returns:
+            Target IssueState if the issue passes the gate and can be dispatched,
+            None if the issue is blocked and should be skipped.
         """
-        has_live_session = self._has_live_dispatch(issue_number)
-        return self.role_def.dispatch_predicate(flow_state or {}, has_live_session)
+        if not flow_state:
+            if IssueState.BLOCKED.to_label() in labels:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} skip #{issue.number}: "
+                    "local flow state missing but remote is blocked",
+                )
+                return None
+            if self.role_def.trigger_state.to_label() in labels:
+                return self.role_def.trigger_state
+            return None
 
-    def _has_live_dispatch(self, issue_number: int) -> bool:
-        if self._registry is None:
-            raise RuntimeError(
-                "SessionRegistryService is required to check live dispatch"
+        # Step 1: Check manual block
+        blocked_reason = flow_state.get("blocked_reason")
+        if blocked_reason and str(blocked_reason).strip():
+            if IssueState.BLOCKED.to_label() not in labels:
+                try:
+                    label_port = GhIssueLabelPort(repo=self.config.repo)
+                    label_port.add_issue_label(issue.number, "state/blocked")
+                except Exception as exc:
+                    logger.bind(domain="orchestra").warning(
+                        f"Failed to add state/blocked: {exc}"
+                    )
+            return None
+
+        # Step 2: Check dependency block
+        dependencies = self._get_issue_dependencies(issue.number)
+        unresolved = []
+        if dependencies:
+            unresolved = [
+                d for d in dependencies if not self._is_dependency_satisfied(d)
+            ]
+
+        if unresolved:
+            if not flow_state.get("blocked_by_issue"):
+                self._store.update_flow_state(
+                    branch,
+                    flow_status="blocked",
+                    blocked_by_issue=unresolved[0],
+                )
+                if IssueState.BLOCKED.to_label() not in labels:
+                    try:
+                        label_port = GhIssueLabelPort(repo=self.config.repo)
+                        label_port.add_issue_label(issue.number, "state/blocked")
+                    except Exception as exc:
+                        logger.bind(domain="orchestra").warning(
+                            f"Failed to add state/blocked for #{issue.number}: {exc}"
+                        )
+                self._store.add_event(
+                    branch,
+                    "flow_blocked",
+                    "orchestra:dispatcher",
+                    detail="Blocked by unresolved dependencies",
+                )
+            return None
+
+        # Step 3: All clear — determine target and perform unblock side effects
+
+        # Issue is not in blocked state: confirm trigger label (no unblock needed)
+        if IssueState.BLOCKED.to_label() not in labels and not flow_state.get(
+            "blocked_by_issue"
+        ):
+            if self.role_def.trigger_state.to_label() in labels:
+                return self.role_def.trigger_state
+            return None
+
+        from vibe3.models.flow import FlowState
+
+        fs_obj = FlowState.model_validate(flow_state)
+        target_label = infer_resume_label(fs_obj)
+
+        if flow_state.get("blocked_by_issue"):
+            dep_issue = flow_state.get("blocked_by_issue")
+            source_pr = None
+            if isinstance(dep_issue, int):
+                dep_flows = self._store.get_flows_by_issue(dep_issue, role="task")
+                for df in dep_flows:
+                    if df.get("pr_number"):
+                        source_pr = df.get("pr_number")
+                        break
+
+            refs: dict[str, str] = {}
+            if source_pr:
+                refs["source_pr"] = str(source_pr)
+
+            self._store.update_flow_state(
+                branch,
+                flow_status=target_label.value,
+                blocked_by_issue=None,
+            )
+            self._store.add_event(
+                branch,
+                "flow_unblocked",
+                "orchestra:dispatcher",
+                detail=f"Dependencies satisfied, target: {target_label.value}",
+                refs=refs if refs else None,
             )
 
-        branch, _ = self._flow_context(issue_number)
-        if not branch:
-            return False
-        sessions = self._registry.get_truly_live_sessions_for_target(
-            role=self.role_def.registry_role,
-            branch=branch,
-            target_id=str(issue_number),
-        )
-        return len(sessions) > 0
+        if IssueState.BLOCKED.to_label() in labels:
+            try:
+                label_port = GhIssueLabelPort(repo=self.config.repo)
+                label_port.remove_issue_label(issue.number, "state/blocked")
+                if target_label.to_label() not in labels:
+                    label_port.add_issue_label(issue.number, target_label.to_label())
+            except Exception as exc:
+                logger.bind(domain="orchestra").warning(
+                    f"Failed to sync unblocked labels for #{issue.number}: {exc}"
+                )
+
+        return target_label
+
+    def qualify_blocked_issue(self, issue: IssueInfo) -> IssueState | None:
+        """Run qualify gate for a blocked issue at dispatch intent time.
+
+        Called by GlobalDispatchCoordinator instead of collection-time scanning.
+
+        Returns:
+            Target IssueState to dispatch to, or None if still blocked.
+        """
+        branch, flow_state = self._flow_context(issue.number)
+        return self._run_qualify_gate(issue, branch, flow_state, list(issue.labels))

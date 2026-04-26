@@ -49,11 +49,14 @@ class IssueFailed(DomainEvent):
 
 
 @dataclass(frozen=True)
-class ManagerDispatched(DomainEvent):
+class ManagerDispatchIntent(DomainEvent):
     """Manager dispatch intent event.
 
     Authoritative signal that manager should be dispatched for an issue.
     Published by StateLabelDispatchService for ready/handoff manager triggers.
+
+    Note: This is an INTENT event, not a completion event.
+    The actual dispatch happens in handlers.
     """
 
     issue_number: int
@@ -64,12 +67,19 @@ class ManagerDispatched(DomainEvent):
     timestamp: str | None = None
 
 
+# Backward compatibility alias
+ManagerDispatched = ManagerDispatchIntent
+
+
 @dataclass(frozen=True)
-class PlannerDispatched(DomainEvent):
+class PlannerDispatchIntent(DomainEvent):
     """Planner dispatch intent event.
 
     Authoritative signal that planner should be dispatched for an issue.
     Published by StateLabelDispatchService when trigger_name="plan".
+
+    Note: This is an INTENT event, not a completion event.
+    The actual dispatch happens in handlers.
     """
 
     issue_number: int
@@ -79,8 +89,12 @@ class PlannerDispatched(DomainEvent):
     timestamp: str | None = None
 
 
+# Backward compatibility alias
+PlannerDispatched = PlannerDispatchIntent
+
+
 @dataclass(frozen=True)
-class ExecutorDispatched(DomainEvent):
+class ExecutorDispatchIntent(DomainEvent):
     """Executor dispatch intent event.
 
     Authoritative signal that executor should be dispatched for an issue.
@@ -88,6 +102,9 @@ class ExecutorDispatched(DomainEvent):
 
     Execution-specific context (plan_ref, audit_ref, commit_mode) is
     resolved by the handler layer, not carried on the dispatch intent.
+
+    Note: This is an INTENT event, not a completion event.
+    The actual dispatch happens in handlers.
     """
 
     issue_number: int
@@ -97,8 +114,12 @@ class ExecutorDispatched(DomainEvent):
     timestamp: str | None = None
 
 
+# Backward compatibility alias
+ExecutorDispatched = ExecutorDispatchIntent
+
+
 @dataclass(frozen=True)
-class ReviewerDispatched(DomainEvent):
+class ReviewerDispatchIntent(DomainEvent):
     """Reviewer dispatch intent event.
 
     Authoritative signal that reviewer should be dispatched for an issue.
@@ -106,6 +127,9 @@ class ReviewerDispatched(DomainEvent):
 
     Execution-specific context (report_ref) is resolved by the handler
     layer, not carried on the dispatch intent.
+
+    Note: This is an INTENT event, not a completion event.
+    The actual dispatch happens in handlers.
     """
 
     issue_number: int
@@ -113,3 +137,7 @@ class ReviewerDispatched(DomainEvent):
     trigger_state: str  # "review"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
+
+
+# Backward compatibility alias
+ReviewerDispatched = ReviewerDispatchIntent

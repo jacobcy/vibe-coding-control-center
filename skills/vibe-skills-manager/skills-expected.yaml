@@ -24,8 +24,8 @@ global:
     expected:
       superpowers:
         description: 开发方法论工具集，包含 brainstorming, systematic-debugging, writing-plans 等 14+ skills
-        install: npx skills add obra/superpowers -g --agent antigravity codex kiro -y
-        # 其他 Agents (Antigravity, Codex, Kiro) 主要使用 npx skills 分发的 Superpowers
+        install: npx skills add obra/superpowers -g --agent antigravity codex kiro-cli -y
+        # 其他 Agents (Antigravity, Codex, Kiro-cli) 主要使用 npx skills 分发的 Superpowers
 
 # 项目级期望 - 当前项目专属
 project:

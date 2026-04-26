@@ -12,13 +12,13 @@ from typing import Self, cast
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_write_mixin import FlowWriteMixin
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.signature_service import SignatureService
+from vibe3.utils.path_helpers import GitClientProtocol
 
 
 class FlowTransitionMixin(FlowWriteMixin):
@@ -28,21 +28,27 @@ class FlowTransitionMixin(FlowWriteMixin):
     - _is_main_branch (protected branch check)
     - create_flow (flow creation)
     - get_flow_status (flow status query)
-    - SAFE_BRANCH_PREFIX constant
+    SAFE_BRANCH_PREFIX constant
     """
 
     store: SQLiteClient
-    git_client: GitClient
+    git_client: GitClientProtocol
     config: VibeConfig
 
     def ensure_flow_for_branch(
-        self: Self, branch: str, slug: str | None = None
+        self: Self,
+        branch: str,
+        slug: str | None = None,
+        *,
+        source: str = "cli",
     ) -> FlowStatusResponse:
         """Ensure flow exists for branch, creating if needed.
 
         Args:
             branch: Git branch name
             slug: Optional flow slug (defaults to derived from branch)
+            source: Caller identity for audit logging
+                (e.g. "dispatch", "cli", "agent").
 
         Returns:
             Existing or newly created FlowStatusResponse
@@ -65,6 +71,7 @@ class FlowTransitionMixin(FlowWriteMixin):
                 action="ensure",
                 branch=branch,
                 existing=True,
+                source=source,
             ).debug("Flow already exists")
             return existing
 
@@ -81,9 +88,10 @@ class FlowTransitionMixin(FlowWriteMixin):
             branch=branch,
             slug=slug,
             existing=False,
+            source=source,
         ).info("Creating flow via ensure")
 
-        flow = self.create_flow(slug=slug, branch=branch)
+        flow = self.create_flow(slug=slug, branch=branch, source=source)
 
         # Initialize issue flow context cache if this is an issue branch
         self._initialize_issue_flow_context(branch)
@@ -120,30 +128,48 @@ class FlowTransitionMixin(FlowWriteMixin):
         ]
         effective_issue_number = task_issues[0] if task_issues else issue_number
 
-        # Try to fetch issue title from GitHub
-        issue_title = None
-        try:
-            gh = GitHubClient()
-            issue_data = gh.view_issue(effective_issue_number)
-            if isinstance(issue_data, dict):
-                issue_title = issue_data.get("title")
-        except Exception as e:
-            logger.bind(
-                domain="flow",
-                action="init_issue_context",
+        # Ensure cache entry exists with issue number before updating title
+        # This must happen BEFORE title update so update_title() can preserve
+        # the issue number
+        if not self.store.get_flow_context_cache(branch):
+            self.store.upsert_flow_context_cache(
                 branch=branch,
-                issue_number=effective_issue_number,
-                error=str(e),
-            ).warning("Failed to fetch issue title from GitHub")
+                task_issue_number=effective_issue_number,
+                issue_title=None,
+                pr_number=None,
+                pr_title=None,
+            )
 
-        # Initialize cache with issue number and title (if available)
-        self.store.upsert_flow_context_cache(
-            branch=branch,
-            task_issue_number=effective_issue_number,
-            issue_title=issue_title,  # May be None if GitHub failed
-            pr_number=None,
-            pr_title=None,
-        )
+        # Try to fetch issue title from GitHub and update cache
+        if effective_issue_number:
+            try:
+                gh = GitHubClient()
+                issue_data = gh.view_issue(effective_issue_number)
+                if isinstance(issue_data, dict):
+                    issue_title = issue_data.get("title")
+                    if issue_title:
+                        # Use IssueTitleCacheService to update cache
+                        from vibe3.services.issue_title_cache_service import (
+                            IssueTitleCacheService,
+                        )
+
+                        title_cache = IssueTitleCacheService(self.store, gh)
+                        title_cache.update_title(branch, issue_title)
+
+                        logger.bind(
+                            domain="flow",
+                            action="init_issue_context",
+                            branch=branch,
+                            issue_number=effective_issue_number,
+                        ).debug("Initialized issue title cache")
+            except Exception as e:
+                logger.bind(
+                    domain="flow",
+                    action="init_issue_context",
+                    branch=branch,
+                    issue_number=effective_issue_number,
+                    error=str(e),
+                ).warning("Failed to fetch issue title from GitHub")
 
     def resolve_flow_name(self: Self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.

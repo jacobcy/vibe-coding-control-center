@@ -37,7 +37,7 @@
 ### 3. 项目边界违规
 
 这是本项目特有高优先级项：
-- 是否绕过 `vibe3 handoff show` / 共享 current.md 去假设 handoff 现场
+- 是否绕过 `vibe3 handoff status` / 共享 current.md 去假设 handoff 现场
 - 是否直接改共享状态真源
 - 是否跨 worktree 假设执行
 - 是否在已有 PR 的工作流上继续扩新目标
@@ -71,7 +71,7 @@
 优先依赖项目自己的 AST / impact 能力，而不是只看 diff 表面。
 
 推荐：
-- 用 `uv run python src/vibe3/cli.py handoff show` 查看当前 flow 现场
+- 用 `uv run python src/vibe3/cli.py handoff status` 查看当前 flow 现场
 - 用 `vibe3 inspect base --json` 看分支风险与影响面
 - 用 `vibe3 inspect commit <sha>` 看符号级波及范围
 - 用 `vibe3 inspect symbols <file|file:symbol>` 检查改动点引用关系
@@ -101,10 +101,20 @@
 - 或输出契约被破坏，导致链路不可安全消费
 - 或关键验证失败
 
+## Comment Contract（Review 角色）
+
+详细规则见「共用前提」中的 Comment vs Handoff Contract，本节只补充 review 特有要求。
+
+- 何时写 comment：review 裁决（PASS / MAJOR / BLOCK）外发、需要 PR 作者修复的明确请求、合并/回退建议。
+- 何时改用 handoff append：审查中的次要观察、不阻塞当前裁决的待跟进事项、给下一轮 reviewer 的上下文。
+- Marker：所有 review 阶段的 issue / PR comment 必须以行首 `[review]` 开头。
+- 内容要求：verdict + 可操作的 findings 摘要（指向 PR review 的行内评论或 handoff 详情）。
+- 禁止：把 verdict 写成自由文本而不带 marker；用 comment 罗列大量风格类建议（这类内容应保留在 PR review 的行内评论）。
+
 ## 输出要求
 
 - 先给 findings，再给 verdict。
 - 只写可操作问题。
-- 问题描述必须指出为什么这是问题，而不只是说“建议更好”。
+- 问题描述必须指出为什么这是问题，而不只是说”建议更好”。
 - 若无问题，明确写无发现，不要编造建议凑数。
 - 输出格式遵循当前审查链路约定的结构化合同。

@@ -9,17 +9,6 @@ from vibe3.clients.ai_client import AIClient
 from vibe3.config.settings import AIConfig
 
 DEFAULT_PROMPTS = {
-    "flow": {
-        "slug_suggestion": {
-            "system": "You are an assistant that generates concise flow slugs.",
-            "user": (
-                "Issue: {issue_title}\n\n{issue_body}\n\n"
-                "Generate 3 flow slug suggestions (kebab-case). "
-                "Each suggestion should be on a separate line. "
-                "Do not include numbers, bullets, or explanations."
-            ),
-        }
-    },
     "pr": {
         "title_suggestion": {
             "system": "You are an assistant that generates PR titles.",
@@ -79,42 +68,6 @@ class AISuggestionClient:
                 )
 
         return DEFAULT_PROMPTS.copy()
-
-    def suggest_flow_slug(
-        self,
-        issue_title: str,
-        issue_body: str | None = None,
-    ) -> list[str] | None:
-        if self.ai_client is None:
-            return None
-
-        prompt_config = self.prompts.get("flow", {}).get("slug_suggestion", {})
-        system_prompt = prompt_config.get(
-            "system", DEFAULT_PROMPTS["flow"]["slug_suggestion"]["system"]
-        )
-        user_template = prompt_config.get(
-            "user", DEFAULT_PROMPTS["flow"]["slug_suggestion"]["user"]
-        )
-
-        user_prompt = user_template.format(
-            issue_title=issue_title,
-            issue_body=issue_body or "",
-        )
-
-        result = self.ai_client.generate_text(system_prompt, user_prompt)
-        if not result:
-            return None
-
-        slugs = [
-            line.strip().lower() for line in result.strip().split("\n") if line.strip()
-        ]
-        if not slugs:
-            return None
-
-        logger.bind(module="ai_suggestion_client").debug(
-            f"Generated {len(slugs)} flow slug suggestions"
-        )
-        return slugs
 
     def suggest_pr_content(
         self,

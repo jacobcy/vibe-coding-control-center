@@ -72,7 +72,7 @@ _vibe_skills_global_agents() {
     else
         echo "antigravity"
         echo "codex"
-        echo "kiro"
+        echo "kiro-cli"
         echo "copilot"
     fi
 }
@@ -85,7 +85,7 @@ _vibe_skills_project_agents() {
         echo "claude-code"
         echo "antigravity"
         echo "codex"
-        echo "kiro"
+        echo "kiro-cli"
     fi
 }
 
@@ -97,7 +97,7 @@ _vibe_skills_superpowers() {
         echo "claude-code"
         echo "antigravity"
         echo "codex"
-        echo "kiro"
+        echo "kiro-cli"
     fi
 }
 
@@ -105,7 +105,7 @@ _vibe_skills_agent_dir() {
     case "$1" in
         antigravity) echo "$HOME/.gemini/antigravity/skills" ;;
         trae) echo "$HOME/.trae/skills" ;;
-        kiro) echo "$HOME/.kiro/skills" ;;
+        kiro-cli) echo "$HOME/.kiro/skills" ;;
         codex) echo "$HOME/.agents/skills" ;;
         *) echo "$HOME/.agents/skills/$1" ;;
     esac
