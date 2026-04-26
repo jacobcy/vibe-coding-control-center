@@ -622,17 +622,13 @@ Allowed:
 
 Steps:
 
-1. 调用 `read_context()`
-2. 检查 `report_ref` 或 `pr_ref`
-3. 如果 `report_ref` 已完成（常规执行）：
+1. 谓词检查：确保当前 scene 健康
+2. 检查 `report_ref` 是否已产出
+3. 如果 `report_ref` 已产出（常规执行完毕）：
    - 转回 `state/handoff`
-   - comment 当前 issue
+   - comment 当前 issue 说明实现阶段结束，进入审核准备
    - `exit()`
-4. 如果 `pr_ref` 已完成（merge-ready 后的 commit + PR 提交）：
-   - 转回 `state/handoff`（由 manager 在 handoff 阶段审核 PR）
-   - comment 当前 issue
-   - `exit()`
-5. 如果执行中没有新事实：
+4. 如果 `report_ref` 尚未产出且执行中没有新事实：
    - 不重复长 comment
    - `exit()`
 

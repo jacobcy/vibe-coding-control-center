@@ -44,7 +44,7 @@ This project has **two parallel implementations**:
 - **V3 (Python)**: `src/vibe3/` (see [.agent/rules/python-standards.md](.agent/rules/python-standards.md))
 - **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`
-- **Shared state truth**: `.git/vibe3/`（位于主仓库 git common dir，即最顶层 `.git`）
+- **Shared state truth**: `.git/vibe3/handoff.db`（位于主仓库 git common dir，即最顶层 `.git`）
 
 ## 🚀 Quick Start
 

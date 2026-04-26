@@ -237,6 +237,7 @@ class FlowStatusResponse(BaseModel):
     ]
     task_issue_number: int | None = None
     pr_number: int | None = None
+    pr_ref: str | None = None  # PR URL as proof of PR creation
     pr_ready_for_review: bool = False
     spec_ref: str | None = None
     plan_ref: str | None = None
@@ -321,6 +322,7 @@ class FlowStatusResponse(BaseModel):
             flow_status=data.get("flow_status", "active"),
             task_issue_number=resolved_task_issue_number,
             pr_number=pr_number if pr_number is not None else data.get("pr_number"),
+            pr_ref=data.get("pr_ref"),
             pr_ready_for_review=(
                 pr_ready
                 if pr_ready is not None

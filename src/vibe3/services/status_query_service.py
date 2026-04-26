@@ -276,8 +276,8 @@ class StatusQueryService:
             state = _state_from_labels(item.get("labels"))
             if state is None:
                 continue
-            if state == IssueState.DONE:
-                continue
+            # Note: IssueState.DONE is no longer skipped here.
+            # It will be filtered at the UI layer or grouped into PR section.
             flow = issue_to_flow.get(number)
             if flow and not is_orchestra_managed_flow_branch(flow.branch):
                 continue

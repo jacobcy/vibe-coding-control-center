@@ -34,13 +34,15 @@ TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路�
 def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     """Only auto-task flows should participate in task-oriented Issue Progress."""
     flow = cast(FlowStatusResponse | None, item.get("flow"))
+    state = cast(IssueState, item["state"])
+
     if flow is None:
-        state = cast(IssueState, item["state"])
         return state in {
             IssueState.READY,
             IssueState.HANDOFF,
             IssueState.BLOCKED,
             IssueState.FAILED,
+            IssueState.DONE,
         }
     return is_auto_task_branch(flow.branch)
 
@@ -179,6 +181,10 @@ def status(
         # 2. Issue Tracking (state truth + local scene)
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
+        if not all_flows:
+            # Also include done flows to show PRs in the dashboard
+            flows.extend(service.list_flows(status="done"))
+
         stale_flows = service.list_flows(status="stale") if not all_flows else []
 
         queued_set = set(orch_snapshot.queued_issues)
@@ -198,8 +204,14 @@ def status(
             TaskStatusBucket.OTHER: [],
         }
         for item in task_progress_items:
+            # Filter out DONE state from standard progress buckets
+            #  to keep them in PR section only
+            state = cast(IssueState | None, item["state"])
+            if state == IssueState.DONE:
+                continue
+
             bucket = classify_task_status(
-                cast(IssueState | None, item["state"]),
+                state,
                 cast(str | None, item.get("assignee")),
             )
             bucketed_items[bucket].append(item)
