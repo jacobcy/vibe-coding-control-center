@@ -5,18 +5,18 @@
 #   - Local hooks (pre-commit/pre-push): WARNING ONLY (exit 0)
 #   - CI: Set env var ENFORCE_LOC_LIMITS=true to BLOCK on violations
 #
-# Reads limits from config/settings.yaml without uv
+# Reads limits from config/loc_limits.yaml without uv
 #
 # Limits (unified for all file types):
 #   default: 300 lines (most files should fit)
 #   max: 400 lines (special cases with justification)
 
 #
-# Code paths (defined in config/settings.yaml:code_limits.code_paths):
+# Code paths (defined in config/loc_limits.yaml:code_limits.code_paths):
 #   Shell: lib/, lib3/, bin/vibe
 #   Python: src/vibe3/
 #
-# Scripts paths (defined in config/settings.yaml:code_limits.scripts_paths):
+# Scripts paths (defined in config/loc_limits.yaml:code_limits.scripts_paths):
 #   Shell: scripts/ (*.sh files)
 #   Python: scripts/ (*.py files)
 #

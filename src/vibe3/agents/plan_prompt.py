@@ -19,6 +19,7 @@ from vibe3.exceptions import VibeError
 from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.plan import PlanRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+from vibe3.prompts.manifest import PromptManifest, PromptProvider
 
 PlanPromptMode = Literal["first", "retry"]
 
@@ -122,6 +123,69 @@ Output a structured plan in this format:
 [Optional additional context]"""
 
 
+def _plan_variant(mode: PlanPromptMode, context_mode: PromptContextMode) -> str:
+    if context_mode == "resume":
+        return f"{mode}.resume"
+    return f"{mode}.bootstrap"
+
+
+def describe_plan_sections(
+    mode: PlanPromptMode,
+    context_mode: PromptContextMode,
+) -> list[str]:
+    """Return configured plan.default section keys for dry-run summaries."""
+    variant = _plan_variant(mode, context_mode)
+    return list(
+        PromptManifest.load_default().recipe("plan.default").variant(variant).sections
+    )
+
+
+def _build_plan_prompt_providers(
+    request: PlanRequest,
+    config: VibeConfig,
+    context_mode: PromptContextMode,
+) -> dict[str, PromptProvider]:
+    """Build providers used by config/prompt-recipes.yaml plan sections."""
+    from vibe3.agents.review_prompt import build_tools_guide_section
+
+    plan_config = getattr(config, "plan", None)
+    task_request = (
+        request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
+    )
+
+    def plan_policy() -> str | None:
+        if not plan_config or not hasattr(plan_config, "policy_file"):
+            return None
+        return build_plan_policy_section(plan_config.policy_file)
+
+    def plan_output_format() -> str:
+        output_format = (
+            getattr(plan_config, "output_format", None) if plan_config else None
+        )
+        return build_plan_output_contract_section(output_format)
+
+    def plan_retry_task() -> str | None:
+        return getattr(plan_config, "retry_task", None) if plan_config else None
+
+    def plan_exit_contract() -> str:
+        plan_task_text = (
+            getattr(plan_config, "plan_task", None) if plan_config else None
+        )
+        return build_plan_task_section(task_request, plan_task_text)
+
+    return {
+        "plan.policy": plan_policy,
+        "common.rules": lambda: build_tools_guide_section(
+            getattr(plan_config, "common_rules", None)
+        ),
+        "plan.output_format": plan_output_format,
+        "plan.retry_task": plan_retry_task,
+        "plan.exit_contract": plan_exit_contract,
+        # Backward-compatible alias for local recipe overrides.
+        "plan.task": plan_exit_contract,
+    }
+
+
 def build_plan_prompt_body(
     request: PlanRequest,
     config: VibeConfig | None = None,
@@ -140,8 +204,6 @@ def build_plan_prompt_body(
     Returns:
         Assembled plan prompt body string.
     """
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
     log = logger.bind(
         domain="plan_context_builder",
         action="build_plan_prompt_body",
@@ -153,41 +215,11 @@ def build_plan_prompt_body(
     if config is None:
         config = VibeConfig.get_defaults()
 
-    sections: list[str] = []
-
-    plan_config = getattr(config, "plan", None)
-
-    if context_mode == "bootstrap":
-        if plan_config and hasattr(plan_config, "policy_file"):
-            policy = build_plan_policy_section(plan_config.policy_file)
-            if policy:
-                sections.append(policy)
-
-        tools_guide = build_tools_guide_section(
-            getattr(plan_config, "common_rules", None)
-        )
-        if tools_guide:
-            sections.append(tools_guide)
-
-    output_format = None
-    if plan_config and hasattr(plan_config, "output_format"):
-        output_format = plan_config.output_format
-    output_contract = build_plan_output_contract_section(output_format)
-    sections.append(output_contract)
-
-    # Task section MUST be last so the exit label instruction has recency effect
-    plan_task_text = None
-    if plan_config:
-        task_key = "retry_task" if mode == "retry" else "plan_task"
-        if hasattr(plan_config, task_key):
-            plan_task_text = getattr(plan_config, task_key)
-    task_request = (
-        request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
+    body = PromptManifest.load_default().render_sections(
+        recipe_key="plan.default",
+        variant_key=_plan_variant(mode, context_mode),
+        providers=_build_plan_prompt_providers(request, config, context_mode),
     )
-    task = build_plan_task_section(task_request, plan_task_text)
-    sections.append(task)
-
-    body = "\n\n---\n\n".join(sections)
     log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
         "Plan prompt body built"
     )

@@ -1,162 +1,115 @@
-# Dependency Handling Mechanism
+# Dependency Handling Mechanism (V2)
 
 ## Overview
 
-Vibe Center 3.0 支持声明式依赖管理：当一个 flow 依赖其他 issue 时，系统会自动：
+Vibe Center 3.0 支持声明式依赖管理。当一个 flow 依赖其他 issue 时，系统采用 **Active Probing（主动嗅探）** 机制来确保逻辑闭环：
 
-1. 将依赖方 flow 标记为 `waiting` 直到所有依赖满足
-2. 在依赖完成（PR 创建）后自动唤醒依赖方
-3. 从依赖的 PR 分支创建依赖方的开发分支，确保代码基于依赖的最新版本
+1. **定义即阻塞**: 绑定依赖时，系统自动将 flow 标记为 `blocked` 并同步 GitHub `state/blocked` 标签。
+2. **主动巡逻**: Orchestra 调度器周期性巡检处于 `state/blocked` 的任务。
+3. **自动解套**: 当所有依赖 Issue 均已 `closed` 时，调度器自动解除阻塞，智能推断并恢复到正确状态（如 `state/handoff`）。
+4. **继承链**: 从依赖的 PR 分支创建依赖方的开发分支，确保代码基于依赖的最新版本。
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Orchestra Dispatcher (collect_ready_issues)                      │
-│  - Check dependencies before scheduling                           │
-│  - Mark flow as waiting if any dependency unsatisfied             │
+│  Orchestra Dispatcher (Qualify Gate)                             │
+│  - Active Polling: include state/blocked in collection           │
+│  - Lazy Evaluation: check dependencies at dispatch intent time    │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  PR Service                                                      │
-│  - After PR creation, trigger DependencySatisfied event          │
+│  GitHub Source of Truth                                          │
+│  - Satisfaction criterion: Issue must be CLOSED                  │
+│  - (Covers both Done and Aborted terminal states)                │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Event Bus (Domain Event)                                        │
-│  - DependencySatisfied event published                           │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Dependency Wake-up Handler                                       │
-│  - Find all flows waiting on this dependency issue               │
-│  - Check if ALL dependencies are satisfied                       │
-│  - Wake up flow: waiting → active, clear blocked fields          │
+│  Flow Resume Resolver                                            │
+│  - Automatic Unblock: remove state/blocked label                 │
+│  - Intelligent Resume: infer next label based on local refs      │
+│  - (e.g., jump to state/handoff if PR already exists)            │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Worktree Manager                                                │
-│  - When creating worktree for woken-up flow                      │
-│  - Fetch PR head branch from dependency                           │
+│  - When creating worktree for unblocked flow                     │
+│  - Fetch PR head branch from dependency                          │
 │  - Create worktree from PR branch instead of origin/main         │
-│  - Fallback to origin/main if PR fetch fails                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Components
 
-### 1. Dependency Checking in Dispatcher
+### 1. Qualify Gate (资格门)
 
 **Location**: `src/vibe3/orchestra/services/state_label_dispatch.py`
 
-**Methods**:
-- `_get_issue_dependencies(issue_number)` - Get all dependency issue numbers from `flow_issue_links`
-- `_is_dependency_satisfied(dep_issue_number)` - Check if dependency is satisfied:
-  - Issue closed → satisfied
-  - Issue has `state/done` or `state/merged` label → satisfied
-  - Issue body mentions "pull request" or "pr #" → satisfied
-  - Otherwise → not satisfied
-- `_mark_issue_waiting(issue_number, unresolved_deps)` - Mark flow as waiting:
-  - Set `flow_status = "waiting"`
-  - Set `blocked_by_issue` to first unresolved dependency
-  - Add `dependency_waiting` event to flow history
+Orchestra 在发射派发意图前执行三步校验：
+- **Step 1 (Manual)**: 检查本地 `blocked_reason`。如果有值，则保持阻塞。
+- **Step 2 (Dependency)**: 检查 `flow_issue_links`。
+  - **唯一满足判据**: GitHub `issue.state == "closed"`。
+  - 只要有任何依赖项处于 `open`，则保持阻塞。
+- **Step 3 (Unblock)**: 
+  - 本地更新：清除 `blocked_by_issue`。
+  - 远端更新：移除 `state/blocked`，同步新推断的标签。
 
-**Integration**: `collect_ready_issues()` checks dependencies before including issue in ready list.
+### 2. Intelligent Resume (智能恢复)
 
-### 2. Auto Wake-up Mechanism
+**Location**: `src/vibe3/services/flow_resume_resolver.py`
 
-**Event Definition**: `src/vibe3/domain/events/flow_lifecycle.py` - `DependencySatisfied`
-
-**Trigger**: `src/vibe3/services/pr_service.py` - After successful PR creation, `_trigger_dependency_wake_up()` publishes the event.
-
-**Handler**: `src/vibe3/domain/handlers/dependency_wake_up.py`
-
-**Handler Steps**:
-1. `_find_waiting_flows(store, dep_issue_number)` - Query `flow_state` for flows where `flow_status = 'waiting' AND blocked_by_issue = dep_issue_number`
-2. For each waiting flow:
-   - `_get_all_dependencies(store, branch)` - Get all dependency issue numbers
-   - Check **all** dependencies are satisfied
-   - If all satisfied: `_wake_up_flow()`:
-     - Set `flow_status = "active"`
-     - Clear `blocked_by_issue` and `blocked_reason`
-     - Add `dependency_wake_up` event with `source_pr` reference
-     - Update GitHub labels (remove `state/blocked`, add `state/ready`)
+当阻塞解除时，系统不再机械地回到 `state/ready`，而是根据本地现场推断目标状态：
+- 有本地 PR -> `state/handoff` (交给 Manager)
+- 有 Audit 结论 -> `state/in-progress` (需要根据审核修改)
+- 有 Report 无 Audit -> `state/review` (代码已写，待审)
+- 仅有 Plan -> `state/in-progress` (计划已定，待执行)
+- 无产物 -> `state/claimed` (重新开始)
 
 ### 3. Branch Creation from PR Source
 
 **Location**: `src/vibe3/environment/worktree.py`
 
-**Logic**: When creating a new worktree for an issue:
-1. Check flow history for `dependency_wake_up` event
-2. If found, get `source_pr` from most recent wake-up event
-3. Fetch PR info from GitHub to get `head_branch`
-4. Fetch the PR branch from origin
-5. If fetch successful: create worktree from `origin/<head_branch>` with `-b <new-branch>`
-6. If fetch fails: log warning, record `dependency_branch_fallback` event, fall back to `origin/main`
-
-**Benefits**:
-- Dependent flow always starts from the latest code of the dependency
-- Avoids merge conflicts when dependency hasn't been merged yet
-- Maintains correct dependency hierarchy in code
+当为解除阻塞的任务创建 Worktree 时：
+1. 查找历史中的 `flow_unblocked` 事件。
+2. 提取 `source_pr` 编号。
+3. 从 GitHub 获取该 PR 的 `head_branch`。
+4. 基于该分支创建新任务分支，实现“依赖继承”。
 
 ## Data Model
 
 ### Tables
 
-- `flow_state`: Added `flow_status = 'waiting'` option, uses existing `blocked_by_issue` field
-- `flow_issue_links`: Existing table, `issue_role = 'dependency'` stores dependency relationships
-- `flow_events`: Existing table, events:
-  - `dependency_waiting` - flow marked as waiting
-  - `dependency_wake_up` - flow woken up when all dependencies satisfied
-  - `dependency_branch_fallback` - fallback to main when PR fetch fails
+- `flow_state`: 移除 `waiting` 状态，统一使用 `blocked`。
+- `flow_issue_links`: `issue_role = 'dependency'` 存储物理依赖关系（真源）。
+- `flow_events`: 
+  - `flow_blocked` - 任务进入阻塞
+  - `flow_unblocked` - 依赖满足，任务恢复（带 `source_pr` 引用）
 
 ### Status Semantics
 
 | Status  | Meaning                                    | Recovery                          |
 |---------|--------------------------------------------|-----------------------------------|
-| `active`| Ready for execution                        | N/A                               |
-| `waiting`| Waiting for dependencies to be satisfied  | Auto recovery when all dependencies done |
-| `blocked`| Internal execution error                   | Manual recovery required           |
-| `failed` | Execution failed                           | Manual recovery required           |
+| `active`| 正常执行中                                  | N/A                               |
+| `blocked`| 被阻塞（手动原因或依赖未满足）                | 依赖项 Closed 后自动恢复，或人工解封 |
+| `failed` | 执行过程报错                                | 需人工处理或修复环境                |
+| `done`   | 已完成                                     | N/A                               |
 
 ## Usage
 
 ### Declaring Dependencies
 
-Add dependency relationship via `flow_issue_links`:
-
-```sql
-INSERT INTO flow_issue_links (branch, issue_number, issue_role)
-VALUES ('task/issue-100', 100, 'task');
-INSERT INTO flow_issue_links (branch, issue-100', 99, 'dependency');
+使用命令绑定依赖：
+```bash
+vibe3 flow bind <dependency-issue-id> --role dependency
 ```
-
-When orchestra collects ready issues:
-- Issue 100 will be marked `waiting` until issue 99 has PR created
-- After issue 99 creates PR → issue 100 automatically woken up
+该命令会原子化地完成：
+1. 在 `flow_issue_links` 写入依赖真源。
+2. 调用 `block_flow` 标记本地 `blocked_by_issue` 并同步 GitHub `state/blocked`。
 
 ## Fallback Behavior
 
-- **PR fetch fails**: Network error, PR branch deleted, permission error → fall back to `origin/main`, log event
-- **Partial dependencies satisfied**: Flow stays `waiting` until all dependencies done
-- **Multiple dependencies**: Only wake up when **all** dependencies are satisfied
-
-## Backward Compatibility
-
-- No database schema changes: uses existing tables and fields
-- Existing flows with `active/blocked/failed/done` are unaffected
-- Only flows with explicit dependency relationships get the new behavior
-- Disabled for flows without dependencies - behaves exactly as before
-
-## Future Enhancements
-
-Possible future extensions (not implemented in this phase):
-
-1. **Cycle detection**: Detect circular dependencies before execution starts
-2. **Dependency failure handling**: If dependency PR is closed without merge, automatically block dependent flow
-3. **CI wait option**: Optionally wait for CI pass before waking up dependent flow
-4. **Priority ordering**: Wake up dependent flows in dependency order
+- **PR 抓取失败**: 如果依赖项已 Close 但 PR 无法获取，将回退到 `origin/main` 并记录警告事件。
+- **多重依赖**: 只有当**所有**绑定的依赖 Issue 在 GitHub 上均显示为 `closed` 时，解封逻辑才会触发。

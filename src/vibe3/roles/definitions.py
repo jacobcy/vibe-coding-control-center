@@ -12,7 +12,7 @@ from vibe3.execution.session_service import SessionRole
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
-TriggerName = Literal["manager", "plan", "run", "review"]
+TriggerName = Literal["manager", "plan", "run", "review", "blocked"]
 
 
 @dataclass(frozen=True)

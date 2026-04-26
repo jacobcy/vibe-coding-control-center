@@ -3,11 +3,10 @@
 
 import json
 from contextlib import contextmanager
-from typing import Annotated, Any, Iterator
+from typing import Annotated, Iterator
 
 import typer
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
@@ -15,7 +14,8 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
-    render_task_show_with_milestone,
+    render_task_comments,
+    render_task_show,
 )
 
 app = typer.Typer(
@@ -28,78 +28,9 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def _build_github_client() -> GitHubClient:
-    """Construct a milestone service."""
-    return GitHubClient()
-
-
 def _build_resume_usecase() -> TaskResumeUsecase:
     """Construct a unified resume usecase."""
     return TaskResumeUsecase()
-
-
-def _is_human_comment(comment: dict[str, Any]) -> bool:
-    author = comment.get("author") or {}
-    login = str(author.get("login") or "").strip().lower()
-    if not login:
-        return True
-    if login == "linear" or login.endswith("[bot]"):
-        return False
-    return True
-
-
-def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict[str, Any]:
-    comments = issue.get("comments") or []
-    latest_comment = comments[-1] if comments else None
-    latest_human = next(
-        (comment for comment in reversed(comments) if _is_human_comment(comment)),
-        None,
-    )
-
-    if json_output:
-        return {
-            "issue": issue.get("number"),
-            "title": issue.get("title"),
-            "body": issue.get("body"),
-            "state": issue.get("state"),
-            "labels": [label.get("name") for label in issue.get("labels", [])],
-            "latest_comment": latest_comment,
-            "latest_human_comment": latest_human,
-        }
-
-    # Render issue body first
-    typer.echo("\nIssue Body:")
-    body = str(issue.get("body") or "").strip()
-    if body:
-        # Indent body lines for better readability
-        for line in body.split("\n"):
-            typer.echo(f"  {line}")
-    else:
-        typer.echo("  (no description)")
-
-    # Render latest comment
-    typer.echo("\nLatest Comment:")
-    if latest_comment:
-        author = (latest_comment.get("author") or {}).get("login") or "unknown"
-        typer.echo(f"  author  {author}")
-        comment_body = str(latest_comment.get("body") or "").strip()
-        for line in comment_body.split("\n"):
-            typer.echo(f"  {line}")
-    else:
-        typer.echo("  (no comments)")
-
-    # Render latest human instruction
-    typer.echo("\nLatest Human Instruction:")
-    if latest_human:
-        author = (latest_human.get("author") or {}).get("login") or "unknown"
-        typer.echo(f"  author  {author}")
-        human_body = str(latest_human.get("body") or "").strip()
-        for line in human_body.split("\n"):
-            typer.echo(f"  {line}")
-    else:
-        typer.echo("  (no human comments)")
-
-    return None
 
 
 @app.command()
@@ -107,13 +38,13 @@ def show(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
-    comments: Annotated[
-        bool, typer.Option("--comments", help="Include latest issue comments context")
-    ] = False,
 ) -> None:
-    """Show task details."""
+    """Show a quick current-task summary for humans and agents.
+
+    This command is the fast scene entry before reading handoff details or
+    entering manager/plan/executor/reviewer prompts.
+    """
     task_svc = TaskService()
-    milestone_svc = _build_github_client()
 
     try:
         target_branch = task_svc.resolve_branch(branch)
@@ -131,21 +62,14 @@ def show(
     )
     with ctx:
         task_result = task_svc.show_task(target_branch)
-
-        # Fetch milestone context if task has an issue number
-        milestone_ctx = None
         issue_number = None
         if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
 
-        if issue_number:
-            milestone_ctx = milestone_svc.get_milestone_context(issue_number)
+        render_task_show(task_result, json_output)
 
-        # Delegate rendering to UI layer
-        render_task_show_with_milestone(task_result, milestone_ctx, json_output)
-
-        if comments and issue_number:
-            task_svc = TaskService()
+        # Always show recent comments (if issue exists and not json output)
+        if issue_number and not json_output:
             issue = task_svc.fetch_issue_with_comments(issue_number)
             if issue == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
@@ -155,16 +79,7 @@ def show(
                 )
             else:
                 assert isinstance(issue, dict)
-                comments_data = _render_comments(issue, json_output)
-                if json_output and comments_data and task_result.local_task:
-                    # Merge comments into a single JSON with task data
-                    combined = task_result.local_task.model_dump()
-                    combined["comments"] = comments_data
-                    typer.echo(json.dumps(combined, indent=2, default=str))
-                elif not json_output:
-                    pass  # _render_comments already printed text
-                elif task_result.local_task:
-                    pass  # task JSON already printed; comments_data is just info
+                render_task_comments(issue)
 
 
 @app.command()
@@ -300,12 +215,12 @@ def resume(
     }
     effective_label: str | None = None
     if label is not None:
-        # --label provided
+        # --label flag is present
         if label == "":
-            # --label without value (Typer passes empty string)
-            effective_label = "handoff"
+            # --label provided without explicit value -> trigger inference in service
+            effective_label = ""
         elif label in valid_states:
-            # --label <state>
+            # --label <state> provided
             effective_label = label
         else:
             typer.echo(

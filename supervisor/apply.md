@@ -140,6 +140,10 @@ Forbidden:
 
 - 只保留一条正式结果 comment，里面包含完整结论与后续建议
 - 如果已经发布正式结果 comment，关闭 issue 时不要再附加额外 comment
+- **Marker 强制**：comment 第一行行首必须以 `[apply]` 开头（前面只允许空白），让人类指令解析器准确识别为 agent 评论
+  - 合规：`[apply] Closed: docs aligned with glossary; PR #123 merged.`
+  - 不合规：`Apply 已完成` / `已修复 [apply]`（marker 缺失或非行首）
+- 在编排链路上以 governance 身份执行的二级动作，可使用 `[governance apply]` 替代 `[apply]`，但仍须行首出现
 
 ## Stop Point
 

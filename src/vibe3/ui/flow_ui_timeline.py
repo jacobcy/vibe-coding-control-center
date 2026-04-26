@@ -1,11 +1,11 @@
 """Flow UI timeline rendering components."""
 
 from pathlib import Path
-from typing import Any
 
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
@@ -68,17 +68,6 @@ _EVENT_COLOR: dict[str, str] = {
     "codeagent_manager_aborted": "red",
 }
 
-_ARTIFACT_EVENT_TYPES = {
-    "handoff_plan",
-    "handoff_report",
-    "handoff_run",
-    "plan_recorded",
-    "run_recorded",
-    "handoff_audit",
-    "handoff_indicate",
-    "audit_recorded",
-}
-
 
 def _format_event_type(event_type: str) -> str:
     """Format event type for display with friendly names.
@@ -105,44 +94,6 @@ def _format_event_type(event_type: str) -> str:
         "handoff_audit_fallback": "Audit Auto-Recorded",  # backward compatibility
     }
     return display_names.get(event_type, event_type)
-
-
-def render_milestone(
-    milestone_data: "dict[str, Any]", current_issue: "int | None" = None
-) -> None:
-    from vibe3.clients.github_issues_ops import parse_blocked_by
-
-    ms_title = milestone_data["title"]
-    open_count = int(milestone_data.get("open", 0))
-    closed_count = int(milestone_data.get("closed", 0))
-    total = open_count + closed_count
-    progress = f"{closed_count}/{total} done" if total else "0 issues"
-    console.print(f"\n[bold]--- Milestone: {ms_title} [{progress}] ---[/]")
-    issues: list[dict[str, Any]] = list(milestone_data.get("issues") or [])
-    for item in sorted(issues, key=lambda x: int(x["number"])):
-        n = int(item["number"])
-        state = str(item.get("state", "open")).upper()
-        title = str(item.get("title", ""))
-        labels = [lb["name"] for lb in (item.get("labels") or [])]
-        is_blocked = "status/blocked" in labels
-        is_done = state == "CLOSED"
-
-        if is_done:
-            icon = "[green]x[/]"
-        elif is_blocked:
-            icon = "[red]![/]"
-        else:
-            icon = "[ ]"
-
-        current = "  [dim]<- this flow[/]" if n == current_issue else ""
-        console.print(f"  {icon}  [dim]#{n}[/]  {title}{current}")
-
-        if is_blocked:
-            body = str(item.get("body") or "")
-            blockers = parse_blocked_by(body)
-            if blockers:
-                blocker_str = "  ".join(f"#{b}" for b in blockers)
-                console.print(f"       [red dim]blocked by: {blocker_str}[/]")
 
 
 def _render_header(state: FlowStatusResponse, parent_branch: str | None) -> None:
@@ -227,29 +178,20 @@ def _render_event_refs(event: FlowEvent, worktree_root: str | None) -> None:
         )
         console.print(f"  [{verdict_color}]verdict: {verdict}[/]")
 
-    # Render log_path for non-artifact events
-    raw_log_path = event.refs.get("log_path")
-    log_path = raw_log_path if isinstance(raw_log_path, str) else None
-    show_log_path = bool(log_path) and event.event_type not in _ARTIFACT_EVENT_TYPES
-
-    if show_log_path:
-        log_display = resolve_ref_path(log_path, worktree_root, absolute=True)
-        _log_suffix = (
-            " [dim yellow](not found)[/]" if not Path(log_display).exists() else ""
-        )
-        console.print(f"  [dim]- {log_display}[/]{_log_suffix}")
+    # Do not render log_path for temp/logs (tmux debug logs, not actionable)
 
     # Render ref if not already in detail
     ref = event.refs.get("ref")
     detail_contains_ref = bool(
         isinstance(ref, str) and isinstance(event.detail, str) and ref in event.detail
     )
-    if ref and isinstance(ref, str) and not show_log_path and not detail_contains_ref:
-        ref_display = resolve_ref_path(ref, worktree_root, absolute=True)
+    if ref and isinstance(ref, str) and not detail_contains_ref:
+        ref_display = resolve_ref_path(ref, worktree_root)
+        ref_cmd = ref_to_handoff_cmd(ref_display, None)
         _ref_suffix = (
             " [dim yellow](not found)[/]" if not Path(ref_display).exists() else ""
         )
-        console.print(f"  [dim]- {ref_display}[/]{_ref_suffix}")
+        console.print(f"  [dim]- {ref_cmd}[/]{_ref_suffix}")
 
 
 def _render_timeline(events: list[FlowEvent], worktree_root: str | None) -> None:
@@ -287,11 +229,12 @@ def _render_refs(state: FlowStatusResponse) -> None:
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
-            display_val = resolve_ref_path(val, state.worktree_root, absolute=True)
+            display_val = resolve_ref_path(val, state.worktree_root)
+            ref_cmd = ref_to_handoff_cmd(display_val, state.branch)
             _missing = (
                 " [dim yellow](not found)[/]" if not Path(display_val).exists() else ""
             )
-            console.print(f"  [dim]{label:10}[/]  {display_val}{actor_str}{_missing}")
+            console.print(f"  [dim]{label:10}[/]  {ref_cmd}{actor_str}{_missing}")
 
 
 def _render_state_summary(state: FlowStatusResponse) -> None:
@@ -312,7 +255,6 @@ def _render_state_summary(state: FlowStatusResponse) -> None:
 def render_flow_timeline(
     state: FlowStatusResponse,
     events: list[FlowEvent],
-    milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
 ) -> None:
     """Render complete flow timeline with header, actors, timeline, and refs."""
@@ -321,17 +263,6 @@ def render_flow_timeline(
     _render_reasons(state)
     console.print()
     _render_timeline(events, state.worktree_root)
-
-    if milestone_data:
-        ms_title = milestone_data["title"]
-        open_count = int(milestone_data.get("open", 0))
-        closed_count = int(milestone_data.get("closed", 0))
-        total = open_count + closed_count
-        progress = f"{closed_count}/{total} done" if total else "—"
-        console.print(
-            f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
-            "  [dim]→ vibe3 flow show --snapshot[/]"
-        )
 
     _render_refs(state)
     _render_state_summary(state)

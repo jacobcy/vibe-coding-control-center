@@ -1,19 +1,20 @@
 """Handoff read commands - status and artifact display."""
 
 import json
-from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
     _render_agent_chain,
     _render_handoff_events,
     _render_updates_log,
+    _to_handoff_cmd,
 )
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
@@ -26,7 +27,9 @@ from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
-def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict]:
+def _get_live_sessions_for_branch(
+    store: SQLiteClient, branch: str
+) -> list[dict[str, Any]]:
     """Return truly live runtime sessions from the registry for a given branch.
 
     This function confirms tmux liveness for each session, unlike
@@ -79,34 +82,64 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
     return updates
 
 
+_HANDOFF_SHOW_HELP = """\
+Usage: vibe3 handoff show <target> [--branch <branch>]
+
+Show a handoff artifact by target reference.
+
+Target formats:
+  @key               Shared artifact key (e.g. @task-476/run-1.md)
+  relative/path      Canonical worktree ref; requires --branch <branch>
+  /abs/path          Absolute filesystem path (debug fallback)
+
+Examples:
+  vibe3 handoff show @task-476/run-1.md
+  vibe3 handoff show --branch task/issue-476 docs/reports/audit.md
+  vibe3 handoff show /abs/path/to/artifact.md
+
+See also:
+  vibe3 handoff status          Show current flow handoff chain
+  vibe3 handoff append "<msg>"  Append a handoff record
+"""
+
+
 def show(
-    artifact: Annotated[Path, typer.Argument(help="Shared handoff artifact path")],
+    target: Annotated[
+        str | None,
+        typer.Argument(help="Handoff target: @key, relative/path, or /abs/path"),
+    ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch for canonical ref resolution"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Show a shared handoff artifact file."""
+    """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
+    from vibe3.utils.path_helpers import resolve_handoff_target
+
+    if target is None:
+        typer.echo(_HANDOFF_SHOW_HELP)
+        raise typer.Exit(0)
+
     with trace_scope(trace, "handoff show", domain="handoff"):
-        resolved_artifact = artifact
-        service = FlowService()
-
-        if not resolved_artifact.exists():
+        # Resolve numeric issue ID → canonical branch name before path lookup
+        resolved_branch: str | None = None
+        if branch is not None:
             try:
-                git_common = Path(service.get_git_common_dir())
-                if git_common:
-                    candidates = [
-                        git_common / artifact,
-                        git_common / "vibe3" / "handoff" / artifact,
-                    ]
-                    for potential in candidates:
-                        if potential.exists():
-                            resolved_artifact = potential
-                            break
-            except Exception:
-                pass
-
-        if not resolved_artifact.exists():
-            typer.echo(f"Error: artifact not found: {artifact}", err=True)
+                resolved_branch = (
+                    resolve_issue_branch_input(branch, FlowService()) or branch
+                )
+            except RuntimeError as exc:
+                typer.echo(f"Error: {exc}", err=True)
+                raise typer.Exit(1)
+        try:
+            resolved_artifact = resolve_handoff_target(
+                target, resolved_branch, git_client=GitClient()
+            )
+        except FileNotFoundError as exc:
+            typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(1)
         if not resolved_artifact.is_file():
             typer.echo(f"Error: artifact is not a file: {resolved_artifact}", err=True)
@@ -219,7 +252,9 @@ def status(
 
         console.print("[bold]--- Recent Handoff Events ---[/]")
         console.print()
-        _render_handoff_events(handoff_events, worktree_root=worktree_root)
+        _render_handoff_events(
+            handoff_events, worktree_root=worktree_root, branch=target_branch
+        )
 
         # Show current.md updates in log format
         git_dir = service.get_git_common_dir()
@@ -227,8 +262,12 @@ def status(
         current_md = handoff_dir / "current.md"
 
         console.print("[bold]--- Update Log (current.md) ---[/]")
-        current_md_display = resolve_ref_path(str(current_md))
-        console.print(f"  [dim]path[/]  {current_md_display}")
+        current_md_display = resolve_ref_path(
+            str(current_md), worktree_root=worktree_root
+        )
+        console.print(
+            f"  [dim]path[/]  {_to_handoff_cmd(current_md_display, target_branch)}"
+        )
         console.print()
 
         if current_md.exists():
@@ -238,10 +277,12 @@ def status(
 
             # Show full content hint
             console.print("[dim]---[/]")
-            console.print(f"[dim]Artifact: {current_md_display}[/]")
+            artifact_cmd = _to_handoff_cmd(current_md_display, target_branch)
+            console.print(f"[dim]Artifact: {artifact_cmd}[/]")
             console.print(
-                "[dim]Use `vibe3 handoff show <path>` "
-                "to inspect the full shared file[/]"
+                "[dim]Use `vibe3 handoff show @key` or "
+                "`vibe3 handoff show --branch <branch> <ref>` "
+                "to inspect artifacts through the unified reader[/]"
             )
         else:
             console.print(

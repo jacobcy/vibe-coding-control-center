@@ -72,8 +72,8 @@ def test_flow_bind_with_dependency_role() -> None:
             result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/demo", 218, "dependency", actor=None
+    flow_service.block_flow.assert_called_once_with(
+        "task/demo", blocked_by_issue=218, actor=None
     )
 
 

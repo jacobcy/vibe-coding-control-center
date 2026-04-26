@@ -3,28 +3,23 @@
 Pure functions for rendering agent chains, handoff events, and updates log.
 """
 
+import re
+
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
-from vibe3.utils.path_helpers import sanitize_event_detail_paths
+from vibe3.utils.constants import AUTOMATED_MARKERS
+from vibe3.utils.path_helpers import (
+    ref_to_handoff_cmd,
+    sanitize_event_detail_paths,
+)
 
 # Preview limit for update messages
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
-_HANDOFF_PREFIX = "vibe3/handoff/"
 
-
-def _to_handoff_cmd(path: str) -> str:
-    """Convert a handoff artifact path to a usable CLI command.
-
-    vibe3/handoff/task-xxx/run-yyy.md -> vibe3 handoff show task-xxx/run-yyy.md
-    Other paths are returned as-is (relative path).
-    """
-    if path.startswith(_HANDOFF_PREFIX):
-        key = path[len(_HANDOFF_PREFIX) :]
-        return f"vibe3 handoff show {key}"
-    return path
+_to_handoff_cmd = ref_to_handoff_cmd
 
 
 def _render_agent_chain(
@@ -79,6 +74,7 @@ def _render_agent_chain(
                         capture_output=True,
                         text=True,
                         check=True,
+                        timeout=10,
                     )
                     import json
 
@@ -142,7 +138,11 @@ def _render_agent_chain(
             )
 
 
-def _render_handoff_events(events: list, worktree_root: str | None = None) -> None:
+def _render_handoff_events(
+    events: list,
+    worktree_root: str | None = None,
+    branch: str | None = None,
+) -> None:
     """Render handoff events in reverse chronological order."""
     if not events:
         console.print("[dim]  no handoff events[/]")
@@ -162,24 +162,41 @@ def _render_handoff_events(events: list, worktree_root: str | None = None) -> No
     for event in reversed(events):
         time_str = event.created_at[:19].replace("T", " ")
         event_name = display_names.get(event.event_type, event.event_type)
-        console.print(
-            f"[dim]{time_str}[/]  [magenta]{event_name}[/]  [dim]{event.actor}[/]"
+
+        # Bug 9: Label manager handoffs vs human ones
+        actor_label = f"[dim]{event.actor}[/]"
+        is_manager = (
+            event.event_type == "handoff_indicate"
+            or "manager" in str(event.actor).lower()
         )
+
+        if is_manager:
+            actor_label = f"[bold yellow]\\[manager][/bold yellow] {actor_label}"
+
+        console.print(f"[dim]{time_str}[/]  [magenta]{event_name}[/]  {actor_label}")
+
         if event.detail:
             sanitized = sanitize_event_detail_paths(
                 event.detail, event.refs, worktree_root
             )
-            console.print(f"  {sanitized}")
+            # Add color for manager details if they start with marker
+            display_detail = sanitized
+            escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
+            pattern = r"^(\s*|#{1,6}\s*)(" + "|".join(escaped_markers) + ")"
+            if re.match(pattern, sanitized, re.IGNORECASE):
+                display_detail = f"[yellow]{sanitized}[/]"
+
+            console.print(f"  {display_detail}")
         if event.refs:
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:
                     display_f = resolve_ref_path(f, worktree_root)
-                    console.print(f"  [dim]- {_to_handoff_cmd(display_f)}[/]")
+                    console.print(f"  [dim]- {_to_handoff_cmd(display_f, branch)}[/]")
             ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
             if ref:
                 display_ref = resolve_ref_path(ref, worktree_root)
-                console.print(f"  [dim]- {_to_handoff_cmd(display_ref)}[/]")
+                console.print(f"  [dim]- {_to_handoff_cmd(display_ref, branch)}[/]")
         console.print()
 
 

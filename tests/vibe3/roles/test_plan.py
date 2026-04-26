@@ -200,5 +200,5 @@ def test_build_plan_prompt_retry_resume_provides_bootstrap_fallback() -> None:
     assert include_notice is False
     assert fallback_prompt is not None
     assert "policy" not in prompt.lower()
-    assert "## Output format requirements" in prompt
+    assert "handoff plan" in prompt
     assert "## Output format requirements" in fallback_prompt

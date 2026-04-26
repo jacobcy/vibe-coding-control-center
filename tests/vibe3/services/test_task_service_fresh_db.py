@@ -1,8 +1,11 @@
 """Tests for TaskService with a fresh database."""
 
+import os
+
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.task_service import TaskService
@@ -178,3 +181,40 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
     assert ("add", 467, "supervisor") in label_port.calls
     assert ("add", 467, "state/handoff") in label_port.calls
     assert ("remove", 467, "state/claimed") in label_port.calls
+
+
+def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> None:
+    """Quick view should prefer the latest valid ref, not blindly prefer audit."""
+    db_path = tmp_path / "fresh.db"
+    store = SQLiteClient(db_path=str(db_path))
+    service = TaskService(store=store)
+
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+    audit_ref = notes_dir / "audit.md"
+    report_ref = notes_dir / "report.md"
+    audit_ref.write_text("# Audit\n旧审查结论", encoding="utf-8")
+    report_ref.write_text(
+        "# Report\n最新一轮已经修好 reviewer 之前的问题",
+        encoding="utf-8",
+    )
+
+    os.utime(audit_ref, (1, 1))
+    os.utime(report_ref, (2, 2))
+
+    flow = FlowStatusResponse(
+        branch="task/issue-501",
+        flow_slug="issue-501",
+        flow_status="active",
+        task_issue_number=501,
+        report_ref="notes/report.md",
+        audit_ref="notes/audit.md",
+        worktree_root=str(tmp_path),
+    )
+
+    summary = service._show_service._select_latest_ref("task/issue-501", flow)
+
+    assert summary is not None
+    assert summary.kind == "report"
+    assert summary.ref == "notes/report.md"
+    assert "最新一轮已经修好" in summary.summary

@@ -5,10 +5,8 @@ from typing import Any
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
-from vibe3.ui.flow_ui_timeline import (  # noqa: F401
-    render_flow_timeline,
-    render_milestone,
-)
+from vibe3.ui.flow_ui_timeline import render_flow_timeline  # noqa: F401
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 
 def _render_flow_row(
@@ -17,42 +15,54 @@ def _render_flow_row(
     pr_data: dict[str, object] | None = None,
     worktree: str | None = None,
 ) -> None:
+    """Render flow row in task-status style.
+
+    Compact format:
+    - With worktree: Show issue#, title, PR, worktree on separate lines
+    - Without worktree: Show only branch and issue# (minimal)
+    """
+    has_worktree = bool(worktree)
+
+    # Line 1: Branch and state
     status_str = status_text(flow.flow_status).plain
-    console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_str})[/]")
-    kv("flow_slug", flow.flow_slug, 1)
-    task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
-    kv("task_issue", task_str, 1)
-    if title is not None:
-        kv("title", title, 1)
-    if worktree:
-        kv("worktree", worktree, 1)
-    if flow.initiated_by:
-        kv("initiated_by", flow.initiated_by, 1)
-    # Always show actor — fallback to worktree identity when flow has no signature
-    _actor, _fallback = display_actor(flow.latest_actor)
-    _suffix = " [dim](worktree)[/]" if _fallback else ""
-    kv("latest", f"{_actor}{_suffix}", 1)
+    console.print(f"  [cyan]{flow.branch}[/]  [dim]({status_str})[/]")
+
+    # Line 2: Issue and title
+    if flow.task_issue_number:
+        issue_str = f"#{flow.task_issue_number}"
+        title_str = f"  {title}" if title else ""
+        console.print(f"    [dim]issue:[/] {issue_str}{title_str}")
+
+    # Line 3: PR (if exists)
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()
-        title = str(pr_data.get("title", ""))
-        title_suffix = f"  {title}" if title else ""
+        pr_title = str(pr_data.get("title", ""))
+        title_suffix = f"  {pr_title}" if pr_title else ""
         console.print(
-            f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
+            f"    [dim]PR:[/] #{pr_data['number']}{draft_tag}"
             f"  [dim]{state}[/]{title_suffix}"
         )
-        # Remove redundant worktree display since it's already shown above
     elif flow.pr_number:
-        kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
-    if flow.latest_verdict:
+        console.print(f"    [dim]PR:[/] #{flow.pr_number}  [dim](offline)[/]")
+
+    # Line 4: Worktree (if exists)
+    if has_worktree:
+        console.print(f"    [dim]worktree:[/] {worktree}")
+
+    # Add verdict for active flows with worktree
+    if has_worktree and flow.latest_verdict:
         v = flow.latest_verdict
         color = {
             "PASS": "green",
             "MAJOR": "yellow",
             "BLOCK": "red",
         }.get(v.verdict, "cyan")
-        kv("verdict", f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]", 1)
-    console.print()
+        console.print(
+            f"    [dim]verdict:[/] [{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+        )
+
+    console.print()  # Empty line between flows
 
 
 def render_flow_created(flow: FlowStatusResponse, task_id: str | None = None) -> None:
@@ -66,7 +76,6 @@ def render_flow_status(
     status: FlowStatusResponse,
     issue_titles: dict[int, str] | None = None,
     pr_data: dict[str, Any] | None = None,
-    milestone_data: dict[str, Any] | None = None,
     parent_branch: str | None = None,
     worktree_root: str | None = None,
 ) -> None:
@@ -119,12 +128,14 @@ def render_flow_status(
         ("execute", status.executor_actor, status.report_ref),
         ("review", status.reviewer_actor, status.audit_ref),
     ):
-        ref_display = (
-            resolve_ref_path(ref, worktree_root, absolute=True) if ref else "—"
-        )
+        if ref:
+            ref_display = resolve_ref_path(ref, worktree_root)
+            ref_cmd = ref_to_handoff_cmd(ref_display, status.branch)
+        else:
+            ref_cmd = "—"
         console.print(f"  [dim]{stage}:[/]")
         kv("actor", actor or "—", 2)
-        kv("ref", ref_display, 2)
+        kv("ref", ref_cmd, 2)
     # Latest verdict — shown inline under review results
     if status.latest_verdict:
         v = status.latest_verdict
@@ -161,8 +172,6 @@ def render_flow_status(
     console.print(f"    [dim]run:[/] {status.executor_actor or '—'}")
     console.print(f"    [dim]review:[/] {status.reviewer_actor or '—'}")
 
-    if milestone_data:
-        render_milestone(milestone_data, status.task_issue_number)
     execution_statuses = [
         ("planner", status.planner_status),
         ("executor", status.executor_status),
@@ -196,16 +205,98 @@ def render_flows_status_dashboard(
     pr_map: dict[str, dict[str, object]] | None = None,
     worktree_map: dict[str, str] | None = None,
 ) -> None:
-    """flow status dashboard — YAML style with remote title and PR status."""
+    """Flow status dashboard — classified by branch type and state.
+
+    Classifies flows into categories:
+    1. Auto Tasks: task/issue-N or dev/issue-N branches (automated)
+    2. Issue Bound: Manual branches with issue binding
+    3. Manual: Manual branches without issue binding
+
+    Groups by state within each category:
+    - Active: Normal active flows
+    - Blocked: Flows with blocked_by
+    - Done/Aborted/Stale: Completed flows
+    """
+    from vibe3.services.flow_classifier import (
+        FlowCategory,
+        FlowState,
+        classify_flow,
+        get_flow_state,
+    )
+
     pr_map = pr_map or {}
     worktree_map = worktree_map or {}
+
+    # Classify and group flows
+    categorized: dict[FlowCategory, dict[FlowState, list[FlowStatusResponse]]] = {
+        FlowCategory.AUTO_TASK: {},
+        FlowCategory.ISSUE_BOUND: {},
+        FlowCategory.MANUAL: {},
+    }
+
     for flow in flows:
-        task_num = flow.task_issue_number
-        title = titles.get(task_num, "—") if task_num else "—"
-        worktree = worktree_map.get(flow.branch)
-        _render_flow_row(
-            flow, title, pr_data=pr_map.get(flow.branch), worktree=worktree
-        )
+        category = classify_flow(flow)
+        state = get_flow_state(flow)
+
+        if state not in categorized[category]:
+            categorized[category][state] = []
+
+        categorized[category][state].append(flow)
+
+    # Render by category
+    def render_category(
+        category: FlowCategory,
+        label: str,
+        state_flows: dict[FlowState, list[FlowStatusResponse]],
+    ) -> None:
+        """Render a category with state grouping."""
+        if not state_flows:
+            return
+
+        console.print(f"\n[bold]{label}[/]")
+
+        # Order states for display
+        state_order = [
+            FlowState.ACTIVE,
+            FlowState.BLOCKED,
+            FlowState.DONE,
+            FlowState.STALE,
+            FlowState.ABORTED,
+        ]
+
+        for state in state_order:
+            flows_in_state = state_flows.get(state, [])
+            if not flows_in_state:
+                continue
+
+            # State header (only if non-active or multiple states)
+            if state != FlowState.ACTIVE or len(state_flows) > 1:
+                state_label = state.value.upper()
+                console.print(f"  [dim]{state_label}:[/]")
+
+            # Render flows in this state
+            for flow in flows_in_state:
+                task_num = flow.task_issue_number
+                title = titles.get(task_num, "—") if task_num else "—"
+                worktree = worktree_map.get(flow.branch)
+                _render_flow_row(
+                    flow, title, pr_data=pr_map.get(flow.branch), worktree=worktree
+                )
+
+    # Render categories in order
+    render_category(
+        FlowCategory.AUTO_TASK,
+        "Active Tasks (automated)",
+        categorized[FlowCategory.AUTO_TASK],
+    )
+    render_category(
+        FlowCategory.ISSUE_BOUND,
+        "Issue-Bound Branches",
+        categorized[FlowCategory.ISSUE_BOUND],
+    )
+    render_category(
+        FlowCategory.MANUAL, "Manual Branches", categorized[FlowCategory.MANUAL]
+    )
 
 
 def render_error(message: str) -> None:

@@ -126,7 +126,8 @@ def test_render_flow_timeline_distinguishes_handoff_and_system_audit(capsys) -> 
     assert "Audit Auto-Recorded" in output
 
 
-def test_render_flow_status_shows_absolute_refs_for_humans(capsys) -> None:
+def test_render_flow_status_shows_handoff_commands_for_artifacts(capsys) -> None:
+    """Test that flow status shows handoff commands instead of absolute paths."""
     worktree_root = Path(tempfile.mkdtemp(prefix="vibe3-flow-ui-", dir="/tmp"))
     report_file = worktree_root / "docs" / "reports" / "issue-304-report.md"
     report_file.parent.mkdir(parents=True)
@@ -142,5 +143,9 @@ def test_render_flow_status_shows_absolute_refs_for_humans(capsys) -> None:
     render_flow_status(status, worktree_root=str(worktree_root))
 
     output = capsys.readouterr().out
-    assert str(worktree_root) in output
-    assert "issue-304-report.md" in output
+    # Should show handoff command, not absolute path
+    assert "vibe3 handoff show" in output
+    assert "--branch task/issue-304" in output
+    assert "docs/reports/issue-304-report.md" in output
+    # Should NOT show absolute path
+    assert str(worktree_root) not in output
