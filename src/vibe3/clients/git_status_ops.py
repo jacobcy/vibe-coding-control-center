@@ -150,8 +150,8 @@ def get_untracked_files(run: Callable[[list[str]], str]) -> list[str]:
 
 def _get_commit_files(run: Callable[[list[str]], str], sha: str) -> list[str]:
     """获取指定 commit 的改动文件."""
-    output = run(["diff-tree", "--no-commit-id", "-r", "--name-only", sha])
-    return [f for f in output.splitlines() if f.strip()]
+    output = run(["diff-tree", "--no-commit-id", "-r", "--name-only", "-m", sha])
+    return sorted(set(f for f in output.splitlines() if f.strip()))
 
 
 def _get_branch_files(
