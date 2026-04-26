@@ -90,17 +90,24 @@ def render_task_show(
         console.print("Summary:")
         console.print(latest_ref.summary)
 
-    instruction = task_result.latest_human_instruction or task_result.latest_comment
-    if instruction:
-        label = (
-            "Latest Instruction"
-            if task_result.latest_human_instruction is not None
-            else "Latest Comment"
-        )
-        console.print(f"\n[bold]{label}[/]")
+    # Only show human instructions; automated comments are filtered out
+    if task_result.latest_human_instruction:
+        instruction = task_result.latest_human_instruction
+        console.print("\n[bold]Latest Instruction[/]")
         console.print(f"Author:  {instruction.author}")
         console.print("Summary:")
         console.print(instruction.body)
+    elif task_result.latest_comment:
+        # No human instructions found, show informational message
+        console.print("\n[bold dim]Latest Comment (Automated)[/]")
+        console.print("[dim]No human instructions found in issue comments.[/]")
+        console.print(f"[dim]Author:  {task_result.latest_comment.author}[/]")
+        console.print("[dim]Summary:[/]")
+        # Truncate automated comment to avoid cluttering output
+        truncated_body = task_result.latest_comment.body[:200]
+        if len(task_result.latest_comment.body) > 200:
+            truncated_body += "..."
+        console.print(f"[dim]{truncated_body}[/]")
 
     if task_result.pr_summary:
         pr = task_result.pr_summary

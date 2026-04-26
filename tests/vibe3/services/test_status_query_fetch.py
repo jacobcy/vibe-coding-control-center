@@ -64,8 +64,12 @@ class TestStatusQueryServiceFetch:
         assert result[2]["number"] == 372
         assert result[2]["state"] == IssueState.BLOCKED
 
-    def test_fetch_orchestrated_issues_filters_done_state(self) -> None:
-        """Service should exclude issues in done state."""
+    def test_fetch_orchestrated_issues_includes_done_state(self) -> None:
+        """Service should include issues in done state for PR section.
+
+        Note: DONE state filtering moved to UI layer (see f7935e78).
+        This allows flows with PRs to be shown in task status dashboard.
+        """
         github = MagicMock()
         github.list_issues.return_value = [
             {"number": 100, "title": "Done issue", "labels": [{"name": "state/done"}]},
@@ -82,8 +86,11 @@ class TestStatusQueryServiceFetch:
         service = StatusQueryService(github_client=github, git_client=git)
         result = service.fetch_orchestrated_issues([], queued_set=set())
 
-        assert len(result) == 1
-        assert result[0]["number"] == 200
+        # Both issues should be included (DONE filtering happens at UI layer)
+        assert len(result) == 2
+        # READY issues are sorted first, then other issues by priority
+        assert result[0]["number"] == 200  # Ready issue (READY comes first)
+        assert result[1]["number"] == 100  # Done issue (after READY)
 
     def test_fetch_orchestrated_issues_handles_github_error(self) -> None:
         """Service should handle GitHub API errors gracefully."""

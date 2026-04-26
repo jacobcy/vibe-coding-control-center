@@ -111,6 +111,18 @@ def build_manager_request(
 
     refs = {"issue_title": issue.title}
     env = dict(os.environ)
+
+    # Inject manager-specific token if configured (Phase 4)
+    if config.assignee_dispatch.token_env:
+        manager_token = os.getenv(config.assignee_dispatch.token_env)
+        if manager_token:
+            env["GH_TOKEN"] = manager_token
+            token_env_name = config.assignee_dispatch.token_env
+            logger.bind(domain="manager", issue_number=issue.number).info(
+                f"Using manager-specific token from {token_env_name}"
+            )
+
+    # Inject manager backend/model if not already set
     if not env.get("VIBE3_MANAGER_BACKEND"):
         from vibe3.config.settings import VibeConfig
         from vibe3.execution.agent_resolver import resolve_manager_agent_options

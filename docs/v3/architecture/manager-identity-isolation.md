@@ -94,107 +94,31 @@ check_manager_token() {
 
 ---
 
-### Phase 2: GitHubClient Token Injection (V3 Layer)
+### Phase 2: GitHubClient Token Injection (V3 Layer) — **NOT NEEDED**
 
-**Objective**: Enable optional token injection while preserving backward compatibility.
+**Initial Design (Over-engineered)**:
+We initially planned to add token parameter to GitHubClient and migrate all subprocess.run calls.
 
-#### Step 2.1: GitHubClient Optional Token Parameter
+**Actual Design (Simplified)**:
+- ❌ No changes needed to GitHubClient
+- ❌ No need to migrate subprocess.run calls
+- ✅ Token injection happens at execution layer via environment variables
 
-**File**: `src/vibe3/clients/github_client_base.py`
+**Why This Works**:
+1. `ExecutionRequest.env` already supports environment variable injection
+2. tmux session automatically inherits environment variables from parent process
+3. `subprocess.run(["gh", ...])` automatically uses `GH_TOKEN` from environment
+4. No client code changes required — Unix process inheritance does the work
 
-```python
-import os
-import subprocess
-from typing import Any
-
-from loguru import logger
-
-from vibe3.exceptions import GitHubError, UserError
-
-
-class GitHubClientBase:
-    """Base class for GitHub client operations."""
-
-    def __init__(self, token: str | None = None):
-        """
-        Initialize GitHub client with optional token override.
-
-        Args:
-            token: Optional explicit token. If None, uses GH_TOKEN from environment.
-                   This preserves backward compatibility: existing GitHubClient() calls
-                   continue to use global GH_TOKEN.
-
-        Design:
-            - Backward compatible: GitHubClient() works as before
-            - Opt-in injection: GitHubClient(token="...") for role-specific tokens
-            - Fallback chain: explicit token → GH_TOKEN → GITHUB_TOKEN
-        """
-        self._explicit_token = token
-
-    def _get_effective_token(self) -> str | None:
-        """Get the effective token following fallback chain."""
-        if self._explicit_token is not None:
-            return self._explicit_token
-        return os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN")
-
-    def _run_gh(self, args: list[str], **kwargs: Any) -> subprocess.CompletedProcess:
-        """Run gh CLI with token injection.
-
-        All gh commands should use this method instead of direct subprocess.run(["gh", ...]).
-        This ensures the explicit token (if provided) is injected into GH_TOKEN environment variable.
-        """
-        env = os.environ.copy()
-        token = self._get_effective_token()
-        if token:
-            env["GH_TOKEN"] = token
-
-        return subprocess.run(["gh"] + args, env=env, **kwargs)
-
-    def check_auth(self) -> bool:
-        """Check if authenticated to GitHub."""
-        try:
-            result = self._run_gh(["auth", "status"], capture_output=True, text=True)
-            return result.returncode == 0
-        except Exception:
-            logger.bind(external="github", operation="check_auth").error(
-                "Failed to check auth"
-            )
-            return False
-
-    def get_current_user(self) -> str:
-        """Get current authenticated user login name."""
-        try:
-            result = self._run_gh(
-                ["api", "user", "-q", ".login"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            error_msg = (e.stderr or str(e)).strip()
-            raise GitHubError(
-                status_code=e.returncode,
-                message=f"Failed to get current GitHub user: {error_msg}",
-            ) from e
-
-    # ... rest of existing methods remain unchanged, but should use self._run_gh() ...
+**Key Insight**:
 ```
-
-**Migration Note**:
-- Existing `GitHubClient()` calls continue to work (backward compatible)
-- All methods using `subprocess.run(["gh", ...])` should migrate to `self._run_gh([...])`
-- This is a **non-breaking change**: no existing call sites need modification
-
-**Backward Compatibility Verification**:
-```python
-# Existing code - continues to work
-client = GitHubClient()
-user = client.get_current_user()  # Uses global GH_TOKEN
-
-# New code - role-specific token
-client = GitHubClient(token="ghp_manager_token")
-user = client.get_current_user()  # Uses manager-specific token
+ExecutionRequest.env["GH_TOKEN"] = manager_token
+    ↓
+tmux session (inherits env)
+    ↓
+subprocess.run(["gh", ...]) (uses GH_TOKEN from env)
+    ↓
+GitHubClient works transparently
 ```
 
 ---
@@ -514,24 +438,24 @@ def render_task_comments(
 - [x] Test doctor check with valid and invalid tokens
 
 ### Phase 2: Client Enhancement (Next)
-- [ ] Add optional `token` parameter to `GitHubClientBase.__init__()`
-- [ ] Migrate all `subprocess.run(["gh", ...])` to `self._run_gh([...])`
-- [ ] Verify backward compatibility: all existing `GitHubClient()` calls work
+- [x] ~~Add optional `token` parameter to `GitHubClientBase.__init__()`~~ **Not needed!**
+- [x] ~~Migrate all `subprocess.run(["gh", ...])` to `self._run_gh([...])`~~ **Not needed!**
+- [x] **Simplified design: Token injection via ExecutionRequest.env**
 
 ### Phase 3: Configuration (Parallel)
-- [ ] Add `token_env` field to `AssigneeDispatchConfig`
-- [ ] Update `config/settings.yaml` documentation
-- [ ] Test with and without token configuration
+- [x] Add `token_env` field to `AssigneeDispatchConfig`
+- [x] Update `config/settings.yaml` documentation
+- [x] Test with and without token configuration
 
 ### Phase 4: Role Isolation (Core)
-- [ ] Implement token injection in `build_manager_request()`
-- [ ] Implement dedicated client in `internal_manager_dispatch()`
-- [ ] Test manager execution with isolated token
+- [x] Implement token injection in `build_manager_request()`
+- [x] ~~Implement dedicated client in `internal_manager_dispatch()`~~ (Not needed!)
+- [x] Test manager execution with isolated token
 
 ### Phase 5: Prompt Logic (Essential)
-- [ ] Add identity filtering rules to `supervisor/manager.md`
-- [ ] Inject `VIBE3_BOT_USERNAME` in role builder
-- [ ] Test comment filtering with bot's own comments
+- [x] Filter manager bot comments in `is_human_comment()`
+- [x] Read from `config.bot_username` and `config.manager_usernames`
+- [x] Test comment filtering with bot's own comments
 
 ### Phase 6: UI Polish (Optional)
 - [ ] Implement `render_task_comments()` with bot filtering
@@ -684,8 +608,8 @@ governance_client = GitHubClient(token=governance_token, rate_limit=100/hour)
 
 ### Key Design Decisions
 
-1. **Minimal Changes**: Optional token parameter in `GitHubClient`, backward compatible
-2. **Role-Level Injection**: Token injection happens in role builders, not coordinator
+1. **No Client Changes**: GitHubClient remains unchanged — token injection via environment variables
+2. **Role-Level Injection**: Token injection happens in role builders via `ExecutionRequest.env`
 3. **V2/V3 Separation**: V2 handles key management, V3 handles business logic
 4. **Fail-Fast at Runtime**: Doctor validates permissions, execution fails fast if token invalid
 5. **Future-Proof**: Architecture supports multi-role token isolation
@@ -699,18 +623,41 @@ Leverage Existing V2/V3 Architecture
   │   └── vibe doctor: permission validation
   │
   └── V3 (Python): Business Logic
-      ├── GitHubClient: optional token (backward compatible)
-      ├── OrchestraConfig: role-specific token_env
-      ├── Role Builders: inject token into environment
-      └── Prompt Layer: filter self-referential comments
+      ├── ExecutionRequest.env: token injection point
+      ├── tmux session: inherits environment variables
+      ├── subprocess.run: automatically uses GH_TOKEN
+      └── GitHubClient: works transparently (no changes)
+```
+
+### Implementation Phases (Simplified)
+
+```
+✅ Phase 1: V2 Infrastructure
+   - Doctor checks token permissions
+   - keys.template.env documentation
+
+❌ Phase 2: GitHubClient Changes (NOT NEEDED!)
+   - No changes required
+   - Environment variables do the work
+
+⏭️  Phase 3: Configuration Extension
+   - Add token_env field to AssigneeDispatchConfig
+
+⏭️  Phase 4: Role-Level Injection
+   - Inject env["GH_TOKEN"] in role builders
+   - ExecutionRequest.env passes to tmux
+
+⏭️  Phase 5: Prompt-Level Filtering
+   - Prevent self-referential loops
+   - Filter bot's own comments
 ```
 
 ### Next Steps
 
-1. **Implement Phase 1**: Doctor check for manager token
-2. **Implement Phase 2**: GitHubClient optional token parameter
-3. **Implement Phase 3-5**: Configuration and role injection
-4. **Test thoroughly**: Verify backward compatibility and isolation
+1. **Implement Phase 3**: Add `token_env` configuration
+2. **Implement Phase 4**: Role builder environment injection
+3. **Implement Phase 5**: Prompt comment filtering
+4. **Test thoroughly**: Verify token isolation works end-to-end
 5. **Document migration**: Provide clear user guide
 
 This architecture provides a solid foundation for role isolation while preserving existing investments and enabling future extensions.

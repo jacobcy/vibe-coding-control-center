@@ -44,6 +44,24 @@ Allowed:
 - `code`: read (质量审查时可阅读代码，但不得修改)
 - `flow.update`: 允许执行 `flow update --spec` 操作，仅用于更新 flow 的 spec_ref 元数据
 
+**Comment 格式要求**：
+
+所有 manager 发出的 issue comment **必须**包含 `[manager]` 标记，格式为：
+
+```
+[manager] <主要内容>
+```
+
+**示例**：
+- `[manager] Issue #338 Moving to Merge-Ready -> In-Progress`
+- `[manager] Plan approved, transitioning to execution`
+- `[manager] 执行 governance 建议：关闭重复 issue`
+
+**目的**：
+- 允许基础设施层过滤 manager 的评论
+- 防止 manager 误读自己的状态报告为人类指令
+- 保持 issue timeline 清晰，区分人类指令和机器报告
+
 Forbidden:
 
 - `code_write`: 任何形式的源码修改

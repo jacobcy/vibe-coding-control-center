@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse
@@ -20,12 +21,67 @@ from vibe3.utils.path_helpers import resolve_ref_path
 
 
 def is_human_comment(comment: dict[str, Any]) -> bool:
-    """Return True if the comment author is a human (not a bot or linear)."""
+    """Return True if the comment author is a human (not a bot or linear).
+
+    Filters out:
+    - Linear bot (linear)
+    - GitHub bots (login ends with [bot])
+    - Manager bot (configured in orchestra.bot_username or manager_usernames)
+    - Automated system comments (identified by [marker] prefix)
+
+    Markers that indicate automated comments:
+    - [manager]: Manager agent reports
+    - [resume]: Task resume operations
+    - [plan]: Plan phase completion
+    - [run]: Run phase completion
+    - [Orchestra]: Orchestra system messages
+    - [handoff]: Handoff operations
+
+    These markers prevent automated systems from interpreting their own
+    status reports as new human instructions.
+    """
     author = comment.get("author") or {}
     login = str(author.get("login") or "").strip().lower()
+    body = str(comment.get("body") or "")
+
     if not login:
         return True
-    return login != "linear" and not login.endswith("[bot]")
+
+    # Filter by content: automated markers indicate non-human comments
+    # These are system-generated status reports, not human instructions
+    automated_markers = [
+        "[manager]",
+        "[resume]",
+        "[plan]",
+        "[run]",
+        "[Orchestra]",
+        "[handoff]",
+    ]
+    if any(marker in body for marker in automated_markers):
+        return False
+
+    # Filter standard bots
+    if login == "linear" or login.endswith("[bot]"):
+        return False
+
+    # Filter manager bot (if configured)
+    try:
+        config = load_orchestra_config()
+
+        # Check bot_username
+        if config.bot_username and login == config.bot_username.lower():
+            return False
+
+        # Check manager_usernames list
+        if config.manager_usernames:
+            manager_logins = [u.lower() for u in config.manager_usernames]
+            if login in manager_logins:
+                return False
+    except Exception:
+        # If config load fails, continue with standard bot filtering
+        pass
+
+    return True
 
 
 @dataclass
