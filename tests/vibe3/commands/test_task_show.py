@@ -17,9 +17,11 @@ from vibe3.services.task_service import (
 runner = CliRunner(env={"NO_COLOR": "1"})
 
 
+@patch("vibe3.commands.task.render_task_comments")
 @patch("vibe3.commands.task.TaskService")
 def test_task_show_renders_quick_summary(
     mock_task_service_cls,
+    mock_render_task_comments,
 ) -> None:
     """task show should present a compact scene summary at a glance."""
     task_service = MagicMock()
@@ -56,6 +58,8 @@ def test_task_show_renders_quick_summary(
             checks="pending",
         ),
     )
+    # Mock fetch_issue_with_comments for render_task_comments
+    task_service.fetch_issue_with_comments.return_value = None
     mock_task_service_cls.return_value = task_service
 
     result = runner.invoke(app, ["task", "show"])
@@ -66,8 +70,7 @@ def test_task_show_renders_quick_summary(
     assert "Task:   #123  Task show quick summary" in output
     assert "Latest Work" in output
     assert "notes/report.md" in output
-    assert "Latest Instruction" in output
-    assert "alice" in output
+    # Comments section removed (now shown via render_task_comments by default)
     assert "PR / CI" in output
     assert "#479" in output
     assert "pending" in output
@@ -121,11 +124,11 @@ def test_task_show_json_includes_summary_fields(
 
 @patch("vibe3.commands.task.render_task_comments")
 @patch("vibe3.commands.task.TaskService")
-def test_task_show_comments_focuses_on_comments_only(
+def test_task_show_always_renders_comments(
     mock_task_service_cls,
     mock_render_task_comments,
 ) -> None:
-    """task show --comments should reuse the summary and then render comments only."""
+    """task show should always render comments (no --comments flag needed)."""
     issue_payload = {
         "number": 123,
         "title": "Task show quick summary",
@@ -152,7 +155,7 @@ def test_task_show_comments_focuses_on_comments_only(
     task_service.fetch_issue_with_comments.return_value = issue_payload
     mock_task_service_cls.return_value = task_service
 
-    result = runner.invoke(app, ["task", "show", "--comments"])
+    result = runner.invoke(app, ["task", "show"])
 
     assert result.exit_code == 0
     mock_render_task_comments.assert_called_once_with(issue_payload)

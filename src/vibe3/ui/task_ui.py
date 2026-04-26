@@ -3,7 +3,6 @@
 import json
 from typing import TYPE_CHECKING
 
-from vibe3.services.task_service import is_human_comment
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils.path_helpers import ref_to_handoff_cmd
@@ -90,24 +89,8 @@ def render_task_show(
         console.print("Summary:")
         console.print(latest_ref.summary)
 
-    # Only show human instructions; automated comments are filtered out
-    if task_result.latest_human_instruction:
-        instruction = task_result.latest_human_instruction
-        console.print("\n[bold]Latest Instruction[/]")
-        console.print(f"Author:  {instruction.author}")
-        console.print("Summary:")
-        console.print(instruction.body)
-    elif task_result.latest_comment:
-        # No human instructions found, show informational message
-        console.print("\n[bold dim]Latest Comment (Automated)[/]")
-        console.print("[dim]No human instructions found in issue comments.[/]")
-        console.print(f"[dim]Author:  {task_result.latest_comment.author}[/]")
-        console.print("[dim]Summary:[/]")
-        # Truncate automated comment to avoid cluttering output
-        truncated_body = task_result.latest_comment.body[:200]
-        if len(task_result.latest_comment.body) > 200:
-            truncated_body += "..."
-        console.print(f"[dim]{truncated_body}[/]")
+    # Comments will be shown via render_task_comments(), not here
+    # Removed: Latest Instruction/Comment section (consolidated into comments view)
 
     if task_result.pr_summary:
         pr = task_result.pr_summary
@@ -119,36 +102,60 @@ def render_task_show(
         console.print(f"URL:     {pr.url}")
 
 
-def render_task_comments(issue: dict[str, object]) -> None:
-    """Render full latest comments for comment-focused inspection."""
+def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> None:
+    """Render last N comments with human/agent labels.
+
+    Args:
+        issue: Issue dict with comments
+        max_comments: Maximum number of recent comments to show (default 3)
+    """
     comments = issue.get("comments") or []
     if not isinstance(comments, list):
         comments = []
 
-    latest_comment = comments[-1] if comments else None
-    latest_human = next(
-        (
-            comment
-            for comment in reversed(comments)
-            if isinstance(comment, dict) and is_human_comment(comment)
-        ),
-        None,
+    if not comments:
+        console.print("\n[dim]No comments found.[/]")
+        return
+
+    # Get last N comments
+    recent_comments = (
+        comments[-max_comments:] if len(comments) > max_comments else comments
     )
 
-    console.print("\n[bold]Latest Comment[/]")
-    if isinstance(latest_comment, dict):
-        author = str((latest_comment.get("author") or {}).get("login") or "unknown")
-        console.print(f"Author:  {author}")
-        body = str(latest_comment.get("body") or "").strip()
-        console.print(body or "(empty)")
-    else:
-        console.print("(no comments)")
+    total = len(comments)
+    shown = len(recent_comments)
+    console.print(f"\n[bold]Recent Comments (last {shown} of {total})[/]\n")
 
-    console.print("\n[bold]Latest Human Instruction[/]")
-    if isinstance(latest_human, dict):
-        author = str((latest_human.get("author") or {}).get("login") or "unknown")
-        console.print(f"Author:  {author}")
-        body = str(latest_human.get("body") or "").strip()
-        console.print(body or "(empty)")
-    else:
-        console.print("(no human comments)")
+    for comment in recent_comments:
+        if not isinstance(comment, dict):
+            continue
+
+        body = str(comment.get("body") or "").strip()
+
+        # Find automation marker if present
+        marker = None
+        markers = [
+            "[manager]",
+            "[resume]",
+            "[plan]",
+            "[run]",
+            "[Orchestra]",
+            "[handoff]",
+        ]
+        for m in markers:
+            if m in body:
+                marker = m
+                break
+
+        # Display with label (only for automated comments)
+        if marker:
+            label = marker.strip("[]")
+            console.print(f"[bold yellow]\\[{label}][/bold yellow]")
+        # No label for human comments (no author to avoid confusion)
+
+        # Truncate long comments
+        if len(body) > 300:
+            body = body[:300] + "..."
+
+        console.print(body)
+        console.print()  # Empty line between comments
