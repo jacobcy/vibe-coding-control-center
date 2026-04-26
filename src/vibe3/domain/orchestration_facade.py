@@ -12,11 +12,13 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
+from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
@@ -43,6 +45,7 @@ class OrchestrationFacade(ServiceBase):
     def __init__(
         self,
         tick_count: int = 0,
+        config: OrchestraConfig | None = None,
         dispatch_services: list[StateLabelDispatchService] | None = None,
         capacity: CapacityService | None = None,
         failed_gate: "FailedGate | None" = None,
@@ -51,6 +54,8 @@ class OrchestrationFacade(ServiceBase):
 
         Args:
             tick_count: Initial tick count for governance scan tracking
+            config: Runtime orchestra config. When omitted, falls back to
+                settings-based defaults for tests and direct construction.
             dispatch_services: Optional list of issue-polling dispatch services
                 (StateLabelDispatchService instances). When provided, their
                 on_tick() methods are called concurrently from this facade's
@@ -60,12 +65,12 @@ class OrchestrationFacade(ServiceBase):
                 When provided, GlobalDispatchCoordinator is used for unified
                 dispatch with capacity checks before emitting intents.
                 When None, legacy concurrent gather path is used (backward compat).
-            failed_gate: Optional FailedGate to check if dispatch is frozen.
-                When provided, on_tick() checks gate before dispatch but
-                always reconciles in-flight markers to prevent capacity deadlock.
+            failed_gate: Optional FailedGate retained for compatibility with
+                existing server assembly. Runtime dispatch is no longer frozen
+                here; gating belongs on the authoritative sync execution path.
         """
         self._tick_count = tick_count
-        self._config = OrchestraConfig.from_settings()
+        self._config = config or load_orchestra_config()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
         self._dispatch_services = list(dispatch_services or [])
@@ -108,10 +113,9 @@ class OrchestrationFacade(ServiceBase):
                 "Both dispatch_services and capacity must be provided at init time."
             )
 
-        # ✅ Always reconcile in-flight markers to prevent capacity deadlock
-        # This must happen even when failed_gate is frozen
+        # Always reconcile session state to prevent stale capacity tracking.
         if self._capacity:
-            # First reconcile session state (mark dead tmux sessions as orphaned)
+            # Reconcile session state (mark dead tmux sessions as orphaned)
             # This ensures count_live_worker_sessions() returns accurate results.
             from vibe3.environment.session_registry import SessionRegistryService
 
@@ -120,21 +124,26 @@ class OrchestrationFacade(ServiceBase):
             registry = SessionRegistryService(store, backend)
             registry.reconcile_live_state()
 
-            # Then reconcile in-flight markers
-            self._capacity.reconcile_in_flight()
-
-        # Check if dispatch is frozen by failed gate
-        if self._failed_gate:
+        if self._failed_gate is not None:
             gate_result = self._failed_gate.check()
             if gate_result.blocked:
+                issue_part = (
+                    f" issue=#{gate_result.issue_number}"
+                    if gate_result.issue_number is not None
+                    else ""
+                )
+                reason_part = (
+                    f" reason={gate_result.reason}" if gate_result.reason else ""
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"dispatch blocked by failed gate:{issue_part}{reason_part}",
+                )
                 logger.bind(
                     domain="orchestration_facade",
-                    action="dispatch_frozen",
-                    issue=gate_result.issue_number,
-                ).info(
-                    f"Dispatch frozen by state/failed issue "
-                    f"#{gate_result.issue_number}, skipping collection and dispatch"
-                )
+                    issue_number=gate_result.issue_number,
+                    reason=gate_result.reason,
+                ).warning("Dispatch blocked by failed gate")
                 return
 
         await self._coordinator.coordinate()

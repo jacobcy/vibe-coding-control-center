@@ -1,5 +1,9 @@
 """Unified exception hierarchy for Vibe 3.0."""
 
+from __future__ import annotations
+
+from pathlib import Path
+
 
 class VibeError(Exception):
     """Base exception for all Vibe errors.
@@ -88,7 +92,9 @@ class SystemError(VibeError):
 class AgentExecutionError(SystemError):
     """Agent execution failed (wrapper/API/backend error)."""
 
-    pass
+    def __init__(self, message: str, log_path: Path | None = None) -> None:
+        super().__init__(message)
+        self.log_path: Path | None = log_path
 
 
 class ModelsJsonSyncError(SystemError):

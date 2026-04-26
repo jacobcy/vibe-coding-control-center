@@ -1,10 +1,13 @@
 """Unified execution coordinator."""
 
 import os
+import re
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Generator, Optional
 
 from loguru import logger
+from typer import echo
 
 from vibe3.agents.backends.async_launcher import start_async_command
 from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -12,10 +15,12 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.capacity_service import CapacityService
+from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
-from vibe3.execution.execution_lifecycle import ExecutionLifecycleService
+from vibe3.execution.execution_lifecycle import execution_prefix
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.logging import append_orchestra_event
 
 
 class ExecutionCoordinator:
@@ -27,14 +32,12 @@ class ExecutionCoordinator:
         store: SQLiteClient,
         backend: Optional[CodeagentBackend] = None,
         capacity: Optional[CapacityService] = None,
-        lifecycle: Optional[ExecutionLifecycleService] = None,
     ) -> None:
         """Initialize the execution coordinator."""
         self.config = config
         self.store = store
         self.backend = backend or CodeagentBackend()
         self.capacity = capacity or CapacityService(config, store, self.backend)
-        self.lifecycle = lifecycle or ExecutionLifecycleService(store)
         self.registry = SessionRegistryService(store, self.backend)
 
     def _resolve_cwd(self, request: ExecutionRequest) -> Optional[Path]:
@@ -99,8 +102,52 @@ class ExecutionCoordinator:
         )
         return ctx.path
 
+    @staticmethod
+    def _resolve_runtime_target(request: ExecutionRequest) -> tuple[str, str]:
+        """Map an execution request to runtime-session target identifiers."""
+        target_branch = request.target_branch or ""
+        target_id = str(request.target_id)
+        if target_branch.startswith("task/issue-") or target_branch.startswith(
+            "issue-"
+        ):
+            return ("issue", target_id)
+        return ("branch", target_branch or target_id)
+
+    @staticmethod
+    @contextmanager
+    def _without_async_child_marker(enabled: bool) -> Generator[None, None, None]:
+        """Keep the async-child marker scoped to outer coordinator logic only."""
+        if not enabled:
+            yield
+            return
+
+        previous = os.environ.pop("VIBE3_ASYNC_CHILD", None)
+        try:
+            yield
+        finally:
+            if previous is not None:
+                os.environ["VIBE3_ASYNC_CHILD"] = previous
+
     def dispatch_execution(self, request: ExecutionRequest) -> ExecutionLaunchResult:
-        """Dispatch an execution request."""
+        """Dispatch an execution request.
+
+        Two dispatch modes:
+
+        Container-inside (sync): All roles run through
+        CodeagentExecutionService, which handles handoff,
+        pre-gate callbacks, gate, and lifecycle uniformly.
+
+        Container-outside (async): Launches a tmux session and returns
+        immediately. The tmux child then re-enters the same sync shell.
+        `VIBE3_ASYNC_CHILD` is scoped to the outer wrapper guards only.
+        Coordinator may record a tmux-start checkpoint, but it does not own
+        execution lifecycle.
+
+        Simple dispatch model:
+        1. Check capacity -> skip if full
+        2. Reserve runtime_session for async wrappers
+        3. Launch execution
+        """
         logger.bind(
             domain="execution_coordinator",
             role=request.role,
@@ -116,86 +163,67 @@ class ExecutionCoordinator:
         is_async_child_sync = request.mode == "sync" and (
             os.environ.get("VIBE3_ASYNC_CHILD") == "1"
         )
+        runtime_session_id: int | None = None
 
-        # 0. Check for existing truly live session (starting or running with live tmux)
-        # to prevent duplicate launches if multiple dispatchers fire concurrently.
-        if request.target_branch and not is_async_child_sync:
-            live_sessions = self.registry.get_truly_live_sessions_for_target(
-                role=request.role,
-                branch=request.target_branch,
-                target_id=str(request.target_id),
-            )
-            if live_sessions:
-                # If it's a manager role and we are in async mode (standard dispatch),
-                # we are more strict unless all sessions are in 'starting' state
-                # for too long, but for now we just block to prevent double-manager.
-                #
-                # Exception: if all live sessions found are NOT actually running
-                # in tmux (get_truly_live already checks this, but we double-verify),
-                # we could theoretically allow it.
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                    branch=request.target_branch,
-                ).info(f"Already running for {request.role}, skipping duplicate")
-                return ExecutionLaunchResult(
-                    launched=False,
-                    skipped=True,
-                    reason=f"Execution already running for {request.role}",
-                    reason_code="already_running",
-                )
-
-        # 1. Check capacity and claim the slot.
+        # 1. Check capacity
         # Async child sync: outer wrapper already reserved capacity and registered
         # the runtime_session; child must not re-check or it double-counts itself.
-        if is_async_child_sync:
-            pre_authorized = True
-        else:
-            pre_authorized = self.capacity.is_in_flight(request.role, request.target_id)
-            if pre_authorized:
-                if not self.capacity.mark_launching(request.role, request.target_id):
+        if not is_async_child_sync:
+            if not self.capacity.can_dispatch(request.role):
+                return ExecutionLaunchResult(
+                    launched=False,
+                    reason=f"Capacity full for {request.role}",
+                    reason_code="capacity_full",
+                )
+
+            # 1b. Dispatch dedup: skip if a live session already exists for
+            # the same role + branch + target. This prevents the same issue
+            # from spawning concurrent duplicate executions.
+            if request.target_branch:
+                target_type, runtime_target_id = self._resolve_runtime_target(request)
+                live = self.registry.get_truly_live_sessions_for_target(
+                    role=request.role,
+                    branch=request.target_branch,
+                    target_id=runtime_target_id,
+                )
+                if live:
                     logger.bind(
                         domain="execution_coordinator",
                         role=request.role,
-                        target_id=request.target_id,
-                    ).info(f"Already launching for {request.role}, skipping duplicate")
+                        target_branch=request.target_branch,
+                        target_id=runtime_target_id,
+                        live_count=len(live),
+                    ).info(
+                        f"Skipping duplicate dispatch for {request.role} "
+                        f"on {request.target_branch}"
+                    )
                     return ExecutionLaunchResult(
                         launched=False,
-                        skipped=True,
-                        reason=f"Execution already launching for {request.role}",
-                        reason_code="already_launching",
+                        reason=(
+                            f"Live session already exists for "
+                            f"{request.role}/{request.target_branch}"
+                        ),
+                        reason_code="duplicate_dispatch",
                     )
-            else:
-                if not self.capacity.can_dispatch(request.role, request.target_id):
-                    return ExecutionLaunchResult(
-                        launched=False,
-                        reason=f"Capacity full for {request.role}",
-                        reason_code="capacity_full",
-                    )
-                self.capacity.mark_launching(request.role, request.target_id)
-
-        # 2. Slot is now claimed as 'launching'.
-        # Whether to prune the in-flight marker at the end of this call.
-        # For a successful async launch we MUST keep the marker — the tmux
-        # session hasn't yet registered with the tmux server when start_async
-        # returns, so count_live_worker_sessions will not see it as live.
-        # Pruning here would create a capacity hole that lets the next tick
-        # over-dispatch. reconcile_in_flight() cleans the marker in the
-        # subsequent tick once the session is truly live in SQLite+tmux.
-        #
-        # For sync, launch failures, and exceptions we DO prune immediately:
-        # the session is either completed (no longer live) or was never
-        # registered, so reconcile_in_flight cannot recover it.
-        should_prune = True
 
         try:
-            # 4. Launch
+            # 2. Launch
             cwd_path = self._resolve_cwd(request)
             env = request.env or dict(os.environ)
 
-            # Ensure we launch async
+            # Launch async
             if request.mode == "async":
+                if request.target_branch:
+                    target_type, runtime_target_id = self._resolve_runtime_target(
+                        request
+                    )
+                    runtime_session_id = self.registry.reserve(
+                        role=request.role,
+                        target_type=target_type,
+                        target_id=runtime_target_id,
+                        branch=request.target_branch,
+                    )
+
                 if request.cmd:
                     handle = start_async_command(
                         request.cmd,
@@ -207,6 +235,14 @@ class ExecutionCoordinator:
                     keep_alive = int(request.refs.get("keep_alive_seconds", "0"))
                     task = request.refs.get("task")
                     session_id = request.refs.get("session_id")
+
+                    # Print execution marker before async execution
+                    # This marker is used to filter out uv installation noise
+                    backend_info = (
+                        request.options.backend or request.options.agent or "agent"
+                    )
+                    echo(f"-> Executing with {backend_info}...")
+
                     handle = self.backend.start_async(
                         prompt=request.prompt,
                         options=request.options,
@@ -223,18 +259,24 @@ class ExecutionCoordinator:
                 tmux_session = handle.tmux_session
                 log_path = str(handle.log_path)
 
-                refs = dict(request.refs)
-                refs["tmux_session"] = tmux_session
-                refs["log_path"] = log_path
+                if runtime_session_id is not None:
+                    self.registry.mark_started(
+                        runtime_session_id,
+                        tmux_session=tmux_session,
+                        log_path=log_path,
+                    )
 
-                # 5. Record started (which handles session registry)
-                # Type ignore because ExecutionRole is a Literal constraint
-                self.lifecycle.record_started(
-                    role=request.role,  # type: ignore[arg-type]
-                    target=request.target_branch,
-                    actor=request.actor,
-                    refs=refs,
-                )
+                if request.target_branch:
+                    checkpoint_refs = dict(request.refs)
+                    checkpoint_refs["tmux_session"] = tmux_session
+                    checkpoint_refs["log_path"] = log_path
+                    self.store.add_event(
+                        request.target_branch,
+                        f"tmux_{execution_prefix(request.role)}_started",  # type: ignore[arg-type]
+                        request.actor,
+                        detail=f"{request.role.capitalize()} tmux wrapper started",
+                        refs=checkpoint_refs,
+                    )
 
                 logger.bind(
                     domain="execution_coordinator",
@@ -243,10 +285,6 @@ class ExecutionCoordinator:
                     tmux_session=tmux_session,
                 ).success(f"Execution launched for {request.role}")
 
-                # Async launch succeeded — keep in-flight marker so capacity
-                # stays reserved until the tmux session becomes observable.
-                # reconcile_in_flight() in the next tick will prune it.
-                should_prune = False
                 return ExecutionLaunchResult(
                     launched=True,
                     tmux_session=tmux_session,
@@ -257,135 +295,59 @@ class ExecutionCoordinator:
                 if not request.prompt or request.options is None:
                     raise ValueError("Sync execution requires prompt and options")
 
-                task = request.refs.get("task")
-
-                # 5. Record started
-                # For async child sync, the outer wrapper already registered
-                # the runtime_session, so the child should not create a duplicate.
-                if not is_async_child_sync:
-                    self.lifecycle.record_started(
-                        role=request.role,  # type: ignore[arg-type]
-                        target=request.target_branch,
-                        actor=request.actor,
-                        refs=request.refs,
-                    )
-
-                logger.bind(
-                    domain="execution_coordinator",
-                    role=request.role,
-                    target_id=request.target_id,
-                ).info(f"Execution started for {request.role} (sync)")
-
-                # Execute sync
-                try:
-                    result = self.backend.run(
-                        prompt=request.prompt,
-                        options=request.options,
-                        task=task,
-                        dry_run=request.dry_run,
-                        session_id=request.refs.get("session_id"),
+                with self._without_async_child_marker(is_async_child_sync):
+                    result = CodeagentExecutionService().execute_sync_request(
+                        request,
                         cwd=cwd_path,
                     )
-
-                    if result.is_success():
-                        self.lifecycle.record_completed(
-                            role=request.role,  # type: ignore[arg-type]
-                            target=request.target_branch,
-                            actor=request.actor,
-                            detail=f"Execution completed for {request.role}",
-                            refs=request.refs,
-                        )
-                        logger.bind(
-                            domain="execution_coordinator",
-                            role=request.role,
-                            target_id=request.target_id,
-                        ).success(f"Execution completed for {request.role} (sync)")
-
-                        return ExecutionLaunchResult(
-                            launched=True,
-                            stdout=result.stdout,  # Pass stdout for sync mode
-                        )
-                    else:
-                        error_msg = getattr(result, "stderr", "") or "Execution failed"
-                        self.lifecycle.record_failed(
-                            role=request.role,  # type: ignore[arg-type]
-                            target=request.target_branch,
-                            actor=request.actor,
-                            error=error_msg,
-                            refs=request.refs,
-                        )
-                        logger.bind(
-                            domain="execution_coordinator",
-                            role=request.role,
-                            target_id=request.target_id,
-                        ).warning(
-                            f"Execution failed for {request.role} (sync): {error_msg}"
-                        )
-
-                        return ExecutionLaunchResult(
-                            launched=False,
-                            reason=error_msg,
-                            reason_code="launch_failed",
-                        )
-                except Exception as run_exc:
-                    self.lifecycle.record_failed(
-                        role=request.role,  # type: ignore[arg-type]
-                        target=request.target_branch,
-                        actor=request.actor,
-                        error=str(run_exc),
-                        refs=request.refs,
-                    )
-                    logger.bind(
-                        domain="execution_coordinator",
-                        role=request.role,
-                        target_id=request.target_id,
-                    ).error(f"Execution threw for {request.role} (sync): {run_exc}")
-
+                if result.success:
                     return ExecutionLaunchResult(
-                        launched=False,
-                        reason=str(run_exc),
-                        reason_code="launch_failed",
+                        launched=True,
+                        stdout=result.stdout,
                     )
+                error_msg = result.stderr or "Execution failed"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{request.role} sync execution failed for #{request.target_id}: "
+                    f"{error_msg}",
+                )
+                return ExecutionLaunchResult(
+                    launched=False,
+                    reason=error_msg,
+                    reason_code="launch_failed",
+                )
             else:
                 raise ValueError(f"Unknown mode: {request.mode}")
 
         except Exception as exc:
+            error_msg = self._format_launch_error(exc)
+            if request.mode == "async" and runtime_session_id is not None:
+                self.registry.mark_failed(runtime_session_id)
+            append_orchestra_event(
+                "dispatcher",
+                f"{request.role} launch failed for #{request.target_id}: {error_msg}",
+            )
             logger.bind(
                 domain="execution_coordinator",
                 role=request.role,
                 target_id=request.target_id,
-            ).error(f"Execution launch failed: {exc}")
-
-            self.lifecycle.record_failed(
-                role=request.role,  # type: ignore[arg-type]
-                target=request.target_branch,
-                actor=request.actor,
-                error=str(exc),
-                refs=request.refs,
-            )
+            ).error(f"Execution launch failed: {error_msg}")
 
             return ExecutionLaunchResult(
                 launched=False,
-                reason=str(exc),
+                reason=error_msg,
                 reason_code="launch_failed",
             )
-        finally:
-            # 6. Prune in-flight ONLY when the caller is done with this slot.
-            # For successful async launches we keep the marker — see the
-            # should_prune comment above. reconcile_in_flight will clean up
-            # on the next tick once SQLite+tmux observe the live session.
-            #
-            # For async child sync, the outer wrapper owns the in-flight marker,
-            # so the child must not prune it (would remove the outer's reservation).
-            if should_prune and not is_async_child_sync:
-                try:
-                    self.capacity.prune_in_flight(request.role, {request.target_id})
-                except Exception as prune_exc:
-                    logger.bind(
-                        domain="execution_coordinator",
-                        role=request.role,
-                        target_id=request.target_id,
-                    ).error(
-                        f"prune_in_flight failed (capacity leak possible): "
-                        f"{prune_exc}"
-                    )
+
+    @staticmethod
+    def _format_launch_error(exc: Exception) -> str:
+        """Add context for known launch-failure patterns."""
+        error_msg = str(exc)
+        match = re.search(r"Tmux session '([^']+)' already exists", error_msg)
+        if match:
+            session_name = match.group(1)
+            return (
+                f"{error_msg} (previous session still alive: {session_name}; "
+                "launch skipped to avoid duplicate worker)"
+            )
+        return error_msg

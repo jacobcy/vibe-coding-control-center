@@ -10,13 +10,18 @@ Section builders (build_plan_policy_section, etc.) remain available for direct u
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
+from vibe3.execution.prompt_meta import PromptContextMode
 from vibe3.models.plan import PlanRequest
 from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+from vibe3.prompts.manifest import PromptManifest, PromptProvider
+
+PlanPromptMode = Literal["first", "retry"]
 
 
 class PlanContextBuilderError(VibeError):
@@ -118,54 +123,106 @@ Output a structured plan in this format:
 [Optional additional context]"""
 
 
+def _plan_variant(mode: PlanPromptMode, context_mode: PromptContextMode) -> str:
+    if context_mode == "resume":
+        return f"{mode}.resume"
+    return f"{mode}.bootstrap"
+
+
+def describe_plan_sections(
+    mode: PlanPromptMode,
+    context_mode: PromptContextMode,
+) -> list[str]:
+    """Return configured plan.default section keys for dry-run summaries."""
+    variant = _plan_variant(mode, context_mode)
+    return list(
+        PromptManifest.load_default().recipe("plan.default").variant(variant).sections
+    )
+
+
+def _build_plan_prompt_providers(
+    request: PlanRequest,
+    config: VibeConfig,
+    context_mode: PromptContextMode,
+) -> dict[str, PromptProvider]:
+    """Build providers used by config/prompt-recipes.yaml plan sections."""
+    from vibe3.agents.review_prompt import build_tools_guide_section
+
+    plan_config = getattr(config, "plan", None)
+    task_request = (
+        request if context_mode == "bootstrap" else PlanRequest(scope=request.scope)
+    )
+
+    def plan_policy() -> str | None:
+        if not plan_config or not hasattr(plan_config, "policy_file"):
+            return None
+        return build_plan_policy_section(plan_config.policy_file)
+
+    def plan_output_format() -> str:
+        output_format = (
+            getattr(plan_config, "output_format", None) if plan_config else None
+        )
+        return build_plan_output_contract_section(output_format)
+
+    def plan_retry_task() -> str | None:
+        return getattr(plan_config, "retry_task", None) if plan_config else None
+
+    def plan_exit_contract() -> str:
+        plan_task_text = (
+            getattr(plan_config, "plan_task", None) if plan_config else None
+        )
+        return build_plan_task_section(task_request, plan_task_text)
+
+    return {
+        "plan.policy": plan_policy,
+        "common.rules": lambda: build_tools_guide_section(
+            getattr(plan_config, "common_rules", None)
+        ),
+        "plan.output_format": plan_output_format,
+        "plan.retry_task": plan_retry_task,
+        "plan.exit_contract": plan_exit_contract,
+        # Backward-compatible alias for local recipe overrides.
+        "plan.task": plan_exit_contract,
+    }
+
+
 def build_plan_prompt_body(
     request: PlanRequest,
     config: VibeConfig | None = None,
+    mode: PlanPromptMode = "first",
+    context_mode: PromptContextMode = "bootstrap",
 ) -> str:
     """Assemble the plan prompt body from policy, tools guide, task, and output format.
 
     Args:
         request: PlanRequest with scope and task guidance.
         config: VibeConfig instance.
+        mode: Prompt mode. ``retry`` revises an existing plan.
+        context_mode: ``resume`` means an existing session is available, so use
+            the minimal retry prompt instead of re-sending policy/rules context.
 
     Returns:
         Assembled plan prompt body string.
     """
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
-    log = logger.bind(domain="plan_context_builder", action="build_plan_prompt_body")
+    log = logger.bind(
+        domain="plan_context_builder",
+        action="build_plan_prompt_body",
+        prompt_mode=mode,
+        context_mode=context_mode,
+    )
     log.info("Building plan prompt body")
 
     if config is None:
         config = VibeConfig.get_defaults()
 
-    sections: list[str] = []
-
-    plan_config = getattr(config, "plan", None)
-
-    if plan_config and hasattr(plan_config, "policy_file"):
-        policy = build_plan_policy_section(plan_config.policy_file)
-        if policy:
-            sections.append(policy)
-
-    tools_guide = build_tools_guide_section(getattr(plan_config, "common_rules", None))
-    if tools_guide:
-        sections.append(tools_guide)
-
-    plan_task_text = None
-    if plan_config and hasattr(plan_config, "plan_task"):
-        plan_task_text = plan_config.plan_task
-    task = build_plan_task_section(request, plan_task_text)
-    sections.append(task)
-
-    output_format = None
-    if plan_config and hasattr(plan_config, "output_format"):
-        output_format = plan_config.output_format
-    output_contract = build_plan_output_contract_section(output_format)
-    sections.append(output_contract)
-
-    body = "\n\n---\n\n".join(sections)
-    log.bind(body_len=len(body)).success("Plan prompt body built")
+    body = PromptManifest.load_default().render_sections(
+        recipe_key="plan.default",
+        variant_key=_plan_variant(mode, context_mode),
+        providers=_build_plan_prompt_providers(request, config, context_mode),
+    )
+    log.bind(body_len=len(body), prompt_mode=mode, context_mode=context_mode).success(
+        "Plan prompt body built"
+    )
     return body
 
 

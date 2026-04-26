@@ -1,79 +1,10 @@
-"""Tests for reviewer role lifecycle publishing helpers."""
+"""Tests for reviewer role audit artifact helpers."""
 
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-import pytest
-
-from vibe3.domain.events import IssueFailed, ReviewCompleted
-from vibe3.domain.publisher import EventPublisher
-from vibe3.roles.review import (
-    _create_minimal_audit_artifact,
-    _resolve_authoritative_audit_ref,
-    publish_review_command_failure,
-    publish_review_command_success,
-)
-
-
-def test_publish_review_command_success_emits_review_completed() -> None:
-    EventPublisher.reset()
-    published_events = []
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        mock_publish.side_effect = lambda event: published_events.append(event)
-        publish_review_command_success(
-            issue_number=42,
-            branch="task/issue-42",
-            verdict="PASS",
-        )
-
-    assert len(published_events) == 1
-    event = published_events[0]
-    assert isinstance(event, ReviewCompleted)
-    assert event.issue_number == 42
-    assert event.branch == "task/issue-42"
-    assert event.verdict == "PASS"
-    assert event.actor == "agent:review"
-
-
-def test_publish_review_command_success_skips_without_issue_context() -> None:
-    EventPublisher.reset()
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        publish_review_command_success(
-            issue_number=None,
-            branch=None,
-            verdict="PASS",
-        )
-
-    mock_publish.assert_not_called()
-
-
-def test_publish_review_command_failure_emits_issue_failed() -> None:
-    EventPublisher.reset()
-    published_events = []
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        mock_publish.side_effect = lambda event: published_events.append(event)
-        publish_review_command_failure(
-            issue_number=24,
-            reason="review parse failed: invalid format",
-        )
-
-    assert len(published_events) == 1
-    event = published_events[0]
-    assert isinstance(event, IssueFailed)
-    assert event.issue_number == 24
-    assert "invalid format" in event.reason
-    assert event.actor == "agent:review"
-
-
-def test_publish_review_command_failure_skips_without_issue_number() -> None:
-    EventPublisher.reset()
-    with patch.object(EventPublisher, "publish") as mock_publish:
-        publish_review_command_failure(
-            issue_number=None,
-            reason="ignored",
-        )
-
-    mock_publish.assert_not_called()
+from vibe3.roles.review_helpers import _create_minimal_audit_artifact
 
 
 class TestReviewerFailed:
@@ -104,12 +35,12 @@ class TestReviewerFailed:
 
 
 class TestReviewerBlockedNoAuditRef:
-    """场景 2: reviewer 无产出 → state/blocked"""
+    """场景 2: reviewer 无行动 → state/blocked"""
 
     def test_reviewer_blocked_no_audit_ref_calls_block_reviewer(
         self,
     ) -> None:
-        """Reviewer 无 audit_ref → 调用 block_reviewer_noop_issue"""
+        """Reviewer 无行动 → 调用 block_reviewer_noop_issue"""
         with patch(
             "vibe3.services.issue_failure_service._ensure_flow_state_for_issue"
         ) as mock_ensure:
@@ -118,7 +49,7 @@ class TestReviewerBlockedNoAuditRef:
             block_reviewer_noop_issue(
                 issue_number=301,
                 repo="jacobcy/vibe-coding-control-center",
-                reason="no audit_ref",
+                reason="state unchanged",
                 actor="agent:review",
             )
 
@@ -126,7 +57,7 @@ class TestReviewerBlockedNoAuditRef:
             mock_ensure.assert_called_once_with(
                 301,
                 "block",  # ← action 参数
-                "no audit_ref",  # ← reason
+                "state unchanged",  # ← reason
                 "agent:review",  # ← actor
             )
 
@@ -160,159 +91,77 @@ class TestReviewerBlockedNoStateChange:
 
 
 class TestReviewerNoOpGate:
-    """场景 4: reviewer 有 audit_ref 但 state 未变 → blocked"""
+    """场景 4: reviewer state 未变 → blocked"""
 
-    def test_reviewer_blocked_when_audit_ref_exists_but_state_unchanged(
+    def test_reviewer_blocked_when_state_unchanged(
         self,
     ) -> None:
-        """Reviewer 有 audit_ref 但 state/review 未变 → blocked"""
-        from unittest.mock import MagicMock, patch
+        """Reviewer state/review 未变 → blocked"""
+        from unittest.mock import patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
 
-        before = {"refs": {}, "state_label": "state/review"}
-        after = {
-            "refs": {"audit_ref": "/path/to/audit.md"},
-            "state_label": "state/review",  # ← state 未变
-        }
-
-        mock_missing_handler = MagicMock()
-
-        with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
         ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                303,
-                "task/issue-303",
-                "agent:review",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="audit_ref",
-                missing_reason="no audit_ref",
-                missing_ref_handler=mock_missing_handler,
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/review"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=303,
+                branch="task/issue-303",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
             )
 
-        # Verify: missing_ref_handler called (block on no-op)
-        mock_missing_handler.assert_called_once()
-        assert result is True
+        mock_block.assert_called_once()
 
-    def test_reviewer_pass_when_audit_ref_exists_and_state_changed(
+    def test_reviewer_pass_when_state_changed(
         self,
     ) -> None:
-        """Reviewer 有 audit_ref 且 state/review → state/handoff → pass"""
-        from unittest.mock import MagicMock, patch
+        """Reviewer state/review → state/handoff → pass"""
+        from unittest.mock import patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
 
-        before = {"refs": {}, "state_label": "state/review"}
-        after = {
-            "refs": {"audit_ref": "/path/to/audit.md"},
-            "state_label": "state/handoff",  # ← state 已变
-        }
-
-        mock_missing_handler = MagicMock()
-
-        with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
         ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                303,
-                "task/issue-303",
-                "agent:review",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="audit_ref",
-                missing_reason="no audit_ref",
-                missing_ref_handler=mock_missing_handler,
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/handoff"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=303,
+                branch="task/issue-303",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
             )
 
-        # Verify: missing_ref_handler NOT called (pass)
-        mock_missing_handler.assert_not_called()
-        assert result is True  # apply_request_completion_gate returned True
-
-
-class TestReviewerParserErrorTolerance:
-    """场景 5: reviewer 输出格式错误 → audit_ref 仍然写入（容错性）"""
-
-    def test_reviewer_output_written_even_if_parser_fails(
-        self,
-    ) -> None:
-        """即使 parser 失败，audit_ref 也应该写入"""
-        # Setup: reviewer 输出 "LGTM"（不符合 VERDICT 格式）
-
-        mock_output = "LGTM - The implementation looks good"
-        mock_branch = "task/issue-303"
-
-        # Create audit_ref from raw output
-        with patch("vibe3.roles.review._create_minimal_audit_artifact") as mock_create:
-            mock_audit_path = Path("/tmp/audit-auto-2026-04-16T12:30:00Z.md")
-            mock_create.return_value = mock_audit_path
-
-            audit_ref = _resolve_authoritative_audit_ref(
-                handoff_file=None,  # ← 无 handoff file
-                review_output=mock_output,  # ← 直接使用原始输出
-                verdict="UNKNOWN",  # ← parser 失败，verdict 为空
-                branch=mock_branch,
-            )
-
-            # Verify: _create_minimal_audit_artifact called
-            mock_create.assert_called_once_with(
-                mock_output,
-                "UNKNOWN",  # ← verdict 标记为 UNKNOWN
-                mock_branch,
-            )
-
-            # Verify: audit_ref returned
-            assert audit_ref == str(mock_audit_path)
-
-    def test_reviewer_parser_error_does_not_raise_exception(
-        self,
-    ) -> None:
-        """Parser 失败时不应该抛异常，而是 verdict=None"""
-        from vibe3.agents.review_parser import ReviewParserError, parse_codex_review
-
-        # Setup: output without VERDICT format
-        invalid_output = "LGTM - looks good"
-
-        # Execute: parser should raise ReviewParserError
-        with pytest.raises(ReviewParserError):
-            parse_codex_review(invalid_output)
-
-        # Expected behavior in actual code:
-        # try:
-        #     review = parse_codex_review(output)
-        #     verdict = review.verdict
-        # except ReviewParserError:
-        #     verdict = None  # ← 不抛异常，继续写 audit_ref
+        mock_block.assert_not_called()
 
 
 def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
     tmp_path: Path,
 ) -> None:
-    with patch("vibe3.roles.review.GitClient") as mock_git_cls:
+    with patch("vibe3.roles.review_helpers.GitClient") as mock_git_cls:
         mock_git = mock_git_cls.return_value
+        mock_git.get_worktree_root.return_value = None
         mock_git.find_worktree_path_for_branch.return_value = tmp_path
         artifact_path = _create_minimal_audit_artifact(
             "LGTM - The implementation looks good",
@@ -327,71 +176,197 @@ def test_create_minimal_audit_artifact_prefers_worktree_reports_dir(
     )
 
 
-class TestReviewerNoProgressPolicy:
-    """Reviewer no-progress 检测"""
+def test_create_minimal_audit_artifact_falls_back_to_cwd_reports_dir(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
 
-    def test_reviewer_has_progress_with_audit_ref(
-        self,
-    ) -> None:
-        """Reviewer 有 audit_ref → 有推进"""
-        from vibe3.models.orchestration import IssueState
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.REVIEW.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.REVIEW.to_label(),
-            "comment_count": 1,
-            "handoff": None,
-            "refs": {"audit_ref": "docs/audits/issue-300-audit.md"},  # ← 有 audit_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="audit_ref",  # ← 检查 audit_ref
+    with patch("vibe3.roles.review_helpers.GitClient") as mock_git_cls:
+        mock_git = mock_git_cls.return_value
+        mock_git.get_worktree_root.return_value = None
+        mock_git.find_worktree_path_for_branch.return_value = None
+        artifact_path = _create_minimal_audit_artifact(
+            "Fallback review output",
+            "UNKNOWN",
+            "task/issue-340",
         )
 
-        assert has_progress is True  # ← 有推进（audit_ref 变化）
+    assert artifact_path.parent == tmp_path / "docs" / "reports"
+    assert artifact_path.exists()
 
-    def test_reviewer_no_progress_without_audit_ref(
+
+class TestFinalizeReviewOutputVerdictSource:
+    """回归测试: finalize_review_output 在不同 audit 来源下正确选择 verdict 来源。
+
+    核心断言:
+    - reviewer 主动写了 handoff_audit → verdict 从 audit 文件读取（不跟 stdout 走）
+    - 系统 auto-generated audit → verdict 从 stdout 读取（等价于 audit 内容）
+    - audit 文件存在但不可读 → fallback 到 stdout
+    """
+
+    def _make_mock_handoff_service(self) -> MagicMock:
+        svc = MagicMock()
+        svc.record_audit.return_value = Path("/tmp/current.md")
+        return svc
+
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
+    def test_reviewer_written_audit_overrides_stdout_verdict(
         self,
+        mock_load_audit_ref: MagicMock,
+        mock_handoff_cls: MagicMock,
+        tmp_path: Path,
     ) -> None:
-        """Reviewer 无 audit_ref → 无推进"""
-        from vibe3.models.orchestration import IssueState
-        from vibe3.runtime.no_progress_policy import has_progress_changed
+        """当 reviewer 主动执行 `handoff audit`，audit 文件内容与 stdout 不一致时，
+        finalize_review_output 必须以 audit 文件为权威来源，不受 stdout 影响。"""
+        from vibe3.roles.review_helpers import finalize_review_output
 
-        before = {
-            "state_label": IssueState.REVIEW.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.REVIEW.to_label(),
-            "comment_count": 2,
-            "handoff": None,
-            "refs": {},  # ← 无 audit_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="audit_ref",  # ← 检查 audit_ref
+        # reviewer stdout 说 PASS，但主动写的 audit 文件说 BLOCK
+        stdout_output = "The implementation looks good\nVERDICT: PASS"
+        audit_file = tmp_path / "issue-42-review-audit.md"
+        audit_file.write_text(
+            "# Authoritative Audit\n\n## Verdict\nVERDICT: BLOCK\n\n"
+            "## Findings\n- Critical security issue found\n",
+            encoding="utf-8",
         )
 
-        assert has_progress is False  # ← 无推进（audit_ref 缺失）
+        # Simulate: reviewer ran `handoff audit <path>`
+        # -> audit_ref already in flow state
+        mock_load_audit_ref.return_value = str(audit_file)
+        mock_handoff_svc = self._make_mock_handoff_service()
+        mock_handoff_cls.return_value = mock_handoff_svc
+
+        audit_ref, verdict = finalize_review_output(
+            review_output=stdout_output,
+            branch="task/issue-42",
+            actor="claude/claude-sonnet-4-6",
+        )
+
+        # Verdict MUST come from the audit file (BLOCK), NOT stdout (PASS)
+        assert verdict == "BLOCK", (
+            f"Expected BLOCK from audit file, got {verdict!r}. "
+            "finalize_review_output must prefer reviewer-written audit over stdout."
+        )
+        assert audit_ref == str(audit_file)
+        # HandoffService.record_audit called with BLOCK
+        mock_handoff_svc.record_audit.assert_called_once_with(
+            audit_ref=str(audit_file),
+            actor="claude/claude-sonnet-4-6",
+            verdict="BLOCK",
+            is_system_auto=False,
+        )
+
+
+def test_build_issue_review_request_retry_resume_provides_bootstrap_fallback() -> None:
+    from vibe3.models.orchestration import IssueInfo
+    from vibe3.roles.review import build_issue_review_request
+
+    issue = IssueInfo(number=301, title="Retry review", labels=[])
+    config = SimpleNamespace(
+        repo="owner/repo",
+        review=SimpleNamespace(review_prompt=None),
+    )
+    flow_state = {
+        "report_ref": "docs/reports/issue-301-report.md",
+        "audit_ref": "docs/reports/issue-301-audit.md",
+    }
+
+    request = build_issue_review_request(
+        issue,
+        branch="task/issue-301",
+        sync=True,
+        config=config,
+        session_id="ses_301",
+        options=object(),
+        dry_run=True,
+        flow_state=flow_state,
+    )
+
+    assert request.refs["report_ref"] == "docs/reports/issue-301-report.md"
+    assert request.refs["audit_ref"] == "docs/reports/issue-301-audit.md"
+    assert request.dry_run_summary["prompt_mode"] == "retry"
+    assert request.dry_run_summary["context_mode"] == "resume"
+    assert request.dry_run_summary["fallback_context_mode"] == "bootstrap"
+    assert request.include_global_notice is False
+    assert request.fallback_prompt is not None
+
+
+class TestFinalizeReviewOutputFallbacks:
+    def _make_mock_handoff_service(self) -> MagicMock:
+        svc = MagicMock()
+        svc.record_audit.return_value = Path("/tmp/current.md")
+        return svc
+
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
+    def test_system_auto_audit_uses_stdout_verdict(
+        self,
+        mock_load_audit_ref: MagicMock,
+        mock_handoff_cls: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """当没有 reviewer-written audit（系统 auto 路径），
+        verdict 来自 stdout（等价于 audit）。"""
+        from vibe3.roles.review_helpers import finalize_review_output
+
+        stdout_output = "All checks pass\nVERDICT: PASS"
+        mock_load_audit_ref.return_value = None
+
+        mock_handoff_svc = self._make_mock_handoff_service()
+        auto_audit = tmp_path / "auto-audit.md"
+        auto_audit.write_text("# Minimal Review Audit\nVERDICT: PASS\n")
+        mock_handoff_svc.record_audit.return_value = auto_audit
+        mock_handoff_cls.return_value = mock_handoff_svc
+
+        with patch(
+            "vibe3.roles.review_helpers._create_minimal_audit_artifact",
+            return_value=auto_audit,
+        ):
+            _, verdict = finalize_review_output(
+                review_output=stdout_output,
+                branch="task/issue-42",
+                actor="claude/claude-sonnet-4-6",
+            )
+
+        assert verdict == "PASS"
+        mock_handoff_svc.record_audit.assert_called_once_with(
+            audit_ref=str(auto_audit),
+            actor="claude/claude-sonnet-4-6",
+            verdict="PASS",
+            is_system_auto=True,
+        )
+
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
+    def test_reviewer_written_audit_unreadable_falls_back_to_stdout(
+        self,
+        mock_load_audit_ref: MagicMock,
+        mock_handoff_cls: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """即使 reviewer 写了 handoff_audit，但 audit 文件不可读，
+        应 fallback 到 stdout 而非崩溃。"""
+        from vibe3.roles.review_helpers import finalize_review_output
+
+        stdout_output = "Partial review\nVERDICT: MAJOR"
+        non_existent_audit = tmp_path / "missing-audit.md"
+        mock_load_audit_ref.return_value = str(non_existent_audit)
+        mock_handoff_svc = self._make_mock_handoff_service()
+        mock_handoff_cls.return_value = mock_handoff_svc
+
+        _, verdict = finalize_review_output(
+            review_output=stdout_output,
+            branch="task/issue-42",
+            actor="claude/claude-sonnet-4-6",
+        )
+
+        assert (
+            verdict == "MAJOR"
+        ), f"Expected MAJOR fallback from stdout, got {verdict!r}."
+        mock_handoff_svc.record_audit.assert_called_once_with(
+            audit_ref=str(non_existent_audit),
+            actor="claude/claude-sonnet-4-6",
+            verdict="MAJOR",
+            is_system_auto=False,
+        )

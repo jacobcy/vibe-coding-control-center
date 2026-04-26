@@ -78,7 +78,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ## 对象边界
 
-- `repo issue`: 需求来源与讨论入口
+- `GitHub issue`: 需求来源与讨论入口
 - `task`: 执行记录语义，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py task status --all --check` 等命令观察
 - `flow`: execution record 的运行时现场，不属于 `vibe-issue` 直接管理范围
 

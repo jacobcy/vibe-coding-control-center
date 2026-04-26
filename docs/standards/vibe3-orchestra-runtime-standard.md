@@ -134,6 +134,20 @@ service 在这一层只负责：
 
 这层可以耗时，但不能阻塞 heartbeat driver。
 
+### 3.4 Dispatch 入口形式
+
+异步 child session 有两种 dispatch 入口：
+
+| 入口形式 | 适用场景 | 示例 | 实现 |
+|---------|---------|------|------|
+| CLI 命令 (`vibe3 internal`) | 需要 issue 参数、手动/脚本触发 | manager, supervisor/apply | `commands/internal.py` → `run_issue_role_async/sync()` |
+| 事件 handler | 全局周期性、无特定参数 | governance scan, supervisor scan | `domain/handlers/` → `handle_*_started()` |
+
+两种入口最终都通过 `ExecutionRequest` + `dispatch_request()` 走相同的执行管道，区别仅在于触发方式：
+
+- **CLI 入口**：orchestra tick 判定某个 issue 需要处理后，构造 `vibe3 internal <role> <issue>` 命令，在 tmux 中启动独立 session
+- **事件入口**：tick 直接在进程内发布 DomainEvent（如 `GovernanceScanStarted`），由对应 handler 构造 `ExecutionRequest` 并 dispatch
+
 ## 4. Governance 语义
 
 ### 4.1 Governance 是什么

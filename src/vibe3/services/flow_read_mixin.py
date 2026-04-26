@@ -1,21 +1,21 @@
 """Flow read operations mixin."""
 
-from typing import Literal, Self, cast
+from typing import Literal, Self
 
 from loguru import logger
 from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
+from vibe3.utils.path_helpers import GitClientProtocol, get_git_common_dir
 
 
 class FlowReadMixin:
     """Mixin providing flow read operations."""
 
     store: SQLiteClient
-    git_client: GitClient
+    git_client: GitClientProtocol
 
     def get_flow_state(self: Self, branch: str) -> FlowState | None:
         """Get flow state for branch.
@@ -70,12 +70,22 @@ class FlowReadMixin:
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
+        # Resolve worktree root for this branch (Execution Directory context)
+        worktree_root = None
+        try:
+            wt_path = self.git_client.find_worktree_path_for_branch(branch)
+            if wt_path:
+                worktree_root = str(wt_path)
+        except Exception:
+            pass
+
         try:
             return FlowStatusResponse.from_state(
                 flow_data,
                 issues=issues,
                 pr_number=pr_number,
                 pr_ready=pr_ready,
+                worktree_root=worktree_root,
             )
         except ValidationError as exc:
             logger.bind(domain="flow", branch=branch).warning(
@@ -105,7 +115,20 @@ class FlowReadMixin:
                 issue_links = self.store.get_issue_links(branch)
                 issues = [IssueLink(**link) for link in issue_links]
 
-                flows.append(FlowStatusResponse.from_state(flow, issues=issues))
+                # Resolve worktree root context
+                worktree_root = None
+                try:
+                    wt_path = self.git_client.find_worktree_path_for_branch(branch)
+                    if wt_path:
+                        worktree_root = str(wt_path)
+                except Exception:
+                    pass
+
+                flows.append(
+                    FlowStatusResponse.from_state(
+                        flow, issues=issues, worktree_root=worktree_root
+                    )
+                )
             except (ValidationError, KeyError) as exc:
                 logger.bind(
                     domain="flow",
@@ -127,9 +150,5 @@ class FlowReadMixin:
         return {"state": status, "events": events}
 
     def get_git_common_dir(self: Self) -> str:
-        """Get git common directory path.
-
-        Returns:
-            Path to git common directory
-        """
-        return cast(str, self.git_client.get_git_common_dir())
+        """Get git common directory path."""
+        return get_git_common_dir(self.git_client)

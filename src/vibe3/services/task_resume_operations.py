@@ -74,11 +74,35 @@ class TaskResumeOperations:
         # Determine target state based on label_state parameter
         if label_state is not None:
             # --label provided: restore to specified state without deleting worktree
-            target_state = (
-                IssueState.READY if label_state == "ready" else IssueState.HANDOFF
-            )
+            # Convert string state to IssueState enum
+            if not label_state:
+                from vibe3.models.flow import FlowState
+                from vibe3.services.flow_resume_resolver import infer_resume_label
 
-            # Clear blocked_reason/failed_reason from FlowState
+                fs_dict = (
+                    self.flow_service.store.get_flow_state(branch)
+                    if isinstance(branch, str)
+                    else None
+                )
+                if fs_dict:
+                    target_state = infer_resume_label(FlowState.model_validate(fs_dict))
+                else:
+                    target_state = IssueState.CLAIMED
+            else:
+                valid_states = {
+                    "ready": IssueState.READY,
+                    "claimed": IssueState.CLAIMED,
+                    "in-progress": IssueState.IN_PROGRESS,
+                    "handoff": IssueState.HANDOFF,
+                    "review": IssueState.REVIEW,
+                    "merge-ready": IssueState.MERGE_READY,
+                }
+                target_state = valid_states.get(label_state, IssueState.CLAIMED)
+
+            # --label: minimal cleanup only. The agent did work but the label
+            # wasn't updated correctly, causing a block.  Clear the reason
+            # fields so the next dispatch picks it up; the flow record, refs,
+            # and worktree are all valid and should be preserved.
             if isinstance(branch, str):
                 self._clear_flow_reasons(branch, resume_kind)
 
@@ -135,34 +159,50 @@ class TaskResumeOperations:
                     raise
 
     def reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
-        """Delete the stale task scene so the next run starts from scratch."""
-        if not self.issue_flow_service.is_task_branch(branch):
-            return
+        """Delete the stale task scene so the next run starts from scratch.
 
-        self.terminate_task_sessions(branch)
+        Flow record deletion is guaranteed even if worktree/branch/handoff
+        cleanup fails partially — a stale flow record is the root cause of
+        phantom downstream dispatches (issue #301).
+        """
+        is_task = self.issue_flow_service.is_task_branch(branch)
 
-        resolved_path = worktree_path
-        if resolved_path is None:
-            found_path = self.git_client.find_worktree_path_for_branch(branch)
-            resolved_path = str(found_path) if found_path is not None else None
-        logger.bind(
-            domain="resume",
-            action="reset_task_scene",
-            branch=branch,
-            worktree_path=resolved_path,
-        ).info("Resetting task scene")
-        if resolved_path is not None:
-            self.git_client.remove_worktree(resolved_path, force=True)
-        if self.git_client.branch_exists(branch):
-            self.git_client.delete_branch(
-                branch,
-                force=True,
-                skip_if_worktree=True,
+        try:
+            if is_task:
+                self.terminate_task_sessions(branch)
+
+                resolved_path = worktree_path
+                if resolved_path is None:
+                    found_path = self.git_client.find_worktree_path_for_branch(branch)
+                    resolved_path = str(found_path) if found_path is not None else None
+                logger.bind(
+                    domain="resume",
+                    action="reset_task_scene",
+                    branch=branch,
+                    worktree_path=resolved_path,
+                ).info("Resetting task scene")
+                if resolved_path is not None:
+                    self.git_client.remove_worktree(resolved_path, force=True)
+                if self.git_client.branch_exists(branch):
+                    self.git_client.delete_branch(
+                        branch,
+                        force=True,
+                        skip_if_worktree=True,
+                    )
+                HandoffService(
+                    store=self.flow_service.store,
+                    git_client=self.git_client,
+                ).storage.clear_handoff_for_branch(branch)
+        except Exception as exc:
+            logger.bind(
+                domain="resume",
+                action="reset_task_scene_partial",
+                branch=branch,
+            ).warning(
+                f"Partial scene cleanup failed (flow will still be deleted): {exc}"
             )
-        HandoffService(
-            store=self.flow_service.store,
-            git_client=self.git_client,
-        ).clear_handoff_for_branch(branch)
+
+        # Always delete the flow record — stale flows cause phantom dispatches
         self.flow_service.delete_flow(branch)
 
     def terminate_task_sessions(self, branch: str) -> None:

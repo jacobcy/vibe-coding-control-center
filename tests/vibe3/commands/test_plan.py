@@ -16,13 +16,19 @@ def strip_ansi(text: str) -> str:
 
 
 def _patch_issue_runtime(monkeypatch) -> MagicMock:
-    """Patch issue mode to use mocked run_issue_role_mode."""
-    mock_runner = MagicMock()
+    """Patch issue mode to use mocked run_issue_role_async (default behavior)."""
+    mock_async = MagicMock()
+    mock_sync = MagicMock()
     monkeypatch.setattr(
-        "vibe3.commands.plan.run_issue_role_mode",
-        mock_runner,
+        "vibe3.commands.plan.run_issue_role_async",
+        mock_async,
     )
-    return mock_runner
+    monkeypatch.setattr(
+        "vibe3.commands.plan.run_issue_role_sync",
+        mock_sync,
+    )
+    # Return async mock (default path for test)
+    return mock_async
 
 
 def _patch_spec_runtime(monkeypatch) -> MagicMock:
@@ -41,7 +47,11 @@ def _patch_spec_runtime(monkeypatch) -> MagicMock:
     )
     mock_execute = MagicMock()
     monkeypatch.setattr(
-        "vibe3.commands.plan.execute_spec_plan",
+        "vibe3.commands.plan.execute_spec_plan_async",
+        mock_execute,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.plan.execute_spec_plan_sync",
         mock_execute,
     )
     return mock_execute

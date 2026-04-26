@@ -12,11 +12,14 @@ from vibe3.models.orchestration import IssueInfo
 # StateLabelDispatchService.service_name.
 # Lower number = higher dispatch priority.
 PIPELINE_STAGE_ORDER: dict[str, int] = {
-    "review:review": 1,  # Closest to done — clear the pipeline first
-    "run:in-progress": 2,
-    "plan:claimed": 3,
-    "manager:handoff": 4,
-    "manager:ready": 5,  # Brand new issues — lowest priority
+    # Flows with pr_ref are dispatched first (highest priority)
+    # These are waiting for manager review after PR creation
+    "manager:handoff": 1,  # Has PR, waiting for final review
+    "run:merge-ready": 2,  # Ready to publish, executor will create PR
+    "review:review": 3,  # In review execution
+    "run:in-progress": 4,  # In execution
+    "plan:claimed": 5,  # Waiting for planning
+    "manager:ready": 6,  # Brand new issues — lowest priority
 }
 PIPELINE_STAGE_DEFAULT = 9  # Unknown stage falls after all known ones
 

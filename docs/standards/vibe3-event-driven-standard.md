@@ -28,6 +28,16 @@
 
 **命名规范**: 事件名称使用过去式（如 `IssueStateChanged`, `PlanCompleted`）。
 
+**Dispatch Intent 事件命名**（特殊规则）：
+- Dispatch Intent 事件使用未来式 + Intent 后缀（如 `ManagerDispatchIntent`）
+- 明确表达这是"意图"而非"完成"，避免语义混淆
+- 示例：`ManagerDispatchIntent` 表示"应该 dispatch manager"，不是"已 dispatched"
+- 向后兼容：旧事件名 `*Dispatched` 作为别名保留
+
+**Audit 事件命名**：
+- `audit_recorded` 表示系统解析并记录 audit_ref 的行为
+- 区别于 `handoff_*` 事件：handoff 是 agent 主动提交，audit_recorded 是系统被动解析
+
 ### 1.3 处理器设计原则
 
 **纯函数**: 处理器应是纯函数或无状态方法，不依赖外部可变状态。
@@ -156,21 +166,20 @@ Apply agent executes
 | `IssueStateChanged` | Issue 状态转换 | `from_state`, `to_state` | 标签变迁 |
 | `IssueFailed` | Agent 执行失败 | `reason` | 失败记录 |
 | `IssueBlocked` | Issue 被阻塞 | `reason` | 缺少前置条件 |
-| `ReportRefRequired` | 需要权威引用验证 | `ref_name` | plan_ref/report_ref/audit_ref |
-| `PlanCompleted` | Planner 完成 | `branch` | 验证 plan_ref |
-| `ReviewCompleted` | Reviewer 完成 | `verdict` | 验证 audit_ref |
-| `FlowBlocked` | Flow 被阻塞 | `blocked_by_issue` | 依赖阻塞 |
-| `FlowAborted` | Flow 中止 | `reason` | 强制终止 |
+| `ManagerDispatchIntent` | Manager 调度意图 | `issue_number`, `branch` | 管理分发意图 |
+| `PlannerDispatchIntent` | Planner 调度意图 | `issue_number`, `branch` | 计划分发意图 |
+| `ExecutorDispatchIntent` | Executor 调度意图 | `issue_number`, `branch` | 执行分发意图 |
+| `ReviewerDispatchIntent` | Reviewer 调度意图 | `issue_number`, `branch` | 审查分发意图 |
 
-**处理器** (`src/vibe3/domain/handlers/flow_lifecycle.py`):
-- 验证权威引用存在性（`require_authoritative_ref`）
-- 转换 issue 状态（由事件处理器调用 `LabelService.confirm_issue_state`）
-- 记录失败与阻塞（`IssueFailureService`）
+**处理器** (`src/vibe3/domain/handlers/`):
+- `flow_lifecycle.py` — 记录状态变迁日志（纯观察），不执行业务判断
+- `dispatch.py` — 接收 dispatch-intent 事件，enrichment with execution context，调用 role builder
+- `issue_state_dispatch.py` — manager 专属 dispatch handler（async dispatch via ExecutionCoordinator）
 
 **集成点**:
-- `agents/plan_agent.py` → 发布 `PlanCompleted`
-- `agents/run_agent.py` → 发布 `ReportRefRequired` + `IssueStateChanged`
-- `agents/review_agent.py` → 发布 `ReviewCompleted`
+- `orchestra/services/state_label_dispatch.py` → 发布 dispatch-intent 事件
+- `codeagent_runner.py` → no-op gate (state-unchanged → block)
+- `domain/handlers/dispatch.py` → handler 读取 flow_state 和 handoff 文件
 
 **Worktree 语义**: 持久 issue-worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
 
@@ -234,10 +243,20 @@ publish(event)
 
 ```python
 def register_event_handlers() -> None:
-    register_governance_handlers()         # L1
-    register_supervisor_apply_handlers()   # L2
-    register_flow_lifecycle_handlers()     # L3
-    register_manager_handlers()            # L3
+    """Register all event handlers with the global publisher.
+
+    Registration order:
+    1. L3 Flow Lifecycle handlers
+    2. L3 Issue-state role dispatch handlers
+    3. L3 Dispatch handlers (planner/executor/reviewer)
+    4. L1 Governance scan handler
+    5. L2 Supervisor scan handler
+    """
+    register_flow_lifecycle_handlers()
+    register_issue_state_dispatch_handlers()
+    register_dispatch_handlers()
+    register_governance_scan_handlers()
+    register_supervisor_scan_handlers()
 ```
 
 ### 5.2 注册调用
@@ -283,6 +302,49 @@ subscribe(
     "PlanCompleted",
     cast(Callable[[DomainEvent], None], handle_plan_completed),
 )
+```
+
+### 5.5 向后兼容性注册
+
+**事件重命名场景**：当事件名称变更时，必须保持向后兼容。
+
+**注册方式**：同时订阅新旧事件名称。
+
+```python
+# 新事件名称
+subscribe(
+    "ManagerDispatchIntent",
+    cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
+)
+
+# 向后兼容：订阅旧事件名称
+subscribe(
+    "ManagerDispatched",  # 旧名称
+    cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
+)
+```
+
+**事件定义**：在事件类定义中提供别名。
+
+```python
+@dataclass(frozen=True)
+class ManagerDispatchIntent(DomainEvent):
+    """Manager dispatch intent event."""
+    ...
+
+# 向后兼容别名
+ManagerDispatched = ManagerDispatchIntent
+```
+
+**事件注册表**：支持新旧名称映射。
+
+```python
+EVENT_TYPES = {
+    # 新名称
+    "manager_dispatch_intent": ManagerDispatchIntent,
+    # 向后兼容
+    "manager_dispatched": ManagerDispatchIntent,
+}
 ```
 
 ---
@@ -497,13 +559,54 @@ LabelService().transition(
 
 ---
 
-## 十二、变更历史
+## 十二、三层概念说明：governance / apply / runtime
+
+以下三个概念容易混淆，特此明确：
+
+**governance scan**（L1）
+- 周期扫描观察，`WorktreeRequirement.NONE`，无 worktree
+- 事件链：`GovernanceScanRequested` → `GovernanceScanCompleted` / `SupervisorExecutionCompleted`
+- 材料来源：`supervisor/governance/*.md`
+- `assignee-pool governance`：观察当前 assignee issue pool
+- `roadmap governance`：扫描 broader repo issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool；不处理 discussion / refactor / big feature
+- `cron governance`：周期性派发过时文档治理 supervisor issue；当前固定一批最多 5 个文档
+- governance 不进入主代码实现链；动作限于观察、最小 routing、派单
+
+**supervisor/apply**（L2）
+- 执行治理动作，`WorktreeRequirement.TEMPORARY`，有临时 worktree
+- 事件链：`SupervisorIssueIdentified` → `SupervisorApplyDispatched` / `SupervisorApplyDelegated`
+- 材料来源：`supervisor/apply.md`
+- **只处理 supervisor issue（带 `supervisor` label），不处理 assignee issue**
+- 执行 label/comment/close/recreate 等动作
+- 可在 L2 临时分支完成文档类与测试修补类修改，并直接 commit / push / pr create
+
+**runtime**
+- 指 vibe3 服务器运行时（EventBus、Heartbeat、HTTP server）
+- 与上述两个治理概念无关，负责基础事件调度与 tick 循环
+
+这三个概念不等价，不可混用。见 `vibe3-worktree-ownership-standard.md` §二 了解完整层级定义。
+
+### Issue 池边界总结
+
+| 角色 | 处理对象 | 说明 |
+|------|---------|------|
+| governance scan | assignee issue pool | `supervisor/governance/assignee-pool.md` |
+| governance/roadmap | broader repo issue pool | 自动纳入适合自动化推进的 bug fix / small feature 到 assignee issue pool |
+| governance/cron | broader repo docs scope | 每轮最多派发 5 个过时文档到 supervisor issue |
+| supervisor/apply | supervisor issue | 显式立项的治理 issue，带 `supervisor` label |
+| manager | assignee issue | 已进入执行池的 issue，由 manager 主链推进 |
+
+---
+
+## 十三、变更历史
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
+| 1.2 | 2026-04-21 | 补充 governance/apply/runtime 三层概念说明，消除混淆 |
+| 1.1 | 2026-04-21 | 重命名 Dispatch 事件为 *DispatchIntent，明确语义；添加 audit_recorded 事件；补充向后兼容性注册规范 |
 | 1.0 | 2026-04-08 | 初始版本，定义四条执行链路的事件驱动架构 |
 
 ---
 
 **维护者**: Vibe Team
-**最后更新**: 2026-04-08
+**最后更新**: 2026-04-21

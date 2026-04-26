@@ -24,14 +24,18 @@ class TestFlowServiceCreate:
         service = FlowService(store=mock_store, git_client=mock_git)
         mock_git.get_current_branch.return_value = "feature/test"
 
-        # Mock get_flow_status to return a valid response after creation
-        mock_store.get_flow_state.return_value = {
-            "branch": "feature/test",
-            "flow_slug": "test-flow",
-            "flow_status": "active",
-            "updated_at": "2026-04-01T00:00:00",
-            "initiated_by": "manual",
-        }
+        # First call (idempotency check) returns None; subsequent calls
+        # return the created state.
+        mock_store.get_flow_state.side_effect = [
+            None,
+            {
+                "branch": "feature/test",
+                "flow_slug": "test-flow",
+                "flow_status": "active",
+                "updated_at": "2026-04-01T00:00:00",
+                "initiated_by": "manual",
+            },
+        ]
         mock_store.get_issue_links.return_value = []
 
         with patch("vibe3.services.flow_read_mixin.GitHubClient") as mock_gh:

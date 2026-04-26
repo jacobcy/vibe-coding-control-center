@@ -6,6 +6,7 @@ backend/model settings to ``~/.codeagent/models.json``.
 
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Final
 
@@ -19,6 +20,12 @@ MODELS_JSON_PATH: Final[Path] = Path.home() / ".codeagent" / "models.json"
 REPO_MODELS_JSON_PATH: Final[Path] = (
     Path(__file__).resolve().parents[4] / "config" / "models.json"
 )
+BACKEND_COMMANDS: Final[dict[str, str]] = {
+    "claude": "claude",
+    "codex": "codex",
+    "gemini": "gemini",
+    "opencode": "opencode",
+}
 
 
 def repo_models_json_path() -> Path:
@@ -41,6 +48,43 @@ def _read_models_json(path: Path) -> dict[str, Any]:
             f"Failed to read models config: {exc}"
         )
     return {}
+
+
+def configured_backends(path: Path | None = None) -> set[str]:
+    """Return all backend names actively referenced by repo models config."""
+    data = _read_models_json(path or repo_models_json_path())
+    backends: set[str] = set()
+
+    default_backend = data.get("default_backend")
+    if isinstance(default_backend, str) and default_backend.strip():
+        backends.add(default_backend.strip())
+
+    agents = data.get("agents")
+    if isinstance(agents, dict):
+        for raw in agents.values():
+            if not isinstance(raw, dict):
+                continue
+            backend = raw.get("backend")
+            if isinstance(backend, str) and backend.strip():
+                backends.add(backend.strip())
+
+    return backends
+
+
+def find_missing_backend_commands(
+    path: Path | None = None,
+    *,
+    env_path: str | None = None,
+) -> dict[str, str]:
+    """Return configured backends whose CLI command is missing from PATH."""
+    missing: dict[str, str] = {}
+    for backend in sorted(configured_backends(path)):
+        command = BACKEND_COMMANDS.get(backend)
+        if not command:
+            continue
+        if shutil.which(command, path=env_path) is None:
+            missing[backend] = command
+    return missing
 
 
 def resolve_repo_agent_preset(

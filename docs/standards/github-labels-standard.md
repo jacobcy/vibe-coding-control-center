@@ -118,13 +118,16 @@
 
 #### `vibe-task`
 
-**语义**: Roadmap / Flow 可视化辅助
+**语义**: Flow bind 自动化镜像标签
 
-**职责**: 让 GitHub Project 视图能通过标签快速识别出“当前正在或曾被纳入 vibe3 flow 管理的任务”。
+**职责**: 让 GitHub 视图能通过标签快速识别"曾被 vibe3 flow bind 管理的 issue"。
 
 **映射规则**:
-- 由 `vibe3` 命令在任务进入 flow 时可选添加。
-- 不再作为自动化同步的硬性指标。
+- 由 `vibe3 flow bind` 在 issue 进入 flow 时自动添加（副作用）。
+- 不作为 governance 的判定依据。
+- 当前 governance 使用 SQLite `flow_issue_links` 表作为 assignee pool 的真源。
+- `state/*` 标签为可选镜像，flow 状态以 SQLite `flow_state` 表为准。
+
 
 ### 3.4 编排状态标签语义 (state/*)
 

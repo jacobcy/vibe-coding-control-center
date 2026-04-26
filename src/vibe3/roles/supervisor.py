@@ -21,13 +21,13 @@ from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
     registry_role="supervisor",
-    gate_config=SUPERVISOR_IDENTIFY_GATE_CONFIG,
+    worktree=SUPERVISOR_IDENTIFY_GATE_CONFIG,
 )
 
 SUPERVISOR_APPLY_ROLE = RoleDefinition(
     name="supervisor-apply",
     registry_role="supervisor",
-    gate_config=SUPERVISOR_APPLY_GATE_CONFIG,
+    worktree=SUPERVISOR_APPLY_GATE_CONFIG,
 )
 
 
@@ -78,6 +78,7 @@ def build_supervisor_handoff_payload(
     governance_cfg = config.governance.model_copy(
         update={
             "supervisor_file": config.supervisor_handoff.supervisor_file,
+            "supervisor_files": [],
             "prompt_template": config.supervisor_handoff.prompt_template,
             "include_supervisor_content": True,
             "dry_run": False,
@@ -157,8 +158,7 @@ def build_supervisor_apply_request(
         refs={"task": task, "issue_number": str(issue_number)},
         actor=actor,
         mode="async",
-        worktree_requirement=SUPERVISOR_APPLY_ROLE.gate_config.worktree,
-        completion_gate=SUPERVISOR_APPLY_ROLE.gate_config.completion_contract,
+        worktree_requirement=SUPERVISOR_APPLY_ROLE.worktree,
     )
 
 
@@ -201,8 +201,7 @@ def build_supervisor_cli_request(
         refs={"task": task, "issue_number": str(issue_number)},
         actor=actor,
         mode="async",
-        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.gate_config.worktree,
-        completion_gate=SUPERVISOR_APPLY_ROLE.gate_config.completion_contract,
+        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
     )
 
 
@@ -210,13 +209,17 @@ def build_supervisor_cli_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
     """Build sync execution request for CLI-driven supervisor apply."""
     import os
+
+    _ = flow_state
 
     prompt, _, task = build_supervisor_handoff_payload(
         config,
@@ -239,8 +242,8 @@ def build_supervisor_cli_sync_request(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
-        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.gate_config.worktree,
-        completion_gate=SUPERVISOR_APPLY_ROLE.gate_config.completion_contract,
+        show_prompt=show_prompt,
+        worktree_requirement=SUPERVISOR_IDENTIFY_ROLE.worktree,
     )
 
 

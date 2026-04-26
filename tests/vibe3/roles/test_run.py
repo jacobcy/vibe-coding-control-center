@@ -3,10 +3,11 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from vibe3.agents.models import CodeagentResult
 from vibe3.domain.events import IssueFailed
 from vibe3.domain.publisher import EventPublisher
-from vibe3.models.orchestration import IssueState
 from vibe3.roles.run import publish_run_command_failure, publish_run_command_success
 
 
@@ -96,6 +97,45 @@ def test_publish_run_command_failure_emits_issue_failed() -> None:
     assert event.actor == "agent:run"
 
 
+def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> None:
+    from types import SimpleNamespace
+
+    from vibe3.roles.run import execute_manual_run
+
+    with (
+        patch("vibe3.roles.run.CodeagentExecutionService") as mock_service_cls,
+        patch(
+            "vibe3.roles.run.make_run_context_builder", return_value=lambda: "prompt"
+        ),
+        patch("vibe3.roles.run.publish_run_command_failure") as mock_publish_failure,
+    ):
+        mock_service_cls.return_value.execute_sync.side_effect = RuntimeError(
+            "backend returned empty result"
+        )
+
+        with pytest.raises(RuntimeError, match="backend returned empty result"):
+            execute_manual_run(
+                config=object(),
+                branch="task/issue-349",
+                issue_number=349,
+                instructions=None,
+                plan_file="docs/plans/issue-349.md",
+                skill=None,
+                summary=SimpleNamespace(mode="plan"),
+                dry_run=False,
+                no_async=True,
+                show_prompt=False,
+                agent=None,
+                backend=None,
+                model=None,
+            )
+
+        mock_publish_failure.assert_called_once_with(
+            issue_number=349,
+            reason="backend returned empty result",
+        )
+
+
 class TestExecutorFailed:
     """场景 1: executor 执行报错 → state/failed"""
 
@@ -124,12 +164,12 @@ class TestExecutorFailed:
 
 
 class TestExecutorBlockedNoReportRef:
-    """场景 2: executor 无产出 → state/blocked"""
+    """场景 2: executor 无行动 → state/blocked"""
 
     def test_executor_blocked_no_report_ref_calls_block_executor(
         self,
     ) -> None:
-        """Executor 无 report_ref → 调用 block_executor_noop_issue"""
+        """Executor 无行动 → 调用 block_executor_noop_issue"""
         with patch(
             "vibe3.services.issue_failure_service._ensure_flow_state_for_issue"
         ) as mock_ensure:
@@ -138,7 +178,7 @@ class TestExecutorBlockedNoReportRef:
             block_executor_noop_issue(
                 issue_number=201,
                 repo="jacobcy/vibe-coding-control-center",
-                reason="no report_ref",
+                reason="state unchanged",
                 actor="agent:run",
             )
 
@@ -146,7 +186,7 @@ class TestExecutorBlockedNoReportRef:
             mock_ensure.assert_called_once_with(
                 201,
                 "block",  # ← action 参数
-                "no report_ref",  # ← reason
+                "state unchanged",  # ← reason
                 "agent:run",  # ← actor
             )
 
@@ -191,165 +231,67 @@ class TestExecutorSuccessStateChanged:
         pass  # ← Placeholder: 实际修复后添加详细测试
 
 
-class TestExecutorNoProgressPolicy:
-    """Executor no-progress 检测"""
-
-    def test_executor_has_progress_with_report_ref(
-        self,
-    ) -> None:
-        """Executor 有 report_ref → 有推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 1,
-            "handoff": None,
-            "refs": {
-                "report_ref": "docs/reports/issue-200-report.md"
-            },  # ← 有 report_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="report_ref",  # ← 检查 report_ref
-        )
-
-        assert has_progress is True  # ← 有推进（report_ref 变化）
-
-    def test_executor_no_progress_without_report_ref(
-        self,
-    ) -> None:
-        """Executor 无 report_ref → 无推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.IN_PROGRESS.to_label(),
-            "comment_count": 2,
-            "handoff": None,
-            "refs": {},  # ← 无 report_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="report_ref",  # ← 检查 report_ref
-        )
-
-        assert has_progress is False  # ← 无推进（report_ref 缺失）
-
-
 class TestExecutorNoOpGate:
-    """Executor no-op gate: report_ref 存在但 state 未变 → blocked"""
+    """Executor no-op gate: state 未变 → blocked"""
 
-    def test_executor_blocked_when_report_ref_exists_but_state_unchanged(
+    def test_executor_blocked_when_state_unchanged(
         self,
     ) -> None:
-        """Executor 有 report_ref 但 state/in-progress 未变 → blocked"""
+        """Executor state/in-progress 未变 → blocked"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
 
-        before = {"refs": {}, "state_label": "state/in-progress"}
-        after = {
-            "refs": {"report_ref": "/path/to/report.md"},
-            "state_label": "state/in-progress",  # ← state 未变
-        }
-
-        mock_missing_handler = MagicMock()
-
-        with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
         ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                200,
-                "task/issue-200",
-                "agent:run",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="report_ref",
-                missing_reason="no report_ref",
-                missing_ref_handler=mock_missing_handler,
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/in-progress"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=200,
+                branch="task/issue-200",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/in-progress",
             )
 
-        # Verify: missing_ref_handler called (block on no-op)
-        mock_missing_handler.assert_called_once()
-        assert result is True
+        mock_block.assert_called_once()
 
-    def test_executor_pass_when_report_ref_exists_and_state_changed(
+    def test_executor_pass_when_state_changed(
         self,
     ) -> None:
-        """Executor 有 report_ref 且 state/in-progress → state/handoff → pass"""
+        """Executor state/in-progress → state/handoff → pass"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
 
-        before = {"refs": {}, "state_label": "state/in-progress"}
-        after = {
-            "refs": {"report_ref": "/path/to/report.md"},
-            "state_label": "state/handoff",  # ← state 已变
-        }
-
-        mock_missing_handler = MagicMock()
-
-        with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
         ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                200,
-                "task/issue-200",
-                "agent:run",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="report_ref",
-                missing_reason="no report_ref",
-                missing_ref_handler=mock_missing_handler,
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/handoff"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=200,
+                branch="task/issue-200",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/in-progress",
             )
 
-        # Verify: missing_ref_handler NOT called (pass)
-        mock_missing_handler.assert_not_called()
-        assert result is True
+        mock_block.assert_not_called()

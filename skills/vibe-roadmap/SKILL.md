@@ -20,16 +20,15 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 intake gate 约束：
 
-- 不是所有 `repo issue` 都自动进入 GitHub Project。
-- 只有经过 `vibe-roadmap` triage 的候选 `repo issue`，才应纳入 task item / GitHub Project。
-- shell 层不负责智能 intake gate；是否纳入 Project 属于 skill / workflow 的规划判断。
-- `vibe-roadmap` 消费的是 `repo issue intake 视图`，而不是本地长期 issue cache / registry。
+- 不是所有 `GitHub issue` 都自动进入 GitHub Project。
+- 只有经过 `vibe-roadmap` triage 的候选 `GitHub issue`，才应纳入 roadmap 规划。
+- `vibe-roadmap` 消费的是 GitHub issue intake 视图，而不是本地长期 issue cache / registry。
 - intake 视图应来自运行时查询与 flow/status 总览对比。
 - 若未来需要留痕，优先保存 triage 决策快照，而不是复制 issue 整池真源。
 
 对象约束：
 
-- `repo issue`: 需求来源
+- `GitHub issue`: 需求来源
 - `vibe-roadmap` 只处理规划元数据，不负责 execution record
 - 任何规划判断都必须先读 GitHub 与 shell 输出，再做编排
 
@@ -56,7 +55,7 @@ intake gate 约束：
 
 ## Hard Boundary
 
-- 只负责规划层调度，不负责 `repo issue` 创建、flow 注册修复或 runtime 修复
+- 只负责规划层调度，不负责 `GitHub issue` 创建、flow 注册修复或 runtime 修复
 - 必须先运行 `vibe3 task status` / `gh issue list` 等命令理解当前版本与候选池
 - 不得直接修改 `.git/vibe3/handoff.db` 底层数据
 - 远端写操作优先通过 `gh` / GitHub 原生命令完成
@@ -68,7 +67,7 @@ intake gate 约束：
 
 边界对照：
 
-- `repo issue` intake、模板补全、查重：交给 `vibe-issue`
+- `GitHub issue` intake、模板补全、查重：交给 `vibe-issue`
 - `task <-> flow` 映射核对与修复：交给 `vibe-task`
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
 - 基于当前运行现场寻找下一个值得处理的 issue：交给 `vibe-orchestra`
@@ -129,7 +128,7 @@ gh issue list -l "roadmap/p0"
 获取：
 
 - 当前版本目标是什么
-- 有哪些 `repo issue` 等待分类
+- 有哪些 `GitHub issue` 等待分类
 - 各版本窗口下有多少候选 issue
 - 现有 issues 的 milestone / roadmap / priority 分布
 
@@ -140,16 +139,16 @@ gh issue list -l "roadmap/p0"
 **场景 A: 没有版本目标**
 
 - 提示用户定义版本目标
-- 展示许愿池中的 `repo issue` 供选择
+- 展示许愿池中的 `GitHub issue` 供选择
 - 要求人类讨论确定目标
 
-**场景 B: 有版本目标但有新 `repo issue`**
+**场景 B: 有版本目标但有新 `GitHub issue`**
 
-- 对新的 `repo issue` 进行分类：
+- 对新的 `GitHub issue` 进行分类：
 - 1.  分配适当的 Milestone
 - 2.  添加 roadmap 状态标签（`roadmap/p0`、`roadmap/p1`、`roadmap/p2` 等）
 - 3.  必要时补 `priority/[0-9]` 作为同一 roadmap 桶内的细粒度顺位提示
-- 对候选 `repo issue` 做 intake gate 判断：纳入 / 不纳入 / 待讨论
+- 对候选 `GitHub issue` 做 intake gate 判断：纳入 / 不纳入 / 待讨论
 - 输出版本窗口内的候选集合，但不根据当前 runtime 现场判断“现在该做谁”
 - 若该 issue 来自已有治理母题，先读取上游 skill/workflow 的范围判断：
   - 仍在原主 issue 范围内，可继续按 sub-issue 进入规划
@@ -266,8 +265,8 @@ Agent 应通过以下方式使用标签触发机制：
 ## Terminology Contract
 
 - `版本目标`: 当前版本要完成的目标
-- `许愿池`: GitHub `repo issues`（需求池）
-- `repo issue`: 需求来源与讨论入口，不是 execution record
+- `许愿池`: GitHub issues（需求池）
+- `GitHub issue`: 需求来源与讨论入口，不是 execution record
 - `Task`: 执行层最小单元，不属于 roadmap 直接管理范围
 - `Flow`: task 的运行时容器，不属于 roadmap 直接管理范围
 - `priority label`: 细粒度顺位标签，如 `priority/5`

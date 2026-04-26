@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-04-02
+last_updated: 2026-04-20
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -75,61 +75,82 @@ related_docs:
 
 - 正式术语：`roadmap item`
 - 别称：`规划项`
-- 定义：写入 `roadmap.json` 的规划层工作单元，是 mirrored `GitHub Project item` 的本地表达。
+- 定义：规划层工作单元概念，用于表达版本规划窗口中的工作项。
+- 状态：**历史兼容 / 规划参考语义**。
 - 边界：
-  - `roadmap item` 不是 execution record
-  - `roadmap item` 不表达 branch/worktree 当前态
-- 落点：
-  - 规划语义见 [command-standard.md](command-standard.md)
-  - 文件边界见 [roadmap-json-standard.md](roadmap-json-standard.md)
+  - `roadmap item` 仅为 planning 层概念，不是执行层真源。
+  - 当前治理（Orchestra）直接管理 `assignee issue`，不经过 `roadmap item -> task` 中间层转换。
+  - `roadmap.json` 与 `GitHub Project` 仅为历史兼容镜像，不作为主开发链锚点。
 - 使用规则：
-  - `feature` / `task` / `bug` 是 roadmap item 的 `type`
-  - 讨论 `p0/current/next/deferred/rejected` 时使用 `roadmap item`
-  - `roadmap item` 是 planning 中间层，不是用户默认主链锚点
-  - 不要把 roadmap 状态当成分支当前执行状态
+  - 仅在讨论版本排期（`p0/current/next/deferred/rejected`）时使用。
+  - 不得将 roadmap 状态作为分支执行进度的判定依据。
 
 ### 3.3 `task`
 
 - 正式术语：`task`
 - 别称：`执行任务`
-- 定义：execution bridge 概念，用于表达当前 flow 绑定的主执行 issue 及相关执行语义。
+- 定义：execution bridge 概念，用于表达当前 flow 绑定的主执行 issue 及其关联执行事实。
 - 边界：
-  - `task` 不是外部需求入口
-  - `task` 不等于 PR
-  - `task` 不等于 roadmap item
-- 落点：
-  - 命令语义见 [command-standard.md](command-standard.md)
-  - 文件字段见 [registry-json-standard.md](registry-json-standard.md)
+  - `task` 不是外部需求入口。
+  - `task` 不等于 PR，不等于 roadmap item。
 - 使用规则：
-  - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
-  - 一个 `type=feature` 的 roadmap item 可以拆出多个执行层 `task` 语义
-  - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
-  - 当前公共 CLI 读路径已收敛到 `flow show` / `flow status` / `status`，不再默认要求独立 `vibe3 task` 命令
-  - GitHub issue 可以被关联为一个或多个 `task`（在不同 flow 中）
+  - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用。
+  - `task` 是 flow 建立后的 execution bridge，不是 roadmap item 的强制下游产物。
+  - 它是执行现场的“任务视图”，不是用户默认主链的第一锚点。
 
 ### 3.3.1 task issue
 
 - 正式术语：`task issue`
 - 别称：无
-- 定义：**vibe3 视角概念**，指被 vibe3 管理的 GitHub issue。判定标准：
-  - 在 SQLite `flow_issue_links` 中有记录，`issue_role = task` 或 `dependency`
-  - GitHub issue 有 `vibe-task` 标签（由 vibe3 自动管理）
+- 定义：**vibe3 视角下的执行关系角色**。指被 vibe3 纳入 flow 管理的 `assignee issue`。
+- 判定标准：
+  - 在 SQLite `flow_issue_links` 中有记录，且角色为 `task` 或 `dependency`。
+  - 该 issue 必须属于 `assignee issue pool`。
 - 边界：
-  - task issue **不是**新的 GitHub 对象类型
-  - task issue **不是**与 GitHub issue 平行的新实体
-  - task issue 是 GitHub issue 在 vibe3 管理视角下的**角色**
-- 落点：
-  - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
-  - 命令语义见 [command-standard.md](command-standard.md)
-  - 标准规范见 [issue-standard.md](issue-standard.md)
+  - **不是**新的 GitHub 对象类型。
+  - **不是**与 GitHub issue 平行的实体。
+  - `vibe-task` 标签是 flow bind 的自动镜像（副作用），不作为治理判定依据。
 - 使用规则：
-  - 不说 "创建 task issue"，而是 "将 issue 关联为 task"
-  - task issue 是相对于 flow 的**关系**，不是 issue 的类型属性
-  - 同一个 issue 可以在不同 flow 中有不同角色
-  - PR 合并时会自动关闭关联的 task issue（联动操作）
+  - 不说 "创建 task issue"，而是 "将 issue 关联为 task"。
+  - 它是相对于 flow 的**关系**，而不是 issue 的固有属性。
 
+### 3.3.2 `assignee issue`
 
-### 3.3.3 `task audit`
+- 正式术语：`assignee issue`
+- 别称：无
+- 定义：**本地开发链的处理对象**。指已进入执行池、由 Manager 主链（Plan/Run/Review）负责推进的 GitHub issue。
+- 职责：它是当前 Governance (Orchestra) 事实观察的**真实且唯一范围**。
+- 边界：
+  - **不是** supervisor issue。
+  - **不是** broader repo issue pool。
+- 使用规则：
+  - Manager 链只消费 `assignee issue`。
+  - 当前 governance 排序与建议只针对此池。
+
+### 3.3.3 `supervisor issue`
+
+- 正式术语：`supervisor issue`
+- 别称：无
+- 定义：**本地治理链的处理对象**。指显式立项的治理任务（带 `supervisor` label），由 `supervisor/apply` 负责闭环。
+- 边界：
+  - **不进入** Manager 主开发链。
+  - 用于文档治理、测试治理、环境清理等非业务开发动作。
+- 使用规则：
+  - `supervisor/apply` 只消费 `supervisor issue`。
+
+### 3.3.4 `broader repo issue pool`
+
+- 正式术语：`broader repo issue pool`
+- 别称：无
+- 定义：仓库中全量的开放 issue 或积压需求。
+- 状态：roadmap governance 的 intake 输入池，也是 cron governance 的上游观察范围之一。
+- 边界：
+  - 不是 assignee issue pool。
+  - 它不自动等于执行池。
+- 使用规则：
+  - roadmap governance 可从此池中把适合自动化推进的 issue 纳入 assignee issue pool。
+  - cron governance 可从与文档治理相关的 broader repo 范围中形成 supervisor issue。
+### 3.3.5 `task audit`
 
 - 正式术语：`task audit`
 - 别称：无
@@ -141,7 +162,7 @@ related_docs:
   - 讨论 task registry、分支、OpenSpec、plans 的执行层核对时使用 `task audit`
   - 不要把 `task audit` 表述成 GitHub Project 同步
 
-### 3.3.4 `OpenSpec 注册`
+### 3.3.6 `OpenSpec 注册`
 
 - 正式术语：`OpenSpec 注册`
 - 别称：`OpenSpec execution spec 来源桥接`
@@ -153,7 +174,7 @@ related_docs:
   - 讨论 `spec_standard/spec_ref` 来源时使用 `OpenSpec 注册`
   - 不要把 OpenSpec change 直接说成 roadmap item 或 task 本体
 
-### 3.3.5 `milestone`
+### 3.3.7 `milestone`
 
 - 正式术语：`milestone`
 - 别称：无
@@ -181,10 +202,39 @@ related_docs:
 - 落点：
   - 命令边界见 [command-standard.md](command-standard.md)
   - 现场态边界见 [data-model-standard.md](data-model-standard.md)
+  - 状态定义：`flow_status` 字段在 `flow_state` 表
 - 使用规则：
   - 讨论当前交付切片、由 branch 锚定且由 worktree 承载的任务现场时使用 `flow`
-  - 讨论用户正在推进哪个目标时，默认优先从 `repo issue -> flow` 叙述
+  - 讨论用户正在推进哪个目标时，默认优先从 `GitHub issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
+
+### 3.4.1 Flow Status 语义
+
+`flow_status` 定义了 flow 当前的执行状态，各状态语义：
+
+- **`active`**：flow 正常执行中，准备就绪或正在处理
+- **`blocked`**：flow 被阻塞（手动锁定或依赖未满足）。
+  - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。
+  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。
+  - 判定标准：依赖项在 GitHub 上进入 `closed` 终态即视为满足。
+  - 自动巡逻：Orchestra 会主动拉取该状态任务进入“资格门”校验，满足条件后自动解套并智能恢复到正确阶段。
+- **`failed`**：flow 执行失败，需要人工修复或放弃
+- **`done`**：flow 执行完成，所有任务已办结
+- **`stale`**：flow 长期未活动，被系统标记为休眠
+- **`aborted`**：flow 被人工中止
+- **`merged`**：flow 的 PR 已合并
+
+### 3.4.2 `dependency` (issue role)
+
+- 正式术语：`dependency` (issue role)
+- 别称：依赖 issue
+- 定义：在 `flow_issue_links` 表中，`issue_role = 'dependency'` 表示该 issue 是当前 flow 所依赖的前置任务。
+- 语义：当前 flow 必须等待所有依赖 issue 完成（GitHub `issue.state == "closed"`）才能开始执行。
+- 机制：
+  - 依赖未满足 → flow 标记为 `blocked`。
+  - 自动巡逻：Orchestra 每轮轮询时会检查依赖 Issue 状态。
+  - 自动恢复：所有依赖满足后，Orchestra 自动移除阻塞，推断并恢复到正确状态。
+  - 继承分支：解封 flow 的 worktree 默认从依赖的 PR 分支创建，确保代码基于最新依赖。
 
 ### 3.5 `pr`
 

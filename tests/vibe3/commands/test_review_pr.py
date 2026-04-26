@@ -62,7 +62,12 @@ def mock_review_usecase(monkeypatch):
     build_mock = MagicMock(return_value=review_request)
     execute_mock = MagicMock(return_value=execute_result)
     monkeypatch.setattr("vibe3.commands.review.build_pr_review_request", build_mock)
-    monkeypatch.setattr("vibe3.commands.review.execute_manual_review", execute_mock)
+    monkeypatch.setattr(
+        "vibe3.commands.review.execute_manual_review_async", execute_mock
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.review.execute_manual_review_sync", execute_mock
+    )
     return MagicMock(
         build_pr_review=build_mock,
         execute_review=execute_mock,

@@ -3,10 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
-from vibe3.execution.role_contracts import (
-    CompletionContract,
-    WorktreeRequirement,
-)
+from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.roles.supervisor import (
     SUPERVISOR_APPLY_ROLE,
@@ -38,22 +35,12 @@ class TestSupervisorRoleDefinitions:
     def test_identify_role(self):
         assert SUPERVISOR_IDENTIFY_ROLE.name == "supervisor-identify"
         assert SUPERVISOR_IDENTIFY_ROLE.registry_role == "supervisor"
-        assert SUPERVISOR_IDENTIFY_ROLE.gate_config.worktree == WorktreeRequirement.NONE
-        assert (
-            SUPERVISOR_IDENTIFY_ROLE.gate_config.completion_contract
-            == CompletionContract.MAY_COMMENT_OR_PROPOSE
-        )
+        assert SUPERVISOR_IDENTIFY_ROLE.worktree == WorktreeRequirement.NONE
 
     def test_apply_role(self):
         assert SUPERVISOR_APPLY_ROLE.name == "supervisor-apply"
         assert SUPERVISOR_APPLY_ROLE.registry_role == "supervisor"
-        assert (
-            SUPERVISOR_APPLY_ROLE.gate_config.worktree == WorktreeRequirement.TEMPORARY
-        )
-        assert (
-            SUPERVISOR_APPLY_ROLE.gate_config.completion_contract
-            == CompletionContract.APPLY_OR_PARTIAL
-        )
+        assert SUPERVISOR_APPLY_ROLE.worktree == WorktreeRequirement.TEMPORARY
 
 
 class TestBuildSupervisorTaskString:
@@ -118,6 +105,7 @@ class TestBuildSupervisorHandoffPayload:
         call_args = mock_render.call_args
         handoff_config = call_args[0][0]
         assert handoff_config.governance.supervisor_file == "supervisor/apply.md"
+        assert handoff_config.governance.supervisor_files == []
         assert handoff_config.governance.prompt_template == "orchestra.supervisor.apply"
         assert handoff_config.governance.include_supervisor_content is True
         assert handoff_config.governance.dry_run is False
@@ -147,7 +135,6 @@ class TestBuildSupervisorApplyRequest:
         assert req.cwd is None
         assert req.mode == "async"
         assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
-        assert req.completion_gate == CompletionContract.APPLY_OR_PARTIAL
 
     @patch("vibe3.roles.supervisor.resolve_supervisor_agent_options")
     @patch("vibe3.roles.governance.render_governance_prompt")

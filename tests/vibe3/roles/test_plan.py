@@ -2,14 +2,15 @@
 
 钉死 planner 的 4 种场景行为：
 1. 执行报错 → state/failed + failed_reason
-2. 无产出 → state/blocked + blocked_reason='no plan_ref'
-3. 有产出但无推进 → state/blocked + blocked_reason='no state change'
+2. 无行动 → state/blocked + blocked_reason='state unchanged'
+3. 有行动但无推进 → state/blocked + blocked_reason='no state change'
 4. 正常推进 → 不干预（agent 改状态）
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from vibe3.models.orchestration import IssueState
+import pytest
 
 
 class TestPlannerFailed:
@@ -42,12 +43,12 @@ class TestPlannerFailed:
 
 
 class TestPlannerBlockedNoPlanRef:
-    """场景 2: planner 无产出 → state/blocked"""
+    """场景 2: planner 无行动 → state/blocked"""
 
     def test_planner_blocked_no_plan_ref_calls_block_planner(
         self,
     ) -> None:
-        """Planner 无 plan_ref → 调用 block_planner_noop_issue"""
+        """Planner 无行动 → 调用 block_planner_noop_issue"""
         mock_issue_number = 101
 
         with patch(
@@ -57,7 +58,7 @@ class TestPlannerBlockedNoPlanRef:
 
             block_planner_noop_issue(
                 issue_number=mock_issue_number,
-                reason="no plan_ref",
+                reason="state unchanged",
                 actor="agent:plan",
             )
 
@@ -65,7 +66,7 @@ class TestPlannerBlockedNoPlanRef:
             mock_ensure.assert_called_once_with(
                 mock_issue_number,
                 "block",  # ← action 参数
-                "no plan_ref",  # ← reason
+                "state unchanged",  # ← reason
                 "agent:plan",  # ← actor
             )
 
@@ -102,173 +103,102 @@ class TestPlannerBlockedNoStateChange:
 class TestPlannerSuccessStateChanged:
     """场景 4: planner 正常推进 → 不干预"""
 
+    @pytest.mark.skip(reason="Placeholder until planner success behavior is asserted")
     def test_planner_success_no_forced_handoff_event(
         self,
     ) -> None:
         """Planner 正常推进 → 不应该强制转 HANDOFF"""
-        # This test verifies that planner success does NOT force HANDOFF
-        # The actual implementation will be fixed to remove confirm_role_handoff
-        # For now, we document the expected behavior
-        pass  # ← Placeholder: 实际修复后添加详细测试
-
-
-class TestPlannerNoProgressPolicy:
-    """Planner no-progress 检测"""
-
-    def test_planner_has_progress_with_plan_ref(
-        self,
-    ) -> None:
-        """Planner 有 plan_ref → 有推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 1,
-            "handoff": None,
-            "refs": {"plan_ref": "docs/plans/issue-100-plan.md"},  # ← 有 plan_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="plan_ref",  # ← 检查 plan_ref
-        )
-
-        assert has_progress is True  # ← 有推进（plan_ref 变化）
-
-    def test_planner_no_progress_without_plan_ref(
-        self,
-    ) -> None:
-        """Planner 无 plan_ref → 无推进"""
-        from vibe3.runtime.no_progress_policy import has_progress_changed
-
-        before = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 0,
-            "handoff": None,
-            "refs": {},
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        after = {
-            "state_label": IssueState.CLAIMED.to_label(),
-            "comment_count": 2,
-            "handoff": None,
-            "refs": {},  # ← 无 plan_ref
-            "issue_state": "open",
-            "flow_status": "active",
-        }
-
-        has_progress = has_progress_changed(
-            before=before,
-            after=after,
-            expected_ref="plan_ref",  # ← 检查 plan_ref
-        )
-
-        assert has_progress is False  # ← 无推进（plan_ref 缺失）
 
 
 class TestPlannerNoOpGate:
-    """Planner no-op gate: plan_ref 存在但 state 未变 → blocked"""
+    """Planner no-op gate: state 未变 → blocked"""
 
-    def test_planner_blocked_when_plan_ref_exists_but_state_unchanged(
+    def test_planner_blocked_when_state_unchanged(
         self,
     ) -> None:
-        """Planner 有 plan_ref 但 state/claimed 未变 → blocked"""
+        """Planner state/claimed 未变 → blocked"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
 
-        before = {"refs": {}, "state_label": "state/claimed"}
-        after = {
-            "refs": {"plan_ref": "/path/to/plan.md"},
-            "state_label": "state/claimed",  # ← state 未变
-        }
-
-        mock_missing_handler = MagicMock()
-
-        with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
         ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                100,
-                "task/issue-100",
-                "agent:plan",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="plan_ref",
-                missing_reason="no plan_ref",
-                missing_ref_handler=mock_missing_handler,
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/claimed"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=100,
+                branch="task/issue-100",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/claimed",
             )
 
-        # Verify: missing_ref_handler called (block on no-op)
-        mock_missing_handler.assert_called_once()
-        assert result is True
+        mock_block.assert_called_once()
 
-    def test_planner_pass_when_plan_ref_exists_and_state_changed(
+    def test_planner_pass_when_state_changed(
         self,
     ) -> None:
-        """Planner 有 plan_ref 且 state/claimed → state/handoff → pass"""
+        """Planner state/claimed → state/handoff → pass"""
         from unittest.mock import MagicMock, patch
 
-        from vibe3.execution.issue_role_support import (
-            apply_required_ref_post_sync,
-        )
+        from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
-        mock_config = MagicMock()
-        mock_config.repo = "owner/repo"
-        mock_request = MagicMock()
 
-        before = {"refs": {}, "state_label": "state/claimed"}
-        after = {
-            "refs": {"plan_ref": "/path/to/plan.md"},
-            "state_label": "state/handoff",  # ← state 已变
-        }
-
-        mock_missing_handler = MagicMock()
-
-        with patch(
-            "vibe3.execution.issue_role_support.apply_request_completion_gate",
-            return_value=True,
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
         ):
-            result = apply_required_ref_post_sync(
-                mock_store,
-                100,
-                "task/issue-100",
-                "agent:plan",
-                mock_config,
-                before,
-                after,
-                mock_request,
-                required_ref="plan_ref",
-                missing_reason="no plan_ref",
-                missing_ref_handler=mock_missing_handler,
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [{"name": "state/handoff"}],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=mock_store,
+                issue_number=100,
+                branch="task/issue-100",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/claimed",
             )
 
-        # Verify: missing_ref_handler NOT called (pass)
-        mock_missing_handler.assert_not_called()
-        assert result is True
+        mock_block.assert_not_called()
+
+
+def test_build_plan_prompt_retry_resume_provides_bootstrap_fallback() -> None:
+    from vibe3.models.orchestration import IssueInfo
+    from vibe3.roles.plan import build_plan_prompt
+
+    config = SimpleNamespace(repo="owner/repo")
+    issue = IssueInfo(number=123, title="Retry planning", labels=[])
+    flow_state = {"plan_ref": "docs/plans/issue-123-plan.md"}
+
+    with patch("vibe3.roles.plan._build_plan_task_guidance", return_value=None):
+        prompt, refs, summary, include_notice, fallback_prompt = build_plan_prompt(
+            config,
+            issue,
+            "task/issue-123",
+            flow_state,
+            session_id="ses_123",
+        )
+
+    assert refs == {"plan_ref": "docs/plans/issue-123-plan.md"}
+    assert summary["prompt_mode"] == "retry"
+    assert summary["context_mode"] == "resume"
+    assert summary["fallback_context_mode"] == "bootstrap"
+    assert include_notice is False
+    assert fallback_prompt is not None
+    assert "policy" not in prompt.lower()
+    assert "handoff plan" in prompt
+    assert "## Output format requirements" in fallback_prompt

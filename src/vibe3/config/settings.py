@@ -10,7 +10,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, model_validator
 
-from vibe3.config.settings_orchestra import OrchestraSettings
 from vibe3.config.settings_pr import (
     FileChangeWeights,
     LineChangeWeights,
@@ -22,6 +21,7 @@ from vibe3.config.settings_pr import (
     SizeThreshold,
     SizeThresholds,
 )
+from vibe3.models.orchestra_config import OrchestraConfig
 
 
 class AIConfig(BaseModel):
@@ -55,8 +55,35 @@ class FlowConfig(BaseModel):
 __all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
            "PRScoringWeights", "PRScoringThresholds", "LineChangeWeights",
            "FileChangeWeights", "ModuleChangeWeights", "SizeThreshold",
-           "SizeThresholds", "VibeConfig"]
+           "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig"]
 # fmt: on
+
+# Prompt fields in prompts.yaml that map to VibeConfig sections.
+# Template-only keys (like "default", "plan", "skill") are excluded.
+_PROMPT_KEYS: dict[str, set[str]] = {
+    "agent_prompt": {"global_notice"},
+    "review": {"output_format", "review_task", "retry_task", "review_prompt"},
+    "plan": {"output_format", "plan_task", "retry_task", "plan_prompt"},
+    "run": {
+        "output_format",
+        "run_task",
+        "coding_task",
+        "retry_task",
+        "run_prompt",
+    },
+}
+
+
+def _merge_prompt_fields(data: dict, prompts: dict) -> None:
+    """Merge VibeConfig-compatible prompt fields from prompts.yaml into data."""
+    for section, allowed in _PROMPT_KEYS.items():
+        src = prompts.get(section)
+        if not isinstance(src, dict):
+            continue
+        dst = data.setdefault(section, {})
+        for key in allowed:
+            if key in src and key not in dst:
+                dst[key] = src[key]
 
 
 class SingleFileLocConfig(BaseModel):
@@ -116,6 +143,12 @@ class CodeLimitsConfig(BaseModel):
     test_paths: TestPathsConfig = Field(default_factory=TestPathsConfig)
 
 
+class DocLimitsConfig(BaseModel):
+    """文档量限制配置."""
+
+    single_file_loc: SingleFileLocConfig = Field(default_factory=SingleFileLocConfig)
+
+
 class ReviewScopeConfig(BaseModel):
     """Review scope configuration."""
 
@@ -150,6 +183,7 @@ class ReviewConfig(BaseModel):
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     review_task: str = Field(default="")
+    retry_task: str = Field(default="")
     review_prompt: str = Field(default="")
 
 
@@ -161,6 +195,7 @@ class PlanConfig(BaseModel):
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     plan_task: str = Field(default="")
+    retry_task: str = Field(default="")
     plan_prompt: str = Field(default="")
 
 
@@ -172,6 +207,8 @@ class RunConfig(BaseModel):
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     run_task: str = Field(default="")
+    coding_task: str = Field(default="")
+    retry_task: str = Field(default="")
     run_prompt: str = Field(default="")
 
 
@@ -194,6 +231,7 @@ class VibeConfig(BaseModel):
 
     agent_prompt: AgentPromptConfig = Field(default_factory=AgentPromptConfig)
     flow: FlowConfig = Field(default_factory=FlowConfig)
+    doc_limits: DocLimitsConfig = Field(default_factory=DocLimitsConfig)
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
@@ -202,7 +240,30 @@ class VibeConfig(BaseModel):
     run: RunConfig = Field(default_factory=RunConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
-    orchestra: OrchestraSettings = Field(default_factory=OrchestraSettings)
+    orchestra: OrchestraConfig = Field(default_factory=OrchestraConfig)
+
+    @classmethod
+    def _load_supplementary(cls, data: dict) -> dict:
+        """Merge config/loc_limits.yaml and prompt fields from prompts.yaml."""
+        import yaml  # type: ignore[import-untyped]
+
+        # Load loc_limits.yaml for code_limits and doc_limits
+        loc_limits_path = Path("config/loc_limits.yaml")
+        if loc_limits_path.exists():
+            with open(loc_limits_path) as f:
+                supp = yaml.safe_load(f) or {}
+            for key in ("doc_limits", "code_limits"):
+                if key in supp and key not in data:
+                    data[key] = supp[key]
+
+        # Load prompt content from prompts.yaml into VibeConfig fields
+        prompts_path = Path("config/prompts.yaml")
+        if prompts_path.exists():
+            with open(prompts_path) as f:
+                prompts = yaml.safe_load(f) or {}
+            _merge_prompt_fields(data, prompts)
+
+        return data
 
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
@@ -211,6 +272,12 @@ class VibeConfig(BaseModel):
 
         with open(config_path) as f:
             data = yaml.safe_load(f)
+
+        if data is None:
+            data = {}
+
+        data = cls._load_supplementary(data)
+
         return cls(**data)
 
     @classmethod

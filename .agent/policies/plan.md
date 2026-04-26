@@ -25,11 +25,10 @@
 - 判断本次任务属于哪一类改动
 
 优先工具见公共规则；规划阶段通常至少会用到：
-- `uv run python src/vibe3/cli.py handoff show`
+- `uv run python src/vibe3/cli.py handoff status`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
-- `mcp_auggie_codebase-retrieval`
 
 ## 任务分型
 
@@ -122,6 +121,16 @@
 - 配置改动：至少验证读取路径、默认值和调用链是否一致
 
 如果某项常规验证不适用，明确写出原因，不要沉默省略。
+
+## Comment Contract（Plan 角色）
+
+详细规则见「共用前提」中的 Comment vs Handoff Contract，本节只补充 plan 特有要求。
+
+- 何时写 comment：plan 阶段产出对外里程碑（plan 完成可交付、范围发生重大变化、依赖人类决策的争议）。
+- 何时改用 handoff append：规划过程中的 finding、临时假设、内部调研记录。
+- Marker：所有 plan 阶段的 issue / PR comment 必须以行首 `[plan]` 开头。
+- 内容要求：一句话结论 + 关键证据（受影响范围 / 风险标签 / 验证策略）。
+- 禁止：不带 marker 提交 comment；用人话写"我是 planner"代替机器可识别的 marker。
 
 ## 输出提醒
 

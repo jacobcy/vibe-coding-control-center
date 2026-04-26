@@ -25,12 +25,13 @@
 ## Size And Complexity
 
 - `lib/ + bin/ + lib3/` 总行数不应超过 7000。
-- `src/` 总行数不应超过 35000。
-- **单文件不应超过 400 行**（项目特定限制，覆盖全局规则的 800 行限制）。
+- `src/` 总行数不应超过 45000。
+- **建议**单文件不超过 400 行。超出文件需评审合理性，合理者可申请 `settings.yaml` 例外。
+- **建议**单函数不超过 50 行。拆分需评估收益：仅当拆分后可显著提升可测试性、可读性或降低耦合时才拆分；否则保持内聚，避免增加复杂度。
 - 超过 400 行或包含密集数据转换的非核心逻辑，应优先迁移到 `scripts/`。
 - 每个 `.sh` 文件只解决一个基础问题。
 - 不允许为了压行数写难读代码。
-- 超限文件必须在 `config/settings.yaml` 的 `file_size_exceptions` 中注册并说明理由，否则应合理拆分。
+- 超限文件必须在 `config/settings.yaml` 的 `file_size_exceptions` 中注册并说明理由。
 
 ## Function Style
 
@@ -56,8 +57,15 @@
 ## Context And File Hygiene
 
 - 不在终端直接喷大体量内容；优先摘要、截断、过滤。
-- 长期共享记忆使用 `.agent/context/memory.md`。
-- 当前 flow handoff 通过 `vibe3 handoff show` 读取，通过 `vibe3 handoff append` 写入。
+- 跨会话记忆使用 `claude-memory` MCP 工具：被动记忆通过 hooks 自动捕获 observations（`search`、`get_observations` 查询）；主动记忆通过 `build_corpus` 创建知识库，`prime_corpus` + `query_corpus` 查询。不使用 `.agent/context/memory.md`。
+- 当前 flow handoff 通过 `vibe3 handoff show <target>` 读取，通过 `vibe3 handoff append` 写入。
+  - `<target>` 支持三种命名空间：
+    - `@key` — 共享 artifact（`.git/vibe3/handoff/` 下，忽略 `--branch`）
+    - `relative/path` — canonical worktree ref，需用 `--branch <branch>` 指定目标 branch
+    - `/abs/path` — 绝对路径（调试 fallback）
+  - **禁止** 直接用 `read_file` / `cat` 访问 `.git/vibe3/handoff/...` 路径
+  - 读取共享 artifact: `vibe3 handoff show @task-xxx/run-yyy.md`
+  - 读取 plan_ref/report_ref: `vibe3 handoff show --branch task/issue-467 docs/reports/audit.md`
 - 跨 worktree 共享状态写入 `.git/vibe/`（位于主仓库 git common dir）。
 - 不在项目根目录随意落临时文件。
 - 仓库相关的临时脚本、调试输出、scratch 文件统一放 `temp/`，便于追踪并由清理流程统一处理。

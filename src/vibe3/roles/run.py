@@ -8,39 +8,50 @@ from types import SimpleNamespace
 from typing import Any
 
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
-from vibe3.agents.run_prompt import make_run_context_builder, make_skill_context_builder
+from vibe3.agents.run_prompt import (
+    RunPromptMode,
+    describe_run_plan_sections,
+    make_run_context_builder,
+    make_skill_context_builder,
+)
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.issue_role_support import (
-    build_issue_async_cli_request,
-    build_issue_sync_prompt_request,
-    build_required_ref_sync_spec,
+    build_issue_sync_spec,
     build_task_flow_branch_resolver,
     resolve_env_overridable_agent_options,
 )
+from vibe3.execution.prompt_meta import PromptContextMode, build_prompt_meta
 from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
+from vibe3.execution.role_request_factory import (
+    build_role_async_request,
+    build_role_sync_request,
+)
+from vibe3.execution.session_service import load_session_id
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
-from vibe3.services.issue_failure_service import (
-    block_executor_noop_issue,
-    fail_executor_issue,
-)
+from vibe3.services.issue_failure_service import fail_executor_issue
 
 EXECUTOR_ROLE = TriggerableRoleDefinition(
     name="executor",
     registry_role="executor",
-    gate_config=EXECUTOR_GATE_CONFIG,
+    worktree=EXECUTOR_GATE_CONFIG,
     trigger_name="run",
     trigger_state=IssueState.IN_PROGRESS,
-    status_field="executor_status",
-    dispatch_predicate=lambda fs, live: (
-        bool(fs.get("plan_ref")) and not fs.get("report_ref") and not live
-    ),
+)
+
+EXECUTOR_PUBLISH_ROLE = TriggerableRoleDefinition(
+    name="executor-publish",
+    registry_role="executor",
+    worktree=EXECUTOR_GATE_CONFIG,
+    trigger_name="run",
+    trigger_state=IssueState.MERGE_READY,
 )
 
 
@@ -74,8 +85,7 @@ def build_run_request(
     actor: str = "orchestra:executor",
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
-    target_branch = branch or f"task/issue-{issue.number}"
-    refs: dict[str, str] = {"issue_number": str(issue.number)}
+    refs: dict[str, str] = {}
     if plan_ref:
         refs["plan_ref"] = plan_ref
     if audit_ref:
@@ -87,17 +97,17 @@ def build_run_request(
         command_args = ["run", "--plan", plan_ref, "--no-async"]
     else:
         command_args = ["run", "--no-async"]
-    return build_issue_async_cli_request(
+
+    return build_role_async_request(
         role="executor",
+        config=config,
         issue=issue,
-        target_branch=target_branch,
         command_args=command_args,
-        actor=actor,
-        execution_name=f"vibe3-executor-issue-{issue.number}",
-        refs=refs,
-        worktree_requirement=EXECUTOR_ROLE.gate_config.worktree,
-        completion_gate=EXECUTOR_ROLE.gate_config.completion_contract,
+        worktree_requirement=EXECUTOR_ROLE.worktree,
+        branch=branch,
         repo_path=repo_path,
+        actor=actor,
+        refs=refs,
     )
 
 
@@ -105,31 +115,70 @@ def build_run_sync_request(
     config: OrchestraConfig,
     issue: IssueInfo,
     branch: str,
+    flow_state: dict[str, object] | None,
     session_id: str | None,
     options: Any,
     actor: str,
     dry_run: bool,
+    show_prompt: bool,
 ) -> ExecutionRequest:
     """Build the executor sync execution request."""
+    store = SQLiteClient()
+    flow_state = store.get_flow_state(branch) if branch else None
+    meta = build_prompt_meta(
+        flow_state,
+        ref_keys=("plan_ref", "report_ref", "audit_ref"),
+        retry_ref_keys=("report_ref", "audit_ref"),
+        session_id=session_id,
+        default_mode="coding",
+    )
     run_config = getattr(config, "run", None)
     run_prompt = run_config.run_prompt if run_config else None
     task = (
         run_prompt or f"Execute implementation for issue #{issue.number}: {issue.title}"
     )
+    summary_sections = describe_run_plan_sections(
+        meta.prompt_mode,  # type: ignore[arg-type]
+        meta.context_mode,
+    )
+    refs = dict(meta.refs)
+    plan_ref = refs.get("plan_ref")
+    audit_ref = refs.get("audit_ref")
+    dry_run_summary = meta.summary(summary_sections)
+    fallback_prompt = None
+    if meta.fallback_context_mode is not None:
+        fallback_prompt = make_run_context_builder(
+            plan_ref,
+            VibeConfig.get_defaults(),
+            audit_file=audit_ref,
+            mode=meta.prompt_mode,  # type: ignore[arg-type]
+            context_mode=meta.fallback_context_mode,
+        )()
 
-    return build_issue_sync_prompt_request(
+    return build_role_sync_request(
         role="executor",
+        config=config,
         issue=issue,
-        target_branch=branch,
-        prompt=task,
-        options=options,
+        branch=branch,
+        prompt=make_run_context_builder(
+            plan_ref,
+            VibeConfig.get_defaults(),
+            audit_file=audit_ref,
+            mode=meta.prompt_mode,  # type: ignore[arg-type]
+            context_mode=meta.context_mode,
+        )(),
         task=task,
-        actor=actor,
-        execution_name=f"vibe3-executor-issue-{issue.number}",
+        options=options,
+        worktree_requirement=EXECUTOR_ROLE.worktree,
         session_id=session_id,
+        actor=actor,
         dry_run=dry_run,
-        worktree_requirement=EXECUTOR_ROLE.gate_config.worktree,
-        completion_gate=EXECUTOR_ROLE.gate_config.completion_contract,
+        show_prompt=show_prompt,
+        include_global_notice=meta.include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=True,
+        extra_refs={k: str(v) for k, v in refs.items()},
+        dry_run_summary=dry_run_summary,
     )
 
 
@@ -176,7 +225,7 @@ def publish_run_command_failure(
     )
 
 
-RUN_SYNC_SPEC = build_required_ref_sync_spec(
+RUN_SYNC_SPEC = build_issue_sync_spec(
     role_name="executor",
     resolve_options=resolve_run_options,
     resolve_branch=RUN_BRANCH_RESOLVER,
@@ -186,16 +235,11 @@ RUN_SYNC_SPEC = build_required_ref_sync_spec(
         actor=actor,
     ),
     build_sync_request=build_run_sync_request,
-    required_ref="report_ref",
-    missing_reason="Executor completed without producing report_ref",
-    missing_ref_handler=block_executor_noop_issue,
     failure_handler=lambda issue_number, reason: fail_executor_issue(
         issue_number=issue_number,
         reason=reason,
         actor="agent:run",
     ),
-    # No success_handler: agent must transition state or get blocked.
-    # See docs/standards/vibe3-noop-gate-boundary-standard.md
 )
 
 
@@ -274,7 +318,7 @@ def dispatch_run_command_async(
     if handoff_metadata:
         refs.update({k: str(v) for k, v in handoff_metadata.items()})
     ExecutionCoordinator(
-        OrchestraConfig.from_settings(),
+        load_orchestra_config(),
         SQLiteClient(),
     ).dispatch_execution(
         ExecutionRequest(
@@ -303,6 +347,7 @@ def execute_manual_run(
     summary: SimpleNamespace,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
     agent: str | None,
     backend: str | None,
     model: str | None,
@@ -346,25 +391,82 @@ def execute_manual_run(
             model=model,
             config=config,
             branch=branch,
+            issue_number=issue_number,
+            show_prompt=show_prompt,
         )
         return CodeagentExecutionService(config).execute_sync(command)
 
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
 
-    # Read audit_ref from flow_state for retry mode (review feedback injection)
+    # Derive retry from authoritative refs: if report_ref or audit_ref exists,
+    # this is a retry round — use retry prompt material.
     audit_file: str | None = None
+    prompt_mode: RunPromptMode = "coding"
+    report_ref: str | None = None
+    retry_session_id: str | None = None
+    context_mode: PromptContextMode = "bootstrap"
+    meta = None
     if branch:
         try:
             flow_state = SQLiteClient().get_flow_state(branch)
-            if flow_state and flow_state.get("audit_ref"):
-                audit_file = str(flow_state["audit_ref"])
+            if flow_state:
+                if flow_state.get("report_ref"):
+                    report_ref = str(flow_state["report_ref"])
+                if flow_state.get("audit_ref"):
+                    audit_file = str(flow_state["audit_ref"])
+                retry_session_id = load_session_id("executor", branch=branch)
+                meta = build_prompt_meta(
+                    flow_state,
+                    ref_keys=("plan_ref", "report_ref", "audit_ref"),
+                    retry_ref_keys=("report_ref", "audit_ref"),
+                    session_id=retry_session_id,
+                    default_mode="coding",
+                )
+                prompt_mode = meta.prompt_mode  # type: ignore[assignment]
+                context_mode = meta.context_mode
         except Exception:
             pass
+    if meta is None:
+        refs_for_summary = {
+            k: v
+            for k, v in {
+                "plan_ref": plan_file,
+                "report_ref": report_ref,
+                "audit_ref": audit_file,
+            }.items()
+            if v
+        }
+        from vibe3.execution.prompt_meta import PromptMeta
+
+        meta = PromptMeta(
+            prompt_mode=prompt_mode,
+            context_mode=context_mode,
+            session_id=retry_session_id,
+            refs=refs_for_summary,
+        )
+    dry_run_summary = meta.summary(
+        describe_run_plan_sections(prompt_mode, context_mode)
+    )
+    fallback_prompt = None
+    if prompt_mode == "retry" and context_mode == "resume":
+        fallback_prompt = make_run_context_builder(
+            plan_file,
+            config,
+            audit_file=audit_file,
+            mode=prompt_mode,
+            context_mode="bootstrap",
+        )()
+        dry_run_summary["fallback_context_mode"] = "bootstrap"
+    include_global_notice = not (prompt_mode == "retry" and context_mode == "resume")
 
     command = create_codeagent_command(
         role="executor",
         context_builder=make_run_context_builder(
-            plan_file, config, audit_file=audit_file
+            plan_file,
+            config,
+            audit_file=audit_file,
+            mode=prompt_mode,
+            context_mode=context_mode,
         ),
         task=instructions or run_prompt,
         dry_run=dry_run,
@@ -379,6 +481,12 @@ def execute_manual_run(
         model=model,
         config=config,
         branch=branch,
+        issue_number=issue_number,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=True,
+        dry_run_summary=dry_run_summary,
     )
 
     if not dry_run and not no_async:
@@ -407,7 +515,16 @@ def execute_manual_run(
         return None
 
     execution_service = CodeagentExecutionService(config)
-    result = execution_service.execute_sync(command)
+    try:
+        result = execution_service.execute_sync(command)
+    except Exception as exc:
+        if not dry_run and no_async and issue_number is not None:
+            publish_run_command_failure(
+                issue_number=issue_number,
+                reason=str(exc) or "Execution aborted",
+            )
+        raise
+
     if not dry_run and no_async and issue_number is not None:
         if result.success:
             publish_run_command_success(

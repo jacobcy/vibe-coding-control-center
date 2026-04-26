@@ -59,6 +59,8 @@ class ExecutionLifecycleService:
         actor: str,
         session_id: str | None = None,
         refs: dict[str, str] | None = None,
+        *,
+        event_type: str | None = None,
     ) -> None:
         # Determine appropriate detail based on actor type
         # orchestra: prefix indicates dispatch intent, not execution start
@@ -76,6 +78,7 @@ class ExecutionLifecycleService:
             detail=detail,
             session_id=session_id,
             refs=refs,
+            event_type=event_type,
         )
 
     def record_completed(
@@ -85,6 +88,8 @@ class ExecutionLifecycleService:
         actor: str,
         detail: str | None = None,
         refs: dict[str, str] | None = None,
+        *,
+        event_type: str | None = None,
     ) -> None:
         persist_execution_lifecycle_event(
             store=self._store,
@@ -94,6 +99,7 @@ class ExecutionLifecycleService:
             actor=actor,
             detail=detail or f"{role} execution completed",
             refs=refs,
+            event_type=event_type,
         )
 
     def record_failed(
@@ -103,6 +109,8 @@ class ExecutionLifecycleService:
         actor: str,
         error: str | None = None,
         refs: dict[str, str] | None = None,
+        *,
+        event_type: str | None = None,
     ) -> None:
         persist_execution_lifecycle_event(
             store=self._store,
@@ -112,6 +120,7 @@ class ExecutionLifecycleService:
             actor=actor,
             detail=error or f"{role} execution failed",
             refs=refs,
+            event_type=event_type,
         )
 
 
@@ -197,25 +206,32 @@ def persist_execution_lifecycle_event(
     session_id: str | None = None,
     refs: dict[str, str] | None = None,
     extra_state_updates: dict[str, object] | None = None,
+    event_type: str | None = None,
 ) -> None:
     """Persist lifecycle state and timeline event for an execution role."""
     now = datetime.now().isoformat()
-    status_field = _ROLE_STATUS_FIELD[role]
     state_updates: dict[str, object] = {}
 
-    if status_field:
-        if lifecycle == "started":
+    if lifecycle == "started":
+        state_updates["execution_started_at"] = now
+        # Update role status to running
+        status_field = _ROLE_STATUS_FIELD[role]
+        if status_field:
             state_updates[status_field] = "running"
-            state_updates["execution_started_at"] = now
-            state_updates["execution_completed_at"] = None
-        elif lifecycle == "completed":
-            state_updates[status_field] = "done"
-            state_updates["execution_completed_at"] = now
-            state_updates["execution_pid"] = None
-        else:
-            state_updates[status_field] = "crashed"
-            state_updates["execution_completed_at"] = now
-            state_updates["execution_pid"] = None
+    elif lifecycle == "completed":
+        state_updates["execution_completed_at"] = now
+        state_updates["execution_pid"] = None
+        # Update role status to completed
+        status_field = _ROLE_STATUS_FIELD[role]
+        if status_field:
+            state_updates[status_field] = "completed"
+    else:
+        state_updates["execution_completed_at"] = now
+        state_updates["execution_pid"] = None
+        # Update role status to lifecycle value (aborted/failed)
+        status_field = _ROLE_STATUS_FIELD[role]
+        if status_field:
+            state_updates[status_field] = lifecycle
 
         actor_field = _ROLE_ACTOR_FIELD[role]
         if actor_field:
@@ -227,9 +243,10 @@ def persist_execution_lifecycle_event(
     if state_updates:
         store.update_flow_state(branch, **state_updates)
 
+    resolved_event_type = event_type or f"{execution_prefix(role)}_{lifecycle}"
     store.add_event(
         branch,
-        f"{execution_prefix(role)}_{lifecycle}",
+        resolved_event_type,
         actor,
         detail=detail,
         refs=refs,

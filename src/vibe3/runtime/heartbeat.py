@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.failed_gate import GateResult
 from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
@@ -149,44 +148,18 @@ class HeartbeatServer:
             if not self._running:
                 break
 
-            # Failed gate check for dispatchers
-            gate_result = GateResult.open()
-            if self._failed_gate:
-                gate_result = self._failed_gate.check()
-
             self._tick_count += 1
             tick_number = self._tick_count
             started_at = time.perf_counter()
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
 
             # Write tick marker for readability (INFO level - shows timeline)
+            # Blank line before each tick for visual separation
+            append_orchestra_event("server", "")
             append_orchestra_event("server", f"tick #{tick_number} start")
-            if gate_result.blocked:
-                append_orchestra_event(
-                    "server",
-                    (
-                        f"heartbeat tick #{tick_number} frozen by state/failed issue "
-                        f"#{gate_result.issue_number or '?'}"
-                        + (
-                            f" reason={gate_result.reason}"
-                            if gate_result.reason
-                            else ""
-                        )
-                    ),
-                )
-
             tasks = []
             tick_services: list[str] = []
-            blocked_services: list[str] = []
             for svc in self._services:
-                if gate_result.blocked and svc.is_dispatch_service:
-                    blocked_services.append(svc.service_name)
-                    logger.bind(
-                        domain="orchestra",
-                        action="tick_blocked",
-                        service=type(svc).__name__,
-                    ).debug("Skip tick: dispatch blocked")
-                    continue
                 tick_services.append(svc.service_name)
                 tasks.append(self._tick_service(svc))
 
@@ -200,16 +173,6 @@ class HeartbeatServer:
                     + ", ".join(tick_services),
                     level="DEBUG",
                 )
-            if blocked_services:
-                append_orchestra_event(
-                    "server",
-                    "tick #"
-                    + str(tick_number)
-                    + " blocked dispatchers: "
-                    + ", ".join(blocked_services),
-                    level="DEBUG",
-                )
-
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -254,11 +217,6 @@ class HeartbeatServer:
             task.add_done_callback(self._pending_tasks.discard)
 
     async def _dispatch_event(self, event: GitHubEvent) -> None:
-        # Check for failed gate to determine if we block dispatch services
-        gate_result = GateResult.open()
-        if self._failed_gate:
-            gate_result = self._failed_gate.check()
-
         matching = [
             svc for svc in self._services if event.event_type in svc.event_types
         ]
@@ -275,22 +233,6 @@ class HeartbeatServer:
 
         tasks = []
         for svc in matching:
-            if gate_result.blocked and svc.is_dispatch_service:
-                logger.bind(
-                    domain="orchestra",
-                    action="event_blocked",
-                    service=type(svc).__name__,
-                ).warning(
-                    f"Event {event.event_type} dispatch frozen for "
-                    f"{type(svc).__name__} by failed issue #{gate_result.issue_number}"
-                )
-                append_orchestra_event(
-                    "server",
-                    f"event {event.event_type} blocked for "
-                    f"{type(svc).__name__} by state/failed issue "
-                    f"#{gate_result.issue_number or '?'}",
-                )
-                continue
             tasks.append(self._handle_with_semaphore(svc, event))
 
         if tasks:

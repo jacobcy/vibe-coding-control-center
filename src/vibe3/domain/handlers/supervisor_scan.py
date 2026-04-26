@@ -8,9 +8,9 @@ from typing import Callable, cast
 
 from loguru import logger
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import DomainEvent
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
-from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None:
@@ -18,7 +18,7 @@ def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None
     from vibe3.domain.handlers._shared import dispatch_request
     from vibe3.roles.supervisor import build_supervisor_apply_request
 
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     if config.dry_run:
         logger.bind(
             domain="supervisor_handler",

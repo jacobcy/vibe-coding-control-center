@@ -149,8 +149,8 @@ tests/doc-text/
 
 示例:
 ```bash
-@test "doc-text: glossary.md locks 'repo issue' term definition" {
-  run rg -n "repo issue.*特指.*GitHub repository issue" "$REPO_ROOT/docs/standards/glossary.md"
+@test "doc-text: glossary.md locks GitHub issue term definition" {
+  run rg -n "GitHub issue.*GitHub repository issue" "$REPO_ROOT/docs/standards/glossary.md"
   [ "$status" -eq 0 ]
 }
 ```

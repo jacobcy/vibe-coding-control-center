@@ -5,6 +5,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_block_mixin import FlowLifecycleMixin
 from vibe3.services.flow_transition import FlowTransitionMixin
+from vibe3.utils.path_helpers import GitClientProtocol
 
 
 class FlowService(FlowLifecycleMixin, FlowTransitionMixin):
@@ -21,13 +22,13 @@ class FlowService(FlowLifecycleMixin, FlowTransitionMixin):
     """
 
     store: SQLiteClient
-    git_client: GitClient
+    git_client: GitClientProtocol
     config: VibeConfig
 
     def __init__(
         self,
         store: SQLiteClient | None = None,
-        git_client: GitClient | None = None,
+        git_client: GitClientProtocol | None = None,
         config: VibeConfig | None = None,
     ) -> None:
         """Initialize flow service.

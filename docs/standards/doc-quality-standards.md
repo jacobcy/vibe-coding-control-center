@@ -328,7 +328,7 @@ created: 2025-01-24
 last_updated: 2025-01-24
 related_docs:
   - SOUL.md
-  - .agent/context/memory.md
+  - claude-memory MCP 工具（跨会话记忆）
 ---
 ```
 

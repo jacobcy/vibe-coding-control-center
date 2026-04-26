@@ -3,45 +3,58 @@
 from __future__ import annotations
 
 import os
-from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import Any, Callable, Iterable
 
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionRequest
-from vibe3.execution.gates import apply_request_completion_gate
-from vibe3.execution.role_contracts import CompletionContract, WorktreeRequirement
+from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.session_service import SessionRole
 from vibe3.models.orchestration import IssueInfo
 from vibe3.models.review_runner import AgentOptions
-from vibe3.runtime.no_progress_policy import snapshot_progress
-
-if TYPE_CHECKING:
-    from vibe3.roles.definitions import IssueRoleSyncSpec
+from vibe3.roles.definitions import IssueRoleSyncSpec
 
 
 def resolve_orchestra_repo_root() -> Path:
-    """Resolve the active repo root for orchestra self-invocation.
+    """Resolve the main repository root for orchestra operations.
 
-    Prefer the current worktree root so async/sync self-invocations execute the
-    same checked-out code the operator is running. Fall back to the shared git
-    common dir parent only when worktree resolution is unavailable.
+    Prioritize git common dir to ensure:
+    1. Worktrees are created under main repo's .worktrees (not nested)
+    2. Shared state (.git/vibe3/) is consistently accessed from main repo
+    3. All orchestra operations reference the canonical repository root
+
+    Fallback to current worktree root only when git common dir is unavailable,
+    and finally to cwd if all git resolution fails.
     """
-    try:
-        worktree_root = GitClient().get_worktree_root()
-        if worktree_root:
-            return Path(worktree_root)
-    except Exception:
-        pass
     try:
         git_common_dir = GitClient().get_git_common_dir()
         if git_common_dir:
             return Path(git_common_dir).parent
     except Exception:
         pass
+    try:
+        worktree_root = GitClient().get_worktree_root()
+        if worktree_root:
+            return Path(worktree_root)
+    except Exception:
+        pass
     return Path.cwd()
+
+
+def resolve_async_cli_project_root(repo_path: Path | None = None) -> Path:
+    """Resolve the code/project root used by async child self-invocation.
+
+    Rules:
+    - If `VIBE3_REPO_MODELS_ROOT` is set, use it. This is the debug-mode override
+      from `vibe3 serve start --debug`, and points at the current worktree code.
+    - Otherwise, use the provided repo_path / orchestra root, which defaults to
+      the main repository root in normal serve mode.
+    """
+    override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
+    if override_root:
+        return Path(override_root).expanduser().resolve()
+    return (repo_path or resolve_orchestra_repo_root()).resolve()
 
 
 def resolve_task_flow_branch(
@@ -119,11 +132,11 @@ def build_issue_async_cli_request(
     execution_name: str,
     refs: dict[str, str] | None,
     worktree_requirement: WorktreeRequirement,
-    completion_gate: CompletionContract | None,
     repo_path: Path | None = None,
 ) -> ExecutionRequest:
     """Build a generic async self-invocation request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
+    command_root = resolve_async_cli_project_root(root)
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
     return ExecutionRequest(
@@ -135,10 +148,10 @@ def build_issue_async_cli_request(
             "uv",
             "run",
             "--project",
-            str(root),
+            str(command_root),
             "python",
             "-I",
-            str((root / "src" / "vibe3" / "cli.py").resolve()),
+            str((command_root / "src" / "vibe3" / "cli.py").resolve()),
             *command_args,
         ],
         repo_path=str(root),
@@ -147,7 +160,6 @@ def build_issue_async_cli_request(
         actor=actor,
         mode="async",
         worktree_requirement=worktree_requirement,
-        completion_gate=completion_gate,
     )
 
 
@@ -162,16 +174,23 @@ def build_issue_sync_prompt_request(
     actor: str,
     execution_name: str,
     worktree_requirement: WorktreeRequirement,
-    completion_gate: CompletionContract | None,
     session_id: str | None = None,
     repo_path: Path | None = None,
     dry_run: bool = False,
+    show_prompt: bool = False,
+    include_global_notice: bool = True,
+    fallback_prompt: str | None = None,
+    fallback_include_global_notice: bool = True,
+    extra_refs: dict[str, str] | None = None,
+    dry_run_summary: dict[str, Any] | None = None,
 ) -> ExecutionRequest:
     """Build a generic sync prompt-based request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
     refs = {"task": task}
     if session_id:
         refs["session_id"] = session_id
+    if extra_refs:
+        refs.update(extra_refs)
     return ExecutionRequest(
         role=role,
         target_branch=target_branch,
@@ -185,8 +204,12 @@ def build_issue_sync_prompt_request(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=fallback_include_global_notice,
+        dry_run_summary=dry_run_summary or {},
         worktree_requirement=worktree_requirement,
-        completion_gate=completion_gate,
     )
 
 
@@ -204,193 +227,34 @@ def resolve_env_overridable_agent_options(
     return fallback_resolver()
 
 
-def snapshot_issue_role_progress(
-    *,
-    issue_number: int,
-    branch: str,
-    store: SQLiteClient,
-    repo: str | None,
-) -> dict[str, object]:
-    """Capture generic issue role progress snapshot."""
-    return snapshot_progress(
-        issue_number=issue_number,
-        branch=branch,
-        store=store,
-        github=GitHubClient(),
-        repo=repo,
-    )
-
-
-def apply_required_ref_post_sync(
-    store: SQLiteClient,
-    issue_number: int,
-    _branch: str,  # Required for signature compatibility, unused
-    actor: str,
-    config: Any,
-    before_snapshot: dict[str, object],
-    after_snapshot: dict[str, object],
-    request: ExecutionRequest,
-    *,
-    required_ref: str,
-    missing_reason: str,
-    missing_ref_handler: Callable[..., None],
-    success_handler: Callable[..., None] | None = None,
-) -> bool:
-    """Apply standard completion gate with required-ref and no-op protection.
-
-    Three-branch logic:
-    1. Missing ref → block (missing_ref_handler)
-    2. Ref present + state unchanged → block (no-op gate)
-    3. Ref present + state changed → pass (apply_request_completion_gate)
-
-    Args:
-        _branch: Required to match IssueRoleSyncSpec.post_sync_hook signature,
-            but not used in this implementation. Prefix underscore indicates
-            intentional unused parameter.
-        success_handler: Deprecated. State transitions are managed by the agent,
-            not by code. The no-op gate blocks if ref exists but state unchanged.
-            This parameter is kept for signature compatibility but should not be
-            used (will be removed in future refactor).
-    """
-    before_refs = before_snapshot.get("refs")
-    after_refs = after_snapshot.get("refs")
-    before_state = before_snapshot.get("state_label")
-    after_state = after_snapshot.get("state_label")
-
-    # Import constants for flow event recording
-    from vibe3.utils.constants import (
-        EVENT_STATE_TRANSITIONED,
-        EVENT_STATE_UNCHANGED,
-    )
-
-    # Branch 1: Missing ref → block
-    if isinstance(before_refs, dict) and isinstance(after_refs, dict):
-        before_value = before_refs.get(required_ref)
-        after_value = after_refs.get(required_ref)
-        if not before_value and not after_value:
-            store.add_event(
-                _branch,
-                EVENT_STATE_UNCHANGED,
-                actor,
-                detail=f"Missing {required_ref} → blocked",
-                refs={
-                    "state": str(before_state or ""),
-                    "required_ref": required_ref,
-                    "issue": str(issue_number),
-                },
-            )
-            missing_ref_handler(
-                issue_number=issue_number,
-                reason=missing_reason,
-                actor=actor,
-                repo=config.repo,
-            )
-            return True
-
-    # Branch 2: Ref present + state unchanged → block (no-op gate)
-    if before_state == after_state:
-        store.add_event(
-            _branch,
-            EVENT_STATE_UNCHANGED,
-            actor,
-            detail=(
-                f"State unchanged after {required_ref} gate: " f"still {before_state}"
-            ),
-            refs={
-                "state": str(before_state or ""),
-                "required_ref": required_ref,
-                "issue": str(issue_number),
-            },
-        )
-        # Block with same handler (or could use dedicated no-op handler)
-        missing_ref_handler(
-            issue_number=issue_number,
-            reason=f"{required_ref} present but state unchanged",
-            actor=actor,
-            repo=config.repo,
-        )
-        return True
-
-    # Branch 3: Ref present + state changed → pass
-    store.add_event(
-        _branch,
-        EVENT_STATE_TRANSITIONED,
-        actor,
-        detail=f"State changed: {before_state} → {after_state}",
-        refs={
-            "before_state": str(before_state or ""),
-            "after_state": str(after_state or ""),
-            "required_ref": required_ref,
-            "issue": str(issue_number),
-        },
-    )
-
-    # Note: success_handler is deprecated. State transitions are managed by agent.
-    # This call is kept for backward compatibility but should not be used.
-    if success_handler is not None:
-        success_handler(issue_number=issue_number, actor=actor)
-
-    return apply_request_completion_gate(
-        request=request,
-        store=store,
-        repo=config.repo,
-        before_snapshot=before_snapshot,
-        after_snapshot=after_snapshot,
-    )
-
-
-def build_required_ref_sync_spec(
+def build_issue_sync_spec(
     *,
     role_name: SessionRole,
     resolve_options: Callable[[Any], Any],
     resolve_branch: Callable[[SQLiteClient, int, str], str],
     build_async_request: Callable[[Any, IssueInfo, str], ExecutionRequest | None],
     build_sync_request: Callable[
-        [Any, IssueInfo, str, str | None, Any, str, bool], ExecutionRequest
+        [
+            Any,
+            IssueInfo,
+            str,
+            dict[str, object] | None,
+            str | None,
+            Any,
+            str,
+            bool,
+            bool,
+        ],
+        ExecutionRequest,
     ],
-    required_ref: str,
-    missing_reason: str,
-    missing_ref_handler: Callable[..., None],
     failure_handler: Callable[..., None],
-    success_handler: Callable[..., None] | None = None,
-    process_sync_result: Callable[..., None] | None = None,
 ) -> IssueRoleSyncSpec:
-    """Build the standard sync spec shared by plan/run/review-style roles.
-
-    Args:
-        success_handler: Optional state-transition callback invoked when
-            required_ref is present after execution completes. Called as
-            success_handler(issue_number=..., actor=...).
-            Use this instead of domain events for async tmux paths where the
-            subprocess event bus is separate from the orchestra process.
-        process_sync_result: Optional callback to process sync execution output
-            before taking the after snapshot. Called as
-            process_sync_result(issue_number=..., branch=..., actor=..., stdout=...).
-            Use this to write refs (e.g., audit_ref) from stdout before snapshot.
-    """
-    from vibe3.roles.definitions import IssueRoleSyncSpec
-
+    """Build the minimal sync spec shared by issue-scoped roles."""
     return IssueRoleSyncSpec(
         role_name=role_name,
         resolve_options=resolve_options,
         resolve_branch=resolve_branch,
         build_async_request=build_async_request,
         build_sync_request=build_sync_request,
-        snapshot_progress=lambda issue_number, branch, store, config: (
-            snapshot_issue_role_progress(
-                issue_number=issue_number,
-                branch=branch,
-                store=store,
-                repo=config.repo,
-            )
-        ),
-        post_sync_hook=partial(
-            apply_required_ref_post_sync,
-            required_ref=required_ref,
-            missing_reason=missing_reason,
-            missing_ref_handler=missing_ref_handler,
-            success_handler=success_handler,
-        ),
         failure_handler=failure_handler,
-        process_sync_result=process_sync_result,
     )

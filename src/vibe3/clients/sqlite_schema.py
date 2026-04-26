@@ -113,8 +113,26 @@ _CREATE_FLOW_CONTEXT_CACHE = """
 """
 
 
+_CLEAN_STALE_VERDICT_LINES_SQL = """
+    UPDATE flow_events
+    SET detail = CASE
+        WHEN instr(detail, char(10)) > 0
+            THEN substr(detail, instr(detail, char(10)) + 1)
+        ELSE REPLACE(detail, 'verdict: UNKNOWN', '')
+    END
+    WHERE event_type IN ('handoff_plan', 'handoff_report', 'handoff_run')
+      AND detail LIKE 'verdict: UNKNOWN%'
+"""
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
+    # Enable WAL mode so concurrent readers (CLI, orchestra, tmux agents)
+    # never block each other.  In DELETE journal mode (the default), a writer
+    # holds an exclusive lock that can cause CLI reads to see stale or
+    # incomplete data during multi-process access.
+    conn.execute("PRAGMA journal_mode=WAL")
+
     cursor = conn.cursor()
 
     cursor.execute(_CREATE_SCHEMA_META)
@@ -184,6 +202,21 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added failed_reason column to flow_state"
         )
 
+    # Migration: add latest_verdict field for verdict tracking
+    if "latest_verdict" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_verdict TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added latest_verdict column to flow_state"
+        )
+
+    # Legacy compatibility: keep old column for existing databases.
+    # New code no longer reads or writes this field.
+    if "latest_indicate_action" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_indicate_action TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added latest_indicate_action column to flow_state"
+        )
+
     # Migration: migrate existing blocked_by data to new fields
     # Pattern: "#218" → blocked_by_issue=218, other text → blocked_reason
     if "blocked_by" in existing and (
@@ -226,6 +259,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
     }
     if "refs" not in event_columns:
         cursor.execute("ALTER TABLE flow_events ADD COLUMN refs TEXT")
+
+    before_changes = conn.total_changes
+    cursor.execute(_CLEAN_STALE_VERDICT_LINES_SQL)
+    cleaned = conn.total_changes - before_changes
+    if cleaned:
+        logger.bind(external="sqlite", operation="migration").info(
+            f"Cleaned stale plan/run verdict lines from {cleaned} flow_events rows"
+        )
 
     # Normalize legacy issue_role values from the old classification view.
     cursor.execute(

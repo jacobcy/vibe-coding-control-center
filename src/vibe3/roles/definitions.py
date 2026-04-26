@@ -7,12 +7,12 @@ from typing import Any, Callable, Literal
 
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionRequest
-from vibe3.execution.role_contracts import RoleGateConfig
+from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.session_service import SessionRole
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
-TriggerName = Literal["manager", "plan", "run", "review"]
+TriggerName = Literal["manager", "plan", "run", "review", "blocked"]
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class RoleDefinition:
 
     name: str
     registry_role: str
-    gate_config: RoleGateConfig
+    worktree: WorktreeRequirement
     trigger_name: TriggerName | None = None
     trigger_state: IssueState | None = None
 
@@ -36,15 +36,12 @@ class TriggerableRoleDefinition(RoleDefinition):
     Attributes:
         trigger_name: TriggerName used to identify this role in dispatch.
         trigger_state: IssueState label that activates this role.
-        status_field: flow_state key tracking running status (None for manager).
         dispatch_predicate: (flow_state, has_live_session) -> bool controlling
             whether an issue should be dispatched for this role.
     """
 
     trigger_name: TriggerName  # type: ignore[override]
     trigger_state: IssueState  # type: ignore[override]
-    # Optional gating data — defaults keep backwards compatibility
-    status_field: str | None = None
     dispatch_predicate: Callable[[dict[str, object], bool], bool] = field(
         default=lambda _flow, has_live: not has_live,
         compare=False,
@@ -63,26 +60,17 @@ class IssueRoleSyncSpec:
         [OrchestraConfig, IssueInfo, str], ExecutionRequest | None
     ]
     build_sync_request: Callable[
-        [OrchestraConfig, IssueInfo, str, str | None, Any, str, bool], ExecutionRequest
-    ]
-    snapshot_progress: Callable[..., dict[str, object]] | None = None
-    post_sync_hook: (
-        Callable[
-            [
-                SQLiteClient,
-                int,
-                str,
-                str,
-                OrchestraConfig,
-                dict[str, object],
-                dict[str, object],
-                ExecutionRequest,
-            ],
+        [
+            OrchestraConfig,
+            IssueInfo,
+            str,
+            dict[str, object] | None,
+            str | None,
+            Any,
+            str,
             bool,
-        ]
-        | None
-    ) = None
+            bool,
+        ],
+        ExecutionRequest,
+    ]
     failure_handler: Callable[..., None] | None = None
-    process_sync_result: Callable[..., None] | None = (
-        None  # Process sync output before snapshot
-    )

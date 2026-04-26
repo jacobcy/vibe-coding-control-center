@@ -12,7 +12,7 @@ from vibe3.models.review_runner import AgentOptions
 def resolve_command_agent_options(
     *,
     config: VibeConfig,
-    section: Literal["plan", "run", "review"],
+    section: Literal["manager", "plan", "run", "review"],
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,

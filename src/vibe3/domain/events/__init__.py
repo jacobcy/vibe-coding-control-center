@@ -23,24 +23,21 @@ class DomainEvent:
 
 # Import from submodules
 from vibe3.domain.events.flow_lifecycle import (  # noqa: E402
-    ExecutionCompleted,
-    ExecutorDispatched,
-    FlowAborted,
-    FlowBlocked,
-    IssueBlocked,
+    ExecutorDispatched,  # Backward compatibility alias
+    ExecutorDispatchIntent,
     IssueFailed,
     IssueStateChanged,
-    PlanCompleted,
-    PlannerDispatched,
-    ReportRefRequired,
-    ReviewCompleted,
-    ReviewerDispatched,
+    ManagerDispatched,  # Backward compatibility alias
+    ManagerDispatchIntent,
+    PlannerDispatched,  # Backward compatibility alias
+    PlannerDispatchIntent,
+    ReviewerDispatched,  # Backward compatibility alias
+    ReviewerDispatchIntent,
 )
 from vibe3.domain.events.governance import (  # noqa: E402
     GovernanceDecisionRequired,
     GovernanceScanCompleted,
     GovernanceScanStarted,
-    SupervisorExecutionCompleted,
 )
 from vibe3.domain.events.supervisor_apply import (  # noqa: E402
     SupervisorApplyCompleted,
@@ -57,14 +54,13 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueStateChanged",
     "IssueFailed",
-    "IssueBlocked",
-    "ReportRefRequired",
-    "FlowBlocked",
-    "FlowAborted",
-    "PlanCompleted",
-    "ReviewCompleted",
-    "ExecutionCompleted",
-    # L3 Dispatch-Intent Events
+    # L3 Dispatch-Intent Events (new names)
+    "ManagerDispatchIntent",
+    "PlannerDispatchIntent",
+    "ExecutorDispatchIntent",
+    "ReviewerDispatchIntent",
+    # L3 Dispatch-Intent Events (backward compatibility)
+    "ManagerDispatched",
     "PlannerDispatched",
     "ExecutorDispatched",
     "ReviewerDispatched",
@@ -72,7 +68,6 @@ __all__ = [
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
     "GovernanceDecisionRequired",
-    "SupervisorExecutionCompleted",
     # L2 Supervisor Apply Events
     "SupervisorIssueIdentified",
     "SupervisorPromptRendered",
@@ -82,27 +77,25 @@ __all__ = [
     "SupervisorApplyDelegated",
 ]
 
-# Event type registry
+# Event type registry with backward compatibility
 EVENT_TYPES = {
     # L3 Flow Lifecycle
     "issue_state_changed": IssueStateChanged,
     "issue_failed": IssueFailed,
-    "issue_blocked": IssueBlocked,
-    "report_ref_required": ReportRefRequired,
-    "flow_blocked": FlowBlocked,
-    "flow_aborted": FlowAborted,
-    "plan_completed": PlanCompleted,
-    "review_completed": ReviewCompleted,
-    "execution_completed": ExecutionCompleted,
-    # L3 Dispatch-Intent
-    "planner_dispatched": PlannerDispatched,
-    "executor_dispatched": ExecutorDispatched,
-    "reviewer_dispatched": ReviewerDispatched,
+    # L3 Dispatch-Intent (new names)
+    "manager_dispatch_intent": ManagerDispatchIntent,
+    "planner_dispatch_intent": PlannerDispatchIntent,
+    "executor_dispatch_intent": ExecutorDispatchIntent,
+    "reviewer_dispatch_intent": ReviewerDispatchIntent,
+    # L3 Dispatch-Intent (backward compatibility)
+    "manager_dispatched": ManagerDispatchIntent,
+    "planner_dispatched": PlannerDispatchIntent,
+    "executor_dispatched": ExecutorDispatchIntent,
+    "reviewer_dispatched": ReviewerDispatchIntent,
     # L1 Governance
     "governance_scan_started": GovernanceScanStarted,
     "governance_scan_completed": GovernanceScanCompleted,
     "governance_decision_required": GovernanceDecisionRequired,
-    "supervisor_execution_completed": SupervisorExecutionCompleted,
     # L2 Supervisor Apply
     "supervisor_issue_identified": SupervisorIssueIdentified,
     "supervisor_prompt_rendered": SupervisorPromptRendered,
