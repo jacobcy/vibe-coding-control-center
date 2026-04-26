@@ -103,7 +103,7 @@
 
 ## Comment Contract（Review 角色）
 
-详细规则见 [common.md → Comment vs Handoff Contract](common.md)，本节只补充 review 特有要求。
+详细规则见「共用前提」中的 Comment vs Handoff Contract，本节只补充 review 特有要求。
 
 - 何时写 comment：review 裁决（PASS / MAJOR / BLOCK）外发、需要 PR 作者修复的明确请求、合并/回退建议。
 - 何时改用 handoff append：审查中的次要观察、不阻塞当前裁决的待跟进事项、给下一轮 reviewer 的上下文。

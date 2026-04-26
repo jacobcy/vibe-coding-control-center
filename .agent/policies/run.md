@@ -88,7 +88,7 @@
 
 ## Comment Contract（Run 角色）
 
-详细规则见 [common.md → Comment vs Handoff Contract](common.md)，本节只补充 run 特有要求。
+详细规则见「共用前提」中的 Comment vs Handoff Contract，本节只补充 run 特有要求。
 
 - 何时写 comment：run 完成（实现 + 验证）后的对外结论、阻塞需要人类介入、PR 状态变化通报。
 - 何时改用 handoff append：执行中的 finding、调试线索、未影响最终交付的过程记录。

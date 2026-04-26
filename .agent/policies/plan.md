@@ -124,7 +124,7 @@
 
 ## Comment Contract（Plan 角色）
 
-详细规则见 [common.md → Comment vs Handoff Contract](common.md)，本节只补充 plan 特有要求。
+详细规则见「共用前提」中的 Comment vs Handoff Contract，本节只补充 plan 特有要求。
 
 - 何时写 comment：plan 阶段产出对外里程碑（plan 完成可交付、范围发生重大变化、依赖人类决策的争议）。
 - 何时改用 handoff append：规划过程中的 finding、临时假设、内部调研记录。
