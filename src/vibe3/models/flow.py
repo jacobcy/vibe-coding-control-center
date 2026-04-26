@@ -74,15 +74,9 @@ class FlowState(BaseModel):
     blocked_reason: str | None = None  # NEW: Block reason text (semantic clarity)
     failed_reason: str | None = None  # NEW: Fail reason text
     next_step: str | None = None
-    flow_status: Literal[
-        "active",
-        "blocked",
-        "failed",
-        "done",
-        "stale",
-        "aborted",
-        "merged",
-    ] = "active"
+    flow_status: Literal["active", "blocked", "failed", "done", "stale", "aborted"] = (
+        "active"
+    )
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -226,15 +220,7 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal[
-        "active",
-        "blocked",
-        "failed",
-        "done",
-        "stale",
-        "aborted",
-        "merged",
-    ]
+    flow_status: Literal["active", "blocked", "failed", "done", "stale", "aborted"]
     task_issue_number: int | None = None
     pr_number: int | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation
