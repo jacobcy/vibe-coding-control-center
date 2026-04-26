@@ -12,6 +12,20 @@ jobs:
       issues: write
       pull-requests: read
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --dev
+
       - name: Set linked issues to done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -26,7 +40,7 @@ jobs:
           fi
 
           export ISSUE_NUMBERS
-          python - <<'PY'
+          uv run python - <<'PY'
           import os
           import sys
 
