@@ -46,17 +46,6 @@ def test_infer_resume_label_audit_major() -> None:
     assert infer_resume_label(state) == IssueState.IN_PROGRESS
 
 
-def test_infer_resume_label_audit_minor() -> None:
-    """Audit minor issues -> IN_PROGRESS."""
-    state = FlowState(
-        branch="task/issue-1",
-        flow_slug="test",
-        audit_ref="audit.md",
-        latest_verdict=_create_verdict("MINOR"),
-    )
-    assert infer_resume_label(state) == IssueState.IN_PROGRESS
-
-
 def test_infer_resume_label_conflict_pr_vs_audit() -> None:
     """Conflict: both PR and Audit exist -> HANDOFF (PR wins)."""
     state = FlowState(

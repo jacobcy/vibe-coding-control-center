@@ -236,13 +236,25 @@ class IssueTitleCacheService:
         Returns:
             Tuple of (title, had_network_error).
         """
-        # Get issue number from cache
+        # 1. Try get issue number from cache
         cache = self.store.get_flow_context_cache(branch)
-        if not cache:
-            return None, False
+        issue_number = cache.get("task_issue_number") if cache else None
 
-        issue_number = cache.get("task_issue_number")
+        # 2. Fall back to flow_issue_links if cache missing (Truth source)
         if not issue_number:
+            links = self.store.get_issue_links(branch)
+            task_link = next(
+                (link for link in links if link.get("issue_role") == "task"), None
+            )
+            if task_link:
+                issue_number = task_link.get("issue_number")
+
+        if not issue_number:
+            logger.bind(
+                domain="issue_title_cache",
+                action="fetch_and_cache",
+                branch=branch,
+            ).debug("No task issue found for branch, skipping GitHub fetch")
             return None, False
 
         try:

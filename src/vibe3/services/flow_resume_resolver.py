@@ -35,7 +35,7 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
     if flow_state.audit_ref and flow_state.latest_verdict:
         verdict = flow_state.latest_verdict.verdict.lower()
         # Review has been completed
-        if verdict in {"pass", "major", "minor"}:
+        if verdict in {"pass", "major"}:
             return IssueState.IN_PROGRESS  # Need to modify code based on review
         if verdict == "unknown":
             return IssueState.HANDOFF  # Cannot decide -> Manager takes over
