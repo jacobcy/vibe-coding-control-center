@@ -72,8 +72,21 @@ class TaskResumeCandidates:
         flows: list[FlowStatusResponse],
         stale_flows: list[FlowStatusResponse],
     ) -> dict[str, Any] | None:
-        """为显式指定的 issue 直接构造恢复候选。"""
+        """为显式指定的 issue 直接构造恢复候选。
+
+        对于显式指定的 issue（通过 vibe3 task resume <issue_number>），
+        允许任何非 DONE 状态进行完整重建，用于清理脏数据场景。
+        """
         current_state = self.label_service.get_state(issue_number)
+
+        # Issue 不存在或已完成，不允许 resume
+        if current_state is None or current_state == IssueState.DONE:
+            return None
+
+        # 查找关联的 flow（可能不存在）
+        flow = self.find_resume_flow(issue_number, flows, stale_flows)
+
+        # 对于 aborted flow 且状态为 ready/handoff，使用 aborted 恢复
         if current_state in {IssueState.READY, IssueState.HANDOFF}:
             aborted_flow = self.find_resume_flow_by_status(
                 issue_number,
@@ -90,26 +103,24 @@ class TaskResumeCandidates:
                     "flow": aborted_flow,
                 }
 
-        flow = self.find_resume_flow(issue_number, flows, stale_flows)
-        if (
-            flow is not None
-            and flow.flow_status == "aborted"
-            and current_state in {IssueState.READY, IssueState.HANDOFF}
-        ):
-            return {
-                "number": issue_number,
-                "title": "",
-                "state": current_state,
-                "resume_kind": "aborted",
-                "flow": flow,
-            }
+            if flow is not None and flow.flow_status == "aborted":
+                return {
+                    "number": issue_number,
+                    "title": "",
+                    "state": current_state,
+                    "resume_kind": "aborted",
+                    "flow": flow,
+                }
 
+        # 根据状态确定 resume_kind
         if current_state == IssueState.FAILED:
             resume_kind = "failed"
         elif current_state == IssueState.BLOCKED:
             resume_kind = "blocked"
         else:
-            return None
+            # 对于其他状态（ready/handoff/review/merge-ready 等），
+            # 使用 "all" 类型，允许完整重建
+            resume_kind = "all"
 
         return {
             "number": issue_number,
@@ -207,6 +218,7 @@ class TaskResumeCandidates:
         candidate_state: object,
         worktree_path: str | None,
         has_live_sessions: bool | None = None,
+        label_state: str | None = None,  # 新增：区分 --label 和完整重建
     ) -> str | None:
         """Skip noop all-task candidates that no longer have a task scene to reset.
 
@@ -217,31 +229,47 @@ class TaskResumeCandidates:
             worktree_path: Worktree path (if exists)
             has_live_sessions: Whether branch has live runtime sessions (from registry).
                 Registry is the single source of truth for session status.
+            label_state: Optional label state (--label mode). None means full rebuild.
 
         Returns:
             Skip reason string if candidate should be skipped, None otherwise.
         """
         branch = getattr(flow, "branch", None) if flow else None
-        if not isinstance(branch, str):
-            return None
 
         # Registry is the source of truth for live sessions
         has_runtime_sessions = bool(has_live_sessions)
 
-        if (
-            candidate_state == IssueState.READY
-            and worktree_path is None
-            and not has_runtime_sessions
-        ):
+        # --label 模式：保留现场，只清理 reason
+        # 如果没有现场可清理 reason，则跳过
+        if label_state is not None:
+            if (
+                candidate_state == IssueState.READY
+                and worktree_path is None
+                and not has_runtime_sessions
+            ):
+                logger.bind(
+                    domain="resume",
+                    action="skip_noop_label_resume",
+                    issue_number=issue_number,
+                    branch=branch,
+                    worktree_path=None,
+                    state="ready",
+                ).info("Skipping --label resume without task scene")
+                return "已是 state/ready 且无 task scene，无法清理 reason，跳过恢复"
+
+        # 完整重建模式（无 --label）：
+        # 即使没有 worktree/flow，也可以继续（将状态设为 ready，等待重新 dispatch）
+        # 只有当有活跃 session 时才跳过（需要用户手动处理）
+        if has_runtime_sessions:
             logger.bind(
                 domain="resume",
-                action="skip_noop_all_task",
+                action="skip_live_session",
                 issue_number=issue_number,
                 branch=branch,
-                worktree_path=None,
-                state="ready",
-            ).info("Skipping ready candidate without task scene")
-            return "已是 state/ready 且无 task scene，跳过恢复"
+                worktree_path=worktree_path,
+            ).info("Skipping resume due to live runtime sessions")
+            return "存在活跃 runtime session，需要先手动终止，跳过恢复"
+
         return None
 
     def verify_issue_state_for_resume(

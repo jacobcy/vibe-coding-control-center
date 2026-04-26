@@ -3,6 +3,7 @@
 from typing import Annotated, Any, Literal
 
 import typer
+from rich.console import Console
 
 from vibe3.commands.check_support import execute_check_mode
 from vibe3.observability.logger import setup_logging
@@ -136,7 +137,7 @@ def check(
 
         # Hint for clean-branch after regular check
         if mode == "fix_all":
-            typer.echo(
+            Console().print(
                 "\n  [dim]Hint: To clean residual branches for done/aborted flows, "
                 "use 'vibe3 check --clean-branch'[/]"
             )
