@@ -136,13 +136,13 @@ def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> Non
         author = comment.get("author") or {}
         login = str(author.get("login") or "unknown").strip()
 
-        # Find automation marker if present (Bug 1: must be at start of line)
+        # Find automation marker if present (supports `### [marker]` format)
         marker = None
         escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
-        pattern = r"^\s*(" + "|".join(escaped_markers) + ")"
+        pattern = r"^(\s*|#{1,6}\s*)(" + "|".join(escaped_markers) + ")"
         match = re.match(pattern, body, re.IGNORECASE)
         if match:
-            marker = match.group(1)
+            marker = match.group(2)  # Group 2 is the marker
 
         # Display with label
         if marker:

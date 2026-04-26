@@ -41,18 +41,18 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
         return True
 
     # Filter by content: automated markers indicate non-human comments
-    # Use regex to match marker at start of line (including whitespace)
-    # to avoid false positives in human discussion or quotes.
+    # Match marker at start of line OR after markdown heading prefix (###).
+    # This handles both `[manager] text` and `### [manager] text` formats.
     if body:
-        # Build pattern like: ^\s*(\[manager\]|\[resume\]|...)
+        # Build pattern like: ^(\s*|#{1,6}\s*)(\[manager\]|\[resume\]|...)
         escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
-        pattern = r"^\s*(" + "|".join(escaped_markers) + ")"
+        pattern = r"^(\s*|#{1,6}\s*)(" + "|".join(escaped_markers) + ")"
         if re.match(pattern, body, re.IGNORECASE):
             return False
 
         # Fallback: generic [agent] / [agent:<role>] pattern
         # Matches markers not in the explicit whitelist
-        generic_pattern = r"^\s*" + GENERIC_AGENT_MARKER_PATTERN
+        generic_pattern = r"^(\s*|#{1,6}\s*)" + GENERIC_AGENT_MARKER_PATTERN
         if re.match(generic_pattern, body, re.IGNORECASE):
             return False
 

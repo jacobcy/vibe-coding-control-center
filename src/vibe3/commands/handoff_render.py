@@ -179,10 +179,10 @@ def _render_handoff_events(
             sanitized = sanitize_event_detail_paths(
                 event.detail, event.refs, worktree_root
             )
-            # Add color for manager details if they start with [manager]
+            # Add color for manager details if they start with marker
             display_detail = sanitized
             escaped_markers = [re.escape(m) for m in AUTOMATED_MARKERS]
-            pattern = r"^\s*(" + "|".join(escaped_markers) + ")"
+            pattern = r"^(\s*|#{1,6}\s*)(" + "|".join(escaped_markers) + ")"
             if re.match(pattern, sanitized, re.IGNORECASE):
                 display_detail = f"[yellow]{sanitized}[/]"
 
