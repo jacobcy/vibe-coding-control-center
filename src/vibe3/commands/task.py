@@ -180,6 +180,11 @@ def resume(
     if trace:
         setup_logging(verbose=2)
 
+    # Register EDA event handlers (resume publishes IssueStateChanged events)
+    from vibe3.domain.handlers import register_event_handlers
+
+    register_event_handlers()
+
     # Validate arguments
     selected_modes = [failed, blocked, all_tasks]
     has_flag = any(selected_modes)

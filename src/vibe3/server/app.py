@@ -151,6 +151,11 @@ def start(
 
     setup_logging(verbose=verbose)
 
+    # Register EDA event handlers for orchestra event processing
+    from vibe3.domain.handlers import register_event_handlers
+
+    register_event_handlers()
+
     # Orchestra events.log level follows global verbosity
     # Default: INFO (key runtime events for monitoring)
     # -v: already INFO (no change needed)
