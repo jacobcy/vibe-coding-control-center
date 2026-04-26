@@ -51,8 +51,8 @@ class CheckService(CheckRemote):
 
     # Terminal flow statuses that indicate completed flows
     TERMINAL_FLOW_STATUSES = ("done", "aborted", "merged")
-    # Active flow statuses that should be checked
-    ACTIVE_FLOW_STATUSES = ("active", "stale")
+    # Flow statuses that should be skipped for handoff/ref checks
+    INACTIVE_FLOW_STATUSES = ("done", "aborted", "stale")
 
     def __init__(
         self,
@@ -284,7 +284,7 @@ class CheckService(CheckRemote):
             return CheckResult(is_valid=True, branch=branch, issues=[])
 
         # ref files exist
-        if flow_status not in ("done", "aborted", "stale"):
+        if flow_status not in self.INACTIVE_FLOW_STATUSES:
             for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
                 ref_value = flow_data.get(ref_field)
                 if ref_value:
@@ -307,7 +307,7 @@ class CheckService(CheckRemote):
                         )
 
         # shared current.md
-        if flow_status not in ("done", "aborted", "stale") and requires_handoff(
+        if flow_status not in self.INACTIVE_FLOW_STATUSES and requires_handoff(
             orchestration_state
         ):
             git_dir = self.git_client.get_git_common_dir()
@@ -325,42 +325,40 @@ class CheckService(CheckRemote):
         """Best-effort cleanup of worktree, local branch, and remote branch.
 
         Checks existence before attempting deletion to avoid noisy warnings.
+        Uses extracted helper methods for consistency.
         """
-        # 1. Clean up worktree (check existence first)
-        try:
-            worktree_path = self.git_client.find_worktree_path_for_branch(branch)
-            if worktree_path is not None:
-                self.git_client.remove_worktree(worktree_path, force=True)
-        except Exception as exc:
-            logger.bind(domain="check", branch=branch).warning(
-                f"Failed to remove worktree during local scene cleanup: {exc}"
-            )
+        # 1. Clean up worktree
+        if self._has_worktree(branch):
+            try:
+                worktree_path = self.git_client.find_worktree_path_for_branch(branch)
+                if worktree_path:
+                    self.git_client.remove_worktree(worktree_path, force=True)
+            except Exception as exc:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to remove worktree during local scene cleanup: {exc}"
+                )
 
-        # 2. Clean up local branch (check existence first)
-        try:
-            output = self.git_client._run(["branch", "--list", branch])
-            if output.strip():
+        # 2. Clean up local branch
+        if self._has_local_branch(branch):
+            try:
                 self.git_client.delete_branch(
                     branch,
                     force=force_delete,
                     skip_if_worktree=True,
                 )
-        except Exception as exc:
-            logger.bind(domain="check", branch=branch).warning(
-                f"Failed to delete branch during local scene cleanup: {exc}"
-            )
+            except Exception as exc:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to delete branch during local scene cleanup: {exc}"
+                )
 
-        # 3. Clean up remote branch (check existence first)
-        try:
-            remote_output = self.git_client._run(
-                ["branch", "-r", "--list", f"origin/{branch}"]
-            )
-            if remote_output.strip():
+        # 3. Clean up remote branch
+        if self._has_remote_branch(branch):
+            try:
                 self.git_client.delete_remote_branch(branch)
-        except Exception as exc:
-            logger.bind(domain="check", branch=branch).warning(
-                f"Failed to delete remote branch during local scene cleanup: {exc}"
-            )
+            except Exception as exc:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to delete remote branch during local scene cleanup: {exc}"
+                )
 
     def _rebuild_stale_ready_flow(
         self,
@@ -420,9 +418,6 @@ class CheckService(CheckRemote):
             "system",
             f"Flow auto-completed: {reason}",
         )
-        # Branch cleanup is deferred to --clean-branch for performance and code reuse
-        # if cleanup_local_scene:
-        #     self._cleanup_local_scene(branch, force_delete=True)
 
         # Check if linked issue is still open
         suggestions: dict[str, int | None] = {"issue_to_close": None}
