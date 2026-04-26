@@ -280,7 +280,7 @@ class TestCleanResidualBranches:
     def test_clean_residual_branches_removes_done_flow_branches(
         self, check_service, mock_store, mock_git_client
     ):
-        """Should clean branches for done/aborted flows."""
+        """Should clean physical resources for done flows but keep flow record."""
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
             {"branch": "feature/active-branch", "flow_status": "active"},
@@ -291,17 +291,18 @@ class TestCleanResidualBranches:
 
         result = check_service.clean_residual_branches()
 
-        assert "feature/done-branch" in result["cleaned"]
-        assert len(result["cleaned"]) == 1
+        # Done flow should be in kept_records (physical resources cleaned, record kept)
+        assert "feature/done-branch" in result["kept_records"]
+        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows only
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_skips_when_no_resources(
         self, check_service, mock_store, mock_git_client
     ):
-        """Should still delete flow record even when no physical resources exist.
+        """Should preserve done/merged flow records even without physical resources.
 
-        This is the key behavior change: flow records are always deleted for
-        terminal flows, allowing issues to be cleanly re-dispatched.
+        Done/merged flows keep their records as completion history.
+        Only aborted flows have their records deleted.
         """
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
@@ -312,9 +313,29 @@ class TestCleanResidualBranches:
 
         result = check_service.clean_residual_branches()
 
-        # Flow record should still be cleaned (deleted from database)
+        # Done flow record should be preserved (in kept_records, not cleaned)
+        assert len(result["kept_records"]) == 1
+        assert "feature/done-branch" in result["kept_records"]
+        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_aborted_deletes_record(
+        self, check_service, mock_store, mock_git_client
+    ):
+        """Should delete aborted flow records to allow issue restart."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/aborted-branch", "flow_status": "aborted"},
+        ]
+        # Simulate no resources exist
+        mock_git_client._run.return_value = ""
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = check_service.clean_residual_branches()
+
+        # Aborted flow record should be deleted (in cleaned)
         assert len(result["cleaned"]) == 1
-        assert "feature/done-branch" in result["cleaned"]
+        assert "feature/aborted-branch" in result["cleaned"]
+        assert len(result["kept_records"]) == 0  # kept_records is for done/merged
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_removes_invalid_records(

@@ -164,6 +164,9 @@ class TaskResumeOperations:
 
         This method uses FlowCleanupService for consistent cleanup behavior
         across `task resume` and `check --clean-branch`.
+
+        Note: Always deletes flow record (keep_flow_record=False) because
+        the purpose of `task resume` is to restart the flow from scratch.
         """
         from vibe3.services.flow_cleanup_service import FlowCleanupService
 
@@ -183,8 +186,9 @@ class TaskResumeOperations:
 
         results = cleanup_service.cleanup_flow_scene(
             branch,
-            include_remote=True,  # Also delete remote branch for clean restart
+            include_remote=True,  # Delete remote branch for clean restart
             terminate_sessions=True,
+            keep_flow_record=False,  # Delete flow record to allow fresh start
         )
 
         # Log if any step failed

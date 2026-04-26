@@ -536,13 +536,9 @@ class CheckService(CheckRemote):
     def clean_residual_branches(self) -> dict[str, object]:
         """Check and clean residual branches for terminal flows.
 
-        Flows marked as done/aborted/merged should have their resources cleaned:
-        - Worktree removed
-        - Local/remote branches deleted
-        - Handoff files cleared
-        - Flow record deleted from database
-
-        This allows issues to be cleanly re-dispatched if they are still open.
+        Different handling based on flow status:
+        - done/merged: Clean physical resources, keep flow record as history
+        - aborted: Clean everything including flow record (allows issue to restart)
 
         Returns:
             Dict with summary and details of cleaned branches.
@@ -565,11 +561,13 @@ class CheckService(CheckRemote):
         )
 
         cleaned: list[str] = []
+        kept_records: list[str] = []
         removed_invalid: list[str] = []
         failed: list[str] = []
 
         for flow in terminal_flows:
             branch = flow["branch"]
+            flow_status = flow.get("flow_status", "")
 
             # Remove invalid branch records (e.g., HEAD)
             if branch == "HEAD" or branch.startswith("HEAD"):
@@ -585,29 +583,48 @@ class CheckService(CheckRemote):
                     )
                 continue
 
-            # Use unified cleanup service for all terminal flows
+            # Determine whether to keep flow record based on status
+            # done/merged: keep record as history (issue is closed)
+            # aborted: delete record (issue may still be open, allow restart)
+            keep_flow_record = flow_status in ("done", "merged")
+
+            # Use unified cleanup service
             try:
                 results = cleanup_service.cleanup_flow_scene(
                     branch,
                     include_remote=True,
                     terminate_sessions=True,
+                    keep_flow_record=keep_flow_record,
                 )
 
-                # Consider cleanup successful if flow record was deleted
-                if results.get("flow_record", False):
-                    cleaned.append(branch)
-                    logger.bind(domain="check", branch=branch).info(
-                        "Cleaned terminal flow resources"
-                    )
+                # Track results
+                if keep_flow_record:
+                    # done/merged: success if physical resources cleaned
+                    if results.get("worktree", False) or results.get(
+                        "local_branch", False
+                    ):
+                        kept_records.append(branch)
+                        logger.bind(domain="check", branch=branch).info(
+                            "Cleaned done/merged flow resources, kept record"
+                        )
                 else:
-                    failed.append(f"{branch}: flow record deletion failed")
+                    # aborted: success if flow record deleted
+                    if results.get("flow_record", False):
+                        cleaned.append(branch)
+                        logger.bind(domain="check", branch=branch).info(
+                            "Cleaned aborted flow completely"
+                        )
+                    else:
+                        failed.append(f"{branch}: flow record deletion failed")
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to clean terminal flow resources: {exc}"
                 )
 
-        summary = f"Cleaned {len(cleaned)} terminal flows"
+        summary = f"Cleaned {len(cleaned)} aborted flows"
+        if kept_records:
+            summary += f", preserved {len(kept_records)} done/merged records"
         if removed_invalid:
             summary += f", removed {len(removed_invalid)} invalid records"
         if failed:
@@ -616,6 +633,7 @@ class CheckService(CheckRemote):
         return {
             "summary": summary,
             "cleaned": cleaned,
+            "kept_records": kept_records,
             "removed_invalid": removed_invalid,
             "failed": failed,
             "total_flows_checked": len(terminal_flows),

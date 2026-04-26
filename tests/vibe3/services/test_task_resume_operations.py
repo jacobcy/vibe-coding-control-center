@@ -55,6 +55,7 @@ def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
             "task/issue-329",
             include_remote=True,
             terminate_sessions=True,
+            keep_flow_record=False,  # Resume always deletes flow record
         )
 
 

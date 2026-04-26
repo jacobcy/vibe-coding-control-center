@@ -84,6 +84,7 @@ class FlowCleanupService:
         *,
         include_remote: bool = True,
         terminate_sessions: bool = True,
+        keep_flow_record: bool = False,
     ) -> dict[str, bool]:
         """Complete cleanup of a flow scene.
 
@@ -95,6 +96,9 @@ class FlowCleanupService:
             branch: Branch name for the flow to clean up
             include_remote: Whether to also delete remote branch
             terminate_sessions: Whether to terminate tmux sessions
+            keep_flow_record: Whether to keep flow record in database
+                - False (default): Delete flow record (for aborted flows)
+                - True: Keep flow record as completion history (for done/merged flows)
 
         Returns:
             Dict with success status for each step:
@@ -102,7 +106,7 @@ class FlowCleanupService:
                 - local_branch: True if deleted or didn't exist
                 - remote_branch: True if deleted, didn't exist, or skipped
                 - handoff: True if cleared or didn't exist
-                - flow_record: True if deleted
+                - flow_record: True if deleted (or kept when keep_flow_record=True)
         """
         results: dict[str, bool] = {
             "worktree": True,
@@ -117,6 +121,7 @@ class FlowCleanupService:
             action="cleanup_flow_scene",
             branch=branch,
             include_remote=include_remote,
+            keep_flow_record=keep_flow_record,
         ).info("Starting flow scene cleanup")
 
         # Step 1: Terminate tmux sessions (for task branches)
@@ -176,15 +181,23 @@ class FlowCleanupService:
             )
             results["handoff"] = False
 
-        # Step 6: Delete flow record (always do this, even if other steps failed)
-        try:
-            self.flow_service.delete_flow(branch)
-            logger.bind(domain="cleanup", branch=branch).info("Deleted flow record")
-        except Exception as exc:
-            logger.bind(domain="cleanup", branch=branch).warning(
-                f"Failed to delete flow record: {exc}"
+        # Step 6: Handle flow record based on keep_flow_record parameter
+        if keep_flow_record:
+            # Keep flow record as completion history (for done/merged flows)
+            logger.bind(domain="cleanup", branch=branch).info(
+                "Keeping flow record as completion history"
             )
-            results["flow_record"] = False
+            results["flow_record"] = True
+        else:
+            # Delete flow record (for aborted flows - allows issue to restart)
+            try:
+                self.flow_service.delete_flow(branch)
+                logger.bind(domain="cleanup", branch=branch).info("Deleted flow record")
+            except Exception as exc:
+                logger.bind(domain="cleanup", branch=branch).warning(
+                    f"Failed to delete flow record: {exc}"
+                )
+                results["flow_record"] = False
 
         success_count = sum(1 for v in results.values() if v)
         logger.bind(
