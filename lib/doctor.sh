@@ -185,7 +185,41 @@ vibe_doctor() {
     echo ""
 
     # Claude Plugins
-    _doctor_check_plugins
+    _doctor_check_plugins "$config_output"
+    echo ""
+
+    # Manager Token Check (Optional)
+    echo "${BOLD}Role-Specific Tokens:${NC}"
+    if [ -n "$VIBE_MANAGER_GITHUB_TOKEN" ]; then
+        # Validate token format (basic check)
+        if [[ ! "$VIBE_MANAGER_GITHUB_TOKEN" =~ ^ghp_ && ! "$VIBE_MANAGER_GITHUB_TOKEN" =~ ^github_pat_ ]]; then
+            printf "  ${YELLOW}!${NC} %-15s Invalid token format (should start with ghp_ or github_pat_)\n" "Manager Token"
+            echo "      建议：检查 VIBE_MANAGER_GITHUB_TOKEN 是否配置正确"
+        else
+            local manager_username
+            manager_username=$(GH_TOKEN="$VIBE_MANAGER_GITHUB_TOKEN" timeout 5 gh api user 2>/dev/null | jq -r '.login' 2>/dev/null)
+
+            if [ -n "$manager_username" ] && [ "$manager_username" != "null" ]; then
+                # Cross-check with settings.yaml manager_usernames
+                local expected_usernames
+                expected_usernames=$(grep -A 10 "manager_usernames:" "$VIBE_ROOT/config/settings.yaml" 2>/dev/null | grep -E '^\s*-\s+"' | sed 's/.*"\([^"]*\)".*/\1/' | tr '\n' ' ')
+
+                if [ -n "$expected_usernames" ] && [[ ! " $expected_usernames " =~ " $manager_username " ]]; then
+                    printf "  ${YELLOW}!${NC} %-15s Identity mismatch (expected: %s, got: %s)\n" \
+                        "Manager Token" "$(echo $expected_usernames | tr ' ' ',')" "$manager_username"
+                    echo "      建议：检查 VIBE_MANAGER_GITHUB_TOKEN 是否配置了正确的 Bot 账号"
+                else
+                    printf "  ${GREEN}✓${NC} %-15s Configured (user: %s)\n" "Manager Token" "$manager_username"
+                fi
+            else
+                printf "  ${YELLOW}!${NC} %-15s Token validation failed (invalid or insufficient permissions)\n" "Manager Token"
+                echo "      建议：运行 'vibe keys check' 检查 token 状态"
+            fi
+        fi
+    else
+        printf "  ${CYAN}○${NC} %-15s Not configured (optional)\n" "Manager Token"
+        echo "      如需启用 Manager 身份隔离，运行: vibe keys set VIBE_MANAGER_GITHUB_TOKEN"
+    fi
     echo ""
 
     # 总结
