@@ -298,7 +298,11 @@ class TestCleanResidualBranches:
     def test_clean_residual_branches_skips_when_no_resources(
         self, check_service, mock_store, mock_git_client
     ):
-        """Should skip when no local/remote/worktree exists."""
+        """Should still delete flow record even when no physical resources exist.
+
+        This is the key behavior change: flow records are always deleted for
+        terminal flows, allowing issues to be cleanly re-dispatched.
+        """
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
         ]
@@ -308,7 +312,9 @@ class TestCleanResidualBranches:
 
         result = check_service.clean_residual_branches()
 
-        assert len(result["cleaned"]) == 0
+        # Flow record should still be cleaned (deleted from database)
+        assert len(result["cleaned"]) == 1
+        assert "feature/done-branch" in result["cleaned"]
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_removes_invalid_records(

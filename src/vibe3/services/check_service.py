@@ -534,26 +534,35 @@ class CheckService(CheckRemote):
             )
 
     def clean_residual_branches(self) -> dict[str, object]:
-        """Check and clean residual branches for done/aborted flows.
+        """Check and clean residual branches for terminal flows.
 
-        Flows marked as done/aborted should have their branches cleaned.
-        This method uses the shared _cleanup_local_scene() method which
-        checks existence before deletion.
+        Flows marked as done/aborted/merged should have their resources cleaned:
+        - Worktree removed
+        - Local/remote branches deleted
+        - Handoff files cleared
+        - Flow record deleted from database
 
-        Performance optimization: Batch check resources to minimize git calls.
+        This allows issues to be cleanly re-dispatched if they are still open.
 
         Returns:
             Dict with summary and details of cleaned branches.
         """
+        from vibe3.services.flow_cleanup_service import FlowCleanupService
+
         logger.bind(domain="check", action="clean_residual").info(
             "Checking for residual branches"
         )
 
-        # Get all done/aborted flows
+        # Get all terminal flows (done/aborted/merged)
         all_flows = self.store.get_all_flows()
         terminal_flows = [
             f for f in all_flows if f.get("flow_status") in self.TERMINAL_FLOW_STATUSES
         ]
+
+        cleanup_service = FlowCleanupService(
+            git_client=self.git_client,
+            store=self.store,
+        )
 
         cleaned: list[str] = []
         removed_invalid: list[str] = []
@@ -576,27 +585,29 @@ class CheckService(CheckRemote):
                     )
                 continue
 
-            # Check if there's anything to clean (using extracted helper)
+            # Use unified cleanup service for all terminal flows
             try:
-                has_local, has_remote, has_worktree = self._check_branch_resources(
-                    branch
+                results = cleanup_service.cleanup_flow_scene(
+                    branch,
+                    include_remote=True,
+                    terminate_sessions=True,
                 )
 
-                if not (has_local or has_remote or has_worktree):
-                    continue  # Nothing to clean
-
-                self._cleanup_local_scene(branch, force_delete=True)
-                cleaned.append(branch)
-                logger.bind(domain="check", branch=branch).info(
-                    "Cleaned residual resources"
-                )
+                # Consider cleanup successful if flow record was deleted
+                if results.get("flow_record", False):
+                    cleaned.append(branch)
+                    logger.bind(domain="check", branch=branch).info(
+                        "Cleaned terminal flow resources"
+                    )
+                else:
+                    failed.append(f"{branch}: flow record deletion failed")
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
                 logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to clean residual resources: {exc}"
+                    f"Failed to clean terminal flow resources: {exc}"
                 )
 
-        summary = f"Cleaned {len(cleaned)} flows"
+        summary = f"Cleaned {len(cleaned)} terminal flows"
         if removed_invalid:
             summary += f", removed {len(removed_invalid)} invalid records"
         if failed:
