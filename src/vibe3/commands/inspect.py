@@ -157,3 +157,102 @@ def commands(
     else:
         # Default: YAML format
         typer.echo(result.to_yaml())
+
+
+@app.command(name="dead-code")
+def dead_code(
+    root: Annotated[
+        str, typer.Argument(help="Root directory to scan (default: src/vibe3)")
+    ] = "src/vibe3",
+    json_out: _JSON_OPT = False,
+    min_confidence: Annotated[
+        str,
+        typer.Option(
+            "--min-confidence",
+            help="Minimum confidence level to show (high/medium/low)",
+        ),
+    ] = "low",
+    trace: _TRACE_OPT = False,
+) -> None:
+    """Scan for dead code (unused functions).
+
+    Identifies functions and methods with zero references.
+
+    Confidence levels:
+    - high: Regular functions with 0 refs
+    - medium: Private functions with 0 refs (might be used dynamically)
+    - low: All findings (including medium confidence)
+
+    Excludes:
+    - CLI commands (invoked via CLI, not code)
+    - Test functions (test_*, pytest fixtures)
+    - Special methods (__init__, __str__, etc.)
+
+    Examples:
+        vibe3 inspect dead-code
+        vibe3 inspect dead-code src/vibe3 --min-confidence=high
+        vibe3 inspect dead-code --json
+    """
+    if trace:
+        enable_trace()
+
+    from vibe3.analysis.serena_service import SerenaService
+    from vibe3.exceptions import SerenaError
+
+    # Validate min_confidence
+    valid_confidences = ["high", "medium", "low"]
+    if min_confidence not in valid_confidences:
+        typer.echo(
+            f"Error: --min-confidence must be one of {valid_confidences}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    try:
+        service = SerenaService()
+        report = service.scan_dead_code(root)
+
+        # Filter by confidence
+        if min_confidence == "high":
+            report.findings = [f for f in report.findings if f.confidence == "high"]
+            report.dead_code_count = len(report.findings)
+        elif min_confidence == "medium":
+            report.findings = [
+                f for f in report.findings if f.confidence in ["high", "medium"]
+            ]
+            report.dead_code_count = len(report.findings)
+
+        if json_out:
+            typer.echo(report.model_dump_json(indent=2))
+        else:
+            typer.echo("=== Dead Code Report ===")
+            typer.echo(f"  Total symbols scanned: {report.total_symbols}")
+            typer.echo(f"  Dead code found: {report.dead_code_count}")
+            typer.echo(f"  Excluded: {report.excluded_count}")
+            typer.echo(f"  Root: {root}")
+            typer.echo(f"  Min confidence: {min_confidence}")
+
+            if report.findings:
+                typer.echo(f"\n  Findings ({len(report.findings)}):")
+                for finding in report.findings:
+                    typer.echo(
+                        f"    [{finding.confidence.upper():6}] "
+                        f"{finding.file}:{finding.symbol}"
+                    )
+                    typer.echo(f"             {finding.reason}")
+            else:
+                typer.echo("\n  ✓ No dead code found!")
+
+            if report.excluded and min_confidence == "low":
+                typer.echo(f"\n  Excluded ({len(report.excluded)}):")
+                for exc in report.excluded[:10]:  # Show first 10
+                    typer.echo(f"    {exc}")
+                if len(report.excluded) > 10:
+                    typer.echo(f"    ... and {len(report.excluded) - 10} more")
+
+    except SerenaError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(f"Unexpected error: {e}", err=True)
+        raise typer.Exit(2)

@@ -1,13 +1,19 @@
 """Flow projection service combining local and remote data."""
 
-from dataclasses import dataclass
-from typing import Any
+from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.services.task_service import TaskService
+
+if TYPE_CHECKING:
+    from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
 
 @dataclass
@@ -57,11 +63,24 @@ class FlowProjectionService:
         task_service: TaskService | None = None,
         pr_service: PRService | None = None,
         github_client: GitHubClient | None = None,
+        store: SQLiteClient | None = None,
+        title_cache: IssueTitleCacheService | None = None,
     ) -> None:
         self.flow_service = flow_service or FlowService()
         self.task_service = task_service or TaskService()
         self.pr_service = pr_service or PRService()
         self.github_client = github_client or GitHubClient()
+        self.store = store or SQLiteClient()
+        self._title_cache = title_cache
+
+    @property
+    def title_cache(self) -> IssueTitleCacheService:
+        """Lazy-initialized title cache service."""
+        if self._title_cache is None:
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            self._title_cache = IssueTitleCacheService(self.store, self.github_client)
+        return self._title_cache
 
     def get_projection(
         self, branch: str, include_remote: bool = True
@@ -94,47 +113,39 @@ class FlowProjectionService:
     def get_issue_titles(self, issue_numbers: list[int]) -> tuple[dict[int, str], bool]:
         """Fetch titles for a list of issues.
 
-        Returns:
-            Tuple of (titles_dict, has_network_error)
-        """
-        titles: dict[int, str] = {}
-        network_error = False
-        for n in issue_numbers:
-            try:
-                issue = self.github_client.view_issue(n)
-                if isinstance(issue, dict):
-                    titles[n] = issue.get("title", f"Issue #{n}")
-                elif issue == "network_error":
-                    network_error = True
-            except Exception:
-                network_error = True
-        return titles, network_error
+        NOTE: This method is used by commands, but we need to convert issue_numbers
+        to branches first using IssueFlowService.
 
-    def get_milestone_data(self, issue_number: int) -> dict[str, Any] | None:
-        """Get milestone data for an issue."""
-        try:
-            issue = self.github_client.view_issue(issue_number)
-            if isinstance(issue, dict):
-                milestone = issue.get("milestone")
-                if milestone and isinstance(milestone, dict):
-                    m_number = milestone.get("number")
-                    if m_number:
-                        all_issues = self.github_client.get_milestone_issues(m_number)
-                        open_issues = [
-                            i for i in all_issues if i.get("state") == "open"
-                        ]
-                        closed_issues = [
-                            i for i in all_issues if i.get("state") == "closed"
-                        ]
-                        return {
-                            "title": milestone.get("title"),
-                            "number": m_number,
-                            "state": milestone.get("state"),
-                            "open": len(open_issues),
-                            "closed": len(closed_issues),
-                            "issues": all_issues,
-                            "task_issue": issue,
-                        }
-        except Exception:
-            pass
-        return None
+        Returns:
+            Tuple of (issue_number -> title dict, had_network_error)
+        """
+        from vibe3.services.issue_flow_service import IssueFlowService
+
+        issue_flow = IssueFlowService(self.store)
+
+        # Convert issue_numbers to branches
+        # Priority: use actual flow branch (could be dev/issue-N) over canonical guess
+        issue_to_branch: dict[int, str] = {}
+        branches: list[str] = []
+        for n in issue_numbers:
+            # Try to find actual flow branch first
+            flow_state = issue_flow.find_active_flow(n)
+            if flow_state and flow_state.get("branch"):
+                branch = str(flow_state["branch"])
+            else:
+                # Fallback to canonical branch name
+                branch = issue_flow.canonical_branch_name(n)
+
+            issue_to_branch[n] = branch
+            branches.append(branch)
+
+        # Get titles using cache service (branch-based)
+        branch_titles, net_err = self.title_cache.get_titles_with_fallback(branches)
+
+        # Convert back to issue_number -> title mapping
+        issue_titles: dict[int, str] = {}
+        for n, branch in issue_to_branch.items():
+            if branch in branch_titles:
+                issue_titles[n] = branch_titles[branch]
+
+        return issue_titles, net_err

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.exceptions import GitError, UserError
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 
@@ -160,6 +161,29 @@ def test_pr_service_preserves_falsey_injected_dependencies() -> None:
     assert service.store is store
     assert service.version_service is version_service
     assert service.briefing_service.github_client is github_client
+
+
+def test_create_draft_pr_push_failure_surfaces_upstream_guidance(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
+    gh_instance = pr_service.github_client
+    gh_instance.check_auth.return_value = True
+    gh_instance.list_prs_for_branch.return_value = []
+
+    no_conflict_git.get_current_branch.return_value = "task/issue-337"
+    no_conflict_git.push_branch.side_effect = GitError(
+        "push -u origin task/issue-337",
+        "fatal: cannot push some refs",
+    )
+
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        with pytest.raises(UserError) as exc_info:
+            pr_service.create_draft_pr(title="Test PR", body="Test body")
+
+    message = str(exc_info.value)
+    assert "git branch -vv" in message
+    assert "tracking origin/main" in message
+    assert "gh pr create" in message
 
 
 def test_close_pr_calls_gh_pr_close(pr_service: PRService) -> None:

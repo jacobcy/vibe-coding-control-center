@@ -179,6 +179,16 @@ def register_create_command(app: typer.Typer) -> None:
                 ai_title, ai_body = usecase.suggest_content(
                     branch, resolved_base, interactive
                 )
+                # If --ai requested but no suggestions generated, provide clear error
+                if not ai_title and not title:
+                    typer.echo(
+                        "Error: --ai mode requires commits to generate suggestions.\n"
+                        "Options:\n"
+                        "  1. Commit your changes first, then retry\n"
+                        "  2. Provide title explicitly with -t option",
+                        err=True,
+                    )
+                    raise typer.Exit(1)
 
             # Agent mode requires explicit title and body
             if agent and not title:

@@ -1,6 +1,6 @@
-# Vibe Center 2.0
+# Vibe Center 3.0
 
-Vibe Center 是一个面向 AI 协作开发的编排工具箱。它保留 V2 Shell 能力层，也提供 V3 Python 运行时，目标不是替代 `git` 和 `gh`，而是把本地 execution scene、agent handoff、runtime observation 和 skill governance 收敛到一套清晰边界里。
+Vibe Center 3.0 的主系统是 V3 Python 运行时。V2 Shell 仍保留环境工具和兼容能力，但不再是默认的语义中心。项目目标不是替代 `git` 和 `gh`，而是把本地 execution scene、agent handoff、runtime observation 和 skill governance 收敛到一套清晰边界里。
 
 ## 当前语义
 
@@ -27,6 +27,9 @@ V2 保留环境工具和基础 shell 能力：
 
 V3 是当前的本地运行时与协作主系统，核心能力包括：
 
+- `uv run python src/vibe3/cli.py status`
+- `uv run python src/vibe3/cli.py flow show`
+- `uv run python src/vibe3/cli.py handoff show`
 - `flow update` / `flow bind` / `flow show` / `flow status`
 - `status` 全局总览
 - `handoff` 本地协作增强
@@ -36,16 +39,56 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 ## 快速开始
 
 ```bash
-# 1. 安装依赖
+# 1. 先看 V3 运行时状态
+uv run python src/vibe3/cli.py status
+
+# 2. 全局安装；会同步基础文件，并自动对当前项目补跑一次 init
 zsh scripts/install.sh
 
-# 2. 同步 Python 依赖
-uv sync --dev
+# 3. 重新加载 shell
+source ~/.zshrc   # 或你的实际 shell rc
 
-# 3. 基础检查
-vibe check
-uv run python src/vibe3/cli.py status
+# 4. 启动 Claude / Codex / Gemini 等工具后，优先用引导式入口
+/vibe-onboard
+
+# 5. 或手工检查
+vibe doctor
+vibe keys check
+
+# 6. 手动编辑密钥文件
+$EDITOR ~/.vibe/keys.env
+
+# 7. 检查 skills / 能力体系
+vibe skills check
+/vibe-skills-manager
 ```
+
+说明：
+
+- `scripts/install.sh` 负责全局安装与命令可用性，并会自动对当前项目补跑一次 `scripts/init.sh`
+- `scripts/init.sh` 负责当前项目 / worktree 的初始化（第三方 skills、OpenSpec、symlink、hooks、任务迁移等），不是安装脚本，而且可重复执行
+- `wtnew` 与 V3 worktree 创建路径也会自动补跑一次 `scripts/init.sh`
+- `vibe doctor` 负责工具与 Claude plugins 的事实检查
+- `vibe keys check` 负责认证 / key 来源检查
+- `/vibe-onboard` 负责引导用户检查和配置工具、Claude plugins、keys，并介绍项目与下一步
+- `vibe skills check` / `/vibe-skills-manager` 负责把 skills 体系梳理清楚，避免 codeagent-wrapper 缺少必要能力
+- `~/.vibe/keys.env` 由 `config/keys.template.env` 初始化而来，按需手动编辑
+- 如果在安装、初始化或使用过程中遇到任何问题，欢迎向项目开发者提交 issue 说明现场与复现步骤
+- skills 体系建议：
+  - Superpowers：Claude 用官方 plugin；其他 agent 用 `npx skills`
+  - OpenSpec：项目内初始化，按需启用
+  - Gstack：用户可选增强，建议全局安装到 `~/.claude/skills/gstack`
+
+## Skills 入门
+
+当 `/vibe-onboard` 和 `/vibe-skills-manager` 帮你把环境与能力体系梳理清楚后，可以从这些入口开始理解 skills：
+
+- Superpowers
+  - `/brainstorming`
+- Gstack（可选增强）
+  - `/office-hours`
+- OpenSpec（项目内工具链）
+  - `/openspec-onboard`
 
 ## 推荐工作方式
 
@@ -86,8 +129,8 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 
 ### Tier 1: Capability Layer
 
-- V2: `bin/`, `lib/`, `config/`
 - V3: `src/vibe3/`
+- V2: `bin/`, `lib/`, `config/`
 
 这一层只负责能力，不负责隐藏 workflow。
 

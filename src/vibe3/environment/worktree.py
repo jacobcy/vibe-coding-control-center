@@ -4,31 +4,30 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
-from vibe3.environment.worktree_manager_compat import ManagerCompatMixin
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.worktree_context import WorktreeContext
+from vibe3.environment.worktree_pr_mixin import WorktreePRMixin
+from vibe3.environment.worktree_support import (
+    align_auto_scene_to_base,
+    find_worktree_by_path,
+    find_worktree_for_branch,
+    initialize_worktree,
+    is_current_branch,
+    recycle_worktree_path,
+)
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
-    from vibe3.manager.flow_manager import FlowManager
+    from vibe3.execution.flow_dispatch import FlowManager
     from vibe3.models.orchestra_config import OrchestraConfig
 
 
-@dataclass
-class WorktreeContext:
-    """Context for a git worktree resource."""
-
-    path: Path
-    is_temporary: bool
-    branch: Optional[str] = None
-    issue_number: Optional[int] = None  # For tracking temporary worktrees
-
-
-class WorktreeManager(ManagerCompatMixin):
+class WorktreeManager(WorktreePRMixin):
     """Unified manager for issue worktrees (L3) and temporary worktrees (L2).
 
     This manager is the SINGLE AUTHORITY for worktree allocation in vibe3.
@@ -56,7 +55,6 @@ class WorktreeManager(ManagerCompatMixin):
         self.config = config
         self.repo_path = repo_path
         self.flow_manager = flow_manager
-        self._capability_cache: dict[Path, bool] = {}
 
     # --- Issue Worktree Methods (L3) ---
 
@@ -70,6 +68,10 @@ class WorktreeManager(ManagerCompatMixin):
         This is the canonical method for L3 manager/plan/run/review execution.
         The worktree is bound to the flow branch and persisted across sessions.
 
+        For flows woken up by dependency satisfaction, this will attempt to
+        create the worktree from the dependency's PR head branch instead of main.
+        If fetching the PR branch fails, it falls back to the standard creation.
+
         Args:
             issue_number: GitHub issue number
             branch: Git branch name for the worktree
@@ -81,7 +83,7 @@ class WorktreeManager(ManagerCompatMixin):
             SystemError: If worktree creation fails
         """
         # Check if already exists
-        existing = self._find_worktree_for_branch(branch)
+        existing = find_worktree_for_branch(self.repo_path, branch)
         if existing:
             logger.info(
                 "Reusing existing issue worktree",
@@ -96,8 +98,52 @@ class WorktreeManager(ManagerCompatMixin):
                 issue_number=issue_number,
             )
 
-        # Create new worktree
+        # Check for dependency wake-up source PR
         wt_path = self.repo_path / ".worktrees" / branch
+        source_pr_number = self._find_dependency_wakeup_pr(branch)
+
+        if source_pr_number:
+            # Try to create from PR branch
+            context = self._create_from_pr_branch(
+                wt_path, branch, issue_number, source_pr_number
+            )
+            if context:
+                # Success! Return PR-based worktree
+                return context
+
+            # Failed, log and fall back to default
+            logger.bind(
+                issue=issue_number,
+                branch=branch,
+                source_pr=source_pr_number,
+            ).warning(
+                "Failed to create worktree from PR branch, falling back to origin/main"
+            )
+
+            # Record fallback event
+            try:
+                # Calculate db path directly from repo_path without git command
+                git_common_dir = self.repo_path / ".git"
+                vibe3_dir = git_common_dir / "vibe3"
+                db_path = str(vibe3_dir / "handoff.db")
+                store = SQLiteClient(db_path=db_path)
+                store.add_event(
+                    branch,
+                    "dependency_branch_fallback",
+                    "worktree:manager",
+                    detail=f"Failed to fetch PR #{source_pr_number} branch, "
+                    f"falling back to origin/main",
+                    refs={"source_pr": str(source_pr_number)},
+                )
+            except Exception:
+                # Failed to record event, but fallback still happens
+                logger.bind(
+                    issue=issue_number,
+                    branch=branch,
+                    source_pr=source_pr_number,
+                ).warning("Failed to record fallback event")
+
+        # Default: create from standard base (origin/main)
         return self._create_issue_worktree(wt_path, branch, issue_number)
 
     def release_issue_worktree(self, context: WorktreeContext) -> None:
@@ -121,7 +167,7 @@ class WorktreeManager(ManagerCompatMixin):
             path=str(context.path),
             branch=context.branch,
         )
-        self._recycle_worktree_path(context.path)
+        recycle_worktree_path(self.repo_path, context.path)
 
     # --- Temporary Worktree Methods (L2) ---
 
@@ -156,7 +202,7 @@ class WorktreeManager(ManagerCompatMixin):
                 issue=issue_number,
                 path=str(wt_path),
             )
-            self._recycle_worktree_path(wt_path)
+            recycle_worktree_path(self.repo_path, wt_path)
 
         # Create fresh temporary worktree
         return self._create_temporary_worktree(wt_path, base_branch, issue_number)
@@ -182,9 +228,44 @@ class WorktreeManager(ManagerCompatMixin):
             path=str(context.path),
             issue=context.issue_number,
         )
-        self._recycle_worktree_path(context.path)
+        recycle_worktree_path(self.repo_path, context.path)
 
-    # --- Internal Implementation ---
+    # --- Manager Execution Compatibility ---
+
+    def resolve_manager_cwd(
+        self,
+        issue_number: int,
+        flow_branch: str,
+    ) -> tuple[Optional[Path], bool]:
+        """Resolve manager cwd using canonical worktree ownership."""
+        if is_current_branch(self.repo_path, flow_branch):
+            return self.repo_path, False
+
+        existing = find_worktree_for_branch(self.repo_path, flow_branch)
+        if existing:
+            if self.align_auto_scene_to_base(existing, flow_branch):
+                return existing, False
+            return None, False
+
+        try:
+            ctx = self.acquire_issue_worktree(issue_number, flow_branch)
+            if self.align_auto_scene_to_base(ctx.path, flow_branch):
+                return ctx.path, False
+            return None, False
+        except Exception:
+            return None, False
+
+    def _resolve_manager_cwd(
+        self,
+        issue_number: int,
+        flow_branch: str,
+    ) -> tuple[Optional[Path], bool]:
+        """Resolve manager cwd for role execution."""
+        return self.resolve_manager_cwd(issue_number, flow_branch)
+
+    def align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:
+        """Align auto task scenes to configured base ref when safe."""
+        return align_auto_scene_to_base(self.config, cwd, flow_branch)
 
     def _create_issue_worktree(
         self,
@@ -194,6 +275,26 @@ class WorktreeManager(ManagerCompatMixin):
     ) -> WorktreeContext:
         """Create an issue-bound worktree."""
         wt_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Pre-flight: cleanup stale references
+        try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception:
+            pass
+
+        # If path exists but is not registered, delete it
+        if wt_path.exists() and not find_worktree_by_path(self.repo_path, wt_path):
+            logger.warning(
+                "Deleting unregistered directory at target worktree path",
+                path=str(wt_path),
+            )
+            shutil.rmtree(wt_path)
 
         try:
             result = subprocess.run(
@@ -213,6 +314,23 @@ class WorktreeManager(ManagerCompatMixin):
             raise SystemError(f"Failed to create issue worktree: {exc}") from exc
 
         if result.returncode != 0:
+            # Handle "already checked out" error
+            if "already checked out" in result.stderr:
+                logger.warning(
+                    "Branch already checked out elsewhere, attempting to resolve",
+                    branch=branch,
+                )
+                # Attempt to find where it is checked out
+                existing_path = find_worktree_for_branch(self.repo_path, branch)
+                if existing_path:
+                    logger.info("Reusing worktree", path=str(existing_path))
+                    return WorktreeContext(
+                        path=existing_path,
+                        is_temporary=False,
+                        branch=branch,
+                        issue_number=issue_number,
+                    )
+
             logger.error(
                 "Git worktree add failed",
                 issue=issue_number,
@@ -227,6 +345,7 @@ class WorktreeManager(ManagerCompatMixin):
             branch=branch,
             path=str(wt_path),
         )
+        initialize_worktree(self.repo_path, wt_path, reason="issue")
 
         return WorktreeContext(
             path=wt_path,
@@ -244,9 +363,25 @@ class WorktreeManager(ManagerCompatMixin):
         """Create a temporary worktree."""
         wt_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Pre-flight prune
         try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception:
+            pass
+
+        if wt_path.exists():
+            shutil.rmtree(wt_path)
+
+        try:
+            # Use --detach for temporary worktrees to allow multiple from same base
             result = subprocess.run(
-                ["git", "worktree", "add", str(wt_path), base_branch],
+                ["git", "worktree", "add", "--detach", str(wt_path), base_branch],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
@@ -276,6 +411,7 @@ class WorktreeManager(ManagerCompatMixin):
             base=base_branch,
             path=str(wt_path),
         )
+        initialize_worktree(self.repo_path, wt_path, reason="temporary")
 
         return WorktreeContext(
             path=wt_path,
@@ -283,107 +419,3 @@ class WorktreeManager(ManagerCompatMixin):
             branch=base_branch,
             issue_number=issue_number,
         )
-
-    def _recycle_worktree_path(self, target: Path) -> None:
-        """Recycle a worktree path, unregistering it first."""
-        # Safety check: verify no active tmux session is using this worktree
-        try:
-            sessions = subprocess.run(
-                ["tmux", "list-sessions", "-F", "#{session_name}:#{session_path}"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-            if sessions.returncode == 0:
-                for line in sessions.stdout.strip().split("\n"):
-                    if not line:
-                        continue
-                    # Check if session path matches or contains target worktree
-                    if ":" in line:
-                        session_name, session_path = line.split(":", 1)
-                        if str(target) in session_path or session_path.startswith(
-                            str(target)
-                        ):
-                            logger.warning(
-                                "Skipping worktree cleanup: active tmux session found",
-                                worktree=str(target),
-                                session=session_name,
-                                session_path=session_path,
-                            )
-                            return
-        except FileNotFoundError:
-            # tmux not installed, proceed with cleanup
-            pass
-        except Exception as exc:
-            logger.warning(
-                "Failed to check tmux sessions, proceeding with cleanup",
-                error=str(exc),
-                worktree=str(target),
-            )
-
-        # Proceed with worktree removal
-        try:
-            result = subprocess.run(
-                ["git", "worktree", "remove", str(target), "--force"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if result.returncode == 0:
-                logger.info("Removed worktree via git", path=str(target))
-                return
-        except Exception:
-            pass
-
-        # Fallback: prune and delete directory
-        try:
-            subprocess.run(
-                ["git", "worktree", "prune"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-        except Exception:
-            pass
-
-        if target.exists():
-            shutil.rmtree(target)
-            logger.info("Forcefully removed worktree directory", path=str(target))
-
-    def _find_worktree_for_branch(self, branch: str) -> Optional[Path]:
-        """Find existing worktree for a branch."""
-        try:
-            result = subprocess.run(
-                ["git", "worktree", "list", "--porcelain"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-        except Exception:
-            return None
-
-        if result.returncode != 0:
-            return None
-
-        # Parse worktree list output
-        current_path = None
-        current_branch = None
-        for line in result.stdout.split("\n"):
-            if line.startswith("worktree "):
-                current_path = Path(line.split(" ", 1)[1])
-            elif line.startswith("branch "):
-                # Extract branch name from refs/heads/<branch>
-                full_branch = line.split(" ", 1)[1]
-                # Strip refs/heads/ prefix if present
-                if full_branch.startswith("refs/heads/"):
-                    current_branch = full_branch[len("refs/heads/") :]
-                else:
-                    current_branch = full_branch
-                if current_branch == branch and current_path:
-                    return current_path
-
-        return None

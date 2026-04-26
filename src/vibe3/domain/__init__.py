@@ -3,7 +3,7 @@
 This module provides domain events for all execution layers:
 - L1: Governance service (periodic scans)
 - L2: Supervisor + Apply chain (lightweight governance execution)
-- L3: Manager + Agent chain (full development workflow)
+- L3: Agent chain (full development workflow)
 
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
@@ -12,34 +12,51 @@ from vibe3.domain.events import (
     # Base
     DomainEvent,
     # L3 Flow Lifecycle Events
-    FlowAborted,
-    FlowBlocked,
     # L1 Governance Events
     GovernanceDecisionRequired,
     GovernanceScanCompleted,
     GovernanceScanStarted,
-    IssueBlocked,
     IssueFailed,
     IssueStateChanged,
-    # L3 Manager Events
-    ManagerExecutionCompleted,
-    ManagerExecutionStarted,
-    ManagerFlowDispatched,
-    ManagerFlowQueued,
-    PlanCompleted,
-    ReportRefRequired,
-    ReviewCompleted,
     # L2 Supervisor Apply Events
     SupervisorApplyCompleted,
     SupervisorApplyDelegated,
     SupervisorApplyDispatched,
     SupervisorApplyStarted,
-    SupervisorExecutionCompleted,
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
-from vibe3.domain.handlers import register_event_handlers
-from vibe3.domain.publisher import get_publisher, publish, subscribe
+
+
+def register_event_handlers() -> None:
+    """Register domain event handlers lazily to avoid import cycles."""
+    from vibe3.domain.handlers import (
+        register_event_handlers as _register_event_handlers,
+    )
+
+    _register_event_handlers()
+
+
+def get_publisher():  # type: ignore[no-untyped-def]
+    """Return the global domain event publisher lazily."""
+    from vibe3.domain.publisher import get_publisher as _get_publisher
+
+    return _get_publisher()
+
+
+def publish(event):  # type: ignore[no-untyped-def]
+    """Publish a domain event lazily."""
+    from vibe3.domain.publisher import publish as _publish
+
+    return _publish(event)
+
+
+def subscribe(event_type, handler):  # type: ignore[no-untyped-def]
+    """Subscribe a handler lazily."""
+    from vibe3.domain.publisher import subscribe as _subscribe
+
+    return _subscribe(event_type, handler)
+
 
 __all__ = [
     # Base
@@ -47,22 +64,10 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueStateChanged",
     "IssueFailed",
-    "IssueBlocked",
-    "ReportRefRequired",
-    "FlowBlocked",
-    "FlowAborted",
-    "PlanCompleted",
-    "ReviewCompleted",
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
     "GovernanceDecisionRequired",
-    "SupervisorExecutionCompleted",
-    # L3 Manager Events
-    "ManagerExecutionStarted",
-    "ManagerExecutionCompleted",
-    "ManagerFlowDispatched",
-    "ManagerFlowQueued",
     # L2 Supervisor Apply Events
     "SupervisorIssueIdentified",
     "SupervisorPromptRendered",

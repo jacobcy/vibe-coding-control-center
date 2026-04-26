@@ -1,39 +1,30 @@
-"""Label service for GitHub state/* label operations."""
+"""Thin orchestration layer for issue state labels.
+
+Domain transition rules live in ``vibe3.domain.state_machine``.
+GitHub label CRUD lives behind ``IssueLabelPort`` in ``vibe3.clients``.
+This service only coordinates the two.
+"""
 
 from datetime import datetime
 from typing import Literal
 
 from loguru import logger
 
+from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
+from vibe3.domain.state_machine import (
+    STATE_LABEL_META,
+    VIBE_TASK_LABEL,
+    validate_transition,
+)
 from vibe3.exceptions import InvalidTransitionError
 from vibe3.models.orchestration import (
-    ALLOWED_TRANSITIONS,
-    FORBIDDEN_TRANSITIONS,
     IssueState,
     StateTransition,
 )
-from vibe3.services.state_sync_ports import GhIssueLabelPort, IssueLabelPort
-
-VIBE_TASK_LABEL = "vibe-task"
-STATE_LABEL_META: dict[IssueState, tuple[str, str]] = {
-    IssueState.READY: ("0E8A16", "Ready for manager dispatch"),
-    IssueState.CLAIMED: ("1D76DB", "Claimed and waiting for planning"),
-    IssueState.IN_PROGRESS: ("FBCA04", "Execution in progress"),
-    IssueState.BLOCKED: ("D93F0B", "Blocked and waiting for follow-up"),
-    IssueState.FAILED: ("B60205", "Execution failed and needs recovery"),
-    IssueState.HANDOFF: ("5319E7", "Waiting for manager handoff decision"),
-    IssueState.REVIEW: ("0052CC", "Waiting for review execution"),
-    IssueState.MERGE_READY: ("0E8A16", "Ready to merge"),
-    IssueState.DONE: ("6A737D", "Flow completed"),
-}
 
 
 class LabelService:
-    """GitHub state/* label operations service.
-
-    This is the core state machine, providing Python API for other services.
-    No CLI commands exposed.
-    """
+    """Coordinate issue state transitions against GitHub labels."""
 
     def __init__(
         self,
@@ -96,11 +87,7 @@ class LabelService:
         from_state = self.get_state(issue_number)
 
         # Validate transition
-        if not force and from_state is not None:
-            if (from_state, to_state) in FORBIDDEN_TRANSITIONS:
-                raise InvalidTransitionError(from_state.value, to_state.value)
-            if (from_state, to_state) not in ALLOWED_TRANSITIONS:
-                raise InvalidTransitionError(from_state.value, to_state.value)
+        validate_transition(from_state, to_state, force=force)
 
         # Execute transition
         self.set_state(issue_number, to_state)

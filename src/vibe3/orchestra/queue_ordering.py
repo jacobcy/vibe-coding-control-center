@@ -7,8 +7,24 @@ from typing import Any
 
 from vibe3.models.orchestration import IssueInfo
 
-# Legacy priority label mapping to numeric priority
-LEGACY_PRIORITY_MAP: dict[str, int] = {
+# Pipeline stage ordering: issues closer to completion are dispatched first.
+# Key is "<trigger_name>:<trigger_state>" matching
+# StateLabelDispatchService.service_name.
+# Lower number = higher dispatch priority.
+PIPELINE_STAGE_ORDER: dict[str, int] = {
+    # Flows with pr_ref are dispatched first (highest priority)
+    # These are waiting for manager review after PR creation
+    "manager:handoff": 1,  # Has PR, waiting for final review
+    "run:merge-ready": 2,  # Ready to publish, executor will create PR
+    "review:review": 3,  # In review execution
+    "run:in-progress": 4,  # In execution
+    "plan:claimed": 5,  # Waiting for planning
+    "manager:ready": 6,  # Brand new issues — lowest priority
+}
+PIPELINE_STAGE_DEFAULT = 9  # Unknown stage falls after all known ones
+
+# Text-based priority label → numeric priority
+PRIORITY_LABEL_MAP: dict[str, int] = {
     "critical": 9,
     "high": 7,
     "medium": 5,
@@ -42,9 +58,9 @@ def resolve_priority(labels: list[str]) -> int:
             if re.match(r"^\d+$", suffix):
                 priorities.append(int(suffix))
 
-            # Check for legacy priority
-            elif suffix in LEGACY_PRIORITY_MAP:
-                priorities.append(LEGACY_PRIORITY_MAP[suffix])
+            # Check for text-based priority label
+            elif suffix in PRIORITY_LABEL_MAP:
+                priorities.append(PRIORITY_LABEL_MAP[suffix])
 
     # Return highest priority, or fallback to 0
     return max(priorities) if priorities else 0

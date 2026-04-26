@@ -20,6 +20,7 @@ _CREATE_FLOW_STATE = """
         plan_ref TEXT,
         report_ref TEXT,
         audit_ref TEXT,
+        pr_ref TEXT,
         planner_actor TEXT,
         executor_actor TEXT,
         reviewer_actor TEXT,
@@ -100,9 +101,38 @@ _CREATE_RUNTIME_SESSION_INDEXES = """
         ON runtime_session(role, branch, target_id)
 """
 
+_CREATE_FLOW_CONTEXT_CACHE = """
+    CREATE TABLE IF NOT EXISTS flow_context_cache (
+        branch TEXT PRIMARY KEY,
+        task_issue_number INTEGER,
+        issue_title TEXT,
+        pr_number INTEGER,
+        pr_title TEXT,
+        updated_at TEXT NOT NULL
+    )
+"""
+
+
+_CLEAN_STALE_VERDICT_LINES_SQL = """
+    UPDATE flow_events
+    SET detail = CASE
+        WHEN instr(detail, char(10)) > 0
+            THEN substr(detail, instr(detail, char(10)) + 1)
+        ELSE REPLACE(detail, 'verdict: UNKNOWN', '')
+    END
+    WHERE event_type IN ('handoff_plan', 'handoff_report', 'handoff_run')
+      AND detail LIKE 'verdict: UNKNOWN%'
+"""
+
 
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
+    # Enable WAL mode so concurrent readers (CLI, orchestra, tmux agents)
+    # never block each other.  In DELETE journal mode (the default), a writer
+    # holds an exclusive lock that can cause CLI reads to see stale or
+    # incomplete data during multi-process access.
+    conn.execute("PRAGMA journal_mode=WAL")
+
     cursor = conn.cursor()
 
     cursor.execute(_CREATE_SCHEMA_META)
@@ -143,10 +173,79 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 f"Added {col} column to flow_state"
             )
 
+    # Migration: add pr_ref column if missing
+    if "pr_ref" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN pr_ref TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added pr_ref column to flow_state"
+        )
+
+    # Migration: split blocked_by into blocked_by_issue (INT) +
+    # blocked_reason (TEXT). This resolves semantic confusion:
+    # blocked_by currently mixes issue numbers and reason text.
+    if "blocked_by_issue" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN blocked_by_issue INTEGER")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added blocked_by_issue column to flow_state"
+        )
+
+    if "blocked_reason" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN blocked_reason TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added blocked_reason column to flow_state"
+        )
+
+    # Migration: add failed_reason field for fail_flow() support
+    if "failed_reason" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN failed_reason TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added failed_reason column to flow_state"
+        )
+
+    # Migration: add latest_verdict field for verdict tracking
+    if "latest_verdict" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_verdict TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added latest_verdict column to flow_state"
+        )
+
+    # Legacy compatibility: keep old column for existing databases.
+    # New code no longer reads or writes this field.
+    if "latest_indicate_action" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_indicate_action TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added latest_indicate_action column to flow_state"
+        )
+
+    # Migration: migrate existing blocked_by data to new fields
+    # Pattern: "#218" → blocked_by_issue=218, other text → blocked_reason
+    if "blocked_by" in existing and (
+        "blocked_by_issue" not in existing or "blocked_reason" not in existing
+    ):
+        # Parse blocked_by values and migrate
+        cursor.execute("""
+            UPDATE flow_state
+            SET
+                blocked_by_issue = CASE
+                    WHEN blocked_by LIKE '#%' THEN
+                        CAST(substr(blocked_by, 2) AS INTEGER)
+                    ELSE NULL
+                END,
+                blocked_reason = CASE
+                    WHEN blocked_by LIKE '#%' THEN NULL
+                    ELSE blocked_by
+                END
+            WHERE blocked_by IS NOT NULL
+        """)
+        logger.bind(external="sqlite", operation="migration").info(
+            "Migrated blocked_by data to blocked_by_issue and blocked_reason fields"
+        )
+
     cursor.execute(_CREATE_FLOW_ISSUE_LINKS)
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
     cursor.execute(_CREATE_RUNTIME_SESSION)
+    cursor.execute(_CREATE_FLOW_CONTEXT_CACHE)
 
     # Create indexes for runtime_session table
     for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
@@ -160,6 +259,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
     }
     if "refs" not in event_columns:
         cursor.execute("ALTER TABLE flow_events ADD COLUMN refs TEXT")
+
+    before_changes = conn.total_changes
+    cursor.execute(_CLEAN_STALE_VERDICT_LINES_SQL)
+    cleaned = conn.total_changes - before_changes
+    if cleaned:
+        logger.bind(external="sqlite", operation="migration").info(
+            f"Cleaned stale plan/run verdict lines from {cleaned} flow_events rows"
+        )
 
     # Normalize legacy issue_role values from the old classification view.
     cursor.execute(

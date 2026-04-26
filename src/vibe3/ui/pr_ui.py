@@ -107,7 +107,3 @@ def render_pr_ready(
         reviewers_str = ", ".join(requested_reviewers)
         console.print(f"[yellow]🤖[/] AI review requested: {reviewers_str}")
     console.print(f"[dim]{pr.url}[/]")
-
-
-def render_error(message: str) -> None:
-    console.print(f"[red]✗[/] {message}")

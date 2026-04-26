@@ -5,30 +5,33 @@ from typing import Annotated, Optional
 import typer
 from loguru import logger
 
-from vibe3.agents.review_agent import ReviewUsecase
-from vibe3.agents.review_parser import parse_codex_review
-from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
-from vibe3.agents.review_prompt import make_review_context_builder
-from vibe3.agents.runner import (
-    CodeagentExecutionService,
-    create_codeagent_command,
-)
 from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
+    _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
-from vibe3.services.flow_service import FlowService
+from vibe3.execution.issue_role_sync_runner import (
+    run_issue_role_async,
+    run_issue_role_sync,
+)
+from vibe3.roles.review import (
+    REVIEW_SYNC_SPEC,
+    build_base_review_request,
+    build_pr_review_request,
+    execute_manual_review_async,
+    execute_manual_review_sync,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
-    help="Code review with two modes:\n\n"
+    help="Code review with three modes:\n\n"
+    "  --issue <n>  - Review issue implementation (orchestra-driven)\n"
     "  pr <number>  - Review existing PR from GitHub (analyzes PR diff)\n"
     "  base [branch] - Review local changes vs base branch (compares snapshots)",
-    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
@@ -42,18 +45,88 @@ def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
         typer.echo(f"→ Review saved to: {handoff_file}")
 
 
-def _build_review_usecase(
-    flow_service: FlowService | None = None,
-) -> ReviewUsecase:
-    """Construct review usecase with command-local dependencies."""
-    return ReviewUsecase(
-        flow_service=flow_service,
-        inspect_runner=run_inspect_json,
-        snapshot_diff_builder=build_snapshot_diff,
-        review_parser=parse_codex_review,
-        context_builder=make_review_context_builder,
-        execution_service_factory=CodeagentExecutionService,
-        command_builder=create_codeagent_command,
+def _review_issue_impl(
+    issue: int,
+    report_ref: str | None,
+    trace: bool,
+    dry_run: bool,
+    no_async: bool,
+    show_prompt: bool,
+) -> None:
+    """Review implementation for an issue via role sync runner."""
+    if trace:
+        enable_trace()
+
+    _ = report_ref
+
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue,
+            dry_run=dry_run,
+            fresh_session=False,
+            show_prompt=show_prompt,
+            spec=REVIEW_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue,
+            dry_run=dry_run,
+            spec=REVIEW_SYNC_SPEC,
+        )
+
+
+@app.callback(invoke_without_command=True)
+def default(
+    ctx: typer.Context,
+    issue: Annotated[
+        Optional[int],
+        typer.Option("--issue", "-i", help="Review issue implementation"),
+    ] = None,
+    report_ref: Annotated[
+        Optional[str],
+        typer.Option("--report-ref", help="Report reference for context"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
+) -> None:
+    """Review with --issue for orchestra-driven review, or use pr/base subcommands."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if issue is not None:
+        _review_issue_impl(
+            issue=issue,
+            report_ref=report_ref,
+            trace=trace,
+            dry_run=dry_run,
+            no_async=no_async,
+            show_prompt=show_prompt,
+        )
+        return
+    typer.echo(ctx.get_help())
+
+
+@app.command(name="issue")
+def issue_command(
+    issue: Annotated[int, typer.Argument(help="GitHub issue number")],
+    report_ref: Annotated[
+        Optional[str],
+        typer.Option("--report-ref", help="Report reference for context"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
+) -> None:
+    """Review implementation for a specific issue (orchestra-driven)."""
+    _review_issue_impl(
+        issue=issue,
+        report_ref=report_ref,
+        trace=trace,
+        dry_run=dry_run,
+        no_async=no_async,
+        show_prompt=show_prompt,
     )
 
 
@@ -85,8 +158,7 @@ def pr(
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting PR review")
     typer.echo(f"→ Review: PR #{pr_number}")
-    usecase = _build_review_usecase()
-    request, issue_number, head_branch = usecase.build_pr_review(pr_number)
+    request, issue_number, head_branch = build_pr_review_request(pr_number)
 
     if not head_branch and not dry_run:
         typer.echo(
@@ -95,15 +167,23 @@ def pr(
         raise typer.Exit(1)
     branch = head_branch
 
-    result = usecase.execute_review(
-        request,
-        dry_run,
-        instructions,
-        issue_number=issue_number,
-        pr_number=pr_number,
-        branch=branch,
-        async_mode=not no_async,
-    )
+    if no_async or dry_run or not branch:
+        result = execute_manual_review_sync(
+            request=request,
+            dry_run=dry_run,
+            instructions=instructions,
+            issue_number=issue_number,
+            pr_number=pr_number,
+            branch=branch,
+        )
+    else:
+        result = execute_manual_review_async(
+            request=request,
+            instructions=instructions,
+            issue_number=issue_number,
+            pr_number=pr_number,
+            branch=branch,
+        )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)
@@ -166,19 +246,26 @@ def base(
     log.info("Starting branch review")
     typer.echo(f"→ Review: {current_branch} vs {resolved_base.base_branch}")
 
-    usecase = _build_review_usecase(flow_service=flow_service)
-    request, issue_number = usecase.build_base_review(
+    request, issue_number, _ = build_base_review_request(
         current_branch,
         resolved_base.base_branch,
+        flow_service=flow_service,
     )
-    result = usecase.execute_review(
-        request,
-        dry_run,
-        instructions,
-        issue_number=issue_number,
-        branch=current_branch,
-        async_mode=not no_async,
-    )
+    if no_async or dry_run:
+        result = execute_manual_review_sync(
+            request=request,
+            dry_run=dry_run,
+            instructions=instructions,
+            issue_number=issue_number,
+            branch=current_branch,
+        )
+    else:
+        result = execute_manual_review_async(
+            request=request,
+            instructions=instructions,
+            issue_number=issue_number,
+            branch=current_branch,
+        )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)

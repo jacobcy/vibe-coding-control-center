@@ -3,18 +3,19 @@
 
 import json
 from contextlib import contextmanager
-from typing import Annotated, Any, Iterator
+from typing import Annotated, Iterator
 
 import typer
 
+from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
-from vibe3.services.milestone_service import MilestoneService
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
-    render_task_show_with_milestone,
+    render_task_comments,
+    render_task_show,
 )
 
 app = typer.Typer(
@@ -27,61 +28,9 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def _build_milestone_service() -> MilestoneService:
-    """Construct a milestone service."""
-    return MilestoneService()
-
-
 def _build_resume_usecase() -> TaskResumeUsecase:
     """Construct a unified resume usecase."""
     return TaskResumeUsecase()
-
-
-def _is_human_comment(comment: dict[str, Any]) -> bool:
-    author = comment.get("author") or {}
-    login = str(author.get("login") or "").strip().lower()
-    if not login:
-        return True
-    if login == "linear" or login.endswith("[bot]"):
-        return False
-    return True
-
-
-def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict:
-    comments = issue.get("comments") or []
-    latest_comment = comments[-1] if comments else None
-    latest_human = next(
-        (comment for comment in reversed(comments) if _is_human_comment(comment)),
-        None,
-    )
-
-    if json_output:
-        return {
-            "issue": issue.get("number"),
-            "title": issue.get("title"),
-            "state": issue.get("state"),
-            "labels": [label.get("name") for label in issue.get("labels", [])],
-            "latest_comment": latest_comment,
-            "latest_human_comment": latest_human,
-        }
-
-    typer.echo("\nLatest Comment:")
-    if latest_comment:
-        author = (latest_comment.get("author") or {}).get("login") or "unknown"
-        typer.echo(f"  author  {author}")
-        typer.echo(f"  body    {str(latest_comment.get('body') or '').strip()}")
-    else:
-        typer.echo("  (no comments)")
-
-    typer.echo("\nLatest Human Instruction:")
-    if latest_human:
-        author = (latest_human.get("author") or {}).get("login") or "unknown"
-        typer.echo(f"  author  {author}")
-        typer.echo(f"  body    {str(latest_human.get('body') or '').strip()}")
-    else:
-        typer.echo("  (no human comments)")
-
-    return None
 
 
 @app.command()
@@ -89,13 +38,13 @@ def show(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
-    comments: Annotated[
-        bool, typer.Option("--comments", help="Include latest issue comments context")
-    ] = False,
 ) -> None:
-    """Show task details."""
+    """Show a quick current-task summary for humans and agents.
+
+    This command is the fast scene entry before reading handoff details or
+    entering manager/plan/executor/reviewer prompts.
+    """
     task_svc = TaskService()
-    milestone_svc = _build_milestone_service()
 
     try:
         target_branch = task_svc.resolve_branch(branch)
@@ -113,21 +62,14 @@ def show(
     )
     with ctx:
         task_result = task_svc.show_task(target_branch)
-
-        # Fetch milestone context if task has an issue number
-        milestone_ctx = None
         issue_number = None
         if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
 
-        if issue_number:
-            milestone_ctx = milestone_svc.get_milestone_context(issue_number)
+        render_task_show(task_result, json_output)
 
-        # Delegate rendering to UI layer
-        render_task_show_with_milestone(task_result, milestone_ctx, json_output)
-
-        if comments and issue_number:
-            task_svc = TaskService()
+        # Always show recent comments (if issue exists and not json output)
+        if issue_number and not json_output:
             issue = task_svc.fetch_issue_with_comments(issue_number)
             if issue == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
@@ -137,16 +79,7 @@ def show(
                 )
             else:
                 assert isinstance(issue, dict)
-                comments_data = _render_comments(issue, json_output)
-                if json_output and comments_data and task_result.local_task:
-                    # Merge comments into a single JSON with task data
-                    combined = task_result.local_task.model_dump()
-                    combined["comments"] = comments_data
-                    typer.echo(json.dumps(combined, indent=2, default=str))
-                elif not json_output:
-                    pass  # _render_comments already printed text
-                elif task_result.local_task:
-                    pass  # task JSON already printed; comments_data is just info
+                render_task_comments(issue)
 
 
 @app.command()
@@ -182,7 +115,7 @@ def resume(
         bool, typer.Option("--failed", help="Resume all failed issues")
     ] = False,
     blocked: Annotated[
-        bool, typer.Option("--blocked", help="Resume all stale blocked issues")
+        bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
     all_tasks: Annotated[
         bool,
@@ -191,6 +124,17 @@ def resume(
             help="Reset all auto-created task/issue-* scenes and resume from ready",
         ),
     ] = False,
+    label: Annotated[
+        str | None,
+        typer.Option(
+            "--label",
+            metavar="[STATE]",
+            help="Clear blocked_reason/failed_reason and restore to specified state "
+            "WITHOUT deleting worktree/branch. "
+            "STATE can be: ready, claimed, in-progress, handoff, review, merge-ready. "
+            "If --label is provided without value, defaults to 'handoff'.",
+        ),
+    ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Execute the resume (default dry-run)")
@@ -201,8 +145,35 @@ def resume(
     """Resume failed or blocked issues to ready.
 
     Use --failed to resume all failed issues, --blocked to resume all
-    stale blocked issues, or --all to reset every auto-created task/issue-*
+    blocked issues, or --all to reset every auto-created task/issue-*
     scene back to ready. Or specify issue numbers directly.
+
+    **Label-only mode (no worktree deletion)**:
+    Use --label [STATE] to clear blocked_reason/failed_reason and restore
+    to specified state WITHOUT deleting worktree/branch.
+    - `--label` (no value) or `--label handoff` → restore to handoff
+    - `--label ready` → restore to ready
+    - `--label claimed` → restore to claimed
+    - `--label in-progress` → restore to in-progress
+    - `--label review` → restore to review
+    - `--label merge-ready` → restore to merge-ready
+    Without --label, the original behavior deletes worktree/branch.
+
+    Examples:
+        vibe3 task resume 303 --label -y
+            # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label handoff -y
+            # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label ready -y
+            # Restore to ready, keep worktree
+        vibe3 task resume 303 --label in-progress -y
+            # Restore to in-progress, keep worktree
+        vibe3 task resume 303 --label review -y
+            # Restore to review, keep worktree
+        vibe3 task resume 303 --label merge-ready -y
+            # Restore to merge-ready, keep worktree
+        vibe3 task resume 303 -y
+            # Delete worktree/branch (original)
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -233,6 +204,33 @@ def resume(
         )
         raise typer.Exit(1)
 
+    # Resolve label state from parameter
+    valid_states = {
+        "ready",
+        "claimed",
+        "in-progress",
+        "handoff",
+        "review",
+        "merge-ready",
+    }
+    effective_label: str | None = None
+    if label is not None:
+        # --label flag is present
+        if label == "":
+            # --label provided without explicit value -> trigger inference in service
+            effective_label = ""
+        elif label in valid_states:
+            # --label <state> provided
+            effective_label = label
+        else:
+            typer.echo(
+                f"Error: Invalid state '{label}'. "
+                f"Must be one of: {', '.join(sorted(valid_states))}.",
+                err=True,
+            )
+            raise typer.Exit(1)
+    # else: label is None → don't specify --label → delete worktree
+
     target_issues: list[int] | None
     candidate_mode = "resumable"
     if has_flag:
@@ -245,6 +243,8 @@ def resume(
 
     usecase = _build_resume_usecase()
     flow_service = FlowService()
+
+    # Fetch all flows for candidate building
     resume_flows = (
         flow_service.list_flows(status=None)
         if candidate_mode == "all_task"
@@ -254,37 +254,51 @@ def resume(
     if candidate_mode != "all_task":
         stale_flows = flow_service.list_flows(status="stale")
 
-        if has_flag and candidate_mode == "resumable":
-            candidates = usecase.status_service.fetch_resume_candidates(
-                flows=resume_flows,
-                stale_flows=stale_flows,
-            )
-            if failed:
-                candidates = [c for c in candidates if c.get("resume_kind") == "failed"]
-            else:
-                candidates = [
-                    c for c in candidates if c.get("resume_kind") == "blocked"
-                ]
-            target_issues = [
-                num
-                for candidate in candidates
-                if isinstance((num := candidate.get("number")), int)
-            ]
-            if not target_issues:
-                if failed:
-                    typer.echo("No failed issues found.")
-                else:
-                    typer.echo("No stale blocked issues found.")
-                return
+    # Handle --failed/--blocked filtering by state label
+    if has_flag and candidate_mode == "resumable":
+        # Fetch all orchestrated issues (not just stale)
+        all_issues = usecase.status_service.fetch_orchestrated_issues(
+            flows=resume_flows,
+            queued_set=set(),
+            stale_flows=stale_flows,
+        )
 
-    result = usecase.resume_issues(
-        issue_numbers=target_issues,
-        reason=reason,
-        dry_run=not yes,
-        flows=resume_flows,
-        stale_flows=stale_flows,
-        candidate_mode=candidate_mode,
-    )
+        # Filter by state label
+        target_state = IssueState.FAILED if failed else IssueState.BLOCKED
+
+        # Extract issue numbers matching target state
+        issue_numbers = [
+            num
+            for issue in all_issues
+            if issue.get("state") == target_state
+            and isinstance((num := issue.get("number")), int)
+        ]
+
+        if not issue_numbers:
+            state_name = "failed" if failed else "blocked"
+            typer.echo(f"No {state_name} issues found.")
+            return
+
+        result = usecase.resume_issues(
+            issue_numbers=issue_numbers,
+            reason=reason,
+            dry_run=not yes,
+            flows=resume_flows,
+            stale_flows=stale_flows,
+            candidate_mode=candidate_mode,
+            label_state=effective_label,
+        )
+    else:
+        # Original logic for --all or explicit issue numbers
+        result = usecase.resume_issues(
+            issue_numbers=target_issues,
+            reason=reason,
+            dry_run=not yes,
+            flows=resume_flows,
+            stale_flows=stale_flows,
+            candidate_mode=candidate_mode,
+            label_state=effective_label,
+        )
 
     if not yes and has_flag and not result.get("candidates"):
         if all_tasks:
@@ -292,7 +306,7 @@ def resume(
         elif failed:
             typer.echo("No failed issues found.")
         else:
-            typer.echo("No stale blocked issues found.")
+            typer.echo("No blocked issues found.")
         return
 
     if json_output:
@@ -307,8 +321,8 @@ def resume(
                 elif failed:
                     typer.echo(f"Found {candidate_count} failed issue(s)")
                 else:
-                    typer.echo(f"Found {candidate_count} stale blocked issue(s)")
-            typer.echo("\n[dry-run mode] Would resume the following issues:")
+                    typer.echo(f"Found {candidate_count} blocked issue(s)")
+                typer.echo("\n[dry-run mode] Would resume the following issues:")
             if "candidates" in result:
                 for candidate in result["candidates"]:
                     num = candidate.get("number")

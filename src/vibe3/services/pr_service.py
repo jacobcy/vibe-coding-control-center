@@ -1,11 +1,7 @@
 """PR service implementation."""
 
-from dataclasses import dataclass
-from typing import Any, Callable
-
 from loguru import logger
 
-from vibe3.analysis.inspect_output_adapter import pr_analysis_summary
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
@@ -17,7 +13,6 @@ from vibe3.models.pr import (
     VersionBumpResponse,
 )
 from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
-from vibe3.services.pr_review_request_service import PRReviewRequestService
 from vibe3.services.pr_utils import (
     build_pr_body,
     check_upstream_conflicts,
@@ -25,16 +20,6 @@ from vibe3.services.pr_utils import (
 )
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.version_service import VersionService
-
-
-@dataclass(frozen=True)
-class PrQueryTarget:
-    """Resolved PR query target from explicit args or current flow."""
-
-    pr_number: int | None
-    branch: str | None
-    current_branch: str | None
-    from_flow: bool = False
 
 
 class PRService:
@@ -55,7 +40,6 @@ class PRService:
             VersionService() if version_service is None else version_service
         )
         self.briefing_service = PRReviewBriefingService(self.github_client)
-        self.review_request_service = PRReviewRequestService(self.github_client)
 
     def create_draft_pr(
         self,
@@ -104,8 +88,12 @@ class PRService:
             raise UserError(
                 f"Failed to push branch '{head_branch}' before PR creation: {exc}\n"
                 f"Tips:\n"
-                f"  1. Resolve local/remote divergence if any\n"
-                f"  2. Ensure you have push permission to origin"
+                f"  1. Run 'git branch -vv' and check whether '{head_branch}' is "
+                f"incorrectly tracking origin/main\n"
+                f"  2. Resolve local/remote divergence or upstream misconfiguration\n"
+                f"  3. Ensure you have push permission to origin\n"
+                f"  4. If automation is still blocked, use 'gh pr create' manually "
+                f"after fixing the branch/upstream state"
             ) from exc
 
         metadata = get_metadata_from_flow(self.store, head_branch)
@@ -185,61 +173,66 @@ class PRService:
         )
 
         if not pr.draft:
-            self._sync_pr_flow_state(pr, actor=effective_actor)
-            try:
-                self.briefing_service.publish_briefing(
-                    pr_number, requested_reviewers=requested_reviewers
-                )
-            except Exception as e:
-                logger.bind(pr_number=pr_number).warning(
-                    f"Briefing update failed (PR still ready): {e}"
-                )
-            # Request AI review if specified
-            if requested_reviewers:
-                try:
-                    self.review_request_service.request_review(
-                        pr_number, requested_reviewers
-                    )
-                except Exception as e:
-                    logger.bind(pr_number=pr_number).warning(
-                        f"Review request failed (PR still ready): {e}"
-                    )
-            logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
+            self._finalize_pr_ready(
+                pr_number,
+                effective_actor,
+                requested_reviewers,
+                pr_for_sync=pr,
+                is_already_ready=True,
+            )
             return pr
 
         updated_pr = self.github_client.mark_ready(pr_number)
-        branch = pr.head_branch
-        self._sync_pr_flow_state(updated_pr, actor=effective_actor)
+        self._finalize_pr_ready(
+            pr_number,
+            effective_actor,
+            requested_reviewers,
+            pr_for_sync=updated_pr,
+            is_already_ready=False,
+        )
+        return updated_pr
+
+    def _finalize_pr_ready(
+        self,
+        pr_number: int,
+        actor: str,
+        requested_reviewers: list[str] | None = None,
+        *,
+        pr_for_sync: PRResponse,
+        is_already_ready: bool = False,
+    ) -> None:
+        """Finalize PR ready state: sync, briefing, and AI reviews."""
+        self._sync_pr_flow_state(pr_for_sync, actor=actor)
 
         try:
             self.briefing_service.publish_briefing(
                 pr_number, requested_reviewers=requested_reviewers
             )
         except Exception as e:
+            action = "update" if is_already_ready else "publication"
             logger.bind(pr_number=pr_number).warning(
-                f"Briefing publication failed (PR marked ready): {e}"
+                f"Briefing {action} failed (PR ready): {e}"
             )
 
         # Request AI review if specified
         if requested_reviewers:
             try:
-                self.review_request_service.request_review(
-                    pr_number, requested_reviewers
-                )
+                self.github_client.request_ai_review(pr_number, requested_reviewers)
             except Exception as e:
                 logger.bind(pr_number=pr_number).warning(
-                    f"Review request failed (PR marked ready): {e}"
+                    f"AI review request failed (PR ready): {e}"
                 )
 
-        self.store.add_event(
-            branch,
-            "pr_ready",
-            effective_actor,
-            f"PR #{pr_number} marked as ready for review",
-        )
-
-        logger.bind(pr_number=pr_number).success("PR marked as ready")
-        return updated_pr
+        if is_already_ready:
+            logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
+        else:
+            self.store.add_event(
+                pr_for_sync.head_branch,
+                "pr_ready",
+                actor,
+                f"PR #{pr_number} marked as ready for review",
+            )
+            logger.bind(pr_number=pr_number).success("PR marked as ready")
 
     def sync_pr_state_from_remote(
         self, pr: PRResponse, actor: str | None = None
@@ -369,99 +362,19 @@ class PRService:
             return None
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
-        """Persist activity to flow."""
+        """Persist activity to flow and update PR context cache."""
         self.store.update_flow_state(
             pr.head_branch,
             latest_actor=actor,
+            pr_ref=pr.url,  # Write PR URL as proof of PR creation
         )
 
-    # ------------------------------------------------------------------
-    # PR query operations (merged from pr_query_usecase.py)
-    # ------------------------------------------------------------------
+        # Update PR context cache with latest PR info using IssueTitleCacheService
+        from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
-    def resolve_pr_target(
-        self,
-        pr_number: int | None,
-        branch: str | None,
-    ) -> PrQueryTarget:
-        """Resolve explicit target or infer PR number from current flow."""
-        if pr_number or branch:
-            return PrQueryTarget(
-                pr_number=pr_number,
-                branch=branch,
-                current_branch=None,
-                from_flow=False,
-            )
-
-        current_branch = self.git_client.get_current_branch()
-        flow_data = self.store.get_flow_state(current_branch)
-        resolved_pr = flow_data.get("pr_number") if flow_data else None
-        return PrQueryTarget(
-            pr_number=resolved_pr,
-            branch=None,
-            current_branch=current_branch,
-            from_flow=resolved_pr is not None,
+        title_cache = IssueTitleCacheService(self.store)
+        title_cache.update_pr(
+            branch=pr.head_branch,
+            pr_number=pr.number,
+            pr_title=pr.title,
         )
-
-    def fetch_pr_or_raise(
-        self,
-        pr_number: int | None,
-        branch: str | None,
-        current_branch: str | None = None,
-    ) -> PRResponse:
-        """Load PR or raise a command-facing lookup error."""
-        pr = self.get_pr(pr_number, branch)
-        if not pr and pr_number is not None and current_branch:
-            # Remote-first fallback: cached pr_number may drift; retry by branch truth.
-            pr = self.get_pr(branch=current_branch)
-        if not pr:
-            raise LookupError("PR not found")
-        return pr
-
-    def build_missing_pr_message(
-        self,
-        pr_number: int | None,
-        branch: str | None,
-        current_branch: str | None,
-    ) -> str:
-        """Build a command-facing not-found message."""
-        if not pr_number and not branch:
-            branch_name = current_branch or self.git_client.get_current_branch()
-            from vibe3.services.flow_service import FlowService
-
-            flow_service = FlowService(store=self.store)
-            flow_status = flow_service.get_flow_status(branch_name)
-            bind_hint = ""
-            if not flow_status or flow_status.task_issue_number is None:
-                bind_hint = (
-                    "\n提示：当前 flow 还没有 task，建议先执行\n"
-                    "  vibe3 flow bind <issue> --role task"
-                )
-            return (
-                f"No PR found for current branch '{branch_name}'\n\n"
-                "To create a PR, run:\n"
-                f'  vibe3 pr create -t "Your PR title"{bind_hint}'
-            )
-
-        target = f"PR #{pr_number}" if pr_number else f"branch '{branch}'"
-        return f"{target} not found"
-
-    def load_pr_analysis_summary(
-        self, pr_number: int, inspect_runner: Callable[[list[str]], dict[str, object]]
-    ) -> dict[str, Any]:
-        """Load inspect summary used by command outputs."""
-        analysis = inspect_runner(["pr", str(pr_number)])
-        return pr_analysis_summary(analysis)
-
-    @staticmethod
-    def build_pr_output_payload(
-        pr: PRResponse,
-        analysis_summary: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Merge PR data with optional analysis summary for structured output."""
-        payload = pr.model_dump()
-        if analysis_summary:
-            payload["analysis"] = {
-                key: value for key, value in analysis_summary.items() if key != "raw"
-            }
-        return payload

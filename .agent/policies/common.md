@@ -10,10 +10,28 @@
 - Python 相关命令必须走 `uv run`，不要直接用 `python` 或 `pip`。
 - 当前主线以 V3 和治理规则为中心；如遇历史 shell 入口，只按兼容现场处理，不把它当默认实现路径。
 - 多 worktree 并行开发时，共享运行时数据位于主仓库 git common dir，也就是主仓库 `.git`，不是当前 worktree 自己的局部 `.git`。
-- 当前 flow 的结构化 handoff 以 `vibe3 handoff show` 为准，不要先读 `.agent/context/task.md`。
+- 当前 flow 的结构化 handoff 以 `vibe3 handoff status` 为准，不要先读 `.agent/context/task.md`。
 - 当前 flow 的共享 handoff 文件路径模式为 `.git/vibe3/handoff/<branch-safe>-<hash>/current.md`。
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
+
+## 工作前必读 Manager 指令
+
+开始任何工作（plan/run/review）前，必须先读取当前 flow 的 manager 交接指令：
+
+```bash
+uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
+```
+
+Manager 可能已写入质量审查意见、具体修复要求、重点关注区域等指令。
+
+## 项目记忆系统（claude-memory）
+
+跨对话长期记忆，用于保存和检索架构共识、重要决策、最佳实践。
+
+- **何时用**：需要回顾架构决策、寻找类似问题的解法、了解模块演进历史
+- **推荐命令**：`smart_search`（智能搜索）、`timeline`（时间线）、`get_observations`（获取详情）
+- **与 handoff 的区别**：claude-memory 是跨对话长期记忆；handoff 是当前 flow 的临时交接记录
 
 ## 工具选择顺序
 
@@ -48,18 +66,7 @@ uv run python src/vibe3/cli.py inspect base --json
 - 当前实际 CLI 中**没有** `inspect structure` 子命令，不要继续引用它。
 - `inspect symbols` 的稳定用法是 `<file>` 或 `<file>:<symbol>`；不要把“symbol-only 全仓搜索”当默认能力。
 
-### 2. 语义理解与跨文件探索
-
-不知道代码在哪、职责边界不清、需要理解实现意图时，使用 `mcp_auggie_codebase-retrieval`。
-
-适合：
-- 找负责某项功能的模块
-- 理解 plan / review / run 链路如何拼装 prompt
-- 理解配置、命令、service 之间的关系
-
-不要拿它代替精确引用分析；涉及“谁调用了谁”时，还是优先回到 `vibe3 inspect`。
-
-### 3. 精确字符串与配置项查找
+### 2. 精确字符串与配置项查找
 
 只在需要精确字面量时使用 `rg`。
 
@@ -73,21 +80,74 @@ uv run python src/vibe3/cli.py inspect base --json
 - 判断某函数真实影响面
 - 替代 AST 分析
 
-### 4. Handoff 现场读取与记录
+### 3. Handoff 记录
 
-涉及当前 flow 的现场、交接、执行中发现的问题时，优先使用仓库内的 handoff CLI 入口。
-
-首选命令：
+执行过程中出现 finding、bug、blocker、next step 等需要留痕的事项，用 `handoff append` 记录：
 
 ```bash
-uv run python src/vibe3/cli.py handoff show
 uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor "<actor>"
 ```
 
 使用规则：
-- 查看当前 flow 结构化 handoff，优先使用 `handoff show`，不要自己猜底层存储位置。
-- 执行过程中出现 finding、bug、blocker、next step 等需要留痕的事项，用 `handoff append` 单独记录。
 - 这类记录不要混进 plan、review、run 的主体输出里，更不要塞进最终交付摘要里冒充正式结论。
+
+## Comment vs Handoff Contract
+
+Issue / PR 评论和 handoff 是两条互补但不可替换的通道。
+
+### 何时用 issue / PR comment
+
+适合需要**外部可见性**的内容：
+- 阶段性里程碑通报（plan 完成、run 完成、review 裁决）
+- 需要人类介入的 blocker（凭证缺失、依赖未就绪、范围争议）
+- 跨角色协作公告（人类、其他 agent、PR reviewer 都可能看到）
+- 与 GitHub issue / PR 状态机直接相关的事件
+
+### 何时用 handoff append
+
+适合 **agent 之间的内部交接**：
+- 执行过程中的 finding、临时观察、调试线索
+- 仅供下一步 agent 消费的上下文
+- 不需要人类即刻知晓的次要信息
+- 与当前 flow 主体输出无直接关联但需要留痕的事项
+
+判断准则：**看一眼 issue 评论区就需要知道的事 → comment；只有同 flow 内的下一个 agent 需要的事 → handoff append**。
+
+### 强制 marker 格式
+
+所有 agent 写出的 issue / PR comment 必须以角色 marker 开头（行首，方括号包裹）。
+
+| 角色 | Marker | 适用场景 |
+|------|--------|---------|
+| manager | `[manager]` | 状态切换、质量审核、调度通报 |
+| planner | `[plan]` | plan 完成、范围澄清、需求确认 |
+| executor | `[run]` | run 完成、阻塞汇报、执行结论 |
+| reviewer | `[review]` | review 裁决、追问、合并建议 |
+| resume | `[resume]` | 任务恢复时的现场说明 |
+| governance | `[governance]` / `[governance suggest]` | 治理建议、自动恢复、 routing |
+| apply / supervisor | `[apply]` / `[orchestra]` | 治理执行、编排公告 |
+
+格式约束：
+- marker 必须出现在评论第一行行首，前面只允许空白字符。
+- marker 与正文之间至少一个空格或换行。
+- 不要用 marker 装饰非自动化评论；marker 一旦出现，系统会按 agent 评论处理。
+- 未来 agent 若使用人类账号发布 comment，marker 是唯一可靠的"我是 agent"信号；缺失即被识别为人类指令。
+
+不合规示例（会被人类指令解析器误读）：
+```
+✗ "Manager: moving to in-progress"        # 无 marker，会被识别为人类
+✗ "请尽快合并 [manager]"                  # marker 不在行首
+✗ "评论里嵌入 [run] 字样作引用"           # 装饰性使用，会触发 agent 过滤
+```
+
+合规示例：
+```
+✓ "[manager] Moved issue to In-Progress; planner queued."
+✓ "[run] Implementation complete. Tests: pytest=PASS, mypy=PASS."
+✓ "[review] MAJOR: handoff contract broken — see findings #1, #3."
+```
+
+
 
 ## 高价值场景
 
@@ -122,18 +182,7 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 plan 必须建立在真实影响面上，而不是凭直觉列步骤。
 
-至少确认：
-- 受影响文件
-- 关键依赖
-- 公开入口或高风险路径
-- 对应验证方式
-- 当前 flow handoff 现场
-
-推荐先看：
-
-```bash
-uv run python src/vibe3/cli.py handoff show
-```
+至少确认：受影响文件、关键依赖、公开入口或高风险路径、对应验证方式。
 
 ## 常用验证命令
 

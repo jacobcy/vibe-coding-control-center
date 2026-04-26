@@ -1,6 +1,17 @@
 #!/usr/bin/env zsh
 # Tmux session & window management
 
+# ── Guard against incomplete loading ──────────────────────
+# When user directly sources this file without loading utils.sh
+_vibe_alias_require_loaded() {
+  if [[ "$(type vibe_require 2>&1)" != *function* ]]; then
+    echo "⚠️  This alias requires Vibe to be loaded first."
+    echo "🚀 To load into current shell: source \$(vibe alias --load)"
+    return 1
+  fi
+  return 0
+}
+
 # @desc Ensure the Vibe Tmux session exists
 vibe_tmux_ensure() {
   vibe_require tmux || return 1
@@ -84,6 +95,7 @@ _vt_find() {
 #   vt <name>   → attach to matched session (only existing)
 # @featured
 vt() {
+  _vibe_alias_require_loaded || return 127
   vibe_require tmux || return 1
   local target="${1:-}"
 
@@ -131,6 +143,7 @@ vt() {
 #   vtup /abs/path  → use dir basename as session
 # @featured
 vtup() {
+  _vibe_alias_require_loaded || return 127
   vibe_require tmux git || return 1
   local target="${1:-}"
 
@@ -230,28 +243,71 @@ vtls() {
   echo "💡 Next: Run ${CYAN}vt${NC} to attach to default, or ${CYAN}vtup <name>${NC} for specific."
 }
 
-# @desc Kill a specific Tmux session
+# @desc Kill a specific Tmux session or all sessions
 vtkill() {
-  local assume_yes=false session="$1"
+  _vibe_alias_require_loaded || return 127
+  vibe_require tmux || return 1
+
+  local assume_yes=false kill_all=false target=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -y|--yes) assume_yes=true; shift ;;
+      -all|--all) kill_all=true; shift ;;
       *)
-        session="$1"
+        target="$1"
         shift
         ;;
     esac
   done
-  if [[ -z "$session" ]]; then
+
+  if [[ "$kill_all" == true ]]; then
+    local -a sessions=()
+    while IFS= read -r s; do
+      [[ -n "$s" ]] && sessions+=("$s")
+    done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
+
+    [[ ${#sessions[@]} -eq 0 ]] && { echo "ℹ️ No active sessions to kill"; return 0; }
+    [[ "$assume_yes" == true ]] || {
+      echo "⚠️ vtkill --yes --all would kill ${#sessions[@]} sessions:"
+      for s in "${sessions[@]}"; do echo "  • $s"; done
+      echo "Rerun with --yes to confirm."
+      return 1
+    }
+    for s in "${sessions[@]}"; do tmux kill-session -t "$s"; done
+    echo "✅ Killed all sessions (${#sessions[@]} total)"
+    return 0
+  fi
+
+  local session=""
+  if [[ -n "$target" ]]; then
+    # Smart match existing session
+    local result=$(_vt_find "$target")
+    [[ -z "$result" ]] && { echo "❌ Session not found: $target"; return 1; }
+
+    local -a matches=(${(f)result})
+    case ${#matches[@]} in
+      1) session="${matches[1]}" ;;
+      *)
+        echo "🔍 Multiple sessions match '${target}':"
+        local s
+        for s in "${matches[@]}"; do
+          echo "  • $s"
+        done
+        echo "📌 Rerun with the exact session name to kill."
+        return 1
+        ;;
+    esac
+  else
     if [[ -n "$TMUX" ]]; then
       session="$(tmux display-message -p '#S')"
-      [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vtkill to terminate the current session '$session'."; return 1; }
+      [[ "$assume_yes" == true ]] || { echo "⚠️ Pass --yes to vtkill to terminate the current session '$session'."; return 1; }
     else
       session="$VIBE_SESSION"
     fi
   fi
+
   tmux has-session -t "$session" 2>/dev/null || { echo "❌ No session: $session"; return 1; }
-  [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vtkill to terminate session '$session'."; return 1; }
+  [[ "$assume_yes" == true ]] || { echo "⚠️ Pass --yes to vtkill to terminate session '$session'."; return 1; }
   tmux kill-session -t "$session"
   echo "✅ Killed: $session"
 }

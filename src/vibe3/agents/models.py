@@ -9,7 +9,7 @@ from typing import Any, Callable, Literal
 
 from vibe3.config.settings import VibeConfig
 
-ExecutionRole = Literal["planner", "executor", "reviewer"]
+ExecutionRole = Literal["planner", "executor", "reviewer", "manager"]
 
 
 @dataclass
@@ -28,7 +28,17 @@ class CodeagentCommand:
     cwd: Path | None = None
     config: VibeConfig | None = None
     branch: str | None = None
+    issue_number: int | None = None
+    pre_gate_callback: Callable[..., None] | None = None
     cli_args: list[str] | None = None
+    resolved_options: Any | None = None
+    actor: str | None = None
+    session_id: str | None = None
+    show_prompt: bool = False
+    include_global_notice: bool = True
+    fallback_prompt: str | None = None
+    fallback_include_global_notice: bool = True
+    dry_run_summary: dict[str, Any] | None = None
 
 
 @dataclass
@@ -46,24 +56,6 @@ class CodeagentResult:
     log_path: Path | None = None
 
 
-@dataclass
-class AgentSpec:
-    """定义一个 Agent 需要做什么，以及做完后触发什么回调。
-
-    用于 Usecase 层描述业务逻辑，封装 role、context、task 和回调钩子。
-    执行引擎通过 execute_with_callbacks 方法接收回调函数。
-    """
-
-    role: ExecutionRole
-    handoff_kind: str
-    context: str
-    task: str | None = None
-
-    # 回调钩子
-    on_success: Callable[[CodeagentResult], None] = lambda _: None
-    on_failure: Callable[[Exception], None] = lambda _: None
-
-
 def create_codeagent_command(
     role: ExecutionRole,
     context_builder: Callable[[], str],
@@ -77,7 +69,17 @@ def create_codeagent_command(
     cwd: Path | None = None,
     config: VibeConfig | None = None,
     branch: str | None = None,
+    issue_number: int | None = None,
+    pre_gate_callback: Callable[..., None] | None = None,
     cli_args: list[str] | None = None,
+    resolved_options: Any | None = None,
+    actor: str | None = None,
+    session_id: str | None = None,
+    show_prompt: bool = False,
+    include_global_notice: bool = True,
+    fallback_prompt: str | None = None,
+    fallback_include_global_notice: bool = True,
+    dry_run_summary: dict[str, Any] | None = None,
 ) -> CodeagentCommand:
     """Factory function to create CodeagentCommand.
 
@@ -94,7 +96,21 @@ def create_codeagent_command(
         cwd: Explicit working directory for agent execution
         config: VibeConfig instance
         branch: Current branch (for async execution)
+        issue_number: GitHub issue number (for no-op gate)
+        pre_gate_callback: Optional callback invoked after agent completes
+            but before the no-op gate fires. Receives (issue_number, branch,
+            actor, stdout). Used by reviewer to write audit_ref from stdout.
         cli_args: Optional explicit CLI args used for async self-invocation
+        resolved_options: Pre-resolved agent options for shared execution paths
+        actor: Explicit actor override for shared execution paths
+        session_id: Explicit session id override for resumed executions
+        show_prompt: Whether dry-run should print the full prompt content
+        include_global_notice: Whether to prepend global notice to prompt file
+        fallback_prompt: Optional bootstrap prompt used when a stored session
+            fails to resume and backend retries fresh
+        fallback_include_global_notice: Whether fallback prompt should prepend
+            the global notice
+        dry_run_summary: Optional structured summary for dry-run output
 
     Returns:
         CodeagentCommand instance
@@ -103,6 +119,7 @@ def create_codeagent_command(
         "planner": "plan",
         "executor": "run",
         "reviewer": "review",
+        "manager": "indicate",
     }
 
     return CodeagentCommand(
@@ -118,5 +135,15 @@ def create_codeagent_command(
         cwd=cwd,
         config=config,
         branch=branch,
+        issue_number=issue_number,
+        pre_gate_callback=pre_gate_callback,
         cli_args=cli_args,
+        resolved_options=resolved_options,
+        actor=actor,
+        session_id=session_id,
+        show_prompt=show_prompt,
+        include_global_notice=include_global_notice,
+        fallback_prompt=fallback_prompt,
+        fallback_include_global_notice=fallback_include_global_notice,
+        dry_run_summary=dry_run_summary,
     )

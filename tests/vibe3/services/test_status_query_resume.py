@@ -10,103 +10,10 @@ from vibe3.services.status_query_service import StatusQueryService
 class TestStatusQueryServiceResume:
     """Tests for StatusQueryService resume candidate operations."""
 
-    def test_fetch_failed_resume_candidates_returns_open_failed_issues(
-        self,
-    ) -> None:
-        """只返回 open 且 label 为 state/failed 的 issue，携带 flow.plan_ref。"""
-        github = MagicMock()
-        github.list_issues.return_value = [
-            {
-                "number": 439,
-                "title": "Manager backend regression",
-                "labels": [{"name": "state/failed"}],
-            },
-            {
-                "number": 440,
-                "title": "Ready issue",
-                "labels": [{"name": "state/ready"}],
-            },
-            {
-                "number": 441,
-                "title": "Another failed issue",
-                "labels": [{"name": "state/failed"}],
-            },
-        ]
-        github.view_issue.return_value = {
-            "comments": [
-                {
-                    "body": (
-                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
-                        "原因:quota exhausted"
-                    )
-                }
-            ]
-        }
-
-        git = MagicMock()
-        git._run.return_value = ""
-
-        service = StatusQueryService(github_client=github, git_client=git)
-
-        # Mock flow with plan_ref for issue 439
-        flow_439 = MagicMock(spec=FlowStatusResponse)
-        flow_439.plan_ref = "docs/plans/issue-439.md"
-        flow_439.branch = "task/issue-439"
-        flow_439.task_issue_number = 439
-
-        # Mock flow without plan_ref for issue 441
-        flow_441 = MagicMock(spec=FlowStatusResponse)
-        flow_441.plan_ref = None
-        flow_441.branch = "task/issue-441"
-        flow_441.task_issue_number = 441
-
-        flows = [flow_439, flow_441]
-
-        result = service.fetch_failed_resume_candidates(flows=flows)
-
-        assert len(result) == 2
-        assert result[0]["number"] == 439
-        assert result[0]["state"] == IssueState.FAILED
-        assert result[0]["flow"] is not None
-        assert result[0]["flow"].plan_ref == "docs/plans/issue-439.md"
-        assert result[1]["number"] == 441
-        assert result[1]["state"] == IssueState.FAILED
-
-    def test_fetch_failed_resume_candidates_excludes_resumed_or_non_failed(
-        self,
-    ) -> None:
-        """已恢复或非 failed 的 issue 不进入候选。"""
-        github = MagicMock()
-        github.list_issues.return_value = [
-            {
-                "number": 439,
-                "title": "Resumed issue",
-                "labels": [{"name": "state/handoff"}],  # Already resumed
-            },
-            {
-                "number": 440,
-                "title": "Blocked issue",
-                "labels": [{"name": "state/blocked"}],
-            },
-            {
-                "number": 441,
-                "title": "Ready issue",
-                "labels": [{"name": "state/ready"}],
-            },
-        ]
-
-        git = MagicMock()
-        git._run.return_value = ""
-
-        service = StatusQueryService(github_client=github, git_client=git)
-        result = service.fetch_failed_resume_candidates(flows=[])
-
-        assert len(result) == 0
-
     def test_status_ignores_resume_comment_for_failed_reason(
         self,
     ) -> None:
-        """status 快照不把 resume comment 当作新的 failed reason。"""
+        """FAILED reason comes from flow state, not GitHub comments."""
         github = MagicMock()
         github.list_issues.return_value = [
             {
@@ -115,31 +22,22 @@ class TestStatusQueryServiceResume:
                 "labels": [{"name": "state/failed"}],
             }
         ]
-        github.view_issue.return_value = {
-            "comments": [
-                {
-                    "body": (
-                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
-                        "原因:quota exhausted"
-                    ),
-                },
-                {
-                    "body": (
-                        "[resume] 已从 state/failed 继续到 state/handoff。\n\n"
-                        "manager 将重新判断现场并决定下一步。\n\n"
-                        "原因:quota resumed"
-                    ),
-                },
-            ]
-        }
 
         git = MagicMock()
         git._run.return_value = ""
 
-        service = StatusQueryService(github_client=github, git_client=git)
-        result = service.fetch_orchestrated_issues([], queued_set=set())
+        # Create flow with failed_reason (ignores GitHub comments now)
+        flow = MagicMock(spec=FlowStatusResponse)
+        flow.branch = "task/issue-439"
+        flow.task_issue_number = 439
+        flow.failed_reason = "quota exhausted"
 
-        # Should extract "quota exhausted", not "quota resumed"
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues(
+            [flow], queued_set=set(), stale_flows=[]
+        )
+
+        # Should read from flow.failed_reason, not GitHub comments
         assert result[0]["failed_reason"] == "quota exhausted"
 
 

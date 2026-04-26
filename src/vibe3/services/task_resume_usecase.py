@@ -13,16 +13,24 @@ from loguru import logger
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
-from vibe3.services.session_registry import SessionRegistryService
 from vibe3.services.status_query_service import StatusQueryService
 from vibe3.services.task_resume_candidates import TaskResumeCandidates
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
+
+
+def _format_resume_failure_reason(exc: Exception) -> str:
+    """Return a concise, human-readable failure reason for resume output."""
+    detail = str(exc).strip()
+    if detail:
+        return detail
+    return exc.__class__.__name__
 
 
 class TaskResumeUsecase:
@@ -68,6 +76,7 @@ class TaskResumeUsecase:
         stale_flows: list[FlowStatusResponse] | None = None,
         repo: str | None = None,
         candidate_mode: str = "resumable",
+        label_state: str | None = None,  # ← 新增参数
     ) -> dict[str, Any]:
         """Resume failed or blocked issues.
 
@@ -78,6 +87,9 @@ class TaskResumeUsecase:
             flows: Active flow status responses
             stale_flows: Stale flow status responses
             repo: Repository (owner/repo format, optional)
+            candidate_mode: Candidate selection mode ("resumable" or "all_task")
+            label_state: Optional state to restore (None=delete worktree,
+                "handoff"/"ready"=keep worktree)
 
         Returns:
             Dict with:
@@ -204,7 +216,34 @@ class TaskResumeUsecase:
                         repo=repo,
                         reason=reason,
                         worktree_path=worktree_path,
+                        label_state=label_state,
                     )
+
+                    # Publish event to notify EDA handlers of the state change
+                    try:
+                        from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+                        from vibe3.domain.publisher import publish
+                        from vibe3.models.orchestration import IssueState
+
+                        # Match the target state used in reset_issue_to_ready
+                        if label_state == "ready":
+                            event_target = IssueState.READY
+                        elif label_state is not None:
+                            event_target = IssueState.HANDOFF
+                        else:
+                            event_target = IssueState.READY
+
+                        publish(
+                            IssueStateChanged(
+                                issue_number,
+                                None,
+                                event_target.value,
+                                actor="human:resume",
+                            )
+                        )
+                    except ImportError:
+                        # Gracefully handle missing EDA dependencies if in lean context
+                        pass
 
                     if resume_kind == "all":
                         self._comment_all_resume_success(
@@ -222,10 +261,20 @@ class TaskResumeUsecase:
                     {"number": issue_number, "resume_kind": resume_kind}
                 )
 
-            except Exception:
-                # Skip on error, could log here
+            except Exception as exc:
+                failure_reason = _format_resume_failure_reason(exc)
+                logger.bind(
+                    domain="resume",
+                    action="candidate_failed",
+                    issue_number=issue_number,
+                    resume_kind=resume_kind,
+                    branch=branch,
+                ).warning(f"Resume candidate failed: {failure_reason}")
                 result["skipped"].append(
-                    {"number": issue_number, "reason": "恢复操作失败"}
+                    {
+                        "number": issue_number,
+                        "reason": f"恢复操作失败: {failure_reason}",
+                    }
                 )
 
         return result

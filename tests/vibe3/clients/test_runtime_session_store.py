@@ -155,3 +155,34 @@ def test_runtime_session_all_fields(tmp_path: pytest.TempPathFactory) -> None:
     assert session["worktree_path"] == "/tmp/wt"
     assert session["created_at"] is not None
     assert session["updated_at"] is not None
+
+
+def test_delete_flow_removes_flow_truth_and_runtime_sessions(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-500"
+
+    store.update_flow_state(branch, flow_slug="issue-500", flow_status="active")
+    store.add_event(branch, "flow_created", "test-user", "created")
+    store.add_issue_link(branch, 500, "task")
+    session_id = store.create_runtime_session(
+        role="manager",
+        target_type="issue",
+        target_id="500",
+        branch=branch,
+        session_name="vibe3-manager-issue-500",
+        status="running",
+    )
+
+    assert store.get_flow_state(branch) is not None
+    assert store.get_events(branch)
+    assert store.get_issue_links(branch)
+    assert store.get_runtime_session(session_id) is not None
+
+    store.delete_flow(branch)
+
+    assert store.get_flow_state(branch) is None
+    assert store.get_events(branch) == []
+    assert store.get_issue_links(branch) == []
+    assert store.get_runtime_session(session_id) is None

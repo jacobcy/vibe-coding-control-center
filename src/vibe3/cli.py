@@ -4,6 +4,7 @@ Vibe 3.0 CLI Entry Point
 Thin wrapper that sets up Typer app and registers subcommands.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
@@ -21,9 +22,7 @@ from vibe3.commands import (
     internal,
     plan,
     pr,
-    prompt_check,
     review,
-    roadmap,
     run,
     snapshot,
     status,
@@ -57,7 +56,6 @@ app = typer.Typer(
 # Register subcommands
 app.add_typer(flow.app, name="flow")
 app.add_typer(task.app, name="task")
-app.add_typer(roadmap.app, name="roadmap")
 app.add_typer(plan.app, name="plan")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
@@ -66,7 +64,6 @@ app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
-app.add_typer(prompt_check.app, name="prompt")
 app.add_typer(internal.app, name="internal")
 
 
@@ -91,6 +88,7 @@ def status_command(
 
 @app.callback()
 def main_callback(
+    ctx: typer.Context,
     verbose: Annotated[
         int,
         typer.Option(
@@ -104,6 +102,8 @@ def main_callback(
     ] = 0,
 ) -> None:
     """Vibe 3.0 - Development orchestration tool."""
+    # Store verbose in context for subcommands to inherit
+    ctx.meta["verbose"] = verbose
     setup_logging(verbose=verbose)
 
     # Register domain event handlers
@@ -137,9 +137,13 @@ def run_command(
     ] = False,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Print command and prompt without executing"),
+        typer.Option(
+            "--dry-run",
+            help="Print command and prompt summary without executing",
+        ),
     ] = False,
     no_async: run._ASYNC_OPT = False,
+    show_prompt: run._SHOW_PROMPT_OPT = False,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -171,6 +175,7 @@ def run_command(
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
+        show_prompt=show_prompt,
         agent=agent,
         backend=backend,
         model=model,
@@ -186,6 +191,7 @@ def version() -> None:
 
 @app.command()
 def help(
+    ctx: typer.Context,
     command: Annotated[Optional[str], typer.Argument(help="Command name")] = None,
 ) -> None:
     """Show help for commands.
@@ -200,21 +206,27 @@ def help(
     # Get the underlying Click command
     click_app = typer.main.get_command(app)
 
+    context = click.Context(
+        click_app,
+        info_name=ctx.info_name or os.environ.get("VIBE3_PROG_NAME") or "vibe3",
+        parent=ctx.parent,
+    )
+
     if command:
-        # Show subcommand help (simplified: show main help)
-        click.echo(click_app.get_help(click.Context(click_app)))
-    else:
-        # Show main help
-        click.echo(click_app.get_help(click.Context(click_app)))
+        click.echo(click_app.get_help(context))
+        return
+
+    click.echo(click_app.get_help(context))
 
 
 def main() -> None:
     """CLI entry point with unified error handling."""
     # Support -h as --help shorthand (globally replace all positions)
     sys.argv = ["--help" if a == "-h" else a for a in sys.argv]
+    prog_name = os.environ.get("VIBE3_PROG_NAME") or Path(sys.argv[0]).name or "vibe3"
 
     try:
-        app(prog_name="vibe")
+        app(prog_name=prog_name)
 
     except UserError as e:
         # User error: concise message

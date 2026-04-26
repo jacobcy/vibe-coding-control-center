@@ -10,7 +10,7 @@ class IssueFlowService:
 
     Provides consistent methods for:
     - Canonical branch name generation (task/issue-N)
-    - Issue number parsing from branch names
+    - Issue number parsing from branch names (task/issue-N and dev/issue-N)
     - Active flow lookup for issues
 
     This consolidates logic that was previously scattered across:
@@ -20,6 +20,7 @@ class IssueFlowService:
     """
 
     CANONICAL_PATTERN = re.compile(r"^task/issue-(\d+)$")
+    ISSUE_BRANCH_PATTERN = re.compile(r"^(?:task|dev)/issue-(\d+)$")
 
     def __init__(self, store: SQLiteClient | None = None) -> None:
         """Initialize IssueFlowService.
@@ -63,6 +64,49 @@ class IssueFlowService:
         """
         match = self.CANONICAL_PATTERN.fullmatch(branch)
         return int(match.group(1)) if match else None
+
+    def parse_issue_number_any(self, branch: str) -> int | None:
+        """Extract issue number from task or dev issue branch.
+
+        Supports both:
+        - task/issue-N (canonical task branch)
+        - dev/issue-N (development branch)
+
+        Args:
+            branch: Git branch name
+
+        Returns:
+            Issue number if branch matches pattern, None otherwise
+
+        Examples:
+            >>> service.parse_issue_number_any("task/issue-436")
+            436
+            >>> service.parse_issue_number_any("dev/issue-328")
+            328
+            >>> service.parse_issue_number_any("feature/my-feature")
+            None
+        """
+        match = self.ISSUE_BRANCH_PATTERN.fullmatch(branch)
+        return int(match.group(1)) if match else None
+
+    def is_issue_branch(self, branch: str) -> bool:
+        """Check if branch is an issue branch (task/issue-N or dev/issue-N).
+
+        Args:
+            branch: Git branch name
+
+        Returns:
+            True if branch matches issue pattern, False otherwise
+
+        Example:
+            >>> service.is_issue_branch("task/issue-372")
+            True
+            >>> service.is_issue_branch("dev/issue-328")
+            True
+            >>> service.is_issue_branch("feature/my-feature")
+            False
+        """
+        return bool(self.ISSUE_BRANCH_PATTERN.fullmatch(branch))
 
     def is_task_branch(self, branch: str) -> bool:
         """Check if branch is a task branch (starts with task/issue-).

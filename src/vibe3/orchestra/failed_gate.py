@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 
@@ -117,7 +117,7 @@ class FailedGate:
             )
             raise RuntimeError(f"GitHub CLI error: {err}")
 
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def _extract_reason(self, issue_number: int) -> tuple[str, str | None]:
         """Extract failure reason from issue comments.

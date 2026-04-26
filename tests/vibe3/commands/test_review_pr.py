@@ -49,19 +49,30 @@ def _mock_inspect_data():
 
 @pytest.fixture
 def mock_review_usecase(monkeypatch):
-    """Stub ReviewUsecase for fast CLI surface tests."""
-    usecase = MagicMock()
-    usecase.build_pr_review.return_value = (
+    """Stub role-level review helpers for fast CLI surface tests."""
+    review_request = (
         ReviewRequest(scope=ReviewScope.for_pr(42)),
         101,
         "feature/branch",
     )
-    usecase.execute_review.return_value = MagicMock(
+    execute_result = MagicMock(
         verdict="PASS",
         handoff_file=None,
     )
-    monkeypatch.setattr("vibe3.commands.review._build_review_usecase", lambda: usecase)
-    return usecase
+    build_mock = MagicMock(return_value=review_request)
+    execute_mock = MagicMock(return_value=execute_result)
+    monkeypatch.setattr("vibe3.commands.review.build_pr_review_request", build_mock)
+    monkeypatch.setattr(
+        "vibe3.commands.review.execute_manual_review_async", execute_mock
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.review.execute_manual_review_sync", execute_mock
+    )
+    return MagicMock(
+        build_pr_review=build_mock,
+        execute_review=execute_mock,
+        result=execute_result,
+    )
 
 
 def test_review_pr_missing_arg_shows_error():
@@ -72,7 +83,7 @@ def test_review_pr_missing_arg_shows_error():
 
 
 def test_review_pr_pass(mock_review_usecase):
-    mock_review_usecase.execute_review.return_value.verdict = "PASS"
+    mock_review_usecase.result.verdict = "PASS"
     result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 0
     assert "PASS" in result.output
@@ -82,7 +93,7 @@ def test_review_pr_pass(mock_review_usecase):
 
 
 def test_review_pr_block_exits_1(mock_review_usecase):
-    mock_review_usecase.execute_review.return_value.verdict = "BLOCK"
+    mock_review_usecase.result.verdict = "BLOCK"
     result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 1
 
@@ -104,14 +115,14 @@ def test_review_pr_does_not_have_publish_option():
 
 def test_review_pr_is_local_only(mock_review_usecase):
     """review pr should not call GitHub publish methods."""
-    mock_review_usecase.execute_review.return_value.verdict = "PASS"
+    mock_review_usecase.result.verdict = "PASS"
     result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
 
 
 def test_review_pr_async_dispatches_background_execution(mock_review_usecase):
-    mock_review_usecase.execute_review.return_value.verdict = "ASYNC"
+    mock_review_usecase.result.verdict = "ASYNC"
     result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
@@ -139,7 +150,7 @@ def test_dry_run_pr_allows_missing_head_branch(mock_review_usecase):
         101,
         None,
     )
-    mock_review_usecase.execute_review.return_value.verdict = "DRY_RUN"
+    mock_review_usecase.result.verdict = "DRY_RUN"
 
     result = runner.invoke(app, ["pr", "42", "--dry-run"])
 
@@ -150,7 +161,7 @@ def test_dry_run_pr_allows_missing_head_branch(mock_review_usecase):
 
 def test_review_parser_failure_returns_error_verdict(mock_review_usecase):
     """Surface ERROR verdict when usecase returns parse-failure result."""
-    mock_review_usecase.execute_review.return_value.verdict = "ERROR"
+    mock_review_usecase.result.verdict = "ERROR"
     result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 1
@@ -162,6 +173,6 @@ def test_review_pr_rejects_unknown_agent_param():
 
     This test ensures the hook-CLI contract is enforced.
     """
-    result = runner.invoke(app, ["pr", "42", "--agent", "code-reviewer"])
+    result = runner.invoke(app, ["pr", "42", "--agent", "vibe-reviewer"])
     assert result.exit_code != 0
     assert "no such option" in result.output.lower() or "error" in result.output.lower()

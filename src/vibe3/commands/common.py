@@ -5,6 +5,7 @@ from typing import Any
 
 import typer
 
+from vibe3.commands.check_support import execute_check_mode
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 
@@ -40,7 +41,7 @@ def run_full_check_shortcut() -> None:
     from vibe3.services.check_service import CheckService
 
     try:
-        result = CheckService().execute_check("fix_all")
+        result = execute_check_mode(CheckService(), "fix_all")
     except Exception as exc:
         typer.echo(
             f"Warning: vibe3 check failed before status: {exc}",

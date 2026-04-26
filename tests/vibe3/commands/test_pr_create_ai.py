@@ -142,7 +142,7 @@ class TestPRCreateCommandAI:
                     ) as mock_config:
                         mock_config.return_value.ai = AIConfig()
                         with patch(
-                            "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
+                            "vibe3.services.pr_create_usecase.AISuggestionClient.suggest_pr_content"
                         ) as mock_suggest:
                             mock_suggest.return_value = (
                                 "feat: ai title",
@@ -177,3 +177,36 @@ class TestPRCreateCommandAI:
 
         assert result.exit_code == 0
         assert json.loads(result.output)["title"] == "feat: ai title"
+
+    def test_pr_create_ai_requires_commits_for_suggestions(
+        self, runner: CliRunner
+    ) -> None:
+        """Test --ai mode fails with clear error when no commits available."""
+        with patch(
+            "vibe3.commands.pr_create.FlowService.get_current_branch",
+            return_value="main",
+        ):
+            with patch(
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
+                return_value="main",
+            ):
+                with patch(
+                    "vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"
+                ):
+                    with patch("vibe3.commands.pr_create.PRService") as mock_service:
+                        mock_service.return_value.get_pr.return_value = None
+                        # Mock collect_branch_material to return empty commits
+                        with patch(
+                            "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
+                        ) as mock_material:
+                            mock_material.return_value = MagicMock(
+                                commits=[],  # No commits
+                                changed_files=[],
+                            )
+                            result = runner.invoke(
+                                app, ["pr", "create", "--ai", "--yes"]
+                            )
+
+        assert result.exit_code == 1
+        assert "requires commits to generate suggestions" in result.output
+        assert "Commit your changes first" in result.output

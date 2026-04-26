@@ -15,7 +15,7 @@
 
 - **`context/`**: 记忆与任务管理
   - `memory.md`: 长期记忆，记录关键决策和架构选择。
-  - handoff：当前 flow 的交接记录（`vibe3 handoff show` 读取，`vibe3 handoff append` 写入）。
+  - handoff：当前 flow 的交接记录（`vibe3 handoff status` 读取，`vibe3 handoff append` 写入）。
 - **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务逻辑。
 - **`rules/`**: 具体的编码标准和项目规则。
   - `coding-standards.md`: 实现、边界、工具与交付细则
@@ -37,7 +37,7 @@
 ## 🤖 AI 互操作协议 (AI Interoperability Protocol)
 
 为了确保不同 AI IDE 和 Agent 行为一致：
-1.  **先读上下文**: 开始任务前，运行 `vibe3 handoff show` 和 `vibe3 flow show` 了解当前上下文，阅读 `context/memory.md`。
+1.  **先读上下文**: 开始任务前，运行 `vibe3 handoff status` 和 `vibe3 flow show` 了解当前上下文，阅读 `context/memory.md`。
 2.  **遵循工作流**: 如果用户请求匹配下方的工作流，请**严格按步骤执行**。
 3.  **遵循约束**: 优先使用现有的能力（如 Skills），不要重新发明轮子。
 4.  **更新上下文**: 任务完成后，运行 `vibe3 handoff append` 记录状态，更新 `context/memory.md`。

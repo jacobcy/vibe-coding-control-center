@@ -123,7 +123,7 @@ uv run python src/vibe3/cli.py flow show
 ```
 
 期望：
-- 出现新的 `handoff_review` 事件
+- 出现新的 `audit_recorded` 事件
 - `audit_ref` 更新到最新 review artifact
 
 ## 6. 常见问题

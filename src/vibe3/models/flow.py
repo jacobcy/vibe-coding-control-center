@@ -1,9 +1,12 @@
 """Flow and Task data models."""
 
+import json
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+from vibe3.models.verdict import VerdictRecord
 
 
 class MainBranchProtectedError(Exception):
@@ -16,10 +19,10 @@ class MainBranchProtectedError(Exception):
     pass
 
 
-ExecutionStatus = Literal["pending", "running", "done", "crashed"]
+ExecutionStatus = Literal["pending", "running", "done", "crashed", "aborted"]
 
 
-def _migrate_flow_status_value(v: str) -> str:
+def _migrate_flow_status_value(v: str | None) -> str | None:
     """Normalize legacy flow status values."""
     if v == "idle":
         return "active"
@@ -27,6 +30,18 @@ def _migrate_flow_status_value(v: str) -> str:
         return "stale"
     if v == "merged":
         return "done"
+    if v == "waiting":
+        return "blocked"
+    return v
+
+
+def _migrate_execution_status_value(v: str | None) -> str | None:
+    """Normalize legacy execution status values."""
+    if v == "completed":
+        return "done"
+    # Map legacy "failed" to "crashed" for consistency
+    if v == "failed":
+        return "crashed"
     return v
 
 
@@ -44,16 +59,30 @@ class FlowState(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    pr_ref: str | None = None  # PR URL as proof of PR creation
     planner_actor: str | None = None
     executor_actor: str | None = None
     reviewer_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
-    blocked_by: str | None = None
-    next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"] = (
-        "active"
+    blocked_by: str | None = (
+        None  # Legacy field (deprecated, kept for backward compatibility)
     )
+    blocked_by_issue: int | None = (
+        None  # NEW: Dependency issue number (semantic clarity)
+    )
+    blocked_reason: str | None = None  # NEW: Block reason text (semantic clarity)
+    failed_reason: str | None = None  # NEW: Fail reason text
+    next_step: str | None = None
+    flow_status: Literal[
+        "active",
+        "blocked",
+        "failed",
+        "done",
+        "stale",
+        "aborted",
+        "merged",
+    ] = "active"
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -62,19 +91,57 @@ class FlowState(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+    latest_verdict: VerdictRecord | None = None  # Latest verdict for quick query
 
     model_config = {"extra": "ignore"}
 
     @field_validator("flow_status", mode="before")
     @classmethod
     def migrate_flow_status(cls, v: str) -> str:
-        """Migrate legacy flow status values.
+        """Migrate legacy flow status values."""
+        return str(_migrate_flow_status_value(v))
 
-        - idle -> active (default state)
-        - missing -> stale (inactive state)
-        - merged -> done (completed state)
+    @field_validator(
+        "planner_status",
+        "executor_status",
+        "reviewer_status",
+        mode="before",
+    )
+    @classmethod
+    def migrate_execution_status(cls, v: str | None) -> str | None:
+        """Migrate legacy execution status values."""
+        return _migrate_execution_status_value(v)
+
+    @field_validator("latest_verdict", mode="before")
+    @classmethod
+    def parse_verdict_record(
+        cls, v: str | dict[str, object] | None
+    ) -> VerdictRecord | None:
+        """Parse verdict record from JSON string or dict.
+
+        SQLite stores latest_verdict as JSON TEXT, so we need to
+        deserialize it when loading from the database.
+
+        Args:
+            v: JSON string, dict, VerdictRecord, or None
+
+        Returns:
+            VerdictRecord instance or None
         """
-        return _migrate_flow_status_value(v)
+        if v is None:
+            return None
+        if isinstance(v, VerdictRecord):
+            return v
+        if isinstance(v, str):
+            try:
+                data = json.loads(v)
+                return VerdictRecord(**data)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if isinstance(v, dict):
+            # Type ignore: v is validated JSON from database
+            return VerdictRecord(**v)  # type: ignore[arg-type]
+        return None
 
 
 class IssueLink(BaseModel):
@@ -98,7 +165,7 @@ class IssueLink(BaseModel):
 
     @staticmethod
     def resolve_task_number(
-        links: list["IssueLink"] | list[dict],
+        links: list["IssueLink"] | list[dict[str, Any]],
     ) -> int | None:
         """Resolve the primary task issue number from links.
 
@@ -107,11 +174,13 @@ class IssueLink(BaseModel):
         for link in links:
             role = link.get("issue_role") if isinstance(link, dict) else link.issue_role
             if role == "task":
-                return (
+                result = (
                     link.get("issue_number")
                     if isinstance(link, dict)
                     else link.issue_number
                 )
+                # Type cast for Pyright strict mode
+                return result if isinstance(result, int) else None
         return None
 
 
@@ -157,9 +226,18 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"]
+    flow_status: Literal[
+        "active",
+        "blocked",
+        "failed",
+        "done",
+        "stale",
+        "aborted",
+        "merged",
+    ]
     task_issue_number: int | None = None
     pr_number: int | None = None
+    pr_ref: str | None = None  # PR URL as proof of PR creation
     pr_ready_for_review: bool = False
     spec_ref: str | None = None
     plan_ref: str | None = None
@@ -170,7 +248,10 @@ class FlowStatusResponse(BaseModel):
     reviewer_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
-    blocked_by: str | None = None
+    blocked_by: str | None = None  # Legacy field (deprecated)
+    blocked_by_issue: int | None = None  # NEW: Dependency issue number
+    blocked_reason: str | None = None  # NEW: Block reason text
+    failed_reason: str | None = None  # NEW: Fail reason text
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
     planner_status: ExecutionStatus | None = None
@@ -179,20 +260,54 @@ class FlowStatusResponse(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+    latest_verdict: VerdictRecord | None = None
+    worktree_root: str | None = None  # NEW: Worktree root path for path resolution
 
     @field_validator("flow_status", mode="before")
     @classmethod
     def migrate_flow_status(cls, v: str) -> str:
         """Migrate legacy flow status values for status responses."""
-        return _migrate_flow_status_value(v)
+        return str(_migrate_flow_status_value(v))
+
+    @field_validator(
+        "planner_status",
+        "executor_status",
+        "reviewer_status",
+        mode="before",
+    )
+    @classmethod
+    def migrate_execution_status(cls, v: str | None) -> str | None:
+        """Migrate legacy execution status values for status responses."""
+        return _migrate_execution_status_value(v)
+
+    @field_validator("latest_verdict", mode="before")
+    @classmethod
+    def parse_verdict_record(
+        cls, v: str | dict[str, object] | None
+    ) -> VerdictRecord | None:
+        """Parse verdict record from JSON string or dict for status responses."""
+        if v is None:
+            return None
+        if isinstance(v, VerdictRecord):
+            return v
+        if isinstance(v, str):
+            try:
+                data = json.loads(v)
+                return VerdictRecord(**data)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if isinstance(v, dict):
+            return VerdictRecord(**v)  # type: ignore[arg-type]
+        return None
 
     @classmethod
     def from_state(
         cls,
-        state: FlowState | dict,
+        state: FlowState | dict[str, Any],
         issues: list[IssueLink] | None = None,
         pr_number: int | None = None,
         pr_ready: bool | None = None,
+        worktree_root: str | None = None,
     ) -> "FlowStatusResponse":
         """Build a hydrated response from state and links."""
         data = state.model_dump() if isinstance(state, FlowState) else dict(state)
@@ -207,6 +322,7 @@ class FlowStatusResponse(BaseModel):
             flow_status=data.get("flow_status", "active"),
             task_issue_number=resolved_task_issue_number,
             pr_number=pr_number if pr_number is not None else data.get("pr_number"),
+            pr_ref=data.get("pr_ref"),
             pr_ready_for_review=(
                 pr_ready
                 if pr_ready is not None
@@ -222,6 +338,9 @@ class FlowStatusResponse(BaseModel):
             latest_actor=data.get("latest_actor"),
             initiated_by=data.get("initiated_by"),
             blocked_by=data.get("blocked_by"),
+            blocked_by_issue=data.get("blocked_by_issue"),
+            blocked_reason=data.get("blocked_reason"),
+            failed_reason=data.get("failed_reason"),
             next_step=data.get("next_step"),
             issues=issues,
             planner_status=data.get("planner_status"),
@@ -230,6 +349,8 @@ class FlowStatusResponse(BaseModel):
             execution_pid=data.get("execution_pid"),
             execution_started_at=data.get("execution_started_at"),
             execution_completed_at=data.get("execution_completed_at"),
+            latest_verdict=data.get("latest_verdict"),
+            worktree_root=worktree_root,
         )
 
 

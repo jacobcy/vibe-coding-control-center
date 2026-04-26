@@ -13,6 +13,16 @@ _TRACE_OPT = Annotated[
 _DRY_RUN_OPT = Annotated[
     bool, typer.Option("--dry-run", help="Print command without executing")
 ]
+_SHOW_PROMPT_OPT = Annotated[
+    bool,
+    typer.Option(
+        "--show-prompt",
+        help=(
+            "With --dry-run, print the full rendered prompt "
+            "in addition to the summary"
+        ),
+    ),
+]
 _ASYNC_OPT = Annotated[
     bool,
     typer.Option(

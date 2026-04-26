@@ -1,6 +1,6 @@
 ---
 name: vibe-done
-description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout: confirm PR outcome, close owned issues, record terminal handoff, and stop using this branch. Do not use for code changes or abandoned work.
+description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout. confirm PR outcome, close owned issues, record terminal handoff, and stop using this branch. Do not use for code changes or abandoned work.
 ---
 
 # /vibe-done - 终态收口
@@ -26,10 +26,9 @@ description: Use when the current human-collaboration flow has reached terminal 
 
 ## 必读文档
 
-- `docs/standards/v3/git-workflow-standard.md`
-- `docs/standards/v3/worktree-lifecycle-standard.md`
-- `docs/standards/v3/command-standard.md`
-- `docs/standards/v3/handoff-governance-standard.md`
+- `docs/standards/v3/handoff-governance-standard.md`（handoff 治理规则）
+- `docs/standards/v3/handoff-store-standard.md`（handoff 存储结构）
+- `docs/standards/v3/git-workflow-standard.md`（PR、issue、git 操作）
 
 ## 完整流程
 
@@ -63,6 +62,7 @@ description: Use when the current human-collaboration flow has reached terminal 
 
 - 允许：读取 `flow show` / `handoff show` / `gh pr view`、关闭 issue、写入 handoff、必要时执行 `vibe3 check`
 - 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
+- **绝对禁止**：删除 worktree（这是人机合作流程的核心资源，worktree 生命周期完全由用户控制）
 - branch / PR / issue 生命周期优先直接使用 git / gh；`flow` / `handoff` 只负责创联和本地协作证据
 - 若 review evidence 尚不存在，或 PR 还没达到 merge 条件，必须停回 `/vibe-integrate`，不得强行继续
 
@@ -106,8 +106,9 @@ uv run python src/vibe3/cli.py flow show <branch>
 
 - 没有 review evidence
 - 或还有 unresolved review / CI 阻塞
+- 或 PR 未处于 merged/closed/aborted 等终态
 
-则立即停止，返回 `/vibe-integrate`，不要继续 Step 2 以后动作。
+则立即停止，返回 `/vibe-integrate`，不要继续后续动作。
 
 ### Step 2: 确认 task 收口事实
 
@@ -125,7 +126,7 @@ gh issue close <issue-number-or-ref>
 
 补充口径：
 
-- `primary_issue_ref` 若存在，它对应的 `repo issue` 是当前 task 的 `task issue`，应作为主闭环 issue 优先确认
+- `primary_issue_ref` 若存在，它指向的 GitHub issue 在当前 flow 中被关联为 task issue，应作为主闭环 issue 优先确认
 - 其余 `issue_refs` 只表示关联来源，不等于都应由当前收口动作负责关闭
 
 ### Step 4: 记录 closeout 与一致性审计
@@ -147,11 +148,21 @@ uv run python src/vibe3/cli.py check
 - 强行 merge 未就绪的 PR
 - 替代 git / gh 去删除 branch 或处理远端生命周期
 
-### Step 5: 汇总并反馈问题
+### Step 5: 汇总并反馈问题（仅在发现系统性问题时）
 
-在完成 flow 收口前，必须从当前 flow 的所有 handoff 记录中提取 `Issues Found` 条目。
+**重要**：仅在发现 vibe skill/system 性问题时创建 feedback issue，不针对单个 PR 的问题。
 
-执行问题反馈：
+单个 PR 的问题已在：
+- PR comment（review evidence）
+- PR 自身的 issue 关联
+- Handoff 记录中
+
+系统性问题示例：
+- Skill 流程设计缺陷（如 vibe-integrate 等待在线 review 超时）
+- 命令参数错误（如文档与实际命令不符）
+- 跨 PR 的重复问题模式
+
+若发现系统性问题，执行问题反馈：
 
 1. **汇总问题清单**
    - 从 `vibe3 handoff show` 读取当前 flow 的所有问题记录

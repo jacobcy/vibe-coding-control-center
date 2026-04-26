@@ -182,12 +182,12 @@ wtrm all             # 删除所有 wt-* worktree
 | `<wt>-git` | lazygit（最终审查点） |
 
 ```bash
-vup wt-login-fix                  # 默认 agent（claude 或 VIBE_DEFAULT_TOOL）
+vup wt-login-fix                  # 默认使用 claude
 vup wt-login-fix --agent codex    # 指定使用 codex
 vup --agent opencode              # 当前 worktree，使用 opencode
 ```
 
-Agent 选项：`claude`（默认）、`codex`、`opencode`
+Agent 选项：`claude`（默认）、`codex`、`opencode`、`gemini`
 
 你需要做的事：
 - 什么都不用管

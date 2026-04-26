@@ -47,6 +47,10 @@ def setup_logging(verbose: int = 0) -> None:
     level = _get_log_level(verbose)
     format_str = _get_format(level)
 
+    # Reconfigure from a clean slate so repeated CLI invocations do not keep
+    # stale sinks pointing at closed test/TTY streams.
+    logger.remove()
+
     # Console output
     logger.add(
         sys.stderr,

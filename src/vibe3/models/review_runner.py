@@ -16,7 +16,7 @@ class AgentOptions:
         agent: The agent preset name (passed to codeagent-wrapper)
         model: Optional model override
         backend: Backend name (for database recording or direct use)
-        timeout_seconds: Maximum execution time (default: 1800 seconds)
+        timeout_seconds: Maximum execution time (default: 3600 seconds)
 
     Usage:
         - Use agent preset: Set agent, leave backend=None
@@ -28,7 +28,7 @@ class AgentOptions:
     agent: str | None = None
     model: str | None = None
     backend: str | None = None
-    timeout_seconds: int = 1800
+    timeout_seconds: int = 3600
 
 
 @dataclass(frozen=True)

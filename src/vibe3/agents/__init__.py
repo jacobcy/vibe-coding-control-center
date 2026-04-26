@@ -1,4 +1,5 @@
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.base import AgentBackend
+"""Agent backend package.
 
-__all__ = ["AgentBackend", "CodeagentBackend"]
+Import concrete backends or protocol types from their module paths instead of
+through package-level re-exports.
+"""

@@ -28,7 +28,11 @@ for arg in "$@"; do
     esac
 done
 
-VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"
+if [[ -f "config/skills.json" ]]; then
+  VIBE_SKILLS_CONFIG="config/skills.json"
+else
+  VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"
+fi
 
 # --- Helper Functions ---
 _symlink_files() {
@@ -57,6 +61,7 @@ _symlink_files() {
 }
 
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
+echo "ℹ️  此脚本可重复运行；重复执行会复用已存在的初始化结果。"
 
 # ── 0.5 Ensure uv CLI is discoverable ─────────────────────────────────────
 if ! command -v uv &> /dev/null; then
@@ -87,29 +92,39 @@ else
   echo "✅ UV_PROJECT_ENVIRONMENT is set: $UV_PROJECT_ENVIRONMENT"
 fi
 
-# ── 1. Install approved skills from ~/.vibe/skills.json ──────────────────────
+# ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
 if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
-  echo "📦 Installing approved skills from ~/.vibe/skills.json..."
+  echo "📦 Installing approved third-party skills from ~/.vibe/skills.json..."
 
-  # Project-level skills
-  agents=$(jq -r '.project.agents | join(" ")' "$VIBE_SKILLS_CONFIG")
-  jq -c '.project.packages[]' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
+  global_agents=$(jq -r '.global.agents // [] | join(" ")' "$VIBE_SKILLS_CONFIG")
+  jq -c '.global.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
+    source=$(echo "$pkg" | jq -r '.source')
+    skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
+    echo "  → $source (global): $skills"
+    # shellcheck disable=SC2086
+    npx skills add "$source" -g --agent $global_agents --skill $skills -y
+  done
+
+  project_agents=$(jq -r '.project.agents // [] | join(" ")' "$VIBE_SKILLS_CONFIG")
+  jq -c '.project.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
     source=$(echo "$pkg" | jq -r '.source')
     skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
     echo "  → $source (project): $skills"
     # shellcheck disable=SC2086
-    npx skills add "$source" --agent $agents --skill $skills -y
+    npx skills add "$source" --agent $project_agents --skill $skills -y
   done
 else
-  # Fallback: install full superpowers if no config or jq not available
+  # Fallback: install superpowers for current supported non-Claude agents
   echo "📦 Installing Superpowers (fallback)..."
-  npx skills add obra/superpowers -y --agent antigravity trae claude
+  npx skills add obra/superpowers -g --agent codex gemini-cli opencode github-copilot qoder codebuddy trae-cn -y
 fi
 
 # ── 2. Initialize OpenSpec ────────────────────────────────────────────────────
 echo "📦 Initializing OpenSpec..."
-if command -v openspec &> /dev/null; then
-  openspec init --tools antigravity,claude,codex,trae
+if [[ -d "openspec/specs" || -f "openspec/config.yaml" ]]; then
+  echo "✅ OpenSpec already initialized"
+elif command -v openspec &> /dev/null; then
+  openspec init --tools claude,codex,opencode,qoder,codebuddy,trae
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping.\033[0m"
   echo "   Install via: pnpm add -g @openspec/tools"
@@ -122,6 +137,11 @@ echo "🔗 Creating symlinks for local skills..."
 _symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".gemini/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".copilot/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".qoder/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".codebuddy/skills" "identity" "dir"
 
 #  Symlink workflows
 echo "🔗 Creating symlinks for workflows..."

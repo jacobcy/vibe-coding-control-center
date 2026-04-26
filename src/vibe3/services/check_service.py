@@ -1,15 +1,18 @@
 # ruff: noqa: E501
 """Check service implementation for verifying handoff store consistency."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.check_remote import (
@@ -20,6 +23,9 @@ from vibe3.services.check_remote import (
     resolve_task_issue_number,
 )
 from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+if TYPE_CHECKING:
+    from vibe3.models.pr import PRResponse
 
 
 @dataclass
@@ -40,16 +46,6 @@ class FixResult:
     applied: list[str] = field(default_factory=list)
 
 
-@dataclass
-class ExecuteCheckResult:
-    """Result of unified check execution."""
-
-    mode: Literal["default", "init", "all", "fix", "fix_all"]
-    success: bool
-    summary: str
-    details: dict = field(default_factory=dict)
-
-
 class CheckService(CheckRemote):
     """Service for verifying handoff store consistency and auto-fixing issues."""
 
@@ -64,132 +60,6 @@ class CheckService(CheckRemote):
         self.github_client = github_client or GitHubClient()
 
     # ------------------------------------------------------------------
-    # Unified Execution
-    # ------------------------------------------------------------------
-
-    def execute_check(
-        self,
-        mode: Literal["default", "init", "all", "fix", "fix_all"] = "default",
-        branch: str | None = None,
-    ) -> ExecuteCheckResult:
-        """Unified check execution with mode-based routing."""
-        if mode == "init":
-            return self._handle_init_mode()
-        elif mode == "all":
-            return self._handle_all_mode()
-        elif mode == "fix":
-            return self._handle_fix_mode(branch)
-        elif mode == "fix_all":
-            return self._handle_fix_all_mode()
-        else:
-            return self._handle_default_mode(branch)
-
-    def _handle_init_mode(self) -> ExecuteCheckResult:
-        """Handle --init mode: scan merged PRs to back-fill task_issue_number."""
-        result = self.init_remote_index()
-        summary = (
-            f"Done  total={result.total_flows}  "
-            f"updated={result.updated}  skipped={result.skipped}"
-        )
-        return ExecuteCheckResult(
-            mode="init",
-            success=True,
-            summary=summary,
-            details=(
-                {"unresolvable": result.unresolvable} if result.unresolvable else {}
-            ),
-        )
-
-    def _handle_all_mode(self) -> ExecuteCheckResult:
-        """Handle --all mode: check active flows."""
-        results = self.verify_all_flows(status="active")
-        invalid = [r for r in results if not r.is_valid]
-        return ExecuteCheckResult(
-            mode="all",
-            success=len(invalid) == 0,
-            summary=(
-                f"All {len(results)} active flows passed"
-                if not invalid
-                else f"{len(invalid)}/{len(results)} active flows have issues"
-            ),
-            details={"invalid": invalid},
-        )
-
-    def _handle_fix_all_mode(self) -> ExecuteCheckResult:
-        """Handle --fix --all mode: check active flows and auto-fix fixable issues."""
-        results = self.verify_all_flows(status=["active", "stale"])
-        invalid = [r for r in results if not r.is_valid]
-        if not invalid:
-            return ExecuteCheckResult(
-                mode="fix_all",
-                success=True,
-                summary=f"All {len(results)} active flows passed",
-            )
-
-        fixed_count = 0
-        failed: list[str] = []
-        for r in invalid:
-            fix_result = self.auto_fix_branch(r.branch, r.issues)
-            if fix_result.success:
-                fixed_count += 1
-            else:
-                error_msg = fix_result.error or "unknown error"
-                failed.append(f"{r.branch}: {error_msg}")
-
-        total = len(invalid)
-        if failed:
-            summary = f"Fixed {fixed_count}/{total}, {len(failed)} had unfixable issues"
-            return ExecuteCheckResult(
-                mode="fix_all",
-                success=False,
-                summary=summary,
-                details={"fixed": fixed_count, "failed": failed},
-            )
-        summary = (
-            f"All {fixed_count} fixable issues resolved across {len(results)} flows"
-        )
-        return ExecuteCheckResult(
-            mode="fix_all",
-            success=True,
-            summary=summary,
-            details={"fixed": fixed_count},
-        )
-
-    def _handle_fix_mode(self, branch: str | None) -> ExecuteCheckResult:
-        """Handle --fix mode: auto-fix current branch."""
-        result_single = self.verify_current_flow()
-        if result_single.is_valid:
-            return ExecuteCheckResult(
-                mode="fix", success=True, summary="All checks passed"
-            )
-
-        fix_result = self.auto_fix(result_single.issues, branch=branch)
-        return ExecuteCheckResult(
-            mode="fix",
-            success=fix_result.success,
-            summary=(
-                "All issues fixed"
-                if fix_result.success
-                else f"Error: {fix_result.error}"
-            ),
-            details={"issues": result_single.issues},
-        )
-
-    def _handle_default_mode(self, branch: str | None) -> ExecuteCheckResult:
-        """Handle default mode: check current branch."""
-        result_single = self.verify_current_flow()
-        return ExecuteCheckResult(
-            mode="default",
-            success=result_single.is_valid,
-            summary=(
-                "All checks passed"
-                if result_single.is_valid
-                else f"Issues found for branch '{result_single.branch}'"
-            ),
-            details={"issues": result_single.issues},
-        )
-
-    # ------------------------------------------------------------------
     # Core Logic
     # ------------------------------------------------------------------
 
@@ -197,6 +67,15 @@ class CheckService(CheckRemote):
         """Verify current branch flow consistency."""
         logger.bind(domain="check", action="verify").info("Verifying flow consistency")
         branch = self.git_client.get_current_branch()
+
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        try:
+            all_prs = self.github_client.list_all_prs(state="all")
+            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        except Exception as exc:
+            logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
+            self._branch_to_pr = {}
+
         return self._check_branch(branch)
 
     def _has_worktree(self, branch: str) -> bool:
@@ -259,46 +138,59 @@ class CheckService(CheckRemote):
         if len(task_issues) > 1:
             issues.append(f"Multiple task issues for branch '{branch}'")
 
-        # PR verification (Remote-first)
-        try:
-            prs = self.github_client.list_prs_for_branch(branch)
-            if not prs:
-                # Check merged/closed to catch stale flows
-                all_prs = self.github_client.list_prs_for_branch(branch, state="all")
-                prs = [p for p in all_prs if p.state != PRState.OPEN]
-
-            if prs:
-                pr = prs[0]
-                # Check if PR is closed or merged - auto-complete flow
-                if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                    self._mark_flow_done(
-                        branch,
-                        f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                        cleanup_local_scene=not branch_missing,
+        # PR verification (Remote-first) - use cached PR data
+        pr = self._branch_to_pr.get(branch)
+        if pr:
+            # Check if PR is closed or merged - auto-complete flow
+            if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                self._mark_flow_done(
+                    branch,
+                    f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                    cleanup_local_scene=not branch_missing,
+                )
+                # Write cache: update PR title
+                self._update_pr_cache(branch, pr)
+                return CheckResult(is_valid=True, branch=branch, issues=[])
+        else:
+            # No PR found in cache, try API as fallback
+            try:
+                prs = self.github_client.list_prs_for_branch(branch)
+                if not prs:
+                    # Check merged/closed to catch stale flows
+                    all_prs = self.github_client.list_prs_for_branch(
+                        branch, state="all"
                     )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-        except Exception as e:
-            logger.bind(domain="check", branch=branch).warning(
-                f"Failed to verify PR status from GitHub: {e}"
-            )
-            if not flow_data.get("pr_number"):
+                    prs = [p for p in all_prs if p.state != PRState.OPEN]
+
+                if prs:
+                    pr = prs[0]
+                    # Check if PR is closed or merged - auto-complete flow
+                    if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                        self._mark_flow_done(
+                            branch,
+                            f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                            cleanup_local_scene=not branch_missing,
+                        )
+                        # Write cache: update PR title
+                        self._update_pr_cache(branch, pr)
+                        return CheckResult(is_valid=True, branch=branch, issues=[])
+            except Exception as e:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to verify PR status from GitHub: {e}"
+                )
                 issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
         # Auto-complete when task issue is closed (and no open PR found)
         if task_issue_closed:
-            try:
-                open_prs = self.github_client.list_prs_for_branch(branch)
-                if not open_prs:
-                    self._mark_flow_done(
-                        branch,
-                        f"Task issue #{task_issue} is CLOSED (no open PR found)",
-                        cleanup_local_scene=not branch_missing,
-                    )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-            except Exception as e:
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to check for open PRs after task issue closed: {e}"
+            # Use cached PR data instead of API call
+            pr = self._branch_to_pr.get(branch)
+            if not pr or pr.state != PRState.OPEN:
+                self._mark_flow_done(
+                    branch,
+                    f"Task issue #{task_issue} is CLOSED (no open PR found)",
+                    cleanup_local_scene=not branch_missing,
                 )
+                return CheckResult(is_valid=True, branch=branch, issues=[])
 
         flow_status = flow_data.get("flow_status", "active")
         if (
@@ -389,8 +281,7 @@ class CheckService(CheckRemote):
             except ValueError:
                 return False
 
-        from vibe3.manager.flow_manager import FlowManager
-        from vibe3.models.orchestra_config import OrchestraConfig
+        from vibe3.execution.flow_dispatch import FlowManager
         from vibe3.models.orchestration import IssueInfo
 
         issue = IssueInfo(
@@ -400,7 +291,7 @@ class CheckService(CheckRemote):
             labels=[IssueState.READY.to_label()],
         )
         manager = FlowManager(
-            OrchestraConfig.from_settings(),
+            load_orchestra_config(),
             store=self.store,
             git=self.git_client,
             github=self.github_client,
@@ -502,6 +393,29 @@ class CheckService(CheckRemote):
             return FixResult(success=False, error=error)
         return FixResult(success=True, applied=fixed)
 
-    def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
-        """Auto-fix issues for a specific branch."""
-        return self.auto_fix(issues, branch=branch)
+    def _update_pr_cache(self, branch: str, pr: "PRResponse") -> None:
+        """Update PR cache when check discovers changes.
+
+        This is a write operation: check command updates cache
+        when it discovers PR state changes.
+
+        Args:
+            branch: Branch name
+            pr: PR response object with title and number
+        """
+        try:
+            from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+            title_cache = IssueTitleCacheService(self.store, self.github_client)
+            title_cache.update_pr(
+                branch=branch,
+                pr_number=pr.number,
+                pr_title=pr.title,
+            )
+            logger.bind(domain="check", branch=branch).info(
+                f"Updated PR cache: #{pr.number} - {pr.title}"
+            )
+        except Exception as e:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to update PR cache: {e}"
+            )

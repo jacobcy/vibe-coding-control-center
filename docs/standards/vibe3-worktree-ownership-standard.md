@@ -41,8 +41,11 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 ### L1 — Governance Service
 
-- 职责：扫描仓库状态（LOC、标签、规则合规），向 GitHub issue 写入治理结论，发布扫描事件，更新 labels。
-- Worktree：**不需要**。Governance 只读取文件、操作 GitHub API，不修改代码。
+- 职责：按治理材料执行观察、纳入与派单。
+- `assignee-pool governance`：观察 assignee issue pool 状态，输出排序 / 建议 / 最小纠偏。
+- `roadmap governance`：扫描 broader repo issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool。
+- `cron governance`：周期性挑选过时文档，创建或更新 supervisor issue，交由 L2 apply 处理。
+- Worktree：**不需要**（`WorktreeRequirement.NONE`）。Governance 是周期扫描观察，只读取文件、操作 GitHub API，不修改代码，无临时 worktree。
 - 参数要求：`cwd=None`。可在主仓库路径或任意目录执行。禁止使用已移除的 `--worktree` 标志。
 - 实现位置：`src/vibe3/orchestra/services/governance_service.py`
 
@@ -51,10 +54,17 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 - 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。发布 `SupervisorApplyDispatched` 等事件。
 - Apply agent 能力范围：
   - 更改 issue labels、关闭 issue、写入 comment
-  - 简单文档修正（typo、补漏）
-  - 参数配置调整（非代码逻辑）
-  - **超出范围的复杂代码改动** → 创建正式 task issue（含 spec），交由 L3 manager 链条处理
-- Worktree：需要**临时隔离 worktree**。Apply agent 可能修改文档/配置，需要独立于主仓库的安全空间。
+  - 在核查后关闭旧 issue 并创建 replacement issue（仅 GitHub 治理动作，不等于代码实现）
+  - 文档类修改（语义对齐、校正、格式修补）
+  - 测试修补类修改（仅限测试文件与测试夹具）
+  - 对上述 L2 改动可直接 commit / push / pr create
+  - **超出范围的主代码改动或复杂验证** → 创建正式 task issue（含 spec），交由 L3 manager 链条处理
+- 治理语义：
+  - `dev/issue-*` 是主线开发承载面
+  - `task/issue-*` 是自动化承载面
+  - 当 `task/issue-*` 现场被旧 PR / 旧 flow / 错误状态污染时，允许 supervisor 直接做 issue 级治理；不要因为“apply”二字就默认只能观察
+- Worktree：需要**临时隔离 worktree**（`WorktreeRequirement.TEMPORARY`）。Apply agent 可能修改文档或测试，需要独立于主仓库的安全空间。与 governance scan 不同：apply 是执行治理动作，需要 worktree；governance 是扫描观察，不需要 worktree。
+- 注意：当前实现即使只做 issue/label/comment/close 动作，也仍可能统一分配临时 worktree；这不代表 apply 自动获得代码修改职责，也不意味着所有治理动作都必须转成实现任务。
 - 参数要求：`cwd=wt_path`（由系统自动分配临时隔离路径）。禁止使用已移除的 `--worktree` 标志。
 - 实现位置：`src/vibe3/orchestra/services/supervisor_handoff.py`
 - **当前状态**：`agent_resolver.py:65` 已传 `worktree=True`，方向正确，但 cwd 处理需确认（待代码重构 branch）。

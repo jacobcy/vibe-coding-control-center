@@ -1,20 +1,22 @@
-# Vibe Center 2.0 — 开发指南
+# Vibe Center 3.0 — 开发指南
 
 > **文档定位**：本文件是开发流程和工具使用的权威指南（详见 [SOUL.md](SOUL.md) §0 文档职责分工）
 > **核心原则**：详见 [SOUL.md](SOUL.md)
 > **项目结构**：详见 [STRUCTURE.md](STRUCTURE.md)
 > **AI 规则**：详见 [CLAUDE.md](CLAUDE.md)
+> **V3 标准入口**：`docs/standards/v3/` 是 V3 命令、数据、技能与 handoff 语义的真源目录。
 
-## 1. 项目双重身份
+## 1. 项目双栈，但 V3 为主链
 
-本项目包含两个维度的工作（详见 [CLAUDE.md](CLAUDE.md)）：
+本项目包含两个维度的工作（详见 [CLAUDE.md](CLAUDE.md)），但当前默认开发路径是 V3 Python：
 
 | 维度 | 内容 | 位置 | 治理标准 |
 |------|------|------|----------|
-| **Zsh CLI** | Shell 脚本，环境编排 | `bin/`, `lib/` | LOC ≤ 7000，单文件 ≤ 300 行 |
+| **V3 Python 运行时** | 主执行链、flow、handoff、orchestra、roles | `src/vibe3/` | 命令、数据、角色语义以 `docs/standards/v3/` 为准 |
+| **V2 Shell** | 环境工具、兼容入口、轻量辅助能力 | `bin/`, `lib/`, `config/` | LOC ≤ 7000，单文件 ≤ 300 行 |
 | **Vibe Coding Framework** | Agent 行为控制技能 | `skills/` | 清晰度、正确性、有效性 |
 
-> Shell 代码严格控制体积；技能是 Markdown 提示词，评估标准不同。
+> Shell 代码严格控制体积；技能是 Markdown 提示词，评估标准不同。V3 Python 的新语义与命令边界优先写入 `docs/standards/v3/`。
 
 ---
 
@@ -33,12 +35,12 @@
 ./scripts/init.sh
 ```
 
-当你执行 `vibe flow start <feature>` 创建新工作区时，`scripts/init.sh` 会自动运行，完成以下工作：
+当你执行 `vibe flow start <feature>`、`wtnew <branch>`，或由 V3 runtime 自动创建 worktree 时，`scripts/init.sh` 会自动运行，完成以下工作：
 1. 安装并配置 `openSpec` 和 `Superpowers`
 2. 在 `.agent/skills/` 建立项目自有技能和第三方技能的符号链接
 3. 为 Trae 编辑器用户准备相同的技能环境
 
-手动创建 worktree 时需要手动运行一次 `./scripts/init.sh`。
+如果你是手动 `git worktree add ...` 创建工作树，则需要手动运行一次 `./scripts/init.sh`。
 
 ### 2.3 验证环境
 ```bash
@@ -46,6 +48,19 @@ bin/vibe check       # 环境诊断
 bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
+
+### 2.4 V3 开发入口
+
+V3 相关工作优先用 Python 入口和 V3 标准来校准语义：
+
+```bash
+uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py handoff show
+uv run pytest tests/vibe3
+```
+
+如果需要理解命令、数据模型、技能或 handoff 的正式边界，优先阅读 `docs/standards/v3/` 下的标准文档。
 
 ---
 
@@ -309,11 +324,11 @@ bin/vibe clean                 # 清理临时文件
 
 ---
 
-## 8. V2 的核心哲学
+## 8. Vibe Center 3.0 的核心哲学
 
 **"用约束驯服 AI"**
 
-AI 不是通才，是专才。给它越大的自由度，越容易出轨。Vibe Center 2.0 的核心不是"让 AI 写更多代码"，而是"让 AI 在极窄的通道里做正确的事"：
+AI 不是通才，是专才。给它越大的自由度，越容易出轨。Vibe Center 3.0 的核心不是"让 AI 写更多代码"，而是"让 AI 在极窄的通道里做正确的事"：
 
 1. **Spec 先行**：CLI 命令有机器可读的 YAML Spec，PRD 先于代码存在
 2. **工具约束**：不靠提示词说"请别写太多"，靠 CI 硬拦截

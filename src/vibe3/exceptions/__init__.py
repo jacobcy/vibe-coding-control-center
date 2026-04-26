@@ -1,5 +1,9 @@
 """Unified exception hierarchy for Vibe 3.0."""
 
+from __future__ import annotations
+
+from pathlib import Path
+
 
 class VibeError(Exception):
     """Base exception for all Vibe errors.
@@ -45,6 +49,27 @@ class ConfigError(UserError):
     pass
 
 
+class AgentPresetNotFoundError(UserError):
+    """Agent preset not found in repo config/models.json.
+
+    Raised when an agent preset name is specified but cannot be resolved
+    to backend/model from config/models.json.
+
+    This indicates a configuration error that must be fixed before execution.
+    """
+
+    def __init__(self, preset_name: str) -> None:
+        """Initialize AgentPresetNotFoundError.
+
+        Args:
+            preset_name: The agent preset name that was not found
+        """
+        super().__init__(
+            f"Agent preset '{preset_name}' not found in config/models.json"
+        )
+        self.preset_name = preset_name
+
+
 # ========== System Errors (Non-recoverable) ==========
 
 
@@ -67,7 +92,28 @@ class SystemError(VibeError):
 class AgentExecutionError(SystemError):
     """Agent execution failed (wrapper/API/backend error)."""
 
-    pass
+    def __init__(self, message: str, log_path: Path | None = None) -> None:
+        super().__init__(message)
+        self.log_path: Path | None = log_path
+
+
+class ModelsJsonSyncError(SystemError):
+    """Failed to sync ~/.codeagent/models.json for wrapper execution.
+
+    Raised when the resolved backend/model cannot be synced to the
+    wrapper's config file, preventing proper execution.
+
+    This indicates a sync or permissions issue.
+    """
+
+    def __init__(self, reason: str) -> None:
+        """Initialize ModelsJsonSyncError.
+
+        Args:
+            reason: The reason why sync failed
+        """
+        super().__init__(f"Failed to sync ~/.codeagent/models.json: {reason}")
+        self.reason = reason
 
 
 class GitError(SystemError):

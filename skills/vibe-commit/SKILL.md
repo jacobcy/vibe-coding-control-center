@@ -30,52 +30,58 @@ PR 创建后停止，输出：
 
 ## 必读文档
 
-- `docs/standards/v3/git-workflow-standard.md`
-- `docs/standards/v3/worktree-lifecycle-standard.md`
-- `docs/standards/v3/command-standard.md`
-- `docs/standards/v3/handoff-governance-standard.md`
-- `docs/standards/github-labels-standard.md`
+- `docs/standards/v3/git-workflow-standard.md` — 提交流程核心规范
+- `docs/standards/v3/command-standard.md` — 命令用法规范
+- `docs/standards/github-labels-standard.md` — PR 标签规则
 
 ## 完整流程
 
 ```
 /vibe-commit [--strategy <single|parallel|stacked>]
-  ├─ Step 1: 读取当前 flow 与上下文
-  │   ├─ uv run python src/vibe3/cli.py flow show
-  │   └─ 检查 issue、flow、branch、task、pr
+  ├─ Step 1: 读取当前任务与交接状态
+  │   ├─ uv run python src/vibe3/cli.py task show
+  │   ├─ uv run python src/vibe3/cli.py handoff status
+  │   └─ 检查 issue、task、branch、pr
   │
-  ├─ Step 2: 运行提交前 metadata preflight
-  │   ├─ uv run python src/vibe3/cli.py flow show --branch <branch>
-  │   └─ 检查 task 绑定、issue_refs、spec_* 等元数据
+  ├─ Step 2: 检查主分支是否已更新
+  │   ├─ git fetch origin main
+  │   ├─ git log HEAD..origin/main --oneline
+  │   └─ 若有新提交：先 rebase 或 merge，处理冲突
   │
-  ├─ Step 3: 审计工作区
+  ├─ Step 3: 判断是否仍需提交
+  │   ├─ 检查改动是否已被其他 PR 覆盖
+  │   ├─ 若已不需要：handoff append 说明理由 → 标记 state/handoff → 停止
+  │   └─ 若仍需提交：继续
+  │
+  ├─ Step 4: 审计工作区
   │   ├─ git status --short
   │   ├─ git diff --stat
   │   └─ 分类：commit now / stash / discard
   │
-  ├─ Step 3.5: Pre-commit 强制验证与格式化
+  ├─ Step 5: Pre-commit 强制验证与格式化
   │   ├─ uv run black src tests/vibe3
   │   ├─ uv run ruff check --fix src tests/vibe3
-  │   ├─ 若有修改：提交临时 commit → soft reset
+  │   ├─ 若有修改：提交临时 commit → 软重置（检查 commit 是否为临时）
   │   ├─ pre-commit run --all-files
   │   └─ Hard block: 任何错误必须修复，禁止跳过
   │
-  ├─ Step 4: 组织 commit
+  ├─ Step 6: 组织 commit
   │   ├─ 每组变更包含哪些文件（含格式化修改）
   │   ├─ 每条 commit 草案
   │   └─ git hooks 自动格式化 commit message
   │
-  ├─ Step 5: 处理串行多 PR（如需要）
+  ├─ Step 7: 处理串行多 PR（如需要）
   │   ├─ 列出待发布分组
   │   ├─ 从正确基线进入新的逻辑 flow
-  │   └─ 依次 cherry-pick、验证、发 PR
+  │   ├─ cherry-pick（需处理冲突）
+  │   └─ 依次验证、发 PR
   │
-  ├─ Step 6: 发 PR 前复核
+  ├─ Step 8: 发 PR 前复核
   │   ├─ 工作区已干净
   │   ├─ commit 只服务一个交付目标
   │   └─ uv run python src/vibe3/cli.py pr create --base <ref>
   │
-  └─ Step 7: 写入 handoff 并停止
+  └─ Step 9: 写入 handoff 并停止
       ├─ vibe3 handoff append
       └─ 停止，等待用户确认后运行 /vibe-integrate
 ```
@@ -90,61 +96,69 @@ PR 创建后停止，输出：
 
 ## Workflow
 
-### Step 1: 读取当前 flow 与上下文
-
-优先读取：
+### Step 1: 读取当前任务与交接状态
 
 ```bash
-uv run python src/vibe3/cli.py flow show
-```
-
-如果当前 flow 不可解析，再退回：
-
-```bash
-uv run python src/vibe3/cli.py flow status
-uv run python src/vibe3/cli.py task status --all --check
+uv run python src/vibe3/cli.py task show
+uv run python src/vibe3/cli.py handoff status
 ```
 
 检查点：
 
-- 当前 `issue` / `flow` / `branch` / `task` / `pr`
-- 当前 flow 是否已经进入 `open + had_pr`
-- `vibe3 handoff show` 里上一环节留下了什么 handoff
+- 当前 `issue` / `task` / `branch` / `pr`
+- 当前 task 是否已经有 `pr_ref`
+- `handoff status` 里上一环节留下了什么交接记录
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能继续沿用旧判断。
 
-### Step 2: 运行提交前 metadata preflight
+### Step 2: 检查主分支是否已更新
 
-在做任何 commit 分类前，必须先检查当前 execution record 的最小完整性。
-
-若 `flow show` 返回了 `current_task`，针对目标 branch 重新读取：
+在提交前必须检查 `origin/main` 是否有新提交，避免提交过时代码：
 
 ```bash
-uv run python src/vibe3/cli.py flow show --branch <branch>
+# 获取远程最新状态
+git fetch origin main
+
+# 检查是否有新提交
+git log HEAD..origin/main --oneline
 ```
 
-> **参数说明**：`<branch>` 为当前分支名，用于读取该分支绑定的 flow / task 详情。
+**处理策略**：
 
-第一版规则：
+- 若有新提交：
+  1. 先 `git rebase origin/main` 或 `git merge origin/main`
+  2. 处理冲突（如有）
+  3. 运行测试验证
+  4. 再继续提交流程
+- 若无新提交：直接继续
 
-- `hard block`
-  - `current_task` 无法从 shell 真源解析
-  - 当前 task 的 `runtime_branch` 为空，或与当前 flow branch 不一致
+**Hard Block**：冲突未解决前禁止提交。
 
-- `warning`
-  - 当前 task 缺 `issue_refs`
-  - 当前 task 缺 `spec_standard` 或 `spec_ref`
+### Step 3: 判断是否仍需提交
 
-动作边界：
+在执行提交前，必须检查改动是否仍然必要：
 
-- 若当前 flow 没有 `current_task`：
-  - 先检查当前 flow / issue / plan 事实能否**唯一推出**一个 execution spec
-  - 若能唯一推出，则由 skill 直接补相关数据，并绑定到当前 flow；这一步默认不再额外征求用户确认
-  - 若无法唯一推出 plan 是哪个，或 issue / plan 归属存在歧义，再 `hard block` 并向用户确认
-- 其余 `hard block`：停止提交，先补最小登记
-- `warning`：允许继续，但必须把缺失元数据当作显式风险报告给用户
+**检查项**：
 
-### Step 3: 审计工作区
+1. 改动是否已被其他 PR 覆盖（查看 `origin/main` 或相关分支）
+2. Issue 是否已被关闭或标记为 `wontfix`
+3. 功能是否已被其他实现替代
+
+**若已不需要提交**：
+
+```bash
+# 记录原因
+uv run python src/vibe3/cli.py handoff append "vibe-commit: 不再需要提交，理由：<具体原因>" --kind note
+
+# 更新 issue 标签为 state/handoff
+gh issue edit <issue-number> --add-label "state/handoff"
+
+# 停止，等待 manager 决定
+```
+
+**若仍需提交**：继续下一步。
+
+### Step 4: 审计工作区
 
 先运行：
 
@@ -166,9 +180,16 @@ git diff --cached --stat
 - 哪些内容会被 stash
 - 哪些内容会被 discard
 
-### Step 3.5: Pre-commit 强制验证与格式化
+### Step 5: Pre-commit 强制验证与格式化（强制两步流程）
 
-**这是硬规定，不可跳过。**
+**这是硬规定，不可跳过。未经用户明确允许，禁止使用 `--no-verify`。**
+
+**强制两步流程**：
+
+1. **第一步（temp commit）**：提交临时 commit → pre-commit 自动修复格式问题
+2. **第二步（正式提交）**：软重置 → 按功能模块分组提交（包含格式化修改）
+
+**理由**：防止 E501 等格式问题进入代码库，保证所有提交都经过质量门禁。
 
 在组织任何 commit 之前，必须确保所有待提交文件通过 pre-commit 检查。项目使用 Python pre-commit 框架，配置见 `.pre-commit-config.yaml`。
 
@@ -198,8 +219,8 @@ git diff --cached --stat
    - 若有文件被 black 或 ruff 修改：
 
      ```bash
-     # 暂存所有格式化修改
-     git add -A
+     # 只暂存格式化修改的文件（避免包含敏感文件）
+     git add <formatted-files>
 
      # 提交临时格式化 commit
      git commit -m "temp: pre-commit format (will be squashed)"
@@ -208,8 +229,11 @@ git diff --cached --stat
 4. **撤销临时 commit（保留修改在工作区）**：
 
    ```bash
-   # Soft reset：撤销 commit，但保留所有修改在工作区
-   git reset HEAD~1
+   # 检查最近一次提交是否为临时格式化 commit
+   if git log -1 --format="%s" | grep -q "temp: pre-commit format"; then
+       # Soft reset：撤销 commit，但保留所有修改在工作区
+       git reset HEAD~1
+   fi
 
    # 确认修改已回到工作区
    git status --short
@@ -233,7 +257,7 @@ git diff --cached --stat
 **关键点**：
 
 - 此时工作区包含：原始改动 + 格式化修改
-- 接下来的 Step 4 将按功能分组提交
+- 接下来的 Step 7 将按功能分组提交
 - 每个功能 commit 都会包含相应的格式化修改
 - 不会有单独的 "style: ..." commit 打乱历史
 
@@ -241,20 +265,21 @@ git diff --cached --stat
 
 - 不允许使用 `--no-verify` 跳过 pre-commit
 - 不允许在有 pre-commit 错误的情况下继续分组提交
-- 不允许保留临时格式化 commit，必须 soft reset
+- 不允许保留临时格式化 commit，必须软重置
 - 格式化修改必须分散到各个功能 commit 中
+- 软重置前必须检查最近提交是否为临时格式化 commit
 
-### Step 4: 组织 commit
+### Step 6: 组织 commit
 
 每个 commit 只对应一个独立交付目标。生成 commit 草案前，先说明：
 
 - 每组变更包含哪些文件
 - 每条 commit 草案
-- 这些 commit 将进入哪个 flow / 哪个 PR
+- 这些 commit 将进入哪个 task / 哪个 PR
 
 若当前分支历史已经混入多个交付目标，不得继续硬挤进一个 PR。
 
-### Step 5: 处理串行多 PR
+### Step 7: 处理串行多 PR
 
 对"当前已有一串待发布 commit，需要串行拆成多个 PR"的场景，固定按以下步骤执行：
 
@@ -265,11 +290,15 @@ git diff --cached --stat
    - 从正确基线进入新的逻辑 flow，默认优先使用最新主干
    - 若需要带入未提交改动，才显式追加 `--save-stash`
    - 只把当前这一组 commit 迁移到新 flow；默认使用 `git cherry-pick <commit...>`
+   - **处理 cherry-pick 冲突**：
+     - 若发生冲突：停止并报告冲突详情
+     - 手动解决冲突后运行 `git cherry-pick --continue`
+     - 或使用 `git cherry-pick --abort` 放弃并重新规划
    - 运行该组应有的验证命令
    - 使用 `uv run python src/vibe3/cli.py pr create --base <ref>` 发当前这一组 PR
    - 当前这一组 PR 创建完成前，不要提前切到下一组
 
-### Step 6: 发 PR 前复核
+### Step 8: 发 PR 前复核
 
 先读取：
 
@@ -284,6 +313,7 @@ git log --oneline <base>..HEAD
 - 当前 commit 只服务一个交付目标
 - 当前分支语义仍匹配这个目标
 - 当前 flow 没有被错误复用
+- 当前分支 upstream 正常；如果 `git branch -vv` 显示任务分支 tracking 到 `origin/main`，先修 upstream，再继续发 PR
 
 发布入口只用：
 
@@ -302,10 +332,33 @@ vibe3 pr create --agent -t "..." -b "..."
 ```
 
 **说明**：
-- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
-- `vibe3 pr create --yes` 是人类专用入口，需要明确确认
+
+- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块，创建 draft PR
+- `vibe3 pr create --yes` 是人类专用入口，需要明确确认，创建 draft PR
 - Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
 - Agent 模式必须提供完整的 `-t` (title) 和 `-b` (body)，否则报错
+- 所有 PR 创建默认都是 draft 状态，需要手动转换为正式 PR
+- `vibe3 pr create --agent` 仍然依赖当前 git 现场正确；若任务分支被错误 tracking 到 `origin/main`，请先修正 branch/upstream，再重试
+
+**发 PR 前的最小 upstream 检查**：
+
+```bash
+git branch -vv
+```
+
+如果当前任务分支显示类似：
+
+```bash
+task/issue-337 [origin/main: ahead 1, behind 1]
+```
+
+说明 upstream 错绑到了 `origin/main`。此时不要继续运行 `vibe3 pr create --agent`；先修正 git 现场，必要时直接改用 `gh pr create` 完成人工收口。
+
+**失败时的收口**：
+
+- 把失败命令、关键 stderr、当前 `git branch -vv` 摘要写进 issue comment
+- 把同样的错误摘要写进 handoff，便于 manager / human 接手
+- 明确说明是 branch/upstream 现场问题、权限问题，还是普通 push 失败
 
 **Contributors 块自动生成**：
 
@@ -314,6 +367,7 @@ PR 创建时，系统会自动从 flow state 中读取 actor 信息并生成 Con
 1. **数据来源**：flow state 中的 `planner_actor`、`executor_actor`、`reviewer_actor`、`latest_actor`
 2. **自动生成位置**：PR body 末尾
 3. **生成格式**：
+
 ```markdown
 ---
 
@@ -328,42 +382,18 @@ claude/sonnet-4.6, gemini, jacob
 
 **手动添加**：如果自动生成失败，可在 PR body 末尾手动添加 Contributors 块。
 
-### Step 6.5: 自动应用标签与智能审查
-
-PR 创建成功后，根据以下规则自动应用标签（详见 `docs/standards/github-labels-standard.md`）：
-
-**类型标签（根据 PR 标题）**：
-
-- 标题以 `feat:` 或 `feature:` 开头 → 添加 `type/feature` → **触发 Codex AI 审查**
-- 标题以 `fix:` 或 `bugfix:` 开头 → 添加 `type/fix` → **触发 Copilot AI 审查**
-- 标题以 `refactor:` 开头 → 添加 `type/refactor` → **自动运行本地测试**
-- 标题以 `docs:` 或 `documentation:` 开头 → 添加 `type/docs`
-- 标题以 `test:` 或 `testing:` 开头 → 添加 `type/test`
-- 标题以 `chore:` 开头 → 添加 `type/chore`
+### Step 9: 应用标签与智能审查
 
 **智能审查策略**：
 
-| 标签类型        | 审查方式        | 自动化程度                               |
-| --------------- | --------------- | ---------------------------------------- |
-| `type/feat`     | Codex AI 审查   | ✅ 全自动 - 在 PR 中评论 `@codex review` |
-| `type/fix`      | Copilot AI 审查 | ✅ 全自动 - 请求 Copilot 作为审查者      |
-| `type/refactor` | 本地测试        | ✅ 全自动 - 运行 lint + pytest + bats    |
-| `type/docs`     | 人工审查        | ⏸️ 需要手动决定是否测试                  |
-| `type/test`     | 人工审查        | ⏸️ 需要手动决定是否测试                  |
-| `type/chore`    | 人工审查        | ⏸️ 需要手动决定是否测试                  |
-
-详见 `docs/standards/github-code-review-standard.md`。
-
-**范围标签（根据文件路径）**：
-
-- 包含 `src/vibe3/**/*.py` → 添加 `scope/python`
-- 包含 `lib/**/*.sh` 或 `scripts/**/*.sh` → 添加 `scope/shell-script`
-- 包含 `docs/**` 或 `*.md` → 添加 `scope/documentation`
-- 包含 `.github/**` 或 `.pre-commit-config.yaml` → 添加 `scope/infrastructure`
-
-**状态标签**：
-
-- PR 创建后 → 自动添加 `status/ready-for-review`
+| 标签类型        | 审查方式     | 自动化程度                     |
+| --------------- | ------------ | ------------------------------ |
+| `type/feat`     | Codex 审查   | 在 PR 中评论 `@codex review`   |
+| `type/fix`      | Copilot 审查 | 在 PR 中评论 `@copilot review` |
+| `type/refactor` | claude 审查  | 在 PR 中评论 `@claude review`  |
+| `type/docs`     | 人工审查     | ⏸️ 需要手动决定是否测试        |
+| `type/test`     | 人工审查     | ⏸️ 需要手动决定是否测试        |
+| `type/chore`    | 人工审查     | ⏸️ 需要手动决定是否测试        |
 
 **执行方式**：
 
@@ -372,43 +402,28 @@ PR 创建成功后，根据以下规则自动应用标签（详见 `docs/standar
 gh pr view <pr-number>
 
 # 添加标签
-gh pr edit <pr-number> --add-label "type/feature,scope/python,status/ready-for-review"
+gh pr edit <pr-number> --add-label "type/feature"
 ```
 
-### Step 7: 写入 handoff 并停止
+### Step 10: 写入 handoff 并停止
 
-PR 创建成功后，当前 flow 进入 `open + had_pr` 状态，skill 在此停止。
+PR 创建成功后，当前 task 进入 `open + had_pr` 状态，skill 在此停止。
 
-此阶段：
+**此阶段**：
 
 - 允许：进入 `/vibe-integrate` 检查 review、CI、merge 阻塞
 - 不允许：直接进入 `/vibe-done`
-- 不允许：把当前 flow 当作下一个新目标继续开发
+- 不允许：把当前 task 当作下一个新目标继续开发
 
 若用户问"下一步是什么"，回答：
 
 > 运行 `/vibe-integrate` 检查 CI 状态和 review，确认合并条件后推进。
 
-### Step 8: 写入 handoff
-
-完成当前 skill 后，运行：
+**写入 handoff**：
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --actor vibe-commit --kind milestone
-```
-
-```markdown
-## Skill Handoff
-
-- skill: vibe-commit
-- updated_at: <ISO-8601>
-- flow: <feature-or-none>
-- branch: <branch-or-none>
-- task: <task-id-or-none>
-- pr: <pr-ref-or-none>
-- issues: <issue-refs-or-none>
-- completed: <本轮已完成的提交/PR 草案>
-- next: <若 PR 已创建，明确写"进入 vibe-integrate 检查 review evidence / CI / merge readiness"；否则写继续 commit 的动作>
+# actor 使用 agent 自身的 backend/model，若不确定则留空
+uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --kind note
 ```
 
 ## Restrictions
@@ -417,10 +432,16 @@ uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --actor 
   - 不得使用 `git commit --no-verify` 跳过 pre-commit 检查
   - 不得在有 pre-commit 错误（如 mypy、shellcheck、LOC 超限）的情况下继续提交
   - 必须在组织 commit 分组前完成 pre-commit 验证
-  - 格式化流程：对所有改动统一格式化 → 提交临时 commit → soft reset → 分组提交
+  - 格式化流程：对所有改动统一格式化 → 提交临时 commit → 软重置（检查是否为临时 commit）→ 分组提交
   - 不得保留单独的格式化 commit，格式化修改必须分散到各功能 commit 中
+- **主分支同步**：
+  - 提交前必须检查 `origin/main` 是否有新提交
+  - 冲突未解决前禁止提交
+- **提交必要性检查**：
+  - 若改动已不需要提交，必须用 `handoff append` 说明理由
+  - 必须更新 issue 标签为 `state/handoff`，等待 manager 决定
 - 不得在用户确认前静默执行 `git commit`
 - 不得把"是否拆多个 PR"的判断偷换成"先发一个再说"
 - 不得把 `stash` 当垃圾桶
 - 不得把 `discard` 当默认处理方式
-- 若发现当前 flow 已有 PR 事实且用户要开始新目标，应停止并切换 flow，而不是继续堆在原 flow
+- 若发现当前 task 已有 PR 事实且用户要开始新目标，应停止并切换 task，而不是继续堆在原 task

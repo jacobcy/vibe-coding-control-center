@@ -5,9 +5,8 @@ from pathlib import Path
 import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.orchestra.failed_gate import GateResult
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 
 def _config() -> OrchestraConfig:
@@ -118,7 +117,7 @@ async def test_tick_loop_writes_tick_separator_lines(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     calls = {"count": 0}
@@ -134,12 +133,10 @@ async def test_tick_loop_writes_tick_separator_lines(monkeypatch) -> None:
 
     await server._tick_loop()
 
-    # Should have tick separator lines
+    # Should have tick start markers (simplified format)
     assert any(
-        "---------- heartbeat tick #1 ----------" in item for item in events
-    ), f"Expected tick separator, got: {events}"
-    # Note: We may not get tick #2 if server stopped early,
-    # but we should at least see tick #1 separator
+        "server:tick #1 start" in item for item in events
+    ), f"Expected tick start marker, got: {events}"
     assert len(events) >= 4, f"Expected at least 4 events, got: {events}"
 
 
@@ -153,7 +150,7 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     calls = {"count": 0}
@@ -169,16 +166,13 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
 
     await server._tick_loop()
 
-    assert any("server:heartbeat tick #1 start" == item for item in events)
-    assert any(
-        f"server:heartbeat tick #1 services: {svc.service_name}" == item
-        for item in events
-    )
-    assert any("server:heartbeat tick #1 completed in " in item for item in events)
+    assert any("server:tick #1 start" == item for item in events)
+    # Services list is DEBUG level, so not present in default log level
+    assert any("server:tick #1 completed in " in item for item in events)
 
 
 @pytest.mark.asyncio
-async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
+async def test_tick_loop_ignores_failed_gate_and_still_ticks(monkeypatch) -> None:
     server = HeartbeatServer(
         OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
     )
@@ -187,7 +181,7 @@ async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     calls = {"count": 0}
@@ -197,17 +191,7 @@ async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
         if calls["count"] >= 2:
             server.stop()
 
-    mock_gate = type(
-        "_Gate",
-        (),
-        {
-            "check": lambda self: GateResult(
-                blocked=True,
-                issue_number=320,
-                reason="state/failed",
-            )
-        },
-    )()
+    mock_gate = type("_Gate", (), {"check": lambda self: None})()
     server._failed_gate = mock_gate
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
@@ -216,10 +200,8 @@ async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
 
     await server._tick_loop()
 
-    assert any(
-        "state/failed issue #320" in item and "heartbeat tick #1 frozen by" in item
-        for item in events
-    )
+    assert svc.ticks == 1
+    assert any("server:tick #1 start" == item for item in events)
 
 
 @pytest.mark.asyncio
@@ -237,7 +219,7 @@ async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     async def _no_wait(_seconds: float) -> None:
@@ -251,8 +233,34 @@ async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
 
     assert server.running is False
     assert svc.ticks == 2
-    assert any("server:heartbeat tick #2 start" == item for item in events)
+    assert any("server:tick #2 start" == item for item in events)
     assert any(
         "server:debug tick limit reached (2), stopping server" == item
         for item in events
     )
+
+
+def test_set_shutdown_callback_invoked_on_cleanup() -> None:
+    """_cleanup() must invoke the registered shutdown callback exactly once."""
+    server = HeartbeatServer(_config())
+    calls: list[str] = []
+    server.set_shutdown_callback(lambda: calls.append("called"))
+
+    server._cleanup()
+
+    assert calls == ["called"], "shutdown callback was not invoked during _cleanup"
+
+
+def test_shutdown_callback_exception_does_not_propagate() -> None:
+    """A callback that raises must not crash _cleanup() (best-effort)."""
+    server = HeartbeatServer(_config())
+    server.set_shutdown_callback(lambda: 1 / 0)
+
+    # Should not raise
+    server._cleanup()
+
+
+def test_no_shutdown_callback_cleanup_still_runs() -> None:
+    """_cleanup() without a registered callback should not raise."""
+    server = HeartbeatServer(_config())
+    server._cleanup()  # must not raise

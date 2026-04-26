@@ -1,5 +1,11 @@
 # V3 Services 模块拆分方案
 
+> 注：本文是早期拆分草案。当前主线已经完成部分迁移：
+> - `ai_service.py` 已迁到 `clients/ai_suggestion_client.py`
+> - GitHub label CRUD 已迁到 `clients/github_labels.py`
+> - label 状态机规则已迁到 `domain/state_machine.py`
+> 阅读本文件时请以仓库当前代码结构为准。
+
 **状态**: Ready
 **目标**: 将 services/ 从 47 个平铺文件（7398 行）瘦身为职责清晰的结构，提升可读性
 **原则**: 不破坏现有接口，不追求完美结构，最小风险逐步推进

@@ -18,6 +18,7 @@ class TestStatusQueryServiceFetch:
                 "number": 278,
                 "title": "Handoff sample",
                 "labels": [{"name": "state/handoff"}],
+                "assignees": [{"login": "manager-bot"}],
             },
             {
                 "number": 320,
@@ -57,13 +58,18 @@ class TestStatusQueryServiceFetch:
 
         assert result[1]["number"] == 278
         assert result[1]["state"] == IssueState.HANDOFF
+        assert result[1]["assignee"] == "manager-bot"
         assert result[1]["flow"] is None
 
         assert result[2]["number"] == 372
         assert result[2]["state"] == IssueState.BLOCKED
 
-    def test_fetch_orchestrated_issues_filters_done_state(self) -> None:
-        """Service should exclude issues in done state."""
+    def test_fetch_orchestrated_issues_includes_done_state(self) -> None:
+        """Service should include issues in done state for PR section.
+
+        Note: DONE state filtering moved to UI layer (see f7935e78).
+        This allows flows with PRs to be shown in task status dashboard.
+        """
         github = MagicMock()
         github.list_issues.return_value = [
             {"number": 100, "title": "Done issue", "labels": [{"name": "state/done"}]},
@@ -80,8 +86,11 @@ class TestStatusQueryServiceFetch:
         service = StatusQueryService(github_client=github, git_client=git)
         result = service.fetch_orchestrated_issues([], queued_set=set())
 
-        assert len(result) == 1
-        assert result[0]["number"] == 200
+        # Both issues should be included (DONE filtering happens at UI layer)
+        assert len(result) == 2
+        # READY issues are sorted first, then other issues by priority
+        assert result[0]["number"] == 200  # Ready issue (READY comes first)
+        assert result[1]["number"] == 100  # Done issue (after READY)
 
     def test_fetch_orchestrated_issues_handles_github_error(self) -> None:
         """Service should handle GitHub API errors gracefully."""
@@ -95,6 +104,27 @@ class TestStatusQueryServiceFetch:
         result = service.fetch_orchestrated_issues([], queued_set=set())
 
         assert result == []
+
+    def test_fetch_orchestrated_issues_ignores_blank_assignee_login(self) -> None:
+        """Blank assignee login should normalize to None."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 210,
+                "title": "Ready issue with blank assignee",
+                "labels": [{"name": "state/ready"}],
+                "assignees": [{"login": "   "}],
+            }
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues([], queued_set=set())
+
+        assert len(result) == 1
+        assert result[0]["assignee"] is None
 
     def test_fetch_orchestrated_issues_does_not_require_config_attr(self) -> None:
         """Service should not depend on a missing self.config attribute."""
@@ -124,7 +154,7 @@ class TestStatusQueryServiceFetch:
         assert result[0]["state"] == IssueState.HANDOFF
 
     def test_fetch_orchestrated_issues_extracts_failed_reason(self) -> None:
-        """FAILED issues should carry a human-readable error reason."""
+        """FAILED issues should carry failed_reason from flow state."""
         github = MagicMock()
         github.list_issues.return_value = [
             {
@@ -133,22 +163,20 @@ class TestStatusQueryServiceFetch:
                 "labels": [{"name": "state/failed"}],
             }
         ]
-        github.view_issue.return_value = {
-            "comments": [
-                {
-                    "body": (
-                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
-                        "原因:quota exhausted"
-                    ),
-                }
-            ]
-        }
 
         git = MagicMock()
         git._run.return_value = ""
 
+        # Create flow with failed_reason
+        flow = MagicMock(spec=FlowStatusResponse)
+        flow.branch = "task/issue-439"
+        flow.task_issue_number = 439
+        flow.failed_reason = "quota exhausted"
+
         service = StatusQueryService(github_client=github, git_client=git)
-        result = service.fetch_orchestrated_issues([], queued_set=set())
+        result = service.fetch_orchestrated_issues(
+            [flow], queued_set=set(), stale_flows=[]
+        )
 
         assert len(result) == 1
         assert result[0]["state"] == IssueState.FAILED
@@ -157,7 +185,7 @@ class TestStatusQueryServiceFetch:
     def test_fetch_orchestrated_issues_ignores_recovery_comments_for_failed_reason(
         self,
     ) -> None:
-        """FAILED reason ignores recovery comments, prefers failure reports."""
+        """FAILED reason comes from flow state, not GitHub comments."""
         github = MagicMock()
         github.list_issues.return_value = [
             {
@@ -166,28 +194,20 @@ class TestStatusQueryServiceFetch:
                 "labels": [{"name": "state/failed"}],
             }
         ]
-        github.view_issue.return_value = {
-            "comments": [
-                {
-                    "body": (
-                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
-                        "原因:quota exhausted"
-                    ),
-                },
-                {
-                    "body": (
-                        "[recovery] 已从 state/failed 恢复到 state/handoff。\n\n"
-                        "原因:manual relabel"
-                    ),
-                },
-            ]
-        }
 
         git = MagicMock()
         git._run.return_value = ""
 
+        # Create flow with failed_reason (ignores GitHub comments now)
+        flow = MagicMock(spec=FlowStatusResponse)
+        flow.branch = "task/issue-439"
+        flow.task_issue_number = 439
+        flow.failed_reason = "quota exhausted"
+
         service = StatusQueryService(github_client=github, git_client=git)
-        result = service.fetch_orchestrated_issues([], queued_set=set())
+        result = service.fetch_orchestrated_issues(
+            [flow], queued_set=set(), stale_flows=[]
+        )
 
         assert result[0]["failed_reason"] == "quota exhausted"
 

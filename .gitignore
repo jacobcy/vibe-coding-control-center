@@ -9,7 +9,6 @@ Desktop.ini
 # Editor & IDE
 # =============================================================================
 .idea/
-.vscode/
 *.iml
 *.swp
 *.swo
@@ -42,6 +41,7 @@ vibe-init-test*
 .venv/
 .tox/
 .nox/
+.python-version
 
 # Build & distribution
 dist/
@@ -116,19 +116,28 @@ wt-*/
 .agent/reports/
 docs/audits/
 docs/plans/
+docs/reports/
+docs/superpowers/
+openspec/
 
 # Tool-specific directories (symlinks only, see DEVELOPER.md)
 .agent/skills/
 .agents/
 .github/prompts/
-.codex
+.codex/
+.gemini/
+.opencode/
+.copilot/
 .trae/
 .kiro/
+.qoder/
 .augment/
 .codebuddy/
 # Claude: track project config, exclude local commands and skills
 .claude/commands/
 .claude/skills/
 .claude/do-tasks/
+.claude/worktrees/
 .aider*
 MagicMock/
+

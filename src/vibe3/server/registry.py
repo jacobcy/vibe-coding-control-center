@@ -4,6 +4,7 @@ Extracted from orchestra/serve_utils.py.
 """
 
 import os
+import shlex
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -11,53 +12,28 @@ from pathlib import Path
 from fastapi import FastAPI
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.domain.orchestration_facade import OrchestrationFacade
+from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.execution.capacity_service import CapacityService
+from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.governance_service import GovernanceService
-from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
+from vibe3.roles.registry import LABEL_DISPATCH_ROLES
+from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.server.webhook_utils import make_webhook_router
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
-from vibe3.services.session_registry import SessionRegistryService
 
-
-def _resolve_orchestra_repo_root() -> Path:
-    """Resolve the shared repo root for orchestra-managed auto scenes.
-
-    We intentionally anchor orchestra to the git common-dir parent (the main
-    repository root), not the caller's current worktree cwd. This keeps auto
-    task scenes under ``<repo>/.worktrees/`` instead of nesting them under the
-    current debug/manual worktree.
-    """
-    try:
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except Exception:
-        pass
-    return Path.cwd()
-
-
-def _resolve_dispatcher_repo_root(
-    config: OrchestraConfig,
-    launch_cwd: Path | None = None,
-) -> Path:
-    """Resolve the worktree root used for dispatcher-managed auto scenes."""
-    _ = config
-    _ = launch_cwd
-    return _resolve_orchestra_repo_root().resolve()
+ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
 
 def _resolve_dispatcher_models_root(
@@ -68,7 +44,7 @@ def _resolve_dispatcher_models_root(
     resolved_cwd = (launch_cwd or Path.cwd()).resolve()
     if config.debug:
         return resolved_cwd
-    return _resolve_orchestra_repo_root().resolve()
+    return resolve_orchestra_repo_root().resolve()
 
 
 def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
@@ -87,42 +63,50 @@ def _build_server_with_launch_cwd(
 ) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.server.app import make_webhook_router
 
     shared_github = GitHubClient()
     shared_store = SQLiteClient()
     shared_backend = CodeagentBackend()
     shared_registry = SessionRegistryService(store=shared_store, backend=shared_backend)
+
+    # Startup cleanup: unconditionally mark all active sessions as stopped.
+    # Design: server lifecycle owns session state. Any session from a previous
+    # run is considered ended on restart, regardless of tmux state. The tmux
+    # processes are NOT killed -- agents may continue writing results -- but
+    # capacity slots are fully released so dispatch starts from a clean slate.
+    shared_registry.clear_all_sessions()
+
     failed_gate = FailedGate(github=shared_github, repo=config.repo)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
+    # Shutdown cleanup: mark all sessions stopped when the server exits.
+    # Same clean-slate semantics as startup -- session lifecycle is owned by
+    # the server. Agents may still be running in tmux; they are not killed.
+    heartbeat.set_shutdown_callback(shared_registry.clear_all_sessions)
 
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-    shared_manager = ManagerExecutor(
-        config,
-        dry_run=config.dry_run,
-        repo_path=_resolve_dispatcher_repo_root(config, launch_cwd),
-        registry=shared_registry,
-    )
+    shared_flow_manager = FlowManager(config, registry=shared_registry)
+    shared_circuit_breaker = None
+
+    # Create shared CapacityService for capacity-aware dispatch
+    shared_capacity = CapacityService(config, shared_store, shared_backend)
+
+    if config.circuit_breaker.enabled:
+        shared_circuit_breaker = CircuitBreaker(
+            failure_threshold=config.circuit_breaker.failure_threshold,
+            cooldown_seconds=config.circuit_breaker.cooldown_seconds,
+            half_open_max_tests=config.circuit_breaker.half_open_max_tests,
+        )
 
     # Pass circuit_breaker from manager for status reporting
     status_service = OrchestraStatusService(
         config,
         github=shared_github,
-        orchestrator=shared_manager.flow_manager,
-        circuit_breaker=shared_manager._circuit_breaker,
+        orchestrator=shared_flow_manager,
+        circuit_breaker=shared_circuit_breaker,
         failed_gate=failed_gate,
     )
 
-    if config.assignee_dispatch.enabled:
-        heartbeat.register(
-            AssigneeDispatchService(
-                config,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-            )
-        )
     if config.comment_reply.enabled:
         heartbeat.register(
             CommentReplyService(
@@ -130,96 +114,41 @@ def _build_server_with_launch_cwd(
                 github=shared_github,
             )
         )
-    if config.pr_review_dispatch.enabled:
-        heartbeat.register(
-            PRReviewDispatchService(
-                config,
-                manager=shared_manager,
-                executor=shared_executor,
-            )
-        )
-    if config.state_label_dispatch.enabled:
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.READY,
-                trigger_name="manager",
-                status_service=status_service,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.HANDOFF,
-                trigger_name="manager",
-                status_service=status_service,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.CLAIMED,
-                trigger_name="plan",
-                status_service=status_service,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.IN_PROGRESS,
-                trigger_name="run",
-                status_service=status_service,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.REVIEW,
-                trigger_name="review",
-                status_service=status_service,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
 
-    if config.governance.enabled:
-        heartbeat.register(
-            GovernanceService(
-                config,
-                status_service=status_service,
-                manager=shared_manager,
-                executor=shared_executor,
-                registry=shared_registry,
+    # Build dispatch services for all trigger states.
+    # These are NOT registered directly with the heartbeat — instead they are
+    # passed to OrchestrationFacade and called concurrently from its on_tick(),
+    # reducing heartbeat services from 6 to 1 (the facade itself).
+    dispatch_services = []
+    if config.state_label_dispatch.enabled:
+        for role_service in LABEL_DISPATCH_ROLES:
+            dispatch_services.append(
+                StateLabelDispatchService(
+                    config,
+                    github=shared_github,
+                    executor=shared_executor,
+                    flow_manager=shared_flow_manager,
+                    registry=shared_registry,
+                    capacity=shared_capacity,
+                    role_def=role_service,
+                )
             )
-        )
-    if config.supervisor_handoff.enabled:
-        heartbeat.register(
-            SupervisorHandoffService(
-                config,
-                github=shared_github,
-                status_service=status_service,
-                manager=shared_manager,
-                executor=shared_executor,
-            )
-        )
+
+    # Register OrchestrationFacade as the single domain-first
+    # heartbeat entry point. It incorporates governance scan,
+    # supervisor scan, and issue-label dispatch polling.
+    facade = OrchestrationFacade(
+        config=config,
+        dispatch_services=dispatch_services,
+        capacity=shared_capacity,
+        failed_gate=failed_gate,
+    )
+    heartbeat.register(facade)
+
+    # GovernanceService and SupervisorHandoffService are deleted.
+    # Governance and supervisor dispatch are now handled inline by
+    # OrchestrationFacade via roles/governance.py and roles/supervisor.py
+    # through ExecutionCoordinator — no per-role service or handler needed.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
@@ -230,15 +159,13 @@ def _build_server_with_launch_cwd(
     @fastapi_app.get("/status")
     def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
-        return status_service.snapshot(queued=shared_manager.queued_issues)
+        return status_service.snapshot()
 
     # Mount MCP server (gracefully degrades if not available)
     try:
         from vibe3.server.mcp import create_mcp_server
 
-        mcp = create_mcp_server(
-            status_service, get_queued=lambda: shared_manager.queued_issues
-        )
+        mcp = create_mcp_server(status_service, get_queued=None)
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")
     except ImportError as exc:
@@ -386,6 +313,7 @@ def _build_async_serve_command(
         "src/vibe3/cli.py",
         "serve",
         "start",
+        "--no-async",
         "--interval",
         str(config.polling_interval),
         "--port",
@@ -403,16 +331,31 @@ def _build_async_serve_command(
 
 
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
-    """Start serve command in tmux session."""
-    session_name = "vibe3-orchestra-serve"
+    """Start serve command in tmux session with streaming output."""
+    session_name = ORCHESTRA_TMUX_SESSION
     launch_cwd = Path.cwd()
     cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
+
+    # Use async_launcher's streaming output logic
+    log_path = orchestra_events_log_path(launch_cwd)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
     try:
         subprocess.run(
-            ["tmux", "new-session", "-d", "-s", session_name, "--"] + cmd,
+            ["tmux", "new-session", "-d", "-s", session_name, *cmd],
             check=True,
             capture_output=True,
             text=True,
+        )
+        subprocess.run(
+            [
+                "tmux",
+                "pipe-pane",
+                "-t",
+                session_name,
+                f"cat >> {shlex.quote(str(log_path))}",
+            ],
+            check=False,
         )
     except FileNotFoundError:
         return False, "tmux not found, cannot start --async serve mode"
@@ -434,3 +377,33 @@ def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )
+
+
+def _orchestra_tmux_session_exists() -> bool:
+    """Return whether the orchestra tmux session currently exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
+def _kill_orchestra_tmux_session() -> bool:
+    """Kill the orchestra tmux session if it exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "kill-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0

@@ -5,18 +5,27 @@ from typing import Annotated, Optional
 
 import typer
 
-from vibe3.agents.plan_agent import PlanUsecase
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
+    _SHOW_PROMPT_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.config.settings import VibeConfig
-from vibe3.services.flow_service import FlowService
+from vibe3.execution.issue_role_sync_runner import (
+    run_issue_role_async,
+    run_issue_role_sync,
+)
+from vibe3.roles.plan import (
+    PLAN_SYNC_SPEC,
+    bind_plan_spec,
+    execute_spec_plan_async,
+    execute_spec_plan_sync,
+    resolve_spec_plan_input,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -27,22 +36,13 @@ app = typer.Typer(
 )
 
 
-def _build_plan_usecase(
-    flow_service: FlowService | None = None,
-) -> PlanUsecase:
-    """Construct plan usecase with command-local dependencies."""
-    return PlanUsecase(
-        flow_service=flow_service,
-        config=VibeConfig.get_defaults(),
-    )
-
-
 def _plan_issue_impl(
     issue: int,
     instructions: str | None,
     trace: bool,
     dry_run: bool,
     no_async: bool,
+    show_prompt: bool,
     agent: str | None,
     backend: str | None,
     model: str | None,
@@ -51,23 +51,22 @@ def _plan_issue_impl(
     if trace:
         enable_trace()
 
-    flow_service, branch = ensure_flow_for_current_branch()
-    usecase = _build_plan_usecase(flow_service=flow_service)
+    _ = instructions, agent, backend, model
 
-    # 1. Resolve task input
-    task_input = usecase.resolve_task_plan(branch, issue_number=issue)
-
-    # 2. Execute
-    if dry_run:
-        typer.echo(f"Plan dry run for issue #{task_input.issue_number}")
-        return
-
-    usecase.execute_plan(
-        request=task_input.request,
-        issue_number=task_input.issue_number,
-        branch=task_input.branch,
-        async_mode=not no_async,
-    )
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue,
+            dry_run=dry_run,
+            fresh_session=False,
+            show_prompt=show_prompt,
+            spec=PLAN_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue,
+            dry_run=dry_run,
+            spec=PLAN_SYNC_SPEC,
+        )
 
 
 def _plan_spec_impl(
@@ -85,53 +84,50 @@ def _plan_spec_impl(
     if trace:
         enable_trace()
 
-    flow_service, branch = ensure_flow_for_current_branch()
-    usecase = _build_plan_usecase(flow_service=flow_service)
+    _ = agent, backend, model
 
-    # 1. Resolve spec input
+    flow_service, branch = ensure_flow_for_current_branch()
     try:
-        spec_input = usecase.resolve_spec_plan(branch, file=file, msg=msg)
+        spec_input = resolve_spec_plan_input(branch, file=file, msg=msg)
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # 2. Bind spec if not dry-run
     if not dry_run and spec_input.spec_path:
-        usecase.bind_spec(branch, spec_input.spec_path)
+        bind_plan_spec(branch, spec_input.spec_path)
 
-    # 3. Execute
     if dry_run:
         typer.echo("Plan dry run for specification")
         return
-
-    # For spec planning, we don't have a task issue number to link lifecycle
-    # Plan agent will run but won't trigger automated transitions without an issue.
-    # Note: PlanUsecase.execute_plan requires an issue_number.
-    # If no issue is linked, we should probably use a lower-level execution call or
-    # handle the missing issue number in PlanUsecase.
-    # For now, if no issue is available, we use a dummy or fallback.
-    # But resolve_task_plan already handles flow-linked issue.
 
     flow = flow_service.get_flow_status(branch)
     issue_number = flow.task_issue_number if flow else None
 
     if not issue_number:
-        # If no issue linked, we still execute the agent but skip lifecycle events
-        # This part might need PlanUsecase refinement, but for now we follow its API.
         typer.echo(
             "Warning: No issue linked to flow. Lifecycle events will be skipped.",
             err=True,
         )
-        # We pass a dummy issue number 0 to satisfy the current API,
-        # but this is a design gap.
-        issue_number = 0
 
-    usecase.execute_plan(
-        request=spec_input.request,
-        issue_number=issue_number,
-        branch=branch,
-        async_mode=not no_async,
-    )
+    if no_async:
+        execute_spec_plan_sync(
+            request=spec_input.request,
+            issue_number=issue_number,
+            branch=branch,
+        )
+    else:
+        execute_spec_plan_async(
+            request=spec_input.request,
+            issue_number=issue_number,
+            branch=branch,
+            cli_args=[
+                "plan",
+                "spec",
+                *(["--file", str(file)] if file else []),
+                *(["--msg", msg] if msg else []),
+                *([instructions] if instructions else []),
+            ],
+        )
 
 
 @app.callback(invoke_without_command=True)
@@ -158,6 +154,7 @@ def default(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -174,6 +171,7 @@ def default(
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
+            show_prompt=show_prompt,
             agent=agent,
             backend=backend,
             model=model,
@@ -210,6 +208,7 @@ def issue_command(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
+    show_prompt: _SHOW_PROMPT_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -220,6 +219,7 @@ def issue_command(
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
+        show_prompt=show_prompt,
         agent=agent,
         backend=backend,
         model=model,

@@ -29,179 +29,6 @@ ai:
   model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
   timeout: 30                 # 超时秒数
 
-# 文本量控制
-doc_limits:
-  single_file_loc:
-    default: 500           # 单文件默认限制（所有类型）
-    max: 800              # 单文件最大限制（所有类型）
-
-# 代码量控制
-code_limits:
-  single_file_loc:
-    default: 300           # 单文件默认限制（所有类型）
-    max: 400              # 单文件最大限制（所有类型）
-
-# 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
-    # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
-    exceptions:
-      # 核心业务聚合 —— 允许 600
-      - path: "src/vibe3/services/flow_service.py"
-        limit: 600
-        reason: "核心状态机聚合，吸收 flow_query_mixin"
-      - path: "src/vibe3/services/pr_service.py"
-        limit: 600
-        reason: "PR 生命周期聚合"
-      - path: "src/vibe3/services/check_service.py"
-        limit: 600
-        reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
-      - path: "src/vibe3/services/task_service.py"
-        limit: 550
-        reason: "任务生命周期聚合"
-      - path: "src/vibe3/services/handoff_service.py"
-        limit: 500
-        reason: "handoff 状态读写聚合"
-      - path: "src/vibe3/services/issue_failure_service.py"
-        limit: 450
-        reason: "Issue 状态异常转换聚合，职责单一，去重辅助函数共享，与测试对称"
-
-      # Clients 聚合 —— 允许 500
-      - path: "src/vibe3/clients/git_client.py"
-        limit: 500
-        reason: "Git 门面聚合"
-      - path: "src/vibe3/clients/github_client.py"
-        limit: 500
-        reason: "GitHub 门面聚合"
-      - path: "src/vibe3/clients/github_pr_ops.py"
-        limit: 500
-        reason: "GitHub PR 操作与查询聚合"
-      - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 550
-        reason: "持久化聚合"
-
-      # Commands 层（CLI 入口）—— 允许 450
-      - path: "src/vibe3/commands/plan.py"
-        limit: 450
-        reason: "Plan command CLI 入口，参数解析和路由逻辑集中，拆分成本高"
-      - path: "src/vibe3/commands/run.py"
-        limit: 450
-        reason: "Run command CLI 入口，多模式路由逻辑集中，拆分成本高"
-
-      # Orchestra —— 允许 550
-      - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
-        limit: 650
-        reason: "状态标签触发执行服务，职责单一但核心方法逻辑完整，__init__/_prune_in_flight/_dispatch_issue 紧密耦合不宜拆分"
-      - path: "src/vibe3/orchestra/services/governance_service.py"
-        limit: 450
-        reason: "Governance 服务聚合，处理 governance dispatch 和 session 状态管理"
-      - path: "src/vibe3/server/registry.py"
-        limit: 450
-        reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
-
-      # Manager —— 允许 450
-      - path: "src/vibe3/manager/manager_run_service.py"
-        limit: 450
-        reason: "Manager 运行服务聚合，处理同步/异步执行和状态管理"
-
-      # Shell / 脚本兼容入口
-      - path: "lib/alias/worktree.sh"
-        limit: 450
-        reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
-      - path: "scripts/tsu.sh"
-        limit: 900
-        reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
-
-      # 基础设施核心模块
-      - path: "src/vibe3/environment/worktree.py"
-        limit: 450
-        reason: "Worktree lifecycle management"
-      - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 550
-        reason: "Codeagent execution backend"
-      - path: "src/vibe3/agents/runner.py"
-        limit: 450
-        reason: "Codeagent 执行服务核心，包含完整的执行流程管理，逻辑高度耦合不宜拆分"
-      - path: "src/vibe3/orchestra/services/status_service.py"
-        limit: 450
-        reason: "Orchestra 状态聚合服务，数据类+辅助函数+主服务类结构清晰，snapshot 方法线性流程不宜拆分"
-      - path: "src/vibe3/services/orchestra_status_service.py"
-        limit: 450
-        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
-
-      # 强耦合测试例外
-      - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
-        limit: 550
-        reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
-      - path: "tests/vibe3/orchestra/test_state_label_dispatch_core.py"
-        limit: 500
-        reason: "State label dispatch 核心服务测试，2 个超长集成测试，fixture 高度耦合不宜拆分"
-      - path: "tests/vibe3/orchestra/test_serve.py"
-        limit: 500
-        reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
-      - path: "tests/vibe3/orchestra/test_status_service.py"
-        limit: 450
-        reason: "Orchestra 状态聚合服务测试，3 个超长集成测试，围绕同一服务契约"
-      - path: "tests/vibe3/services/test_issue_failure_service.py"
-        limit: 500
-        reason: "Issue failure/resume 测试集，16 个测试围绕同一服务契约，平均 31 lines/test，拆分收益低"
-      - path: "tests/vibe3/services/test_task_resume_usecase.py"
-        limit: 550
-        reason: "Task resume usecase 测试集，10 个测试，平均 53.5 lines/test，大量 mock setup，拆分成本高"
-      - path: "tests/vibe3/commands/test_plan.py"
-        limit: 500
-        reason: "Plan command 测试集，23 个测试，平均 20.8 lines/test，围绕同一 CLI 入口，拆分会破坏测试完整性"
-      - path: "tests/vibe3/commands/test_run.py"
-        limit: 450
-        reason: "Run command 测试集，15 个测试，超限 1 行，围绕同一 CLI 入口"
-      - path: "tests/vibe3/commands/test_task_command_surface.py"
-        limit: 500
-        reason: "Task command surface 测试集，10 个测试，平均 45.2 lines/test，大量 mock setup"
-      - path: "tests/vibe3/commands/test_task_resume_failed.py"
-        limit: 430
-        reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
-      - path: "tests/vibe3/commands/test_run_manager_issue.py"
-        limit: 500
-        reason: "manager issue 模式回归矩阵集中在单入口，拆分会削弱可读性"
-      - path: "tests/vibe3/manager/test_manager_executor.py"
-        limit: 400
-        reason: "manager executor 容量与调度回归共享构造，维持单文件更稳"
-      - path: "tests/vibe3/commands/test_run_supervisor.py"
-        limit: 400
-        reason: "supervisor 运行契约测试共享大量上下文，拆分收益低"
-      - path: "tests/vibe3/commands/test_handoff_command.py"
-        limit: 400
-        reason: "handoff 命令回归围绕同一 CLI 面展开，拆分会放大重复夹具"
-      - path: "tests/vibe3/services/test_check_service.py"
-        limit: 400
-        reason: "check service 回归按同一服务契约组织，当前维持集中更清晰"
-      - path: "tests/vibe3/services/test_pr_utils.py"
-        limit: 550
-        reason: "PR utils 测试集，54 个测试围绕同一服务契约，平均 9.4 lines/test，拆分收益低"
-
-  total_file_loc:
-    v2_shell: 2000         # Shell 核心代码总行数
-    v3_python: 38000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
-
-  # 统计口径（路径定义）
-  code_paths:
-    v2_shell:              # Shell 核心代码路径
-      - "lib/"
-      - "lib3/"
-      - "bin/vibe"
-    v3_python:             # Python 核心代码路径
-      - "src/vibe3/"
-
-  scripts_paths:
-    v2_shell:              # Shell 工具脚本路径
-      - "scripts/"
-    v3_python:             # Python 工具脚本路径
-      - "scripts/"
-
-  test_paths:
-    v2_shell:              # Shell 测试路径
-      - "tests/vibe2/"
-    v3_python:             # Python 测试路径
-      - "tests/vibe3/"
-
 # 审核范围（适配 vibe-center 实际结构）
 # 用于判断改动文件是否属于关键路径或公开 API
 review_scope:
@@ -251,7 +78,7 @@ pr_scoring:
       medium: 10       # 4-10 files = medium (1 point), >10 = large (1 point)
     impacted_modules:
       small: 2         # 1 module = small (0 points)
-      medium: 5        # 2-4 modules = medium (1 point), ≥5 = large (2 points)
+      medium: 5        # 2-4 modules = medium (1 point), >=5 = large (2 points)
 
   # Points for each dimension
   weights:
@@ -278,19 +105,19 @@ pr_scoring:
 
   # Risk level thresholds (for display/labeling purposes)
   # These determine the risk level label (LOW/MEDIUM/HIGH/CRITICAL)
-  # Example: score=7 → HIGH (because 6 <= 7 < 9)
+  # Example: score=7 -> HIGH (because 6 <= 7 < 9)
   thresholds:
-    medium: 3     # score >= 3 → MEDIUM risk
-    high: 6       # score >= 6 → HIGH risk
-    critical: 9   # score >= 9 → CRITICAL risk
+    medium: 3     # score >= 3 -> MEDIUM risk
+    high: 6       # score >= 6 -> HIGH risk
+    critical: 9   # score >= 9 -> CRITICAL risk
 
   # Merge gate configuration (for action/behavior)
   # Controls whether to block and require review
   merge_gate:
     # Block pre-push if score >= this value
     # Note: This is separate from risk level thresholds
-    # Example: score=10 → CRITICAL level, but NOT blocked (10 < 12)
-    # Example: score=12 → CRITICAL level, AND blocked (12 >= 12)
+    # Example: score=10 -> CRITICAL level, but NOT blocked (10 < 12)
+    # Example: score=12 -> CRITICAL level, AND blocked (12 >= 12)
     block_on_score_at_or_above: 10  # Raised from 9 to reduce false positives
 
     # Always block if codex returns these verdicts
@@ -320,7 +147,7 @@ review:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
     # 典型用途：保留 preset 作为实际执行入口，同时把 backend/model 写出来用于显式说明或记录。
-    agent: "code-reviewer"
+    agent: "vibe-reviewer"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -328,35 +155,9 @@ review:
     # - model 只有在 backend 已配置时才有意义
     backend: "claude"  # e.g., "claude", "opencode", "gemini"
     model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
-    timeout_seconds: 1800
+    timeout_seconds: 3600
 
-  # Static: Output format requirements (VERDICT contract)
-  output_format: |
-    Each finding should follow this format:
-    path/to/file.py:42 [MAJOR] concise issue description
 
-    The final line must be:
-    VERDICT: PASS | MAJOR | BLOCK
-
-    Where:
-    - PASS: No significant issues found
-    - MAJOR: Issues found that should be addressed before merge
-    - BLOCK: Critical issues that must be fixed before merge
-
-  # Static: Default review task guidance
-  # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
-  review_task: |
-    Review only changed code, focus on correctness, regression, and security.
-    Use AST analysis to understand impact scope.
-    Prioritize actionable findings with clear severity.
-    Follow the repository review contract.
-    The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
-    If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
-    and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
-
-  # Static: Custom review prompt (optional prefix)
-  # Added to beginning of review context if provided
-  review_prompt: "/code-review"
 
 # Plan command configuration
 # Plan Configuration
@@ -373,7 +174,7 @@ plan:
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
-    agent: "code-explorer"
+    agent: "vibe-planner"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -381,43 +182,7 @@ plan:
     # - model 只有在 backend 已配置时才有意义
     backend: "codex"  # e.g., "claude", "opencode", "gemini"
     model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
-    timeout_seconds: 1800
-
-  # Static: Output format requirements
-  output_format: |
-    The plan should follow this structure:
-
-    ## Summary
-    Brief description of the implementation approach.
-
-    ## Changes
-    - file/path/one.py: Description of changes
-    - file/path/two.py: Description of changes
-
-    ## Implementation Steps
-    1. Step one with details
-    2. Step two with details
-
-    ## Risks & Considerations
-    - Risk 1 and mitigation
-    - Risk 2 and mitigation
-
-  # Static: Default plan task guidance
-  # Can be overridden via CLI: vibe3 plan --issue 42
-  plan_task: |
-    Analyze requirements and identify affected files using inspect tools.
-    Design minimal changes with clear implementation steps.
-    Document risks and breaking changes upfront.
-    Follow the repository planning contract.
-    The auto-saved planner artifact is only for shared handoff or audit and is not the authoritative `plan_ref`.
-    You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
-    After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
-    Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
-    If you do not register `plan_ref`, the planner run is treated as no-op and the issue is moved to `state/blocked`.
-
-  # Static: Optional plain-text default task guidance.
-  # Slash-prefixed external skill triggers are ignored by vibe3 plan.
-  plan_prompt: ""
+    timeout_seconds: 3600
 
 # Run command configuration
 # Run Configuration
@@ -434,7 +199,7 @@ run:
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
     # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
-    agent: "develop"
+    agent: "vibe-executor"
 
     # Backend/model direct mode.
     # - 只配置 backend/model，不配置 agent：走 backend 直连模式
@@ -444,41 +209,6 @@ run:
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
     timeout_seconds: 3600
 
-  # Static: Output format requirements
-  output_format: |
-    The execution report should follow this structure:
-
-    ## Summary
-    Brief description of what was implemented.
-
-    ## Changes Made
-    - file/path/one.py: What was changed and why
-    - file/path/two.py: What was changed and why
-
-    ## Tests
-    - test_one.py: What is being tested
-    - test_two.py: What is being tested
-
-    ## Verification
-    - [ ] All tests pass
-    - [ ] No type errors
-    - [ ] No lint errors
-
-  # Static: Default run task guidance
-  # Can be overridden via CLI: vibe run execute --message "Skip slow tests"
-  run_task: |
-    Follow plan steps strictly, verify each step before proceeding.
-    Write clean code with tests, run verification after changes.
-    Document any deviations with reasons.
-    Follow the repository execution contract.
-    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
-    You must write a canonical execution report under `docs/reports/` in the current worktree.
-    After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
-    Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
-    If you do not register `report_ref`, the executor run is treated as no-op and the issue is moved to `state/blocked`.
-
-  # Static: Custom run prompt (optional prefix)
-  run_prompt: "/executing-plan"
 
 # Orchestra Configuration
 # =======================
@@ -525,7 +255,7 @@ orchestra:
     # - 配置 agent：走 preset 模式，preset 从 config/models.json 解析
     # - 只配置 backend/model：走 backend 直连模式
     # 如果同时配置 agent 和 backend/model，manager 执行时 agent 优先。
-    agent: "explore"
+    agent: "vibe-manager"
     # backend/model 仅在以下场景生效：
     # - 未配置 agent，显式走 backend 直连模式
     # - 同时配置 agent 时，agent 仍是主入口；但 manager resolver 会先把 agent
@@ -555,9 +285,13 @@ orchestra:
   # Governance prompt composition
   governance:
     enabled: true
-    interval_ticks: 1
+    interval_ticks: 4
     # Supervisor file source: supervisor/<name>.md
-    supervisor_file: "supervisor/orchestra.md"
+    supervisor_file: "supervisor/governance/assignee-pool.md"
+    supervisor_files:
+      - "supervisor/governance/assignee-pool.md"
+      - "supervisor/governance/roadmap-intake.md"
+      - "supervisor/governance/cron-supervisor.md"
     # Template selector: config/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
     # Whether to inline the supervisor file into the composed governance prompt
@@ -565,7 +299,7 @@ orchestra:
     dry_run: false
     # Governance agent configuration (independent from run/manager)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    agent: "vibe-governance"  # Maps in config/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：governance resolver 会先解析 preset，再允许 model
@@ -578,9 +312,10 @@ orchestra:
     issue_label: "supervisor"
     handoff_state_label: "state/handoff"
     supervisor_file: "supervisor/apply.md"
+    prompt_template: "orchestra.supervisor.apply"
     # Supervisor handoff agent configuration (independent from run/manager/governance)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    agent: "vibe-supervisor"  # Maps in config/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：supervisor resolver 会先解析 preset，再允许 model

@@ -23,7 +23,7 @@ related_docs:
 
 本文档只提供默认含义、执行提醒和禁止隐含项，用于减少语义歧义，不扩展成功能设计、命令设计、skill 设计或 workflow 设计。
 
-名词术语见 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md)。
+名词术语见 [glossary.md](docs/standards/glossary.md)。
 
 ## 1. Use Rule
 

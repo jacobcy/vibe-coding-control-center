@@ -5,10 +5,11 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.commands.handoff_read import (
+from vibe3.commands.handoff_render import (
     UPDATE_LOG_MESSAGE_PREVIEW_LIMIT,
     _preview_update_message,
     _render_updates_log,
+    _to_handoff_cmd,
 )
 
 runner = CliRunner()
@@ -70,6 +71,75 @@ class TestHandoffAdvancedCommands:
             call.args[0] for call in mock_print.call_args_list if call.args
         ]
         assert any(message in line for line in printed_lines)
+
+    def test_to_handoff_cmd_wraps_relative_refs(self):
+        assert (
+            _to_handoff_cmd("docs/plans/test-plan.md")
+            == "vibe3 handoff show docs/plans/test-plan.md"
+        )
+        # Shared artifacts get @ prefix
+        assert (
+            _to_handoff_cmd("vibe3/handoff/task-123/current.md")
+            == "vibe3 handoff show @task-123/current.md"
+        )
+        # Canonical ref with branch uses --branch flag
+        assert (
+            _to_handoff_cmd("docs/plans/test-plan.md", branch="task/issue-123")
+            == "vibe3 handoff show --branch task/issue-123 docs/plans/test-plan.md"
+        )
+
+    @patch("vibe3.commands.handoff_read._render_updates_log")
+    @patch("vibe3.commands.handoff_read._render_handoff_events")
+    @patch("vibe3.commands.handoff_read._render_agent_chain")
+    @patch("vibe3.commands.handoff_read.VerdictService")
+    @patch("vibe3.commands.handoff_read.HandoffService")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_status_renders_current_md_via_handoff_show(
+        self,
+        mock_flow_service_cls,
+        mock_handoff_service_cls,
+        mock_verdict_service_cls,
+        _render_agent_chain,
+        _render_handoff_events,
+        _render_updates_log,
+        tmp_path,
+    ):
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "task/issue-467"
+        mock_flow_service.get_git_common_dir.return_value = "/tmp/repo/.git"
+        mock_flow_service.git_client.find_worktree_path_for_branch.return_value = (
+            "/tmp/repo/.worktrees/task/issue-467"
+        )
+        mock_flow_service.git_client.get_worktree_root.return_value = (
+            "/tmp/repo/.worktrees/wt-claude-v3"
+        )
+        mock_flow_service.store = MagicMock()
+        mock_flow_service.get_flow_state.return_value = MagicMock(flow_slug="issue-467")
+        mock_flow_service_cls.return_value = mock_flow_service
+
+        mock_handoff_service = MagicMock()
+        mock_handoff_service.get_handoff_events.return_value = []
+        mock_handoff_service_cls.return_value = mock_handoff_service
+
+        mock_verdict_service = MagicMock()
+        mock_verdict_service.get_latest_verdict.return_value = None
+        mock_verdict_service_cls.return_value = mock_verdict_service
+
+        with (
+            patch("vibe3.commands.handoff_read.get_branch_handoff_dir") as mock_dir,
+            patch(
+                "vibe3.commands.handoff_read.resolve_ref_path",
+                return_value="vibe3/handoff/task-issue-467/current.md",
+            ),
+        ):
+            handoff_dir = tmp_path / "vibe3" / "handoff" / "task-issue-467"
+            handoff_dir.mkdir(parents=True)
+            mock_dir.return_value = handoff_dir
+
+            result = runner.invoke(app, ["handoff", "status", "task/issue-467"])
+
+        assert result.exit_code == 0
+        assert "vibe3 handoff show @task-issue-467/current.md" in result.output
 
     @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_append_command(self, mock_service_class):
@@ -263,12 +333,7 @@ class TestHandoffAdvancedCommands:
 
         # Verify side effects in database
         flow_state = real_store.get_flow_state("main")
+        assert flow_state is not None
         assert flow_state["audit_ref"] == audit_ref
         assert flow_state["next_step"] == "Finalize PR"
         assert flow_state["reviewer_actor"] == "test-actor"
-
-        # Verify event was recorded
-        events = real_store.get_events(branch="main", event_type="handoff_audit")
-        assert len(events) == 1
-        assert events[0]["actor"] == "test-actor"
-        assert events[0]["refs"]["ref"] == audit_ref

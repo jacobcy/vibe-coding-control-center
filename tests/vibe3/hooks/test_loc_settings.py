@@ -33,14 +33,14 @@ def test_loc_settings_parser_reads_unified_exceptions() -> None:
     assert (
         module.find_exception(
             settings.exceptions,
-            "src/vibe3/orchestra/services/state_label_dispatch.py",
+            "src/vibe3/clients/git_client.py",
         )
         is not None
     )
     assert (
         module.find_exception(
             settings.exceptions,
-            "tests/vibe3/commands/test_handoff_command.py",
+            "src/vibe3/roles/review.py",
         )
         is not None
     )
@@ -64,7 +64,7 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
         == exceptions["src/vibe3/services/check_service.py"].limit
         == 600
     )
-    assert exceptions["tests/vibe3/orchestra/test_state_label_dispatch.py"].reason != ""
+    assert exceptions["src/vibe3/roles/review.py"].reason != ""
 
 
 def test_runtime_defaults_align_with_hook_fallbacks() -> None:

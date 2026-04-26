@@ -6,8 +6,8 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.models.review_runner import AgentOptions
 
 
-@patch("vibe3.agents.backends.codeagent.subprocess.run")
-@patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
+@patch.object(CodeagentBackend, "_run_subprocess")
+@patch("vibe3.utils.codeagent_helpers.tempfile.NamedTemporaryFile")
 def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"
@@ -17,9 +17,9 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     mock_cp.returncode = 0
     mock_cp.stdout = "SESSION_ID: 262f0fea-eacb-4223-b842-b5b5097f94e8\nSuccess"
     mock_cp.stderr = ""
-    mock_run.return_value = mock_cp
+    mock_run.return_value = (mock_cp, None)
 
-    options = AgentOptions(agent="planner")
+    options = AgentOptions(agent="vibe-planner")
     session_id = "262f0fea-eacb-4223-b842-b5b5097f94e8"
 
     backend = CodeagentBackend()
@@ -35,8 +35,8 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     assert called_dir == Path.home() / ".codeagent" / "agents"
 
     called_command = mock_run.call_args[0][0]
-    assert "--agent" in called_command
-    assert "planner" in called_command
+    assert "--backend" in called_command
+    assert "claude" in called_command
     assert "--prompt-file" in called_command
     assert "resume" in called_command
     assert session_id in called_command
@@ -46,8 +46,8 @@ def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     assert result.exit_code == 0
 
 
-@patch("vibe3.agents.backends.codeagent.subprocess.run")
-@patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
+@patch.object(CodeagentBackend, "_run_subprocess")
+@patch("vibe3.utils.codeagent_helpers.tempfile.NamedTemporaryFile")
 def test_codeagent_backend_new_session(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"
@@ -57,9 +57,9 @@ def test_codeagent_backend_new_session(mock_tempfile, mock_run):
     mock_cp.returncode = 0
     mock_cp.stdout = "SESSION_ID: 12345678-1234-1234-1234-1234567890ab\nSuccess"
     mock_cp.stderr = ""
-    mock_run.return_value = mock_cp
+    mock_run.return_value = (mock_cp, None)
 
-    options = AgentOptions(agent="planner")
+    options = AgentOptions(agent="vibe-planner")
 
     backend = CodeagentBackend()
     result = backend.run(prompt="context", options=options, task="start work")
@@ -70,8 +70,8 @@ def test_codeagent_backend_new_session(mock_tempfile, mock_run):
 
     called_command = mock_run.call_args[0][0]
     assert "resume" not in called_command
-    assert "--agent" in called_command
-    assert "planner" in called_command
+    assert "--backend" in called_command
+    assert "claude" in called_command
     assert "--prompt-file" in called_command
     assert "start work" in called_command
 

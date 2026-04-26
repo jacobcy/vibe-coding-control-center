@@ -52,5 +52,5 @@ _vibe_load_keys "$VIBE_CONFIG/keys.env"
 _vibe_load_keys "${HOME}/.vibe/keys.env"
 
 # ── Defaults ────────────────────────────────────────────
-export VIBE_DEFAULT_TOOL="${VIBE_DEFAULT_TOOL:-claude}"
+# VIBE_SESSION: tmux session name (used by tmux.sh, worktree.sh, etc.)
 export VIBE_SESSION="${VIBE_SESSION:-vibe}"

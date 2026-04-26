@@ -1,121 +1,37 @@
 """vibe3 server - HTTP webhook receiver and CLI management."""
 
 import asyncio
-import hashlib
-import hmac
-import json
 import os
 import signal
+import sys
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 import uvicorn
-from fastapi import APIRouter, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
-from loguru import logger
 
+from vibe3.agents.backends.codeagent_config import find_missing_backend_commands
 from vibe3.clients.git_client import GitClient
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime.event_bus import GitHubEvent
-from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
+    _kill_orchestra_tmux_session,
+    _orchestra_tmux_session_exists,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
     _start_async_serve,
     _validate_pid_file,
 )
+from vibe3.server.server_utils import ensure_port_available
 
 app = typer.Typer(
     help="Orchestra server: GitHub webhook receiver + heartbeat polling",
     no_args_is_help=True,
 )
-
-
-def _verify_signature(body: bytes, secret: str, header: str) -> bool:
-    """Return True if the HMAC-SHA256 signature matches."""
-    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, header)
-
-
-def make_webhook_router(
-    heartbeat: HeartbeatServer,
-    webhook_secret: str | None,
-) -> APIRouter:
-    """Build a FastAPI router with GitHub webhook and health endpoints."""
-
-    router = APIRouter()
-
-    @router.post("/webhook/github")
-    async def receive_webhook(
-        request: Request,
-        x_github_event: str = Header(...),
-        x_hub_signature_256: str | None = Header(None),
-        x_github_delivery: str | None = Header(None),
-    ) -> JSONResponse:
-        body = await request.body()
-
-        if webhook_secret:
-            if not x_hub_signature_256:
-                raise HTTPException(status_code=401, detail="Missing webhook signature")
-            if not _verify_signature(body, webhook_secret, x_hub_signature_256):
-                raise HTTPException(status_code=403, detail="Invalid webhook signature")
-
-        try:
-            payload: dict[str, Any] = json.loads(body)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
-
-        action = str(payload.get("action", ""))
-
-        logger.bind(
-            domain="orchestra",
-            action="webhook",
-            delivery=x_github_delivery,
-        ).info(
-            "Received: "
-            f"{x_github_event}/{action} "
-            f"(source=webhook, delivery={x_github_delivery or '-'})"
-        )
-
-        event = GitHubEvent(
-            event_type=x_github_event,
-            action=action,
-            payload=payload,
-            source="webhook",
-        )
-        await heartbeat.emit(event)
-
-        return JSONResponse({"status": "accepted", "event": x_github_event})
-
-    @router.get("/health")
-    async def health() -> JSONResponse:
-        return JSONResponse(
-            {
-                "status": "ok",
-                "services": heartbeat.service_names,
-                "queue_size": heartbeat.queue_size,
-            }
-        )
-
-    @router.get("/heartbeat")
-    async def heartbeat_status() -> JSONResponse:
-        """Legacy heartbeat status (use /status for full orchestra snapshot)."""
-        return JSONResponse(
-            {
-                "running": heartbeat.running,
-                "services": heartbeat.service_names,
-                "polling_interval": heartbeat.config.polling_interval,
-                "polling_enabled": heartbeat.config.polling.enabled,
-                "max_concurrent": heartbeat.config.max_concurrent_flows,
-            }
-        )
-
-    return router
 
 
 # --- Server Run Logic ---
@@ -132,11 +48,20 @@ async def _run(config: OrchestraConfig, port: int) -> None:
         log_level="warning",  # loguru handles our logs
     )
     uv_server = uvicorn.Server(uv_config)
+    heartbeat_task = asyncio.create_task(heartbeat.run())
+    server_task = asyncio.create_task(uv_server.serve())
 
-    await asyncio.gather(
-        heartbeat.run(),
-        uv_server.serve(),
+    done, _pending = await asyncio.wait(
+        {heartbeat_task, server_task},
+        return_when=asyncio.FIRST_COMPLETED,
     )
+
+    if heartbeat_task in done and not server_task.done():
+        uv_server.should_exit = True
+    if server_task in done and not heartbeat_task.done():
+        heartbeat.stop()
+
+    await asyncio.gather(heartbeat_task, server_task)
 
 
 # --- CLI Commands ---
@@ -144,6 +69,7 @@ async def _run(config: OrchestraConfig, port: int) -> None:
 
 @app.command()
 def start(
+    ctx: typer.Context,
     interval: Annotated[
         int | None,
         typer.Option(
@@ -191,9 +117,12 @@ def start(
             ),
         ),
     ] = False,
-    async_mode: Annotated[
+    no_async: Annotated[
         bool,
-        typer.Option("--async", help="Run in tmux background session"),
+        typer.Option(
+            "--no-async",
+            help="Run synchronously (blocking) instead of async tmux session",
+        ),
     ] = False,
     ts: Annotated[
         bool,
@@ -207,16 +136,34 @@ def start(
     ] = False,
     verbose: Annotated[
         int,
-        typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
+        typer.Option(
+            "-v", "--verbose", count=True, help="Increase verbosity (or use global -v)"
+        ),
     ] = 0,
 ) -> None:
     """Start Orchestra server (webhook receiver + heartbeat polling).
 
     Defaults from config/settings.yaml; repo defaults to current repository.
     """
+    # Inherit global verbose if not specified locally
+    if verbose == 0 and "verbose" in ctx.meta:
+        verbose = ctx.meta["verbose"]
+
     setup_logging(verbose=verbose)
 
-    config = OrchestraConfig.from_settings()
+    # Orchestra events.log level follows global verbosity
+    # Default: INFO (key runtime events for monitoring)
+    # -v: already INFO (no change needed)
+    # -vv: DEBUG (full debugging details)
+    import os as _os
+
+    if verbose >= 2:
+        _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "DEBUG"
+    else:
+        # Default and -v: show key events (tick completion, issue dispatch, etc.)
+        _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "INFO"
+
+    config = load_orchestra_config()
     if not config.enabled:
         typer.echo("Orchestra is disabled in config (orchestra.enabled=false)")
         raise typer.Exit(1)
@@ -249,6 +196,9 @@ def start(
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
         config.pid_file.unlink(missing_ok=True)
 
+    # Pre-flight: Check if port is available
+    ensure_port_available(config.port)
+
     # Phase 1: FailedGate Preflight
     from vibe3.orchestra.failed_gate import FailedGate
 
@@ -267,7 +217,20 @@ def start(
         )
         raise typer.Exit(1)
 
-    if async_mode:
+    missing_backend_commands = find_missing_backend_commands(
+        env_path=os.environ.get("PATH")
+    )
+    if missing_backend_commands:
+        typer.echo("\nOrchestra start blocked by missing backend executables in PATH\n")
+        for backend, command in missing_backend_commands.items():
+            typer.echo(f"- {backend}: expected `{command}` in PATH")
+        typer.echo(
+            "\nFix the shell environment used to launch serve, or update "
+            "`config/models.json` to use only installed backends, then retry."
+        )
+        raise typer.Exit(1)
+
+    if not no_async:
         ok, msg = _start_async_serve(config, verbose)
         typer.echo(msg)
         if not ok:
@@ -296,6 +259,10 @@ def start(
     typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
     typer.echo("Press Ctrl+C to stop")
 
+    # Write PID file for the synchronous server process
+    config.pid_file.parent.mkdir(parents=True, exist_ok=True)
+    config.pid_file.write_text(str(os.getpid()))
+
     try:
         os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         os.environ["VIBE3_REPO_MODELS_ROOT"] = str(
@@ -305,19 +272,37 @@ def start(
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")
+    except SystemExit as e:
+        # Catch uvicorn exit to avoid asyncio "never retrieved" warnings
+        if e.code != 0:
+            sys.exit(e.code)
+        raise
+    finally:
+        # Cleanup PID file on exit
+        if config.pid_file.exists():
+            config.pid_file.unlink()
 
 
 @app.command()
 def status() -> None:
     """Show Orchestra server status."""
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     pid, is_valid = _validate_pid_file(config.pid_file)
 
     if pid is None:
+        if _orchestra_tmux_session_exists():
+            typer.echo("Orchestra server running in tmux session (PID file missing)")
+            raise typer.Exit(0)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
+        if _orchestra_tmux_session_exists():
+            typer.echo(
+                "Orchestra server running in tmux session "
+                f"(stale PID file points to non-orchestra process {pid})"
+            )
+            raise typer.Exit(0)
         typer.echo(
             f"Orchestra server is not running (stale PID file, process {pid} "
             "is not orchestra)"
@@ -330,15 +315,34 @@ def status() -> None:
 @app.command()
 def stop() -> None:
     """Stop Orchestra server via SIGTERM."""
-    config = OrchestraConfig.from_settings()
+    config = load_orchestra_config()
     pid_file = config.pid_file
     pid, is_valid = _validate_pid_file(pid_file)
 
     if pid is None:
+        if _orchestra_tmux_session_exists():
+            if _kill_orchestra_tmux_session():
+                typer.echo("Stopped Orchestra server tmux session")
+                raise typer.Exit(0)
+            typer.echo("Failed to stop Orchestra tmux session")
+            raise typer.Exit(1)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
+        if _orchestra_tmux_session_exists():
+            if _kill_orchestra_tmux_session():
+                pid_file.unlink(missing_ok=True)
+                typer.echo(
+                    "Stopped Orchestra server tmux session "
+                    f"(stale PID file referenced process {pid})"
+                )
+                raise typer.Exit(0)
+            typer.echo(
+                "Failed to stop Orchestra tmux session "
+                f"(stale PID file referenced process {pid})"
+            )
+            raise typer.Exit(1)
         typer.echo(f"Cleaning up stale PID file (process {pid} is not orchestra)")
         pid_file.unlink()
         raise typer.Exit(0)

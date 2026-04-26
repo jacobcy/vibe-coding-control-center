@@ -34,17 +34,9 @@ case "$command" in
         source "$VIBE_LIB/doctor.sh"
         vibe_doctor "$@"
         ;;
-    tools)
-        source "$VIBE_LIB/tool.sh"
-        vibe_tool "$@"
-        ;;
     keys)
         source "$VIBE_LIB/keys.sh"
         vibe_keys "$@"
-        ;;
-    clean)
-        source "$VIBE_LIB/clean.sh"
-        vibe_clean "$@"
         ;;
     skills)
         source "$VIBE_LIB/skills.sh"
@@ -58,32 +50,21 @@ case "$command" in
         echo "Vibe $VIBE_VERSION"
         ;;
     help|--help|-h)
-        echo "${BOLD}Vibe CLI${NC} v${VIBE_VERSION} (basic utilities)"
+        echo "${BOLD}Vibe CLI${NC} v${VIBE_VERSION}"
         echo ""
         echo "Usage: ${CYAN}vibe <command>${NC} [args]"
         echo ""
-        echo "For flow/task/pr commands, use: ${GREEN}vibe3${NC}"
-        echo ""
-        echo "Utilities:"
-        echo "  ${GREEN}doctor${NC}   环境诊断与依赖检查"
-        echo "  ${GREEN}skills${NC}   Skills 物理同步与状态检查"
-        echo "  ${GREEN}keys${NC}     API 密钥安全管理"
-        echo "  ${GREEN}clean${NC}    清理项目临时/构建文件"
-        echo "  ${GREEN}tools${NC}    AI 开发工具链安装/更新"
+        echo "V2 Utilities:"
+        echo "  ${GREEN}doctor${NC}   环境诊断与依赖建议"
+        echo "  ${GREEN}keys${NC}     认证 / Key 来源检查"
+        echo "  ${GREEN}skills${NC}   Skills 安装与同步状态检查"
         echo "  ${GREEN}alias${NC}    加载 Shell 快捷别名"
         echo ""
-        echo "V3 Capability Domains (redirects to vibe3):"
-        echo "  ${GREEN}flow${NC}      Execution scene context management"
-        echo "  ${GREEN}task${NC}      execution record 生命周期管理 (list, add, update, remove)"
-        echo "  ${GREEN}roadmap${NC}   repo issue / roadmap item classification"
-        ;;
-    flow|task|roadmap|check)
-        # Delegate to V3 wrapper
-        exec "${VIBE_ROOT}/bin/vibe3" "$command" "$@"
+        echo "其余顶级命令默认透传到 ${GREEN}vibe3${NC}。"
+        echo ""
+        "${VIBE_ROOT}/bin/vibe3" -h
         ;;
     *)
-        echo "Unknown command: $command"
-        echo "Run 'vibe help' for usage."
-        exit 1
+        exec "${VIBE_ROOT}/bin/vibe3" "$command" "$@"
         ;;
 esac

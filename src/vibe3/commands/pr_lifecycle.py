@@ -41,10 +41,8 @@ def _resolve_ready_pr_number(
         return pr_number
 
     branch = flow_service.get_current_branch()
-    flow_data = pr_service.store.get_flow_state(branch)
-    if flow_data and flow_data.get("pr_number") is not None:
-        return int(flow_data["pr_number"])
-
+    # Try to find PR for current branch from GitHub
+    # TODO: Optimize with cache service when implemented
     pr = pr_service.get_pr(branch=branch)
     if pr is not None:
         return pr.number
@@ -77,7 +75,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             List[str] | None,
             typer.Option(
                 "--review",
-                help="Request AI review (codex, copilot, auggie, claude)",
+                help="Request AI review (codex, copilot, claude)",
             ),
         ] = None,
     ) -> None:

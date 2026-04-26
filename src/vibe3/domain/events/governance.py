@@ -50,17 +50,3 @@ class GovernanceDecisionRequired(DomainEvent):
     suggested_action: str | None = None
     actor: str = "system:governance"
     timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class SupervisorExecutionCompleted(DomainEvent):
-    """Supervisor execution completed event.
-
-    Published when supervisor mode execution finishes.
-    """
-
-    supervisor_file: str
-    issue_number: int | None = None
-    success: bool = True
-    actor: str = "agent:supervisor"
-    timestamp: str | None = None

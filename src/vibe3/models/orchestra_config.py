@@ -56,9 +56,9 @@ class AssigneeDispatchConfig(BaseModel):
     backend: str | None = None
     model: str | None = None
     timeout_seconds: int = Field(
-        default=1800,
+        default=3600,
         ge=60,
-        description="Manager execution timeout in seconds (default 30 minutes)",
+        description="Manager execution timeout in seconds (default 60 minutes)",
     )
     prompt_template: str = Field(
         default="orchestra.assignee_dispatch.manager",
@@ -71,6 +71,15 @@ class AssigneeDispatchConfig(BaseModel):
     include_supervisor_content: bool = Field(
         default=True,
         description="Whether to include supervisor file content in the manager prompt",
+    )
+    token_env: str | None = Field(
+        default="VIBE_MANAGER_GITHUB_TOKEN",
+        description=(
+            "Environment variable name for manager-specific GitHub token. "
+            "If set and the env var exists, its value will be injected into "
+            "ExecutionRequest.env['GH_TOKEN'], enabling role isolation. "
+            "If None or the env var is not set, falls back to global GH_TOKEN."
+        ),
     )
 
 
@@ -93,7 +102,7 @@ class CircuitBreakerConfig(BaseModel):
 
     enabled: bool = True
     failure_threshold: int = Field(
-        default=3,
+        default=4,
         ge=1,
         description="Consecutive failures to trigger OPEN",
     )
@@ -112,9 +121,24 @@ class GovernanceConfig(BaseModel):
 
     enabled: bool = True
     supervisor_file: str = Field(
-        default="supervisor/orchestra.md",
+        default="supervisor/governance/assignee-pool.md",
         description="Supervisor file to include in the composed governance prompt",
     )
+    supervisor_files: list[str] = Field(
+        default=[],
+        description="Multiple governance material files for round-robin rotation. "
+        "Takes precedence over supervisor_file when non-empty.",
+    )
+
+    def get_supervisor_materials(self) -> list[str]:
+        """Return the list of governance material files to rotate through.
+
+        supervisor_files takes precedence; falls back to [supervisor_file].
+        """
+        if self.supervisor_files:
+            return list(self.supervisor_files)
+        return [self.supervisor_file]
+
     prompt_template: str = Field(
         default="orchestra.governance.plan",
         description="Dotted prompts.yaml path used to render governance prompt",
@@ -152,6 +176,10 @@ class SupervisorHandoffConfig(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    prompt_template: str = Field(
+        default="orchestra.supervisor.apply",
+        description="Dotted prompts.yaml path used to render supervisor/apply prompt",
+    )
     agent: str | None = Field(
         default=None,
         description="Agent preset name for supervisor handoff execution",
@@ -181,6 +209,19 @@ class OrchestraConfig(BaseModel):
     scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
+
+    # Per-role capacity configuration
+    governance_max_concurrent: int = Field(
+        default=1,
+        ge=1,
+        description="Maximum concurrent governance executions",
+    )
+    supervisor_max_concurrent: int = Field(
+        default=2,
+        ge=1,
+        description="Maximum concurrent supervisor executions",
+    )
+
     dry_run: bool = False
     pid_file: Path = Field(default_factory=_default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
@@ -211,156 +252,3 @@ class OrchestraConfig(BaseModel):
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
     )
-
-    @classmethod
-    def from_settings(cls) -> "OrchestraConfig":
-        """Load config from settings.yaml via OrchestraSettings."""
-        from vibe3.config.settings import VibeConfig
-
-        settings = VibeConfig.get_defaults()
-        src = settings.orchestra
-
-        repo = src.repo
-        if isinstance(repo, str):
-            repo = repo.strip() or None
-
-        # Build circuit_breaker config with defaults
-        circuit_breaker_config = CircuitBreakerConfig()
-        if hasattr(src, "circuit_breaker") and src.circuit_breaker:
-            cb = src.circuit_breaker
-            circuit_breaker_config = CircuitBreakerConfig(
-                enabled=getattr(cb, "enabled", True),
-                failure_threshold=getattr(cb, "failure_threshold", 3),
-                cooldown_seconds=getattr(cb, "cooldown_seconds", 300),
-                half_open_max_tests=getattr(cb, "half_open_max_tests", 1),
-            )
-
-        governance_defaults: dict[str, bool | str | int | None] = {
-            "enabled": True,
-            "supervisor_file": "supervisor/orchestra.md",
-            "prompt_template": "orchestra.governance.plan",
-            "include_supervisor_content": True,
-            "dry_run": False,
-            "interval_ticks": 4,
-            "agent": None,
-            "backend": None,
-            "model": None,
-        }
-        governance_src = getattr(src, "governance", None)
-        if governance_src is not None:
-            if isinstance(governance_src, dict):
-                governance_defaults.update(governance_src)
-            elif hasattr(governance_src, "__dict__"):
-                # It's a settings object with attributes
-                governance_defaults.update(
-                    {
-                        "enabled": getattr(governance_src, "enabled", True),
-                        "supervisor_file": getattr(
-                            governance_src,
-                            "supervisor_file",
-                            "supervisor/orchestra.md",
-                        ),
-                        "prompt_template": getattr(
-                            governance_src,
-                            "prompt_template",
-                            "orchestra.governance.plan",
-                        ),
-                        "include_supervisor_content": getattr(
-                            governance_src, "include_supervisor_content", True
-                        ),
-                        "dry_run": getattr(governance_src, "dry_run", False),
-                        "interval_ticks": getattr(governance_src, "interval_ticks", 4),
-                        "agent": getattr(governance_src, "agent", None),
-                        "backend": getattr(governance_src, "backend", None),
-                        "model": getattr(governance_src, "model", None),
-                    }
-                )
-
-        supervisor_handoff_defaults: dict[str, bool | str | None] = {
-            "enabled": True,
-            "issue_label": "supervisor",
-            "handoff_state_label": "state/handoff",
-            "supervisor_file": "supervisor/apply.md",
-            "agent": None,
-            "backend": None,
-            "model": None,
-        }
-        supervisor_handoff_src = getattr(src, "supervisor_handoff", None)
-        if supervisor_handoff_src is not None:
-            if isinstance(supervisor_handoff_src, dict):
-                supervisor_handoff_defaults.update(supervisor_handoff_src)
-            elif hasattr(supervisor_handoff_src, "__dict__"):
-                # It's a settings object with attributes
-                supervisor_handoff_defaults.update(
-                    {
-                        "enabled": getattr(supervisor_handoff_src, "enabled", True),
-                        "issue_label": getattr(
-                            supervisor_handoff_src, "issue_label", "supervisor"
-                        ),
-                        "handoff_state_label": getattr(
-                            supervisor_handoff_src,
-                            "handoff_state_label",
-                            "state/handoff",
-                        ),
-                        "supervisor_file": getattr(
-                            supervisor_handoff_src,
-                            "supervisor_file",
-                            "supervisor/apply.md",
-                        ),
-                        "agent": getattr(supervisor_handoff_src, "agent", None),
-                        "backend": getattr(supervisor_handoff_src, "backend", None),
-                        "model": getattr(supervisor_handoff_src, "model", None),
-                    }
-                )
-
-        return cls(
-            enabled=src.enabled,
-            polling_interval=src.polling_interval,
-            debug_polling_interval=getattr(src, "debug_polling_interval", 60),
-            debug_max_ticks=getattr(src, "debug_max_ticks", 10),
-            debug=False,
-            scene_base_ref=getattr(src, "scene_base_ref", "origin/main"),
-            repo=repo,
-            max_concurrent_flows=src.max_concurrent_flows,
-            port=src.port,
-            webhook_secret=src.webhook_secret,
-            bot_username=getattr(src, "bot_username", None),
-            manager_usernames=src.manager_usernames,
-            polling=PollingConfig(enabled=src.polling.enabled),
-            assignee_dispatch=AssigneeDispatchConfig(
-                enabled=src.assignee_dispatch.enabled,
-                use_worktree=src.assignee_dispatch.use_worktree,
-                agent=getattr(src.assignee_dispatch, "agent", None),
-                backend=getattr(src.assignee_dispatch, "backend", None),
-                model=getattr(src.assignee_dispatch, "model", None),
-                prompt_template=getattr(
-                    src.assignee_dispatch,
-                    "prompt_template",
-                    "orchestra.assignee_dispatch.manager",
-                ),
-                supervisor_file=getattr(
-                    src.assignee_dispatch, "supervisor_file", "supervisor/manager.md"
-                ),
-                include_supervisor_content=getattr(
-                    src.assignee_dispatch, "include_supervisor_content", True
-                ),
-            ),
-            comment_reply=CommentReplyConfig(
-                enabled=src.comment_reply.enabled,
-            ),
-            pr_review_dispatch=PRReviewDispatchConfig(
-                enabled=src.pr_review_dispatch.enabled,
-                async_mode=src.pr_review_dispatch.async_mode,
-                use_worktree=src.pr_review_dispatch.use_worktree,
-            ),
-            state_label_dispatch=StateLabelDispatchConfig(
-                enabled=getattr(
-                    getattr(src, "state_label_dispatch", None), "enabled", True
-                )
-            ),
-            circuit_breaker=circuit_breaker_config,
-            governance=GovernanceConfig.model_validate(governance_defaults),
-            supervisor_handoff=SupervisorHandoffConfig.model_validate(
-                supervisor_handoff_defaults
-            ),
-        )

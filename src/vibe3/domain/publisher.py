@@ -35,10 +35,16 @@ class EventPublisher:
     def subscribe(
         self, event_type: str, handler: Callable[[DomainEvent], None]
     ) -> None:
-        """Subscribe a handler to an event type."""
+        """Subscribe a handler to an event type.
+
+        Prevents duplicate handler registration to avoid multiple calls
+        for the same event.
+        """
         if event_type not in self._handlers:
             self._handlers[event_type] = []
-        self._handlers[event_type].append(handler)
+        # Deduplication check
+        if handler not in self._handlers[event_type]:
+            self._handlers[event_type].append(handler)
 
     def publish(self, event: DomainEvent) -> None:
         """Publish an event to all subscribed handlers."""

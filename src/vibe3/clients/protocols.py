@@ -1,8 +1,84 @@
 """Protocol definitions for clients."""
 
+from pathlib import Path
 from typing import Any, Protocol
 
-from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest  # type: ignore
+from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
+from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest
+from vibe3.models.review_runner import AgentOptions, AgentResult
+
+
+class BackendProtocol(Protocol):
+    """Protocol for backend operations (tmux, execution).
+
+    Used for dependency injection to avoid architecture layer violations.
+    Services layer depends on this protocol, concrete implementation
+    (CodeagentBackend) is injected at handler/orchestration layer.
+    """
+
+    def has_tmux_session(self, session_name: str) -> bool:
+        """Check if tmux session exists.
+
+        Args:
+            session_name: Exact tmux session name to check
+
+        Returns:
+            True if session exists, False otherwise
+        """
+        ...
+
+    def run(
+        self,
+        prompt: str,
+        options: AgentOptions,
+        task: str | None = None,
+        dry_run: bool = False,
+        session_id: str | None = None,
+        cwd: Path | None = None,
+    ) -> AgentResult:
+        """Run agent synchronously.
+
+        Args:
+            prompt: Prompt content
+            options: Agent execution options
+            task: Optional task description
+            dry_run: If True, print command without executing
+            session_id: Optional session ID to resume
+            cwd: Working directory
+
+        Returns:
+            Agent execution result
+        """
+        ...
+
+    def start_async(
+        self,
+        prompt: str,
+        options: AgentOptions,
+        *,
+        task: str | None = None,
+        session_id: str | None = None,
+        execution_name: str,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        keep_alive_seconds: int = 0,
+    ) -> AsyncExecutionHandle:
+        """Start agent asynchronously in tmux.
+
+        Args:
+            prompt: Prompt content
+            options: Agent execution options
+            task: Optional task description
+            session_id: Optional session ID to resume
+            execution_name: Unique execution name for session and logs
+            cwd: Working directory
+            env: Optional environment variable overrides
+            keep_alive_seconds: Seconds to keep tmux session alive after completion
+
+        Returns:
+            Async execution handle with session and log info
+        """
+        ...
 
 
 class GitHubClientProtocol(Protocol):
@@ -60,6 +136,7 @@ class GitHubClientProtocol(Protocol):
         state: str = "open",
         assignee: str | None = None,
         repo: str | None = None,
+        label: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -67,6 +144,7 @@ class GitHubClientProtocol(Protocol):
             limit: Maximum number of issues to fetch
             state: Issue state filter (open, closed, all)
             assignee: Filter by assignee username
+            label: Server-side label filter (reduces payload vs client-side filtering)
         """
         ...
 
@@ -79,7 +157,30 @@ class GitHubClientProtocol(Protocol):
     def list_prs_for_branch(
         self, branch: str, *, state: str | None = None
     ) -> list[PRResponse]:
-        """List PRs for a specific branch."""
+        """List PRs for a specific branch.
+
+        Args:
+            branch: Branch name to query
+            state: Optional PR state filter
+
+        Returns:
+            List of PR responses
+        """
+        ...
+
+    def list_all_prs(self, state: str = "open", limit: int = 100) -> list[PRResponse]:
+        """List all PRs in repository (batch query).
+
+        Batch query optimization: fetch all PRs in one API call
+        instead of N calls for N branches.
+
+        Args:
+            state: PR state filter (open, closed, merged, all)
+            limit: Maximum number of PRs to return
+
+        Returns:
+            List of PR responses
+        """
         ...
 
     def list_pr_comments(self, pr_number: int) -> list[dict[str, Any]]:
@@ -96,4 +197,16 @@ class GitHubClientProtocol(Protocol):
 
     def update_pr_comment(self, comment_id: str, body: str) -> str:
         """Update an existing PR comment. Returns comment URL."""
+        ...
+
+    def request_ai_review(self, pr_number: int, reviewers: list[str]) -> str | None:
+        """Request AI review by posting mention comment.
+
+        Args:
+            pr_number: PR number
+            reviewers: List of reviewer names
+
+        Returns:
+            Comment URL if successful, None if failed
+        """
         ...

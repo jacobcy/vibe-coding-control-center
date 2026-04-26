@@ -52,6 +52,69 @@ class StateTransition(BaseModel):
     forced: bool = False
 
 
+# ============================================================================
+# State Machine Diagram
+# ============================================================================
+#
+# Decision makers: [M]anager AI agent  [C]ode layer (auto)  [H]uman (resume)
+#
+#   READY ───────────────────────────────────────────────────────────────
+#     │
+#     │ [M] handle_ready: claim or block
+#     ▼
+#   CLAIMED ─────────────────────────────────────────────────────────────
+#     │  │
+#     │  │ [C] planner fails → FAILED
+#     │  │ [C] no plan_ref   → BLOCKED (no-op gate)
+#     │  │ [M] plan_ref exists, AI advances → HANDOFF
+#     │  │
+#     ▼  ▼
+#   HANDOFF ◄───────────────────────────────────────────────────────────
+#     │  ▲       ▲
+#     │  │       │  [C] executor/reviewer completes, no auto-transition
+#     │  │       │  [M] reads refs, decides next action
+#     │  │       │
+#     │  ├───────┘  [M] handle_handoff: dispatch next role
+#     │  │
+#     │  │ [M] plan_ref exists → IN_PROGRESS
+#     │  │ [M] report_ref exists → REVIEW
+#     │  │ [M] audit_ref + verdict=PASS → MERGE_READY
+#     │  │ [M] cannot proceed → BLOCKED
+#     ▼  ▼
+#   IN_PROGRESS          REVIEW            MERGE_READY
+#     │  ▲                 │  ▲               │
+#     │  │ [C] no report   │  │ [C] no audit  │ [M] write indicate
+#     │  │  → BLOCKED      │  │  → BLOCKED    │     keep MERGE_READY
+#     │  │                 │  │               │  executor publish path
+#     │  └─────────────────┘  └──── HANDOFF   │  auto-injects vibe-commit
+#     │                         ▲  ▲          │
+#     │                         │  │          ▼
+#     │                         │  └── MERGE_READY (pr_ref created)
+#     │                         │ pr_ref
+#     │                         │
+#     └──── HANDOFF ◄──────────┘  (manager reviews PR → DONE)
+#              │
+#              │ [M] review pr_ref → DONE
+#              ▼
+#             DONE
+#
+#   BLOCKED ◄──── any state (via [C] no-op gate or [M] business decision)
+#     │
+#     │ [H] vibe3 task resume --blocked / --label (force=True)
+#     └──→ READY or HANDOFF (human decides)
+#
+#   FAILED ◄──── CLAIMED / IN_PROGRESS / REVIEW (via [C] execution error)
+#     │
+#     │ [C] auto-retry paths (FAILED → CLAIMED/HANDOFF/IN_PROGRESS/REVIEW)
+#     │ [H] vibe3 task resume --failed (force=True → READY)
+#     └──→ READY (human decides)
+#
+# Key invariants (Issue #303):
+#   1. Code layer NEVER auto-transitions to HANDOFF (no-op gate)
+#   2. BLOCKED has NO automatic exit (requires human resume with force=True)
+#   3. State decisions belong to: manager AI (normal) or human (override)
+# ============================================================================
+
 # Allowed state transitions
 ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     # Main chain
@@ -62,16 +125,21 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.HANDOFF, IssueState.REVIEW),
     (IssueState.REVIEW, IssueState.HANDOFF),
     (IssueState.HANDOFF, IssueState.MERGE_READY),
-    (IssueState.MERGE_READY, IssueState.DONE),
-    # Side paths
+    (
+        IssueState.MERGE_READY,
+        IssueState.HANDOFF,
+    ),  # executor publish completes → manager reviews PR
+    (IssueState.HANDOFF, IssueState.DONE),  # manager concludes after PR review
+    # Side paths (→ blocked)
     (IssueState.READY, IssueState.BLOCKED),
     (IssueState.CLAIMED, IssueState.BLOCKED),
     (IssueState.HANDOFF, IssueState.BLOCKED),
     (IssueState.IN_PROGRESS, IssueState.BLOCKED),
     (IssueState.REVIEW, IssueState.BLOCKED),
     (IssueState.MERGE_READY, IssueState.BLOCKED),
-    (IssueState.BLOCKED, IssueState.CLAIMED),
-    (IssueState.BLOCKED, IssueState.HANDOFF),
+    # NOTE: blocked → other states removed (修复 Issue #303)
+    # blocked 状态不允许自动转换，必须等人类核查
+    # 手动 resume 命令可以用 force=True 绕过
     # Execution failures
     (IssueState.CLAIMED, IssueState.FAILED),
     (IssueState.IN_PROGRESS, IssueState.FAILED),
@@ -80,8 +148,6 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.FAILED, IssueState.HANDOFF),
     (IssueState.FAILED, IssueState.IN_PROGRESS),
     (IssueState.FAILED, IssueState.REVIEW),
-    # Closure paths
-    (IssueState.MERGE_READY, IssueState.DONE),
 }
 
 # Progress expectations for each state
@@ -91,7 +157,7 @@ STATE_PROGRESS_CONTRACT: dict[IssueState, str | None] = {
     IssueState.READY: None,  # System enforces MUST transition (claimed/blocked only)
     IssueState.HANDOFF: None,  # System enforces MUST transition
     IssueState.CLAIMED: "plan_ref",
-    IssueState.IN_PROGRESS: "report_ref",
+    IssueState.IN_PROGRESS: "report_ref",  # also accepts pr_ref (commit mode)
     IssueState.REVIEW: "audit_ref",
 }
 
@@ -110,7 +176,7 @@ FORBIDDEN_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.CLAIMED, IssueState.DONE),
     (IssueState.BLOCKED, IssueState.DONE),
     (IssueState.FAILED, IssueState.DONE),
-    (IssueState.HANDOFF, IssueState.DONE),
+    (IssueState.MERGE_READY, IssueState.DONE),
 }
 
 

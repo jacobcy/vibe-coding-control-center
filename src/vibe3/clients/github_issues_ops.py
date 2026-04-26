@@ -4,11 +4,25 @@ import json
 import os
 import re
 import subprocess
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, cast
 
 from loguru import logger
 
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
+
+
+@dataclass(frozen=True)
+class MilestoneContext:
+    """Aggregated milestone context for a task issue."""
+
+    number: int
+    title: str
+    open_count: int
+    closed_count: int
+    issues: list[dict[str, Any]]
+    task_issue_number: int
+
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
@@ -107,7 +121,7 @@ class IssuesMixin(IssueAdminMixin):
                 "Failed to list merged PRs"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def list_issues(
         self,
@@ -115,6 +129,7 @@ class IssuesMixin(IssueAdminMixin):
         state: str = "open",
         assignee: str | None = None,
         repo: str | None = None,
+        label: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -122,6 +137,9 @@ class IssuesMixin(IssueAdminMixin):
             limit: Maximum number of issues to fetch
             state: Issue state filter (open, closed, all)
             assignee: Filter by assignee username
+            label: Server-side label filter — passed as ``--label`` to the GitHub
+                CLI so GitHub returns only matching issues, reducing both network
+                payload and client-side filtering work.
         """
         logger.bind(
             external="github",
@@ -129,6 +147,7 @@ class IssuesMixin(IssueAdminMixin):
             limit=limit,
             state=state,
             assignee=assignee,
+            label=label,
         ).debug("Calling GitHub API: list_issues")
         cmd = [
             "gh",
@@ -139,10 +158,12 @@ class IssuesMixin(IssueAdminMixin):
             "--state",
             state,
             "--json",
-            "number,title,state,updatedAt,labels,assignees,milestone",
+            "number,title,body,state,updatedAt,labels,assignees,milestone",
         ]
         if assignee:
             cmd.extend(["--assignee", assignee])
+        if label:
+            cmd.extend(["--label", label])
         if repo:
             cmd.extend(["--repo", repo])
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -151,7 +172,7 @@ class IssuesMixin(IssueAdminMixin):
                 "Failed to list issues"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
 
     def view_issue(
         self: Any, issue_number: int, repo: str | None = None
@@ -180,7 +201,7 @@ class IssuesMixin(IssueAdminMixin):
             "view",
             str(issue_number),
             "--json",
-            "number,title,body,state,updatedAt,labels,comments,milestone",
+            "number,title,body,state,updatedAt,labels,comments,milestone,assignees",
         ]
         if repo:
             cmd.extend(["--repo", repo])
@@ -224,7 +245,7 @@ class IssuesMixin(IssueAdminMixin):
                 f"Issue #{issue_number} not found: {stderr.strip()}"
             )
             return None
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast("dict[str, Any] | None | str", json.loads(result.stdout))
 
     def get_milestone_issues(self: Any, milestone_number: int) -> list[dict[str, Any]]:
         """Get all issues in a milestone (open + closed).
@@ -260,4 +281,39 @@ class IssuesMixin(IssueAdminMixin):
                 f"Failed to get milestone {milestone_number} issues: {err}"
             )
             return []
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
+        return cast(list[dict[str, Any]], json.loads(result.stdout))
+
+    def get_milestone_context(self: Any, issue_number: int) -> MilestoneContext | None:
+        """Fetch milestone orchestration context for a task issue.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            MilestoneContext if issue has milestone, None otherwise
+        """
+        try:
+            issue = self.view_issue(issue_number)
+            if not isinstance(issue, dict) or not issue.get("milestone"):
+                return None
+
+            ms = issue["milestone"]
+            ms_issues = self.get_milestone_issues(ms["number"])
+        except (FileNotFoundError, RuntimeError):
+            return None
+
+        open_count = sum(
+            1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN"
+        )
+        closed_count = sum(
+            1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
+        )
+
+        return MilestoneContext(
+            number=ms["number"],
+            title=ms["title"],
+            open_count=open_count,
+            closed_count=closed_count,
+            issues=ms_issues,
+            task_issue_number=issue_number,
+        )

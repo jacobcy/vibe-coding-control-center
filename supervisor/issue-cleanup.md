@@ -6,6 +6,16 @@
 
 - 当前 `uv run python src/vibe3/cli.py task status` 暴露出来的 issue / flow / worktree 现场里，哪些看起来像调试残留、陈旧现场或需要人工确认的 cleanup 候选
 
+## Core Model
+
+- `dev/issue-*` 是用户主线开发分支；需要较强业务判断、架构判断、正式实现推进的工作，应回到这条主线
+- `task/issue-*` 是自动化执行链；默认只承接边界清晰、可被 manager/plan/run/review 链稳定消费的任务
+- 自动化链发现的 findings，如果已经超出“继续自动推进”的边界，应转为：
+  - 关闭旧 issue
+  - 基于 findings 重建干净 issue
+  - 或创建新的 task issue 承接
+- 不要为了保留历史上下文，强行让已污染的 `task/issue-*` 现场继续承担新的语义
+
 ## What It Reads
 
 - governance prompt 里的最小 runtime summary
@@ -20,6 +30,8 @@
 - keep-as-is items
 - governance issues
 - short report reasons
+- polluted-scene candidates
+- close/recreate recommendations
 
 ## Hard Boundary
 
@@ -30,6 +42,7 @@
 - 不负责删除 branch / worktree / flow 记录
 - 不直接执行治理动作
 - 不直接 comment / close 治理 issue
+- 不把“当前 issue 还有历史内容”自动当作必须保留的理由
 
 ## Execution Pattern
 
@@ -40,22 +53,32 @@
    - 有 flow 记录但没有 worktree，且看起来不是当前活跃实现
    - issue 长期停留在过时状态，需要人工重新确认
    - 现场事实与 label 明显不一致
+   - `task/issue-*` 绑定了旧 bootstrap PR、陈旧 merged PR、错误 issue 语义，继续推进只会制造噪音
+   - 当前 issue 的真正后续工作已经明显变成新的业务目标，旧 issue 已不适合作为真源
 5. 对每个候选给出简短理由
-6. 在创建治理 issue 之前，先检查现有 open 的治理 issue：
+6. 对每个 polluted scene 额外判断最小治理策略：
+   - 继续保留并修正 metadata
+   - 关闭旧 issue 并重建干净 issue
+   - 创建新的 task issue 承接 finding
+7. 在创建治理 issue 之前，先检查现有 open 的治理 issue：
    - 如果已有 issue 覆盖同一批对象或同一类 findings，不要重复创建
    - 如果只是部分重叠，优先复用或收窄新 issue 的范围，避免一批对象出现在多条治理 issue 里
-7. 把需要后续核查或执行、且尚未被治理 issue 覆盖的 findings 组织成新的治理 issue
-8. 治理 issue 必须使用：
+8. 把需要后续核查或执行、且尚未被治理 issue 覆盖的 findings 组织成新的治理 issue
+9. 当判断为“旧 issue 已污染，不值得继续维护”时，应明确把建议动作写成：
+   - close old issue
+   - create clean replacement issue
+   - explain why not to reuse the current scene
+10. 治理 issue 必须使用：
    - label: `supervisor`
    - label: `state/handoff`
    - title 前缀表达 findings 类型，例如 `cleanup: ...`
-9. issue body 要写清：
+11. issue body 要写清：
    - findings
    - 建议动作
    - 原因
    - 禁止动作
    - 需要后续 `supervisor/apply.md` 核查并执行
-10. 如果不是 dry-run，直接使用 `gh issue create` 创建这些治理 issue，并在最终报告里列出创建结果；如果因为查重而跳过，也要明确说明跳过原因
+12. 如果不是 dry-run，直接使用 `gh issue create` 创建这些治理 issue，并在最终报告里列出创建结果；如果因为查重而跳过，也要明确说明跳过原因
 
 ## Output Contract
 
@@ -63,6 +86,7 @@
 
 - `Healthy`
 - `Cleanup findings`
+- `Polluted scenes`
 - `Governance issues`
 - `Dedup check`
 - `Report`
@@ -73,6 +97,12 @@
 - 默认只使用非破坏性治理标签，例如 `cleanup/candidate`
 - 如果仓库没有该标签，可先建议而不是臆造更多动作
 - 不要移除 `state/*`，除非上下文明显要求
+
+## Polluted Scene Rule
+
+- 如果 `task/issue-*` 现场已经被旧 PR、旧 flow、错误 state、错误 issue 语义污染，且继续修补只会增加误判成本，优先建议关闭并重建，而不是继续在原 issue 上打补丁
+- `PR merged but task issue not closed` 本身不自动等于 bug；先判断该 PR 是否本来就不是 closing PR、是否只是 bootstrap PR、是否导致当前 flow 真源被污染
+- 只要“重建一个干净 issue”比“继续维护旧 issue 语义”更简单、更清晰，就优先建议重建
 
 ## Stop Point
 

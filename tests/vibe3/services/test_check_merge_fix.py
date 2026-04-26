@@ -224,7 +224,7 @@ class TestStaleFlowHandling:
         mock_github_client.list_prs_for_branch.return_value = []
 
         with patch(
-            "vibe3.manager.flow_manager.FlowManager.create_flow_for_issue",
+            "vibe3.execution.flow_dispatch.FlowManager.create_flow_for_issue",
             return_value={"branch": "task/issue-431", "flow_status": "active"},
         ) as mock_create_flow:
             with patch.object(
@@ -243,10 +243,12 @@ class TestAutoFix:
 
     def test_fix_all_checks_active_and_stale_flows(self, check_service):
         """fix_all should converge stale flows in addition to active flows."""
+        from vibe3.commands.check_support import execute_check_mode
+
         with patch.object(
             check_service, "verify_all_flows", return_value=[]
         ) as mock_verify:
-            result = check_service.execute_check("fix_all")
+            result = execute_check_mode(check_service, "fix_all")
 
         assert result.success
         mock_verify.assert_called_once_with(status=["active", "stale"])
