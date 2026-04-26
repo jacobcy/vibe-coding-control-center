@@ -15,15 +15,36 @@
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
 
-## 工作前必读 Manager 指令
+## 工作前必读：Handoff + Task Show 双通道
 
-开始任何工作（plan/run/review）前，必须先读取当前 flow 的 manager 交接指令：
+开始任何工作（plan/run/review）前，**必须同时**读取以下两个信息源：
+
+### 1. Handoff 状态（manager 交接指令）
 
 ```bash
 uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
 ```
 
 Manager 可能已写入质量审查意见、具体修复要求、重点关注区域等指令。
+
+### 2. Task Show + Comments（最新上下文）
+
+```bash
+uv run python src/vibe3/cli.py task show
+```
+
+**重要**：必须查看 issue comments 部分，特别是：
+- 最新的人类指令（`[user:xxx]` 标记）
+- 最新的 agent 状态通报
+
+### 为什么必须双通道？
+
+| 信息源 | 包含内容 | 不能替代的原因 |
+|--------|----------|----------------|
+| Handoff | manager 给当前角色的具体指令 | 包含"给下一阶段 agent 的指令"等精确任务 |
+| Task Show + Comments | issue 的完整讨论历史 | 人类可能通过 comment 直接给出新指令，绕过 manager |
+
+**禁止**：只看 handoff 忽视 comments。如果 comments 中有人类最新指令与 handoff 冲突，以 comments 为准。
 
 ## 项目记忆系统（claude-memory）
 

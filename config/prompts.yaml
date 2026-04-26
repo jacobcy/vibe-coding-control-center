@@ -382,6 +382,13 @@ run:
     Treat this run as a focused retry round, not a fresh implementation pass.
     Reuse the existing session context when available.
 
+    ## RETRY MODE REQUIREMENTS
+    **You are in RETRY mode.** You MUST:
+    1. Check $handoff status and $task show for manager instructions first using commands below
+    2. If you cannot determine your task for this round, write an issue comment explaining why
+    3. Set the issue state to `state/blocked` for human intervention
+    4. **NEVER exit with zero work done** — always leave a trace of what you attempted or why you are blocked
+
     ## Quick Scene Commands
     - Read current task context: `uv run python src/vibe3/cli.py task show`
     - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
@@ -472,6 +479,13 @@ plan:
   retry_task: |
     This is a retry planning round, not a fresh planning pass.
     Reuse the existing session context when available.
+
+    ## RETRY MODE REQUIREMENTS
+    **You are in RETRY mode.** You MUST:
+    1. Check $handoff status and $task show for manager instructions first using commands below
+    2. If you cannot determine your task for this round, write an issue comment explaining why
+    3. Set the issue state to `state/blocked` for human intervention
+    4. **NEVER exit with zero work done** — always leave a trace of what you attempted or why you are blocked
 
     ## Quick Scene Commands
     - Read current task context: `uv run python src/vibe3/cli.py task show`
@@ -566,6 +580,13 @@ review:
   retry_task: |
     This is a retry review round, not a fresh review pass.
     Reuse the existing session context when available.
+
+    ## RETRY MODE REQUIREMENTS
+    **You are in RETRY mode.** You MUST:
+    1. Check $handoff status and $task show for manager instructions first using commands below
+    2. If you cannot determine your task for this round, write an issue comment explaining why
+    3. Set the issue state to `state/blocked` for human intervention
+    4. **NEVER exit with zero work done** — always leave a trace of what you attempted or why you are blocked
 
     ## Quick Scene Commands
     - Read current task context: `uv run python src/vibe3/cli.py task show`
