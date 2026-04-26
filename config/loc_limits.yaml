@@ -56,6 +56,9 @@ code_limits:
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，CLI 入口函数难以拆分"
 
       # Services 层 —— 允许 400-500
+      - path: "src/vibe3/analysis/snapshot_service.py"
+        limit: 450
+        reason: "Snapshot 服务聚合，包含 build/save/load/list、branch baseline 管理、结构分析等紧密耦合逻辑"
       - path: "src/vibe3/services/status_query_service.py"
         limit: 450
         reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"

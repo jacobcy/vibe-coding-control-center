@@ -421,6 +421,14 @@ class CheckService(CheckRemote):
         Returns:
             Dict with suggestions, e.g., {"issue_to_close": 123}
         """
+        # Auto-save baseline snapshot on flow auto-complete
+        try:
+            from vibe3.analysis import snapshot_service
+
+            snapshot_service.save_branch_baseline(branch)
+        except Exception as e:
+            logger.warning(f"Failed to save branch baseline on auto-complete: {e}")
+
         self._mark_flow_status(
             branch, "done", reason, "flow_auto_completed", "auto_complete_flow"
         )

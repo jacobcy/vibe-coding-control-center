@@ -34,6 +34,7 @@ class SnapshotNotFoundError(SnapshotError):
 
 
 SNAPSHOT_DIR_NAME = "vibe3/structure/snapshots"
+SNAPSHOT_TAG_DIR_NAME = "vibe3/structure/baselines"
 LATEST_LINK_NAME = "vibe3/structure/latest.json"
 
 
@@ -49,6 +50,15 @@ def _get_latest_link_path() -> Path:
 
 def _ensure_snapshot_dir() -> None:
     _get_snapshot_dir().mkdir(parents=True, exist_ok=True)
+
+
+def _get_baseline_dir() -> Path:
+    git = GitClient()
+    return Path(git.get_git_common_dir()) / SNAPSHOT_TAG_DIR_NAME
+
+
+def _ensure_baseline_dir() -> None:
+    _get_baseline_dir().mkdir(parents=True, exist_ok=True)
 
 
 def _get_module_from_path(file_path: str) -> str:
@@ -211,24 +221,46 @@ def load_snapshot(snapshot_id: str | None = None) -> StructureSnapshot:
         raise SnapshotError(f"Failed to load snapshot: {e}") from e
 
 
-def list_snapshots() -> list[str]:
-    """List all available snapshot IDs (newest first)."""
-    snapshot_dir = _get_snapshot_dir()
-    if not snapshot_dir.exists():
-        return []
+def list_snapshots(include_baselines: bool = False) -> list[str]:
+    """List all available snapshot IDs (newest first).
 
+    Args:
+        include_baselines: If True, include auto-saved baselines in the list
+    """
     snapshots = []
-    for fp in snapshot_dir.glob("*.json"):
-        try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
-            snapshots.append(
-                {
-                    "id": data.get("snapshot_id", fp.stem),
-                    "created_at": data.get("created_at", ""),
-                }
-            )
-        except (json.JSONDecodeError, KeyError):
-            continue
+
+    # Scan regular snapshots directory
+    snapshot_dir = _get_snapshot_dir()
+    if snapshot_dir.exists():
+        for fp in snapshot_dir.glob("*.json"):
+            try:
+                data = json.loads(fp.read_text(encoding="utf-8"))
+                if not include_baselines and data.get("baseline_for"):
+                    continue
+                snapshots.append(
+                    {
+                        "id": data.get("snapshot_id", fp.stem),
+                        "created_at": data.get("created_at", ""),
+                    }
+                )
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    # Scan baselines directory if requested
+    if include_baselines:
+        baseline_dir = _get_baseline_dir()
+        if baseline_dir.exists():
+            for fp in baseline_dir.glob("*.json"):
+                try:
+                    data = json.loads(fp.read_text(encoding="utf-8"))
+                    snapshots.append(
+                        {
+                            "id": data.get("snapshot_id", fp.stem),
+                            "created_at": data.get("created_at", ""),
+                        }
+                    )
+                except (json.JSONDecodeError, KeyError):
+                    continue
 
     snapshots.sort(key=lambda x: x["created_at"], reverse=True)
     return [s["id"] for s in snapshots]
@@ -303,3 +335,76 @@ def find_snapshot_by_branch(
     # Sort by created_at descending and return the most recent
     snapshots.sort(key=lambda x: x["created_at"], reverse=True)
     return load_snapshot(snapshots[0]["id"])
+
+
+def save_branch_baseline(branch: str) -> Path | None:
+    """Build current snapshot and save as baseline for the specified branch.
+
+    This function is called when a flow completes (PR merge or auto-complete).
+    It builds a fresh snapshot and saves it with baseline_for tag.
+
+    Args:
+        branch: Branch name to save baseline for
+
+    Returns:
+        Path to saved baseline, or None if build failed
+    """
+    log = logger.bind(domain="snapshot", action="save_baseline", branch=branch)
+    log.info("Saving branch baseline")
+
+    try:
+        snapshot = build_snapshot()
+        snapshot.baseline_for = branch
+
+        _ensure_baseline_dir()
+        baseline_dir = _get_baseline_dir()
+
+        # Sanitize branch name for filename safety
+        safe_branch = branch.replace("/", "-")
+        filename = f"baseline_{safe_branch}.json"
+        filepath = baseline_dir / filename
+
+        filepath.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+
+        log.bind(path=str(filepath)).success("Branch baseline saved")
+        return filepath
+
+    except Exception as e:
+        logger.warning(f"Failed to save branch baseline: {e}")
+        return None
+
+
+def load_branch_baseline(branch: str) -> StructureSnapshot | None:
+    """Load the most recent baseline snapshot for a branch.
+
+    Args:
+        branch: Branch name to load baseline for
+
+    Returns:
+        StructureSnapshot for the branch baseline, or None if not found
+    """
+    log = logger.bind(domain="snapshot", action="load_baseline", branch=branch)
+    log.info("Loading branch baseline")
+
+    try:
+        baseline_dir = _get_baseline_dir()
+        if not baseline_dir.exists():
+            return None
+
+        # Sanitize branch name for filename safety
+        safe_branch = branch.replace("/", "-")
+        filename = f"baseline_{safe_branch}.json"
+        filepath = baseline_dir / filename
+
+        if not filepath.exists():
+            return None
+
+        data = json.loads(filepath.read_text(encoding="utf-8"))
+        snapshot = StructureSnapshot.model_validate(data)
+
+        log.success("Branch baseline loaded")
+        return snapshot
+
+    except Exception as e:
+        logger.warning(f"Failed to load branch baseline: {e}")
+        return None
