@@ -7,7 +7,7 @@ audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2026-03-25
+last_updated: 2026-04-24
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -46,12 +46,25 @@ vibe-center/
 │
 ├── src/vibe3/                   # V3 Python 实现（主要）
 │   ├── cli.py                   # CLI 主入口
-│   ├── commands/                # 命令实现
-│   ├── services/                # 业务逻辑
+│   ├── agents/                  # AI Agent 调用层
+│   ├── analysis/                # 代码智能与影响分析
 │   ├── clients/                 # 外部客户端
+│   ├── commands/                # 命令实现
+│   ├── config/                  # 配置加载与 schema
+│   ├── domain/                  # 领域事件与 handlers
+│   ├── environment/             # 环境资源管理
+│   ├── exceptions/              # 统一异常层级
+│   ├── execution/               # 执行控制平面
 │   ├── models/                  # 数据模型
-│   ├── utils/                   # 工具函数
-│   └── observability/           # 可观测性
+│   ├── observability/           # 可观测性
+│   ├── orchestra/               # 编排中枢
+│   ├── prompts/                 # Prompt 组装与变量解析
+│   ├── roles/                   # 角色定义与执行模块
+│   ├── runtime/                 # 事件驱动运行时
+│   ├── server/                  # HTTP / MCP / health 服务
+│   ├── services/                # 业务逻辑
+│   ├── ui/                      # CLI 输出格式化
+│   └── utils/                   # 工具函数
 │
 ├── lib/                         # V2 Shell 核心逻辑
 │   ├── *.sh                     # 各功能模块
