@@ -229,8 +229,24 @@ class CheckService(CheckRemote):
         if flow_status not in ("done", "aborted", "stale"):
             for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
                 ref_value = flow_data.get(ref_field)
-                if ref_value and not Path(ref_value).exists():
-                    issues.append(f"{ref_field} file not found: {ref_value}")
+                if ref_value:
+                    # Resolve path relative to the flow's worktree, not current worktree
+                    from vibe3.utils.path_helpers import resolve_ref_path
+
+                    worktree_path = self.git_client.find_worktree_path_for_branch(
+                        branch
+                    )
+                    resolved_path = resolve_ref_path(
+                        ref_value,
+                        worktree_root=str(worktree_path) if worktree_path else None,
+                        absolute=True,
+                    )
+                    if resolved_path and not Path(resolved_path).exists():
+                        # Provide actionable suggestion for damaged flow
+                        issues.append(
+                            f"{ref_field} file not found: {ref_value}. "
+                            f"Suggestion: Run 'vibe3 task resume --blocked {task_issue}' to reset."
+                        )
 
         # shared current.md
         if flow_status not in ("done", "aborted", "stale") and requires_handoff(
@@ -358,6 +374,15 @@ class CheckService(CheckRemote):
         self, status: str | list[str] | None = "active"
     ) -> list[CheckResult]:
         """Run consistency checks for flows in the store."""
+        # Initialize PR cache (optimization: 1 API call instead of N)
+        if not hasattr(self, "_branch_to_pr"):
+            try:
+                all_prs = self.github_client.list_all_prs(state="all")
+                self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+            except Exception as exc:
+                logger.bind(domain="check").warning(f"Failed to fetch PRs: {exc}")
+                self._branch_to_pr = {}
+
         all_flows = self.store.get_all_flows()
         if status:
             statuses = [status] if isinstance(status, str) else status
