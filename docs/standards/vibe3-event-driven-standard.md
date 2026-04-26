@@ -243,10 +243,20 @@ publish(event)
 
 ```python
 def register_event_handlers() -> None:
-    register_governance_handlers()         # L1
-    register_supervisor_apply_handlers()   # L2
-    register_flow_lifecycle_handlers()     # L3
-    register_manager_handlers()            # L3
+    """Register all event handlers with the global publisher.
+
+    Registration order:
+    1. L3 Flow Lifecycle handlers
+    2. L3 Issue-state role dispatch handlers
+    3. L3 Dispatch handlers (planner/executor/reviewer)
+    4. L1 Governance scan handler
+    5. L2 Supervisor scan handler
+    """
+    register_flow_lifecycle_handlers()
+    register_issue_state_dispatch_handlers()
+    register_dispatch_handlers()
+    register_governance_scan_handlers()
+    register_supervisor_scan_handlers()
 ```
 
 ### 5.2 注册调用
