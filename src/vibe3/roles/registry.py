@@ -22,6 +22,14 @@ from vibe3.roles.run import (
     EXECUTOR_ROLE,
 )
 
+BLOCKED_ROLE = TriggerableRoleDefinition(
+    name="qualify-gate-unblocker",
+    registry_role="none",
+    worktree="none",  # type: ignore[arg-type]
+    trigger_name="blocked",
+    trigger_state=IssueState.BLOCKED,
+)
+
 LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
     MANAGER_ROLE,
     HANDOFF_MANAGER_ROLE,
@@ -29,6 +37,7 @@ LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (
     EXECUTOR_ROLE,
     EXECUTOR_PUBLISH_ROLE,
     REVIEWER_ROLE,
+    BLOCKED_ROLE,
 )
 
 
@@ -50,6 +59,9 @@ def build_label_dispatch_event(
     the request before calling the role builder.
     """
     trigger = role.trigger_name
+    if trigger == "blocked":
+        # Should not be dispatched directly; handled entirely within qualify gate
+        raise ValueError("BLOCKED_ROLE cannot be dispatched directly")
     if trigger == "manager":
         return ManagerDispatchIntent(
             issue_number=issue.number,

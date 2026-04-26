@@ -308,12 +308,12 @@ class TestDependencySatisfactionCheck:
         assert result is True
 
     def test_issue_with_state_done_label_satisfies(self) -> None:
-        """Issue with state/done label should be considered satisfied."""
+        """Closed issue with state/done label satisfies dependency."""
         config = OrchestraConfig()
         github = MagicMock()
         github.view_issue.return_value = {
             "number": 301,
-            "state": "open",
+            "state": "closed",
             "labels": [{"name": "state/done"}],
             "body": "No PR reference in body",
         }
@@ -328,12 +328,12 @@ class TestDependencySatisfactionCheck:
         assert result is True
 
     def test_issue_with_state_merged_label_satisfies(self) -> None:
-        """Issue with state/merged label should be considered satisfied."""
+        """Closed issue with state/merged label satisfies dependency."""
         config = OrchestraConfig()
         github = MagicMock()
         github.view_issue.return_value = {
             "number": 301,
-            "state": "open",
+            "state": "closed",
             "labels": [{"name": "state/merged"}],
             "body": "No PR reference in body",
         }
@@ -347,8 +347,11 @@ class TestDependencySatisfactionCheck:
         result = service._is_dependency_satisfied(301)
         assert result is True
 
-    def test_issue_with_pr_mention_in_body_satisfies(self) -> None:
-        """Issue mentioning PR in body should be considered satisfied."""
+    def test_issue_with_pr_mention_in_body_does_not_satisfy(self) -> None:
+        """Open issue with PR mention in body does NOT satisfy dependency.
+
+        Only issue.state == 'closed' is the truth source for dependency satisfaction.
+        """
         config = OrchestraConfig()
         github = MagicMock()
         github.view_issue.return_value = {
@@ -365,7 +368,7 @@ class TestDependencySatisfactionCheck:
         )
 
         result = service._is_dependency_satisfied(301)
-        assert result is True
+        assert result is False
 
     def test_open_issue_without_pr_does_not_satisfy(self) -> None:
         """Open issue without PR reference should NOT be considered satisfied."""

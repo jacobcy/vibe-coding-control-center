@@ -100,14 +100,14 @@ class StateLabelDispatchService(ServiceBase):
     async def collect_ready_issues(self) -> list[IssueInfo]:
         """Scan and return ready issues without dispatching.
 
-        Also polls state/blocked issues to perform automatic unblocking.
+        BLOCKED_ROLE collects blocked issues without a qualify gate;
+        the gate runs at intent time in GlobalDispatchCoordinator.
 
         Returns:
             Filtered and sorted ready issues list.
         """
         async with self._dispatch_guard:
-            # Poll issues matching this role's trigger state
-            trigger_issues = await asyncio.get_event_loop().run_in_executor(
+            raw_issues = await asyncio.get_event_loop().run_in_executor(
                 self._executor,
                 lambda: self._github.list_issues(
                     limit=100,
@@ -117,23 +117,6 @@ class StateLabelDispatchService(ServiceBase):
                     label=self.role_def.trigger_state.to_label(),
                 ),
             )
-            # ALSO poll blocked issues for this dispatcher to perform patrol
-            blocked_issues = await asyncio.get_event_loop().run_in_executor(
-                self._executor,
-                lambda: self._github.list_issues(
-                    limit=100,
-                    state="open",
-                    assignee=None,
-                    repo=self.config.repo,
-                    label=IssueState.BLOCKED.to_label(),
-                ),
-            )
-
-            # Merge and deduplicate
-            raw_issues_map = {item["number"]: item for item in trigger_issues}
-            for item in blocked_issues:
-                raw_issues_map[item["number"]] = item
-            raw_issues = list(raw_issues_map.values())
 
             ready = self._select_ready_issues(raw_issues)
 
@@ -243,10 +226,17 @@ class StateLabelDispatchService(ServiceBase):
             if issue is None:
                 continue
 
+            # BLOCKED_ROLE: collect all candidates without qualify gate.
+            # Gate runs at intent time in GlobalDispatchCoordinator.
+            if self.role_def.trigger_name == "blocked":
+                selected.append(issue)
+                continue
+
             branch, flow_state = self._flow_context(issue.number)
 
-            # Qualify Gate
-            if not self._run_qualify_gate(issue, branch, flow_state, labels):
+            # Qualify Gate — returns target state or None if blocked
+            target = self._run_qualify_gate(issue, branch, flow_state, labels)
+            if target is None or target != self.role_def.trigger_state:
                 continue
 
             # Role-specific branch existence requirements
@@ -282,29 +272,28 @@ class StateLabelDispatchService(ServiceBase):
         branch: str,
         flow_state: dict[str, object] | None,
         labels: list[str],
-    ) -> bool:
+    ) -> IssueState | None:
         """Run the Qualify Gate for an issue to resolve dependencies and blocking.
 
         Returns:
-            True if the issue passes the gate and should be dispatched by
-            THIS dispatcher.
+            Target IssueState if the issue passes the gate and can be dispatched,
+            None if the issue is blocked and should be skipped.
         """
         if not flow_state:
             if IssueState.BLOCKED.to_label() in labels:
-                # Local state missing but remote is blocked -> skip
                 append_orchestra_event(
                     "dispatcher",
                     f"{self.service_name} skip #{issue.number}: "
                     "local flow state missing but remote is blocked",
                 )
-                return False
-            # For manager entry point on new issues
-            return self.role_def.trigger_state.to_label() in labels
+                return None
+            if self.role_def.trigger_state.to_label() in labels:
+                return self.role_def.trigger_state
+            return None
 
         # Step 1: Check manual block
         blocked_reason = flow_state.get("blocked_reason")
         if blocked_reason and str(blocked_reason).strip():
-            # Missing remote blocked label but locally blocked manually
             if IssueState.BLOCKED.to_label() not in labels:
                 try:
                     label_port = GhIssueLabelPort(repo=self.config.repo)
@@ -313,7 +302,7 @@ class StateLabelDispatchService(ServiceBase):
                     logger.bind(domain="orchestra").warning(
                         f"Failed to add state/blocked: {exc}"
                     )
-            return False
+            return None
 
         # Step 2: Check dependency block
         dependencies = self._get_issue_dependencies(issue.number)
@@ -344,15 +333,23 @@ class StateLabelDispatchService(ServiceBase):
                     "orchestra:dispatcher",
                     detail="Blocked by unresolved dependencies",
                 )
-            return False
+            return None
 
-        # Step 3: Automatic unblock and dispatch
+        # Step 3: All clear — determine target and perform unblock side effects
+
+        # Issue is not in blocked state: confirm trigger label (no unblock needed)
+        if IssueState.BLOCKED.to_label() not in labels and not flow_state.get(
+            "blocked_by_issue"
+        ):
+            if self.role_def.trigger_state.to_label() in labels:
+                return self.role_def.trigger_state
+            return None
+
         from vibe3.models.flow import FlowState
 
         fs_obj = FlowState.model_validate(flow_state)
         target_label = infer_resume_label(fs_obj)
 
-        unblocked = False
         if flow_state.get("blocked_by_issue"):
             dep_issue = flow_state.get("blocked_by_issue")
             source_pr = None
@@ -363,7 +360,7 @@ class StateLabelDispatchService(ServiceBase):
                         source_pr = df.get("pr_number")
                         break
 
-            refs = {}
+            refs: dict[str, str] = {}
             if source_pr:
                 refs["source_pr"] = str(source_pr)
 
@@ -379,7 +376,6 @@ class StateLabelDispatchService(ServiceBase):
                 detail=f"Dependencies satisfied, target: {target_label.value}",
                 refs=refs if refs else None,
             )
-            unblocked = True
 
         if IssueState.BLOCKED.to_label() in labels:
             try:
@@ -391,13 +387,16 @@ class StateLabelDispatchService(ServiceBase):
                 logger.bind(domain="orchestra").warning(
                     f"Failed to sync unblocked labels for #{issue.number}: {exc}"
                 )
-            unblocked = True
 
-        # H3: If we just unblocked, skip dispatch in this tick.
-        # This allows the unblocked labels to propagate and avoids
-        # race conditions/ambiguous dispatcher states.
-        if unblocked:
-            return False
+        return target_label
 
-        # If no unblock happened, just check if the label matches our trigger state.
-        return self.role_def.trigger_state.to_label() in labels
+    def qualify_blocked_issue(self, issue: IssueInfo) -> IssueState | None:
+        """Run qualify gate for a blocked issue at dispatch intent time.
+
+        Called by GlobalDispatchCoordinator instead of collection-time scanning.
+
+        Returns:
+            Target IssueState to dispatch to, or None if still blocked.
+        """
+        branch, flow_state = self._flow_context(issue.number)
+        return self._run_qualify_gate(issue, branch, flow_state, list(issue.labels))
