@@ -25,6 +25,7 @@ def _make_operations() -> TaskResumeOperations:
 
 
 def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
+    """Test that reset_task_scene uses FlowCleanupService for complete cleanup."""
     operations = _make_operations()
     operations.git_client.find_worktree_path_for_branch.return_value = Path(
         "/tmp/issue-329"
@@ -32,32 +33,30 @@ def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
     operations.git_client.branch_exists.return_value = True
 
     with patch(
-        "vibe3.services.task_resume_operations.HandoffService"
-    ) as mock_handoff_cls:
-        # Mock the HandoffService instance and its storage attribute
-        mock_handoff_instance = MagicMock()
-        mock_storage = MagicMock()
-        mock_handoff_instance.storage = mock_storage
-        mock_handoff_cls.return_value = mock_handoff_instance
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup_instance = MagicMock()
+        mock_cleanup_instance.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": True,
+            "handoff": True,
+            "flow_record": True,
+        }
+        mock_cleanup_cls.return_value = mock_cleanup_instance
 
         operations.reset_task_scene("task/issue-329")
 
-    operations.git_client.remove_worktree.assert_called_once_with(
-        "/tmp/issue-329", force=True
-    )
-    operations.git_client.delete_branch.assert_called_once_with(
-        "task/issue-329",
-        force=True,
-        skip_if_worktree=True,
-    )
-    # Verify HandoffService was instantiated with correct parameters
-    mock_handoff_cls.assert_called_once_with(
-        store=operations.flow_service.store,
-        git_client=operations.git_client,
-    )
-    # Verify storage.clear_handoff_for_branch was called
-    mock_storage.clear_handoff_for_branch.assert_called_once_with("task/issue-329")
-    operations.flow_service.delete_flow.assert_called_once_with("task/issue-329")
+        # Verify FlowCleanupService was instantiated
+        mock_cleanup_cls.assert_called_once()
+
+        # Verify cleanup_flow_scene was called with correct parameters
+        mock_cleanup_instance.cleanup_flow_scene.assert_called_once_with(
+            "task/issue-329",
+            include_remote=True,
+            terminate_sessions=True,
+            keep_flow_record=False,  # Resume always deletes flow record
+        )
 
 
 def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
@@ -73,10 +72,17 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
     mock_flow.branch = "task/issue-303"
 
     with patch(
-        "vibe3.services.task_resume_operations.HandoffService"
-    ) as mock_handoff_cls:
-        handoff_service = MagicMock()
-        mock_handoff_cls.return_value = handoff_service
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup_instance = MagicMock()
+        mock_cleanup_instance.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": True,
+            "handoff": True,
+            "flow_record": True,
+        }
+        mock_cleanup_cls.return_value = mock_cleanup_instance
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -88,9 +94,8 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
             label_state=None,  # ← No --label
         )
 
-    # Verify: worktree deleted (reset_task_scene called)
-    operations.git_client.remove_worktree.assert_called_once()
-    operations.git_client.delete_branch.assert_called_once()
+        # Verify: cleanup_flow_scene was called (via reset_task_scene)
+        mock_cleanup_instance.cleanup_flow_scene.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:

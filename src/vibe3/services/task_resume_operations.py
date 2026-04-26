@@ -6,14 +6,11 @@ managing flow states during resume operations.
 
 from __future__ import annotations
 
-import subprocess
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.models.orchestration import IssueState
-from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
     resume_failed_issue_to_ready,
@@ -164,98 +161,44 @@ class TaskResumeOperations:
         Flow record deletion is guaranteed even if worktree/branch/handoff
         cleanup fails partially — a stale flow record is the root cause of
         phantom downstream dispatches (issue #301).
+
+        This method uses FlowCleanupService for consistent cleanup behavior
+        across `task resume` and `check --clean-branch`.
+
+        Note: Always deletes flow record (keep_flow_record=False) because
+        the purpose of `task resume` is to restart the flow from scratch.
         """
-        is_task = self.issue_flow_service.is_task_branch(branch)
+        from vibe3.services.flow_cleanup_service import FlowCleanupService
 
-        try:
-            if is_task:
-                self.terminate_task_sessions(branch)
+        logger.bind(
+            domain="resume",
+            action="reset_task_scene",
+            branch=branch,
+            worktree_path=worktree_path,
+        ).info("Resetting task scene")
 
-                resolved_path = worktree_path
-                if resolved_path is None:
-                    found_path = self.git_client.find_worktree_path_for_branch(branch)
-                    resolved_path = str(found_path) if found_path is not None else None
-                logger.bind(
-                    domain="resume",
-                    action="reset_task_scene",
-                    branch=branch,
-                    worktree_path=resolved_path,
-                ).info("Resetting task scene")
-                if resolved_path is not None:
-                    self.git_client.remove_worktree(resolved_path, force=True)
-                if self.git_client.branch_exists(branch):
-                    self.git_client.delete_branch(
-                        branch,
-                        force=True,
-                        skip_if_worktree=True,
-                    )
-                HandoffService(
-                    store=self.flow_service.store,
-                    git_client=self.git_client,
-                ).storage.clear_handoff_for_branch(branch)
-        except Exception as exc:
+        cleanup_service = FlowCleanupService(
+            git_client=self.git_client,
+            store=self.flow_service.store,
+            flow_service=self.flow_service,
+            issue_flow_service=self.issue_flow_service,
+        )
+
+        results = cleanup_service.cleanup_flow_scene(
+            branch,
+            include_remote=True,  # Delete remote branch for clean restart
+            terminate_sessions=True,
+            keep_flow_record=False,  # Delete flow record to allow fresh start
+        )
+
+        # Log if any step failed
+        failed_steps = [k for k, v in results.items() if not v]
+        if failed_steps:
             logger.bind(
                 domain="resume",
                 action="reset_task_scene_partial",
                 branch=branch,
-            ).warning(
-                f"Partial scene cleanup failed (flow will still be deleted): {exc}"
-            )
-
-        # Always delete the flow record — stale flows cause phantom dispatches
-        self.flow_service.delete_flow(branch)
-
-    def terminate_task_sessions(self, branch: str) -> None:
-        """Kill lingering tmux sessions for a task issue before resume."""
-        issue_number = self.issue_flow_service.parse_issue_number(branch)
-        if issue_number is None:
-            return
-
-        prefixes = (
-            get_manager_session_name(issue_number),
-            f"vibe3-plan-issue-{issue_number}",
-            f"vibe3-run-issue-{issue_number}",
-            f"vibe3-review-issue-{issue_number}",
-        )
-
-        try:
-            result = subprocess.run(
-                ["tmux", "ls"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-        except FileNotFoundError:
-            return
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="terminate_task_sessions",
-                branch=branch,
-            ).warning(f"Failed to inspect tmux sessions: {exc}")
-            return
-
-        if result.returncode != 0:
-            return
-
-        active_sessions: list[str] = []
-        for line in result.stdout.splitlines():
-            session_name = line.split(":", 1)[0].strip()
-            if any(
-                session_name == prefix or session_name.startswith(f"{prefix}-")
-                for prefix in prefixes
-            ):
-                active_sessions.append(session_name)
-
-        for session_name in active_sessions:
-            subprocess.run(
-                ["tmux", "kill-session", "-t", session_name],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
+            ).warning(f"Some cleanup steps failed: {', '.join(failed_steps)}")
 
     def restore_issue_state(
         self,

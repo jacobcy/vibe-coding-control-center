@@ -47,8 +47,14 @@ def execute_check_mode(
         )
 
     if mode == "clean_branch":
-        # Check and clean residual branches for done/aborted flows
-        result = service.clean_residual_branches()
+        # Use dedicated cleanup service for --clean-branch
+        from vibe3.services.check_cleanup_service import CheckCleanupService
+
+        cleanup_service = CheckCleanupService(
+            store=service.store,
+            git_client=service.git_client,
+        )
+        result = cleanup_service.clean_residual_branches()
         return ExecuteCheckResult(
             mode="clean_branch",
             success=True,

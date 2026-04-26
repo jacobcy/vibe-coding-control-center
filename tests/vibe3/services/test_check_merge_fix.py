@@ -11,6 +11,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse, PRState
+from vibe3.services.check_cleanup_service import CheckCleanupService
 from vibe3.services.check_service import CheckService
 
 
@@ -44,6 +45,15 @@ def check_service(mock_store, mock_git_client, mock_github_client):
         store=mock_store,
         git_client=mock_git_client,
         github_client=mock_github_client,
+    )
+
+
+@pytest.fixture
+def cleanup_service(mock_store, mock_git_client):
+    """Create a CheckCleanupService instance with mocked dependencies."""
+    return CheckCleanupService(
+        store=mock_store,
+        git_client=mock_git_client,
     )
 
 
@@ -275,12 +285,12 @@ class TestAutoFix:
 
 
 class TestCleanResidualBranches:
-    """Tests for clean_residual_branches method."""
+    """Tests for clean_residual_branches method in CheckCleanupService."""
 
     def test_clean_residual_branches_removes_done_flow_branches(
-        self, check_service, mock_store, mock_git_client
+        self, cleanup_service, mock_store, mock_git_client
     ):
-        """Should clean branches for done/aborted flows."""
+        """Should clean physical resources for done flows but keep flow record."""
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
             {"branch": "feature/active-branch", "flow_status": "active"},
@@ -289,16 +299,21 @@ class TestCleanResidualBranches:
         mock_git_client._run.return_value = "feature/done-branch"
         mock_git_client.find_worktree_path_for_branch.return_value = None
 
-        result = check_service.clean_residual_branches()
+        result = cleanup_service.clean_residual_branches()
 
-        assert "feature/done-branch" in result["cleaned"]
-        assert len(result["cleaned"]) == 1
+        # Done flow should be in kept_records (physical resources cleaned, record kept)
+        assert "feature/done-branch" in result["kept_records"]
+        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows only
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_skips_when_no_resources(
-        self, check_service, mock_store, mock_git_client
+        self, cleanup_service, mock_store, mock_git_client
     ):
-        """Should skip when no local/remote/worktree exists."""
+        """Should preserve done/merged flow records even without physical resources.
+
+        Done/merged flows keep their records as completion history.
+        Only aborted flows have their records deleted.
+        """
         mock_store.get_all_flows.return_value = [
             {"branch": "feature/done-branch", "flow_status": "done"},
         ]
@@ -306,13 +321,35 @@ class TestCleanResidualBranches:
         mock_git_client._run.return_value = ""
         mock_git_client.find_worktree_path_for_branch.return_value = None
 
-        result = check_service.clean_residual_branches()
+        result = cleanup_service.clean_residual_branches()
 
-        assert len(result["cleaned"]) == 0
+        # Done flow record should be preserved (in kept_records, not cleaned)
+        assert len(result["kept_records"]) == 1
+        assert "feature/done-branch" in result["kept_records"]
+        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_aborted_deletes_record(
+        self, cleanup_service, mock_store, mock_git_client
+    ):
+        """Should delete aborted flow records to allow issue restart."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/aborted-branch", "flow_status": "aborted"},
+        ]
+        # Simulate no resources exist
+        mock_git_client._run.return_value = ""
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = cleanup_service.clean_residual_branches()
+
+        # Aborted flow record should be deleted (in cleaned)
+        assert len(result["cleaned"]) == 1
+        assert "feature/aborted-branch" in result["cleaned"]
+        assert len(result["kept_records"]) == 0  # kept_records is for done/merged
         assert result["total_flows_checked"] == 1
 
     def test_clean_residual_branches_removes_invalid_records(
-        self, check_service, mock_store, mock_git_client
+        self, cleanup_service, mock_store, mock_git_client
     ):
         """Should remove HEAD records from database."""
         mock_store.get_all_flows.return_value = [
@@ -320,13 +357,13 @@ class TestCleanResidualBranches:
             {"branch": "HEAD~1", "flow_status": "aborted"},
         ]
 
-        result = check_service.clean_residual_branches()
+        result = cleanup_service.clean_residual_branches()
 
         assert len(result["removed_invalid"]) == 2
         assert mock_store.delete_flow.call_count == 2
 
     def test_clean_residual_branches_handles_partial_failures(
-        self, check_service, mock_store, mock_git_client
+        self, cleanup_service, mock_store, mock_git_client
     ):
         """Should continue cleaning even if some fail."""
         mock_store.get_all_flows.return_value = [
@@ -347,7 +384,7 @@ class TestCleanResidualBranches:
         mock_git_client._run.side_effect = mock_run
         mock_git_client.find_worktree_path_for_branch.return_value = None
 
-        result = check_service.clean_residual_branches()
+        result = cleanup_service.clean_residual_branches()
 
         # Should have some result despite failures
         assert "failed" in result
