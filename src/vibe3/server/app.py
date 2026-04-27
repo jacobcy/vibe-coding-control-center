@@ -264,8 +264,9 @@ def start(
             raise typer.Exit(1)
 
     # Add visual separator for new server start
+    separator_width = 60  # Standard width for readability
     typer.echo("")  # Blank line
-    typer.echo("=" * 60)  # Separator line
+    typer.echo("=" * separator_width)  # Separator line
     typer.echo("")  # Blank line
 
     typer.echo(

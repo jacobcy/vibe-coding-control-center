@@ -219,8 +219,11 @@ class FailedGate:
 
         # Check for failed_reason field in issue body
         # Format: **failed_reason**: <value>
+        # Use MULTILINE flag for more robust matching
         match = re.search(
-            r"\*\*failed_reason\*\*:\s*(.+?)(?:\n|$)", body, re.IGNORECASE
+            r"\*\*failed_reason\*\*:\s*([^\n]+?)(?:\n|$)",
+            body,
+            re.IGNORECASE | re.MULTILINE,
         )
         if match:
             reason_value = match.group(1).strip()
