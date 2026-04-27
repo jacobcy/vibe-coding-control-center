@@ -94,8 +94,10 @@ def _resolve_manager_token(config: OrchestraConfig) -> str | None:
                             f"Manager token loaded from {keys_path}"
                         )
                         return value
-    except Exception:
-        pass
+    except (OSError, UnicodeDecodeError) as e:
+        logger.bind(domain="manager").debug(
+            f"Failed to read keys.env for manager token: {e}"
+        )
 
     return None
 
