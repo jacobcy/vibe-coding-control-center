@@ -134,6 +134,69 @@ def normalize_ref_path(
     return ref_value
 
 
+def _resolve_absolute_path(
+    ref_path: Path,
+    root_path: Path,
+    absolute: bool,
+) -> str:
+    """Resolve absolute path to relative or absolute form.
+
+    Priority:
+    1. Relative to worktree root (agent's local files)
+    2. Relative to git common dir (shared artifacts)
+    3. Return as absolute path
+    """
+    if absolute:
+        return str(ref_path)
+
+    # Priority 1: Relative to worktree root (agent's local files)
+    try:
+        return str(ref_path.relative_to(root_path))
+    except ValueError:
+        pass
+
+    # Priority 2: Relative to git common dir (shared artifacts)
+    try:
+        git_common = Path(_get_git_client().get_git_common_dir())
+        if git_common and str(ref_path).startswith(str(git_common)):
+            return str(ref_path.relative_to(git_common))
+    except (OSError, ValueError):
+        pass
+
+    return str(ref_path)
+
+
+def _resolve_relative_path(
+    ref_path: Path,
+    root_path: Path,
+    absolute: bool,
+) -> str:
+    """Resolve relative path by checking worktree and git common dir.
+
+    Priority:
+    1. Worktree root (usually local files like docs/plans)
+    2. Git common dir (usually shared artifacts in .git/vibe3)
+    3. Return as-is
+    """
+    # Priority 1: Worktree root (usually local files like docs/plans)
+    worktree_resolved = root_path / ref_path
+    if worktree_resolved.exists():
+        return str(worktree_resolved.absolute()) if absolute else str(ref_path)
+
+    # Priority 2: Git common dir (usually shared artifacts in .git/vibe3)
+    try:
+        git_common = Path(_get_git_client().get_git_common_dir())
+        if git_common:
+            git_resolved = git_common / ref_path
+            if git_resolved.exists():
+                return str(git_resolved.absolute()) if absolute else str(ref_path)
+    except (OSError, ValueError):
+        pass
+
+    # Fallback: return as-is
+    return str(ref_path)
+
+
 def resolve_ref_path(
     ref_value: str | None,
     worktree_root: str | None = None,
@@ -156,52 +219,20 @@ def resolve_ref_path(
     try:
         ref_path = Path(ref_value)
 
-        # 1. Resolve worktree root
+        # Resolve worktree root
         if not worktree_root:
-            git_client = _get_git_client()
             try:
-                worktree_root = git_client.get_worktree_root()
+                worktree_root = _get_git_client().get_worktree_root()
             except (OSError, ValueError):
                 worktree_root = ""
 
         root_path = Path(worktree_root) if worktree_root else Path.cwd()
 
-        # 2. Handle Absolute Paths
+        # Dispatch to specialized resolvers
         if ref_path.is_absolute():
-            if not absolute:
-                # Priority 1: Relative to worktree root (agent's local files)
-                try:
-                    return str(ref_path.relative_to(root_path))
-                except ValueError:
-                    pass
-
-                # Priority 2: Relative to git common dir (shared artifacts)
-                try:
-                    git_common = Path(_get_git_client().get_git_common_dir())
-                    if git_common and str(ref_path).startswith(str(git_common)):
-                        return str(ref_path.relative_to(git_common))
-                except (OSError, ValueError):
-                    pass
-            return str(ref_path)
-
-        # 3. Handle Relative Paths (portable format)
-        # Priority 1: Worktree root (usually local files like docs/plans)
-        worktree_resolved = root_path / ref_path
-        if worktree_resolved.exists():
-            return str(worktree_resolved.absolute()) if absolute else str(ref_path)
-
-        # Priority 2: Git common dir (usually shared artifacts in .git/vibe3)
-        try:
-            git_common = Path(_get_git_client().get_git_common_dir())
-            if git_common:
-                git_resolved = git_common / ref_path
-                if git_resolved.exists():
-                    return str(git_resolved.absolute()) if absolute else str(ref_path)
-        except (OSError, ValueError):
-            pass
-
-        # Fallback: return as-is
-        return ref_value
+            return _resolve_absolute_path(ref_path, root_path, absolute)
+        else:
+            return _resolve_relative_path(ref_path, root_path, absolute)
     except Exception:
         # Fallback: just show the raw value
         return ref_value
@@ -270,51 +301,52 @@ def check_ref_exists(
         return (ref_value, False)
 
 
-def resolve_handoff_target(
+def _resolve_shared_artifact(
     target: str,
-    branch: str | None = None,
-    git_client: GitClientProtocol | None = None,
+    git_client: GitClientProtocol,
 ) -> Path:
-    """Resolve a handoff show target into an absolute file path.
+    """Resolve @prefix shared artifact path.
 
-    Three namespaces:
+    Args:
+        target: Target string with @ prefix (e.g., "@task-xxx/run.md")
+        git_client: Git client for path resolution
 
-    1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
-       The ``@`` is stripped and the remainder is joined to the handoff dir.
-       ``branch`` is ignored for shared artifacts.
-
-    2. ``relative/path`` → canonical worktree ref.
-       Resolved against the target branch's worktree root (or current worktree
-       when ``branch`` is None).
-
-    3. ``/abs/path`` → absolute path passthrough (debug fallback).
+    Returns:
+        Absolute path to the shared artifact
 
     Raises:
-        FileNotFoundError: If the resolved path does not exist.
+        FileNotFoundError: If git common dir unavailable or artifact not found
     """
-    git_client = _get_git_client(git_client)
+    key = target[1:]  # Strip @ prefix
+    git_common = get_git_common_dir(git_client)
+    if not git_common:
+        raise FileNotFoundError(
+            f"Cannot resolve shared artifact without git common dir: {target}"
+        )
+    resolved = Path(git_common) / "vibe3" / "handoff" / key
+    if not resolved.exists():
+        raise FileNotFoundError(f"Shared artifact not found: {target}")
+    return resolved
 
-    # Namespace 1: @ prefix → shared handoff store
-    if target.startswith("@"):
-        key = target[1:]
-        git_common = get_git_common_dir(git_client)
-        if not git_common:
-            raise FileNotFoundError(
-                f"Cannot resolve shared artifact without git common dir: {target}"
-            )
-        resolved = Path(git_common) / "vibe3" / "handoff" / key
-        if not resolved.exists():
-            raise FileNotFoundError(f"Shared artifact not found: {target}")
-        return resolved
 
-    # Namespace 3: absolute path → passthrough
-    target_path = Path(target)
-    if target_path.is_absolute():
-        if not target_path.exists():
-            raise FileNotFoundError(f"File not found: {target}")
-        return target_path
+def _resolve_worktree_artifact(
+    target: str,
+    branch: str | None,
+    git_client: GitClientProtocol,
+) -> Path:
+    """Resolve worktree-relative artifact path.
 
-    # Namespace 2: relative path → worktree canonical ref
+    Args:
+        target: Relative path to artifact
+        branch: Optional branch name for strict worktree resolution
+        git_client: Git client for path resolution
+
+    Returns:
+        Absolute path to the artifact
+
+    Raises:
+        FileNotFoundError: If artifact not found in any worktree context
+    """
     if branch:
         # Strict mode: when branch is explicitly given, only resolve within
         # that branch's worktree. Never fall back to current worktree or CWD,
@@ -342,6 +374,46 @@ def resolve_handoff_target(
         return cwd_resolved
 
     raise FileNotFoundError(f"Artifact not found: {target}")
+
+
+def resolve_handoff_target(
+    target: str,
+    branch: str | None = None,
+    git_client: GitClientProtocol | None = None,
+) -> Path:
+    """Resolve a handoff show target into an absolute file path.
+
+    Three namespaces:
+
+    1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+       The ``@`` is stripped and the remainder is joined to the handoff dir.
+       ``branch`` is ignored for shared artifacts.
+
+    2. ``relative/path`` → canonical worktree ref.
+       Resolved against the target branch's worktree root (or current worktree
+       when ``branch`` is None).
+
+    3. ``/abs/path`` → absolute path passthrough (debug fallback).
+
+    Raises:
+        FileNotFoundError: If the resolved path does not exist.
+    """
+    git_client = _get_git_client(git_client)
+
+    # Namespace 1: @ prefix → shared handoff store
+    if target.startswith("@"):
+        return _resolve_shared_artifact(target, git_client)
+
+    target_path = Path(target)
+
+    # Namespace 3: absolute path → passthrough
+    if target_path.is_absolute():
+        if not target_path.exists():
+            raise FileNotFoundError(f"File not found: {target}")
+        return target_path
+
+    # Namespace 2: relative path → worktree canonical ref
+    return _resolve_worktree_artifact(target, branch, git_client)
 
 
 def is_shared_handoff_ref(ref_value: str) -> bool:
