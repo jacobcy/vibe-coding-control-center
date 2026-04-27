@@ -102,6 +102,7 @@ uv run python src/vibe3/cli.py inspect files <file>
 ```
 
 必须检查：
+
 1. 改动的每个函数/类，谁在调用它
 2. 移除的函数/类，是否还有调用者残留
 3. 签名变更是否波及所有调用方
@@ -109,6 +110,7 @@ uv run python src/vibe3/cli.py inspect files <file>
 ### 2.2 补充：精确字符串查找
 
 只在需要精确字面量时使用 `rg`：
+
 - 查错误消息、配置 key、prompt 文案
 - 查固定路径、文件名、常量名
 
@@ -129,6 +131,7 @@ uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 ## 3. Review Standards (Vibe V3 Paradigm Gate)
 
 审查必须参考以下文件：
+
 - `.agent/policies/review.md` — 审查策略（正确性、回归、边界违规、安全性）
 - `.agent/policies/common.md` — 工具使用顺序和现场约束
 - `.agent/rules/python-standards.md` — Python 实现标准
@@ -136,7 +139,7 @@ uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 
 ### 3.1 代码质量门
 
-1. **LOC 限制**：检查改动文件是否触及 `config/settings.yaml` 中的单文件限制（default 300, max 400）和 exception 清单。新增文件不应一开始就接近上限。
+1. **LOC 限制**：检查改动文件是否触及 `config/loc_limits.yaml` 中的单文件限制（default 300, max 400）和 exception 清单。新增文件不应一开始就接近上限。
 2. **零死代码**：每个新增函数/类必须有明确调用者。使用 `vibe3 inspect symbols` 验证。无调用者的新增代码标记为 `Major`。
 3. **Python 标准**：类型注解完整（禁止 `Any`）、Pydantic 模型、分层架构不越界。
 4. **测试覆盖**：功能修复/新增必须伴随 `tests/vibe3/` 的对应修改。
@@ -145,11 +148,13 @@ uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 ### 3.2 死代码检测
 
 审查时必须检查：
+
 - 本次改动是否引入了无调用者的新函数/类/方法
 - 本次改动是否废弃了旧路径但未清理（兼容层残留、过时 import）
 - 本次改动是否留下了 unreachable 代码分支（永远为 True/False 的条件、空的 catch/except）
 
 发现死代码时：
+
 - 若为本次改动新增 → 标记 `Major`，要求清理
 - 若为历史遗留、本次改动触及附近 → 标记 `Minor`，记录线索供后续 issue
 - 若为历史遗留、本次改动未触及 → 不标记，但可在手记中提及
@@ -157,6 +162,7 @@ uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 ### 3.3 审查优先级
 
 按 `.agent/policies/review.md` 定义的优先级：
+
 1. **正确性** — 逻辑是否成立、边界条件、错误处理、输出契约
 2. **回归风险** — 公开命令行为、prompt/context 拼接、配置路径一致性
 3. **项目边界违规** — 绕过 handoff 真源、直接改共享状态、跨 worktree 假设
@@ -165,6 +171,7 @@ uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 ### 3.4 高风险审查点
 
 命中以下路径时提高强度：
+
 - `config/settings.yaml` 中 `review_scope.critical_paths` 定义的关键路径
 - `review_scope.public_api_paths` 定义的公开 API
 - `plan` / `review` / `run` 的 context builder
@@ -181,6 +188,7 @@ When the change touches documentation, you MUST also review it against:
 - `docs/standards/doc-quality-standards.md`
 
 Check these questions:
+
 1. Is the document acting within its role (`入口文件` / `标准文件` / `参考文件` / `规则文件`)?
 2. Does it redefine a concept that should only live in `glossary.md`?
 3. Does it use a high-frequency action verb in a way that conflicts with `action-verbs.md`?
