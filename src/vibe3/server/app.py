@@ -263,6 +263,12 @@ def start(
         if not ts_ok:
             raise typer.Exit(1)
 
+    # Add visual separator for new server start
+    separator_width = 60  # Standard width for readability
+    typer.echo("")  # Blank line
+    typer.echo("=" * separator_width)  # Separator line
+    typer.echo("")  # Blank line
+
     typer.echo(
         f"Starting Orchestra server on port {config.port} "
         f"(tick interval: {config.polling_interval}s, "

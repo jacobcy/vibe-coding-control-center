@@ -32,11 +32,18 @@ def test_failed_gate_blocked_with_explicit_reason() -> None:
     """Gate should extract explicit '原因:' or 'reason:' from latest comment."""
     with patch("subprocess.run") as mock_run:
         # Call 1: list_failed_issues
-        # Call 2: _extract_reason (view comments)
+        # Call 2: _check_failed_reason (view body)
+        # Call 3: _extract_reason (view comments)
         mock_run.side_effect = [
             MagicMock(
                 returncode=0,
                 stdout=json.dumps([{"number": 123, "title": "Fail title"}]),
+            ),
+            MagicMock(
+                returncode=0,
+                stdout=json.dumps(
+                    {"body": "**failed_reason**: network timeout\n\nContent"}
+                ),
             ),
             MagicMock(
                 returncode=0,
@@ -74,6 +81,10 @@ def test_failed_gate_blocked_with_summary_fallback() -> None:
             MagicMock(returncode=0, stdout=json.dumps([{"number": 123}])),
             MagicMock(
                 returncode=0,
+                stdout=json.dumps({"body": "**failed_reason**: manager timeout"}),
+            ),
+            MagicMock(
+                returncode=0,
                 stdout=json.dumps(
                     {
                         "comments": [
@@ -104,33 +115,50 @@ def test_failed_gate_error_handling() -> None:
         result = gate.check()
 
         assert result.blocked
-        assert "failed gate check error" in result.reason
+        reason = result.reason or ""
+        assert "failed gate check error" in reason
 
 
 def test_failed_gate_unblocks_after_resumed() -> None:
     """Gate should unblock after failed issue is resumed (label changed)."""
     with patch("subprocess.run") as mock_run:
-        # First call: issue has state/failed -> blocked
-        # Second call: issue no longer has state/failed -> open
+        # First check: issue has state/failed AND has reason -> blocked
+        # Call sequence: list_failed_issues, _check_failed_reason, _extract_reason
+        # Second check: issue no longer has state/failed -> open
         mock_run.side_effect = [
+            # First check: list_failed_issues
             MagicMock(
                 returncode=0,
                 stdout=json.dumps([{"number": 123, "title": "Failed issue"}]),
             ),
+            # First check: _check_failed_reason (has reason)
             MagicMock(
                 returncode=0,
-                stdout=json.dumps({"comments": []}),
+                stdout=json.dumps({"body": "**failed_reason**: timeout"}),
             ),
-            MagicMock(returncode=0, stdout="[]"),  # No more failed issues
+            # First check: _extract_reason
+            MagicMock(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "comments": [
+                            {"body": "Older comment", "url": "url1"},
+                            {"body": "原因: timeout", "url": "url2"},
+                        ]
+                    }
+                ),
+            ),
+            # Second check: list_failed_issues (empty - label removed by resume)
+            MagicMock(returncode=0, stdout="[]"),
         ]
 
         gate = FailedGate(repo="owner/repo")
 
-        # First check: blocked
+        # First check: blocked (has reason)
         result1 = gate.check()
         assert result1.blocked
         assert result1.issue_number == 123
 
-        # Second check: open (after resume)
+        # Second check: open (after resume removed failed label)
         result2 = gate.check()
         assert not result2.blocked

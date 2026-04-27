@@ -32,13 +32,15 @@ def test_serve_start_preflight_blocked() -> None:
                 # Mock _validate_pid_file to say no process running
                 with patch("vibe3.server.app._validate_pid_file") as mock_pid:
                     mock_pid.return_value = (None, False)
-                    result = runner.invoke(app, ["start"])
+                    with patch("vibe3.server.app.ensure_port_available"):
+                        result = runner.invoke(app, ["start"])
 
             assert result.exit_code == 1
-            assert "blocked by open state/failed issue" in result.stdout
-            assert "issue:  #123" in result.stdout
-            assert "reason: System down" in result.stdout
-            assert "transition it back to state/handoff" in result.stdout
+            output = result.output  # Combined stdout + stderr
+            assert "blocked by open state/failed issue" in output
+            assert "issue:  #123" in output
+            assert "reason: System down" in output
+            assert "transition it back to state/handoff" in output
 
 
 @pytest.mark.asyncio
