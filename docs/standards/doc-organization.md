@@ -24,9 +24,9 @@ related_docs:
 
 本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
-本文档定义 Vibe Center 2.0 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式完全对齐。
-任务身份以 GitHub issue 为准；需要长期留存的结论写入 issue comment 或 PR comment。
-旧任务目录里残留的 `plan-*` / `audit-*` 文件只作为历史归档，不改变新 plan / report 的默认落点。
+本文档定义 Vibe Center 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式对齐。
+任务身份以 GitHub issue 为准；正式 Spec / Plan / Report 分别落在 `docs/specs/`、`docs/plans/`、`docs/reports/`。
+旧的统一任务镜像目录不再作为默认组织方式；若历史文件仍存在，仅作为归档参考。
 
 ## 核心原则
 
@@ -43,20 +43,14 @@ docs/
 ├── standards/                       # 标准和规范文档
 │   ├── DOC_ORGANIZATION.md         # 本文档组织标准
 │   └── ...                         # 其他现行标准
+├── specs/                          # 规范文档
 ├── prds/                           # 产品需求文档（全局 PRD）
 │   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
 │   └── ...                         # 其他全局 PRD
+├── plans/                         # 执行计划
+├── reports/                       # 报告与总结
 ├── archive/                        # 历史文档归档
 │   └── ...                         # 已退役设计与历史任务文档
-└── tasks/                          # 任务文档（按 issue 组织）
-    └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
-        ├── README.md               # 任务概述、状态和导航
-        ├── prd-v1-initial.md       # PRD 层文档
-        ├── spec-v1-initial.md      # Spec 层文档
-        ├── plan-v1-initial.md      # Plan 层文档
-        ├── test-strategy.md        # Test 层文档
-        ├── code-implementation.md  # Code 层文档
-        └── audit-2024-01-15.md     # Review 层文档（AI 审计）
 
 AI 工作区中的临时产物与模板：
 - `.agent/plans/` - AI 临时计划
@@ -137,33 +131,28 @@ audit-{YYYY-MM-DD}.md
 
 ### 创建新任务
 
-1. **创建任务目录**：
+1. **创建对应目录**：
    ```bash
-   mkdir -p docs/tasks/2024-01-15-feature-name
+   mkdir -p docs/specs docs/plans docs/reports
    ```
 
-2. **从模板创建 README**：
+2. **从模板创建正式文档**：
    ```bash
-   cp .agent/templates/task-readme.md docs/tasks/2024-01-15-feature-name/README.md
+   cp .agent/templates/tech-spec.md docs/specs/<name>.md
+   cp .agent/templates/plan.md docs/plans/<name>.md
+   cp .agent/templates/prd.md docs/prds/<name>.md
    ```
 
-3. **替换占位符**：
-   - `{{TASK_ID}}` → `2024-01-15-feature-name`
-   - `{{TASK_TITLE}}` → `Feature Name`
-   - `{{DATE}}` → `2024-01-15`
+3. **替换占位符并填写内容**
 
-4. **创建 PRD 文档**：
-   ```bash
-   cp .agent/templates/prd.md docs/tasks/2024-01-15-feature-name/prd-v1-initial.md
-   ```
-
-5. **按 Vibe Guard 流程逐步创建其他文档**
-   - 计划和报告优先落到 `.agent/plans/`、`.agent/reports/`
+4. **按 Vibe Guard 流程逐步推进**
+   - 临时草稿优先写入 `.agent/plans/`、`.agent/reports/`
+   - 需要长期保留的正式版本写入 `docs/plans/`、`docs/reports/`
    - 长期结论写入 issue comment 或 PR comment
 
 ### 更新任务状态
 
-在任务 README.md 的 frontmatter 中更新：
+在对应文档的 frontmatter 中更新：
 
 ```yaml
 current_layer: "spec"  # 当前所在层级
@@ -186,7 +175,7 @@ gates:
 **重要**：所有模板文件位于 `.agent/templates/`（AI 工作区），而不是 `docs/templates/`（人类主权区）。
 
 这是因为：
-- `docs/` - 人类阅读的文档（PRD、Spec、任务文档等）
+- `docs/` - 人类阅读的文档（PRD、Spec、Plan、Report、归档等）
 - `.agent/` - AI 使用的工具（模板、规则、工作流、临时 plan/report 等）
 
 模板是 AI 用来生成文档的工具，应该放在 AI 工作区。

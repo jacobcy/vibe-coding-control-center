@@ -12,13 +12,14 @@ docs/
 │   ├── cognition-spec-dominion.md  # 宪法大纲：Vibe Guard 流程定义
 │   ├── ...                         # 其他现行标准
 │   └── v3/                          # V3 命令、数据、技能与 handoff 标准
+├── specs/                           # 规范文档
 ├── prds/                           # 产品需求文档（全局 PRD）
 │   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
 │   └── ...                         # 其他全局 PRD
+├── plans/                          # 执行计划
+├── reports/                        # 报告与总结
 ├── references/                     # 外部参考资料
 │   └── ...                         # 收集的外部文档、论文、资料等
-├── tasks/                          # 任务文档（按 issue 组织）
-│   └── {Task_ID}/                  # 任务镜像与导航
 ├── archive/                        # 历史归档
 └── ...                             # 其他现行文档
 ```
@@ -54,13 +55,27 @@ docs/
 
 **用途**：为项目决策和实现提供外部知识支持，不属于项目自身文档。
 
-### 任务文档 (`tasks/`)
-每个任务一个子目录，按 GitHub issue 组织任务镜像。
+### 规范文档 (`specs/`)
+按 issue / feature 组织的规范和实现约束文档。
 
 **原则**：
 - issue 是任务身份真源
-- task README 只做导航、状态和阶段记录
+- 规范文档记录接口契约、边界行为和实现约束
 - 需要长期保留的结论写到 issue comment 或 PR comment
+
+### 执行计划 (`plans/`)
+需要长期保留的计划文档与推进记录。
+
+**原则**：
+- 正式计划可以直接写入 `docs/plans/`
+- 临时草稿优先写入 `.agent/plans/`
+
+### 报告与总结 (`reports/`)
+长期保留的报告、审计和复盘文档。
+
+**原则**：
+- 正式报告可以直接写入 `docs/reports/`
+- 临时草稿优先写入 `.agent/reports/`
 
 ### 临时计划 (`.agent/plans/`)
 存放 Agent 生成的临时计划文档，不作为正式真源。
@@ -83,7 +98,7 @@ docs/
 
 **兼容说明**：
 - 旧任务目录里可能仍有 `plan-*` / `audit-*` 示例文件，它们只作为历史任务归档
-- 新的 plan / report 一律写入 `.agent/plans/` 和 `.agent/reports/`
+- 新的 plan / report 草稿写入 `.agent/plans/` 和 `.agent/reports/`，需要长期保留的正式版本写入 `docs/plans/` 和 `docs/reports/`
 
 ## 🚪 Vibe Guard 流程
 
@@ -102,27 +117,28 @@ docs/
 
 ### 创建新任务
 
-1. 创建任务目录：
+1. 创建对应目录：
    ```bash
-   mkdir -p docs/tasks/2024-01-15-feature-name
+   mkdir -p docs/specs docs/plans docs/reports
    ```
 
-2. 从模板创建文档（模板位于 `.agent/templates/`）：
+2. 从模板创建正式文档（模板位于 `.agent/templates/`）：
    ```bash
-   cp .agent/templates/task-readme.md docs/tasks/2024-01-15-feature-name/README.md
-   cp .agent/templates/prd.md docs/tasks/2024-01-15-feature-name/prd-v1-initial.md
+   cp .agent/templates/tech-spec.md docs/specs/<name>.md
+   cp .agent/templates/plan.md docs/plans/<name>.md
+   cp .agent/templates/prd.md docs/prds/<name>.md
    ```
 
 3. 替换占位符并填写内容
 
-4. 按 Vibe Guard 流程逐步推进，长期结论写入 issue comment 或 PR comment
+4. 按 Vibe Guard 流程逐步推进
+   - 临时草稿优先写入 `.agent/plans/`、`.agent/reports/`
+   - 需要长期保留的正式版本写入 `docs/plans/`、`docs/reports/`
+   - 长期结论写入 issue comment 或 PR comment
 
 ### 查看任务状态
 
-每个任务的 `README.md` 包含：
-- 当前所在层级
-- Vibe Guard 各 Gate 的通过状态
-- 文档导航链接
+对应文档可在 frontmatter 中记录当前层级、状态和 Gate 结果。
 
 ## 🔗 相关文档
 
@@ -135,14 +151,14 @@ docs/
 ## 📚 文档 vs AI 工作区
 
 **重要区分**：
-- **`docs/`** - 人类主权区，存放给人类阅读的正式规范、任务镜像和历史归档
+- **`docs/`** - 人类主权区，存放给人类阅读的正式规范、计划、报告和历史归档
 - **`.agent/`** - AI 工作区，存放 AI 使用的模板、规则、工作流和临时产物
 
-模板文件位于 `.agent/templates/`，临时计划与报告分别位于 `.agent/plans/` 和 `.agent/reports/`。
+模板文件位于 `.agent/templates/`，临时计划与报告分别位于 `.agent/plans/` 和 `.agent/reports/`；正式计划与报告分别位于 `docs/plans/` 和 `docs/reports/`。
 
 ## 🆘 需要帮助？
 
 - 阅读 [doc-organization.md](standards/doc-organization.md) 了解详细的文档组织标准
 - 阅读 [vibe-workflow-paradigm.md](prds/vibe-workflow-paradigm.md) 了解 Vibe Guard 范式
 - 阅读 [standards/v3/](standards/v3/) 了解 V3 的正式语义边界
-- 查看 `docs/tasks/` 中的现有任务作为参考
+- 查看 `docs/specs/`、`docs/plans/` 和 `docs/reports/` 中的现有文档作为参考
