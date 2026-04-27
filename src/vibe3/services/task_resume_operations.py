@@ -14,6 +14,7 @@ from vibe3.models.orchestration import IssueState
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
     resume_failed_issue_to_ready,
+    resume_issue,
 )
 
 if TYPE_CHECKING:
@@ -116,22 +117,14 @@ class TaskResumeOperations:
                 emit_progress(f"clearing reasons for branch {branch}")
                 self._clear_flow_reasons(branch, resume_kind)
 
-            emit_progress(f"setting issue state to {target_state.value}")
-            # Restore issue to target state
-            self.label_service.confirm_issue_state(
-                issue_number,
-                target_state,
-                actor="human:resume",
-                force=True,
-            )
-
-            # Add comment about label-based resume
-            self._add_label_resume_comment(
+            # Use unified resume_issue for event registration and state transition
+            emit_progress(f"resuming via unified handler to {target_state.value}")
+            resume_issue(
                 issue_number=issue_number,
-                resume_kind=resume_kind,
-                target_state=target_state,
-                repo=repo,
                 reason=reason,
+                from_state=resume_kind,
+                to_state=target_state,
+                repo=repo,
             )
             emit_progress("label resume done", status="done")
 
@@ -333,75 +326,3 @@ class TaskResumeOperations:
                 action="clear_flow_reasons",
                 branch=branch,
             ).warning(f"Failed to clear flow reasons: {exc}")
-
-    def _add_label_resume_comment(
-        self,
-        *,
-        issue_number: int,
-        resume_kind: str,
-        target_state: IssueState,
-        repo: str | None,
-        reason: str,
-    ) -> None:
-        """Add comment about label-based resume.
-
-        Args:
-            issue_number: GitHub issue number
-            resume_kind: Resume kind (failed, blocked, all)
-            target_state: Target state (HANDOFF or READY)
-            repo: Repository (owner/repo format, optional)
-            reason: Resume reason
-        """
-        try:
-            kind_label = {
-                "failed": "state/failed",
-                "blocked": "state/blocked",
-                "all": "task scene",
-            }.get(resume_kind, resume_kind)
-
-            comment_body = (
-                f"[resume] 已从 {kind_label} 恢复到 state/{target_state.value}。\n\n"
-                f"已清除 blocked_reason/failed_reason，保留 worktree现场。\n"
-                f"后续可在当前 worktree 继续推进。"
-            )
-
-            normalized_reason = reason.strip()
-            if normalized_reason:
-                comment_body += f"\n\n原因:{normalized_reason}"
-
-            # Deduplicate: skip if latest comment matches
-            issue_payload = self.github_client.view_issue(issue_number, repo=repo)
-            if isinstance(issue_payload, dict) and self._latest_comment_matches(
-                issue_payload, comment_body
-            ):
-                return
-
-            self.github_client.add_comment(
-                issue_number,
-                comment_body,
-                repo=repo,
-            )
-        except Exception as exc:
-            # Non-blocking: comment failure should not affect resume
-            logger.bind(
-                domain="resume",
-                action="add_label_resume_comment",
-                issue_number=issue_number,
-            ).warning(f"Failed to add label resume comment: {exc}")
-
-    def _latest_comment_matches(
-        self,
-        issue_payload: dict[str, object],
-        comment_body: str,
-    ) -> bool:
-        """Return True when the latest issue comment is the same comment."""
-        comments = issue_payload.get("comments")
-        if not isinstance(comments, list):
-            return False
-        normalized_comment = comment_body.strip()
-        for comment in reversed(comments):
-            if not isinstance(comment, dict):
-                continue
-            body = comment.get("body")
-            return isinstance(body, str) and body.strip() == normalized_comment
-        return False

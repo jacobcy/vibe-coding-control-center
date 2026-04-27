@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -284,27 +283,34 @@ class CheckService(CheckRemote):
 
         # ref files exist
         if flow_status not in self.INACTIVE_FLOW_STATUSES:
+            from vibe3.utils.path_helpers import check_ref_exists
+
             for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
                 ref_value = flow_data.get(ref_field)
                 if ref_value:
-                    # Resolve path relative to the flow's worktree, not current worktree
-                    from vibe3.utils.path_helpers import resolve_ref_path
+                    # Use unified check_ref_exists method
+                    display_path, exists = check_ref_exists(
+                        ref_value, branch, git_client=self.git_client
+                    )
 
-                    worktree_path = self.git_client.find_worktree_path_for_branch(
-                        branch
-                    )
-                    resolved_path = resolve_ref_path(
-                        ref_value,
-                        worktree_root=str(worktree_path) if worktree_path else None,
-                        absolute=True,
-                    )
-                    if resolved_path and not Path(resolved_path).exists():
-                        # Provide actionable suggestion for damaged flow
-                        issues.append(
-                            f"{ref_field} file not found: {ref_value}. "
-                            f"Suggestion: Run 'vibe3 task resume --blocked "
-                            f"{task_issue}' to reset."
+                    if not exists:
+                        # Check if worktree exists for better error message
+                        worktree_path = self.git_client.find_worktree_path_for_branch(
+                            branch
                         )
+                        if worktree_path is None:
+                            issues.append(
+                                f"{ref_field} cannot be verified: no worktree for "
+                                f"branch '{branch}'. Suggestion: Check if worktree "
+                                f"was accidentally deleted or run 'vibe3 task resume "
+                                f"--label handoff {task_issue}'."
+                            )
+                        else:
+                            issues.append(
+                                f"{ref_field} file not found: {ref_value}. "
+                                f"Suggestion: Run 'vibe3 task resume --blocked "
+                                f"{task_issue}' to reset."
+                            )
 
         # shared current.md
         if flow_status not in self.INACTIVE_FLOW_STATUSES and requires_handoff(

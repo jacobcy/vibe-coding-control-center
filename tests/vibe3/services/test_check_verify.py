@@ -182,7 +182,18 @@ class TestVerifyCurrentFlow:
         }
         mock_store.get_issue_links.return_value = []
 
-        result = check_service.verify_current_flow()
+        # Create a temp worktree so resolve_handoff_target can find it
+        with tempfile.TemporaryDirectory() as tmpdir:
+            worktree_path = Path(tmpdir)
+            # Create the docs/plans directory but NOT the missing.md file
+            (worktree_path / "docs" / "plans").mkdir(parents=True)
+
+            with patch.object(
+                check_service.git_client,
+                "find_worktree_path_for_branch",
+                return_value=worktree_path,
+            ):
+                result = check_service.verify_current_flow()
 
         assert not result.is_valid
         assert any("plan_ref file not found" in issue for issue in result.issues)

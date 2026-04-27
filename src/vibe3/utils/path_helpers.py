@@ -217,6 +217,69 @@ def resolve_ref_path(
 _SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
 
 
+def check_ref_exists(
+    ref_value: str,
+    branch: str | None = None,
+    git_client: GitClientProtocol | None = None,
+) -> tuple[str, bool]:
+    """Check if a reference path exists, unified method for all callers.
+
+    This is the single source of truth for reference file existence checks.
+    Used by check_service.py (flow verification) and flow_ui_timeline.py (display).
+
+    Args:
+        ref_value: The reference string to check (path, @key, or absolute)
+        branch: Optional branch for worktree resolution
+        git_client: Optional git client (defaults to new GitClient)
+
+    Returns:
+        Tuple of (display_path, exists):
+        - display_path: Relative path for display (or original if cannot relativize)
+        - exists: True if the file exists in the correct worktree context
+    """
+    try:
+        resolved_path = resolve_handoff_target(ref_value, branch, git_client)
+        exists = resolved_path.exists()
+
+        # Get display path (relative if possible)
+        if git_client is None:
+            from vibe3.clients.git_client import GitClient
+
+            git_client = GitClient()
+
+        # Try to make relative to worktree or git common for display
+        display = ref_value
+        if resolved_path.is_absolute():
+            # Try worktree root
+            try:
+                wt_root = (
+                    find_worktree_path_for_branch(branch, git_client)
+                    if branch
+                    else None
+                )
+                if wt_root is None:
+                    wt_root = Path(get_worktree_root(git_client))
+                if wt_root:
+                    display = str(resolved_path.relative_to(wt_root))
+            except (ValueError, Exception):
+                # Try git common dir
+                try:
+                    git_common = Path(get_git_common_dir(git_client))
+                    if str(resolved_path).startswith(str(git_common)):
+                        display = str(resolved_path.relative_to(git_common))
+                except Exception:
+                    pass
+
+        return (display, exists)
+
+    except FileNotFoundError:
+        # File doesn't exist or worktree missing
+        return (ref_value, False)
+    except Exception:
+        # Any other error: assume doesn't exist
+        return (ref_value, False)
+
+
 def resolve_handoff_target(
     target: str,
     branch: str | None = None,
