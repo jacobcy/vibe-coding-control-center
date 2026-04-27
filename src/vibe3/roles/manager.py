@@ -67,6 +67,41 @@ MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
 )
 
 
+def _resolve_manager_token(config: OrchestraConfig) -> str | None:
+    """Resolve manager token with fallback: env var (.zshrc) → keys.env → None."""
+    token_env = config.assignee_dispatch.token_env
+    if not token_env:
+        return None
+
+    # 1. Environment variable (set via .zshrc / direnv)
+    token = os.getenv(token_env)
+    if token:
+        return token
+
+    # 2. Fallback to config/keys.env
+    try:
+        from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+
+        keys_path = resolve_orchestra_repo_root() / "config" / "keys.env"
+        if keys_path.exists():
+            prefix = f"{token_env}="
+            for line in keys_path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if stripped.startswith(prefix) and not stripped.startswith("#"):
+                    value = stripped[len(prefix) :].strip().strip("\"'")
+                    if value:
+                        logger.bind(domain="manager").debug(
+                            f"Manager token loaded from {keys_path}"
+                        )
+                        return value
+    except (OSError, UnicodeDecodeError) as e:
+        logger.bind(domain="manager").debug(
+            f"Failed to read keys.env for manager token: {e}"
+        )
+
+    return None
+
+
 def _make_section_provider(
     manager_sections: dict[str, Any], section_key: str
 ) -> PromptProvider:
@@ -113,20 +148,19 @@ def build_manager_request(
     env = dict(os.environ)
 
     # Inject manager-specific token if configured (Phase 4)
-    if config.assignee_dispatch.token_env:
-        manager_token = os.getenv(config.assignee_dispatch.token_env)
-        if manager_token:
-            env["GH_TOKEN"] = manager_token
-            token_env_name = config.assignee_dispatch.token_env
-            logger.bind(domain="manager", issue_number=issue.number).info(
-                f"Using manager-specific token from {token_env_name}"
-            )
-        else:
-            # Bug 5: Log warning about fallback to user identity
-            logger.bind(domain="manager", issue_number=issue.number).warning(
-                f"Manager token {config.assignee_dispatch.token_env} not set. "
-                "Falling back to user identity (GH_TOKEN). Isolation is degraded."
-            )
+    manager_token = _resolve_manager_token(config)
+    if manager_token:
+        env["GH_TOKEN"] = manager_token
+        logger.bind(domain="manager", issue_number=issue.number).info(
+            f"Using manager-specific token from {config.assignee_dispatch.token_env}"
+        )
+    elif config.assignee_dispatch.token_env:
+        # Token configured but not available anywhere
+        logger.bind(domain="manager", issue_number=issue.number).warning(
+            f"Manager token {config.assignee_dispatch.token_env} not set "
+            "in env or keys.env. Falling back to user identity (GH_TOKEN). "
+            "Isolation is degraded."
+        )
 
     # Inject manager backend/model if not already set
     if not env.get("VIBE3_MANAGER_BACKEND"):

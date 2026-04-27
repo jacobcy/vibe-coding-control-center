@@ -811,6 +811,16 @@ Steps:
 - 若无新增事实，不重复发布几乎相同的长 comment
 - 若最新评论已给出明确方向，不再输出 `Option A/B/C`
 - 若当前 state 是 `ready` 且无明确阻止推进的指示，本轮 comment 应写”已认领、当前风险、下一阶段 handoff”
+- **去重与修正优先编辑**：
+  - 发 comment 前必须检查上一条 `[manager]` 评论是否已包含本轮核心论点（状态转换、关键发现、质量判断）
+  - 若上一条 `[manager]` 评论内容截断或信息不完整，**编辑上一条评论**而非发新评论：
+    ```bash
+    # 获取上一条 manager 评论的 comment_id
+    gh issue view <issue-number> --json comments --jq '.comments | map(select(.author.login == “<bot_username>” or .body | startswith(“[manager]”))) | last | .id'
+    # 编辑该评论
+    gh api repos/{owner}/{repo}/issues/comments/<comment_id> -X PATCH -f body=”<修正后的完整内容>”
+    ```
+  - 禁止为纠正自身输出格式问题而发新评论
 
 ## Handoff Contract
 
