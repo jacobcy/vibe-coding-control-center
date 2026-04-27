@@ -247,7 +247,7 @@ bash scripts/hooks/check-python-loc.sh  # exits 0
 ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if over
 ```
 
-**配置**：`config/settings.yaml` → `code_limits`
+**配置**：`config/loc_limits.yaml` → `code_limits`
 
 ---
 
@@ -351,7 +351,7 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 | Format | ✅ | - | ✅ | `.pre-commit-config.yaml` |
 | Type | ✅ | ✅ | ✅ | `.pre-commit-config.yaml` |
 | Test | - | ✅ | ✅ | `.pre-commit-config.yaml` |
-| LOC | - | ⚠️ | ✅ | `config/settings.yaml` |
+| LOC | - | ⚠️ | ✅ | `config/loc_limits.yaml` |
 | Review | - | ✅ | - | `scripts/hooks/pre-push.sh` |
 | Coverage | - | - | ✅ | `CI / Manual` |
 
@@ -359,7 +359,7 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 
 **LOC限制调整**：
 ```yaml
-# config/settings.yaml
+# config/loc_limits.yaml
 code_limits:
   total_file_loc:
     v3_python: 32000  # 可根据项目规模调整（治理触发器）

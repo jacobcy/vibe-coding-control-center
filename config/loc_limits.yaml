@@ -119,6 +119,11 @@ code_limits:
         limit: 450
         reason: "State label dispatch 服务，包含依赖检查、状态查询、事件发射等紧密耦合的调度逻辑"
 
+      # Utils 层 —— 允许 500
+      - path: "src/vibe3/utils/path_helpers.py"
+        limit: 500
+        reason: "路径解析核心工具，包含 GitClientProtocol、路径相关 Git wrapper、BranchBoundGitClient 适配器和路径解析逻辑，虽然职责略显混杂但都围绕路径处理，暂不拆分"
+
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
         limit: 600

@@ -123,7 +123,7 @@
 ### ✅ 符合规范
 
 **文件大小**：
-- 所有超限文件已在 `config/settings.yaml` 中注册例外
+- 所有超限文件已在 `config/loc_limits.yaml` 中注册例外
 - `flow_service.py` (519/600), `pr_service.py` (467/600), `check_service.py` (507/600)
 
 **类型注解**：

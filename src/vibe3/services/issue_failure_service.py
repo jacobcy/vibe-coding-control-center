@@ -251,10 +251,20 @@ def resume_issue(
     issue_number: int,
     reason: str,
     from_state: str,  # "failed" or "blocked"
+    to_state: IssueState = IssueState.READY,
     repo: str | None = None,
     actor: str = "human:resume",
 ) -> None:
-    """Generic resume issue handler."""
+    """Generic resume issue handler.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Resume reason for comment
+        from_state: Previous state (failed, blocked)
+        to_state: Target state (default: READY)
+        repo: Optional repository
+        actor: Actor name for events
+    """
     # Write to flow (source of truth) before GitHub sync
     issue_flow_service = _get_issue_flow_service()
     flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
@@ -265,25 +275,34 @@ def resume_issue(
                 branch,
                 "resumed",
                 actor,
-                detail=f"Resumed from {from_state} to ready: {reason}",
+                detail=f"Resumed from {from_state} to {to_state.value}: {reason}",
                 refs={
                     "issue": str(issue_number),
                     "from_state": from_state,
-                    "to_state": "ready",
+                    "to_state": to_state.value,
                 },
             )
 
     action_text = "恢复" if from_state == "blocked" else "继续"
-    header = f"[resume] 已从 state/{from_state} {action_text}到 state/ready。"
-    detail = (
-        "阻塞已解除,准备继续执行。"
-        if from_state == "blocked"
-        else "将重新进入 manager 标准入口。"
+    header = (
+        f"[resume] 已从 state/{from_state} {action_text}到 state/{to_state.value}。"
     )
+
+    if to_state == IssueState.READY:
+        detail = (
+            "阻塞已解除,准备继续执行。"
+            if from_state == "blocked"
+            else "将重新进入 manager 标准入口。"
+        )
+    else:
+        detail = (
+            "已清除 blocked_reason/failed_reason，保留 worktree现场。\n"
+            "后续可在当前 worktree 继续推进。"
+        )
 
     _transition_issue_state(
         issue_number=issue_number,
-        to_state=IssueState.READY,
+        to_state=to_state,
         actor=actor,
         force=True,
         repo=repo,

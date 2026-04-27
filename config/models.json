@@ -16,7 +16,7 @@
     },
     "vibe-planner": {
       "backend": "claude",
-      "model": "claude-sonnet-4-6",
+      "model": "sonnet",
       "yolo": true,
       "description": "Strategic planner: design implementation plans and architecture"
     },
@@ -28,7 +28,7 @@
     },
     "vibe-reviewer": {
       "backend": "claude",
-      "model": "claude-sonnet-4-6",
+      "model": "sonnet",
       "description": "Code reviewer: quality assurance and best practices"
     },
     "vibe-supervisor": {
@@ -48,8 +48,8 @@
       "description": "General code exploration and analysis"
     },
     "document-writer": {
-      "backend": "gemini",
-      "model": "gemini-3-flash-preview",
+      "backend": "claude",
+      "model": "haiku",
       "yolo": true,
       "description": "Documentation generation and maintenance"
     },
@@ -61,7 +61,7 @@
     },
     "code-architect": {
       "backend": "codex",
-      "model": "gpt-5.4-mini",
+      "model": "gpt-5.4",
       "yolo": true,
       "description": "Architecture design and system planning"
     }

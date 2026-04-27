@@ -74,4 +74,5 @@ optional = [
   { name = "LINEAR_API_KEY", env_var = "LINEAR_API_KEY", description = "Linear API", get_from = "https://linear.app/settings/api", used_by = ["plugin:linear@claude-plugins-official"], resolution = ["env"], activation = "any_used" },
   { name = "DEEPSEEK_API_KEY", env_var = "DEEPSEEK_API_KEY", description = "DeepSeek API", get_from = "https://api.deepseek.com", used_by = [], resolution = ["env"], activation = "explicit_only" },
   { name = "GEMINI_API_KEY", env_var = "GEMINI_API_KEY", description = "Gemini API", get_from = "https://ai.google.dev", note = "Gemini 登录可替代", used_by = ["tool:gemini", "plugin:claude-mem@thedotmack"], resolution = ["gemini_auth", "env"], activation = "any_used" },
+  { name = "VIBE_MANAGER_GITHUB_TOKEN", env_var = "VIBE_MANAGER_GITHUB_TOKEN", description = "Manager Bot GitHub Token", get_from = "GitHub Bot 账号的 Personal Access Token", note = "用于区分人类和 Manager Bot 的 GitHub 操作", used_by = [], resolution = ["env"], activation = "explicit_only" },
 ]

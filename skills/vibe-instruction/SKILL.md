@@ -121,15 +121,15 @@ uv run python src/vibe3/cli.py task resume --all      # 回退所有 auto task/i
 #### settings - 治理真源
 
 ```bash
-cat config/settings.yaml
+cat config/loc_limits.yaml
 ```
 
 补充语义：
 
-- `config/settings.yaml` 是代码总量、单文件 LOC 限制和 exception 的真源。
+- `config/loc_limits.yaml` 是代码总量、单文件 LOC 限制和 exception 的真源。
 - 总量命中阈值时，默认动作不是机械阻断，而是触发一轮代码质量复查。
 - 单文件命中默认或 max 限制时，先判断是否值得拆分；若不值得拆分，再进入 exception 流程。
-- 任何“允许提升总量”或“允许单文件例外”的判断，都应回写到 `config/settings.yaml` 并附 reason。
+- 任何“允许提升总量”或“允许单文件例外”的判断，都应回写到 `config/loc_limits.yaml` 并附 reason。
 
 #### run - Agent 执行引擎
 
@@ -219,7 +219,7 @@ uv run python src/vibe3/cli.py handoff status     # 阅读 agent 留下的 Findi
 - **先看现场**：运行 `vibe3 task status --all`，必要时补 `vibe3 flow status` / `vibe3 flow show`。
 - **状态不一致**：运行 `vibe3 check` 进行同步审计。
 - **其他 auto-task scene 需要回退**：运行 `vibe3 task resume --failed|--blocked|--all`。
-- **代码总量 / 单文件超限**：先看 `config/settings.yaml` 的阈值与 exceptions，再决定是否进入质量复查或 exception 处理。
+- **代码总量 / 单文件超限**：先看 `config/loc_limits.yaml` 的阈值与 exceptions，再决定是否进入质量复查或 exception 处理。
 - **环境配置**：查看 `config/settings.yaml`。
 - **调用追踪**：任何命令加 `--trace` 可查看内部调用栈。
 - **权限/API 错误**：运行 `bin/vibe keys list` 检查 Token 有效性。

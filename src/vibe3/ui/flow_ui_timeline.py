@@ -1,11 +1,9 @@
 """Flow UI timeline rendering components."""
 
-from pathlib import Path
-
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
-from vibe3.utils.path_helpers import ref_to_handoff_cmd
+from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
+from vibe3.utils.path_helpers import check_ref_exists, ref_to_handoff_cmd
 
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
@@ -157,7 +155,9 @@ def _render_reasons(state: FlowStatusResponse) -> None:
         console.print(f"  [red bold]failed_reason:[/] [red]{state.failed_reason}[/]")
 
 
-def _render_event_refs(event: FlowEvent, worktree_root: str | None) -> None:
+def _render_event_refs(
+    event: FlowEvent, worktree_root: str | None, branch: str | None
+) -> None:
     """Render event references (files, verdict, log_path, ref)."""
     if not event.refs or not isinstance(event.refs, dict):
         return
@@ -186,15 +186,16 @@ def _render_event_refs(event: FlowEvent, worktree_root: str | None) -> None:
         isinstance(ref, str) and isinstance(event.detail, str) and ref in event.detail
     )
     if ref and isinstance(ref, str) and not detail_contains_ref:
-        ref_display = resolve_ref_path(ref, worktree_root)
-        ref_cmd = ref_to_handoff_cmd(ref_display, None)
-        _ref_suffix = (
-            " [dim yellow](not found)[/]" if not Path(ref_display).exists() else ""
-        )
+        # Use unified check_ref_exists for consistent worktree resolution
+        display_path, exists = check_ref_exists(ref, branch)
+        ref_cmd = ref_to_handoff_cmd(display_path, branch)
+        _ref_suffix = "" if exists else " [dim yellow](not found)[/]"
         console.print(f"  [dim]- {ref_cmd}[/]{_ref_suffix}")
 
 
-def _render_timeline(events: list[FlowEvent], worktree_root: str | None) -> None:
+def _render_timeline(
+    events: list[FlowEvent], worktree_root: str | None, branch: str | None
+) -> None:
     """Render timeline events with details and references."""
     if not events:
         console.print("[dim]  no events[/]")
@@ -213,7 +214,7 @@ def _render_timeline(events: list[FlowEvent], worktree_root: str | None) -> None
         )
         if event.detail:
             console.print(f"  {event.detail}")
-        _render_event_refs(event, worktree_root)
+        _render_event_refs(event, worktree_root, branch)
         console.print()
 
 
@@ -229,11 +230,11 @@ def _render_refs(state: FlowStatusResponse) -> None:
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
-            display_val = resolve_ref_path(val, state.worktree_root)
-            ref_cmd = ref_to_handoff_cmd(display_val, state.branch)
-            _missing = (
-                " [dim yellow](not found)[/]" if not Path(display_val).exists() else ""
-            )
+
+            # Use unified check_ref_exists for consistent worktree resolution
+            display_path, exists = check_ref_exists(val, state.branch)
+            ref_cmd = ref_to_handoff_cmd(display_path, state.branch)
+            _missing = "" if exists else " [dim yellow](not found)[/]"
             console.print(f"  [dim]{label:10}[/]  {ref_cmd}{actor_str}{_missing}")
 
 
@@ -262,7 +263,7 @@ def render_flow_timeline(
     _render_actors(state)
     _render_reasons(state)
     console.print()
-    _render_timeline(events, state.worktree_root)
+    _render_timeline(events, state.worktree_root, state.branch)
 
     _render_refs(state)
     _render_state_summary(state)

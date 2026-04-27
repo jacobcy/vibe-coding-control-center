@@ -37,17 +37,30 @@ def repo_models_json_path() -> Path:
 
 
 def _read_models_json(path: Path) -> dict[str, Any]:
-    """Read a models.json file and return a dict, or empty dict on failure."""
+    """Read a models.json file and return a dict, or empty dict on failure.
+
+    Applies global env var overrides for default_backend/default_model.
+    """
     try:
         if path.exists():
             data = json.loads(path.read_text())
-            if isinstance(data, dict):
-                return data
+            if not isinstance(data, dict):
+                return {}
+        else:
+            data = {}
     except Exception as exc:
         logger.bind(domain="review_runner", path=str(path)).warning(
             f"Failed to read models config: {exc}"
         )
-    return {}
+        data = {}
+
+    # Apply global env defaults
+    if "VIBE_DEFAULT_BACKEND" in os.environ:
+        data["default_backend"] = os.environ["VIBE_DEFAULT_BACKEND"]
+    if "VIBE_DEFAULT_MODEL" in os.environ:
+        data["default_model"] = os.environ["VIBE_DEFAULT_MODEL"]
+
+    return data
 
 
 def configured_backends(path: Path | None = None) -> set[str]:
@@ -90,13 +103,31 @@ def find_missing_backend_commands(
 def resolve_repo_agent_preset(
     agent_name: str,
 ) -> tuple[str | None, str | None] | None:
-    """Resolve agent preset from repo-local config/models.json.
+    """Resolve agent preset from repo-local config/models.json with env override.
+
+    Priority:
+    1. Environment variable override (VIBE_BACKEND_<ROLE>, VIBE_MODEL_<ROLE>)
+    2. Repo-local config/models.json mapping
 
     Automatically tries with 'vibe-' prefix if direct lookup fails.
 
     Returns:
         (backend, model) when repo-local mapping exists, otherwise None.
     """
+    # 1. Check env var override first
+    role = agent_name.replace("vibe-", "").upper()
+    env_backend = os.environ.get(f"VIBE_BACKEND_{role}")
+    env_model = os.environ.get(f"VIBE_MODEL_{role}")
+    if env_backend or env_model:
+        logger.bind(
+            domain="codeagent_config",
+            agent=agent_name,
+            backend=env_backend,
+            model=env_model,
+        ).debug("Using env var override for agent preset")
+        return (env_backend or None, env_model or None)
+
+    # 2. Fall back to models.json
     data = _read_models_json(repo_models_json_path())
     agents = data.get("agents")
     if not isinstance(agents, dict):
