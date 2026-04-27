@@ -222,6 +222,16 @@ def start(
         )
         raise typer.Exit(1)
 
+    # Warning: Manager token isolation
+    manager_token = os.environ.get("VIBE_MANAGER_GITHUB_TOKEN")
+    if not manager_token:
+        typer.echo(
+            "\nWARNING: VIBE_MANAGER_GITHUB_TOKEN not configured.\n"
+            "Manager role will use fallback token (same as human identity).\n"
+            "Set VIBE_MANAGER_GITHUB_TOKEN in shell environment "
+            "to enable token isolation.\n"
+        )
+
     missing_backend_commands = find_missing_backend_commands(
         env_path=os.environ.get("PATH")
     )
