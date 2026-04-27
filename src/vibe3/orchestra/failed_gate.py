@@ -45,40 +45,52 @@ class FailedGate:
         """Check if orchestra dispatch should be frozen.
 
         Returns:
-            GateResult: blocked=True if any state/failed issue is open.
+            GateResult: blocked=True if any state/failed issue is open
+                and has a non-empty failed_reason.
         """
         log = logger.bind(domain="orchestra", action="failed_gate_check")
         log.debug("Checking for open state/failed issues")
 
         try:
             # 1. Search for open issues with state/failed label
-            # We use gh issue list --label state/failed --state open
-            # Note: list_issues might not support multiple labels in args
-            # but we can pass via repo or use label filter if supported.
-            # github_issues_ops.py list_issues lacks label param.
-            # I should add it or use a custom gh command.
-
             issues = self._list_failed_issues()
             if not issues:
                 return GateResult.open()
 
-            # 2. Pick the first one (usually most recent or most relevant)
-            issue = issues[0]
-            issue_number = issue["number"]
-            issue_title = issue.get("title", f"Issue #{issue_number}")
+            # 2. Check each failed issue for valid reason
+            for issue in issues:
+                issue_number = issue["number"]
+                issue_title = issue.get("title", f"Issue #{issue_number}")
 
-            log.info(f"Found open state/failed issue #{issue_number}: {issue_title}")
+                log.debug(f"Checking failed issue #{issue_number}")
 
-            # 3. Fetch comments to extract reason
-            reason, comment_url = self._extract_reason(issue_number)
+                # 3. Check if issue has failed_reason (stored in issue body)
+                has_reason = self._check_failed_reason(issue_number)
 
-            return GateResult(
-                blocked=True,
-                issue_number=issue_number,
-                issue_title=issue_title,
-                reason=reason,
-                comment_url=comment_url,
-            )
+                if has_reason:
+                    # Issue has a valid reason, extract it and block
+                    reason, comment_url = self._extract_reason(issue_number)
+                    log.info(
+                        f"Found open state/failed issue #{issue_number} "
+                        f"with reason: {reason[:50] if reason else 'N/A'}"
+                    )
+                    return GateResult(
+                        blocked=True,
+                        issue_number=issue_number,
+                        issue_title=issue_title,
+                        reason=reason,
+                        comment_url=comment_url,
+                    )
+                else:
+                    # Issue has no reason, auto-remove failed label
+                    log.info(
+                        f"Failed issue #{issue_number} has no reason, "
+                        "auto-removing state/failed label"
+                    )
+                    self._remove_failed_label(issue_number)
+
+            # All failed issues have been cleaned up
+            return GateResult.open()
 
         except Exception as exc:
             log.error(f"Failed to check failed gate: {exc}")
@@ -173,3 +185,72 @@ class FailedGate:
         # Fallback to latest comment summary
         latest_body = comments[-1].get("body", "").strip().split("\n")[0][:100]
         return f"{latest_body}...", comments[-1].get("url")
+
+    def _check_failed_reason(self, issue_number: int) -> bool:
+        """Check if issue has a non-empty failed_reason in its body.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            True if issue has a failed_reason field that is not empty
+        """
+        import json
+        import subprocess
+
+        cmd = [
+            "gh",
+            "issue",
+            "view",
+            str(issue_number),
+            "--json",
+            "body",
+        ]
+        if self._repo:
+            cmd.extend(["--repo", self._repo])
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            # Cannot determine, assume it has reason to be safe
+            return True
+
+        data = json.loads(result.stdout)
+        body = data.get("body", "")
+
+        # Check for failed_reason field in issue body
+        # Format: **failed_reason**: <value>
+        match = re.search(
+            r"\*\*failed_reason\*\*:\s*(.+?)(?:\n|$)", body, re.IGNORECASE
+        )
+        if match:
+            reason_value = match.group(1).strip()
+            # Non-empty and not "None" or "null"
+            return bool(reason_value and reason_value.lower() not in ("none", "null"))
+
+        return False
+
+    def _remove_failed_label(self, issue_number: int) -> None:
+        """Remove state/failed label from issue.
+
+        Args:
+            issue_number: GitHub issue number
+        """
+        import subprocess
+
+        cmd = [
+            "gh",
+            "issue",
+            "edit",
+            str(issue_number),
+            "--remove-label",
+            IssueState.FAILED.to_label(),
+        ]
+        if self._repo:
+            cmd.extend(["--repo", self._repo])
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to remove failed label from issue #{issue_number}: "
+                f"{result.stderr.strip()}"
+            )
