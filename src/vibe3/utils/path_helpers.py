@@ -13,27 +13,33 @@ class GitClientProtocol(Protocol):
     def get_current_branch(self) -> str: ...
 
 
-def get_git_common_dir(git_client: GitClientProtocol | None = None) -> str:
-    """Get the shared git common directory (.git/)."""
+def _get_git_client(git_client: GitClientProtocol | None = None) -> GitClientProtocol:
+    """Get or create a GitClient instance.
+
+    Factory function to avoid repeating GitClient initialization logic.
+    """
     if git_client is None:
         from vibe3.clients.git_client import GitClient
 
-        git_client = GitClient()
+        return GitClient()
+    return git_client
+
+
+def get_git_common_dir(git_client: GitClientProtocol | None = None) -> str:
+    """Get the shared git common directory (.git/)."""
+    git_client = _get_git_client(git_client)
     try:
         return git_client.get_git_common_dir()
-    except Exception:
+    except (OSError, ValueError):
         return ""
 
 
 def get_worktree_root(git_client: GitClientProtocol | None = None) -> str:
     """Get the current worktree root."""
-    if git_client is None:
-        from vibe3.clients.git_client import GitClient
-
-        git_client = GitClient()
+    git_client = _get_git_client(git_client)
     try:
         return git_client.get_worktree_root()
-    except Exception:
+    except (OSError, ValueError):
         return ""
 
 
@@ -41,13 +47,10 @@ def find_worktree_path_for_branch(
     branch: str, git_client: GitClientProtocol | None = None
 ) -> Path | None:
     """Find the worktree path for a specific branch."""
-    if git_client is None:
-        from vibe3.clients.git_client import GitClient
-
-        git_client = GitClient()
+    git_client = _get_git_client(git_client)
     try:
         return git_client.find_worktree_path_for_branch(branch)
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -55,10 +58,8 @@ class BranchBoundGitClient:
     """Git client shim that pins operations to an explicit branch."""
 
     def __init__(self, branch: str) -> None:
-        from vibe3.clients.git_client import GitClient
-
         self._branch = branch
-        self._delegate = GitClient()
+        self._delegate = _get_git_client()
 
     def get_current_branch(self) -> str:
         return self._branch
@@ -96,22 +97,19 @@ def normalize_ref_path(
     if not ref_path.is_absolute():
         return ref_value
 
-    if git_client is None:
-        from vibe3.clients.git_client import GitClient
-
-        git_client = GitClient()
+    git_client = _get_git_client(git_client)
 
     # Try branch worktree root
     worktree_root: Path | None = None
     try:
         worktree_root = git_client.find_worktree_path_for_branch(branch)
-    except Exception:
+    except (OSError, ValueError):
         worktree_root = None
 
     if worktree_root is None:
         try:
             current_root = git_client.get_worktree_root()
-        except Exception:
+        except (OSError, ValueError):
             current_root = ""
         if current_root:
             worktree_root = Path(current_root)
@@ -130,7 +128,7 @@ def normalize_ref_path(
                 return str(ref_path.relative_to(git_common))
             except ValueError:
                 pass
-    except Exception:
+    except (OSError, ValueError):
         pass
 
     return ref_value
@@ -160,11 +158,10 @@ def resolve_ref_path(
 
         # 1. Resolve worktree root
         if not worktree_root:
-            from vibe3.clients.git_client import GitClient
-
+            git_client = _get_git_client()
             try:
-                worktree_root = GitClient().get_worktree_root()
-            except Exception:
+                worktree_root = git_client.get_worktree_root()
+            except (OSError, ValueError):
                 worktree_root = ""
 
         root_path = Path(worktree_root) if worktree_root else Path.cwd()
@@ -180,12 +177,10 @@ def resolve_ref_path(
 
                 # Priority 2: Relative to git common dir (shared artifacts)
                 try:
-                    from vibe3.clients.git_client import GitClient
-
-                    git_common = Path(GitClient().get_git_common_dir())
+                    git_common = Path(_get_git_client().get_git_common_dir())
                     if git_common and str(ref_path).startswith(str(git_common)):
                         return str(ref_path.relative_to(git_common))
-                except Exception:
+                except (OSError, ValueError):
                     pass
             return str(ref_path)
 
@@ -196,15 +191,13 @@ def resolve_ref_path(
             return str(worktree_resolved.absolute()) if absolute else str(ref_path)
 
         # Priority 2: Git common dir (usually shared artifacts in .git/vibe3)
-        from vibe3.clients.git_client import GitClient
-
         try:
-            git_common = Path(GitClient().get_git_common_dir())
+            git_common = Path(_get_git_client().get_git_common_dir())
             if git_common:
                 git_resolved = git_common / ref_path
                 if git_resolved.exists():
                     return str(git_resolved.absolute()) if absolute else str(ref_path)
-        except Exception:
+        except (OSError, ValueError):
             pass
 
         # Fallback: return as-is
@@ -242,10 +235,7 @@ def check_ref_exists(
         exists = resolved_path.exists()
 
         # Get display path (relative if possible)
-        if git_client is None:
-            from vibe3.clients.git_client import GitClient
-
-            git_client = GitClient()
+        git_client = _get_git_client(git_client)
 
         # Try to make relative to worktree or git common for display
         display = ref_value
@@ -261,13 +251,13 @@ def check_ref_exists(
                     wt_root = Path(get_worktree_root(git_client))
                 if wt_root:
                     display = str(resolved_path.relative_to(wt_root))
-            except (ValueError, Exception):
+            except ValueError:
                 # Try git common dir
                 try:
                     git_common = Path(get_git_common_dir(git_client))
                     if str(resolved_path).startswith(str(git_common)):
                         display = str(resolved_path.relative_to(git_common))
-                except Exception:
+                except (OSError, ValueError):
                     pass
 
         return (display, exists)
@@ -302,10 +292,7 @@ def resolve_handoff_target(
     Raises:
         FileNotFoundError: If the resolved path does not exist.
     """
-    if git_client is None:
-        from vibe3.clients.git_client import GitClient
-
-        git_client = GitClient()
+    git_client = _get_git_client(git_client)
 
     # Namespace 1: @ prefix → shared handoff store
     if target.startswith("@"):
