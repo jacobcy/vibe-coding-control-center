@@ -80,3 +80,15 @@ def test_maps_hook_changes_to_hook_regression_tests() -> None:
 
     assert selection.mode == "smoke"
     assert selection.tests == ["tests/vibe3/analysis/test_pre_push_scope.py"]
+
+
+def test_top_level_unmapped_source_skips_full_suite() -> None:
+    # src/vibe3/__init__.py has no direct test file mapping.
+    # Its directory fallback would resolve to tests/vibe3 (the full suite root).
+    # Must return mode=skip instead of running everything locally.
+    selection = select_pre_push_tests(["src/vibe3/__init__.py"])
+
+    assert selection.mode == "skip"
+    assert selection.tests == []
+    assert selection.unmapped_sources == ["src/vibe3/__init__.py"]
+    assert "tests/vibe3" not in selection.tests
