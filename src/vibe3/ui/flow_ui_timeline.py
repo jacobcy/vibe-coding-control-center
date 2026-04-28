@@ -146,13 +146,10 @@ def _render_actors(state: FlowStatusResponse) -> None:
 
 
 def _render_reasons(state: FlowStatusResponse) -> None:
-    """Show blocked/failed reasons if present."""
+    """Show blocked reason if present (failed_reason deprecated)."""
     if state.blocked_reason:
         console.print()
         console.print(f"  [red bold]blocked_reason:[/] [red]{state.blocked_reason}[/]")
-    if state.failed_reason:
-        console.print()
-        console.print(f"  [red bold]failed_reason:[/] [red]{state.failed_reason}[/]")
 
 
 def _render_event_refs(

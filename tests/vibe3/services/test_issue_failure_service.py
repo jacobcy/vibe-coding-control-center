@@ -213,7 +213,11 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
 
 
 def test_block_flow_uses_new_fields():
-    """Test block_flow writes blocked_by_issue + blocked_reason (new fields)."""
+    """Test block_flow writes blocked_by_issue + blocked_reason (new fields).
+
+    Note: flow_status no longer set to "blocked" (2026-04-28).
+    Blocked status inferred from IssueState.BLOCKED label.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -230,10 +234,9 @@ def test_block_flow_uses_new_fields():
             actor="test-actor",
         )
 
-        # Verify flow state in database
+        # Verify flow state in database (blocked metadata, NOT flow_status)
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
-        assert flow_state["flow_status"] == "blocked"
         assert flow_state["blocked_by_issue"] == 301
         assert flow_state["blocked_reason"] == "Blocked by dependency"
 

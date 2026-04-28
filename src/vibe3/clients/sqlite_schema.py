@@ -241,6 +241,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added latest_verdict column to flow_state"
         )
 
+    # Migration: add deleted_at field for soft delete support
+    if "deleted_at" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN deleted_at TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added deleted_at column to flow_state"
+        )
+
     # Legacy compatibility: keep old column for existing databases.
     # New code no longer reads or writes this field.
     if "latest_indicate_action" not in existing:

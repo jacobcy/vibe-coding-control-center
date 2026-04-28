@@ -17,17 +17,17 @@ class TestIssuePriority:
         assert issue_priority(IssueState.IN_PROGRESS) < issue_priority(
             IssueState.BLOCKED
         )
-        assert issue_priority(IssueState.IN_PROGRESS) < issue_priority(
-            IssueState.FAILED
-        )
 
     def test_ready_before_blocked(self) -> None:
         """READY should sort before BLOCKED."""
         assert issue_priority(IssueState.READY) < issue_priority(IssueState.BLOCKED)
 
-    def test_blocked_before_failed(self) -> None:
-        """BLOCKED should sort before FAILED."""
-        assert issue_priority(IssueState.BLOCKED) < issue_priority(IssueState.FAILED)
+    def test_blocked_has_lower_priority(self) -> None:
+        """BLOCKED should have lower priority than IN_PROGRESS and READY."""
+        assert issue_priority(IssueState.BLOCKED) > issue_priority(IssueState.READY)
+        assert issue_priority(IssueState.BLOCKED) > issue_priority(
+            IssueState.IN_PROGRESS
+        )
 
 
 class TestBranchClassification:

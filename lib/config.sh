@@ -33,23 +33,24 @@ if [[ "${VIBE_UTILS_LOADED:-}" != "$VIBE_LIB/utils.sh" ]]; then
 fi
 
 # ── Load Keys (if keys.env exists) ──────────────────────
-_vibe_load_keys() {
-    local keys_file="$1"
-    [[ -f "$keys_file" ]] || return 0
-    while IFS='=' read -r key value; do
-        # Skip comments and empty lines
-        [[ "$key" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "$key" ]] && continue
-        # Strip surrounding quotes from value
-        value="${value#\"}" ; value="${value%\"}"
-        value="${value#\'}" ; value="${value%\'}"
-        export "$key=$value"
-    done < "$keys_file"
-}
+if [[ "${VIBE_KEYS_DETECT:-}" != "1" ]]; then
+    _vibe_load_keys() {
+        local keys_file="$1"
+        [[ -f "$keys_file" ]] || return 1
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            value="${value#\"}" ; value="${value%\"}"
+            value="${value#\'}" ; value="${value%\'}"
+            export "$key=$value"
+        done < "$keys_file"
+        return 0
+    }
 
-# Load project keys.env, then user keys.env
-_vibe_load_keys "$VIBE_CONFIG/keys.env"
-_vibe_load_keys "${HOME}/.vibe/keys.env"
+    if ! _vibe_load_keys "$VIBE_CONFIG/keys.env"; then
+        _vibe_load_keys "${HOME}/.vibe/config/keys.env"
+    fi
+fi
 
 # ── Defaults ────────────────────────────────────────────
 # VIBE_SESSION: tmux session name (used by tmux.sh, worktree.sh, etc.)

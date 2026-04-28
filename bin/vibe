@@ -22,6 +22,10 @@ if [[ "$VIBE_REAL_INSTALL_ROOT" == "$VIBE_REAL_HOME_VIBE" ]] && command -v git >
 fi
 
 export VIBE_ROOT="$VIBE_INSTALL_ROOT"
+
+# Detached env detection: skip loading keys.env when running vibe keys
+[[ "$1" == "keys" && ( "$2" == "check" || "$2" == "list" || "$2" == "ls" || -z "$2" ) ]] && export VIBE_KEYS_DETECT=1
+
 source "$VIBE_ROOT/lib/config.sh"
 readonly VIBE_VERSION="$(get_vibe_version)"
 

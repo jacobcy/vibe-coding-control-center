@@ -217,7 +217,7 @@ class TaskResumeUsecase:
                 continue
 
             try:
-                if resume_kind in {"failed", "blocked", "all"}:
+                if resume_kind in {"blocked", "all"}:
                     self.operations.reset_issue_to_ready(
                         issue_number=issue_number,
                         resume_kind=resume_kind,

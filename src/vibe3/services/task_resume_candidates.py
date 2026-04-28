@@ -113,9 +113,8 @@ class TaskResumeCandidates:
                 }
 
         # 根据状态确定 resume_kind
-        if current_state == IssueState.FAILED:
-            resume_kind = "failed"
-        elif current_state == IssueState.BLOCKED:
+        # Note: FAILED unified to BLOCKED, resume_kind always "blocked"
+        if current_state == IssueState.BLOCKED:
             resume_kind = "blocked"
         else:
             # 对于其他状态（ready/handoff/review/merge-ready 等），
@@ -279,12 +278,24 @@ class TaskResumeCandidates:
 
         Args:
             issue_number: GitHub issue number
-            resume_kind: Expected resume kind ("failed", "blocked", or "aborted")
+            resume_kind: Expected resume kind ("failed", "blocked", "aborted", or "all")
             repo: Repository (owner/repo format, optional)
 
         Returns:
-            True if issue state matches resume_kind, False otherwise
+            True if issue can be resumed, False otherwise
         """
+        # ✅ Use authoritative truth: check if issue has merged PR
+        from vibe3.services.pr_status_checker import has_merged_pr_for_issue
+
+        if has_merged_pr_for_issue(issue_number, repo):
+            # Issue has merged PR, cannot be resumed
+            logger.bind(
+                domain="resume",
+                issue_number=issue_number,
+                resume_kind=resume_kind,
+            ).info("Issue has merged PR, cannot be resumed")
+            return False
+
         current_state = self.label_service.get_state(issue_number)
 
         if resume_kind == "all":
@@ -293,9 +304,7 @@ class TaskResumeCandidates:
         if current_state is None:
             return False
 
-        if resume_kind == "failed":
-            return current_state.value == "failed"
-        elif resume_kind == "blocked":
+        if resume_kind == "blocked":
             return current_state.value == "blocked"
         elif resume_kind == "aborted":
             # Aborted flows can be resumed from READY or HANDOFF states

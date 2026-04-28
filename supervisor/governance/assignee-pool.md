@@ -179,6 +179,18 @@ Exit:
 
 治理建议以 `[governance suggest]` 署名写入 issue comment。
 
+**去重规则（强制）**：
+
+- **写评论前必须检查**：读取该 issue 的现有 comments
+- **去重检查**：若已存在相同类型的 `[governance suggest]` 评论（关键字匹配），跳过该评论
+- **类型匹配规则**：
+  - `[governance suggest] 建议关闭此 Issue` → 检查是否已有"建议关闭"
+  - `[governance suggest] 建议恢复此 Issue` → 检查是否已有"建议恢复"
+  - `[governance suggest] 关注` → 检查是否已有"关注"且关注原因相同
+  - `[governance auto-recover]` → 检查是否已有相同恢复动作
+- **跳过时的输出**：在 governance 输出中记录"已建议（跳过重复评论）"，说明原因
+- **目的**：避免重复刷屏，保持 issue 讨论清洁
+
 建议类型：
 
 ### `suggest_close()`

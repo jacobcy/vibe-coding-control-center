@@ -19,7 +19,8 @@ def resolve_issue_branch_input(branch: str | None, flow_service: object) -> str 
 
     If ``branch`` is a plain number like ``436``, this helper checks supported
     branch patterns in order and returns the first one that already exists in the
-    local flow store.
+    local flow store. If no flow exists, returns the original input instead of
+    raising an error (for better UX in task show/status commands).
     """
     if branch is None:
         return None
@@ -35,7 +36,6 @@ def resolve_issue_branch_input(branch: str | None, flow_service: object) -> str 
         if get_flow_state(candidate):
             return candidate
 
-    checked = ", ".join(iter_issue_branch_candidates(issue_number))
-    raise RuntimeError(
-        f"unable to resolve issue #{issue_number} to an existing branch ({checked})"
-    )
+    # ✅ Return original input instead of raising error
+    # This allows task show/status to query issue state even without flow
+    return stripped

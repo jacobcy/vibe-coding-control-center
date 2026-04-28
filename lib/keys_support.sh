@@ -3,12 +3,12 @@
 
 _keys_file() {
     if [[ "$VIBE_ROOT" == "$HOME/.vibe" ]]; then
-        echo "$HOME/.vibe/keys.env"
+        echo "$HOME/.vibe/config/keys.env"
         return
     fi
 
     local f="$VIBE_CONFIG/keys.env"
-    [[ -f "$f" ]] || f="${HOME}/.vibe/keys.env"
+    [[ -f "$f" ]] || { f="$HOME/.vibe/config/keys.env"; }
     echo "$f"
 }
 

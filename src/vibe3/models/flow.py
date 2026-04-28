@@ -30,8 +30,10 @@ def _migrate_flow_status_value(v: str | None) -> str | None:
         return "stale"
     if v == "merged":
         return "done"
-    if v == "waiting":
-        return "blocked"
+    # Legacy "blocked" and "failed" migrated to "active"
+    # Blocked status now inferred from IssueState.BLOCKED label
+    if v in ("blocked", "failed", "waiting"):
+        return "active"
     return v
 
 
@@ -72,11 +74,12 @@ class FlowState(BaseModel):
         None  # NEW: Dependency issue number (semantic clarity)
     )
     blocked_reason: str | None = None  # NEW: Block reason text (semantic clarity)
-    failed_reason: str | None = None  # NEW: Fail reason text
+    failed_reason: str | None = None  # Deprecated: use blocked_reason instead
     next_step: str | None = None
-    flow_status: Literal["active", "blocked", "failed", "done", "stale", "aborted"] = (
-        "active"
-    )
+    flow_status: Literal["active", "done", "stale", "aborted"] = "active"
+    # Note: "blocked" and "failed" removed (2026-04-28).
+    # Blocked status is now inferred from IssueState.BLOCKED label.
+    # blocked_reason field stores the reason text.
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -86,6 +89,9 @@ class FlowState(BaseModel):
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None  # Latest verdict for quick query
+    deleted_at: str | None = (
+        None  # Soft delete timestamp (None = active, ISO 8601 = deleted)
+    )
 
     model_config = {"extra": "ignore"}
 
@@ -220,7 +226,8 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "failed", "done", "stale", "aborted"]
+    flow_status: Literal["active", "done", "stale", "aborted"]
+    # Note: "blocked" and "failed" removed. Blocked inferred from issue label.
     task_issue_number: int | None = None
     pr_number: int | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation
@@ -237,7 +244,7 @@ class FlowStatusResponse(BaseModel):
     blocked_by: str | None = None  # Legacy field (deprecated)
     blocked_by_issue: int | None = None  # NEW: Dependency issue number
     blocked_reason: str | None = None  # NEW: Block reason text
-    failed_reason: str | None = None  # NEW: Fail reason text
+    failed_reason: str | None = None  # Deprecated: use blocked_reason instead
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
     planner_status: ExecutionStatus | None = None

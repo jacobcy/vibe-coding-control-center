@@ -116,26 +116,40 @@ class CheckService(CheckRemote):
             return None
 
     def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
-        """Handle closed/merged PR by marking flow done.
+        """Handle PR state changes detected during check.
 
-        Returns CheckResult if PR is closed/merged, None otherwise.
+        Returns CheckResult if PR is merged or closed, None otherwise.
+
+        - PR MERGED: flow is successfully completed → mark done.
+          If branch is task/issue-N, also auto-close the linked issue.
+        - PR CLOSED (without merge): PR was abandoned → mark aborted.
         """
-        if pr.state not in (PRState.CLOSED, PRState.MERGED) and not pr.merged_at:
-            return None
-
-        suggestions = self._mark_flow_done(
-            branch,
-            f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-        )
-        self._update_pr_cache(branch, pr)
-
         result_issues: list[str] = []
-        if suggestions.get("issue_to_close"):
-            result_issues.append(
-                f"Suggestion: Issue #{suggestions['issue_to_close']} is still OPEN. "
-                "Consider closing it."
+
+        if pr.merged_at or pr.state == PRState.MERGED:
+            # Normal completion via merge → done
+            suggestions = self._mark_flow_done(
+                branch,
+                f"PR #{pr.number} merged (detected from GitHub)",
             )
-        return CheckResult(is_valid=True, branch=branch, issues=result_issues)
+            self._update_pr_cache(branch, pr)
+            if suggestions.get("issue_to_close"):
+                result_issues.append(
+                    f"Issue #{suggestions['issue_to_close']} was still OPEN — "
+                    "auto-closed because PR was merged."
+                )
+            return CheckResult(is_valid=True, branch=branch, issues=result_issues)
+
+        if pr.state == PRState.CLOSED:
+            # PR closed without merge → aborted (task abandoned)
+            self._mark_flow_aborted(
+                branch,
+                f"PR #{pr.number} closed without merge (detected from GitHub)",
+            )
+            self._update_pr_cache(branch, pr)
+            return CheckResult(is_valid=True, branch=branch, issues=result_issues)
+
+        return None
 
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
@@ -382,6 +396,11 @@ class CheckService(CheckRemote):
             f"Flow auto-{status}: {reason}",
         )
 
+    @staticmethod
+    def _is_task_branch(branch: str) -> bool:
+        """Check if branch follows the task/issue-N auto-flow pattern."""
+        return branch.startswith("task/issue-")
+
     def _mark_flow_done(
         self,
         branch: str,
@@ -389,13 +408,16 @@ class CheckService(CheckRemote):
     ) -> dict[str, int | None]:
         """Mark a flow as done and record the event.
 
+        For task/issue-N auto-flow branches, also closes the linked
+        GitHub issue since the PR was successfully merged.
+
         Note: Branch cleanup is deferred to 'vibe3 check --clean-branch'.
         This keeps check fast and allows code reuse.
 
         Returns:
             Dict with suggestions, e.g., {"issue_to_close": 123}
+            where issue_to_close is set only when auto-close was needed.
         """
-        # Auto-save baseline snapshot on flow auto-complete
         try:
             from vibe3.analysis import snapshot_service
 
@@ -407,20 +429,27 @@ class CheckService(CheckRemote):
             branch, "done", reason, "flow_auto_completed", "auto_complete_flow"
         )
 
-        # Check if linked issue is still open
         suggestions: dict[str, int | None] = {"issue_to_close": None}
         issue_links = self.store.get_issue_links(branch)
         task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
         if task_issues:
             task_issue = task_issues[0]["issue_number"]
-            issue = self.github_client.view_issue(task_issue)
-            # view_issue() can return dict, None, or "network_error" string
-            if (
-                issue
-                and isinstance(issue, dict)
-                and str(issue.get("state", "")).upper() != "CLOSED"
-            ):
-                suggestions["issue_to_close"] = task_issue
+            if self._is_task_branch(branch):
+                self.github_client.close_issue_if_open(
+                    issue_number=task_issue,
+                    closing_comment=(
+                        f"PR merged. Flow '{branch}' completed. "
+                        "Closed automatically by vibe check."
+                    ),
+                )
+            else:
+                issue = self.github_client.view_issue(task_issue)
+                if (
+                    issue
+                    and isinstance(issue, dict)
+                    and str(issue.get("state", "")).upper() != "CLOSED"
+                ):
+                    suggestions["issue_to_close"] = task_issue
 
         return suggestions
 

@@ -82,7 +82,6 @@ related_docs:
    - flow 已打开
    - 当前 branch 尚未形成 PR 事实
    - 允许继续开发
-   - 允许通过 `vibe3 flow switch` 重新进入
 - `open + had_pr`
    - flow 尚未关闭
    - 当前 branch 已经形成 PR 事实
@@ -147,7 +146,7 @@ related_docs:
 
 closeout 约束：
 
-- `vibe3 flow done (Python)` 在关闭当前 branch 时，应把当前目录落到安全的、非 detached 的、指向 `main` 的基线分支上；优先使用本地 `main`，若受 `git worktree` 限制则使用当前 worktree 专用的 safe branch
+- PR merged 后，`vibe check` 自动检测 PR 状态并将 flow 标记为 `done`。对 `task/issue-N` 分支，对应 issue 会自动关闭。
 - closeout 完成后，同一物理目录可直接进入下一条 `flow`；"继续开发"默认是新的 `branch` / 新的 `flow`，不是继续占用旧 branch
 
 内部桥接链：

@@ -62,7 +62,7 @@ class TestPRStatusDetection:
         assert flow["flow_status"] == "done"
 
     def test_check_detects_closed_pr(self, tmp_path):
-        """Should mark flow as done when PR is closed."""
+        """Should mark flow as aborted when PR is closed (without merge)."""
         # ARRANGE: Flow with closed PR
         store = SQLiteClient(db_path=tmp_path / "test.db")
         store.update_flow_state(
@@ -78,7 +78,7 @@ class TestPRStatusDetection:
         git_client.get_current_branch.return_value = "task/my-feature"
         git_client.get_git_common_dir.return_value = tmp_path
 
-        # Mock GitHub client to return closed PR
+        # Mock GitHub client to return closed PR (not merged)
         github_client = MagicMock(spec=GitHubClient)
         closed_pr = PRResponse(
             number=42,
@@ -106,9 +106,9 @@ class TestPRStatusDetection:
         )
         service.verify_current_flow()
 
-        # ASSERT: Flow should be marked as done
+        # ASSERT: Flow should be marked as aborted (closed without merge)
         flow = store.get_flow_state("task/my-feature")
-        assert flow["flow_status"] == "done"
+        assert flow["flow_status"] == "aborted"
 
     def test_check_keeps_active_flow_for_open_pr(self, tmp_path):
         """Should NOT mark flow as done when PR is still open."""

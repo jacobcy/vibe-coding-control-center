@@ -26,6 +26,27 @@ VIBE3_PYTHON_CORE="$VIBE3_ROOT/src/vibe3/cli.py"
     exit 1
 }
 
+# Load keys.env to prepare environment for Python code
+# Priority: project config/keys.env > ~/.vibe/config/keys.env > ~/.vibe/keys.env (legacy)
+_vibe3_load_keys() {
+    local keys_file="$1"
+    [[ -f "$keys_file" ]] || return 1
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+        value="${value#\"}" ; value="${value%\"}"
+        value="${value#\'}" ; value="${value%\'}"
+        export "$key=$value"
+    done < "$keys_file"
+    return 0
+}
+
+local project_keys="$VIBE3_ROOT/config/keys.env"
+local global_keys="$HOME/.vibe/config/keys.env"
+
+if _vibe3_load_keys "$project_keys"; then :; \
+else _vibe3_load_keys "$global_keys"; fi
+
 cd "$VIBE3_ROOT"
 export VIBE3_PROG_NAME="vibe3"
 

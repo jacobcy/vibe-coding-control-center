@@ -46,6 +46,19 @@ code_limits:
       - path: "src/vibe3/clients/sqlite_client.py"
         limit: 650
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
+      - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
+        limit: 420
+        reason: |
+          Repo 层职责内聚，包含：
+          - 基础 CRUD 操作（10 个 get 方法）
+          - Soft-delete 扩展（4 个方法）
+          - Cascade delete 逻辑
+          - Query 过滤逻辑（WHERE deleted_at IS NULL）
+
+          拆分会破坏：
+          - 数据访问层完整性
+          - 查询一致性（所有方法都需过滤 deleted_at）
+          - 事务原子性保证
 
       # Commands 层 —— 允许 440-480
       - path: "src/vibe3/commands/task.py"

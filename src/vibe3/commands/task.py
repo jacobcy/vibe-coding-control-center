@@ -66,6 +66,12 @@ def show(
         if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
 
+        # ✅ Handle case where flow not found
+        if not task_result.local_task and target_branch.isdigit():
+            # User provided issue number but no flow exists
+            typer.echo(f"未找到 flow 记录: {target_branch}")
+            typer.echo("提示: 请先创建 flow 或使用完整分支名")
+
         render_task_show(task_result, json_output)
 
         # Always show recent comments (if issue exists and not json output)
@@ -112,7 +118,11 @@ def resume(
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
     failed: Annotated[
-        bool, typer.Option("--failed", help="Resume all failed issues")
+        bool,
+        typer.Option(
+            "--failed",
+            help="[DEPRECATED] Use --blocked instead. Resume all blocked issues",
+        ),
     ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
@@ -129,7 +139,7 @@ def resume(
         typer.Option(
             "--label",
             metavar="[STATE]",
-            help="Clear blocked_reason/failed_reason and restore to specified state "
+            help="Clear blocked_reason and restore to specified state "
             "WITHOUT deleting worktree/branch. "
             "STATE can be: ready, claimed, in-progress, handoff, review, merge-ready. "
             "If --label is provided without value, defaults to 'handoff'.",
@@ -149,7 +159,7 @@ def resume(
     scene back to ready. Or specify issue numbers directly.
 
     **Label-only mode (no worktree deletion)**:
-    Use --label [STATE] to clear blocked_reason/failed_reason and restore
+    Use --label [STATE] to clear blocked_reason and restore
     to specified state WITHOUT deleting worktree/branch.
     - `--label` (no value) or `--label handoff` → restore to handoff
     - `--label ready` → restore to ready
@@ -268,8 +278,15 @@ def resume(
             stale_flows=stale_flows,
         )
 
-        # Filter by state label
-        target_state = IssueState.FAILED if failed else IssueState.BLOCKED
+        if failed:
+            typer.echo(
+                "⚠  --failed is deprecated and will be removed in a future version. "
+                "Use --blocked instead.",
+                err=True,
+            )
+
+        # Filter by state label (FAILED unified to BLOCKED)
+        target_state = IssueState.BLOCKED
 
         # Extract issue numbers matching target state
         issue_numbers = [
@@ -280,8 +297,7 @@ def resume(
         ]
 
         if not issue_numbers:
-            state_name = "failed" if failed else "blocked"
-            typer.echo(f"No {state_name} issues found.")
+            typer.echo("No blocked issues found.")
             return
 
     # Progress callback for verbose output
