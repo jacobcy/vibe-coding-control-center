@@ -239,9 +239,89 @@ for flow in terminal_flows:  # done/merged/aborted
 3. 删除本地 branch
 4. 删除远程 branch
 5. 清理 handoff 文件
-6. 删除 flow 记录（仅在 aborted 场景）
+6. 处理 flow 记录（软删除或保留）
 
-### 6.2 Issue Label 清理
+### 6.2 软删除机制（Soft Delete）
+
+**设计原理**：
+
+Flow 记录采用**软删除**策略，防止意外数据丢失并提供恢复能力：
+
+- **软删除**：设置 `deleted_at` 时间戳，记录仍存在于数据库
+- **硬删除**：物理删除记录及级联数据（需显式指定）
+- **默认软删除**：所有 cleanup 操作默认使用软删除
+
+**数据模型**：
+
+```python
+# FlowState 模型
+deleted_at: str | None = None  # ISO 8601 时间戳
+
+# SQLiteFlowStateRepo 方法
+soft_delete_flow(branch)         # 设置 deleted_at
+hard_delete_flow(branch)          # 物理删除 + 级联
+delete_flow(branch, force=False) # 统一接口（默认软删除）
+restore_flow(branch)              # 恢复软删除记录
+get_deleted_flows()               # 查询所有已删除 flows
+```
+
+**查询行为**：
+
+所有查询方法自动过滤已删除记录：
+
+```python
+# 示例：get_flow_state, get_all_flows, get_flows_by_issue 等
+WHERE deleted_at IS NULL
+```
+
+特殊查询方法：
+
+```python
+get_flow_state_include_deleted(branch)  # 包含已删除记录（用于恢复检查）
+get_deleted_flows()                      # 专门查询已删除记录
+```
+
+**删除策略**：
+
+| Flow Status | 默认行为 | deleted_at | 说明 |
+|-------------|---------|-----------|------|
+| done/merged | 保留记录 | NULL | 审计历史，Issue 已关闭 |
+| aborted | 软删除 | 设置时间戳 | Issue 可能重新打开，允许重建 |
+
+**恢复流程**：
+
+```bash
+# 查看已删除 flows
+vibe flow list-deleted
+
+# 恢复软删除 flow
+vibe flow restore <branch>
+
+# 创建新 flow 自动覆盖已删除记录
+vibe flow create <branch>  # 自动清除 deleted_at
+```
+
+**硬删除场景**：
+
+硬删除仅在以下情况使用：
+
+1. **显式指定**：`force=True` 参数
+2. **数据清理**：测试环境数据清理
+3. **隐私合规**：需要永久删除敏感数据
+
+```python
+# 硬删除示例
+flow_service.delete_flow(branch, force=True)  # 物理删除
+```
+
+**容错保障**：
+
+- ✅ **误删恢复**：软删除记录可通过 `restore_flow()` 恢复
+- ✅ **审计追踪**：保留删除时间戳，支持审计查询
+- ✅ **自动覆盖**：创建新 flow 自动清除 deleted_at
+- ✅ **查询隔离**：普通查询不包含已删除记录，避免污染
+
+### 6.3 Issue Label 清理
 
 **主动恢复**（task resume）：
 ```python
@@ -262,15 +342,18 @@ if flow_status == "aborted":
 - FlowCleanupService 不处理 issue labels
 - 调用者负责协调 resume_issue() 的时机
 
-### 6.3 保留策略
+### 6.5 保留策略
 
 **保留 flow 记录**（done/merged）：
 - 目的：审计历史，统计完成情况
 - Issue 已关闭，无需处理 labels
+- deleted_at 保持 NULL
 
-**删除 flow 记录**（aborted）：
-- 目的：允许 issue 重新开始，无历史包袱
+**软删除 flow 记录**（aborted）：
+- 目的：允许 issue 重新开始，同时保留审计追踪
 - Issue 可能仍在 open，需要恢复 labels
+- deleted_at 设置为删除时间戳
+- 可通过 `vibe flow restore` 恢复
 
 ## 7. 典型场景流程
 
@@ -314,7 +397,7 @@ vibe3 task resume 456
   └─ reset_task_scene(task/issue-456)
       ├─ 删除 worktree
       ├─ 删除 branch
-      └─ 删除 flow 记录 ✅
+      └─ 软删除 flow 记录 ✅
   ↓ Orchestra 重新派发
 Manager 创建新 flow task/issue-456
   └─ 全新开始
@@ -332,6 +415,27 @@ Issue #789 (state/blocked)
   ├─ cleanup_flow_scene(keep_flow_record=False)
   └─ _resume_blocked_issue(task/issue-789)
       └─ issue label: state/blocked → state/ready ✅
+```
+
+### 7.4 软删除恢复流程
+
+```
+Issue #999 (state/blocked)
+  ↓ Flow 被软删除
+vibe check --clean-branch
+  ├─ cleanup_flow_scene(keep_flow_record=False)
+  ├─ deleted_at: "2026-04-28T15:00:00"
+  └─ issue label: state/blocked → state/ready
+  ↓ 用户发现需要恢复
+vibe flow list-deleted
+  └─ 显示: task/issue-999 | deleted_at: 2026-04-28T15:00:00
+  ↓ 恢复软删除 flow
+vibe flow restore task/issue-999
+  ├─ deleted_at: NULL ✅
+  └─ flow 记录恢复可用
+  ↓ 验证恢复结果
+vibe flow show task/issue-999
+  └─ Flow 显示正常，可继续操作
 ```
 
 ## 8. 实现约束
@@ -376,6 +480,11 @@ Issue #789 (state/blocked)
 - 被动清理（check --clean-branch）→ 恢复 labels
 - 依赖阻塞 → 自动恢复
 - FailedGate 自动清理无效 FAILED 标签
+- 软删除设置 deleted_at 时间戳
+- 软删除记录查询自动过滤
+- 软删除恢复流程（restore_flow）
+- 硬删除流程（force=True）
+- 创建新 flow 覆盖已删除记录
 
 ### 8.4 日志审计
 
@@ -383,12 +492,21 @@ Issue #789 (state/blocked)
 ```python
 store.add_event(
     branch,
-    event_type="blocked",  # or "resumed", "done", "aborted"
+    event_type="blocked",  # or "resumed", "done", "aborted", "deleted", "restored"
     actor="manager:claude",
     detail="Agent execution failed",
     refs={"issue": str(issue_number)}
 )
 ```
+
+**软删除相关事件**：
+- `deleted`: 软删除记录，记录删除时间和操作者
+- `restored`: 恢复软删除记录，记录恢复时间
+- 日志示例：
+  ```python
+  logger.info("Soft deleted flow record", branch=branch, deleted_at=now)
+  logger.info("Restored soft-deleted flow", branch=branch)
+  ```
 
 ## 9. 参考文档
 
