@@ -279,12 +279,24 @@ class TaskResumeCandidates:
 
         Args:
             issue_number: GitHub issue number
-            resume_kind: Expected resume kind ("failed", "blocked", or "aborted")
+            resume_kind: Expected resume kind ("failed", "blocked", "aborted", or "all")
             repo: Repository (owner/repo format, optional)
 
         Returns:
-            True if issue state matches resume_kind, False otherwise
+            True if issue can be resumed, False otherwise
         """
+        # ✅ Use authoritative truth: check if issue has merged PR
+        from vibe3.services.pr_status_checker import has_merged_pr_for_issue
+
+        if has_merged_pr_for_issue(issue_number, repo):
+            # Issue has merged PR, cannot be resumed
+            logger.bind(
+                domain="resume",
+                issue_number=issue_number,
+                resume_kind=resume_kind,
+            ).info("Issue has merged PR, cannot be resumed")
+            return False
+
         current_state = self.label_service.get_state(issue_number)
 
         if resume_kind == "all":
