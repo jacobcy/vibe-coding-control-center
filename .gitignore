@@ -141,3 +141,6 @@ openspec/
 .aider*
 MagicMock/
 
+# Symlink to lib/alias (content tracked in lib/)
+alias
+
