@@ -119,8 +119,72 @@ _keys_check() {
     done <<< "$config_output"
     echo ""
 
-    echo "密钥配置：${CYAN}vibe keys init${NC} 初始化配置文件"
-    echo "密钥查看：${CYAN}vibe keys get <KEY_NAME>${NC} 查看特定密钥"
+    # 自定义配置（扫描 keys.env 中的 VIBE_* 变量）
+    _keys_print_custom_vars
+
+    echo ""
+    echo "${BOLD}配置文件:${NC} ${CYAN}$(_keys_file)${NC}"
+    echo ""
+    echo "${BOLD}如何设置:${NC}"
+    echo "  1. 编辑文件: ${CYAN}\${EDITOR:-vim} $(_keys_file)${NC}"
+    echo "  2. 添加变量: KEY=VALUE (每行一个)"
+    echo "  3. 保存后重新打开终端，或运行: ${CYAN}source $(_keys_file)${NC}"
+    echo ""
+    echo "${BOLD}Agent 配置覆盖 (覆盖 config/models.json):${NC}"
+    echo "  VIBE_BACKEND_<ROLE>   如 VIBE_BACKEND_PLANNER=opencode"
+    echo "  VIBE_MODEL_<ROLE>     如 VIBE_MODEL_PLANNER=deepseek/deepseek-v4-pro"
+    echo "  VIBE_DEFAULT_BACKEND  全局默认 backend"
+    echo "  VIBE_DEFAULT_MODEL    全局默认 model"
+}
+
+# ── Scan Custom VIBE_* Variables ───────────────────────────────
+_keys_print_custom_vars() {
+    local kf="$(_keys_file)"
+    [[ -f "$kf" ]] || return 0
+
+    local defined_vars
+    defined_vars="$(_keys_read_config | grep -E "^[^#]" | cut -d'|' -f2 | sort -u)"
+
+    local file_vars=()
+    local line="" var_name="" file_value=""
+    while IFS= read -r line; do
+        [[ "$line" =~ "^#" ]] && continue
+        [[ "$line" =~ "^VIBE_" ]] || continue
+        [[ -z "$line" ]] && continue
+
+        var_name="${line%%=*}"
+        file_value="${line#*=}"
+
+        echo "$defined_vars" | grep -qx "$var_name" && continue
+        [[ -z "$file_value" || "$file_value" =~ "^<.*>$" ]] && continue
+
+        file_vars+=("$var_name|$file_value")
+    done < "$kf"
+
+    if (( ${#file_vars[@]} == 0 )); then
+        return 0
+    fi
+
+    echo "${BOLD}自定义配置 (来自 $(_keys_file_short)):${NC}"
+    for entry in "${file_vars[@]}"; do
+        var_name="${entry%%|*}"
+        file_value="${entry#*|}"
+        if [[ -n "${(P)var_name:-}" ]]; then
+            printf "  ${GREEN}✓${NC} %-25s %s\n" "$var_name" "${(P)var_name}"
+        else
+            printf "  ${YELLOW}!${NC} %-25s %s ${YELLOW}(未加载)${NC}\n" "$var_name" "$file_value"
+        fi
+    done
+}
+
+_keys_file_short() {
+    local path="$(_keys_file)"
+    path="${path/#$HOME/~}"
+    local max_len=40
+    if (( ${#path} > max_len )); then
+        path="...${path: -$max_len}"
+    fi
+    echo "$path"
 }
 
 # ── Get a Key ───────────────────────────────────────────

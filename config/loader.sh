@@ -22,3 +22,17 @@ fi
 if [[ -f "${HOME}/.vibe/config/aliases.sh" ]]; then
     source "${HOME}/.vibe/config/aliases.sh"
 fi
+
+# ---------- Config ----------
+# Load keys.env so VIBE_* vars are available to all tools
+_keys_load() {
+    local f="$1"
+    [[ -f "$f" ]] || return 1
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+        export "$key=$value"
+    done < "$f"
+    return 0
+}
+_keys_load "${HOME}/.vibe/config/keys.env"
