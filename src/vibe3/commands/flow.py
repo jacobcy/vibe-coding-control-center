@@ -255,3 +255,69 @@ def bind(
 app.command(name="blocked")(blocked)
 app.command(name="show")(show)
 app.command(name="status")(status)
+
+
+@app.command(name="list-deleted")
+def list_deleted(
+    json_output: JsonOption = False,
+) -> None:
+    """List all soft-deleted flows (for audit and recovery)."""
+    from rich.table import Table
+
+    from vibe3.clients import SQLiteClient
+
+    store = SQLiteClient()
+    deleted_flows = store.get_deleted_flows()
+
+    if not deleted_flows:
+        console.print("[yellow]No deleted flows found[/]")
+        return
+
+    if json_output:
+        typer.echo(json.dumps(deleted_flows, indent=2, default=str))
+    else:
+        table = Table(title=f"Deleted Flows ({len(deleted_flows)} total)")
+        table.add_column("Branch", style="cyan")
+        table.add_column("Flow Slug", style="magenta")
+        table.add_column("Status", style="yellow")
+        table.add_column("Deleted At", style="red")
+
+        for flow in deleted_flows:
+            table.add_row(
+                flow.get("branch", "?"),
+                flow.get("flow_slug", "?"),
+                flow.get("flow_status", "?"),
+                flow.get("deleted_at", "?"),
+            )
+
+        console.print(table)
+        console.print(
+            "\n[dim]Use 'vibe flow restore <branch>' to recover a deleted flow[/]"
+        )
+
+
+@app.command(name="restore")
+def restore_flow(
+    branch: str,
+    trace: TraceOption = False,
+) -> None:
+    """Restore a soft-deleted flow."""
+    from vibe3.clients import SQLiteClient
+
+    with trace_scope(trace, "flow restore", branch=branch):
+        store = SQLiteClient()
+
+        # Check if flow exists and is deleted
+        flow = store.get_flow_state_include_deleted(branch)
+        if flow is None:
+            console.print(f"[red]Error: Flow '{branch}' not found[/]")
+            raise typer.Exit(1)
+
+        if flow.get("deleted_at") is None:
+            console.print(f"[yellow]Flow '{branch}' is not deleted[/]")
+            raise typer.Exit(0)
+
+        # Restore the flow
+        store.restore_flow(branch)
+        console.print(f"[green]✓[/] Flow '{branch}' restored successfully")
+        console.print(f"[dim]Run 'vibe flow show {branch}' to verify[/]")
