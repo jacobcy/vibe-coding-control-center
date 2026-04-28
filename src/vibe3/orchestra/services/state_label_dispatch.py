@@ -364,9 +364,18 @@ class StateLabelDispatchService(ServiceBase):
             if source_pr:
                 refs["source_pr"] = str(source_pr)
 
+            # Unblock: restore flow_status to "active" (flow resumes execution)
+            # IssueState (GitHub label) and FlowStatus (internal state)
+            # are separate:
+            # - FlowStatus: internal state machine
+            #   (active/blocked/failed/done/stale/aborted)
+            # - IssueState: external GitHub label
+            #   (ready/claimed/in-progress/handoff/review/etc.)
+            # When unblocking, flow becomes active again, while issue label
+            # is updated separately below
             self._store.update_flow_state(
                 branch,
-                flow_status=target_label.value,
+                flow_status="active",  # Restore to active flow state
                 blocked_by_issue=None,
             )
             self._store.add_event(
