@@ -270,17 +270,35 @@ class CodeagentExecutionService:
                 handoff_file=handoff_file,
                 session_id=effective_session_id,
             )
-        except BaseException as exc:
-            if ctx.branch and ctx.store:
-                abort_msg = (
-                    f"{command.role.capitalize()} aborted "
-                    f"(status: aborted, reason: {exc})"
-                )
-                from vibe3.exceptions import AgentExecutionError
+        except Exception as exc:
+            from vibe3.exceptions import AgentExecutionError
+            from vibe3.exceptions.error_classification import classify_error
+            from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-                abort_refs: dict[str, str] = {"reason": str(exc), "status": "aborted"}
+            # Classify error and record to SQLite for threshold tracking.
+            # FailedGate.check() reads SQLite error_log on next heartbeat tick.
+            error_output = f"{type(exc).__name__}: {exc}"
+            error_code = classify_error(error_output)
+
+            error_tracking = ErrorTrackingService.get_instance()
+            error_tracking.record_error(error_code, str(exc))
+
+            # Build abort message
+            abort_msg = (
+                f"{command.role.capitalize()} aborted "
+                f"(status: blocked, error: {error_code})"
+            )
+
+            # Record abort event to flow timeline
+            if ctx.branch and ctx.store:
+                abort_refs: dict[str, str] = {
+                    "reason": str(exc),
+                    "error_code": error_code,
+                    "status": "blocked",
+                }
                 if isinstance(exc, AgentExecutionError) and exc.log_path:
                     abort_refs["log_path"] = str(exc.log_path)
+
                 persist_execution_lifecycle_event(
                     ctx.store,
                     ctx.branch,
@@ -290,8 +308,25 @@ class CodeagentExecutionService:
                     abort_msg,
                     session_id=ctx.session_id,
                     refs=abort_refs,
-                    event_type=f"codeagent_{execution_prefix(command.role)}_aborted",  # type: ignore[arg-type]
+                    event_type=f"codeagent_{execution_prefix(command.role)}_aborted",
                 )
+
+            # Block the issue with error code
+            if command.issue_number is not None:
+                from vibe3.services.issue_failure_service import fail_issue
+
+                blocked_reason = f"{error_code}: {exc}"
+
+                try:
+                    fail_issue(
+                        issue_number=command.issue_number,
+                        reason=blocked_reason,
+                        role=command.role,
+                        actor=ctx.actor,
+                    )
+                except Exception as block_exc:
+                    logger.warning(f"Failed to block issue: {block_exc}", exc_info=True)
+
             raise
 
     def execute_sync_request(

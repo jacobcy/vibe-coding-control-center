@@ -21,9 +21,8 @@ def test_serve_start_preflight_blocked() -> None:
         with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
             mock_check.return_value = GateResult(
                 blocked=True,
-                issue_number=123,
-                issue_title="Broken",
-                reason="System down",
+                reason="Model configuration errors: E_MODEL_NOT_FOUND",
+                blocked_ticks=0,
             )
 
             runner = CliRunner()
@@ -37,43 +36,48 @@ def test_serve_start_preflight_blocked() -> None:
 
             assert result.exit_code == 1
             output = result.output  # Combined stdout + stderr
-            assert "blocked by open state/failed issue" in output
-            assert "issue:  #123" in output
-            assert "reason: System down" in output
-            assert "transition it back to state/handoff" in output
+            assert "blocked by failed gate" in output
+            assert "Model configuration errors" in output
+            assert "vibe3 serve resume" in output
 
 
 @pytest.mark.asyncio
-async def test_heartbeat_tick_not_blocked_by_failed_gate() -> None:
-    """Heartbeat runtime should ignore FailedGate and keep ticking."""
+async def test_heartbeat_tick_blocked_by_active_gate() -> None:
+    """Heartbeat runtime should skip on_tick() when FailedGate is ACTIVE."""
     config = OrchestraConfig(polling_interval=1)
     mock_gate = MagicMock()
-    mock_gate.check.return_value = GateResult(
-        blocked=True, issue_number=123, reason="Blocked"
-    )
+    mock_gate.check.return_value = GateResult(blocked=True, reason="Blocked")
 
     server = HeartbeatServer(config, failed_gate=mock_gate)
     tick_calls: list[str] = []
 
     class TickService:
         service_name = "tick-service"
-        event_types = []
+        event_types: list[str] = []
         is_dispatch_service = True
 
         async def on_tick(self) -> None:
             tick_calls.append("tick")
-            server.stop()
 
     server.register(TickService())
     server._running = True
 
+    call_count = 0
+
     async def _no_wait(_seconds: float) -> None:
-        return None
+        nonlocal call_count
+        call_count += 1
+        # First sleep: let gate check execute
+        # Second sleep: stop server to exit loop
+        if call_count >= 2:
+            server.stop()
 
     with patch("vibe3.runtime.heartbeat.asyncio.sleep", _no_wait):
         await server._tick_loop()
 
-    assert tick_calls == ["tick"]
+    # Gate is ACTIVE → on_tick skipped, blocked_ticks incremented
+    assert tick_calls == []
+    mock_gate.increment_blocked_ticks.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -81,9 +85,7 @@ async def test_event_dispatch_not_blocked_by_failed_gate() -> None:
     """Heartbeat runtime should ignore FailedGate and keep dispatching."""
     config = OrchestraConfig()
     mock_gate = MagicMock()
-    mock_gate.check.return_value = GateResult(
-        blocked=True, issue_number=123, reason="Blocked"
-    )
+    mock_gate.check.return_value = GateResult(blocked=True, reason="Blocked")
 
     server = HeartbeatServer(config, failed_gate=mock_gate)
     mock_service = MagicMock()
@@ -113,13 +115,11 @@ async def test_event_dispatch_not_blocked_for_non_dispatchers() -> None:
 
     config = OrchestraConfig()
     mock_gate = MagicMock()
-    mock_gate.check.return_value = GateResult(
-        blocked=True, issue_number=123, reason="Blocked"
-    )
+    mock_gate.check.return_value = GateResult(blocked=True, reason="Blocked")
 
     server = HeartbeatServer(config, failed_gate=mock_gate)
     svc = NonDispatchService()
-    svc.handle_event = MagicMock(side_effect=asyncio.Future)
+    svc.handle_event = MagicMock(side_effect=asyncio.Future)  # type: ignore[method-assign]
     svc.handle_event.return_value.set_result(None)
     server.register(svc)
 

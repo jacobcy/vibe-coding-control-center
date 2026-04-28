@@ -242,8 +242,8 @@ class TestOrchestrationFacade:
         gate = MagicMock()
         gate.check.return_value = GateResult(
             blocked=True,
-            issue_number=328,
             reason="manager failed",
+            blocked_ticks=0,
         )
 
         facade = OrchestrationFacade(

@@ -1,10 +1,12 @@
 """Tests for HeartbeatServer."""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
@@ -191,7 +193,8 @@ async def test_tick_loop_ignores_failed_gate_and_still_ticks(monkeypatch) -> Non
         if calls["count"] >= 2:
             server.stop()
 
-    mock_gate = type("_Gate", (), {"check": lambda self: None})()
+    mock_gate = MagicMock()
+    mock_gate.check.return_value = GateResult.open_gate()
     server._failed_gate = mock_gate
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)

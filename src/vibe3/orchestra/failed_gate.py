@@ -1,15 +1,19 @@
-"""FailedGate: global freeze signal based on open state/failed issues."""
+"""FailedGate: global freeze signal based on persistent error tracking.
+
+No longer checks GitHub labels. All state is persisted to SQLite:
+- error_log table: records all errors
+- failed_gate_state table: tracks gate activation state
+"""
 
 from __future__ import annotations
 
-import re
+import sqlite3
 from dataclasses import dataclass
-from typing import Any, cast
+from datetime import UTC, datetime
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.clients import SQLiteClient
 
 
 @dataclass(frozen=True)
@@ -17,243 +21,271 @@ class GateResult:
     """Result of a failed gate check."""
 
     blocked: bool
-    issue_number: int | None = None
-    issue_title: str | None = None
     reason: str | None = None
-    comment_url: str | None = None
+    blocked_ticks: int = 0
 
     @classmethod
-    def open(cls) -> GateResult:
+    def open_gate(cls) -> GateResult:
         """Create a non-blocking gate result."""
         return cls(blocked=False)
+
+
+@dataclass
+class GateStatus:
+    """Full status of FailedGate for display."""
+
+    is_active: bool
+    reason: str | None
+    triggered_at: str | None
+    triggered_by_error_code: str | None
+    cleared_at: str | None
+    cleared_by: str | None
+    cleared_reason: str | None
+    blocked_ticks: int
 
 
 class FailedGate:
     """Orchestra failed state gate.
 
-    Checks if there are any open issues with 'state/failed' label and extracts
-    the failure reason from comments to provide a unified freeze signal.
+    State machine:
+    - OPEN: normal operation, check error thresholds each tick
+    - ACTIVE: blocked, increment blocked_ticks, no auto-clear
+
+    Trigger rules:
+    - E_MODEL_* → immediate trigger
+    - E_API_* (2+ in 3 ticks) → trigger
+
+    Persistence:
+    - State saved to failed_gate_state table
+    - Survives process restarts
+    - Manual clear via vibe3 serve resume
     """
 
-    def __init__(
-        self, github: GitHubClient | None = None, repo: str | None = None
-    ) -> None:
-        self._github = github or GitHubClient()
-        self._repo = repo
+    def __init__(self, store: SQLiteClient | None = None) -> None:
+        """Initialize FailedGate with SQLite persistence.
+
+        Args:
+            store: SQLiteClient for database access
+        """
+        self.store = store or SQLiteClient()
+        self.db_path = self.store.db_path
+
+        # Ensure gate state row exists
+        self._init_gate_state()
+
+    def _init_gate_state(self) -> None:
+        """Initialize failed_gate_state table if empty."""
+        with sqlite3.connect(self.db_path) as conn:
+            # Check if row exists
+            row = conn.execute(
+                "SELECT COUNT(*) FROM failed_gate_state WHERE id = 1"
+            ).fetchone()
+
+            if row[0] == 0:
+                # Insert default row (OPEN state)
+                conn.execute("""
+                    INSERT INTO failed_gate_state (id, is_active, blocked_ticks)
+                    VALUES (1, 0, 0)
+                    """)
 
     def check(self) -> GateResult:
         """Check if orchestra dispatch should be frozen.
 
+        Reads from failed_gate_state table:
+        - If ACTIVE: return blocked with reason and blocked_ticks
+        - If OPEN: check error thresholds, maybe activate
+
         Returns:
-            GateResult: blocked=True if any state/failed issue is open
-                and has a non-empty failed_reason.
+            GateResult: blocked=True if gate is ACTIVE or should activate
         """
         log = logger.bind(domain="orchestra", action="failed_gate_check")
-        log.debug("Checking for open state/failed issues")
+        log.debug("Checking failed gate")
 
-        try:
-            # 1. Search for open issues with state/failed label
-            issues = self._list_failed_issues()
-            if not issues:
-                return GateResult.open()
+        # Read current state from database
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute("""
+                SELECT is_active, reason, blocked_ticks
+                FROM failed_gate_state
+                WHERE id = 1
+                """).fetchone()
 
-            # 2. Check each failed issue for valid reason
-            for issue in issues:
-                issue_number = issue["number"]
-                issue_title = issue.get("title", f"Issue #{issue_number}")
+        if not row:
+            log.warning("Failed gate state row missing, assuming OPEN")
+            return GateResult.open_gate()
 
-                log.debug(f"Checking failed issue #{issue_number}")
+        is_active, reason, blocked_ticks = row
 
-                # 3. Check if issue has failed_reason (stored in issue body)
-                has_reason = self._check_failed_reason(issue_number)
-
-                if has_reason:
-                    # Issue has a valid reason, extract it and block
-                    reason, comment_url = self._extract_reason(issue_number)
-                    log.info(
-                        f"Found open state/failed issue #{issue_number} "
-                        f"with reason: {reason[:50] if reason else 'N/A'}"
-                    )
-                    return GateResult(
-                        blocked=True,
-                        issue_number=issue_number,
-                        issue_title=issue_title,
-                        reason=reason,
-                        comment_url=comment_url,
-                    )
-                else:
-                    # Issue has no reason, auto-remove failed label
-                    log.info(
-                        f"Failed issue #{issue_number} has no reason, "
-                        "auto-removing state/failed label"
-                    )
-                    self._remove_failed_label(issue_number)
-
-            # All failed issues have been cleaned up
-            return GateResult.open()
-
-        except Exception as exc:
-            log.error(f"Failed to check failed gate: {exc}")
-            # Fail-closed: If we cannot verify the repository state, we assume
-            # it might be blocked to prevent accidental dispatches during
-            # infrastructure or authentication issues.
+        # If already ACTIVE, return blocked status
+        if is_active:
+            log.error(f"Failed gate is ACTIVE: {reason}")
             return GateResult(
                 blocked=True,
-                reason=f"failed gate check error: {exc}",
+                reason=reason or "Unknown reason",
+                blocked_ticks=blocked_ticks,
             )
 
-    def _list_failed_issues(self) -> list[dict[str, Any]]:
-        """List open issues with state/failed label using gh CLI."""
-        import json
-        import subprocess
+        # If OPEN, check error thresholds (maybe activate)
+        threshold_result = self._check_error_threshold()
 
-        cmd = [
-            "gh",
-            "issue",
-            "list",
-            "--label",
-            IssueState.FAILED.to_label(),
-            "--state",
-            "open",
-            "--json",
-            "number,title",
-        ]
-        if self._repo:
-            cmd.extend(["--repo", self._repo])
+        if threshold_result.blocked:
+            # Threshold reached, activate gate
+            self.activate(threshold_result.reason or "Error threshold reached")
+            return threshold_result
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            err = result.stderr.strip()
-            logger.bind(domain="orchestra").warning(
-                f"Failed to list failed issues: {err}"
-            )
-            raise RuntimeError(f"GitHub CLI error: {err}")
+        # No threshold, gate remains OPEN
+        log.debug("Failed gate is OPEN")
+        return GateResult.open_gate()
 
-        return cast(list[dict[str, Any]], json.loads(result.stdout))
+    def _check_error_threshold(self) -> GateResult:
+        """Check global error thresholds.
 
-    def _extract_reason(self, issue_number: int) -> tuple[str, str | None]:
-        """Extract failure reason from issue comments.
-
-        Priority:
-        1. Latest comment containing '原因:' or 'reason:'
-        2. Latest comment from a manager/orchestra actor
-        3. Latest comment overall (summary)
-        """
-        import json
-        import subprocess
-
-        cmd = [
-            "gh",
-            "issue",
-            "view",
-            str(issue_number),
-            "--json",
-            "comments",
-        ]
-        if self._repo:
-            cmd.extend(["--repo", self._repo])
-
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            return "reason unavailable (failed to fetch comments)", None
-
-        data = json.loads(result.stdout)
-        comments = data.get("comments", [])
-        if not comments:
-            return "reason unavailable (no comments found)", None
-
-        # Reverse to get latest first
-        for comment in reversed(comments):
-            body = comment.get("body", "")
-            url = comment.get("url")
-
-            # Look for explicit reason markers
-            # Matches: 原因: xxx or reason: xxx (case insensitive)
-            match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)
-            if match:
-                reason = match.group(1).strip()
-                if reason:
-                    # Multi-line: take first non-empty line
-                    return reason.split("\n")[0].strip(), url
-
-            # If no explicit marker, check if it looks like a failure report
-            if "failed" in body.lower() or "error" in body.lower():
-                # Take first 100 chars as summary
-                summary = body.strip().split("\n")[0][:100]
-                return f"{summary}...", url
-
-        # Fallback to latest comment summary
-        latest_body = comments[-1].get("body", "").strip().split("\n")[0][:100]
-        return f"{latest_body}...", comments[-1].get("url")
-
-    def _check_failed_reason(self, issue_number: int) -> bool:
-        """Check if issue has a non-empty failed_reason in its body.
-
-        Args:
-            issue_number: GitHub issue number
+        Rules:
+        - E_MODEL_* → immediate block
+        - E_API_* (2+ in recent window) → block
 
         Returns:
-            True if issue has a failed_reason field that is not empty
+            GateResult with blocked=True if threshold reached
         """
-        import json
-        import subprocess
+        from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        cmd = [
-            "gh",
-            "issue",
-            "view",
-            str(issue_number),
-            "--json",
-            "body",
-        ]
-        if self._repo:
-            cmd.extend(["--repo", self._repo])
+        log = logger.bind(domain="orchestra", action="error_threshold_check")
+        log.debug("Checking error threshold")
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            # Cannot determine, assume it has reason to be safe
-            return True
+        error_tracking = ErrorTrackingService.get_instance()
 
-        data = json.loads(result.stdout)
-        body = data.get("body", "")
+        # Check for model config errors (immediate block)
+        if error_tracking.has_model_config_error():
+            error_counts = error_tracking.get_error_counts()
+            model_errors = [
+                code for code in error_counts.keys() if code.startswith("E_MODEL_")
+            ]
+            log.error(f"Model config errors detected: {model_errors}")
+            return GateResult(
+                blocked=True,
+                reason=f"Model configuration errors: {', '.join(model_errors)}",
+            )
 
-        # Check for failed_reason field in issue body
-        # Format: **failed_reason**: <value>
-        # Use MULTILINE flag for more robust matching
-        match = re.search(
-            r"\*\*failed_reason\*\*:\s*([^\n]+?)(?:\n|$)",
-            body,
-            re.IGNORECASE | re.MULTILINE,
-        )
-        if match:
-            reason_value = match.group(1).strip()
-            # Non-empty and not "None" or "null"
-            return bool(reason_value and reason_value.lower() not in ("none", "null"))
+        # Check for frequent API errors (threshold: 2+ in window)
+        api_error_count = error_tracking.get_api_error_count()
 
-        return False
+        if api_error_count >= 2:
+            log.error(f"API error threshold reached: {api_error_count} errors")
+            return GateResult(
+                blocked=True,
+                reason=f"API error threshold: {api_error_count} recent errors",
+            )
 
-    def _remove_failed_label(self, issue_number: int) -> None:
-        """Remove state/failed label from issue.
+        # No threshold reached
+        log.debug(f"Error threshold check passed (API errors: {api_error_count})")
+        return GateResult.open_gate()
+
+    def activate(self, reason: str, error_code: str | None = None) -> None:
+        """Activate failed gate.
 
         Args:
-            issue_number: GitHub issue number
+            reason: Reason for activation
+            error_code: Optional error code that triggered activation
         """
-        import subprocess
+        log = logger.bind(domain="orchestra", action="failed_gate_activate")
+        log.error(f"Activating failed gate: {reason}")
 
-        cmd = [
-            "gh",
-            "issue",
-            "edit",
-            str(issue_number),
-            "--remove-label",
-            IssueState.FAILED.to_label(),
-        ]
-        if self._repo:
-            cmd.extend(["--repo", self._repo])
+        now = datetime.now(UTC).isoformat()
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.bind(domain="orchestra").warning(
-                f"Failed to remove failed label from issue #{issue_number}: "
-                f"{result.stderr.strip()}"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE failed_gate_state
+                SET is_active = 1,
+                    reason = ?,
+                    triggered_at = ?,
+                    triggered_by_error_code = ?,
+                    blocked_ticks = 0
+                WHERE id = 1
+                """,
+                (reason, now, error_code),
             )
+
+    def clear(self, cleared_by: str, reason: str) -> None:
+        """Clear failed gate (manual resume).
+
+        Args:
+            cleared_by: Who cleared (e.g., "admin:manual")
+            reason: Reason for clearing
+        """
+        log = logger.bind(
+            domain="orchestra",
+            action="failed_gate_clear",
+            cleared_by=cleared_by,
+            reason=reason,
+        )
+        log.info("Clearing failed gate")
+
+        now = datetime.now(UTC).isoformat()
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE failed_gate_state
+                SET is_active = 0,
+                    cleared_at = ?,
+                    cleared_by = ?,
+                    cleared_reason = ?,
+                    blocked_ticks = 0,
+                    reason = NULL,
+                    triggered_at = NULL,
+                    triggered_by_error_code = NULL
+                WHERE id = 1
+                """,
+                (now, cleared_by, reason),
+            )
+
+        # Also clear error log
+        from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+        ErrorTrackingService.get_instance().clear(cleared_by, reason)
+
+    def increment_blocked_ticks(self) -> None:
+        """Increment blocked_ticks counter (called each tick when ACTIVE)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE failed_gate_state
+                SET blocked_ticks = blocked_ticks + 1
+                WHERE id = 1 AND is_active = 1
+                """)
+
+    def get_status(self) -> GateStatus:
+        """Get full gate status for display.
+
+        Returns:
+            GateStatus dataclass with all fields
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute("""
+                SELECT is_active, reason, triggered_at, triggered_by_error_code,
+                       cleared_at, cleared_by, cleared_reason, blocked_ticks
+                FROM failed_gate_state
+                WHERE id = 1
+                """).fetchone()
+
+        if not row:
+            return GateStatus(
+                is_active=False,
+                reason=None,
+                triggered_at=None,
+                triggered_by_error_code=None,
+                cleared_at=None,
+                cleared_by=None,
+                cleared_reason=None,
+                blocked_ticks=0,
+            )
+
+        return GateStatus(
+            is_active=bool(row[0]),
+            reason=row[1],
+            triggered_at=row[2],
+            triggered_by_error_code=row[3],
+            cleared_at=row[4],
+            cleared_by=row[5],
+            cleared_reason=row[6],
+            blocked_ticks=row[7],
+        )

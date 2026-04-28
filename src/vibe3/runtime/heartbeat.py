@@ -157,6 +157,29 @@ class HeartbeatServer:
             # Blank line before each tick for visual separation
             append_orchestra_event("server", "")
             append_orchestra_event("server", f"tick #{tick_number} start")
+
+            # Check FailedGate before dispatching
+            if self._failed_gate is not None:
+                gate_result = self._failed_gate.check()
+
+                if gate_result.blocked:
+                    # Gate is ACTIVE - skip dispatch and increment blocked_ticks
+                    self._failed_gate.increment_blocked_ticks()
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} blocked by failed gate: "
+                            f"{gate_result.reason}"
+                        ),
+                    )
+                    logger.bind(domain="orchestra", action="tick").error(
+                        f"Tick #{tick_number} blocked by failed gate: "
+                        f"{gate_result.reason}"
+                    )
+                    # Skip service dispatch, continue to next tick
+                    continue
+
+            # Gate is OPEN (or no gate) - proceed with normal dispatch
             tasks = []
             tick_services: list[str] = []
             for svc in self._services:

@@ -31,7 +31,11 @@ def _ensure_flow_state_for_issue(
     reason: str,
     actor: str,
 ) -> None:
-    """Record block/fail reason on the flow for observability."""
+    """Record block/fail reason on the flow for observability.
+
+    Note: Both block and fail now record to blocked_reason field.
+    The failed_reason field is deprecated - all errors are modeled as blocked.
+    """
     try:
         issue_flow_service = _get_issue_flow_service()
         store = issue_flow_service.store
@@ -55,17 +59,8 @@ def _ensure_flow_state_for_issue(
             refs={"issue": str(issue_number), "action": action},
         )
 
-        # Record reason as display-only field
-        if action == "block":
-            store.update_flow_state(branch, blocked_reason=reason, latest_actor=actor)
-        elif action == "fail":
-            store.update_flow_state(branch, failed_reason=reason, latest_actor=actor)
-        else:
-            logger.bind(
-                domain="flow",
-                action=action,
-                issue_number=issue_number,
-            ).warning(f"Unknown action: {action}")
+        # Record reason as blocked_reason (unified for both block and fail)
+        store.update_flow_state(branch, blocked_reason=reason, latest_actor=actor)
 
     except Exception as e:
         logger.bind(
@@ -158,10 +153,10 @@ def _build_missing_ref_comment(role: str, ref_name: str, reason: str) -> str:
 
 
 _ROLE_FAILURE_COPY = {
-    "review": "审查执行报错,已切换为 state/failed。",
-    "plan": "规划执行报错,已切换为 state/failed。",
-    "run": "执行报错,已切换为 state/failed。",
-    "manager": "管理执行报错,已切换为 state/failed。",
+    "review": "审查执行报错,已切换为 state/blocked。",
+    "plan": "规划执行报错,已切换为 state/blocked。",
+    "run": "执行报错,已切换为 state/blocked。",
+    "manager": "管理执行报错,已切换为 state/blocked。",
 }
 
 _ROLE_MISSING_REF_COPY = {
@@ -191,16 +186,27 @@ def fail_issue(
     role: str,
     actor: str | None = None,
 ) -> None:
-    """Generic fail issue handler."""
+    """Generic fail issue handler.
+
+    Note: This now sets state/blocked instead of state/failed.
+    The failed state is deprecated - all errors are now modeled as blocked
+    with structured blocked_reason field.
+
+    IssueFailed event is still recorded for observability.
+    blocked_reason is recorded in flow state via _ensure_flow_state_for_issue().
+    """
     # Normalize role names
     role = _ROLE_MAP.get(role, role)
     actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
 
+    # Record IssueFailed event for observability (but use blocked state)
+    # This also records blocked_reason to flow state
     _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
 
+    # Transition to BLOCKED state (changed from FAILED to BLOCKED)
     _transition_issue_state(
         issue_number=issue_number,
-        to_state=IssueState.FAILED,
+        to_state=IssueState.BLOCKED,
         actor=actor,
         force=True,
         comment=_build_failure_comment(role, reason),
