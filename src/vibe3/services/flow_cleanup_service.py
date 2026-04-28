@@ -162,10 +162,17 @@ class FlowCleanupService:
             results["worktree"] = False
 
     def _delete_local_branch(self, branch: str, results: dict[str, bool]) -> None:
-        """Delete local branch if exists."""
+        """Delete local branch if exists.
+
+        Note: Uses skip_if_worktree=False to force delete even if Git thinks
+        the branch is in use. This is safe because we already removed the worktree
+        in the previous step. Git's internal worktree pointers may be stale.
+        """
         try:
             if self.git_client.branch_exists(branch):
-                self.git_client.delete_branch(branch, force=True, skip_if_worktree=True)
+                self.git_client.delete_branch(
+                    branch, force=True, skip_if_worktree=False
+                )
                 logger.bind(domain="cleanup", branch=branch).debug(
                     "Deleted local branch"
                 )

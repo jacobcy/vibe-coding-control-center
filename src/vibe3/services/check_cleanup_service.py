@@ -172,6 +172,9 @@ class CheckCleanupService:
                     logger.bind(domain="check", branch=branch).info(
                         "Cleaned aborted flow completely"
                     )
+
+                    # Resume blocked issue to READY (passive cleanup)
+                    self._resume_blocked_issue(branch)
                 else:
                     failed.append(f"{branch}: flow record deletion failed")
         except Exception as exc:
@@ -179,3 +182,72 @@ class CheckCleanupService:
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to clean terminal flow resources: {exc}"
             )
+
+    def _resume_blocked_issue(self, branch: str) -> None:
+        """Resume blocked issue when flow is aborted (passive cleanup).
+
+        This closes the cleanup loop for vibe check --clean-branch:
+        when a flow is detected as aborted and cleaned up, the corresponding
+        issue should return to READY state, allowing it to be dispatched again.
+
+        Args:
+            branch: Branch name (expected to be task/issue-N pattern)
+        """
+        try:
+            from vibe3.models.orchestration import IssueState
+            from vibe3.services.issue_failure_service import resume_issue
+
+            issue_number = self._parse_issue_number(branch)
+            if issue_number is None:
+                logger.bind(domain="check", branch=branch).debug(
+                    "Not a task branch, skipping issue label cleanup"
+                )
+                return
+
+            # Get current state for accurate event record
+            current_state = self._get_issue_state(issue_number)
+            from_state = current_state if current_state else "blocked"
+
+            # Resume issue to READY (force=True bypasses transition rules)
+            resume_issue(
+                issue_number=issue_number,
+                reason="Flow aborted and cleaned up by vibe check --clean-branch",
+                from_state=from_state,
+                to_state=IssueState.READY,
+            )
+
+            logger.bind(domain="check", branch=branch).info(
+                f"Resumed issue #{issue_number} to READY (from {from_state})"
+            )
+        except Exception as exc:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to resume blocked issue: {exc}"
+            )
+
+    def _get_issue_state(self, issue_number: int) -> str | None:
+        """Get current issue state for event record.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            Current state value (e.g., "blocked", "ready") or None if unknown
+        """
+        try:
+            from vibe3.services.label_service import LabelService
+
+            state = LabelService().get_state(issue_number)
+            return state.value if state else None
+        except Exception as exc:
+            logger.bind(
+                domain="check",
+                issue_number=issue_number,
+            ).debug(f"Failed to get issue state: {exc}")
+            return None
+
+    def _parse_issue_number(self, branch: str) -> int | None:
+        """Extract issue number from task/issue-N branch."""
+        import re
+
+        match = re.fullmatch(r"^task/issue-(\d+)$", branch)
+        return int(match.group(1)) if match else None
