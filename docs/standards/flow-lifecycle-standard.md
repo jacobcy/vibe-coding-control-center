@@ -51,14 +51,12 @@ new → active → blocked → active (恢复)
            ↓         ↓
          done      failed → blocked (业务错误)
            ↓
-       merged
-           ↓
-       aborted
+        aborted
 ```
 
 **区分 Flow Status 和 Issue State**：
 
-- **Flow Status**：`active/blocked/done/merged/aborted`（SQLite flow_state）
+- **Flow Status**：`active/blocked/done/aborted`（SQLite flow_state）
   - 描述 flow 的执行状态
   - 图中的 `failed → blocked` 是 Flow Status 的转换
 
@@ -95,12 +93,12 @@ new → active → blocked → active (恢复)
 
 ### 2.2 终端状态处理
 
-Flow 进入终端状态（done/merged/aborted）后：
+Flow 进入终端状态（done/aborted）后：
 
 1. **等待 Check 清理**：`vibe check --clean-branch`
 2. **物理资源回收**：删除 worktree/branch/handoff
 3. **Flow 记录处理**：
-   - done/merged: 保留记录（审计历史）
+   - done: 保留记录（审计历史）
    - aborted: 删除记录（允许重建）
 
 ## 3. Issue → Flow 流转
@@ -229,7 +227,7 @@ PR closed (GitHub webhook)
 
 ```python
 # CheckCleanupService.clean_residual_branches
-for flow in terminal_flows:  # done/merged/aborted
+for flow in terminal_flows:  # done/aborted
     _process_terminal_flow(flow)
 ```
 
@@ -285,7 +283,7 @@ get_deleted_flows()                      # 专门查询已删除记录
 
 | Flow Status | 默认行为 | deleted_at | 说明 |
 |-------------|---------|-----------|------|
-| done/merged | 保留记录 | NULL | 审计历史，Issue 已关闭 |
+| done | 保留记录 | NULL | 审计历史，Issue 已关闭 |
 | aborted | 软删除 | 设置时间戳 | Issue 可能重新打开，允许重建 |
 
 **恢复流程**：
@@ -344,7 +342,7 @@ if flow_status == "aborted":
 
 ### 6.5 保留策略
 
-**保留 flow 记录**（done/merged）：
+**保留 flow 记录**（done）：
 - 目的：审计历史，统计完成情况
 - Issue 已关闭，无需处理 labels
 - deleted_at 保持 NULL

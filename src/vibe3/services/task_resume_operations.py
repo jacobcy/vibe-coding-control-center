@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
+from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
@@ -73,9 +74,24 @@ class TaskResumeOperations:
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,
                     status: str) -> None
+
+        Raises:
+            UserError: If flow has status "done" (completed flows cannot be reset
+                through task resume)
         """
         branch = getattr(flow, "branch", None) if flow else None
         previous_state = self.label_service.get_state(issue_number)
+
+        # Guard: done flows must not be reset — their issue should already
+        # be closed and the flow record preserved as audit history.
+        if isinstance(branch, str):
+            flow_status = self.flow_service.get_flow_status(branch)
+            if flow_status and flow_status.flow_status == "done":
+                raise UserError(
+                    f"Flow '{branch}' is done — cannot reset. "
+                    "Use 'vibe check --clean-branch' to clean physical resources, "
+                    "or close the linked issue manually if still open."
+                )
 
         def emit_progress(step: str, status: str = "running") -> None:
             if progress_callback:

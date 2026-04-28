@@ -21,12 +21,14 @@ class CheckCleanupService:
     """Service for cleaning up terminal flow resources.
 
     Handles the --clean-branch functionality:
-    - done/merged: Clean physical resources, keep flow record as history
+    - done: Clean physical resources, keep flow record as audit history
     - aborted: Clean everything including flow record (allows issue to restart)
     """
 
-    # Terminal flow statuses that indicate completed flows
-    TERMINAL_FLOW_STATUSES = ("done", "aborted", "merged")
+    # Terminal flow statuses that indicate completed flows.
+    # "merged" was a historical status now migrated to "done" by
+    # FlowState.migrate_flow_status in models/flow.py.
+    TERMINAL_FLOW_STATUSES = ("done", "aborted")
 
     def __init__(
         self,
@@ -40,7 +42,7 @@ class CheckCleanupService:
         """Check and clean residual branches for terminal flows.
 
         Different handling based on flow status:
-        - done/merged: Clean physical resources, keep flow record as history
+        - done: Clean physical resources, keep flow record as audit history
         - aborted: Clean everything including flow record (allows issue to restart)
 
         Returns:
@@ -52,7 +54,7 @@ class CheckCleanupService:
             "Checking for residual branches"
         )
 
-        # Get all terminal flows (done/aborted/merged)
+        # Get all terminal flows (done/aborted)
         all_flows = self.store.get_all_flows()
         terminal_flows = [
             f for f in all_flows if f.get("flow_status") in self.TERMINAL_FLOW_STATUSES
@@ -90,7 +92,7 @@ class CheckCleanupService:
 
         summary = f"Cleaned {len(cleaned)} aborted flows"
         if kept_records:
-            summary += f", preserved {len(kept_records)} done/merged records"
+            summary += f", preserved {len(kept_records)} done records"
         if removed_invalid:
             summary += f", removed {len(removed_invalid)} invalid records"
         if failed:
@@ -140,15 +142,15 @@ class CheckCleanupService:
 
         Args:
             branch: Branch name
-            flow_status: Flow status (done/merged/aborted)
+            flow_status: Flow status (done/aborted)
             cleanup_service: Cleanup service instance
             cleaned: List to append successfully cleaned aborted flows
-            kept_records: List to append done/merged flows with preserved records
+            kept_records: List to append done flows with preserved records
             failed: List to append failure messages
         """
-        # done/merged: keep record as history (issue is closed)
+        # done: keep record as audit history (issue is closed, PR was merged)
         # aborted: delete record (issue may still be open, allow restart)
-        keep_flow_record = flow_status in ("done", "merged")
+        keep_flow_record = flow_status == "done"
 
         try:
             results = cleanup_service.cleanup_flow_scene(
@@ -159,11 +161,11 @@ class CheckCleanupService:
             )
 
             if keep_flow_record:
-                # done/merged: success if physical resources cleaned
+                # done: success if physical resources cleaned
                 if results.get("worktree", False) or results.get("local_branch", False):
                     kept_records.append(branch)
                     logger.bind(domain="check", branch=branch).info(
-                        "Cleaned done/merged flow resources, kept record"
+                        "Cleaned done flow resources, kept record"
                     )
             else:
                 # aborted: success if flow record deleted
@@ -190,6 +192,8 @@ class CheckCleanupService:
         when a flow is detected as aborted and cleaned up, the corresponding
         issue should return to READY state, allowing it to be dispatched again.
 
+        Skips already-closed issues to avoid reopening completed work.
+
         Args:
             branch: Branch name (expected to be task/issue-N pattern)
         """
@@ -204,11 +208,22 @@ class CheckCleanupService:
                 )
                 return
 
-            # Get current state for accurate event record
+            from vibe3.clients.github_client import GitHubClient
+
+            gh = GitHubClient()
+            gh_issue = gh.view_issue(issue_number)
+            if (
+                isinstance(gh_issue, dict)
+                and str(gh_issue.get("state", "")).upper() == "CLOSED"
+            ):
+                logger.bind(domain="check", branch=branch).info(
+                    f"Issue #{issue_number} already closed, skip resume"
+                )
+                return
+
             current_state = self._get_issue_state(issue_number)
             from_state = current_state if current_state else "blocked"
 
-            # Resume issue to READY (force=True bypasses transition rules)
             resume_issue(
                 issue_number=issue_number,
                 reason="Flow aborted and cleaned up by vibe check --clean-branch",
