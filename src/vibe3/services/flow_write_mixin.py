@@ -3,13 +3,13 @@
 Inherits from FlowReadMixin to access get_flow_status method.
 """
 
-from typing import Self
+from typing import Any, Self
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
+from vibe3.models.flow import FlowState, FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_read_mixin import FlowReadMixin
 from vibe3.services.signature_service import SignatureService
 
@@ -150,16 +150,35 @@ class FlowWriteMixin(FlowReadMixin):
 
         return status
 
-    def update_flow_metadata(self: Self, branch: str, **updates: object) -> None:
-        """Update flow metadata fields (slug, actor, etc.).
+    def update_flow_metadata(self: Self, branch: str, **updates: Any) -> None:
+        """Update flow metadata fields (slug, actor, etc.) with business validation.
 
         Encapsulates store.update_flow_state so commands don't need
-        direct store access.
+        direct store access. Validates flow_status if provided to prevent
+        type confusion bugs (IssueState vs FlowStatus).
 
         Args:
             branch: Flow branch name
             **updates: Keyword args passed to store.update_flow_state
+
+        Raises:
+            ValueError: If flow_status is not a valid FlowStatus value
         """
+        # Validate flow_status if provided
+        if "flow_status" in updates:
+            # Get valid flow_status values from FlowState model definition
+            valid_statuses = FlowState.model_fields["flow_status"].annotation
+            # Extract Literal values
+            from typing import get_args
+
+            valid_values = get_args(valid_statuses)
+
+            if updates["flow_status"] not in valid_values:
+                raise ValueError(
+                    f"Invalid flow_status '{updates['flow_status']}'. "
+                    f"Must be one of: {valid_values}"
+                )
+
         self.store.update_flow_state(branch, **updates)
 
     def delete_flow(self: Self, branch: str, force: bool = False) -> None:

@@ -62,13 +62,12 @@ class SQLiteFlowStateRepo:
             return None
 
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
-        """Update flow state with validation.
+        """Update flow state fields.
 
-        Validates flow_status against FlowStatus schema to prevent
-        type confusion bugs (IssueState vs FlowStatus).
+        Validation is handled at the service layer (FlowStateService).
 
         Raises:
-            ValueError: If flow_status is not a valid FlowStatus value
+            ValueError: If invalid fields are provided
         """
         if "updated_at" not in kwargs:
             kwargs["updated_at"] = datetime.datetime.now().isoformat()
@@ -76,19 +75,6 @@ class SQLiteFlowStateRepo:
         invalid_fields = set(kwargs.keys()) - self.VALID_FLOW_STATE_FIELDS
         if invalid_fields:
             raise ValueError(f"Invalid flow_state fields: {invalid_fields}")
-
-        # Validate flow_status against FlowState schema
-        if "flow_status" in kwargs:
-            from typing import get_args
-
-            from vibe3.models.flow import FlowState
-
-            valid_statuses = get_args(FlowState.model_fields["flow_status"].annotation)
-            if kwargs["flow_status"] not in valid_statuses:
-                raise ValueError(
-                    f"Invalid flow_status '{kwargs['flow_status']}'. "
-                    f"Must be one of: {valid_statuses}"
-                )
 
         fields = list(kwargs.keys())
         values = [kwargs[f] for f in fields]
