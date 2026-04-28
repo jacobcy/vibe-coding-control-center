@@ -14,7 +14,6 @@ from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
-    resume_failed_issue_to_ready,
     resume_issue,
 )
 
@@ -148,14 +147,7 @@ class TaskResumeOperations:
         else:
             # Original logic: delete worktree/branch for full rebuild
             emit_progress("full rebuild mode")
-            if resume_kind == "failed":
-                emit_progress("clearing failed state")
-                resume_failed_issue_to_ready(
-                    issue_number=issue_number,
-                    repo=repo,
-                    reason=reason,
-                )
-            elif resume_kind == "blocked":
+            if resume_kind == "blocked":
                 emit_progress("clearing blocked state")
                 resume_blocked_issue_to_ready(
                     issue_number=issue_number,

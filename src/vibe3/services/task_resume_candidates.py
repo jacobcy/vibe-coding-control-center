@@ -304,9 +304,7 @@ class TaskResumeCandidates:
         if current_state is None:
             return False
 
-        if resume_kind == "failed":
-            return current_state.value == "failed"
-        elif resume_kind == "blocked":
+        if resume_kind == "blocked":
             return current_state.value == "blocked"
         elif resume_kind == "aborted":
             # Aborted flows can be resumed from READY or HANDOFF states

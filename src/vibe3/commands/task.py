@@ -118,7 +118,11 @@ def resume(
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
     failed: Annotated[
-        bool, typer.Option("--failed", help="Resume all failed issues")
+        bool,
+        typer.Option(
+            "--failed",
+            help="[DEPRECATED] Use --blocked instead. Resume all blocked issues",
+        ),
     ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
@@ -273,6 +277,13 @@ def resume(
             queued_set=set(),
             stale_flows=stale_flows,
         )
+
+        if failed:
+            typer.echo(
+                "⚠  --failed is deprecated and will be removed in a future version. "
+                "Use --blocked instead.",
+                err=True,
+            )
 
         # Filter by state label (FAILED unified to BLOCKED)
         target_state = IssueState.BLOCKED
