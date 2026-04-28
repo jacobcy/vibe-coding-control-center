@@ -80,10 +80,10 @@ code_limits:
         limit: 450
         reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑"
 
-      # Server —— 允许 470
+      # Server —— 允许 480
       - path: "src/vibe3/server/app.py"
-        limit: 470
-        reason: "Orchestra CLI 入口聚合，职责单一"
+        limit: 480
+        reason: "Orchestra CLI 入口聚合，职责单一（包含 FailedGate/ErrorTracking status 显示）"
       - path: "src/vibe3/server/registry.py"
         limit: 420
         reason: "Orchestra PID/tmux 管理，多进程协调辅助函数共生"
