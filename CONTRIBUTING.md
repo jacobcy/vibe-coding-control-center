@@ -8,6 +8,13 @@
 - 保持最小改动范围，避免无关重构。
 - 变更需要有清晰的动机与说明，便于 review。
 
+## V3 开发工作流
+
+- 默认先用 `uv run python src/vibe3/cli.py check`、`status`、`flow show`、`handoff show` 校准现场。
+- Python 运行时与共享状态相关改动，优先执行 `uv run pytest tests/vibe3` 进行验证。
+- Shell 兼容层只在需要维护 `bin/`、`lib/`、`config/` 时再跑 Bats / shellcheck。
+- 涉及 V3 语义或工作流的文档更新，优先对齐 `docs/standards/v3/` 与 `CLAUDE.md`。
+
 ## 分支管理与保护
 
 为了维护 `main` 分支的稳定性，我们实施了严格的分支保护规则（Rulesets）。

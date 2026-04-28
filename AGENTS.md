@@ -31,6 +31,8 @@ Follow this reading order. Each document is the authority for its domain:
 
 ## 📍 Project Identity
 
+V3 是默认执行链：flow、handoff、orchestra 和 role dispatch 的语义真源都在 V3 Python + `docs/standards/v3/`。V2 仍然存在，但只作为兼容入口和环境工具。
+
 This project has **two parallel implementations**:
 
 1. **V2 (Shell)** — Zsh alias 和环境工具（`bin/`, `lib/`, `config/aliases.zsh`）

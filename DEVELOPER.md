@@ -45,6 +45,7 @@
 ### 2.3 验证环境
 ```bash
 bin/vibe check       # 环境诊断
+uv run python src/vibe3/cli.py check  # V3 一致性与共享状态审计
 bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
@@ -54,6 +55,7 @@ bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 V3 相关工作优先用 Python 入口和 V3 标准来校准语义：
 
 ```bash
+uv run python src/vibe3/cli.py check
 uv run python src/vibe3/cli.py status
 uv run python src/vibe3/cli.py flow show
 uv run python src/vibe3/cli.py handoff show
