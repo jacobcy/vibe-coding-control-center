@@ -131,7 +131,7 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
-            if issue.state in {IssueState.FAILED, IssueState.DONE}:
+            if issue.state == IssueState.DONE:
                 self._frozen_queue.pop(index)
                 continue
 
@@ -282,8 +282,8 @@ class GlobalDispatchCoordinator:
                 retained.append(entry)
                 continue
 
-            # Blocked/failed states require human intervention - remove from queue
-            if current_state in ("blocked", "failed"):
+            # Blocked state requires human intervention - remove from queue
+            if current_state == "blocked":
                 removed.append(entry)
                 append_orchestra_event(
                     "dispatcher",

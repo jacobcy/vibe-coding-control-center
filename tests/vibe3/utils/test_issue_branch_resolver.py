@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
@@ -38,9 +36,15 @@ def test_resolve_issue_branch_input_preserves_non_numeric_branch() -> None:
     flow_service.get_flow_state.assert_not_called()
 
 
-def test_resolve_issue_branch_input_raises_when_issue_branch_missing() -> None:
+def test_resolve_issue_branch_input_returns_original_when_issue_branch_missing() -> (
+    None
+):
+    """Test that the function returns original input instead of raising error.
+
+    This allows task show/status to query issue state even without flow.
+    """
     flow_service = MagicMock()
     flow_service.get_flow_state.return_value = None
 
-    with pytest.raises(RuntimeError, match="436"):
-        resolve_issue_branch_input("436", flow_service)
+    result = resolve_issue_branch_input("436", flow_service)
+    assert result == "436"

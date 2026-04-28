@@ -15,13 +15,17 @@ class FlowCategory(str, Enum):
 
 
 class FlowState(str, Enum):
-    """Flow execution state for display grouping."""
+    """Flow execution state for display grouping.
 
-    ACTIVE = "active"  # Normal active flow
-    BLOCKED = "blocked"  # Flow is blocked (blocked_by field set)
-    DONE = "done"  # Flow completed
-    ABORTED = "aborted"  # Flow aborted
-    STALE = "stale"  # Flow marked as stale
+    Note: This is for UI grouping only. The actual blocked status is
+    inferred from IssueState.BLOCKED label, not from flow_status.
+    """
+
+    ACTIVE = "active"
+    BLOCKED = "blocked"  # Inferred from blocked_reason presence
+    DONE = "done"
+    ABORTED = "aborted"
+    STALE = "stale"
 
 
 def classify_flow(flow: FlowStatusResponse) -> FlowCategory:
@@ -50,18 +54,25 @@ def classify_flow(flow: FlowStatusResponse) -> FlowCategory:
 
 
 def get_flow_state(flow: FlowStatusResponse) -> FlowState:
-    """Get flow execution state for grouping.
+    """Get flow execution state for display grouping.
+
+    Blocked status is inferred from blocked_reason presence rather than
+    flow_status, since blocked/failed were removed from flow_status literal.
 
     Args:
         flow: Flow status response
 
     Returns:
-        Flow state for display grouping
+        Flow state enum for display grouping
     """
-    # Map flow_status to FlowState
+    # Blocked: inferred from blocked_reason (single source of truth is
+    # IssueState.BLOCKED label, blocked_reason is local metadata)
+    if flow.blocked_reason:
+        return FlowState.BLOCKED
+
+    # Map flow_status to display state
     status_to_state = {
         "active": FlowState.ACTIVE,
-        "blocked": FlowState.BLOCKED,
         "done": FlowState.DONE,
         "aborted": FlowState.ABORTED,
         "stale": FlowState.STALE,

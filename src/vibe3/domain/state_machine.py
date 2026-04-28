@@ -16,7 +16,6 @@ STATE_LABEL_META: dict[IssueState, tuple[str, str]] = {
     IssueState.CLAIMED: ("1D76DB", "Claimed and waiting for planning"),
     IssueState.IN_PROGRESS: ("FBCA04", "Execution in progress"),
     IssueState.BLOCKED: ("D93F0B", "Blocked and waiting for follow-up"),
-    IssueState.FAILED: ("B60205", "Execution failed and needs recovery"),
     IssueState.HANDOFF: ("5319E7", "Waiting for manager handoff decision"),
     IssueState.REVIEW: ("0052CC", "Waiting for review execution"),
     IssueState.MERGE_READY: ("0E8A16", "Ready to merge"),

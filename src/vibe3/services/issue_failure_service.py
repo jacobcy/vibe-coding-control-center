@@ -72,7 +72,6 @@ def _ensure_flow_state_for_issue(
 
 
 _TERMINAL_LABELS = {
-    IssueState.FAILED.to_label(),
     IssueState.BLOCKED.to_label(),
 }
 
@@ -256,7 +255,7 @@ def resume_issue(
     *,
     issue_number: int,
     reason: str,
-    from_state: str,  # "failed" or "blocked"
+    from_state: str = "blocked",  # Unified: only "blocked" now
     to_state: IssueState = IssueState.READY,
     repo: str | None = None,
     actor: str = "human:resume",
@@ -266,7 +265,7 @@ def resume_issue(
     Args:
         issue_number: GitHub issue number
         reason: Resume reason for comment
-        from_state: Previous state (failed, blocked)
+        from_state: Previous state (now always "blocked")
         to_state: Target state (default: READY)
         repo: Optional repository
         actor: Actor name for events
@@ -289,20 +288,16 @@ def resume_issue(
                 },
             )
 
-    action_text = "恢复" if from_state == "blocked" else "继续"
+    action_text = "恢复"
     header = (
         f"[resume] 已从 state/{from_state} {action_text}到 state/{to_state.value}。"
     )
 
     if to_state == IssueState.READY:
-        detail = (
-            "阻塞已解除,准备继续执行。"
-            if from_state == "blocked"
-            else "将重新进入 manager 标准入口。"
-        )
+        detail = "阻塞已解除,准备继续执行。"
     else:
         detail = (
-            "已清除 blocked_reason/failed_reason，保留 worktree现场。\n"
+            "已清除 blocked_reason，保留 worktree 现场。\n"
             "后续可在当前 worktree 继续推进。"
         )
 
@@ -407,10 +402,15 @@ def block_reviewer_noop_issue(
 def resume_failed_issue_to_ready(
     *, issue_number: int, repo: str | None, reason: str, actor: str = "human:resume"
 ) -> None:
+    """Resume from failed/blocked to ready.
+
+    Note: FAILED is now unified to BLOCKED. This function remains for
+    backward compatibility but uses from_state="blocked".
+    """
     resume_issue(
         issue_number=issue_number,
         reason=reason,
-        from_state="failed",
+        from_state="blocked",
         repo=repo,
         actor=actor,
     )

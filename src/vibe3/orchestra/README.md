@@ -48,8 +48,9 @@ driver 在 heartbeat tick 中消费已有 `state/*`：
 
 补充：
 
-- `state/blocked` 表示 manager 业务上无法推进
-- `state/failed` 表示执行器/运行时报错，并暂停新的自动任务进入
+- `state/blocked` 表示无法继续推进（包括业务阻塞和执行失败）
+  - blocked_reason 字段记录具体原因
+  - 人工 resume 恢复执行
 
 ## 内置 Service
 

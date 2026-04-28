@@ -94,11 +94,11 @@ class TestDependencyChecking:
             # Should NOT collect this issue (it's waiting)
             assert len(issues) == 0
 
-            # Should mark as waiting (now blocked)
+            # Should mark as waiting (blocked metadata, not flow_status)
             store.update_flow_state.assert_called_once()
             call_kwargs = store.update_flow_state.call_args[1]
-            assert call_kwargs["flow_status"] == "blocked"
             assert call_kwargs["blocked_by_issue"] == 301
+            assert call_kwargs["blocked_reason"] == "Blocked by unresolved dependencies"
 
             # Should add event
             store.add_event.assert_called_once()
@@ -220,12 +220,11 @@ class TestDependencyChecking:
             # Should NOT collect (one dependency unsatisfied)
             assert len(issues) == 0
 
-            # Should mark as waiting
+            # Should mark as waiting (blocked metadata, not flow_status)
             store.update_flow_state.assert_called_once()
             call_kwargs = store.update_flow_state.call_args[1]
-            assert call_kwargs["flow_status"] == "blocked"
-            # Primary dependency should be first unresolved
             assert call_kwargs["blocked_by_issue"] == 302
+            assert call_kwargs["blocked_reason"] == "Blocked by unresolved dependencies"
 
     def test_issue_with_multiple_dependencies_all_satisfied(self) -> None:
         """Issue with multiple dependencies (all satisfied) should be ready."""

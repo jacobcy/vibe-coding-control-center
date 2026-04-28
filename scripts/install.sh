@@ -153,10 +153,10 @@ done
 log_success "Core modules synced"
 
 # 4. Handle Key Template
-if [[ ! -f "$INSTALL_DIR/keys.env" ]]; then
+if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
     log_info "Initializing keys.env from template..."
-    cp "$SOURCE_ROOT/config/keys.template.env" "$INSTALL_DIR/keys.env"
-    chmod 600 "$INSTALL_DIR/keys.env"
+    cp "$SOURCE_ROOT/config/keys.template.env" "$INSTALL_DIR/config/keys.env"
+    chmod 600 "$INSTALL_DIR/config/keys.env"
 fi
 
 # 4.5 Sync canonical skills manifest
@@ -253,6 +253,6 @@ echo -e "\n${BOLD}NEXT STEPS:${NC}"
 echo "1. Reload shell: ${CYAN}source $RC_FILE${NC}"
 echo "2. 进入项目后使用引导式入口：${CYAN}/vibe-onboard${NC}"
 echo "3. 或手工检查：${CYAN}vibe doctor${NC} / ${CYAN}vibe keys check${NC}"
-echo "4. 手动编辑密钥文件：${CYAN}\${EDITOR:-vim} ~/.vibe/keys.env${NC}"
+echo "4. 手动编辑密钥文件：${CYAN}\${EDITOR:-vim} ~/.vibe/config/keys.env${NC}"
 echo "5. 检查 skills 体系：${CYAN}vibe skills check${NC} / ${CYAN}/vibe-skills-manager${NC}"
 echo "----------------------------------------"

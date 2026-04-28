@@ -12,12 +12,14 @@ class TestIssueState:
     """Tests for IssueState enum."""
 
     def test_all_states_defined(self):
-        """Test that all expected states are defined."""
+        """Test that all expected states are defined.
+
+        Note: FAILED removed (2026-04-28) - unified to BLOCKED.
+        """
         assert IssueState.READY == "ready"
         assert IssueState.CLAIMED == "claimed"
         assert IssueState.IN_PROGRESS == "in-progress"
         assert IssueState.BLOCKED == "blocked"
-        assert IssueState.FAILED == "failed"
         assert IssueState.HANDOFF == "handoff"
         assert IssueState.REVIEW == "review"
         assert IssueState.MERGE_READY == "merge-ready"
@@ -88,11 +90,10 @@ class TestTransitionRules:
     def test_allowed_transitions_count(self):
         """Test that we have expected number of allowed transitions.
 
-        Removed: MERGE_READY→IN_PROGRESS (executor stays in merge-ready for publish)
-        Added: MERGE_READY→HANDOFF (executor publish completes → manager reviews PR)
-        Kept: HANDOFF→DONE (manager concludes after PR review)
+        FAILED removed (2026-04-28): 7 FAILED transitions removed.
+        Original: 22, Now: 15
         """
-        assert len(ALLOWED_TRANSITIONS) == 22
+        assert len(ALLOWED_TRANSITIONS) == 15
 
     def test_main_chain_transitions_allowed(self):
         """Test that main chain transitions are allowed."""
@@ -109,8 +110,9 @@ class TestTransitionRules:
     def test_side_path_transitions_allowed(self):
         """Test that side path transitions are allowed.
 
-        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF
-        Blocked state requires manual intervention (force=True for resume)
+        Fixed Issue #303: Removed BLOCKED→CLAIMED and BLOCKED→HANDOFF.
+        Blocked state requires manual intervention (force=True for resume).
+        FAILED removed (2026-04-28): All FAILED transitions removed.
         """
         # → blocked transitions (allowed)
         assert (IssueState.READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
@@ -120,18 +122,9 @@ class TestTransitionRules:
         assert (IssueState.REVIEW, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.MERGE_READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
 
-        # blocked → other transitions (NOT allowed, removed)
+        # blocked → other transitions (NOT allowed, requires force=True)
         assert (IssueState.BLOCKED, IssueState.CLAIMED) not in ALLOWED_TRANSITIONS
         assert (IssueState.BLOCKED, IssueState.HANDOFF) not in ALLOWED_TRANSITIONS
-
-        # failed transitions (allowed)
-        assert (IssueState.CLAIMED, IssueState.FAILED) in ALLOWED_TRANSITIONS
-        assert (IssueState.IN_PROGRESS, IssueState.FAILED) in ALLOWED_TRANSITIONS
-        assert (IssueState.REVIEW, IssueState.FAILED) in ALLOWED_TRANSITIONS
-        assert (IssueState.FAILED, IssueState.CLAIMED) in ALLOWED_TRANSITIONS
-        assert (IssueState.FAILED, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
-        assert (IssueState.FAILED, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
-        assert (IssueState.FAILED, IssueState.REVIEW) in ALLOWED_TRANSITIONS
 
     def test_closure_path_transitions_allowed(self):
         """Test that closure path transitions are allowed."""
@@ -143,8 +136,12 @@ class TestTransitionRules:
         assert (IssueState.READY, IssueState.DONE) not in ALLOWED_TRANSITIONS
 
     def test_forbidden_transitions_count(self):
-        """Test that we have expected number of forbidden transitions."""
-        assert len(FORBIDDEN_TRANSITIONS) == 5
+        """Test that we have expected number of forbidden transitions.
+
+        FAILED removed (2026-04-28): (FAILED, DONE) removed.
+        Original: 5, Now: 4
+        """
+        assert len(FORBIDDEN_TRANSITIONS) == 4
 
     def test_skip_to_done_forbidden(self):
         """Test that skipping to done is forbidden."""
@@ -152,7 +149,6 @@ class TestTransitionRules:
         assert (IssueState.READY, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.CLAIMED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.BLOCKED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
-        assert (IssueState.FAILED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.MERGE_READY, IssueState.DONE) in FORBIDDEN_TRANSITIONS
 
     def test_allowed_not_in_forbidden(self):

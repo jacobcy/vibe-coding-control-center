@@ -86,9 +86,7 @@ def issue_priority(state: IssueState) -> tuple[int, str]:
         return (1, state.value)
     if state == IssueState.BLOCKED:
         return (2, state.value)
-    if state == IssueState.FAILED:
-        return (3, state.value)
-    return (4, state.value)
+    return (3, state.value)
 
 
 def is_auto_task_branch(branch: str) -> bool:
@@ -281,12 +279,9 @@ class StatusQueryService:
             flow = issue_to_flow.get(number)
             if flow and not is_orchestra_managed_flow_branch(flow.branch):
                 continue
-            # Get failed_reason from flow state (avoid GitHub API call)
-            failed_reason = None
-            if state == IssueState.FAILED and flow:
-                failed_reason = getattr(flow, "failed_reason", None)
 
             # Get blocked_by and blocked_reason from flow state
+            # (Note: failed_reason is deprecated, now unified to blocked_reason)
             blocked_by = None
             blocked_reason = None
             if state == IssueState.BLOCKED and flow:
@@ -326,7 +321,6 @@ class StatusQueryService:
                     "assignee": assignee,
                     "flow": flow,
                     "queued": number in queued_set,
-                    "failed_reason": failed_reason,
                     "blocked_by": blocked_by,
                     "blocked_reason": blocked_reason,
                     # PR data
@@ -413,13 +407,10 @@ class StatusQueryService:
             state = issue.get("state")
             flow = issue.get("flow")
 
-            if state == IssueState.FAILED:
-                # Failed issues are always resumable
-                resumable.append({**issue, "resume_kind": "failed"})
-            elif state == IssueState.BLOCKED:
-                # Blocked issues are resumable only if flow is stale
+            if state == IssueState.BLOCKED:
+                # Blocked issues are resumable only if flow is stale or aborted
                 if flow is not None and hasattr(flow, "flow_status"):
-                    if flow.flow_status == "stale":
+                    if flow.flow_status in ("stale", "aborted"):
                         resumable.append({**issue, "resume_kind": "blocked"})
             else:
                 # For other states (READY, HANDOFF), check if flow is aborted

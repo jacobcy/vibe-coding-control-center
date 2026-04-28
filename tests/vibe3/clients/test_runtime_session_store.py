@@ -160,6 +160,7 @@ def test_runtime_session_all_fields(tmp_path: pytest.TempPathFactory) -> None:
 def test_delete_flow_removes_flow_truth_and_runtime_sessions(
     tmp_path: pytest.TempPathFactory,
 ) -> None:
+    """Hard delete flow should remove all flow data permanently."""
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     branch = "task/issue-500"
 
@@ -180,7 +181,8 @@ def test_delete_flow_removes_flow_truth_and_runtime_sessions(
     assert store.get_issue_links(branch)
     assert store.get_runtime_session(session_id) is not None
 
-    store.delete_flow(branch)
+    # Hard delete to remove all data
+    store.delete_flow(branch, force=True)
 
     assert store.get_flow_state(branch) is None
     assert store.get_events(branch) == []

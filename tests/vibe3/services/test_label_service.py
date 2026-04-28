@@ -86,22 +86,22 @@ def test_confirm_issue_state_creates_missing_target_label() -> None:
     port = FakeIssuePort({123: ["state/claimed"]})
     service = LabelService(issue_port=port)
 
-    result = service.confirm_issue_state(123, IssueState.FAILED, actor="agent:manager")
+    result = service.confirm_issue_state(123, IssueState.BLOCKED, actor="agent:manager")
 
     assert result == "advanced"
-    assert port.labels[123] == ["state/failed"]
-    assert "state/failed" in port.repo_labels
+    assert port.labels[123] == ["state/blocked"]
+    assert "state/blocked" in port.repo_labels
 
 
-def test_confirm_issue_state_allows_failed_to_handoff_recovery() -> None:
-    port = FakeIssuePort({123: ["state/failed"]})
+def test_confirm_issue_state_blocked_to_handoff_requires_force() -> None:
+    """BLOCKED -> HANDOFF is forbidden (requires force=True via resume)."""
+    port = FakeIssuePort({123: ["state/blocked"]})
     service = LabelService(issue_port=port)
 
     result = service.confirm_issue_state(123, IssueState.HANDOFF, actor="agent:manager")
 
-    assert result == "advanced"
-    assert port.labels[123] == ["state/handoff"]
-    assert "state/handoff" in port.repo_labels
+    assert result == "blocked"
+    assert port.labels[123] == ["state/blocked"]
 
 
 def test_confirm_issue_state_keeps_old_label_when_add_fails() -> None:
@@ -109,7 +109,7 @@ def test_confirm_issue_state_keeps_old_label_when_add_fails() -> None:
     port.fail_add = True
     service = LabelService(issue_port=port)
 
-    result = service.confirm_issue_state(123, IssueState.FAILED, actor="agent:manager")
+    result = service.confirm_issue_state(123, IssueState.BLOCKED, actor="agent:manager")
 
     assert result == "blocked"
     assert port.labels[123] == ["state/claimed"]
@@ -120,7 +120,7 @@ def test_confirm_issue_state_returns_blocked_when_ensure_fails() -> None:
     port.fail_ensure = True
     service = LabelService(issue_port=port)
 
-    result = service.confirm_issue_state(123, IssueState.FAILED, actor="agent:manager")
+    result = service.confirm_issue_state(123, IssueState.BLOCKED, actor="agent:manager")
 
     assert result == "blocked"
     assert port.labels[123] == ["state/claimed"]

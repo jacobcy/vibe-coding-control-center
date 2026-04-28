@@ -217,12 +217,13 @@ related_docs:
   - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。
   - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。
   - 判定标准：依赖项在 GitHub 上进入 `closed` 终态即视为满足。
-  - 自动巡逻：Orchestra 会主动拉取该状态任务进入“资格门”校验，满足条件后自动解套并智能恢复到正确阶段。
+  - 自动巡逻：Orchestra 会主动拉取该状态任务进入"资格门"校验，满足条件后自动解套并智能恢复到正确阶段。
 - **`failed`**：flow 执行失败，需要人工修复或放弃
-- **`done`**：flow 执行完成，所有任务已办结
+- **`done`**：flow 执行完成（PR 已合并）。`task/issue-N` 分支的对应 issue 会自动关闭。
 - **`stale`**：flow 长期未活动，被系统标记为休眠
-- **`aborted`**：flow 被人工中止
-- **`merged`**：flow 的 PR 已合并
+- **`aborted`**：flow 被人工/自动中止（PR closed unmerged / issue 关闭 / branch 丢失）
+
+> `merged` 是历史遗留状态，已通过 `models/flow.py` 的 `_migrate_flow_status_value()` 统一规范化为 `done`。禁止在新代码中使用。
 
 ### 3.4.2 `dependency` (issue role)
 

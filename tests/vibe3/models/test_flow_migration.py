@@ -21,10 +21,22 @@ class TestFlowStatusMigration:
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="active")
         assert flow.flow_status == "active"
 
-    def test_blocked_status_unchanged(self):
-        """Test that 'blocked' status is not modified."""
+    def test_blocked_status_migrated_to_active(self):
+        """Test that 'blocked' status is migrated to 'active'.
+
+        Blocked/failed removed from flow_status (2026-04-28).
+        Blocked status is now inferred from IssueState.BLOCKED label.
+        """
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="blocked")
-        assert flow.flow_status == "blocked"
+        assert flow.flow_status == "active"
+
+    def test_failed_status_migrated_to_active(self):
+        """Test that 'failed' status is migrated to 'active'.
+
+        Failed unified to blocked (2026-04-28).
+        """
+        flow = FlowState(branch="test-branch", flow_slug="test", flow_status="failed")
+        assert flow.flow_status == "active"
 
     def test_done_status_unchanged(self):
         """Test that 'done' status is not modified."""
