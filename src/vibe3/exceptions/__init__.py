@@ -191,3 +191,19 @@ class InvalidTransitionError(UserError):
         self.from_state = from_state
         self.to_state = to_state
         super().__init__(f"Invalid transition: {from_state or 'None'} -> {to_state}")
+
+
+# ========== Error Tracking and Classification ==========
+
+# Import error tracking utilities (lazy import to avoid circular dependencies)
+# These are imported when needed, not at module level
+#
+# Usage:
+#   from vibe3.exceptions.error_tracking import ErrorTrackingService
+#   from vibe3.exceptions.error_classification import (
+#       classify_error, should_trigger_failed_gate
+#   )
+#   from vibe3.exceptions.error_logging import write_error_log
+#   from vibe3.exceptions.error_codes import (
+#       E_MODEL_NOT_FOUND, E_API_RATE_LIMIT, etc.
+#   )

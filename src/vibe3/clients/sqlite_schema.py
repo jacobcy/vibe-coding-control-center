@@ -112,6 +112,38 @@ _CREATE_FLOW_CONTEXT_CACHE = """
     )
 """
 
+_CREATE_ERROR_LOG = """
+    CREATE TABLE IF NOT EXISTS error_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tick_id INTEGER NOT NULL,
+        error_code TEXT NOT NULL,
+        error_message TEXT NOT NULL,
+        issue_number INTEGER,
+        branch TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+"""
+
+_CREATE_ERROR_LOG_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_error_log_tick ON error_log(tick_id)",
+    "CREATE INDEX IF NOT EXISTS idx_error_log_code ON error_log(error_code)",
+    "CREATE INDEX IF NOT EXISTS idx_error_log_created ON error_log(created_at)",
+]
+
+_CREATE_FAILED_GATE_STATE = """
+    CREATE TABLE IF NOT EXISTS failed_gate_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        is_active INTEGER NOT NULL DEFAULT 0,
+        reason TEXT,
+        triggered_at TEXT,
+        triggered_by_error_code TEXT,
+        cleared_at TEXT,
+        cleared_by TEXT,
+        cleared_reason TEXT,
+        blocked_ticks INTEGER NOT NULL DEFAULT 0
+    )
+"""
+
 
 _CLEAN_STALE_VERDICT_LINES_SQL = """
     UPDATE flow_events
@@ -246,6 +278,10 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_FLOW_EVENTS)
     cursor.execute(_CREATE_RUNTIME_SESSION)
     cursor.execute(_CREATE_FLOW_CONTEXT_CACHE)
+    cursor.execute(_CREATE_ERROR_LOG)
+    for index_sql in _CREATE_ERROR_LOG_INDEXES:
+        cursor.execute(index_sql)
+    cursor.execute(_CREATE_FAILED_GATE_STATE)
 
     # Create indexes for runtime_session table
     for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
