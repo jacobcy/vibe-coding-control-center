@@ -67,10 +67,10 @@ def test_ensure_flow_state_for_issue_existing_flow_fail():
 
             _ensure_flow_state_for_issue(456, "fail", "Test failure", "test-actor")
 
-        # Verify failed_reason was recorded
+        # Verify blocked_reason was recorded (failed_reason is deprecated)
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
-        assert flow_state["failed_reason"] == "Test failure"
+        assert flow_state["blocked_reason"] == "Test failure"
         # flow_status must NOT be changed — GitHub labels are the SSOT
         assert flow_state["flow_status"] == "active"
 
@@ -161,7 +161,7 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
         # Verify reason recorded in flow (not changing flow_status)
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
-        assert flow_state["failed_reason"] == "Test manager failure"
+        assert flow_state["blocked_reason"] == "Test manager failure"
         assert flow_state["flow_status"] == "active"
 
 

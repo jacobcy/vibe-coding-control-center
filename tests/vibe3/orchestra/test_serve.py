@@ -46,7 +46,7 @@ def mock_failed_gate():
     # Patch the class where it is defined,
     # which handles instances created via local imports
     with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
-        mock_check.return_value = GateResult.open()
+        mock_check.return_value = GateResult.open_gate()
         yield mock_check
 
 
