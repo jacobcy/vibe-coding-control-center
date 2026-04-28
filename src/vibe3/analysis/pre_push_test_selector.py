@@ -81,6 +81,19 @@ def select_pre_push_tests(
             test_dir = root / "tests" / "vibe3" / src_rel.parent
             if test_dir.exists() and any(test_dir.glob("test_*.py")):
                 dir_targets.add(test_dir.relative_to(root).as_posix())
+        # Guard: if any resolved directory is the full test suite root,
+        # skip local pytest instead of running everything.
+        if "tests/vibe3" in dir_targets:
+            return PrePushTestSelection(
+                mode="skip",
+                tests=[],
+                reason=(
+                    f"unmapped source(s) resolve to full test suite root, "
+                    f"skipping local run (CI covers full suite): "
+                    f"{', '.join(sorted(unmapped_sources))}"
+                ),
+                unmapped_sources=sorted(unmapped_sources),
+            )
         if dir_targets:
             return PrePushTestSelection(
                 mode="incremental",
