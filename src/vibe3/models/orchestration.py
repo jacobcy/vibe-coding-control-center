@@ -20,7 +20,7 @@ class IssueState(str, Enum):
     CLAIMED = "claimed"
     IN_PROGRESS = "in-progress"
     BLOCKED = "blocked"
-    FAILED = "failed"
+    # FAILED removed — all failures unified to BLOCKED (see design doc)
     HANDOFF = "handoff"
     REVIEW = "review"
     MERGE_READY = "merge-ready"
@@ -64,7 +64,7 @@ class StateTransition(BaseModel):
 #     ▼
 #   CLAIMED ─────────────────────────────────────────────────────────────
 #     │  │
-#     │  │ [C] planner fails → FAILED
+#     │  │ [C] planner fails → BLOCKED (execution errors)
 #     │  │ [C] no plan_ref   → BLOCKED (no-op gate)
 #     │  │ [M] plan_ref exists, AI advances → HANDOFF
 #     │  │
@@ -98,16 +98,14 @@ class StateTransition(BaseModel):
 #              ▼
 #             DONE
 #
-#   BLOCKED ◄──── any state (via [C] no-op gate or [M] business decision)
+#   BLOCKED ◄──── any state (via [C] no-op gate, execution error, or [M] decision)
 #     │
 #     │ [H] vibe3 task resume --blocked / --label (force=True)
 #     └──→ READY or HANDOFF (human decides)
 #
-#   FAILED ◄──── CLAIMED / IN_PROGRESS / REVIEW (via [C] execution error)
-#     │
-#     │ [C] auto-retry paths (FAILED → CLAIMED/HANDOFF/IN_PROGRESS/REVIEW)
-#     │ [H] vibe3 task resume --failed (force=True → READY)
-#     └──→ READY (human decides)
+#   Note: FAILED state removed (2026-04-28).
+#   All execution failures now go to BLOCKED with blocked_reason.
+#   Recovery: human resume via force=True (same as BLOCKED).
 #
 # Key invariants (Issue #303):
 #   1. Code layer NEVER auto-transitions to HANDOFF (no-op gate)
@@ -140,14 +138,7 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     # NOTE: blocked → other states removed (修复 Issue #303)
     # blocked 状态不允许自动转换，必须等人类核查
     # 手动 resume 命令可以用 force=True 绕过
-    # Execution failures
-    (IssueState.CLAIMED, IssueState.FAILED),
-    (IssueState.IN_PROGRESS, IssueState.FAILED),
-    (IssueState.REVIEW, IssueState.FAILED),
-    (IssueState.FAILED, IssueState.CLAIMED),
-    (IssueState.FAILED, IssueState.HANDOFF),
-    (IssueState.FAILED, IssueState.IN_PROGRESS),
-    (IssueState.FAILED, IssueState.REVIEW),
+    # FAILED removed — execution failures now go to BLOCKED with blocked_reason
 }
 
 # Progress expectations for each state
@@ -175,7 +166,6 @@ FORBIDDEN_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.READY, IssueState.DONE),
     (IssueState.CLAIMED, IssueState.DONE),
     (IssueState.BLOCKED, IssueState.DONE),
-    (IssueState.FAILED, IssueState.DONE),
     (IssueState.MERGE_READY, IssueState.DONE),
 }
 

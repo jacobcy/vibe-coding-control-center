@@ -218,8 +218,8 @@ class StateLabelDispatchService(ServiceBase):
             if not any(lbl.startswith("state/") for lbl in labels):
                 continue
 
-            # Skip failed issues
-            if IssueState.FAILED.to_label() in labels:
+            # Skip blocked issues (FAILED unified to BLOCKED)
+            if IssueState.BLOCKED.to_label() in labels:
                 continue
 
             issue = IssueInfo.from_github_payload(item)
@@ -316,8 +316,8 @@ class StateLabelDispatchService(ServiceBase):
             if not flow_state.get("blocked_by_issue"):
                 self._store.update_flow_state(
                     branch,
-                    flow_status="blocked",
                     blocked_by_issue=unresolved[0],
+                    blocked_reason="Blocked by unresolved dependencies",
                 )
                 if IssueState.BLOCKED.to_label() not in labels:
                     try:
@@ -364,19 +364,17 @@ class StateLabelDispatchService(ServiceBase):
             if source_pr:
                 refs["source_pr"] = str(source_pr)
 
-            # Unblock: restore flow_status to "active" (flow resumes execution)
+            # Unblock: restore flow from blocked metadata
             # IssueState (GitHub label) and FlowStatus (internal state)
             # are separate:
-            # - FlowStatus: internal state machine
-            #   (active/blocked/failed/done/stale/aborted)
+            # - FlowStatus: internal state machine (active/done/stale/aborted)
             # - IssueState: external GitHub label
-            #   (ready/claimed/in-progress/handoff/review/etc.)
-            # When unblocking, flow becomes active again, while issue label
-            # is updated separately below
+            #   (ready/claimed/in-progress/handoff/review)
+            # When unblocking, we clear blocked metadata
             self._store.update_flow_state(
                 branch,
-                flow_status="active",  # Restore to active flow state
                 blocked_by_issue=None,
+                blocked_reason=None,
             )
             self._store.add_event(
                 branch,

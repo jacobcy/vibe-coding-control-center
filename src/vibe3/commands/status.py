@@ -41,7 +41,6 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
             IssueState.READY,
             IssueState.HANDOFF,
             IssueState.BLOCKED,
-            IssueState.FAILED,
             IssueState.DONE,
         }
     return is_auto_task_branch(flow.branch)
@@ -354,18 +353,19 @@ def status(
         else:
             console.print("  [dim](none)[/]")
 
-        failed_items = [
+        # Note: FAILED unified to BLOCKED - show blocked items only
+        blocked_items = [
             item
             for item in task_progress_items
-            if cast(IssueState, item["state"]) == IssueState.FAILED
+            if cast(IssueState, item["state"]) == IssueState.BLOCKED
         ]
-        console.print("\n[bold cyan]Failed Issues:[/]")
-        if failed_items:
-            for item in failed_items:
+        console.print("\n[bold cyan]Blocked Issues:[/]")
+        if blocked_items:
+            for item in blocked_items:
                 number = cast(int, item["number"])
                 title = cast(str, item["title"])
                 flow = cast(FlowStatusResponse | None, item["flow"])
-                reason = cast(str | None, item.get("failed_reason"))
+                reason = cast(str | None, item.get("blocked_reason"))
                 if flow is None:
                     flow_info = "[dim](no flow scene)[/]"
                 elif getattr(flow, "flow_status", "active") == "stale":

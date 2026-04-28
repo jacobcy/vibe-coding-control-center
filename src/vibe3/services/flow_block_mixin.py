@@ -6,28 +6,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
-from vibe3.models.orchestration import IssueState
-from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
-
-
-def sync_flow_blocked_task_label(store: SQLiteClient, branch: str) -> None:
-    """Sync task-role issues in a flow to state/blocked when flow is blocked."""
-    issue_links_raw = store.get_issue_links(branch)
-    issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
-    label_service = LabelService()
-    for link in issue_links:
-        if link.get("issue_role") != "task":
-            continue
-        issue_number = link.get("issue_number")
-        if issue_number is None:
-            continue
-        label_service.confirm_issue_state(
-            int(issue_number),
-            IssueState.BLOCKED,
-            actor="flow:blocked",
-            force=True,
-        )
 
 
 class FlowLifecycleMixin:
@@ -42,7 +21,11 @@ class FlowLifecycleMixin:
         blocked_by_issue: int | None = None,
         actor: str | None = None,
     ) -> None:
-        """Mark flow as blocked."""
+        """Mark flow as blocked.
+
+        Note: This only writes blocked_reason/blocked_by_issue metadata.
+        Blocked status is inferred from IssueState.BLOCKED label on issue.
+        """
         logger.bind(
             domain="flow",
             action="block",
@@ -74,12 +57,10 @@ class FlowLifecycleMixin:
                 actor=effective_actor,
             )
 
-        # Update flow state with new field structure (semantic clarity)
-        # blocked_by_issue: dependency issue number (INT)
-        # blocked_reason: block reason text (TEXT)
+        # Update flow state with blocked metadata (NOT flow_status)
+        # Blocked status inferred from IssueState.BLOCKED label
         self.store.update_flow_state(
             branch,
-            flow_status="blocked",
             blocked_by_issue=blocked_by_issue,
             blocked_reason=reason,
             latest_actor=effective_actor,
@@ -91,7 +72,6 @@ class FlowLifecycleMixin:
             effective_actor,
             f"Flow blocked{': ' + reason if reason else ''}",
         )
-        sync_flow_blocked_task_label(self.store, branch)
 
     def fail_flow(
         self: Self,
@@ -107,8 +87,10 @@ class FlowLifecycleMixin:
             actor: Actor performing the fail (defaults to system)
 
         Note:
-            Failed flows indicate execution errors or system faults requiring
-            human intervention before they can continue. Recovery path: Ready.
+            Failed flows indicate execution errors or system faults.
+            Now unified with blocked: writes blocked_reason instead of
+            flow_status="failed". The blocked status is inferred from
+            IssueState.BLOCKED label on the task issue.
         """
         logger.bind(
             domain="flow",
@@ -129,15 +111,15 @@ class FlowLifecycleMixin:
             flow_actor=flow_data.get("latest_actor"),
         )
 
-        # Update flow state to failed with failure reason
+        # Update flow state with blocked_reason (unified with block)
+        # Do NOT write flow_status - blocked inferred from issue label
         self.store.update_flow_state(
             branch,
-            flow_status="failed",
-            failed_reason=reason,
+            blocked_reason=reason,
             latest_actor=effective_actor,
         )
 
-        # Record fail event
+        # Record fail event (event type preserved for observability)
         self.store.add_event(
             branch,
             "flow_failed",
@@ -145,7 +127,7 @@ class FlowLifecycleMixin:
             f"Flow failed: {reason}",
         )
 
-        logger.bind(branch=branch).success("Flow marked as failed")
+        logger.bind(branch=branch).success("Flow marked as failed (blocked_reason)")
 
     def abort_flow(
         self: Self,

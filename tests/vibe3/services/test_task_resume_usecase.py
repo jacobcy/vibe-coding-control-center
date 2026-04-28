@@ -22,8 +22,8 @@ def test_resume_issues_surfaces_operation_error_in_skipped_reason() -> None:
     candidate = {
         "number": 431,
         "title": "resume me",
-        "state": IssueState.FAILED,
-        "resume_kind": "failed",
+        "state": IssueState.BLOCKED,
+        "resume_kind": "blocked",
         "flow": None,
     }
     usecase.status_service.fetch_resume_candidates.return_value = [candidate]
@@ -45,8 +45,8 @@ def test_resume_issues_uses_exception_class_when_message_missing() -> None:
     candidate = {
         "number": 432,
         "title": "resume me too",
-        "state": IssueState.FAILED,
-        "resume_kind": "failed",
+        "state": IssueState.BLOCKED,
+        "resume_kind": "blocked",
         "flow": None,
     }
     usecase.status_service.fetch_resume_candidates.return_value = [candidate]

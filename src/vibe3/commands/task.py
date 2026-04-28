@@ -135,7 +135,7 @@ def resume(
         typer.Option(
             "--label",
             metavar="[STATE]",
-            help="Clear blocked_reason/failed_reason and restore to specified state "
+            help="Clear blocked_reason and restore to specified state "
             "WITHOUT deleting worktree/branch. "
             "STATE can be: ready, claimed, in-progress, handoff, review, merge-ready. "
             "If --label is provided without value, defaults to 'handoff'.",
@@ -155,7 +155,7 @@ def resume(
     scene back to ready. Or specify issue numbers directly.
 
     **Label-only mode (no worktree deletion)**:
-    Use --label [STATE] to clear blocked_reason/failed_reason and restore
+    Use --label [STATE] to clear blocked_reason and restore
     to specified state WITHOUT deleting worktree/branch.
     - `--label` (no value) or `--label handoff` → restore to handoff
     - `--label ready` → restore to ready
@@ -274,8 +274,8 @@ def resume(
             stale_flows=stale_flows,
         )
 
-        # Filter by state label
-        target_state = IssueState.FAILED if failed else IssueState.BLOCKED
+        # Filter by state label (FAILED unified to BLOCKED)
+        target_state = IssueState.BLOCKED
 
         # Extract issue numbers matching target state
         issue_numbers = [
@@ -286,8 +286,7 @@ def resume(
         ]
 
         if not issue_numbers:
-            state_name = "failed" if failed else "blocked"
-            typer.echo(f"No {state_name} issues found.")
+            typer.echo("No blocked issues found.")
             return
 
     # Progress callback for verbose output

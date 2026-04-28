@@ -113,9 +113,8 @@ class TaskResumeCandidates:
                 }
 
         # 根据状态确定 resume_kind
-        if current_state == IssueState.FAILED:
-            resume_kind = "failed"
-        elif current_state == IssueState.BLOCKED:
+        # Note: FAILED unified to BLOCKED, resume_kind always "blocked"
+        if current_state == IssueState.BLOCKED:
             resume_kind = "blocked"
         else:
             # 对于其他状态（ready/handoff/review/merge-ready 等），

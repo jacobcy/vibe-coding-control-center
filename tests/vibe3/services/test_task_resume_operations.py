@@ -144,7 +144,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
 def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
     """With --label ready, should restore to state/ready."""
     operations = _make_operations()
-    operations.label_service.get_state.return_value = IssueState.FAILED
+    operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
 
     mock_flow = MagicMock()
@@ -157,7 +157,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
 
         operations.reset_issue_to_ready(
             issue_number=303,
-            resume_kind="failed",
+            resume_kind="blocked",
             flow=mock_flow,
             repo=None,
             reason="test resume",
@@ -171,7 +171,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         # Verify: state restored to READY via resume_issue
         mock_label_instance.confirm_issue_state.assert_called_once()
 
-    # Verify: reasons cleared (minimal cleanup, flow record preserved)
+    # Verify: reasons cleared (blocked_reason + failed_reason for backward compat)
     operations.flow_service.store.update_flow_state.assert_called_once_with(
         "task/issue-303",
         blocked_reason=None,
@@ -248,7 +248,7 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
 def test_reset_issue_to_ready_with_label_in_progress() -> None:
     """With --label in-progress, should restore to state/in-progress."""
     operations = _make_operations()
-    operations.label_service.get_state.return_value = IssueState.FAILED
+    operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
 
     mock_flow = MagicMock()
@@ -261,7 +261,7 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
 
         operations.reset_issue_to_ready(
             issue_number=303,
-            resume_kind="failed",
+            resume_kind="blocked",
             flow=mock_flow,
             repo=None,
             reason="test resume",
@@ -310,7 +310,7 @@ def test_reset_issue_to_ready_with_label_review() -> None:
 def test_reset_issue_to_ready_with_label_merge_ready() -> None:
     """With --label merge-ready, should restore to state/merge-ready."""
     operations = _make_operations()
-    operations.label_service.get_state.return_value = IssueState.FAILED
+    operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
 
     mock_flow = MagicMock()
@@ -323,7 +323,7 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
 
         operations.reset_issue_to_ready(
             issue_number=303,
-            resume_kind="failed",
+            resume_kind="blocked",
             flow=mock_flow,
             repo=None,
             reason="test resume",
@@ -344,7 +344,7 @@ def test_clear_flow_reasons_clears_both_reasons() -> None:
 
     operations._clear_flow_reasons("task/issue-303", "blocked")
 
-    # Verify: both reasons cleared
+    # Verify: both reasons cleared (failed_reason for backward compat)
     operations.flow_service.store.update_flow_state.assert_called_once_with(
         "task/issue-303",
         blocked_reason=None,

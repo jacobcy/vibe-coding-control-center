@@ -335,7 +335,7 @@ class OrchestraStatusService:
             gate_result = self._failed_gate.check()
             if gate_result.blocked:
                 dispatch_blocked = True
-                blocked_reason = "state/failed"
+                blocked_reason = "state/blocked"
                 blocked_issue_number = gate_result.issue_number
                 blocked_issue_reason = gate_result.reason
 
