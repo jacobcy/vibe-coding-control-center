@@ -107,15 +107,16 @@ vibe-center/
 │   │   ├── DOC_ORGANIZATION.md  # 文档组织标准
 │   │   ├── cognition-spec-dominion.md  # 宪法大纲
 │   │   └── ...                         # 其他现行标准
+│   ├── specs/                   # 规范文档
 │   ├── prds/                    # 全局 PRD
 │   │   ├── vibe-workflow-paradigm.md   # 总 PRD
 │   │   └── ...
+│   ├── plans/                   # 执行计划
+│   ├── reports/                 # 报告和总结
 │   ├── references/              # 外部参考资料
 │   │   └── ...                  # 收集的外部文档、论文、资料等
 │   ├── archive/                 # 历史文档归档
 │   │   └── ...                  # 已退役设计与历史任务文档
-│   └── tasks/                   # 任务文档
-│       └── {Task_ID}/           # 各任务目录
 │
 └── .kiro/                       # Kiro Spec 工作区
     └── specs/                   # Spec 定义
@@ -401,23 +402,29 @@ ls ~/.vibe/
 
 **用途**：为项目决策和实现提供外部知识支持，不属于项目自身文档
 
-#### `docs/tasks/` - 任务文档
+#### `docs/specs/` - 规范文档
 
-**职责**：每个任务的完整 Vibe Guard 文档
+**职责**：按 issue / feature 组织的规范与实现约束文档
 
-**命名格式**：`YYYY-MM-DD-feature-name`
+**用途**：
+- 记录具体问题的接口契约、边界行为和实现约束
+- 与 `docs/prds/`、`docs/plans/`、`docs/reports/` 配合使用
 
-**文档结构**：
-```
-{Task_ID}/
-├── README.md               # 任务概述、状态、导航
-├── prd-v1-initial.md       # PRD 层
-├── spec-v1-initial.md      # Spec 层
-├── plan-v1-initial.md      # Plan 层
-├── test-strategy.md        # Test 层
-├── code-implementation.md  # Code 层
-└── audit-2024-01-15.md     # Review 层
-```
+#### `docs/plans/` - 执行计划
+
+**职责**：需要长期保留的计划文档与推进记录
+
+**用途**：
+- 记录正式计划、分解步骤和阶段性推进
+- 不再以统一任务镜像目录承载任务文档
+
+#### `docs/reports/` - 报告与总结
+
+**职责**：长期保留的报告、审计和复盘文档
+
+**用途**：
+- 记录结论、验证结果、审计摘要和阶段总结
+- 供后续会话和人类读者稳定引用
 
 ### `.kiro/` - Kiro Spec 工作区
 
@@ -506,7 +513,7 @@ ls ~/.vibe/
 ### 我要理解工作流
 1. 阅读 `docs/prds/vibe-workflow-paradigm.md` - Vibe Guard 范式
 2. 阅读 `docs/standards/cognition-spec-dominion.md` - 宪法大纲
-3. 查看 `docs/tasks/` 中的示例任务
+3. 查看 `docs/specs/`、`docs/plans/` 和 `docs/reports/` 中的现有文档
 4. 运行 `uv run python src/vibe3/cli.py flow --help` - 查看命令帮助
 
 ### 我要使用 V3 命令

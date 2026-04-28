@@ -33,7 +33,7 @@ related_docs:
 - `.agent/plans/` 是临时计划工作区。
 - `.agent/reports/` 是临时报告工作区。
 - 这两个目录下的文件都属于工作产物，不是长期规范真源。
-- 新的 plan / report 文档只应落在这两个目录中，不应再作为正式文档放入 `docs/plans/` 或 `docs/reports/`。
+- 临时草稿和过程证据可先写入这里；需要长期保留、供人类阅读的正式 plan / report，应落在 `docs/plans/` 和 `docs/reports/`。
 
 ## 3. 留存规则
 
@@ -42,14 +42,14 @@ related_docs:
 - 若该结论直接影响合并或审查，也应同步到 PR comment。
 - 本地临时文档只保留工作过程与证据，不承担长期沟通职责。
 
-## 4. 任务文档
+## 4. 正式文档落点
 
-- `docs/tasks/` 下的任务文档是任务镜像，不是任务身份真源。
-- 任务 README 可以记录导航、状态和阶段，但任务定义应以 issue 为准。
-- 若任务文档与 issue 冲突，以 issue 及其 comment 为准。
+- GitHub issue 是任务身份真源。
+- 与任务相关的正式 Spec / Plan / Report 文档，可分别落在 `docs/specs/`、`docs/plans/`、`docs/reports/`。
+- 不再维护统一任务镜像目录。
+- 若正式文档与 issue 冲突，以 issue 及其 comment 为准。
 
 ## 5. 兼容原则
 
-- 旧的 `docs/plans/` 和 `docs/reports/` 内容可作为历史参考保留。
-- 这些历史文件不应再被新的工作流当作默认落点。
+- `docs/plans/` 和 `docs/reports/` 既承载当前可用的正式文档，也保留历史参考内容。
 - 如果需要引用历史结论，应优先引用 issue comment，而不是复制旧计划或旧报告正文。
