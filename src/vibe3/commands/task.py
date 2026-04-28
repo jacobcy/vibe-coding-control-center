@@ -66,6 +66,12 @@ def show(
         if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
 
+        # ✅ Handle case where flow not found
+        if not task_result.local_task and target_branch.isdigit():
+            # User provided issue number but no flow exists
+            typer.echo(f"未找到 flow 记录: {target_branch}")
+            typer.echo("提示: 请先创建 flow 或使用完整分支名")
+
         render_task_show(task_result, json_output)
 
         # Always show recent comments (if issue exists and not json output)
