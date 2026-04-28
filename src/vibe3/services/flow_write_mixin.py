@@ -162,20 +162,26 @@ class FlowWriteMixin(FlowReadMixin):
         """
         self.store.update_flow_state(branch, **updates)
 
-    def delete_flow(self: Self, branch: str) -> None:
+    def delete_flow(self: Self, branch: str, force: bool = False) -> None:
         """Delete all persisted flow truth for a branch.
 
         This is the hard-reset counterpart to ``reactivate_flow()``.
         It removes authoritative database state so any future manager/planner
         pass must recreate the flow scene from scratch instead of inheriting
         stale refs, events, issue links, or runtime session registry entries.
+
+        Args:
+            branch: Branch name
+            force: If True, hard delete (physical removal); otherwise soft delete
         """
+        action = "hard deleting" if force else "soft deleting"
         logger.bind(
             domain="flow",
             action="delete",
             branch=branch,
-        ).info("Deleting flow")
-        self.store.delete_flow(branch)
+            force=force,
+        ).info(f"{action.capitalize()} flow")
+        self.store.delete_flow(branch, force=force)
 
     def bind_spec(
         self: Self,

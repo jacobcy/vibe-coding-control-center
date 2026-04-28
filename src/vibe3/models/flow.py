@@ -86,6 +86,9 @@ class FlowState(BaseModel):
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None  # Latest verdict for quick query
+    deleted_at: str | None = (
+        None  # Soft delete timestamp (None = active, ISO 8601 = deleted)
+    )
 
     model_config = {"extra": "ignore"}
 

@@ -85,6 +85,7 @@ class FlowCleanupService:
         include_remote: bool = True,
         terminate_sessions: bool = True,
         keep_flow_record: bool = False,
+        force_delete: bool = False,
     ) -> dict[str, bool]:
         """Complete cleanup of a flow scene.
 
@@ -97,8 +98,11 @@ class FlowCleanupService:
             include_remote: Whether to also delete remote branch
             terminate_sessions: Whether to terminate tmux sessions
             keep_flow_record: Whether to keep flow record in database
-                - False (default): Delete flow record (for aborted flows)
+                - False (default): Soft delete flow record (for aborted flows)
                 - True: Keep flow record as completion history (for done/merged flows)
+            force_delete: Whether to hard delete flow record
+                - False (default): Soft delete (preserves audit trail)
+                - True: Hard delete (physical deletion, cannot recover)
 
         Returns:
             Dict with success status for each step:
@@ -136,7 +140,7 @@ class FlowCleanupService:
         self._clear_handoff(branch, results)
 
         # Step 6: Handle flow record based on keep_flow_record parameter
-        self._handle_flow_record(branch, keep_flow_record, results)
+        self._handle_flow_record(branch, keep_flow_record, force_delete, results)
 
         success_count = sum(1 for v in results.values() if v)
         logger.bind(
@@ -212,9 +216,20 @@ class FlowCleanupService:
             results["handoff"] = False
 
     def _handle_flow_record(
-        self, branch: str, keep_flow_record: bool, results: dict[str, bool]
+        self,
+        branch: str,
+        keep_flow_record: bool,
+        force_delete: bool,
+        results: dict[str, bool],
     ) -> None:
-        """Handle flow record deletion or preservation."""
+        """Handle flow record deletion or preservation.
+
+        Args:
+            branch: Branch name
+            keep_flow_record: Keep record for done/merged flows
+            force_delete: Hard delete (True) or soft delete (False)
+            results: Results dict to update
+        """
         if keep_flow_record:
             logger.bind(domain="cleanup", branch=branch).info(
                 "Keeping flow record as completion history"
@@ -222,8 +237,12 @@ class FlowCleanupService:
             results["flow_record"] = True
         else:
             try:
-                self.flow_service.delete_flow(branch)
-                logger.bind(domain="cleanup", branch=branch).info("Deleted flow record")
+                # Use soft delete by default, hard delete if force_delete=True
+                self.flow_service.delete_flow(branch, force=force_delete)
+                action = "Hard deleted" if force_delete else "Soft deleted"
+                logger.bind(domain="cleanup", branch=branch).info(
+                    f"{action} flow record"
+                )
             except Exception as exc:
                 logger.bind(domain="cleanup", branch=branch).warning(
                     f"Failed to delete flow record: {exc}"

@@ -41,13 +41,18 @@ class SQLiteFlowStateRepo:
         "execution_started_at",
         "execution_completed_at",
         "latest_verdict",  # Latest verdict record (JSON)
+        "deleted_at",  # Soft delete timestamp (ISO 8601 or NULL)
     }
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
+        """Get flow state for branch (excludes soft-deleted flows)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_state WHERE branch = ?", (branch,))
+            cursor.execute(
+                "SELECT * FROM flow_state WHERE branch = ? AND deleted_at IS NULL",
+                (branch,),
+            )
             row = cursor.fetchone()
             if row:
                 logger.bind(
@@ -170,10 +175,11 @@ class SQLiteFlowStateRepo:
             return links
 
     def get_all_flows(self) -> list[dict[str, Any]]:
+        """Get all flows (excludes soft-deleted flows)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_state")
+            cursor.execute("SELECT * FROM flow_state WHERE deleted_at IS NULL")
             flows = [dict(row) for row in cursor.fetchall()]
             logger.bind(
                 external="sqlite", operation="get_all_flows", count=len(flows)
@@ -181,10 +187,12 @@ class SQLiteFlowStateRepo:
             return flows
 
     def get_active_flow_count(self) -> int:
+        """Get count of active flows (excludes soft-deleted flows)."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT COUNT(*) FROM flow_state WHERE flow_status = 'active'"
+                "SELECT COUNT(*) FROM flow_state "
+                "WHERE flow_status = 'active' AND deleted_at IS NULL"
             )
             count = cursor.fetchone()[0]
             logger.bind(
@@ -193,11 +201,13 @@ class SQLiteFlowStateRepo:
             return int(count)
 
     def get_active_auto_flow_count(self) -> int:
+        """Get count of active auto flows (excludes soft-deleted flows)."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT COUNT(*) FROM flow_state "
-                "WHERE flow_status = 'active' AND branch LIKE 'task/issue-%'"
+                "WHERE flow_status = 'active' AND branch LIKE 'task/issue-%' "
+                "AND deleted_at IS NULL"
             )
             count = cursor.fetchone()[0]
             logger.bind(
@@ -207,7 +217,31 @@ class SQLiteFlowStateRepo:
             ).debug("Retrieved active auto flow count")
             return int(count)
 
-    def delete_flow(self, branch: str) -> None:
+    def soft_delete_flow(self, branch: str) -> None:
+        """Soft delete flow by setting deleted_at timestamp.
+
+        Preserves all flow data for audit trail and potential recovery.
+        """
+        now = datetime.datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_state SET deleted_at = ? WHERE branch = ?",
+                (now, branch),
+            )
+            conn.commit()
+        logger.bind(
+            external="sqlite",
+            operation="soft_delete_flow",
+            branch=branch,
+        ).info("Soft deleted flow record")
+
+    def hard_delete_flow(self, branch: str) -> None:
+        """Hard delete flow with cascade (physical deletion).
+
+        Removes all flow records including runtime_session, events,
+        issue_links, and context cache.
+        """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
@@ -218,12 +252,65 @@ class SQLiteFlowStateRepo:
             conn.commit()
         logger.bind(
             external="sqlite",
-            operation="delete_flow",
+            operation="hard_delete_flow",
             branch=branch,
-        ).info("Deleted persisted flow records and cache")
+        ).info("Hard deleted flow records and cache")
+
+    def delete_flow(self, branch: str, force: bool = False) -> None:
+        """Delete flow (soft by default, hard if force=True).
+
+        Args:
+            branch: Branch name
+            force: If True, perform hard delete; otherwise soft delete
+        """
+        if force:
+            self.hard_delete_flow(branch)
+        else:
+            self.soft_delete_flow(branch)
+
+    def restore_flow(self, branch: str) -> None:
+        """Restore soft-deleted flow by clearing deleted_at."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_state SET deleted_at = NULL WHERE branch = ?",
+                (branch,),
+            )
+            conn.commit()
+        logger.bind(
+            external="sqlite",
+            operation="restore_flow",
+            branch=branch,
+        ).info("Restored soft-deleted flow")
+
+    def get_deleted_flows(self) -> list[dict[str, Any]]:
+        """Get all soft-deleted flows."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM flow_state WHERE deleted_at IS NOT NULL "
+                "ORDER BY deleted_at DESC"
+            )
+            flows = [dict(row) for row in cursor.fetchall()]
+            logger.bind(
+                external="sqlite", operation="get_deleted_flows", count=len(flows)
+            ).debug("Retrieved deleted flows")
+            return flows
+
+    def get_flow_state_include_deleted(self, branch: str) -> dict[str, Any] | None:
+        """Get flow state including soft-deleted flows (for recovery check)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM flow_state WHERE branch = ?", (branch,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
-        """Get flows linked to an issue with specified role.
+        """Get flows linked to an issue with specified role (excludes soft-deleted).
 
         Returns flows ordered by updated_at DESC, branch ASC for stable sorting.
         Domain-specific priority logic (canonical/active) should be implemented
@@ -236,6 +323,7 @@ class SQLiteFlowStateRepo:
                 "SELECT f.* FROM flow_state f "
                 "JOIN flow_issue_links l ON f.branch = l.branch "
                 "WHERE l.issue_number = ? AND l.issue_role = ? "
+                "AND f.deleted_at IS NULL "
                 "ORDER BY COALESCE(f.updated_at, '') DESC, f.branch ASC",
                 (issue_number, role),
             )
@@ -270,6 +358,7 @@ class SQLiteFlowStateRepo:
         ).debug("Updated bridge fields")
 
     def get_flow_dependents(self, branch: str) -> list[str]:
+        """Get dependent flows (excludes soft-deleted flows)."""
         task_issue_number: int | None = None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -305,6 +394,7 @@ class SQLiteFlowStateRepo:
                 WHERE fil.issue_number = ?
                   AND fil.issue_role = 'dependency'
                   AND fs.flow_status = 'active'
+                  AND fs.deleted_at IS NULL
                 ORDER BY fil.branch
                 """,
                 (task_issue_number,),

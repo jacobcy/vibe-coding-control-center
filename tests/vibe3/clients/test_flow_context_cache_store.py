@@ -62,7 +62,7 @@ def test_cache_upsert_is_idempotent() -> None:
 
 
 def test_delete_flow_removes_context_cache() -> None:
-    """Deleting flow should also delete cache."""
+    """Hard deleting flow should also delete cache."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -76,12 +76,12 @@ def test_delete_flow_removes_context_cache() -> None:
             pr_title="old pr",
         )
 
-        # Delete flow (should delete cache too)
-        store.delete_flow("task/issue-329")
+        # Hard delete flow (should delete cache too)
+        store.delete_flow("task/issue-329", force=True)
 
         # Verify cache deleted
         cache = store.get_flow_context_cache("task/issue-329")
-        assert cache is None, "Cache should be deleted when flow is deleted"
+        assert cache is None, "Cache should be deleted when flow is hard deleted"
 
 
 def test_get_nonexistent_cache_returns_none() -> None:
