@@ -76,7 +76,7 @@ def _build_server_with_launch_cwd(
     # capacity slots are fully released so dispatch starts from a clean slate.
     shared_registry.clear_all_sessions()
 
-    failed_gate = FailedGate(github=shared_github, repo=config.repo)
+    failed_gate = FailedGate(store=shared_store)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
     # Shutdown cleanup: mark all sessions stopped when the server exits.

@@ -1,164 +1,146 @@
-"""Tests for FailedGate module."""
+"""Tests for FailedGate module (SQLite-based implementation)."""
 
-import json
-from unittest.mock import MagicMock, patch
+import sqlite3
+from collections.abc import Iterator
+from pathlib import Path
 
-from vibe3.models.orchestration import IssueState
+import pytest
+
+from vibe3.clients import SQLiteClient
 from vibe3.orchestra.failed_gate import FailedGate
 
 
-def test_failed_gate_open() -> None:
-    """Gate should be open when no state/failed issues are found."""
-    with patch("subprocess.run") as mock_run:
-        # Mock gh issue list --label state/failed --state open
-        mock_run.return_value = MagicMock(returncode=0, stdout="[]")
+@pytest.fixture(autouse=True)
+def reset_error_tracking() -> Iterator[None]:
+    """Reset ErrorTrackingService singleton between tests to prevent state leakage."""
+    yield
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        gate = FailedGate(repo="owner/repo")
-        result = gate.check()
-
-        assert not result.blocked
-        assert result.issue_number is None
-
-        # Verify command
-        cmd = mock_run.call_args[0][0]
-        assert "gh" in cmd
-        assert "issue" in cmd
-        assert "list" in cmd
-        assert "--label" in cmd
-        assert IssueState.FAILED.to_label() in cmd
+    ErrorTrackingService._instance = None
 
 
-def test_failed_gate_blocked_with_explicit_reason() -> None:
-    """Gate should extract explicit '原因:' or 'reason:' from latest comment."""
-    with patch("subprocess.run") as mock_run:
-        # Call 1: list_failed_issues
-        # Call 2: _check_failed_reason (view body)
-        # Call 3: _extract_reason (view comments)
-        mock_run.side_effect = [
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps([{"number": 123, "title": "Fail title"}]),
-            ),
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps(
-                    {"body": "**failed_reason**: network timeout\n\nContent"}
-                ),
-            ),
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps(
-                    {
-                        "comments": [
-                            {"body": "Older comment", "url": "url1"},
-                            {
-                                "body": (
-                                    "Newer comment\n原因: "
-                                    "specific failure reason\nMore text"
-                                ),
-                                "url": "url2",
-                            },
-                        ]
-                    }
-                ),
-            ),
-        ]
+@pytest.fixture
+def temp_store(tmp_path: Path) -> SQLiteClient:
+    """Create a temporary SQLiteClient for testing."""
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    from vibe3.clients.sqlite_schema import init_schema
 
-        gate = FailedGate(repo="owner/repo")
-        result = gate.check()
-
-        assert result.blocked
-        assert result.issue_number == 123
-        assert result.issue_title == "Fail title"
-        assert result.reason == "specific failure reason"
-        assert result.comment_url == "url2"
+    init_schema(conn)
+    conn.close()
+    return SQLiteClient(db_path=str(db_path))
 
 
-def test_failed_gate_blocked_with_summary_fallback() -> None:
-    """Gate should fallback to summary if no explicit reason marker is found."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = [
-            MagicMock(returncode=0, stdout=json.dumps([{"number": 123}])),
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps({"body": "**failed_reason**: manager timeout"}),
-            ),
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps(
-                    {
-                        "comments": [
-                            {
-                                "body": "Failed to execute manager: timeout error",
-                                "url": "url3",
-                            }
-                        ]
-                    }
-                ),
-            ),
-        ]
+def test_failed_gate_open(temp_store: SQLiteClient) -> None:
+    """Gate should be open when no errors are recorded."""
+    gate = FailedGate(store=temp_store)
+    result = gate.check()
 
-        gate = FailedGate(repo="owner/repo")
-        result = gate.check()
-
-        assert result.blocked
-        assert result.reason == "Failed to execute manager: timeout error..."
-        assert result.comment_url == "url3"
+    assert not result.blocked
+    assert result.reason is None
 
 
-def test_failed_gate_error_handling() -> None:
-    """Gate should fail-closed (blocked=True) if API check fails for safety."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stderr="API error")
+def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
+    """Gate should block immediately on model config errors."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        gate = FailedGate(repo="owner/repo")
-        result = gate.check()
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
-        assert result.blocked
-        reason = result.reason or ""
-        assert "failed gate check error" in reason
+    # Record a model error
+    ErrorTrackingService._instance.record_error("E_MODEL_NOT_FOUND", "Model not found")
+
+    gate = FailedGate(store=temp_store)
+    result = gate.check()
+
+    assert result.blocked
+    assert "Model configuration errors" in (result.reason or "")
 
 
-def test_failed_gate_unblocks_after_resumed() -> None:
-    """Gate should unblock after failed issue is resumed (label changed)."""
-    with patch("subprocess.run") as mock_run:
-        # First check: issue has state/failed AND has reason -> blocked
-        # Call sequence: list_failed_issues, _check_failed_reason, _extract_reason
-        # Second check: issue no longer has state/failed -> open
-        mock_run.side_effect = [
-            # First check: list_failed_issues
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps([{"number": 123, "title": "Failed issue"}]),
-            ),
-            # First check: _check_failed_reason (has reason)
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps({"body": "**failed_reason**: timeout"}),
-            ),
-            # First check: _extract_reason
-            MagicMock(
-                returncode=0,
-                stdout=json.dumps(
-                    {
-                        "comments": [
-                            {"body": "Older comment", "url": "url1"},
-                            {"body": "原因: timeout", "url": "url2"},
-                        ]
-                    }
-                ),
-            ),
-            # Second check: list_failed_issues (empty - label removed by resume)
-            MagicMock(returncode=0, stdout="[]"),
-        ]
+def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
+    """Gate should block when API error threshold is reached."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        gate = FailedGate(repo="owner/repo")
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
-        # First check: blocked (has reason)
-        result1 = gate.check()
-        assert result1.blocked
-        assert result1.issue_number == 123
+    # Record 2 API errors (threshold is 2 in 3 ticks)
+    ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT", "Rate limit", tick_id=1
+    )
+    ErrorTrackingService._instance.record_error("E_API_TIMEOUT", "Timeout", tick_id=2)
 
-        # Second check: open (after resume removed failed label)
-        result2 = gate.check()
-        assert not result2.blocked
+    gate = FailedGate(store=temp_store)
+    result = gate.check()
+
+    assert result.blocked
+    assert "API error threshold" in (result.reason or "")
+
+
+def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
+    """Gate should clear and allow operation after manual resume."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Record an error and trigger gate
+    ErrorTrackingService._instance.record_error("E_MODEL_NOT_FOUND", "Model error")
+
+    gate = FailedGate(store=temp_store)
+    result = gate.check()
+    assert result.blocked
+
+    # Clear the gate
+    gate.clear(cleared_by="admin:manual", reason="Fixed model config")
+
+    # Check again - should be open
+    result = gate.check()
+    assert not result.blocked
+
+
+def test_failed_gate_persists_state(temp_store: SQLiteClient) -> None:
+    """Gate state should persist across instances."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Record error with first instance
+    ErrorTrackingService._instance.record_error(
+        "E_MODEL_PERMISSION", "Permission denied"
+    )
+
+    gate1 = FailedGate(store=temp_store)
+    result1 = gate1.check()
+    assert result1.blocked
+
+    # Create new instance - should load state from DB
+    gate2 = FailedGate(store=temp_store)
+    result2 = gate2.check()
+    assert result2.blocked
+    assert result2.reason == result1.reason
+
+
+def test_failed_gate_increment_blocked_ticks(temp_store: SQLiteClient) -> None:
+    """Gate should increment blocked_ticks when active."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Trigger gate
+    ErrorTrackingService._instance.record_error("E_MODEL_CONFIG", "Config error")
+
+    gate = FailedGate(store=temp_store)
+    result = gate.check()
+    assert result.blocked
+    assert result.blocked_ticks == 0
+
+    # Increment ticks
+    gate.increment_blocked_ticks()
+    gate.increment_blocked_ticks()
+
+    # Check status
+    status = gate.get_status()
+    assert status.blocked_ticks == 2
