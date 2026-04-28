@@ -71,7 +71,11 @@ def classify_error(error_output: str) -> str:
     if "no output" in output_lower or "completed without agent_message" in output_lower:
         return E_EXEC_NO_OUTPUT
 
-    # Fallback
+    # Fallback with warning for unclassified errors
+    logger.bind(
+        domain="error_tracking",
+        error_output=error_output[:100],  # Truncate for logging
+    ).warning("Unclassified error, defaulting to E_EXEC_UNKNOWN")
     return E_EXEC_UNKNOWN
 
 
@@ -119,7 +123,7 @@ def should_trigger_failed_gate(
                 True,
                 (
                     f"API error threshold: {count} errors in "
-                    f"{ErrorTrackingService.WINDOW_SIZE} ticks"
+                    f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes"
                 ),
             )
         else:

@@ -19,9 +19,9 @@ from vibe3.exceptions.error_codes import is_api_error, is_model_error
 
 
 class ErrorTrackingService:
-    """Track API errors in sliding window for threshold detection.
+    """Track API errors in time window for threshold detection.
 
-    Threshold rule: 2+ API errors in last 3 ticks → failed gate
+    Threshold rule: 2+ API errors in last 10 minutes → failed gate
 
     Error categories:
     - MODEL_CONFIG: Immediate failed gate
@@ -31,10 +31,10 @@ class ErrorTrackingService:
     All error records are persisted to SQLite `error_log` table.
     """
 
-    # Sliding window size (ticks)
-    WINDOW_SIZE = 3
+    # Time window size (minutes)
+    TIME_WINDOW_MINUTES = 10
 
-    # Threshold count in window
+    # Threshold count in time window
     THRESHOLD_COUNT = 2
 
     # Global singleton instance
@@ -227,5 +227,5 @@ class ErrorTrackingService:
             "error_counts": error_counts,
             "api_error_window_count": self.get_api_error_count(),
             "threshold": self.THRESHOLD_COUNT,
-            "window_size": self.WINDOW_SIZE,
+            "time_window_minutes": self.TIME_WINDOW_MINUTES,
         }

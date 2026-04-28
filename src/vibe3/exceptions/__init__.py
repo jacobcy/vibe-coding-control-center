@@ -203,7 +203,6 @@ class InvalidTransitionError(UserError):
 #   from vibe3.exceptions.error_classification import (
 #       classify_error, should_trigger_failed_gate
 #   )
-#   from vibe3.exceptions.error_logging import write_error_log
 #   from vibe3.exceptions.error_codes import (
 #       E_MODEL_NOT_FOUND, E_API_RATE_LIMIT, etc.
 #   )
