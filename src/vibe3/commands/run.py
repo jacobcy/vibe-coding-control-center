@@ -91,7 +91,11 @@ def run_command(
     flow = flow_service.get_flow_status(target_branch)
 
     if not flow:
-        typer.echo(f"Error: No flow for branch '{target_branch}'.", err=True)
+        typer.echo(
+            f"Error: No flow for branch '{target_branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     issue_number = (

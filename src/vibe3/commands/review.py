@@ -68,7 +68,8 @@ def _review_branch_impl(
 
     if not flow:
         typer.echo(
-            f"Error: No flow for branch '{branch}'.\n" "Run 'vibe flow update' first.",
+            f"Error: No flow for branch '{branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
             err=True,
         )
         raise typer.Exit(1)
@@ -103,10 +104,6 @@ def _review_branch_impl(
 def default(
     ctx: typer.Context,
     branch: BranchOption = None,
-    report_ref: Annotated[
-        Optional[str],
-        typer.Option("--report-ref", help="Report reference for context"),
-    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
@@ -115,8 +112,6 @@ def default(
     """Review with --branch for orchestra-driven review, or use pr/base subcommands."""
     if ctx.invoked_subcommand is not None:
         return
-
-    _ = report_ref
 
     if branch is not None or ctx.args:
         # --branch provided or positional arg (legacy issue number)
@@ -135,17 +130,12 @@ def default(
 @app.command(name="issue", hidden=True)
 def issue_command(
     issue: Annotated[int, typer.Argument(help="GitHub issue number")],
-    report_ref: Annotated[
-        Optional[str],
-        typer.Option("--report-ref", help="Report reference for context"),
-    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
     """Legacy: review by issue number (use --branch instead)."""
-    _ = report_ref
     from vibe3.services.issue_flow_service import IssueFlowService
 
     branch = IssueFlowService().canonical_branch_name(issue)

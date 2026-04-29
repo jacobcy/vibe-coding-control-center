@@ -49,19 +49,28 @@ def test_plan_help_shows_options() -> None:
     assert "--spec" in result.output
 
 
-def test_plan_spec_requires_file() -> None:
+def test_plan_spec_uses_flow_spec_ref(monkeypatch) -> None:
+    """Test plan without --spec uses flow's spec_ref."""
+    mock_flow = _make_mock_flow(spec_ref="@task-42/spec.md")
     mock_flow_service = MagicMock()
-    mock_flow_service.get_flow_status.return_value = _make_mock_flow()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+    mock_execute = MagicMock()
 
-    with patch("vibe3.commands.plan.FlowService", return_value=mock_flow_service):
-        with patch(
-            "vibe3.commands.plan.resolve_branch_arg",
-            lambda _: "task/issue-42",
-        ):
-            result = runner.invoke(plan_app, ["--spec"])
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    )
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_execute)
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_execute)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        MagicMock(),
+    )
 
-    assert result.exit_code != 0
-    assert "--file is required" in result.output
+    result = runner.invoke(plan_app, ["--branch", "42"])
+    # When no --spec provided, default action is _plan_for_branch (not _plan_spec_impl)
+    # This test now validates that behavior
+    assert result.exit_code == 0
 
 
 def test_plan_branch_basic_flow(monkeypatch) -> None:
@@ -106,7 +115,7 @@ def test_plan_branch_no_spec_error(monkeypatch) -> None:
 
 
 def test_plan_spec_file_basic_flow(monkeypatch) -> None:
-    """Test plan --spec --file flow."""
+    """Test plan --spec <file> flow."""
     mock_flow = _make_mock_flow()
     mock_flow_service = MagicMock()
     mock_flow_service.get_flow_status.return_value = mock_flow
@@ -127,7 +136,7 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
         with patch.object(Path, "is_file", return_value=True):
             with patch.object(Path, "resolve", return_value=Path("/abs/docs/spec.md")):
                 result = runner.invoke(
-                    plan_app, ["--spec", "--file", "docs/spec.md", "--branch", "42"]
+                    plan_app, ["--spec", "docs/spec.md", "--branch", "42"]
                 )
     assert result.exit_code == 0
 

@@ -6,11 +6,8 @@ from typing import Annotated, Optional
 import typer
 
 from vibe3.commands.command_options import (
-    _AGENT_OPT,
     _ASYNC_OPT,
-    _BACKEND_OPT,
     _DRY_RUN_OPT,
-    _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
 )
@@ -57,7 +54,8 @@ def _plan_for_branch(
 
     if not flow:
         typer.echo(
-            f"Error: No flow for branch '{branch}'.\n" "Run 'vibe flow update' first.",
+            f"Error: No flow for branch '{branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
             err=True,
         )
         raise typer.Exit(1)
@@ -97,36 +95,47 @@ def _plan_for_branch(
 
 def _plan_spec_impl(
     branch: str,
-    file: Path | None,
-    instructions: str | None,
+    spec_path: Path | None,
     trace: bool,
     dry_run: bool,
     no_async: bool,
-    agent: str | None,
-    backend: str | None,
-    model: str | None,
 ) -> None:
     """Create implementation plan from a specification file."""
     if trace:
         enable_trace()
 
-    _ = agent, backend, model, instructions
-
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
 
     if not flow:
-        typer.echo(f"Error: No flow for branch '{branch}'.", err=True)
+        typer.echo(
+            f"Error: No flow for branch '{branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
+            err=True,
+        )
         raise typer.Exit(1)
 
-    if not file:
-        typer.echo("Error: --file is required for plan --spec.", err=True)
-        raise typer.Exit(1)
-
-    # Replace spec_ref with new file
-    spec_path = str(file.resolve())
-    flow_service.bind_spec(branch, spec_path, actor=None)
-    typer.echo(f"Spec updated: {spec_path}")
+    # If spec_path provided, update flow's spec_ref
+    if spec_path:
+        if not spec_path.exists() or not spec_path.is_file():
+            typer.echo(f"Error: Spec file not found: {spec_path}", err=True)
+            raise typer.Exit(1)
+        resolved_spec = str(spec_path.resolve())
+        flow_service.bind_spec(branch, resolved_spec, actor=None)
+        typer.echo(f"Spec updated: {resolved_spec}")
+        spec_file = spec_path
+    else:
+        # Use existing spec_ref from flow
+        if not flow.spec_ref:
+            typer.echo(
+                "Error: No spec bound.\n"
+                "Use 'vibe3 plan --spec <file>' to bind a spec, or "
+                "'vibe3 flow bind <issue> --role task' first.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        spec_file = Path(flow.spec_ref)
+        typer.echo(f"Using flow spec: {flow.spec_ref}")
 
     if dry_run:
         typer.echo("Plan dry run for specification")
@@ -142,7 +151,7 @@ def _plan_spec_impl(
 
     # Build request from spec file
     try:
-        spec_input = resolve_spec_plan_input(branch, file=file)
+        spec_input = resolve_spec_plan_input(branch, file=spec_file)
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -154,14 +163,14 @@ def _plan_spec_impl(
             branch=branch,
         )
     else:
+        spec_arg = str(spec_path) if spec_path else None
         execute_spec_plan_async(
             request=spec_input.request,
             issue_number=issue_number,
             branch=branch,
             cli_args=[
                 "plan",
-                "spec",
-                *(["--file", str(file)] if file else []),
+                *(["--spec", spec_arg] if spec_arg else []),
             ],
         )
 
@@ -171,43 +180,31 @@ def default(
     ctx: typer.Context,
     branch: BranchOption = None,
     spec: Annotated[
-        bool,
-        typer.Option("--spec", help="Plan from specification file (requires --file)"),
-    ] = False,
-    file: Annotated[
         Optional[Path],
-        typer.Option("--file", "-f", help="Path to spec file"),
+        typer.Option(
+            "--spec",
+            help="Spec file path (replaces flow spec_ref; omit to use flow spec_ref)",
+        ),
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
-    agent: _AGENT_OPT = None,
-    backend: _BACKEND_OPT = None,
-    model: _MODEL_OPT = None,
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
 
     target_branch = resolve_branch_arg(branch)
 
-    if spec:
+    if spec is not None:
         _plan_spec_impl(
             branch=target_branch,
-            file=file,
-            instructions=None,
+            spec_path=spec,
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
-            agent=agent,
-            backend=backend,
-            model=model,
         )
         return
-
-    if file is not None:
-        typer.echo("Error: --file requires --spec.", err=True)
-        raise typer.Exit(1)
 
     # Default: plan for branch
     _plan_for_branch(
@@ -230,12 +227,9 @@ def issue_command(
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
-    agent: _AGENT_OPT = None,
-    backend: _BACKEND_OPT = None,
-    model: _MODEL_OPT = None,
 ) -> None:
     """Legacy: plan from issue number (use --branch instead)."""
-    _ = instructions, agent, backend, model
+    _ = instructions
     from vibe3.services.issue_flow_service import IssueFlowService
 
     branch = IssueFlowService().canonical_branch_name(issue)
@@ -245,38 +239,4 @@ def issue_command(
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
-    )
-
-
-@app.command(hidden=True)
-def spec(
-    file: Annotated[
-        Optional[Path],
-        typer.Option("--file", "-f", help="Path to spec file"),
-    ] = None,
-    instructions: Annotated[
-        Optional[str],
-        typer.Argument(help="Additional task guidance"),
-    ] = None,
-    trace: _TRACE_OPT = False,
-    dry_run: _DRY_RUN_OPT = False,
-    no_async: _ASYNC_OPT = False,
-    agent: _AGENT_OPT = None,
-    backend: _BACKEND_OPT = None,
-    model: _MODEL_OPT = None,
-) -> None:
-    """Hidden: plan from spec file."""
-    from vibe3.clients.git_client import GitClient
-
-    branch = GitClient().get_current_branch()
-    _plan_spec_impl(
-        branch=branch,
-        file=file,
-        instructions=instructions,
-        trace=trace,
-        dry_run=dry_run,
-        no_async=no_async,
-        agent=agent,
-        backend=backend,
-        model=model,
     )

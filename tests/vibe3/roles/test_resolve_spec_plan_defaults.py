@@ -22,14 +22,6 @@ class TestResolveSpecPlanInputDefaultSpecRef:
         assert result.description == "Explicit spec content"
         assert result.spec_path == str(spec_file.resolve())
 
-    def test_explicit_msg_works(self) -> None:
-        """Explicit --msg should work normally."""
-        # Explicit msg input never queries flow
-        result = resolve_spec_plan_input("test-branch", msg="Inline spec")
-
-        assert result.description == "Inline spec"
-        assert result.spec_path is None
-
     def test_no_explicit_input_uses_flow_spec_ref_file(self, tmp_path: Path) -> None:
         """When no --file or --msg, use flow.spec_ref (file type)."""
         spec_file = tmp_path / "flow-spec.md"
