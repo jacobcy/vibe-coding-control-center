@@ -13,6 +13,7 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
+from vibe3.exceptions import UserError
 from vibe3.execution.issue_role_sync_runner import (
     run_issue_role_async,
     run_issue_role_sync,
@@ -247,7 +248,7 @@ def base(
             base_branch,
             current_branch=current_branch,
         )
-    except RuntimeError as error:
+    except UserError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 

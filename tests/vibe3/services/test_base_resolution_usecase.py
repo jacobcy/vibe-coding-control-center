@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vibe3.exceptions import UserError
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 
 
@@ -64,7 +65,7 @@ def test_resolve_review_base_raises_when_parent_missing() -> None:
     """Review base should fail clearly when no parent branch can be inferred."""
     usecase = BaseResolutionUsecase(parent_branch_finder=lambda branch: None)
 
-    with pytest.raises(RuntimeError, match="Could not auto-detect parent branch"):
+    with pytest.raises(UserError, match="Could not auto-detect parent branch"):
         usecase.resolve_review_base(None, current_branch="feature/child")
 
 

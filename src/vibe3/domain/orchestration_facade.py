@@ -16,6 +16,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
+from vibe3.exceptions import SystemError
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.logging import append_orchestra_event
@@ -127,7 +128,7 @@ class OrchestrationFacade(ServiceBase):
             return
 
         if self._coordinator is None:
-            raise RuntimeError(
+            raise SystemError(
                 "OrchestrationFacade: GlobalDispatchCoordinator not initialized. "
                 "Both dispatch_services and capacity must be provided at init time."
             )

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vibe3.exceptions import UserError
 from vibe3.services.flow_service import FlowService
 
 
@@ -153,9 +154,9 @@ def test_reactivate_flow_rejects_nonexistent_flow():
 
         # Try to reactivate a flow that was never created
         branch = "task/issue-999"
-        with pytest.raises(RuntimeError, match="Flow not found"):
+        with pytest.raises(UserError, match="Flow not found"):
             service.reactivate_flow(branch, flow_slug="issue-999")
 
         # Also test with no flow_slug provided
-        with pytest.raises(RuntimeError, match="Flow not found"):
+        with pytest.raises(UserError, match="Flow not found"):
             service.reactivate_flow(branch)

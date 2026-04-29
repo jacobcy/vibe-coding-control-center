@@ -17,6 +17,7 @@ from vibe3.commands.handoff_render import (
     _to_handoff_cmd,
 )
 from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.exceptions import SystemError, UserError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.verdict_service import VerdictService
@@ -131,7 +132,7 @@ def show(
                 resolved_branch = (
                     resolve_issue_branch_input(branch, FlowService()) or branch
                 )
-            except RuntimeError as exc:
+            except (UserError, SystemError) as exc:
                 typer.echo(f"Error: {exc}", err=True)
                 raise typer.Exit(1)
         try:
@@ -170,7 +171,7 @@ def status(
         if branch:
             try:
                 target_branch = resolve_issue_branch_input(branch, service) or branch
-            except RuntimeError as error:
+            except (UserError, SystemError) as error:
                 typer.echo(f"Error: {error}", err=True)
                 raise typer.Exit(1) from error
         else:

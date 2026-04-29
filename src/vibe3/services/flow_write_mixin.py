@@ -9,6 +9,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowState, FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_read_mixin import FlowReadMixin
 from vibe3.services.signature_service import SignatureService
@@ -146,7 +147,7 @@ class FlowWriteMixin(FlowReadMixin):
 
         status = self.get_flow_status(branch)
         if not status:
-            raise RuntimeError(f"Failed to create flow for branch {branch}")
+            raise UserError(f"Failed to create flow for branch {branch}")
 
         return status
 
