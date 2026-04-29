@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Generator, Optional
 
 from loguru import logger
-from typer import echo
 
 from vibe3.agents.backends.async_launcher import start_async_command
 from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -235,13 +234,6 @@ class ExecutionCoordinator:
                     keep_alive = int(request.refs.get("keep_alive_seconds", "0"))
                     task = request.refs.get("task")
                     session_id = request.refs.get("session_id")
-
-                    # Print execution marker before async execution
-                    # This marker is used to filter out uv installation noise
-                    backend_info = (
-                        request.options.backend or request.options.agent or "agent"
-                    )
-                    echo(f"-> Executing with {backend_info}...")
 
                     handle = self.backend.start_async(
                         prompt=request.prompt,

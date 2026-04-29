@@ -113,6 +113,7 @@ def run_command(
         Optional[str],
         typer.Argument(help="Instructions to pass to codeagent"),
     ] = None,
+    branch: run.BranchOption = None,
     plan: Annotated[
         Optional[Path],
         typer.Option(
@@ -156,10 +157,15 @@ def run_command(
             help="Skip session resume and start a fresh agent session",
         ),
     ] = False,
+    publish: Annotated[
+        bool,
+        typer.Option("--publish", help="Publish mode: create commit + PR"),
+    ] = False,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
     run.run_command(
         instructions=instructions,
+        branch=branch,
         plan=plan,
         skill=skill,
         trace=trace,
@@ -170,6 +176,7 @@ def run_command(
         backend=backend,
         model=model,
         fresh_session=fresh_session,
+        publish=publish,
     )
 
 
