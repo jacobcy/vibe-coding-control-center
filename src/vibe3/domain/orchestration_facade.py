@@ -100,6 +100,25 @@ class OrchestrationFacade(ServiceBase):
 
         self.on_heartbeat_tick()
 
+        # Check failed gate before any dispatch (supervisor included)
+        if self._failed_gate is not None:
+            gate_result = self._failed_gate.check()
+            if gate_result.blocked:
+                reason_part = (
+                    f" reason={gate_result.reason}" if gate_result.reason else ""
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"dispatch blocked by failed gate:{reason_part}",
+                )
+                logger.bind(
+                    domain="orchestration_facade",
+                    reason=gate_result.reason,
+                    blocked_ticks=gate_result.blocked_ticks,
+                ).warning("Dispatch blocked by failed gate")
+                self._failed_gate.increment_blocked_ticks()
+                return
+
         # Scan for supervisor candidates and publish events
         await self.on_supervisor_scan()
 
@@ -123,23 +142,6 @@ class OrchestrationFacade(ServiceBase):
             backend = self._capacity._backend
             registry = SessionRegistryService(store, backend)
             registry.reconcile_live_state()
-
-        if self._failed_gate is not None:
-            gate_result = self._failed_gate.check()
-            if gate_result.blocked:
-                reason_part = (
-                    f" reason={gate_result.reason}" if gate_result.reason else ""
-                )
-                append_orchestra_event(
-                    "dispatcher",
-                    f"dispatch blocked by failed gate:{reason_part}",
-                )
-                logger.bind(
-                    domain="orchestration_facade",
-                    reason=gate_result.reason,
-                    blocked_ticks=gate_result.blocked_ticks,
-                ).warning("Dispatch blocked by failed gate")
-                return
 
         await self._coordinator.coordinate()
 
@@ -279,8 +281,21 @@ class OrchestrationFacade(ServiceBase):
 
         查找带有 supervisor + state/handoff labels 的 issues，
         发布 SupervisorIssueIdentified 事件。
+        包含 interval_ticks gating，避免每 tick 都触发（与 governance 同频）。
         执行装配由 supervisor_scan handler 负责，facade 只做 observation。
         """
+        interval = self._config.supervisor_handoff.interval_ticks
+        if self._tick_count % interval != 0:
+            logger.bind(
+                domain="orchestration_facade",
+                tick_count=self._tick_count,
+                interval=interval,
+            ).debug(
+                f"Skipping supervisor scan (tick {self._tick_count} "
+                f"not divisible by {interval})"
+            )
+            return
+
         from vibe3.clients.github_client import GitHubClient
         from vibe3.roles.supervisor import iter_supervisor_identified_events
 

@@ -119,6 +119,9 @@ code_limits:
       - path: "src/vibe3/environment/session_registry.py"
         limit: 470
         reason: "Session 生命周期聚合，包含状态对账、容量统计、活跃检查等紧密耦合逻辑"
+      - path: "src/vibe3/execution/codeagent_runner.py"
+        limit: 450
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、context preparation、finalize 等紧密耦合的执行生命周期逻辑"
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 610
         reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"

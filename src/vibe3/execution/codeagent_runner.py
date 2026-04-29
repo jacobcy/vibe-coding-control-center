@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import cast
 
 from loguru import logger
+from loguru._logger import Logger
 from typer import echo
 
 from vibe3.agents.backends.codeagent import AgentResult, CodeagentBackend
@@ -60,6 +61,34 @@ class CodeagentExecutionService:
 
     def __init__(self, config: VibeConfig | None = None) -> None:
         self.config = config or VibeConfig.get_defaults()
+
+    @staticmethod
+    def _cleanup_supervisor_handoff_label(
+        issue_number: int,
+        actor: str,
+        log: Logger,
+    ) -> None:
+        """Remove state/handoff label to prevent supervisor re-dispatch.
+
+        Supervisor (L2) has no flow/state machine. After execution
+        (success or failure), we remove the handoff trigger label so
+        the next tick does not re-dispatch the same issue.
+        """
+        from vibe3.clients.github_labels import GhIssueLabelPort
+        from vibe3.config.orchestra_settings import load_orchestra_config
+
+        config = load_orchestra_config()
+        handoff_label = config.supervisor_handoff.handoff_state_label
+
+        try:
+            labels_client = GhIssueLabelPort()
+            labels_client.remove_issue_label(issue_number, handoff_label)
+            log.info(f"Removed {handoff_label} label from #{issue_number}")
+        except Exception as exc:
+            log.warning(
+                f"Failed to remove {handoff_label} label from "
+                f"#{issue_number}: {exc}"
+            )
 
     @staticmethod
     def _resolve_command_cwd(explicit_cwd: Path | None) -> Path:
@@ -186,8 +215,10 @@ class CodeagentExecutionService:
                     log.warning(f"pre_gate_callback failed: {cb_exc}")
 
             # Unified no-op gate: single hard logic check after agent completion.
-            # Executes ONLY if issue_number is available (worker roles).
-            if command.issue_number is not None:
+            # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).
+            # Supervisor (L2) is lightweight: no flow, no state machine, skip gate.
+            _noop_gate_roles = {"manager", "planner", "executor", "reviewer"}
+            if command.issue_number is not None and command.role in _noop_gate_roles:
                 apply_unified_noop_gate(
                     store=ctx.store,
                     issue_number=command.issue_number,
@@ -196,6 +227,13 @@ class CodeagentExecutionService:
                     role=command.role,
                     before_state_label=ctx.before_state_label,
                     repo=getattr(self.config, "repo", None),
+                )
+
+            # Supervisor success: remove state/handoff label to prevent re-dispatch.
+            # Agent is expected to close the issue, but we ensure label cleanup.
+            if command.role == "supervisor" and command.issue_number is not None:
+                self._cleanup_supervisor_handoff_label(
+                    command.issue_number, ctx.actor, log
                 )
 
             passive_kind = {"planner": "plan", "executor": "run"}.get(command.role)
@@ -322,21 +360,32 @@ class CodeagentExecutionService:
                     event_type=f"codeagent_{execution_prefix(command.role)}_aborted",
                 )
 
-            # Block the issue with error code
+            # Block the issue with error code.
+            # Supervisor (L2) uses lightweight failure: remove handoff label
+            # instead of calling fail_issue() which requires a task flow.
             if command.issue_number is not None:
-                from vibe3.services.issue_failure_service import fail_issue
-
-                blocked_reason = f"{error_code}: {exc}"
-
-                try:
-                    fail_issue(
-                        issue_number=command.issue_number,
-                        reason=blocked_reason,
-                        role=command.role,
-                        actor=ctx.actor,
+                if command.role == "supervisor":
+                    self._cleanup_supervisor_handoff_label(
+                        command.issue_number,
+                        ctx.actor,
+                        log,
                     )
-                except Exception as block_exc:
-                    logger.warning(f"Failed to block issue: {block_exc}", exc_info=True)
+                else:
+                    from vibe3.services.issue_failure_service import fail_issue
+
+                    blocked_reason = f"{error_code}: {exc}"
+
+                    try:
+                        fail_issue(
+                            issue_number=command.issue_number,
+                            reason=blocked_reason,
+                            role=command.role,
+                            actor=ctx.actor,
+                        )
+                    except Exception as block_exc:
+                        logger.warning(
+                            f"Failed to block issue: {block_exc}", exc_info=True
+                        )
 
             raise
 
