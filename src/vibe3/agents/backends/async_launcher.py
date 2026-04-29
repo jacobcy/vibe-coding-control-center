@@ -53,12 +53,6 @@ skip_prompt {
 /\\[2m/ { next }
 /░/ { next }
 /█/ { next }
-/API Error: 429/ || /ServerOverloaded/ || /TooManyRequests/ || /rate_limit/ {
-    print "\\n[vibe3] FATAL: 429 Rate Limit. Aborting to prevent loop."
-    fflush()
-    system("tmux kill-session -t {SESSION_ID}")
-    exit 1
-}
 {
     print
     fflush()

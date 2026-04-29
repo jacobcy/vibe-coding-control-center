@@ -176,6 +176,10 @@ class SupervisorHandoffConfig(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    interval_ticks: int = Field(
+        default=4,
+        description="Run supervisor scan every N heartbeat ticks (same as governance)",
+    )
     prompt_template: str = Field(
         default="orchestra.supervisor.apply",
         description="Dotted prompts.yaml path used to render supervisor/apply prompt",

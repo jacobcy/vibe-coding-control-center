@@ -33,7 +33,7 @@
     },
     "vibe-supervisor": {
       "backend": "gemini",
-      "model": "gemini-3.1-pro-preview",
+      "model": "gemini-3-flash-preview",
       "yolo": true,
       "description": "Governance supervisor: periodic scans and issue management"
     },

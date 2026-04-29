@@ -53,11 +53,22 @@ def classify_error(error_output: str) -> str:
         return E_MODEL_CONFIG
 
     # API errors
-    if "rate limit" in output_lower:
+    if (
+        "rate limit" in output_lower
+        or "rate_limit" in output_lower
+        or "429" in output_lower
+        or "toomanyrequests" in output_lower
+        or "too many requests" in output_lower
+    ):
         return E_API_RATE_LIMIT
     if "timeout" in output_lower or "timed out" in output_lower:
         return E_API_TIMEOUT
-    if "service unavailable" in output_lower or "503" in output_lower:
+    if (
+        "service unavailable" in output_lower
+        or "serveroverloaded" in output_lower
+        or "server overloaded" in output_lower
+        or "503" in output_lower
+    ):
         return E_API_UNAVAILABLE
     if "network error" in output_lower or "connection refused" in output_lower:
         return E_API_NETWORK

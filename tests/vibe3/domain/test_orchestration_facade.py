@@ -279,6 +279,7 @@ class TestOrchestrationFacade:
                 issue_label="supervisor",
                 handoff_state_label="state/handoff",
                 supervisor_file="supervisor.md",
+                interval_ticks=1,
             ),
         )
         mock_list_issues.return_value = [
@@ -319,6 +320,7 @@ class TestOrchestrationFacade:
                 issue_label="supervisor",
                 handoff_state_label="state/handoff",
                 supervisor_file="supervisor.md",
+                interval_ticks=1,
             ),
         )
         mock_list_issues.return_value = [
