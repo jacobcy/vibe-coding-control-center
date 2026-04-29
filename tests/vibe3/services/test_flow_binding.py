@@ -13,6 +13,7 @@ class TestFlowBinding:
 
     def test_bind_flow_success(self, mock_store) -> None:
         """Test binding a task issue to a flow via TaskService.link_issue."""
+        mock_store.get_events.return_value = []
         service = TaskService(store=mock_store)
         result = service.link_issue(
             branch="test-branch",
@@ -28,16 +29,14 @@ class TestFlowBinding:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             latest_actor="test-actor",
+            spec_ref="#123",
         )
-        mock_store.add_event.assert_called_once_with(
-            "test-branch",
-            "issue_linked",
-            "test-actor",
-            "Issue #123 linked as task",
-        )
+        # Should have both spec_bound and issue_linked events
+        assert mock_store.add_event.call_count == 2
 
     def test_bind_flow_already_bound(self, mock_store) -> None:
         """Binding again overwrites — link_issue is idempotent at store level."""
+        mock_store.get_events.return_value = []
         service = TaskService(store=mock_store)
         result = service.link_issue(
             branch="test-branch",
@@ -50,6 +49,7 @@ class TestFlowBinding:
 
     def test_bind_related_role(self, mock_store) -> None:
         """Related role should remain local-only."""
+        mock_store.get_events.return_value = []
         service = TaskService(store=mock_store)
 
         result = service.link_issue("test-branch", 219, "related")
@@ -59,6 +59,7 @@ class TestFlowBinding:
 
     def test_reclassify_issue_role(self, mock_store) -> None:
         """Existing issue link can be reclassified without deleting the flow."""
+        mock_store.get_events.return_value = []
         mock_store.update_issue_link_role.return_value = True
         service = TaskService(store=mock_store)
 
@@ -90,6 +91,7 @@ class TestFlowBinding:
     def test_bind_task_demotes_previous_task_flow_and_notifies_supervisor(
         self, mock_store
     ) -> None:
+        mock_store.get_events.return_value = []
         mock_store.update_issue_link_role.return_value = True
         mock_store.get_flows_by_issue.return_value = [
             {"branch": "debug/new-attempt", "flow_status": "active"},
@@ -166,6 +168,7 @@ class TestFlowBinding:
     def test_bind_task_demotes_previous_task_flow_without_remote_nudge_for_noncanonical(
         self, mock_store
     ) -> None:
+        mock_store.get_events.return_value = []
         mock_store.update_issue_link_role.return_value = True
         mock_store.get_flows_by_issue.return_value = [
             {"branch": "task/issue-467", "flow_status": "active"},

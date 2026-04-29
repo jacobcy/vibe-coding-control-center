@@ -119,10 +119,6 @@ def run_command(
             "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
         ),
     ] = None,
-    file: Annotated[
-        Optional[Path],
-        typer.Option("--file", "-f", help="Alias for --plan (deprecated)"),
-    ] = None,
     skill: Annotated[
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
@@ -162,10 +158,9 @@ def run_command(
     ] = False,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
-    resolved_plan = plan or file
     run.run_command(
         instructions=instructions,
-        plan=resolved_plan,
+        plan=plan,
         skill=skill,
         trace=trace,
         dry_run=dry_run,

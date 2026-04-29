@@ -451,7 +451,7 @@ plan:
 
   # Static: planner exit contract plus default planning guidance.
   # Target recipe section name: plan.exit_contract
-  # Can be overridden via CLI: vibe3 plan --issue 42
+  # Can be overridden via CLI: vibe3 plan --branch <b>
   plan_task: |
     Before starting, read the current task context:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest ref, and next step.

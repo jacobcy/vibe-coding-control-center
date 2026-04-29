@@ -17,6 +17,7 @@ from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.path_helpers import (
+    _SHARED_HANDOFF_PREFIX,
     GitClientProtocol,
 )
 
@@ -326,11 +327,17 @@ class HandoffService:
         )
         event_type = f"{kind}_recorded"
         git_common = Path(self.git_client.get_git_common_dir())
-        ref_value = (
+        relative_ref = (
             str(artifact_path.relative_to(git_common))
             if artifact_path.is_absolute()
             else str(artifact_path)
         )
+        # Normalize to @ prefix format for shared handoff artifacts
+        # vibe3/handoff/task-xxx/plan.md → @task-xxx/plan.md
+        if relative_ref.startswith(_SHARED_HANDOFF_PREFIX):
+            ref_value = "@" + relative_ref[len(_SHARED_HANDOFF_PREFIX) :]
+        else:
+            ref_value = relative_ref
         refs: dict[str, str | list[str]] = {"ref": ref_value}
         refs.update(extra_refs)
         self.store.add_event(

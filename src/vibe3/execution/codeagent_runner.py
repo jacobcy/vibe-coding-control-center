@@ -199,26 +199,37 @@ class CodeagentExecutionService:
                 )
 
             passive_kind = {"planner": "plan", "executor": "run"}.get(command.role)
-            # Passive recording: record if NO active handoff happened this round
+            # Passive recording: ONLY as fallback when primary ref is missing
+            # (i.e., agent did NOT call `handoff plan` or `handoff report`)
             if passive_kind and agent_result.stdout.strip() and handoff_file is None:
-                try:
-                    handoff_file = HandoffService(
-                        store=ctx.store
-                    ).record_passive_artifact(
-                        kind=passive_kind,
-                        content=agent_result.stdout,
-                        actor=ctx.actor,
-                        metadata=(
-                            {"session_id": effective_session_id}
-                            if effective_session_id
-                            else None
-                        ),
-                        branch=ctx.branch,
+                ref_field = f"{passive_kind}_ref"
+                existing_state = (
+                    ctx.store.get_flow_state(ctx.branch) if ctx.store else None
+                )
+                if existing_state and existing_state.get(ref_field):
+                    log.info(
+                        f"Skipping passive {passive_kind} recording: "
+                        f"{ref_field} already set"
                     )
-                except Exception as exc:
-                    log.warning(
-                        f"Failed to record passive {passive_kind} artifact: {exc}"
-                    )
+                else:
+                    try:
+                        handoff_file = HandoffService(
+                            store=ctx.store
+                        ).record_passive_artifact(
+                            kind=passive_kind,
+                            content=agent_result.stdout,
+                            actor=ctx.actor,
+                            metadata=(
+                                {"session_id": effective_session_id}
+                                if effective_session_id
+                                else None
+                            ),
+                            branch=ctx.branch,
+                        )
+                    except Exception as exc:
+                        log.warning(
+                            f"Failed to record passive {passive_kind} artifact: {exc}"
+                        )
 
         return handoff_file
 

@@ -316,7 +316,7 @@ def resume_issue(
     )
 
 
-# Backward compatibility wrappers (can be removed later if all callers updated)
+# Role-specific convenience wrappers for fail_issue/block_issue
 def fail_reviewer_issue(
     *, issue_number: int, reason: str, actor: str = "agent:review"
 ) -> None:
@@ -396,23 +396,6 @@ def block_reviewer_noop_issue(
         actor=actor,
         repo=repo,
         is_noop=True,
-    )
-
-
-def resume_failed_issue_to_ready(
-    *, issue_number: int, repo: str | None, reason: str, actor: str = "human:resume"
-) -> None:
-    """Resume from failed/blocked to ready.
-
-    Note: FAILED is now unified to BLOCKED. This function remains for
-    backward compatibility but uses from_state="blocked".
-    """
-    resume_issue(
-        issue_number=issue_number,
-        reason=reason,
-        from_state="blocked",
-        repo=repo,
-        actor=actor,
     )
 
 

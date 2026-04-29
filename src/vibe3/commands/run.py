@@ -14,7 +14,6 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
-    ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
 from vibe3.roles.run import (
@@ -23,6 +22,8 @@ from vibe3.roles.run import (
     find_skill_file,
     resolve_run_mode,
 )
+from vibe3.services.flow_service import FlowService
+from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -33,8 +34,14 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
+BranchOption = Annotated[
+    str | None,
+    typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
+]
+
 
 def run_command(
+    branch: BranchOption = None,
     instructions: Annotated[
         Optional[str],
         typer.Argument(help="Instructions to pass to codeagent"),
@@ -63,6 +70,10 @@ def run_command(
             help="Skip session resume and start a fresh agent session",
         ),
     ] = False,
+    publish: Annotated[
+        bool,
+        typer.Option("--publish", help="Publish mode: create commit + PR"),
+    ] = False,
 ) -> None:
     """Execute implementation plan or skill."""
     if trace:
@@ -74,11 +85,30 @@ def run_command(
     register_event_handlers()
 
     config = VibeConfig.get_defaults()
-    flow_service, branch = ensure_flow_for_current_branch()
-    flow = flow_service.get_flow_status(branch)
+    target_branch = resolve_branch_arg(branch)
+
+    flow_service = FlowService()
+    flow = flow_service.get_flow_status(target_branch)
+
+    if not flow:
+        typer.echo(
+            f"Error: No flow for branch '{target_branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     issue_number = (
         str(flow.task_issue_number) if flow and flow.task_issue_number else None
     )
+
+    if publish and skill:
+        typer.echo("Error: --publish and --skill are mutually exclusive.", err=True)
+        raise typer.Exit(1)
+
+    if publish:
+        skill = "vibe-commit"
+        typer.echo("-> Publish mode: creating commit + PR")
 
     if skill:
         skill_file = find_skill_file(skill)
@@ -92,23 +122,28 @@ def run_command(
         typer.echo(f"-> Skill: {skill_file}")
         execute_manual_run(
             config=config,
-            branch=branch,
+            branch=target_branch,
             issue_number=int(issue_number) if issue_number else None,
             instructions=instructions,
             plan_file=None,
             skill=skill,
-            summary=resolve_run_mode(flow_service, branch, instructions, None, skill),
+            summary=resolve_run_mode(
+                flow_service, target_branch, instructions, None, skill
+            ),
             dry_run=dry_run,
             no_async=no_async,
             show_prompt=show_prompt,
             agent=agent,
             backend=backend,
             model=model,
+            fresh_session=fresh_session,
         )
         return
 
     try:
-        summary = resolve_run_mode(flow_service, branch, instructions, plan, skill)
+        summary = resolve_run_mode(
+            flow_service, target_branch, instructions, plan, skill
+        )
     except ValueError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
@@ -136,9 +171,10 @@ def run_command(
     except FileNotFoundError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
+
     execute_manual_run(
         config=config,
-        branch=branch,
+        branch=target_branch,
         issue_number=int(issue_number) if issue_number else None,
         instructions=instructions,
         plan_file=plan_file,
@@ -150,12 +186,14 @@ def run_command(
         agent=agent,
         backend=backend,
         model=model,
+        fresh_session=fresh_session,
     )
 
 
 @app.callback(invoke_without_command=True)
 def default(
     ctx: typer.Context,
+    branch: BranchOption = None,
     instructions: Annotated[
         Optional[str],
         typer.Argument(help="Instructions to pass to codeagent"),
@@ -177,19 +215,33 @@ def default(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
+    fresh_session: Annotated[
+        bool,
+        typer.Option(
+            "--fresh-session",
+            help="Skip session resume and start a fresh agent session",
+        ),
+    ] = False,
+    publish: Annotated[
+        bool,
+        typer.Option("--publish", help="Publish mode: create commit + PR"),
+    ] = False,
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
 
     run_command(
-        instructions,
-        plan,
-        skill,
-        trace,
-        dry_run,
-        no_async,
-        show_prompt,
-        agent,
-        backend,
-        model,
+        branch=branch,
+        instructions=instructions,
+        plan=plan,
+        skill=skill,
+        trace=trace,
+        dry_run=dry_run,
+        no_async=no_async,
+        show_prompt=show_prompt,
+        agent=agent,
+        backend=backend,
+        model=model,
+        fresh_session=fresh_session,
+        publish=publish,
     )

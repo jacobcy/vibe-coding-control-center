@@ -259,8 +259,8 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
    # 开始执行：优先通过 flow bind / manager 主链推进
    uv run python src/vibe3/cli.py flow bind 123
 
-   # 如需查看运行状态，优先检查 flow 状态
-   uv run python src/vibe3/cli.py flow show --issue 123
+    # 如需查看运行状态，优先检查 flow 状态
+    uv run python src/vibe3/cli.py flow show task/issue-123
    ```
 
 #### 版本结束

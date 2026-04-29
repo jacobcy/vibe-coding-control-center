@@ -70,65 +70,7 @@ no matter what. Do not include this section in your response until the very end.
 """
 
 
-def build_run_standard_sections(config: VibeConfig) -> list[str]:
-    """Run role-level hard-standard sections. All run paths must include these.
-
-    Includes: policy_file, common_rules, output_format, run_task (common contract).
-    Does NOT include path-specific content (plan, audit, skill, coding_task).
-    """
-    from vibe3.agents.review_prompt import build_tools_guide_section
-
-    sections: list[str] = []
-    run_config = getattr(config, "run", None)
-
-    # Policy file
-    if run_config and hasattr(run_config, "policy_file"):
-        policy_path = run_config.policy_file
-        if policy_path and Path(policy_path).exists():
-            sections.append(Path(policy_path).read_text(encoding="utf-8"))
-
-    # Common rules (shared conventions)
-    tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
-    if tools_guide:
-        sections.append(tools_guide)
-
-    # Output format (hard standard — placed before task so task is the LAST section)
-    output_format = getattr(run_config, "output_format", None) if run_config else None
-    sections.append(build_run_output_contract_section(output_format))
-
-    # Run task (hard standard: includes label-writing instruction — MUST be last)
-    run_task = getattr(run_config, "run_task", None) if run_config else None
-    sections.append(build_run_task_section(run_task))
-
-    return sections
-
-
 RunPromptMode = Literal["coding", "retry"]
-
-
-def build_run_mode_sections(config: VibeConfig, mode: RunPromptMode) -> list[str]:
-    """Mode-specific execution sections.
-
-    Injected ONLY for non-skill executor paths.
-    - ``coding``: regular implementation round
-    - ``retry``: focused retry round based on prior audit feedback
-    NOT included in skill/commit paths to avoid instruction conflicts.
-    """
-    run_config = getattr(config, "run", None)
-    if not run_config:
-        return []
-
-    section_text: str | None
-    if mode == "retry":
-        section_text = getattr(run_config, "retry_task", None) or getattr(
-            run_config, "coding_task", None
-        )
-    else:
-        section_text = getattr(run_config, "coding_task", None)
-
-    if not section_text:
-        return []
-    return [section_text]
 
 
 def _build_run_prompt_providers(
@@ -287,8 +229,7 @@ def make_skill_context_builder(
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for skill execution mode.
 
-    Uses build_run_standard_sections() so the skill agent receives the common
-    contract (output_format, run_task exit step, policy, common_rules).
+    Uses run.skill recipe with standard providers (policy, output_format).
     coding_task is intentionally excluded — skills define their own execution guidance.
     """
     cfg = config or VibeConfig.get_defaults()

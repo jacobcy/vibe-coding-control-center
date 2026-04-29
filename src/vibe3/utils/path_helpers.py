@@ -404,6 +404,14 @@ def resolve_handoff_target(
     if target.startswith("@"):
         return _resolve_shared_artifact(target, git_client)
 
+    # Namespace 1.5: vibe3/handoff/ prefix → shared handoff store (no @ needed)
+    # This handles refs stored by record_passive_artifact that don't have @ prefix
+    if target.startswith(_SHARED_HANDOFF_PREFIX):
+        # Convert vibe3/handoff/task-xxx/run.md → @task-xxx/run.md
+        return _resolve_shared_artifact(
+            "@" + target[len(_SHARED_HANDOFF_PREFIX) :], git_client
+        )
+
     target_path = Path(target)
 
     # Namespace 3: absolute path → passthrough

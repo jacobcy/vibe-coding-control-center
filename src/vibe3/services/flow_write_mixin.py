@@ -215,6 +215,14 @@ class FlowWriteMixin(FlowReadMixin):
             spec_ref: Spec file reference
             actor: Actor performing the bind
         """
+        # Idempotency check: skip if spec_ref is already bound
+        existing = self.store.get_flow_state(branch)
+        if existing and existing.get("spec_ref") == spec_ref:
+            logger.bind(branch=branch, spec=spec_ref).debug(
+                "Spec already bound, skipping"
+            )
+            return
+
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
             branch,

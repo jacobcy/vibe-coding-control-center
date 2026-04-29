@@ -41,12 +41,6 @@ from vibe3.clients.git_status_ops import (
 from vibe3.clients.git_status_ops import (
     has_uncommitted_changes as _has_uncommitted_changes,
 )
-from vibe3.clients.git_status_ops import (
-    stash_apply as _stash_apply,
-)
-from vibe3.clients.git_status_ops import (
-    stash_push as _stash_push,
-)
 from vibe3.clients.git_worktree_ops import (
     _parse_worktree_list,
 )
@@ -203,14 +197,6 @@ class GitClient:
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""
         return _get_untracked_files(self._run)
-
-    def stash_push(self, message: str | None = None) -> str:
-        """Stash current changes, return stash ref."""
-        return _stash_push(self._run, message)
-
-    def stash_apply(self, stash_ref: str) -> None:
-        """Apply and drop stash."""
-        return _stash_apply(self._run, stash_ref)
 
     def has_uncommitted_changes(self) -> bool:
         """Check if working directory is dirty."""

@@ -101,20 +101,47 @@ class TaskService:
         # Now add the new link
         self.store.add_issue_link(normalized_branch, issue_number, role)
 
+        # Fetch existing events for idempotent checks
+        existing_events = self.store.get_events(normalized_branch)
+
         if role == "task":
-            # task_issue_number is no longer stored in flow_state.
-            # We only update latest_actor to track activity.
+            # Write spec_ref for task role (issue number as spec)
             self.store.update_flow_state(
                 normalized_branch,
                 latest_actor=effective_actor,
+                spec_ref=f"#{issue_number}",
             )
+            # Add spec_bound event (idempotent)
+            already_bound = any(
+                e.get("event_type") == "spec_bound"
+                and str((e.get("refs") or {}).get("issue_number") or "")
+                == str(issue_number)
+                for e in existing_events
+            )
+            if not already_bound:
+                self.store.add_event(
+                    normalized_branch,
+                    "spec_bound",
+                    effective_actor,
+                    f"Spec bound: #{issue_number}",
+                    refs={"issue_number": issue_number},
+                )
 
-        self.store.add_event(
-            normalized_branch,
-            "issue_linked",
-            effective_actor,
-            f"Issue #{issue_number} linked as {role}",
+        # Add issue_linked event (idempotent)
+        already_linked = any(
+            e.get("event_type") == "issue_linked"
+            and str((e.get("refs") or {}).get("issue_number") or "")
+            == str(issue_number)
+            for e in existing_events
         )
+        if not already_linked:
+            self.store.add_event(
+                normalized_branch,
+                "issue_linked",
+                effective_actor,
+                f"Issue #{issue_number} linked as {role}",
+                refs={"issue_number": issue_number, "role": role},
+            )
 
         # Demote superseded flows AFTER successful link
         if role == "task" and superseded_flows:
