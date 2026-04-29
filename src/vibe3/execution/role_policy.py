@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Callable, Literal
 
 if TYPE_CHECKING:
     from vibe3.agents.models import ExecutionRole
-    from vibe3.models.handoff import HandoffKind
 
 # Role to config section mapping
 # Note: Uses str instead of ExecutionRole because it includes "manager"
@@ -35,16 +34,6 @@ KIND_TO_ACTOR_KEY: dict[str, str] = {
     "run": "executor_actor",
     "review": "reviewer_actor",
 }
-
-
-def get_kind_actor_key(kind: "HandoffKind") -> str:
-    """Get the actor state key for a given handoff kind."""
-    return KIND_TO_ACTOR_KEY[kind]
-
-
-def get_optional_kind_actor_key(kind: "HandoffKind") -> str | None:
-    """Get the actor state key for a handoff kind when one exists."""
-    return KIND_TO_ACTOR_KEY.get(kind)
 
 
 # Lazy import to avoid circular dependencies

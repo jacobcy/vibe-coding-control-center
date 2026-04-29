@@ -130,17 +130,16 @@ def default(
 @app.command(name="issue", hidden=True)
 def issue_command(
     issue: Annotated[int, typer.Argument(help="GitHub issue number")],
+    ctx: typer.Context,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
-    """Legacy: review by issue number (use --branch instead)."""
-    from vibe3.services.issue_flow_service import IssueFlowService
-
-    branch = IssueFlowService().canonical_branch_name(issue)
-    _review_branch_impl(
-        branch=branch,
+    """Legacy alias: review --branch <issue>."""
+    default(
+        ctx=ctx,
+        branch=str(issue),
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,

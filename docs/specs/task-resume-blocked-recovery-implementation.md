@@ -15,7 +15,6 @@
 ### Side Effect 层 (Task #1)
 - **保留**:
   - `resume_failed_issue_to_handoff()` - failed + plan_ref → handoff
-  - `resume_failed_issue_to_ready()` - failed → ready
 - **新增**:
   - `resume_blocked_issue_to_ready()` - blocked → ready
   - comment 文案明确区分 failed vs blocked 来源

@@ -4,25 +4,11 @@ import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass
 from typing import Any, cast
 
 from loguru import logger
 
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
-
-
-@dataclass(frozen=True)
-class MilestoneContext:
-    """Aggregated milestone context for a task issue."""
-
-    number: int
-    title: str
-    open_count: int
-    closed_count: int
-    issues: list[dict[str, Any]]
-    task_issue_number: int
-
 
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
@@ -282,38 +268,3 @@ class IssuesMixin(IssueAdminMixin):
             )
             return []
         return cast(list[dict[str, Any]], json.loads(result.stdout))
-
-    def get_milestone_context(self: Any, issue_number: int) -> MilestoneContext | None:
-        """Fetch milestone orchestration context for a task issue.
-
-        Args:
-            issue_number: GitHub issue number
-
-        Returns:
-            MilestoneContext if issue has milestone, None otherwise
-        """
-        try:
-            issue = self.view_issue(issue_number)
-            if not isinstance(issue, dict) or not issue.get("milestone"):
-                return None
-
-            ms = issue["milestone"]
-            ms_issues = self.get_milestone_issues(ms["number"])
-        except (FileNotFoundError, RuntimeError):
-            return None
-
-        open_count = sum(
-            1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN"
-        )
-        closed_count = sum(
-            1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
-        )
-
-        return MilestoneContext(
-            number=ms["number"],
-            title=ms["title"],
-            open_count=open_count,
-            closed_count=closed_count,
-            issues=ms_issues,
-            task_issue_number=issue_number,
-        )

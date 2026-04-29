@@ -300,7 +300,7 @@ def resolve_spec_plan_input(
         "Use one of:\n"
         "  vibe flow bind <issue> --role task # Bind issue as spec\n"
         "  vibe flow update --spec <file>    # Bind spec file to flow\n"
-        "  vibe3 plan spec --file <path>     # From spec file (replaces current spec)\n"
+        "  vibe3 plan --spec <path>          # Override flow spec_ref with file\n"
         "Or ensure flow has an existing spec_ref."
     )
 

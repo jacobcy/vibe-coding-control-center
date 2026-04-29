@@ -35,8 +35,3 @@ def is_model_error(error_code: str) -> bool:
 def is_api_error(error_code: str) -> bool:
     """Check if error is an API error."""
     return error_code.startswith("E_API_")
-
-
-def is_exec_error(error_code: str) -> bool:
-    """Check if error is an execution error."""
-    return error_code.startswith("E_EXEC_")

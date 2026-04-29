@@ -1,4 +1,4 @@
-"""Git status operations - 封装 diff、status、stash 相关 git 命令."""
+"""Git status operations - diff and status helpers."""
 
 from typing import TYPE_CHECKING, Callable
 
@@ -160,40 +160,6 @@ def _get_branch_files(
     """获取分支相对于 base 的改动文件."""
     output = run(["diff", "--name-only", f"{base}...{branch}"])
     return [f for f in output.splitlines() if f.strip()]
-
-
-def stash_push(run: Callable[[list[str]], str], message: str | None = None) -> str:
-    """Stash current changes, return stash ref.
-
-    Args:
-        run: Git command runner function
-        message: Optional stash message
-
-    Returns:
-        Stash reference (e.g., stash@{0})
-    """
-    args = ["stash", "push"]
-    if message:
-        args.extend(["-m", message])
-    run(args)
-    stash_ref = "stash@{0}"
-    logger.bind(
-        domain="git", action="stash_push", stash_ref=stash_ref, message=message
-    ).info("Stashed changes")
-    return stash_ref
-
-
-def stash_apply(run: Callable[[list[str]], str], stash_ref: str) -> None:
-    """Apply and drop stash.
-
-    Args:
-        run: Git command runner function
-        stash_ref: Stash reference to apply
-    """
-    run(["stash", "pop", stash_ref])
-    logger.bind(domain="git", action="stash_apply", stash_ref=stash_ref).info(
-        "Applied stash"
-    )
 
 
 def has_uncommitted_changes(run: Callable[[list[str]], str]) -> bool:
