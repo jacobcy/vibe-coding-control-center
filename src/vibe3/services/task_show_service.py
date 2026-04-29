@@ -303,8 +303,17 @@ class TaskShowService:
         issue_state: str | None = None
         latest_human_instruction: TaskCommentSummary | None = None
         latest_comment: TaskCommentSummary | None = None
+
+        # Determine issue number: from flow or from branch if numeric
+        issue_number: int | None = None
         if local_task and local_task.task_issue_number:
-            issue = self.fetch_issue_with_comments(local_task.task_issue_number)
+            issue_number = local_task.task_issue_number
+        elif target_branch.isdigit():
+            # Branch is an issue number but no flow exists
+            issue_number = int(target_branch)
+
+        if issue_number:
+            issue = self.fetch_issue_with_comments(issue_number)
             if isinstance(issue, dict):
                 issue_title = str(issue.get("title") or "").strip() or None
                 issue_state = str(issue.get("state") or "").strip() or None

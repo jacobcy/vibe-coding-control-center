@@ -191,10 +191,22 @@ def status(
         orchestrated_issues = query_service.fetch_orchestrated_issues(
             flows, queued_set, stale_flows=stale_flows
         )
+
+        # Separate supervisor issues (label: supervisor, no phase display)
+        supervisor_label = config.supervisor_handoff.issue_label
+        supervisor_items = [
+            item
+            for item in orchestrated_issues
+            if supervisor_label in cast(list[str], item.get("labels", []))
+        ]
+        # Remove supervisor items from task_progress to avoid duplication
+        supervisor_numbers = {cast(int, item["number"]) for item in supervisor_items}
+
         task_progress_items = [
             item
             for item in orchestrated_issues
             if _include_issue_in_task_progress(item)
+            and cast(int, item["number"]) not in supervisor_numbers
         ]
         bucketed_items: dict[TaskStatusBucket, list[dict[str, object]]] = {
             TaskStatusBucket.ASSIGNEE_INTAKE: [],
@@ -297,6 +309,21 @@ def status(
 
         console.print()
 
+        # 2.5 Supervisor Issues (no phase display)
+        console.print("[bold cyan]Supervisor Issues:[/]")
+        if supervisor_items:
+            for item in supervisor_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                state = cast(IssueState, item["state"])
+                display_title = title[:52] + "..." if len(title) > 52 else title
+                state_str = state.value.upper()
+                console.print(f"  #{number:4}  [{state_str}]  {display_title}")
+        else:
+            console.print("  [dim](none)[/]")
+
+        console.print()
+
         # NEW: Show flows with PRs (factually complete, waiting for merge)
         pr_ref_items = [
             item
@@ -350,31 +377,6 @@ def status(
                     console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
                 if blocked_reason:
                     console.print(f"         [yellow]reason:[/] {blocked_reason}")
-        else:
-            console.print("  [dim](none)[/]")
-
-        # Note: FAILED unified to BLOCKED - show blocked items only
-        blocked_items = [
-            item
-            for item in task_progress_items
-            if cast(IssueState, item["state"]) == IssueState.BLOCKED
-        ]
-        console.print("\n[bold cyan]Blocked Issues:[/]")
-        if blocked_items:
-            for item in blocked_items:
-                number = cast(int, item["number"])
-                title = cast(str, item["title"])
-                flow = cast(FlowStatusResponse | None, item["flow"])
-                reason = cast(str | None, item.get("blocked_reason"))
-                if flow is None:
-                    flow_info = "[dim](no flow scene)[/]"
-                elif getattr(flow, "flow_status", "active") == "stale":
-                    flow_info = f"[dim]{flow.branch} (stale)[/]"
-                else:
-                    flow_info = f"[cyan]{flow.branch}[/]"
-                console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
-                if reason:
-                    console.print(f"         [red]reason:[/] {reason}")
         else:
             console.print("  [dim](none)[/]")
 

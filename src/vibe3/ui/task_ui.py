@@ -28,9 +28,35 @@ def render_task_show(
         task_result: Task show query result
         json_output: If True, output as JSON; otherwise formatted text
     """
+    # Handle case where no flow exists
     if not task_result.local_task:
-        console.print(f"[red]Task not found: {task_result.branch}[/]")
-        raise SystemExit(1)
+        # Check if branch is an issue number - try to show basic issue info
+        branch = task_result.branch
+        if branch.isdigit():
+            # Branch is an issue number without flow
+            # Try to fetch and display basic issue info
+            if task_result.issue_title or task_result.issue_state:
+                console.print(f"[yellow]No flow found for issue #{branch}[/]")
+                console.print()
+                console.print("[bold]Issue Info[/]")
+                if task_result.issue_title:
+                    console.print(f"Title:  {task_result.issue_title}")
+                if task_result.issue_state:
+                    console.print(f"State:  {task_result.issue_state.lower()}")
+                if task_result.pr_summary:
+                    pr = task_result.pr_summary
+                    console.print("\n[bold]PR / CI[/]")
+                    console.print(f"PR: #{pr.number} {pr.state} {pr.title}")
+                    if pr.checks:
+                        console.print(f"Checks: {pr.checks}")
+                return
+            # No issue info available
+            console.print(f"[yellow]No flow found for issue #{branch}[/]")
+            console.print("Tip: Use 'vibe3 flow new' to create a flow")
+            return
+        # Non-numeric branch without flow
+        console.print(f"[yellow]No flow found: {branch}[/]")
+        return
 
     task = task_result.local_task
     if json_output:

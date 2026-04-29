@@ -40,6 +40,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
         pid_file="/tmp/vibe3.pid",
         repo="openai/vibe-center",
         port=1234,
+        supervisor_handoff=SimpleNamespace(issue_label="supervisor"),
     )
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -130,6 +131,7 @@ def test_task_status_shows_flows_with_prs(
         pid_file="/tmp/vibe3.pid",
         repo="openai/vibe-center",
         port=1234,
+        supervisor_handoff=SimpleNamespace(issue_label="supervisor"),
     )
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
