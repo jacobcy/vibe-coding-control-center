@@ -455,8 +455,9 @@ manager 不应：
 
 1. 如果缺少 `spec_ref`
 - 当前轮不进入 `run` / `review`
-- 先补齐 spec 真源，例如执行：
-  - `uv run python src/vibe3/cli.py flow update --spec <...>`
+- 先补齐 spec 真源:
+  - 绑定 issue 为 spec: `vibe flow bind <issue-number> --role task`
+  - 或绑定 spec 文件: `vibe flow update --spec <file>`
 - 写 issue comment 说明当前缺失的是 spec 真源
 - 必要时写 handoff
 - `exit()`

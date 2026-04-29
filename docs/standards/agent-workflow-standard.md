@@ -61,10 +61,11 @@ Plan → Run → Review → Commit
 **Step 1: 创建 Plan**
 
 ```bash
-# 从 issue 创建 plan
-vibe3 plan --issue <issue_number>
+# 从 flow 创建 plan（需要已有 spec_ref）
+vibe3 plan --branch <branch_or_issue_number>
+vibe3 plan                    # 使用当前 branch
 
-# 从 spec 文件创建 plan
+# 从 spec 文件创建 plan（替换当前 flow 的 spec_ref）
 vibe3 plan --spec --file spec.md
 
 # 从 spec message 创建 plan
@@ -158,14 +159,14 @@ codeagent-wrapper cleanup
 git checkout -b feature/api-v2
 vibe3 flow update
 
-# 2. 绑定 task issue
-vibe3 flow bind <issue_number>
+# 2. 绑定 task issue（同时绑定为 spec）
+vibe flow bind <issue_number> --role task
 
 # 3. 创建 plan
-vibe3 plan --issue
+vibe plan --branch <issue_number>
 
 # 4. 执行 plan（agent 实现）
-vibe3 run --plan
+vibe run --branch <issue_number>
 
 # 5. 验证结果
 uv run pytest tests/vibe3

@@ -166,11 +166,10 @@ Skill Layer 负责：
 
 好例子：
 
-- `task add`
-- `task update --issue-ref ...`
-- `task update --roadmap-item ...`
-- `flow new`
 - `flow bind`
+- `flow update --spec`
+- `handoff plan`
+- `handoff report`
 
 坏例子：
 

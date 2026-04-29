@@ -42,7 +42,8 @@ Allowed:
 - `pr_ref`: read (审核 executor 提交的 PR)
 - `scene`: read
 - `code`: read (质量审查时可阅读代码，但不得修改)
-- `flow.update`: 允许执行 `flow update --spec` 操作，仅用于更新 flow 的 spec_ref 元数据
+- `flow.update`: 允许执行 `flow update --spec <file>` 操作（仅文件路径），用于更新 flow 的 spec_ref 为 spec 文件
+- `flow.bind`: 允许执行 `vibe flow bind <issue-number> --role task` 绑定 issue 为 spec
 
 **Comment 格式要求**：
 
@@ -214,7 +215,7 @@ uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
 
 允许：
 
-- 当缺少 spec_ref 时，执行 `uv run python src/vibe3/cli.py flow update --spec <...>` 更新 spec_ref 元数据
+- 当缺少 spec_ref 时，优先执行 `vibe flow bind <issue-number> --role task` 绑定 issue 为 spec；若需补充 spec 文件，执行 `vibe flow update --spec <file>`
 
 ## Pseudo Functions
 
@@ -456,9 +457,11 @@ Steps:
 Decision sketch:
 
 - 无 `spec_ref`：
-  - comment 当前 issue，指出缺少 spec 真源
-  - 如需修复，先执行 `uv run python src/vibe3/cli.py flow update --spec <...>`
-  - 必要时写 handoff append
+  - 优先用 issue 号绑定：`vibe flow bind <issue-number> --role task`
+  - 若 issue 描述不清楚，写 docs/specs/ 下的 spec 文件，再 `vibe flow update --spec docs/specs/xxx.md`
+  - 禁止用 plan 文件路径作为 spec（plan_ref 是输出，spec_ref 是输入）
+  - 禁止用 `vibe flow update --spec <issue-id>`（应使用 `vibe flow bind`）
+  - 必要时写 handoff append 说明 spec 绑定决策
   - `exit()`
 - 已有 `plan_ref`，无 `report_ref`：
   - **实质审查 plan**: 读 plan_ref 内容，判断质量是否达标（是否完整、是否可执行、是否有遗漏）

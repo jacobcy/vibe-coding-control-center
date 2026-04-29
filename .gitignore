@@ -114,6 +114,7 @@ wt-*/
 .agent/plans/
 .agent/context/task.md
 .agent/reports/
+.sisyphus/
 docs/audits/
 docs/plans/
 docs/reports/
