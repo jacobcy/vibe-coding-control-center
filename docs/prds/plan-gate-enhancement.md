@@ -1,4 +1,9 @@
+---
+status: historical
+---
 # PRD: Plan Gate Enhancement - 多源计划读取与验证
+
+> **Note**: This PRD references the historical Gate architecture which is now deprecated. See `docs/standards/glossary.md` for current terminology.
 
 ## 1. Overview
 

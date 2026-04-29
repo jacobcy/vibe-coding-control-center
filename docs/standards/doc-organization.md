@@ -118,14 +118,14 @@ audit-{YYYY-MM-DD}.md
 
 ## Vibe Guard 对应关系
 
-| 层级 | 文档类型 | Gate | 验证标准 |
+| 层级 | 文档类型 | 阶段 | 验证标准 |
 |------|---------|------|---------|
-| PRD（认知层） | prd-*.md | Scope Gate | 业务目标、绝对边界、核心数据流、成功判据 |
-| Spec（规范层） | spec-*.md | Spec Gate | 接口契约、核心不变量、边界行为、非功能约束 |
-| Plan（执行计划层） | plan-*.md | Plan Gate | 上下文圈定、任务拆分、风险对策 |
-| Test（测试层） | test-*.md | Test Gate | 测试策略、断言来源、TDD 流程记录 |
-| Code（代码实现层） | code-*.md | Code Gate | 实现概述、复杂度报告、AST 约束检查 |
-| Review（AI 审计层） | audit-*.md | Audit Gate | 目标对齐、规范遵守、路径一致、架构纯洁 |
+| PRD（认知层） | prd-*.md | Scope | 业务目标、绝对边界、核心数据流、成功判据 |
+| Spec（规范层） | spec-*.md | Spec | 接口契约、核心不变量、边界行为、非功能约束 |
+| Plan（执行计划层） | plan-*.md | Plan | 上下文圈定、任务拆分、风险对策 |
+| Test（测试层） | test-*.md | Test | 测试策略、断言来源、TDD 流程记录 |
+| Code（代码实现层） | code-*.md | Code | 实现概述、复杂度报告、AST 约束检查 |
+| Review（AI 审计层） | audit-*.md | Audit | 目标对齐、规范遵守、路径一致、架构纯洁 |
 
 ## 使用指南
 

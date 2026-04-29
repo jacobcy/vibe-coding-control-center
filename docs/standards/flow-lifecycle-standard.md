@@ -197,7 +197,7 @@ Issue label 自动转换：
 PR merged (GitHub webhook)
   ↓ Check 检测
 发现 flow.pr_ref == merged PR
-  ├─ 标记 flow_status = "merged"
+  ├─ 标记 flow_status = "done"
   └─ 等待 vibe check --clean-branch
 ```
 
