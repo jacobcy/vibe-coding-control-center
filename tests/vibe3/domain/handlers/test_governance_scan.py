@@ -7,7 +7,7 @@ from vibe3.execution.contracts import ExecutionLaunchResult
 
 
 class TestGovernanceScanHandler:
-    """governance_scan handler dispatches governance agent via coordinator."""
+    """governance_scan handler dispatches governance agent via CLI self-invocation."""
 
     @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
@@ -17,10 +17,8 @@ class TestGovernanceScanHandler:
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
-    @patch("vibe3.roles.governance.build_governance_request")
     def test_skips_when_governance_already_running(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
@@ -46,7 +44,6 @@ class TestGovernanceScanHandler:
         handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
 
         mock_registry.mark_governance_sessions_done_when_tmux_gone.assert_called_once()
-        mock_build_request.assert_not_called()
         mock_coordinator_cls.return_value.dispatch_execution.assert_not_called()
         mock_append_governance_event.assert_called_once()
         assert (
@@ -57,12 +54,12 @@ class TestGovernanceScanHandler:
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
-    @patch("vibe3.roles.governance.build_governance_request")
     def test_normal_dispatch(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
+        mock_append_governance_event: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
@@ -73,9 +70,6 @@ class TestGovernanceScanHandler:
 
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
-
-        mock_request = MagicMock()
-        mock_build_request.return_value = mock_request
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -91,19 +85,24 @@ class TestGovernanceScanHandler:
 
         handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
 
-        mock_build_request.assert_called_once()
-        mock_coordinator.dispatch_execution.assert_called_once_with(mock_request)
+        mock_coordinator.dispatch_execution.assert_called_once()
+        # Verify CLI self-invocation command structure
+        call_args = mock_coordinator.dispatch_execution.call_args.args[0]
+        assert call_args.role == "governance"
+        assert call_args.mode == "async"
+        assert call_args.cmd is not None
+        assert "internal" in call_args.cmd
+        assert "governance" in call_args.cmd
+        assert "5" in call_args.cmd  # tick_count
 
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
-    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
-    @patch("vibe3.roles.governance.build_governance_request")
-    def test_no_dispatch_when_request_is_none(
+    def test_no_dispatch_when_circuit_breaker_open(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
-        mock_coordinator_cls: MagicMock,
+        mock_append_governance_event: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
     ) -> None:
@@ -114,28 +113,24 @@ class TestGovernanceScanHandler:
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
 
-        mock_build_request.return_value = None
-
-        mock_coordinator = MagicMock()
-        mock_coordinator_cls.return_value = mock_coordinator
-
         mock_status = MagicMock()
-        mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
+        mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="open")
         mock_status_cls.return_value = mock_status
 
         handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
 
-        mock_coordinator.dispatch_execution.assert_not_called()
+        mock_append_governance_event.assert_called_once()
+        assert "circuit breaker OPEN" in mock_append_governance_event.call_args.args[0]
 
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
-    @patch("vibe3.roles.governance.build_governance_request")
     def test_coordinator_failure_logged(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
+        mock_append_governance_event: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
@@ -146,9 +141,6 @@ class TestGovernanceScanHandler:
 
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
-
-        mock_request = MagicMock()
-        mock_build_request.return_value = mock_request
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -163,16 +155,17 @@ class TestGovernanceScanHandler:
         handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
 
         mock_coordinator.dispatch_execution.assert_called_once()
+        mock_append_governance_event.assert_called()
 
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.orchestra.logging.append_governance_event")
     @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
-    @patch("vibe3.roles.governance.build_governance_request")
-    def test_exception_during_build_logged(
+    def test_exception_during_dispatch_logged(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
+        mock_append_governance_event: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
@@ -184,11 +177,16 @@ class TestGovernanceScanHandler:
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
 
-        mock_build_request.side_effect = RuntimeError("snap failed")
-        mock_coordinator_cls.return_value = MagicMock()
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.side_effect = RuntimeError(
+            "dispatch failed"
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
 
         mock_status = MagicMock()
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="closed")
         mock_status_cls.return_value = mock_status
 
         handle_governance_scan_started(GovernanceScanStarted(tick_count=5))
+
+        mock_coordinator.dispatch_execution.assert_called_once()
