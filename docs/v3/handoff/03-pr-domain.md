@@ -91,7 +91,7 @@ class GitHubClient:
 **PR Description 模板**：
 ```markdown
 ## Task
-- Task Issue: #123
+- Task Issue (role): #123
 - Spec Ref: docs/plans/example.md
 
 ## Flow

@@ -483,7 +483,7 @@ related_docs:
 - 正文中的"当前状态"部分应使用指引文本：`见 frontmatter \`status\` 字段（唯一真源）`
 - 不要在正文中重复或冗余状态值，避免双头真源问题
 
-**`gates`**（仅用于 task-readme）
+**`gates`**（仅用于 task-readme，*注：当前 Gate 范式已废弃，此字段为历史遗留/可选，具体见 glossary.md*）
 - 记录任务各个 Gate 的状态
 - 每个 Gate 包含：
   - `status`：`pending` / `passed` / `failed`
