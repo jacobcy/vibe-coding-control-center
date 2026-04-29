@@ -35,7 +35,7 @@ related_docs:
 
 ## 主链路
 
-`repo issue -> roadmap item -> vibe-new -> vibe-start -> spec execution -> PR -> review/integrate -> done`
+`GitHub issue -> roadmap item -> vibe-new -> vibe-start -> spec execution -> PR -> review/integrate -> done`
 
 对应常用 skill：
 

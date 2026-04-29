@@ -259,8 +259,8 @@ Detect:
 
 你的流程：
 
-repo issue
-task issue
+GitHub issue
+task
 flow
 branch
 PR

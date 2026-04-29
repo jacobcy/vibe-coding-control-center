@@ -35,8 +35,8 @@ flow wrapper = 流程记录
 
 以下信息永远通过 gh 实时获取：
 
-repo issue
-task issue
+GitHub issue
+task
 branch
 PR
 merge 状态
@@ -78,9 +78,9 @@ Flow 表示一条开发线。
 
 关系如下：
 
-Repo Issue
+GitHub Issue
    ↓
-Task Issue
+Task
    ↓
 Flow
    ↓
@@ -90,7 +90,7 @@ PR
 
 规则：
 
-1 task issue = 1 flow
+1 task = 1 flow
 1 flow = 1 main branch
 1 flow = 1 main PR
 
@@ -176,7 +176,7 @@ done	PR 已 merge
 推荐关系：
 
 Flow Stage	GitHub 状态
-plan	task issue 已创建
+plan	task 已创建
 execute	branch 存在 + draft PR
 review	PR open
 done	PR merged
@@ -399,8 +399,8 @@ flow show 124
 Flow 124
 Stage: execute
 
-Task Issue: #124
-Repo Issue: #120
+Task: #124
+GitHub Issue: #120
 
 Branch: flow/124-state-sync
 PR: #245
