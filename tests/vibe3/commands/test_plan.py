@@ -45,32 +45,22 @@ def _patch_plan_deps(monkeypatch, mock_flow: MagicMock | None = None) -> MagicMo
 def test_plan_help_shows_options() -> None:
     result = runner.invoke(plan_app, ["--help"])
     assert result.exit_code == 0
-    assert "--branch" in result.output
-    assert "--spec" in result.output
+    # Strip ANSI codes for reliable assertion
+    clean_output = result.output.replace("\x1b[1m", "").replace("\x1b[0m", "")
+    assert "--branch" in clean_output
+    assert "--spec" in clean_output
 
 
 def test_plan_spec_uses_flow_spec_ref(monkeypatch) -> None:
-    """Test plan without --spec uses flow's spec_ref."""
-    mock_flow = _make_mock_flow(spec_ref="@task-42/spec.md")
-    mock_flow_service = MagicMock()
-    mock_flow_service.get_flow_status.return_value = mock_flow
-    mock_execute = MagicMock()
-
-    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
-    monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
+    """Test plan --branch without --spec delegates to _plan_for_branch."""
+    # _plan_for_branch requires spec_ref and issue_number,
+    # then calls run_issue_role_async/sync
+    mock_runner = _patch_plan_deps(
+        monkeypatch, mock_flow=_make_mock_flow(spec_ref="@task-42/spec.md")
     )
-    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_execute)
-    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_execute)
-    monkeypatch.setattr(
-        "vibe3.commands.plan.resolve_spec_plan_input",
-        MagicMock(),
-    )
-
     result = runner.invoke(plan_app, ["--branch", "42"])
-    # When no --spec provided, default action is _plan_for_branch (not _plan_spec_impl)
-    # This test now validates that behavior
     assert result.exit_code == 0
+    mock_runner.assert_called_once()
 
 
 def test_plan_branch_basic_flow(monkeypatch) -> None:
