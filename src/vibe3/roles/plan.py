@@ -160,11 +160,12 @@ def build_plan_request(
     actor: str = "orchestra:planner",
 ) -> ExecutionRequest:
     """Build the planner async execution request for dispatch."""
+    target_branch = branch or f"task/issue-{issue.number}"
     return build_role_async_request(
         role="planner",
         config=config,
         issue=issue,
-        command_args=["plan", "--issue", str(issue.number), "--no-async"],
+        command_args=["plan", "--branch", target_branch, "--no-async"],
         worktree_requirement=PLANNER_ROLE.worktree,
         branch=branch,
         repo_path=repo_path,
@@ -237,20 +238,16 @@ def resolve_spec_plan_input(
     branch: str,
     *,
     file: Path | None = None,
-    msg: str | None = None,
 ) -> PlanSpecInput:
-    """Resolve spec planning input from file, inline message, or flow spec_ref.
+    """Resolve spec planning input from file or flow spec_ref.
 
     Priority:
-    1. Explicit --file or --msg from CLI
+    1. Explicit --file from CLI
     2. Flow's existing spec_ref (if available)
     3. Error if none available
     """
     from vibe3.services.flow_service import FlowService
     from vibe3.services.spec_ref_service import SpecRefService
-
-    if file and msg:
-        raise ValueError("Provide either --file or --msg, not both.")
 
     # Case 1: Explicit file provided
     if file:
@@ -266,19 +263,7 @@ def resolve_spec_plan_input(
             spec_path=spec_path,
         )
 
-    # Case 2: Explicit message provided
-    if msg:
-        description = msg
-        spec_path = None  # Already defined with str | None type in Case 1
-        request = PlanRequest(scope=PlanScope.for_spec(description))
-        return PlanSpecInput(
-            branch=branch,
-            request=request,
-            description=description,
-            spec_path=spec_path,
-        )
-
-    # Case 3: Try flow's spec_ref as default
+    # Case 2: Try flow's spec_ref as default
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
 
@@ -309,22 +294,15 @@ def resolve_spec_plan_input(
             spec_path=spec_path,
         )
 
-    # Case 4: No spec available
+    # Case 3: No spec available
     raise ValueError(
         "No spec provided.\n"
         "Use one of:\n"
-        "  vibe3 plan spec --file <path>     # From spec file\n"
-        "  vibe3 plan spec --msg <text>      # From inline message\n"
-        "  vibe3 flow update --spec <ref>    # Bind spec to flow first\n"
+        "  vibe flow bind <issue> --role task # Bind issue as spec\n"
+        "  vibe flow update --spec <file>    # Bind spec file to flow\n"
+        "  vibe3 plan spec --file <path>     # From spec file (replaces current spec)\n"
         "Or ensure flow has an existing spec_ref."
     )
-
-
-def bind_plan_spec(branch: str, spec_path: str) -> None:
-    """Bind resolved spec path to current flow."""
-    from vibe3.services.flow_service import FlowService
-
-    FlowService().bind_spec(branch, spec_path, "user")
 
 
 def execute_spec_plan_async(

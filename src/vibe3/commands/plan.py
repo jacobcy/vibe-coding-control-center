@@ -13,7 +13,6 @@ from vibe3.commands.command_options import (
     _MODEL_OPT,
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
-    ensure_flow_for_current_branch,
 )
 from vibe3.execution.issue_role_sync_runner import (
     run_issue_role_async,
@@ -21,11 +20,12 @@ from vibe3.execution.issue_role_sync_runner import (
 )
 from vibe3.roles.plan import (
     PLAN_SYNC_SPEC,
-    bind_plan_spec,
     execute_spec_plan_async,
     execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
+from vibe3.services.flow_service import FlowService
+from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -35,27 +35,53 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
+BranchOption = Annotated[
+    str | None,
+    typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
+]
 
-def _plan_issue_impl(
-    issue: int,
-    instructions: str | None,
+
+def _plan_for_branch(
+    branch: str,
     trace: bool,
     dry_run: bool,
     no_async: bool,
     show_prompt: bool,
-    agent: str | None,
-    backend: str | None,
-    model: str | None,
 ) -> None:
-    """Create implementation plan for an issue."""
+    """Create implementation plan for a branch with spec_ref."""
     if trace:
         enable_trace()
 
-    _ = instructions, agent, backend, model
+    flow_service = FlowService()
+    flow = flow_service.get_flow_status(branch)
+
+    if not flow:
+        typer.echo(
+            f"Error: No flow for branch '{branch}'.\n" "Run 'vibe flow update' first.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if not flow.spec_ref:
+        typer.echo(
+            "Error: No spec bound.\n"
+            "Run 'vibe flow bind <issue>' or 'vibe flow update --spec <file>'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    issue_number = flow.task_issue_number
+    if not issue_number:
+        typer.echo(
+            f"Error: No issue linked to flow '{branch}'.\n"
+            "Run 'vibe flow bind <issue>' first.",
+            err=True,
+        )
+        raise typer.Exit(1)
 
     if no_async:
         run_issue_role_sync(
-            issue_number=issue,
+            issue_number=issue_number,
             dry_run=dry_run,
             fresh_session=False,
             show_prompt=show_prompt,
@@ -63,15 +89,15 @@ def _plan_issue_impl(
         )
     else:
         run_issue_role_async(
-            issue_number=issue,
+            issue_number=issue_number,
             dry_run=dry_run,
             spec=PLAN_SYNC_SPEC,
         )
 
 
 def _plan_spec_impl(
+    branch: str,
     file: Path | None,
-    msg: str | None,
     instructions: str | None,
     trace: bool,
     dry_run: bool,
@@ -80,34 +106,46 @@ def _plan_spec_impl(
     backend: str | None,
     model: str | None,
 ) -> None:
-    """Create implementation plan from a specification."""
+    """Create implementation plan from a specification file."""
     if trace:
         enable_trace()
 
-    _ = agent, backend, model
+    _ = agent, backend, model, instructions
 
-    flow_service, branch = ensure_flow_for_current_branch()
-    try:
-        spec_input = resolve_spec_plan_input(branch, file=file, msg=msg)
-    except (ValueError, FileNotFoundError) as e:
-        typer.echo(f"Error: {e}", err=True)
+    flow_service = FlowService()
+    flow = flow_service.get_flow_status(branch)
+
+    if not flow:
+        typer.echo(f"Error: No flow for branch '{branch}'.", err=True)
         raise typer.Exit(1)
 
-    if not dry_run and spec_input.spec_path:
-        bind_plan_spec(branch, spec_input.spec_path)
+    if not file:
+        typer.echo("Error: --file is required for plan --spec.", err=True)
+        raise typer.Exit(1)
+
+    # Replace spec_ref with new file
+    spec_path = str(file.resolve())
+    flow_service.bind_spec(branch, spec_path, actor=None)
+    typer.echo(f"Spec updated: {spec_path}")
 
     if dry_run:
         typer.echo("Plan dry run for specification")
         return
 
-    flow = flow_service.get_flow_status(branch)
-    issue_number = flow.task_issue_number if flow else None
+    issue_number = flow.task_issue_number
 
     if not issue_number:
         typer.echo(
             "Warning: No issue linked to flow. Lifecycle events will be skipped.",
             err=True,
         )
+
+    # Build request from spec file
+    try:
+        spec_input = resolve_spec_plan_input(branch, file=file)
+    except (ValueError, FileNotFoundError) as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
     if no_async:
         execute_spec_plan_sync(
@@ -124,8 +162,6 @@ def _plan_spec_impl(
                 "plan",
                 "spec",
                 *(["--file", str(file)] if file else []),
-                *(["--msg", msg] if msg else []),
-                *([instructions] if instructions else []),
             ],
         )
 
@@ -133,23 +169,14 @@ def _plan_spec_impl(
 @app.callback(invoke_without_command=True)
 def default(
     ctx: typer.Context,
-    issue: Annotated[
-        Optional[int],
-        typer.Option("--issue", "-i", help="GitHub issue number"),
-    ] = None,
+    branch: BranchOption = None,
     spec: Annotated[
         bool,
-        typer.Option(
-            "--spec", help="Plan from specification (requires --file or --msg)"
-        ),
+        typer.Option("--spec", help="Plan from specification file (requires --file)"),
     ] = False,
     file: Annotated[
         Optional[Path],
         typer.Option("--file", "-f", help="Path to spec file"),
-    ] = None,
-    msg: Annotated[
-        Optional[str],
-        typer.Option("--msg", help="Spec description"),
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
@@ -161,26 +188,13 @@ def default(
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
-    if issue is not None and spec:
-        typer.echo("Error: --issue and --spec are mutually exclusive.", err=True)
-        raise typer.Exit(1)
-    if issue is not None:
-        _plan_issue_impl(
-            issue=issue,
-            instructions=None,
-            trace=trace,
-            dry_run=dry_run,
-            no_async=no_async,
-            show_prompt=show_prompt,
-            agent=agent,
-            backend=backend,
-            model=model,
-        )
-        return
+
+    target_branch = resolve_branch_arg(branch)
+
     if spec:
         _plan_spec_impl(
+            branch=target_branch,
             file=file,
-            msg=msg,
             instructions=None,
             trace=trace,
             dry_run=dry_run,
@@ -190,15 +204,22 @@ def default(
             model=model,
         )
         return
-    if file is not None or msg is not None:
-        typer.echo("Error: --file/--msg require --spec.", err=True)
+
+    if file is not None:
+        typer.echo("Error: --file requires --spec.", err=True)
         raise typer.Exit(1)
 
-    # If no issue or spec, show help
-    typer.echo(ctx.get_help())
+    # Default: plan for branch
+    _plan_for_branch(
+        branch=target_branch,
+        trace=trace,
+        dry_run=dry_run,
+        no_async=no_async,
+        show_prompt=show_prompt,
+    )
 
 
-@app.command(name="issue")
+@app.command(name="issue", hidden=True)
 def issue_command(
     issue: Annotated[int, typer.Argument(help="GitHub issue number")],
     instructions: Annotated[
@@ -213,16 +234,17 @@ def issue_command(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
-    _plan_issue_impl(
-        issue=issue,
-        instructions=instructions,
+    """Legacy: plan from issue number (use --branch instead)."""
+    _ = instructions, agent, backend, model
+    from vibe3.services.issue_flow_service import IssueFlowService
+
+    branch = IssueFlowService().canonical_branch_name(issue)
+    _plan_for_branch(
+        branch=branch,
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
         show_prompt=show_prompt,
-        agent=agent,
-        backend=backend,
-        model=model,
     )
 
 
@@ -231,10 +253,6 @@ def spec(
     file: Annotated[
         Optional[Path],
         typer.Option("--file", "-f", help="Path to spec file"),
-    ] = None,
-    msg: Annotated[
-        Optional[str],
-        typer.Option("--msg", help="Spec description"),
     ] = None,
     instructions: Annotated[
         Optional[str],
@@ -247,9 +265,13 @@ def spec(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
+    """Hidden: plan from spec file."""
+    from vibe3.clients.git_client import GitClient
+
+    branch = GitClient().get_current_branch()
     _plan_spec_impl(
+        branch=branch,
         file=file,
-        msg=msg,
         instructions=instructions,
         trace=trace,
         dry_run=dry_run,

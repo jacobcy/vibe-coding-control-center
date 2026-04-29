@@ -24,16 +24,23 @@ from vibe3.roles.review import (
     execute_manual_review_async,
     execute_manual_review_sync,
 )
+from vibe3.services.flow_service import FlowService
+from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
     help="Code review with three modes:\n\n"
-    "  --issue <n>  - Review issue implementation (orchestra-driven)\n"
+    "  --branch <b> - Review issue implementation (orchestra-driven)\n"
     "  pr <number>  - Review existing PR from GitHub (analyzes PR diff)\n"
     "  base [branch] - Review local changes vs base branch (compares snapshots)",
     rich_markup_mode="rich",
 )
+
+BranchOption = Annotated[
+    str | None,
+    typer.Option("--branch", "-b", help="Branch name or issue number (e.g., 320)"),
+]
 
 
 def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
@@ -42,26 +49,43 @@ def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
         return
     typer.echo(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
-        typer.echo(f"→ Review saved to: {handoff_file}")
+        typer.echo(f"-> Review saved to: {handoff_file}")
 
 
-def _review_issue_impl(
-    issue: int,
-    report_ref: str | None,
+def _review_branch_impl(
+    branch: str,
     trace: bool,
     dry_run: bool,
     no_async: bool,
     show_prompt: bool,
 ) -> None:
-    """Review implementation for an issue via role sync runner."""
+    """Review implementation for a branch via role sync runner."""
     if trace:
         enable_trace()
 
-    _ = report_ref
+    flow_service = FlowService()
+    flow = flow_service.get_flow_status(branch)
+
+    if not flow:
+        typer.echo(
+            f"Error: No flow for branch '{branch}'.\n" "Run 'vibe flow update' first.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    issue_number = flow.task_issue_number
+
+    if not issue_number:
+        typer.echo(
+            f"Error: No issue linked to flow '{branch}'.\n"
+            "Run 'vibe flow bind <issue>' first.",
+            err=True,
+        )
+        raise typer.Exit(1)
 
     if no_async:
         run_issue_role_sync(
-            issue_number=issue,
+            issue_number=issue_number,
             dry_run=dry_run,
             fresh_session=False,
             show_prompt=show_prompt,
@@ -69,7 +93,7 @@ def _review_issue_impl(
         )
     else:
         run_issue_role_async(
-            issue_number=issue,
+            issue_number=issue_number,
             dry_run=dry_run,
             spec=REVIEW_SYNC_SPEC,
         )
@@ -78,10 +102,7 @@ def _review_issue_impl(
 @app.callback(invoke_without_command=True)
 def default(
     ctx: typer.Context,
-    issue: Annotated[
-        Optional[int],
-        typer.Option("--issue", "-i", help="Review issue implementation"),
-    ] = None,
+    branch: BranchOption = None,
     report_ref: Annotated[
         Optional[str],
         typer.Option("--report-ref", help="Report reference for context"),
@@ -91,13 +112,17 @@ def default(
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
-    """Review with --issue for orchestra-driven review, or use pr/base subcommands."""
+    """Review with --branch for orchestra-driven review, or use pr/base subcommands."""
     if ctx.invoked_subcommand is not None:
         return
-    if issue is not None:
-        _review_issue_impl(
-            issue=issue,
-            report_ref=report_ref,
+
+    _ = report_ref
+
+    if branch is not None or ctx.args:
+        # --branch provided or positional arg (legacy issue number)
+        target_branch = resolve_branch_arg(branch)
+        _review_branch_impl(
+            branch=target_branch,
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,
@@ -107,7 +132,7 @@ def default(
     typer.echo(ctx.get_help())
 
 
-@app.command(name="issue")
+@app.command(name="issue", hidden=True)
 def issue_command(
     issue: Annotated[int, typer.Argument(help="GitHub issue number")],
     report_ref: Annotated[
@@ -119,10 +144,13 @@ def issue_command(
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
-    """Review implementation for a specific issue (orchestra-driven)."""
-    _review_issue_impl(
-        issue=issue,
-        report_ref=report_ref,
+    """Legacy: review by issue number (use --branch instead)."""
+    _ = report_ref
+    from vibe3.services.issue_flow_service import IssueFlowService
+
+    branch = IssueFlowService().canonical_branch_name(issue)
+    _review_branch_impl(
+        branch=branch,
         trace=trace,
         dry_run=dry_run,
         no_async=no_async,
@@ -157,7 +185,7 @@ def pr(
 
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting PR review")
-    typer.echo(f"→ Review: PR #{pr_number}")
+    typer.echo(f"-> Review: PR #{pr_number}")
     request, issue_number, head_branch = build_pr_review_request(pr_number)
 
     if not head_branch and not dry_run:
@@ -235,7 +263,7 @@ def base(
         raise typer.Exit(1) from error
 
     if resolved_base.auto_detected:
-        typer.echo(f"→ Auto-detected parent branch: {resolved_base.base_branch}")
+        typer.echo(f"-> Auto-detected parent branch: {resolved_base.base_branch}")
 
     log = logger.bind(
         domain="review",
@@ -244,7 +272,7 @@ def base(
         base_branch=resolved_base.base_branch,
     )
     log.info("Starting branch review")
-    typer.echo(f"→ Review: {current_branch} vs {resolved_base.base_branch}")
+    typer.echo(f"-> Review: {current_branch} vs {resolved_base.base_branch}")
 
     request, issue_number, _ = build_base_review_request(
         current_branch,

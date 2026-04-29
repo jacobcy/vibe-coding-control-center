@@ -90,13 +90,29 @@ def build_run_request(
         refs["plan_ref"] = plan_ref
     if audit_ref:
         refs["audit_ref"] = audit_ref
+
+    target_branch = branch or f"task/issue-{issue.number}"
     if commit_mode:
-        command_args = ["run", "--skill", "vibe-commit", "--no-async"]
+        command_args = [
+            "run",
+            "--branch",
+            target_branch,
+            "--skill",
+            "vibe-commit",
+            "--no-async",
+        ]
         refs["commit_mode"] = "true"
     elif plan_ref:
-        command_args = ["run", "--plan", plan_ref, "--no-async"]
+        command_args = [
+            "run",
+            "--branch",
+            target_branch,
+            "--plan",
+            plan_ref,
+            "--no-async",
+        ]
     else:
-        command_args = ["run", "--no-async"]
+        command_args = ["run", "--branch", target_branch, "--no-async"]
 
     return build_role_async_request(
         role="executor",
@@ -351,6 +367,7 @@ def execute_manual_run(
     agent: str | None,
     backend: str | None,
     model: str | None,
+    fresh_session: bool = False,
 ) -> CodeagentResult | None:
     """Execute manual run command via role-owned facade."""
     if skill:
@@ -414,7 +431,11 @@ def execute_manual_run(
                     report_ref = str(flow_state["report_ref"])
                 if flow_state.get("audit_ref"):
                     audit_file = str(flow_state["audit_ref"])
-                retry_session_id = load_session_id("executor", branch=branch)
+                retry_session_id = (
+                    None
+                    if fresh_session
+                    else load_session_id("executor", branch=branch)
+                )
                 meta = build_prompt_meta(
                     flow_state,
                     ref_keys=("plan_ref", "report_ref", "audit_ref"),
