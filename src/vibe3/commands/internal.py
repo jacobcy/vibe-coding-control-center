@@ -81,3 +81,31 @@ def internal_apply_dispatch(
             dry_run=dry_run,
             spec=SUPERVISOR_CLI_SYNC_SPEC,
         )
+
+
+@app.command("governance")
+def internal_governance_dispatch(
+    tick: Annotated[
+        int, typer.Argument(help="Tick count for governance material rotation")
+    ],
+    dry_run: bool = False,
+    show_prompt: bool = False,
+) -> None:
+    """L3: Dispatch the Governance scan agent.
+
+    Governance scan uses tick count to rotate through supervisor materials.
+    Unlike manager/apply, governance has no issue_number - it scans the whole system.
+
+    Note: This command is only called via CLI self-invocation (internal governance)
+    from the tmux wrapper launched by governance_scan handler. It always runs sync.
+    """
+    from vibe3.execution.governance_sync_runner import run_governance_sync
+
+    # Governance always runs sync in CLI self-invocation context
+    # (async wrapper already launched by governance_scan handler)
+    run_governance_sync(
+        tick_count=tick,
+        dry_run=dry_run,
+        show_prompt=show_prompt,
+        session_id=None,
+    )

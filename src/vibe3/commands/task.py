@@ -35,7 +35,10 @@ def _build_resume_usecase() -> TaskResumeUsecase:
 
 @app.command()
 def show(
-    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
+    issue: Annotated[
+        str | None,
+        typer.Argument(help="Issue number (auto-resolves to task branch if exists)"),
+    ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -47,7 +50,7 @@ def show(
     task_svc = TaskService()
 
     try:
-        target_branch = task_svc.resolve_branch(branch)
+        target_branch = task_svc.resolve_branch(issue)
     except RuntimeError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
@@ -65,27 +68,23 @@ def show(
         issue_number = None
         if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
-
-        # ✅ Handle case where flow not found
-        if not task_result.local_task and target_branch.isdigit():
-            # User provided issue number but no flow exists
-            typer.echo(f"未找到 flow 记录: {target_branch}")
-            typer.echo("提示: 请先创建 flow 或使用完整分支名")
+        elif target_branch.isdigit():
+            issue_number = int(target_branch)
 
         render_task_show(task_result, json_output)
 
         # Always show recent comments (if issue exists and not json output)
         if issue_number and not json_output:
-            issue = task_svc.fetch_issue_with_comments(issue_number)
-            if issue == "network_error":
+            issue_data = task_svc.fetch_issue_with_comments(issue_number)
+            if issue_data == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
-            elif issue is None:
+            elif issue_data is None:
                 typer.echo(
                     f"\nIssue comments unavailable: issue #{issue_number} not found"
                 )
             else:
-                assert isinstance(issue, dict)
-                render_task_comments(issue)
+                assert isinstance(issue_data, dict)
+                render_task_comments(issue_data)
 
 
 @app.command()

@@ -7,16 +7,18 @@ from vibe3.execution.contracts import ExecutionLaunchResult
 
 
 class TestSupervisorScanHandler:
-    """supervisor_scan handler dispatches supervisor apply via coordinator."""
+    """supervisor_scan handler dispatches supervisor apply via CLI self-invocation."""
 
+    @patch("vibe3.orchestra.logging.append_orchestra_event")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
-    @patch("vibe3.roles.supervisor.build_supervisor_apply_request")
     def test_normal_dispatch(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
         mock_coordinator_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
+        mock_append_event: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.supervisor_scan import (
             handle_supervisor_issue_identified,
@@ -24,9 +26,6 @@ class TestSupervisorScanHandler:
 
         mock_config = MagicMock(dry_run=False)
         mock_from_settings.return_value = mock_config
-
-        mock_request = MagicMock()
-        mock_build_request.return_value = mock_request
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -44,19 +43,21 @@ class TestSupervisorScanHandler:
             )
         )
 
-        mock_build_request.assert_called_once_with(
-            mock_config,
-            42,
-            issue_title="Test governance issue",
-        )
-        mock_coordinator.dispatch_execution.assert_called_once_with(mock_request)
+        mock_coordinator.dispatch_execution.assert_called_once()
+        # Verify CLI self-invocation command structure
+        call_args = mock_coordinator.dispatch_execution.call_args.args[0]
+        assert call_args.role == "supervisor"
+        assert call_args.mode == "async"
+        assert call_args.cmd is not None
+        assert "internal" in call_args.cmd
+        assert "apply" in call_args.cmd
+        assert "42" in call_args.cmd  # issue_number
+        assert "--no-async" in call_args.cmd
 
-    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
     def test_dry_run_skips_dispatch(
         self,
         mock_from_settings: MagicMock,
-        mock_coordinator_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.supervisor_scan import (
             handle_supervisor_issue_identified,
@@ -73,16 +74,16 @@ class TestSupervisorScanHandler:
             )
         )
 
-        mock_coordinator_cls.assert_not_called()
-
+    @patch("vibe3.orchestra.logging.append_orchestra_event")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
-    @patch("vibe3.roles.supervisor.build_supervisor_apply_request")
     def test_dispatch_failure_logged(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
         mock_coordinator_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
+        mock_append_event: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.supervisor_scan import (
             handle_supervisor_issue_identified,
@@ -90,9 +91,6 @@ class TestSupervisorScanHandler:
 
         mock_config = MagicMock(dry_run=False)
         mock_from_settings.return_value = mock_config
-
-        mock_request = MagicMock()
-        mock_build_request.return_value = mock_request
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -110,14 +108,16 @@ class TestSupervisorScanHandler:
 
         mock_coordinator.dispatch_execution.assert_called_once()
 
+    @patch("vibe3.orchestra.logging.append_orchestra_event")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
-    @patch("vibe3.roles.supervisor.build_supervisor_apply_request")
-    def test_exception_during_build_logged(
+    def test_exception_during_dispatch_logged(
         self,
-        mock_build_request: MagicMock,
         mock_from_settings: MagicMock,
         mock_coordinator_cls: MagicMock,
+        mock_sqlite_cls: MagicMock,
+        mock_append_event: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.supervisor_scan import (
             handle_supervisor_issue_identified,
@@ -126,7 +126,11 @@ class TestSupervisorScanHandler:
         mock_config = MagicMock(dry_run=False)
         mock_from_settings.return_value = mock_config
 
-        mock_build_request.side_effect = RuntimeError("build failed")
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.side_effect = RuntimeError(
+            "dispatch failed"
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
 
         handle_supervisor_issue_identified(
             SupervisorIssueIdentified(
@@ -135,3 +139,5 @@ class TestSupervisorScanHandler:
                 supervisor_file="supervisor.md",
             )
         )
+
+        mock_coordinator.dispatch_execution.assert_called_once()
