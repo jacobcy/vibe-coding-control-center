@@ -53,9 +53,10 @@ _EVENT_COLOR: dict[str, str] = {
     "resumed": "green bold",
     "handoff_plan": "blue",
     "handoff_report": "blue",
-    "handoff_run": "blue",  # backward-compat: old event type
+    "handoff_run": "blue",  # backward-compat: legacy event type
     "plan_recorded": "dim blue",
-    "report_recorded": "dim blue",  # Changed from run_recorded
+    "report_recorded": "dim blue",  # new canonical name
+    "run_recorded": "dim blue",  # backward-compat: legacy event type
     "handoff_audit": "magenta bold",  # reviewer-initiated authoritative audit
     "audit_recorded": "magenta",  # legacy: system auto-generated / backward-compat
     "handoff_indicate": "cyan bold",
@@ -87,7 +88,8 @@ def _format_event_type(event_type: str) -> str:
         # Audit Events — semantic names
         "handoff_audit": "Audit Handoff",  # reviewer-initiated authoritative audit
         "plan_recorded": "Plan Auto-Recorded",
-        "report_recorded": "Run Auto-Recorded",  # Changed from run_recorded
+        "report_recorded": "Run Auto-Recorded",  # new canonical name
+        "run_recorded": "Run Auto-Recorded",  # backward-compat: legacy event type
         "audit_recorded": "Audit Auto-Recorded",  # system auto-generated
         "handoff_audit_fallback": "Audit Auto-Recorded",  # backward compatibility
     }

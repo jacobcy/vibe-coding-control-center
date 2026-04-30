@@ -29,11 +29,12 @@ class HandoffService:
     _HANDOFF_EVENT_TYPES = {
         "handoff_plan",
         "handoff_report",
-        "handoff_run",
+        "handoff_run",  # backward-compat: legacy event type
         "handoff_audit",
         "handoff_indicate",
         "plan_recorded",
-        "report_recorded",  # Changed from run_recorded to match report_ref
+        "report_recorded",  # new canonical name
+        "run_recorded",  # backward-compat: legacy event type
         "audit_recorded",
     }
     _SUCCESS_HANDOFF_EVENT_TYPES = {
