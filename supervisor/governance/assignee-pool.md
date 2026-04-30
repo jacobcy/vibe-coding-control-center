@@ -29,6 +29,11 @@
 - **建议** → 输出治理结论和最小 label 调整建议
 - **不做** → 不恢复一般 blocked issue、不执行任何代码变更
 
+**Intake 原则**：
+- **实质判断优先**：不只看标签类型，要实质检查 issue 范围和代码缺口
+- **灵活处理**：范围过大可拆分，明确范围可处理重构，确定不适用可关闭
+- **保守兜底**：不确定且池子空时可放行，不确定且池子非空时等待
+
 ## Permission Contract
 
 Allowed:
@@ -87,6 +92,84 @@ Forbidden:
 - `priority/[0-9]` labels（兼容 legacy priority labels，仅用于 assignee issue pool 内排序）
 - dependency information（如 `blocked_by`、issue body 中的依赖引用）
 - orchestra heartbeat status
+
+## Issue Intake 策略
+
+**原则**：实质判断优先，灵活处理，保守兜底
+
+### 实质检查优先
+
+不只看标签类型（bug/feature/refactor），要实质检查：
+- issue 描述的改动范围是否明确
+- 是否有清晰的验收标准或验收口径
+- 代码缺口是否可通过阅读 issue 和现有代码确定
+
+### 灵活处理
+
+**范围过大 → 拆分**
+- 若 issue 范围过大（如涉及多个独立模块），写 `[governance suggest]` 建议 manager 拆分为多个小 issue
+- 不要直接拒绝大范围 issue
+
+**范围明确 → 可处理重构**
+- 若重构类 issue 范围明确、边界清晰、验收标准确定，可纳入 assignee pool
+- 关键判断：是否有明确的模块边界和验收口径
+
+**确定不适用 → 关闭**
+- 若已明确不适用当前架构（如依赖已废弃模块），写 `[governance suggest]` 建议关闭
+- 必须在建议中说明关闭原因（如"依赖 X 已在 #123 移除"）
+- 不要让确定不做的 issue 悬而不决
+
+**不确定 → 看池子状态**
+- 若 assignee pool 为空（无任何候选 issue），且 issue 不确定是否可执行：
+  - 写 `[governance suggest]` 说明不确定性
+  - 放行给 manager 判断是否值得执行
+- 若 assignee pool 非空，保守等待
+
+### Intake 决策流程
+
+```
+issue 是否可纳入？
+  ├─ 检查实质条件
+  │   ├─ 范围是否明确？
+  │   ├─ 验收标准是否清晰？
+  │   └─ 代码缺口是否可确定？
+  │
+  ├─ 明确范围 + 清晰验收 → 可纳入（包括重构）
+  │
+  ├─ 范围过大 → 建议 manager 拆分
+  │
+  ├─ 确定不适用 → 建议关闭（附原因）
+  │
+  └─ 不确定
+      ├─ pool 为空 → 建议放行给 manager 判断
+      └─ pool 非空 → 保守等待
+```
+
+### 例子
+
+**可纳入的重构 issue**
+- #550: refactor(error): decouple ErrorTrackingService singleton
+  - 范围明确：只涉及 error 模块
+  - 验收标准：移除单例，使用依赖注入
+  - 代码缺口明确：需重构 `error/tracking.py`
+  - **结论**：可纳入
+
+**需要拆分的 issue**
+- #503: chore: src/vibe3 总行数超过35000行限制
+  - 范围过大：涉及整个 src/vibe3
+  - 建议：拆分为多个模块级别的清理任务
+  - **结论**：写 `[governance suggest]` 建议拆分
+
+**应关闭的 issue**
+- #556: tech-debt: 清理事件系统向后兼容别名
+  - 若确认事件系统已完全移除旧别名
+  - **结论**：写 `[governance suggest]` 建议关闭（附：旧别名已在 #XYZ 移除）
+
+**不确定的 issue**
+- #539: 讨论：统一 vibe3 plan/review/run 命令参数和行为
+  - 范围不明确，需要架构讨论
+  - 若 pool 为空：写 `[governance suggest]` 说明不确定性，放行给 manager
+  - 若 pool 非空：保守等待
 
 ## What It Produces
 
