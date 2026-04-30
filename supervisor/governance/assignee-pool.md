@@ -210,7 +210,6 @@ Steps:
 1. 读取当前 running issues 与 queue / flow 现场
 2. **依赖过滤**：从候选中排除不可进入 ready queue 的 issue：
    - 检查 issue body 和 comments 中的依赖引用（如 "Depends on #123"）
-   - 检查 `dependency/*` labels
    - 若被依赖的 issue 未关闭或未处于 `state/done`，从候选中排除
    - 已有有效 flow / live dispatch 的 issue，从候选中排除
    - 被硬规则阻塞的 issue，从候选中排除

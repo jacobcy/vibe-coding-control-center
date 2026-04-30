@@ -28,11 +28,12 @@ scope/python:
   - changed-files:
     - any-glob-to-any-file: 'src/vibe3/**/*.py'
 
-scope/shell-script:
+scope/shell:
   - changed-files:
     - any-glob-to-any-file:
       - 'lib/**/*.sh'
       - 'scripts/**/*.sh'
+      - 'bin/**'
 
 scope/documentation:
   - changed-files:

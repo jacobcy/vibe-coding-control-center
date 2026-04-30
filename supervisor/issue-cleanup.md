@@ -92,11 +92,6 @@
 - `Report`
 - `Why`
 
-## Label Rule
-
-- 默认只使用非破坏性治理标签，例如 `cleanup/candidate`
-- 如果仓库没有该标签，可先建议而不是臆造更多动作
-- 不要移除 `state/*`，除非上下文明显要求
 
 ## Polluted Scene Rule
 
@@ -119,3 +114,24 @@
   - 先执行查重，确认不会重复发布
   - 再使用 `gh issue create` 创建治理 issue
   - 输出每条 issue 的 title、labels、创建结果或跳过原因
+
+## Cleanup Action Rule
+
+**确定性判断**：
+- 如果通过现场核查（flow state、worktree 状态、git 历史、issue 内容）可以明确判断为陈旧/污染现场
+- **直接关闭 issue**，不需要任何标签或中间步骤
+
+**不确定性判断**：
+- 如果需要人工复核或现场证据不足
+- **在 issue 中添加 governance suggest comment**，建议人类关闭或进一步核查
+- Comment 格式：`[governance suggest] 建议 close 或进一步核查，理由：...`
+
+**禁止行为**：
+- ❌ 不使用 `cleanup/candidate` 或任何其他 cleanup 相关标签
+- ❌ 不创建治理 issue 来处理可以直接关闭的陈旧 issue
+- ❌ 不保留明显污染的现场继续承担新语义
+
+**原则**：
+- 确定性优先：宁可直接关闭，也不要通过标签或治理 issue 延长不确定状态
+- 证据为王：基于现场事实（flow state、worktree、git）而非猜测
+- 简单直接：能用关闭解决的不创建治理 issue，能用建议解决的不等待确认

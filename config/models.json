@@ -9,8 +9,8 @@
   },
   "agents": {
     "vibe-manager": {
-      "backend": "gemini",
-      "model": "gemini-3-flash-preview",
+      "backend": "claude",
+      "model": "sonnet",
       "yolo": true,
       "description": "Orchestra manager: dispatch coordination and execution supervision"
     },
@@ -32,14 +32,14 @@
       "description": "Code reviewer: quality assurance and best practices"
     },
     "vibe-supervisor": {
-      "backend": "gemini",
-      "model": "gemini-3-flash-preview",
+      "backend": "claude",
+      "model": "sonnet",
       "yolo": true,
       "description": "Governance supervisor: periodic scans and issue management"
     },
     "vibe-governance": {
       "backend": "claude",
-      "model": "sonnet",
+      "model": "haiku",
       "description": "Governance agent: policy enforcement and cleanup"
     },
     "code-explorer": {
