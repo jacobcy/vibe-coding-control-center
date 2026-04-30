@@ -17,6 +17,13 @@ related_docs:
 
 本文档保留早期 Vibe Workflow Engine 的完整架构蓝图，供历史背景、设计演化和旧文档考据使用。
 
+**特别说明：本文档描述的以下概念已正式废弃，仅作为历史参考：**
+- **`Stage 1/2/3/4` (及其对应的 Scope/Plan/Execution/Review Gate)**
+- **`Unified Workflow Orchestrator` (旧引擎模型)**
+- **`MSC 拦截门` 范式**
+
+当前正式架构以 [vibe3-architecture-convergence-standard.md](../standards/vibe3-architecture-convergence-standard.md) 定义的 6 层模型（Server/Runtime/Domain/Execution/Environment/Role Adapters）为准。
+
 它不是现行标准真源。当前正式语义以以下文档为准：
 
 - `docs/standards/glossary.md`
