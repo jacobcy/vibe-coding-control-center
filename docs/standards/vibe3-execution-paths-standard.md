@@ -29,7 +29,7 @@ related_docs:
 当前架构已遵循的原则：
 1. **Orchestration 只派发**：coordinator/domain handlers 只负责 session/capacity check + dispatch，不接管 state，不做业务判断
 2. **Async wrapper 只防阻塞**：tmux 容器不承载业务逻辑，只包裹同步链
-3. **Sync chain 内做业务**：gate/callback/handoff/lifecycle 都在 `execute_sync`（同步链）内执行，无论是 orchestration sync 还是 async child
+3. **Sync chain 内做业务**：gate/handoff/lifecycle 都在 `execute_sync`（同步链）内执行，无论是 orchestration sync 还是 async child
 4. **tmux 观测只是 checkpoint**：async wrapper 可以记录容器已启动，但这不是业务 lifecycle，也不推进 state
 
 ## 1. 术语定义

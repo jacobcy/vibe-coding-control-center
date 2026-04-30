@@ -171,7 +171,7 @@ class CodeagentExecutionService:
         ctx: SyncExecutionContext,
         agent_result: AgentResult,
     ) -> Path | None:
-        """Finalize sync execution: handoff, lifecycle, callback, gate."""
+        """Finalize sync execution: handoff, lifecycle, gate."""
         log = logger.bind(
             domain="codeagent",
             role=command.role,
