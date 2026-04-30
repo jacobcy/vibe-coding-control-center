@@ -132,4 +132,5 @@ class TestInspectOutputIntegration:
         """Test inspect commands without arguments lists available commands."""
         result = runner.invoke(app, ["inspect", "commands"])
         assert result.exit_code == 0
-        assert "Available commands" in result.output
+        assert "=== vibe3 command structure ===" in result.output
+        assert "Top-level commands:" in result.output

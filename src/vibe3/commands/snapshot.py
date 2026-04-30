@@ -11,7 +11,27 @@ from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage structure snapshots for code quality tracking",
+    help="""Project-level structure tracking (persistent).
+
+When to use snapshot:
+  - Tracking project structure evolution (save points)
+  - Comparing structure vs baseline / branches
+  - Finding structural changes (module, dependency, LOC growth)
+
+Subcommands:
+  build [--branch]           Build current structure (memory only)
+  save [--as-baseline]       Persist structure to .git/vibe3/structure/snapshots/
+  list                       List all saved snapshots
+  show [<snapshot-id>]       Show structure details
+  diff [<baseline>]          Compare structure vs baseline
+
+For single-file analysis → use:
+  vibe3 inspect              (real-time file & change analysis)
+
+Examples:
+  vibe3 snapshot save
+  vibe3 snapshot diff main
+  vibe3 snapshot show""",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -142,6 +162,9 @@ def show(
         typer.Option("--branch", help="Show baseline for specific branch"),
     ] = None,
     json_out: _JSON_OPT = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", help="Suppress next step suggestions")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Show snapshot details.
@@ -193,6 +216,10 @@ def show(
             for m in snapshot.modules:
                 typer.echo(f"    {m.module}: {m.file_count} files, {m.total_loc} LOC")
 
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("snapshot_show", quiet)
+
     except snapshot_service.SnapshotNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -205,6 +232,9 @@ def diff(
         typer.Argument(help="Baseline snapshot ID (default: current branch baseline)"),
     ] = None,
     json_out: _JSON_OPT = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", help="Suppress next step suggestions")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Compare current codebase with a baseline snapshot.
@@ -293,6 +323,10 @@ def diff(
                 typer.echo(f"\n  Warnings ({len(result.warnings)}):")
                 for w in result.warnings:
                     typer.echo(f"    [{w.severity}] {w.message}")
+
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("snapshot_diff", quiet)
 
     except snapshot_service.SnapshotNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)

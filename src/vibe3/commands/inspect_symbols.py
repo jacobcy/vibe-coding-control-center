@@ -26,21 +26,21 @@ def register(app: typer.Typer) -> None:
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
+        quiet: Annotated[
+            bool, typer.Option("--quiet", help="Suppress next step suggestions")
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
     ) -> None:
         """Show symbol references with detailed locations.
 
-        Three query modes:
+        Two query modes (file context required):
 
-        1. Symbol only (search across codebase):
-           vibe inspect symbols build_module_graph
-
-        2. File:Symbol (find specific symbol in file):
+        1. <file>:<symbol>  - Find specific symbol in file
            vibe inspect symbols src/vibe3/services/dag_service.py:build_module_graph
 
-        3. File only (show all symbols in file):
+        2. <file>           - List all symbols in file
            vibe inspect symbols src/vibe3/services/dag_service.py
 
         Reference counts show:
@@ -53,7 +53,6 @@ def register(app: typer.Typer) -> None:
         - Context snippet showing the usage
 
         Examples:
-            vibe inspect symbols build_module_graph
             vibe inspect symbols src/vibe3/services/dag_service.py:_file_to_module
             vibe inspect symbols src/vibe3/commands/inspect.py --json
         """
@@ -69,7 +68,6 @@ def register(app: typer.Typer) -> None:
                 sys.stderr = old_stderr
                 typer.echo("Error: Please provide a symbol specification.", err=True)
                 typer.echo("\nUsage:")
-                typer.echo("  vibe inspect symbols <symbol>")
                 typer.echo("  vibe inspect symbols <file>:<symbol>")
                 typer.echo("  vibe inspect symbols <file>")
                 raise typer.Exit(code=1)
@@ -101,6 +99,10 @@ def register(app: typer.Typer) -> None:
                 _print_symbols_table(result)
             else:
                 _print_symbol_references(result)
+
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("inspect_symbols", quiet)
 
         except Exception as e:
             sys.stderr = old_stderr
