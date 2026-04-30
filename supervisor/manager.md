@@ -366,11 +366,11 @@ Steps:
     gh issue edit <issue-number> --add-label "state/claimed" --remove-label "state/ready"
     ```
 
-    - **保存 snapshot baseline**（记录开发起点）：
+     - **保存 snapshot baseline**（记录开发起点）：
 
-    ```bash
-    uv run python src/vibe3/cli.py snapshot save
-    ```
+     ```bash
+     uv run python src/vibe3/cli.py snapshot save --as-baseline
+     ```
 
     说明：baseline 记录了分支创建时的代码库结构，供后续 `snapshot diff` 对比分析开发过程中的结构变化。
 

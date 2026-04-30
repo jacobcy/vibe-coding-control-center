@@ -19,19 +19,20 @@ When to use snapshot:
   - Finding structural changes (module, dependency, LOC growth)
 
 Subcommands:
-  build [--branch]           Build current structure (memory only)
-  save [--as-baseline]       Persist structure to .git/vibe3/structure/snapshots/
-  list                       List all saved snapshots
-  show [<snapshot-id>]       Show structure details
-  diff [<baseline>]          Compare structure vs baseline
+  build                     Build current structure (memory only)
+  save [--as-baseline]      Persist structure (use --as-baseline for diff)
+  list                      List all saved snapshots
+  show [<snapshot-id>]      Show structure details
+  diff [<snapshot-id>]      Compare structure vs baseline
 
 For single-file analysis → use:
   vibe3 inspect              (real-time file & change analysis)
 
 Examples:
-  vibe3 snapshot save
-  vibe3 snapshot diff main
-  vibe3 snapshot show""",
+  vibe3 snapshot save --as-baseline    # Save as branch baseline
+  vibe3 snapshot diff                  # Compare with branch baseline
+  vibe3 snapshot diff latest           # Compare with latest snapshot
+  vibe3 snapshot show --branch main    # Show baseline for 'main' branch""",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -87,6 +88,10 @@ def build(
 
 @app.command()
 def save(
+    as_baseline: Annotated[
+        bool,
+        typer.Option("--as-baseline", help="Save as branch baseline for diff"),
+    ] = False,
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
@@ -94,21 +99,41 @@ def save(
 
     This is the canonical command for creating and saving a snapshot to disk.
 
+    Use --as-baseline to save as the branch's baseline for `snapshot diff`.
+    This is automatically called at development start points (vibe-new, state/claimed).
+
     Examples:
         vibe3 snapshot save
+        vibe3 snapshot save --as-baseline
         vibe3 snapshot save --json
     """
+    from vibe3.clients.git_client import GitClient
+
     if trace:
         enable_trace()
 
     try:
-        snapshot = snapshot_service.build_snapshot()
-        filepath = snapshot_service.save_snapshot(snapshot)
+        if as_baseline:
+            # Save as branch baseline (for diff workflow)
+            git = GitClient()
+            current_branch = git.get_current_branch()
+            filepath = snapshot_service.save_branch_baseline(current_branch)
+            if filepath is None:
+                typer.echo("Error: Failed to save baseline", err=True)
+                raise typer.Exit(1)
+            # Build snapshot for display (already saved by save_branch_baseline)
+            snapshot = snapshot_service.build_snapshot()
+            action = "saved as baseline"
+        else:
+            # Save regular snapshot
+            snapshot = snapshot_service.build_snapshot()
+            filepath = snapshot_service.save_snapshot(snapshot)
+            action = "saved"
 
         if json_out:
             typer.echo(snapshot.model_dump_json(indent=2))
         else:
-            typer.echo(f"✓ Snapshot saved: {snapshot.snapshot_id}")
+            typer.echo(f"✓ Snapshot {action}: {snapshot.snapshot_id}")
             typer.echo(f"  Branch: {snapshot.branch}")
             typer.echo(f"  Commit: {snapshot.commit_short}")
             typer.echo(f"  Files: {snapshot.metrics.total_files}")

@@ -122,7 +122,7 @@ vibe3 flow update --actor <your-identity>
 vibe3 flow bind 123 --role task
 
 # 4. 保存开发起点 baseline（用于后续结构对比）
-vibe3 snapshot save
+vibe3 snapshot save --as-baseline
 ```
 
 **重要**：`--actor` 参数用于记录当前操作的执行者，是 Contributors 块的数据来源。建议格式：
@@ -141,7 +141,7 @@ vibe3 flow update --actor <your-identity>
 vibe3 flow bind <issue-number> --role task
 
 # 保存开发起点 baseline
-vibe3 snapshot save
+vibe3 snapshot save --as-baseline
 ```
 
 **场景 C：已有 flow，需要追加绑定更多 issue**

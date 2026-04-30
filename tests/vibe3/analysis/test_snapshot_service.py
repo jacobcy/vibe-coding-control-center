@@ -350,3 +350,49 @@ def test_list_snapshots_excludes_baselines_by_default(
     result = snapshot_service.list_snapshots(include_baselines=True)
     assert "regular-1" in result
     assert "baseline-main-1" in result
+
+
+def test_save_branch_baseline_creates_baseline_for_diff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test save_branch_baseline creates baseline load_branch_baseline can find."""
+    from vibe3.analysis import snapshot_service
+    from vibe3.models.snapshot import StructureMetrics, StructureSnapshot
+
+    baseline_dir = tmp_path / "vibe3" / "structure" / "baselines"
+    baseline_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(snapshot_service, "_get_baseline_dir", lambda: baseline_dir)
+
+    # Mock build_snapshot to return a minimal snapshot
+    mock_snapshot = StructureSnapshot(
+        snapshot_id="test-snapshot-1",
+        branch="feature-test",
+        commit="abc1234",
+        commit_short="abc1234",
+        created_at="2026-04-30T10:00:00",
+        root="src/vibe3",
+        files=[],
+        modules=[],
+        dependencies=[],
+        metrics=StructureMetrics(
+            total_files=10,
+            total_loc=1000,
+            total_functions=50,
+            python_files=8,
+        ),
+    )
+    monkeypatch.setattr(snapshot_service, "build_snapshot", lambda: mock_snapshot)
+
+    # Save as baseline
+    filepath = snapshot_service.save_branch_baseline("feature-test")
+    assert filepath is not None
+    assert filepath.exists()
+    assert "baseline_feature-test.json" in str(filepath)
+
+    # Load it back
+    loaded = snapshot_service.load_branch_baseline("feature-test")
+    assert loaded is not None
+    assert loaded.snapshot_id == "test-snapshot-1"
+    assert loaded.branch == "feature-test"
+    assert loaded.baseline_for == "feature-test"

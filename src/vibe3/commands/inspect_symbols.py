@@ -19,9 +19,7 @@ def register(app: typer.Typer) -> None:
     def symbols(
         symbol_spec: Annotated[
             str,
-            typer.Argument(
-                help="Symbol specification: <symbol> or <file>:<symbol> or <file>"
-            ),
+            typer.Argument(help="Symbol specification: <file>:<symbol> or <file>"),
         ] = "",
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
