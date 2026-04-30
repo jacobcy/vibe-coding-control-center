@@ -97,7 +97,7 @@
 执行前优先用项目工具确认影响面：
 - `uv run python src/vibe3/cli.py handoff status`
 - `vibe3 inspect symbols`
-- `vibe3 inspect structure`
+- `vibe3 inspect files`
 - `vibe3 inspect base --json`
 
 如果改动触及公开入口、关键路径或 prompt contract，验证强度必须随之提高。
