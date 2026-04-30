@@ -5,6 +5,41 @@ from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
 from vibe3.utils.path_helpers import check_ref_exists, ref_to_handoff_cmd
 
+
+def _filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]:
+    """Filter passive recorded events when corresponding active events exist.
+
+    When a handoff_plan/report/run/audit event exists, suppress the matching
+    plan_recorded/run_recorded/audit_recorded passive event to avoid duplication.
+
+    Args:
+        events: List of flow events to filter.
+
+    Returns:
+        Filtered list with passive events removed when active counterparts exist.
+    """
+    active_kind = {
+        "handoff_plan": "plan",
+        "handoff_report": "report",
+        "handoff_run": "report",  # legacy
+        "handoff_audit": "audit",
+    }
+    passive_kind = {
+        "plan_recorded": "plan",
+        "report_recorded": "report",
+        "run_recorded": "report",  # legacy
+        "audit_recorded": "audit",
+    }
+
+    has_active: set[str] = set()
+    for event in events:
+        kind = active_kind.get(event.event_type)
+        if kind:
+            has_active.add(kind)
+
+    return [e for e in events if passive_kind.get(e.event_type) not in has_active]
+
+
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
     "task_bound": "cyan",
@@ -199,6 +234,11 @@ def _render_timeline(
     if not events:
         console.print("[dim]  no events[/]")
         return
+
+    events = _filter_passive_if_active_exists(events)
+
+    # Filter out orchestra:* actor events (internal orchestration)
+    events = [e for e in events if not (e.actor and e.actor.startswith("orchestra:"))]
 
     console.print("[bold]--- Timeline ---[/]")
     console.print()
