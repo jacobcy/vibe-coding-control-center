@@ -21,6 +21,7 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
+    from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
 
@@ -40,9 +41,11 @@ class GlobalDispatchCoordinator:
         self,
         capacity: CapacityService,
         dispatch_services: list[StateLabelDispatchService],
+        registry: "SessionRegistryService | None" = None,
     ) -> None:
         self._capacity = capacity
         self._dispatch_services = dispatch_services
+        self._registry = registry
         self._frozen_queue: list[QueueEntry] | None = None
         self._github = (
             dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
@@ -142,6 +145,22 @@ class GlobalDispatchCoordinator:
             if entry.waiting_state is not None:
                 index += 1
                 continue
+
+            # Per-issue active session gate:
+            # Prevent dispatch if ANY worker role session is still live for this issue.
+            if self._registry is not None:
+                active = self._registry.get_live_sessions_for_issue(
+                    issue_number=entry.issue_number,
+                    roles=["manager", "planner", "executor", "reviewer"],
+                )
+                if active:
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"GlobalDispatchCoordinator: skipped #{entry.issue_number} "
+                        f"(active session: role={active[0].get('role')})",
+                    )
+                    index += 1
+                    continue
 
             # For BLOCKED issues: run qualify gate at intent time (lazy evaluation)
             if issue.state == IssueState.BLOCKED:

@@ -79,13 +79,18 @@ class OrchestrationFacade(ServiceBase):
         self._failed_gate = failed_gate
 
         if self._dispatch_services and self._capacity is not None:
+            from vibe3.environment.session_registry import SessionRegistryService
             from vibe3.orchestra.global_dispatch_coordinator import (
                 GlobalDispatchCoordinator,
             )
 
+            store = self._capacity._store
+            backend = self._capacity._backend
+            registry = SessionRegistryService(store, backend)
             self._coordinator = GlobalDispatchCoordinator(
                 capacity=self._capacity,
                 dispatch_services=self._dispatch_services,
+                registry=registry,
             )
 
     async def on_tick(self) -> None:
@@ -141,6 +146,9 @@ class OrchestrationFacade(ServiceBase):
             store = self._capacity._store
             backend = self._capacity._backend
             registry = SessionRegistryService(store, backend)
+            # Mark worker sessions as done (not orphaned) when tmux exits
+            registry.mark_worker_sessions_done_when_tmux_gone()
+            # Then orphan any remaining dead sessions (failed launches)
             registry.reconcile_live_state()
 
         await self._coordinator.coordinate()

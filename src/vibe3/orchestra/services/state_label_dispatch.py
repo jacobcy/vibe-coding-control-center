@@ -130,6 +130,23 @@ class StateLabelDispatchService(ServiceBase):
         from vibe3.domain import publish
         from vibe3.roles.registry import build_label_dispatch_event
 
+        # Pre-dispatch cleanup: remove conflicting state/* labels
+        # This ensures a single state label before dispatch.
+        old_state_labels = [
+            lb
+            for lb in issue.labels
+            if lb.startswith("state/") and lb != self.role_def.trigger_state.to_label()
+        ]
+        if old_state_labels:
+            try:
+                label_port = GhIssueLabelPort(repo=self.config.repo)
+                for old_lb in old_state_labels:
+                    label_port.remove_issue_label(issue.number, old_lb)
+            except Exception as exc:
+                logger.bind(domain="orchestra").warning(
+                    f"Failed to clean old state labels for #{issue.number}: {exc}"
+                )
+
         branch, _ = self._flow_context(issue.number)
         publish(
             build_label_dispatch_event(
