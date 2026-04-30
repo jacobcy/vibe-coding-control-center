@@ -81,6 +81,13 @@ def check(
             ),
         ),
     ] = False,
+    no_progress: Annotated[
+        bool,
+        typer.Option(
+            "--no-progress",
+            help="Disable progress bar for 'all' and 'fix_all' modes.",
+        ),
+    ] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -125,7 +132,9 @@ def check(
         else:
             mode = "fix_all"
 
-        result = execute_check_mode(service, mode, verbose=trace)
+        result = execute_check_mode(
+            service, mode, verbose=trace, show_progress=not no_progress
+        )
 
         if result.success:
             typer.echo(f"✓ {result.summary}")

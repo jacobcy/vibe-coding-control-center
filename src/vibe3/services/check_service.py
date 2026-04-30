@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -499,9 +500,17 @@ class CheckService(CheckRemote):
         )
 
     def verify_all_flows(
-        self, status: str | list[str] | None = "active"
+        self,
+        status: str | list[str] | None = "active",
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> list[CheckResult]:
-        """Run consistency checks for flows in the store."""
+        """Run consistency checks for flows in the store.
+
+        Args:
+            status: Filter flows by status(es). None checks all flows.
+            on_progress: Optional callback invoked after each branch check.
+                Receives (current_index, total_count, branch_name).
+        """
         # Initialize PR cache (optimization: 1 API call instead of N)
         self._initialize_pr_cache()
 
@@ -520,8 +529,11 @@ class CheckService(CheckRemote):
         ]
 
         results = []
-        for flow in all_flows:
+        total = len(all_flows)
+        for i, flow in enumerate(all_flows):
             results.append(self._check_branch(flow["branch"]))
+            if on_progress:
+                on_progress(i, total, flow["branch"])
         return results
 
     def auto_fix(self, issues: list[str], *, branch: str | None = None) -> FixResult:

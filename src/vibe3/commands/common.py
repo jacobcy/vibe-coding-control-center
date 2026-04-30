@@ -41,7 +41,7 @@ def run_full_check_shortcut() -> None:
     from vibe3.services.check_service import CheckService
 
     try:
-        result = execute_check_mode(CheckService(), "fix_all")
+        result = execute_check_mode(CheckService(), "fix_all", show_progress=False)
     except Exception as exc:
         typer.echo(
             f"Warning: vibe3 check failed before status: {exc}",
