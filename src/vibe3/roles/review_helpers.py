@@ -105,15 +105,43 @@ def _resolve_review_verdict(
     return VERDICT_UNKNOWN
 
 
+def _load_existing_verdict(branch: str | None) -> str | None:
+    """Load existing verdict from flow state if agent already wrote it."""
+    if not branch:
+        return None
+    flow = FlowService().get_flow_status(branch)
+    if flow and flow.latest_verdict:
+        # latest_verdict is already parsed as VerdictRecord by Pydantic
+        return flow.latest_verdict.verdict
+    return None
+
+
 def finalize_review_output(
     *,
     review_output: str,
     branch: str | None,
     actor: str,
 ) -> tuple[str, str]:
-    """Finalize review output by confirming audit_ref and writing verdict."""
+    """Finalize review output by confirming audit_ref and writing verdict.
+
+    Skip passive recording if agent already completed both audit_ref and verdict.
+    This prevents duplicate handoff_audit events when agent proactively writes.
+    """
     existing_audit_ref = _load_existing_audit_ref(branch)
+    existing_verdict = _load_existing_verdict(branch)
     reviewer_wrote_audit = bool(existing_audit_ref)
+    reviewer_wrote_verdict = bool(existing_verdict)
+
+    # Agent already completed both audit and verdict → skip passive recording entirely
+    agent_already_completed = reviewer_wrote_audit and reviewer_wrote_verdict
+
+    if agent_already_completed and existing_audit_ref:
+        logger.bind(domain="review", action="finalize").debug(
+            "Skipping passive audit recording: agent already completed handoff"
+        )
+        # existing_verdict is guaranteed non-None when agent_already_completed=True
+        assert existing_verdict is not None
+        return existing_audit_ref, existing_verdict
 
     audit_ref: str
     if reviewer_wrote_audit:
@@ -142,21 +170,23 @@ def finalize_review_output(
     else:
         verdict = _resolve_review_verdict(review_output, audit_ref=audit_ref)
 
-    try:
-        handoff_svc = (
-            HandoffService(git_client=BranchBoundGitClient(branch))
-            if branch
-            else HandoffService()
-        )
-        handoff_svc.record_audit(
-            audit_ref=audit_ref,
-            actor=actor,
-            verdict=verdict,  # type: ignore[arg-type]
-            is_system_auto=not reviewer_wrote_audit,
-        )
-    except Exception as exc:
-        logger.bind(domain="review", action="finalize").warning(
-            f"Failed to record audit handoff: {exc}"
-        )
+    # Only record if agent didn't already complete the handoff
+    if not agent_already_completed:
+        try:
+            handoff_svc = (
+                HandoffService(git_client=BranchBoundGitClient(branch))
+                if branch
+                else HandoffService()
+            )
+            handoff_svc.record_audit(
+                audit_ref=audit_ref,
+                actor=actor,
+                verdict=verdict,  # type: ignore[arg-type]
+                is_system_auto=not reviewer_wrote_audit,
+            )
+        except Exception as exc:
+            logger.bind(domain="review", action="finalize").warning(
+                f"Failed to record audit handoff: {exc}"
+            )
 
     return audit_ref, verdict

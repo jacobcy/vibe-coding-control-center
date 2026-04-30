@@ -370,3 +370,33 @@ class TestFinalizeReviewOutputFallbacks:
             verdict="MAJOR",
             is_system_auto=False,
         )
+
+    @patch("vibe3.roles.review_helpers.HandoffService")
+    @patch("vibe3.roles.review_helpers._load_existing_verdict")
+    @patch("vibe3.roles.review_helpers._load_existing_audit_ref")
+    def test_skip_passive_recording_when_agent_already_completed(
+        self,
+        mock_load_audit_ref: MagicMock,
+        mock_load_verdict: MagicMock,
+        mock_handoff_cls: MagicMock,
+    ) -> None:
+        """When agent already wrote both audit_ref and verdict,
+        finalize_review_output must skip record_audit entirely."""
+        from vibe3.roles.review_helpers import finalize_review_output
+
+        mock_load_audit_ref.return_value = "docs/reports/issue-42-audit.md"
+        mock_load_verdict.return_value = "MAJOR"
+        mock_handoff_svc = self._make_mock_handoff_service()
+        mock_handoff_cls.return_value = mock_handoff_svc
+
+        audit_ref, verdict = finalize_review_output(
+            review_output="some stdout",
+            branch="task/issue-42",
+            actor="claude/claude-sonnet-4-6",
+        )
+
+        assert audit_ref == "docs/reports/issue-42-audit.md"
+        # verdict comes from _load_existing_verdict (MAJOR),
+        # not from stdout parsing (which would return UNKNOWN for "some stdout")
+        assert verdict == "MAJOR"
+        mock_handoff_svc.record_audit.assert_not_called()
