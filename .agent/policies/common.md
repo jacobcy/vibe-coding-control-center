@@ -102,11 +102,17 @@ uv run python src/vibe3/cli.py inspect base --json
 # 保存当前结构快照
 uv run python src/vibe3/cli.py snapshot save
 
-# 对比当前结构与 baseline（开发起点）
+# 保存为分支 baseline（用于后续 diff）
+uv run python src/vibe3/cli.py snapshot save --as-baseline
+
+# 对比当前结构与分支 baseline（开发起点）
 uv run python src/vibe3/cli.py snapshot diff
 
-# 对比当前结构与指定分支的 baseline
-uv run python src/vibe3/cli.py snapshot diff main
+# 对比当前结构与最新快照
+uv run python src/vibe3/cli.py snapshot diff latest
+
+# 查看指定分支的 baseline
+uv run python src/vibe3/cli.py snapshot show --branch main
 
 # 查看当前结构详情
 uv run python src/vibe3/cli.py snapshot show
