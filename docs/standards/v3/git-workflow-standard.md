@@ -52,8 +52,8 @@ related_docs:
 
 默认交付模型如下：
 
-- `GitHub issue` 负责来源层需求与讨论事实
-- `roadmap item` 负责规划窗口与 GitHub Project item 镜像，是 planning 中间层
+- `GitHub issue` 负责来源层需求与讨论事实，是当前治理与执行的**直接真源**
+- `roadmap item` 负责版本规划窗口的表达。状态：**历史兼容 / 规划参考语义**。不再作为执行层的强制中间层
 - `task` 负责 execution record，是 flow 建立后的 execution bridge
 - `flow` 负责当前交付切片与 runtime 现场
 - `pr` 负责当前交付产物
@@ -62,7 +62,7 @@ related_docs:
 
 默认关系：
 
-- 一个 `flow` 对应一个当前交付目标
+- 一个 `flow` 对应一个当前交付目标（对应一个 `GitHub issue`）
 - 一个当前交付目标默认对应一个当前 `pr`
 - 一个 `flow` 默认绑定一个当前 `branch`
 - 一个 `worktree` 可以承载当前 `flow`，但 `flow` 不等于目录
@@ -151,11 +151,11 @@ closeout 约束：
 
 内部桥接链：
 
-1. 从 `GitHub issue` 确认来源层目标
-2. 创建、选择或同步对应的 `roadmap item`
+1. 从 `GitHub issue` 确认来源层目标（直接真源）
+2. 若有必要，同步对应的 `roadmap item`（仅作规划参考）
 3. 通过 `vibe-new` 确认/创建目标 issue、创建/注册 flow、绑定 issue 并创建 PR draft
-4. 进入新 flow 后，通过 `vibe-start` 确认并补齐 flow 环境（恢复开发场景）
-5. 让该 `flow` 绑定本轮要交付的 `task`
+4. 进入新 flow 后，通过 `vibe-start` 确认并补齐 flow 环境
+5. 让该 `flow` 绑定本轮要交付的 `task` (execution record)
 6. 在该 `flow` 对应的 `branch` 上提交本地 commit
 7. 执行 `review`
 8. 提交 `pr`
@@ -164,10 +164,10 @@ closeout 约束：
 
 执行要求：
 
-- 一个 `type=feature` 的 roadmap item 默认对应一个主 `branch` 和一个主 `pr`
-- `task` 作为 execution record / execution bridge 服务于 roadmap item，不替代规划对象本身
-- `flow` 是用户主视角的默认执行锚点；roadmap item 与 task 继续保留为内部桥接对象
-- 同一 `flow` 内的 commit 应服务同一个当前交付目标
+- 交付链以 `GitHub issue` 为核心。`roadmap item` 继续保留为历史兼容与规划排期对象，不作为执行的必经关口。
+- `task` 作为 execution record / execution bridge 服务于执行过程，不替代规划对象本身。
+- `flow` 是用户主视角的默认执行锚点。
+- 同一 `flow` 内的 commit 应服务同一个当前交付目标。
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
 - `done` 只应发生在当前交付目标已经完成或明确废弃之后，通过 `/vibe-done` 编排收口动作。
 
