@@ -138,7 +138,7 @@ class VerdictService:
         # 7. Persist event to event log
         self.store.add_event(
             target_branch,
-            "verdict_recorded",
+            "handoff_verdict",
             actor,
             detail=f"Verdict: {verdict}",
             refs={"verdict": verdict, "reason": reason or ""},

@@ -182,7 +182,9 @@ def status(
             raise typer.Exit(1)
 
         limit = None if show_all else 5
-        handoff_events = handoff_service.get_handoff_events(target_branch, limit=limit)
+        handoff_events = handoff_service.get_success_handoff_events(
+            target_branch, limit=limit
+        )
 
         if json_output:
             output = {
@@ -250,7 +252,7 @@ def status(
             if hints_shown:
                 console.print()
 
-        console.print("[bold]--- Recent Handoff Events ---[/]")
+        console.print("[bold]--- Successful Handoff Events ---[/]")
         console.print()
         _render_handoff_events(
             handoff_events, worktree_root=worktree_root, branch=target_branch

@@ -36,6 +36,13 @@ class HandoffService:
         "run_recorded",
         "audit_recorded",
     }
+    _SUCCESS_HANDOFF_EVENT_TYPES = {
+        "handoff_plan",
+        "handoff_report",
+        "handoff_audit",
+        "handoff_indicate",
+        "handoff_verdict",
+    }
 
     def __init__(
         self,
@@ -71,6 +78,33 @@ class HandoffService:
         if limit is not None:
             handoff_events = handoff_events[:limit]
         return handoff_events
+
+    def get_success_handoff_events(
+        self,
+        branch: str,
+        limit: int | None = None,
+    ) -> list[FlowEvent]:
+        """Return only successful artifact handoff events (plan/report/audit).
+
+        Includes active handoff events (handoff_plan/report/audit) plus
+        handoff_indicate (manager) and handoff_verdict (review verdict).
+
+        Args:
+            branch: Branch name to query events for.
+            limit: Optional limit on number of events to return.
+
+        Returns:
+            List of FlowEvent objects representing successful artifact handoffs.
+        """
+        events_data = self.store.get_events(branch)
+        success_events = [
+            FlowEvent(**event)
+            for event in events_data
+            if event["event_type"] in self._SUCCESS_HANDOFF_EVENT_TYPES
+        ]
+        if limit is not None:
+            success_events = success_events[:limit]
+        return success_events
 
     def append_current_handoff(
         self,
