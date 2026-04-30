@@ -145,3 +145,4 @@ MagicMock/
 # Symlink to lib/alias (content tracked in lib/)
 alias
 
+.claude/settings.local.json

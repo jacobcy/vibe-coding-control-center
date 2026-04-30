@@ -5,7 +5,7 @@
 
 # ── 配置读取 ─────────────────────────────────────────────
 _keys_read_config() {
-    python3 "$VIBE_ROOT/scripts/vibe-read-dependencies.py" --format shell
+    uv run python "$VIBE_ROOT/scripts/vibe-read-dependencies.py" --format shell
 }
 
 if [[ "${VIBE_KEYS_SUPPORT_LOADED:-}" != "$VIBE_LIB/keys_support.sh" ]]; then

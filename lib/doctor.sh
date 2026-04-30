@@ -5,7 +5,7 @@
 
 # ── 配置读取 ─────────────────────────────────────────────
 _doctor_read_config() {
-    python3 "$VIBE_ROOT/scripts/vibe-read-dependencies.py" --format shell
+    uv run python "$VIBE_ROOT/scripts/vibe-read-dependencies.py" --format shell
 }
 
 if [[ "${VIBE_DOCTOR_PLUGINS_LOADED:-}" != "$VIBE_LIB/doctor_plugins.sh" ]]; then
