@@ -179,9 +179,12 @@ class HandoffService:
         blocked_by: str | None,
         actor: str | None,
         verdict: str | None = None,
-        audit_is_system_auto: bool = False,
     ) -> Path:
-        """Internal helper to record a handoff reference."""
+        """Internal helper to record an active handoff reference.
+
+        Note: For passive artifact recording, use record_passive_artifact() instead.
+        This method only handles active handoff events (handoff_plan/report/audit).
+        """
         branch = self.git_client.get_current_branch()
         self._validate_authoritative_ref(ref_kind, ref_value, branch)
         # Inlined _normalize_ref_value
@@ -238,15 +241,8 @@ class HandoffService:
         if verdict:
             event_refs["verdict"] = verdict
 
-        event_type = (
-            "audit_recorded"
-            if ref_kind.lower() == "audit" and audit_is_system_auto
-            else (
-                "handoff_audit"
-                if ref_kind.lower() == "audit"
-                else f"handoff_{ref_kind.lower()}"
-            )
-        )
+        # Active handoff event type (passive recorded via record_passive_artifact)
+        event_type = f"handoff_{ref_kind.lower()}"
         self.store.add_event(
             branch,
             event_type,
@@ -333,7 +329,6 @@ class HandoffService:
                 blocked_by,
                 actor,
                 verdict=verdict,
-                audit_is_system_auto=False,
             )
 
     def record_indicate(
