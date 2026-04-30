@@ -28,7 +28,25 @@ from vibe3.utils.path_helpers import (
 class HandoffService:
     """Service for managing handoff records."""
 
-    _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit"}
+    # Canonical kind → DB ref column
+    _KIND_TO_REF_FIELD: dict[str, str] = {
+        "plan": "plan_ref",
+        "run": "report_ref",
+        "review": "audit_ref",
+    }
+    # Canonical kind → actor state column
+    _KIND_TO_ACTOR_FIELD: dict[str, str] = {
+        "plan": "planner_actor",
+        "run": "executor_actor",
+        "review": "reviewer_actor",
+    }
+    # Legacy kind aliases → canonical kind
+    _LEGACY_KIND_ALIASES: dict[str, str] = {
+        "report": "run",
+        "audit": "review",
+    }
+
+    _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit", "run", "review"}
     _HANDOFF_EVENT_TYPES = {
         "handoff_plan",
         "handoff_report",
@@ -52,6 +70,16 @@ class HandoffService:
         "handoff_ci_status",
         "handoff_pr_comment",
     }
+
+    @staticmethod
+    def _normalize_kind(kind: str) -> str:
+        """Normalize kind to canonical form.
+
+        Maps legacy 'report'/'audit' to canonical 'run'/'review',
+        lowercases input, and passes through unknown values.
+        """
+        lowered = kind.lower()
+        return HandoffService._LEGACY_KIND_ALIASES.get(lowered, lowered)
 
     def __init__(
         self,
@@ -184,16 +212,16 @@ class HandoffService:
 
         handoff_path = self.storage.ensure_current_handoff()
 
-        ref_field = f"{ref_kind.lower()}_ref"
+        # Normalize kind and lookup ref field
+        normalized_kind = self._normalize_kind(ref_kind)
+        ref_field = self._KIND_TO_REF_FIELD.get(normalized_kind)
+        if not ref_field:
+            # Fallback for unknown kinds (shouldn't happen in practice)
+            ref_field = f"{normalized_kind}_ref"
 
         # Build flow state updates
         flow_updates = {ref_field: ref_value}
-        actor_field_by_kind = {
-            "plan": "planner_actor",
-            "report": "executor_actor",
-            "audit": "reviewer_actor",
-        }
-        actor_field = actor_field_by_kind.get(ref_kind.lower())
+        actor_field = self._KIND_TO_ACTOR_FIELD.get(normalized_kind)
         if actor_field:
             flow_updates[actor_field] = effective_actor
         if next_step:
@@ -362,7 +390,9 @@ class HandoffService:
         Raises:
             UserError: If kind is not supported
         """
-        if kind not in {"plan", "report", "audit"}:
+        # Normalize kind and validate
+        normalized_kind = self._normalize_kind(kind)
+        if normalized_kind not in self._KIND_TO_REF_FIELD:
             raise UserError(f"Unsupported passive artifact kind: {kind}")
 
         target_branch = branch or self.git_client.get_current_branch()
@@ -375,8 +405,12 @@ class HandoffService:
         if not sanitized_content:
             return None
 
+        # Use legacy prefix for artifact creation (backward compat)
+        artifact_prefix = {"plan": "plan", "run": "report", "review": "audit"}.get(
+            normalized_kind, normalized_kind
+        )
         created = self.storage.create_artifact(
-            prefix=kind,
+            prefix=artifact_prefix,
             content=sanitized_content + "\n",
             branch=target_branch,
         )
@@ -384,15 +418,20 @@ class HandoffService:
             return None
         _, artifact_path = created
 
+        # Use normalized kind for artifact detail
         detail, extra_refs = ArtifactParser.build_artifact_detail(
-            kind,
+            normalized_kind,
             sanitized_content,
             artifact_path,
             metadata=metadata,
         )
 
-        # Build event_type (use "report_recorded" instead of "run_recorded")
-        event_type = "report_recorded" if kind == "report" else f"{kind}_recorded"
+        # Build event_type (use "report_recorded" for run kind)
+        event_type = (
+            "report_recorded"
+            if normalized_kind == "run"
+            else f"{artifact_prefix}_recorded"
+        )
 
         git_common = Path(self.git_client.get_git_common_dir())
         relative_ref = (
