@@ -98,6 +98,20 @@ PR 创建后停止，输出：
 
 ### Step 1: 读取当前任务与交接状态
 
+**原则**：如果对话中已有足够的上下文（清楚当前 issue/branch/PR 状态），跳过命令检查。
+
+**需要执行命令检查的情况**：
+- 刚开始新对话，不了解当前状态
+- 切换了工作目录或分支后
+- 不确定当前 flow/task 状态
+
+**可以跳过命令检查的情况**：
+- 对话中已明确知道当前 issue、branch、PR
+- 刚执行过 `task show` 或 `handoff status`
+- 用户直接说"提交这些改动"，且改动内容明确
+
+**命令检查（仅在需要时执行）**：
+
 ```bash
 uv run python src/vibe3/cli.py task show
 uv run python src/vibe3/cli.py handoff status
@@ -382,20 +396,22 @@ claude/sonnet-4.6, gemini, jacob
 
 **手动添加**：如果自动生成失败，可在 PR body 末尾手动添加 Contributors 块。
 
-### Step 9: 应用标签与智能审查
+### Step 9: 智能审查（可选）
 
-**智能审查策略**：
+**默认不执行**。仅在用户明确要求时触发。
 
-| 标签类型        | 审查方式     | 自动化程度                     |
+智能审查策略：
+
+| 标签类型        | 审查方式     | 触发方式                       |
 | --------------- | ------------ | ------------------------------ |
 | `type/feat`     | Codex 审查   | 在 PR 中评论 `@codex review`   |
 | `type/fix`      | Copilot 审查 | 在 PR 中评论 `@copilot review` |
 | `type/refactor` | claude 审查  | 在 PR 中评论 `@claude review`  |
-| `type/docs`     | 人工审查     | ⏸️ 需要手动决定是否测试        |
-| `type/test`     | 人工审查     | ⏸️ 需要手动决定是否测试        |
-| `type/chore`    | 人工审查     | ⏸️ 需要手动决定是否测试        |
+| `type/docs`     | 人工审查     | 无自动触发                     |
+| `type/test`     | 人工审查     | 无自动触发                     |
+| `type/chore`    | 人工审查     | 无自动触发                     |
 
-**执行方式**：
+**执行方式（仅在用户要求时）**：
 
 ```bash
 # 查看当前 PR
@@ -403,6 +419,9 @@ gh pr view <pr-number>
 
 # 添加标签
 gh pr edit <pr-number> --add-label "type/feature"
+
+# 触发审查（可选）
+gh pr comment <pr-number> --body "@codex review"
 ```
 
 ### Step 10: 写入 handoff 并停止

@@ -359,12 +359,20 @@ Steps:
 - 最新人类评论（不含 `[governance suggest]`）是最高优先级的人类指示
 - 如果 governance 建议与最新人类评论冲突，优先遵循人类指示
 
-7. 如果 scene 健康且最新评论中没有明确阻止推进的指示：
-   - 执行：
+ 7. 如果 scene 健康且最新评论中没有明确阻止推进的指示：
+    - 执行：
 
-   ```bash
-   gh issue edit <issue-number> --add-label "state/claimed" --remove-label "state/ready"
-   ```
+    ```bash
+    gh issue edit <issue-number> --add-label "state/claimed" --remove-label "state/ready"
+    ```
+
+    - **保存 snapshot baseline**（记录开发起点）：
+
+    ```bash
+    uv run python src/vibe3/cli.py snapshot save
+    ```
+
+    说明：baseline 记录了分支创建时的代码库结构，供后续 `snapshot diff` 对比分析开发过程中的结构变化。
 
 8. 再次读取当前 labels/state
 9. 如果 `state/claimed` 未生效：
@@ -499,7 +507,12 @@ Decision sketch:
         gh issue create --title "系统改进：<改进点>" --body "<改进建议详情>"
         ```
       - 记录已创建的改进 issue 编号（用于 state/done 阶段检查）
-      - 写 handoff append：确认通过 + 遗漏点清单，提醒 executor 在发布阶段注意
+      - **检查 baseline 变化**：对比当前代码库结构与 baseline（开发起点）：
+        ```bash
+        uv run python src/vibe3/cli.py snapshot diff
+        ```
+        若发现重大结构变化（新增模块、依赖大幅增长、LOC 异常增加等），在 handoff 中记录发现。
+      - 写 handoff append：确认通过 + 遗漏点清单 + baseline 变化摘要，提醒 executor 在发布阶段注意
       - 进入 `state/merge-ready`
       - comment：Review passed with notes，列出遗漏点
       - `exit()`
@@ -510,7 +523,12 @@ Decision sketch:
         gh issue create --title "系统改进：<改进点>" --body "<改进建议详情>"
         ```
       - 记录已创建的改进 issue 编号（用于 state/done 阶段检查）
-      - 写 handoff append：确认审核通过，说明进入 merge-ready 后的发布注意事项
+      - **检查 baseline 变化**：对比当前代码库结构与 baseline（开发起点）：
+        ```bash
+        uv run python src/vibe3/cli.py snapshot diff
+        ```
+        若发现重大结构变化（新增模块、依赖大幅增长、LOC 异常增加等），在 handoff 中记录发现。
+      - 写 handoff append：确认审核通过 + baseline 变化摘要，说明进入 merge-ready 后的发布注意事项
       - 进入 `state/merge-ready`
       - comment：Review passed, moving to merge-ready
       - `exit()`

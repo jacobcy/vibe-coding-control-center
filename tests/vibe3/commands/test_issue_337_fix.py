@@ -36,6 +36,7 @@ def test_inspect_commands_default_no_command():
     """Verify that no flags still result in plain text output."""
     result = runner.invoke(app, ["commands"])
     assert result.exit_code == 0
-    assert "Available commands:" in result.output
+    assert "=== vibe3 command structure ===" in result.output
+    assert "Top-level commands:" in result.output
     assert "flow" in result.output
     assert "pr" in result.output

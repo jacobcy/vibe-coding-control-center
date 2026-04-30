@@ -14,7 +14,31 @@ from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="inspect",
-    help="Provide code analysis information",
+    help="""Single-file & change analysis (real-time).
+
+When to use inspect:
+  - Analyzing one file structure (LOC, functions, imports)
+  - Looking up where a symbol is used
+  - Finding dead code
+  - Analyzing impact of a single change (PR / commit / branch)
+
+Subcommands:
+  files [<file>]             Structure of one file (default: all Python files)
+  symbols <file>:<symbol>    Find symbol references
+  base [<branch>]            Key impact vs base branch
+  pr <number>                Impact analysis of a GitHub PR
+  commit <sha>               Impact analysis of one commit
+  uncommit                   Impact analysis of uncommitted changes
+  dead-code [<root>]         Find unused functions
+  commands [<cmd> <subcmd>]  Static analysis of CLI command structure
+
+For project-level structure snapshots → use:
+  vibe3 snapshot             (persistent structure tracking)
+
+Examples:
+  vibe3 inspect files src/vibe3/services/
+  vibe3 inspect symbols src/vibe3/cli.py:app
+  vibe3 inspect base main""",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -50,6 +74,9 @@ register_change(app)
 def files_(
     file: Annotated[str, typer.Argument(help="File to analyze")] = "",
     json_out: _JSON_OPT = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", help="Suppress next step suggestions")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Analyze file structure (functions, LOC, dependencies).
@@ -111,6 +138,11 @@ def files_(
                     f"{r['function_count']} functions"
                 )
 
+        if file and not json_out:
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("inspect_files", quiet)
+
 
 @app.command()
 def commands(
@@ -152,8 +184,16 @@ def commands(
             )
             # Proceed to formatting logic below
         else:
-            names_str = ", ".join(names)
-            typer.echo(f"Available commands: {names_str}")
+            typer.echo("=== vibe3 command structure ===")
+            typer.echo(f"Top-level commands: {', '.join(names)}")
+            typer.echo()
+            typer.echo("Use this command to inspect a specific call tree:")
+            typer.echo("  vibe3 inspect commands pr show          # YAML format")
+            typer.echo("  vibe3 inspect commands pr show --tree   # ASCII tree")
+            typer.echo("  vibe3 inspect commands pr show --mermaid # Mermaid diagram")
+            typer.echo()
+            typer.echo("Examples:")
+            typer.echo("  vibe3 inspect commands review")
             return
     else:
         result = command_analyzer.analyze_command(command, subcommand or None)
@@ -185,6 +225,9 @@ def dead_code(
             help="Minimum confidence level to show (high/medium/low)",
         ),
     ] = "low",
+    quiet: Annotated[
+        bool, typer.Option("--quiet", help="Suppress next step suggestions")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Scan for dead code (unused functions).
@@ -262,6 +305,10 @@ def dead_code(
                     typer.echo(f"    {exc}")
                 if len(report.excluded) > 10:
                     typer.echo(f"    ... and {len(report.excluded) - 10} more")
+
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("inspect_dead_code", quiet)
 
     except SerenaError as e:
         typer.echo(f"Error: {e}", err=True)
