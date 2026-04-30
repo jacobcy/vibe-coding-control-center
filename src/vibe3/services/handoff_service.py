@@ -33,7 +33,7 @@ class HandoffService:
         "handoff_audit",
         "handoff_indicate",
         "plan_recorded",
-        "run_recorded",
+        "report_recorded",  # Changed from run_recorded to match report_ref
         "audit_recorded",
     }
     _SUCCESS_HANDOFF_EVENT_TYPES = {
@@ -300,16 +300,40 @@ class HandoffService:
         verdict: str | None = None,
         is_system_auto: bool = False,
     ) -> Path:
-        """Record audit handoff reference."""
-        return self._record_ref(
-            "audit",
-            audit_ref,
-            next_step,
-            blocked_by,
-            actor,
-            verdict=verdict,
-            audit_is_system_auto=is_system_auto,
-        )
+        """Record audit handoff reference.
+
+        If is_system_auto=True, creates a passive artifact via record_passive_artifact.
+        Otherwise, creates an active handoff event.
+        """
+        if is_system_auto:
+            # Use passive artifact recording for system auto-generated audits
+            result = self.record_passive_artifact(
+                kind="audit",
+                content=audit_ref,
+                actor=actor,
+                branch=None,
+                verdict=verdict,
+                next_step=next_step,
+                blocked_by=blocked_by,
+            )
+            # record_passive_artifact returns Path or None, but this method
+            # always returns Path
+            # If None (empty content), still return the handoff path
+            if result is None:
+                # Fallback: return current handoff path
+                return self.storage.ensure_current_handoff()
+            return result
+        else:
+            # Active handoff recording
+            return self._record_ref(
+                "audit",
+                audit_ref,
+                next_step,
+                blocked_by,
+                actor,
+                verdict=verdict,
+                audit_is_system_auto=False,
+            )
 
     def record_indicate(
         self,
@@ -329,9 +353,33 @@ class HandoffService:
         actor: str | None = None,
         metadata: dict[str, str] | None = None,
         branch: str | None = None,
+        # Audit-specific optional parameters
+        verdict: str | None = None,
+        next_step: str | None = None,
+        blocked_by: str | None = None,
     ) -> Path | None:
-        """Record a shared fallback artifact without upgrading authoritative refs."""
-        if kind not in {"plan", "run"}:
+        """Record a shared fallback artifact without upgrading authoritative refs.
+
+        Supports all three artifact kinds: plan, report, audit.
+        Audit can optionally include verdict, next_step, blocked_by.
+
+        Args:
+            kind: Artifact kind ("plan", "report", or "audit")
+            content: Artifact content
+            actor: Actor string (resolved from signature service if None)
+            metadata: Optional metadata dict
+            branch: Target branch (current if None)
+            verdict: Optional verdict value (audit only)
+            next_step: Optional next step (audit only)
+            blocked_by: Optional blocked by description (audit only)
+
+        Returns:
+            Path to created artifact, or None if content is empty
+
+        Raises:
+            UserError: If kind is not supported
+        """
+        if kind not in {"plan", "report", "audit"}:
             raise UserError(f"Unsupported passive artifact kind: {kind}")
 
         target_branch = branch or self.git_client.get_current_branch()
@@ -359,7 +407,10 @@ class HandoffService:
             artifact_path,
             metadata=metadata,
         )
-        event_type = f"{kind}_recorded"
+
+        # Build event_type (use "report_recorded" instead of "run_recorded")
+        event_type = "report_recorded" if kind == "report" else f"{kind}_recorded"
+
         git_common = Path(self.git_client.get_git_common_dir())
         relative_ref = (
             str(artifact_path.relative_to(git_common))
@@ -372,8 +423,25 @@ class HandoffService:
             ref_value = "@" + relative_ref[len(_SHARED_HANDOFF_PREFIX) :]
         else:
             ref_value = relative_ref
+
+        # Build refs including audit-specific fields
         refs: dict[str, str | list[str]] = {"ref": ref_value}
         refs.update(extra_refs)
+
+        # Add audit-specific refs if provided
+        if kind == "audit":
+            if verdict:
+                refs["verdict"] = verdict
+            # Add verdict and other fields to detail for audit
+            detail_parts = [detail]
+            if verdict:
+                detail_parts.insert(0, f"verdict: {verdict}")
+            if next_step:
+                detail_parts.append(f"Next Step: {next_step}")
+            if blocked_by:
+                detail_parts.append(f"Blocked By: {blocked_by}")
+            detail = "\n".join(detail_parts)
+
         self.store.add_event(
             target_branch,
             event_type,

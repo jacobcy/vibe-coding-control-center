@@ -159,7 +159,7 @@ def _render_handoff_events(
         "handoff_indicate": "Manager Handoff",
         "handoff_verdict": "Verdict Handoff",
         "plan_recorded": "Plan Auto-Recorded",
-        "run_recorded": "Run Auto-Recorded",
+        "report_recorded": "Run Auto-Recorded",
         "audit_recorded": "Audit Auto-Recorded",
     }
 
