@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
@@ -116,6 +117,19 @@ class CheckRemote:
         logger.bind(
             domain="check", path="pr_body", branches_resolved=len(branch_issue_map)
         ).info("Remote index build done (Path A)")
+
+        # Path B: rebuild merged PR cache
+        from vibe3.clients.merged_pr_cache import MergedPRCache
+
+        # Resolve repo path from git common dir
+        git_common_dir = this.git_client.get_git_common_dir()
+        repo_path = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+
+        cache = MergedPRCache(repo_path)
+        cache_rebuild_count = cache.rebuild(this.github_client)
+        logger.bind(
+            domain="check", path="cache_rebuild", prs_cached=cache_rebuild_count
+        ).info("Merged PR cache rebuilt")
 
         all_flows = this.store.get_all_flows()
         updated, skipped, unresolvable = 0, 0, []
