@@ -336,3 +336,9 @@ def status(
         if net_err:
             render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")
         render_flows_status_dashboard(flows, titles, pr_map, worktree_map)
+
+
+def register_status_commands(app: typer.Typer) -> None:
+    """Register flow status commands."""
+    app.command(name="show")(show)
+    app.command(name="status")(status)
