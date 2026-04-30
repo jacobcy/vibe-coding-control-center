@@ -316,7 +316,7 @@ agent 认领 issue 时：
 
 - [github-labels-reference.md](github-labels-reference.md) - 标签速查手册（有哪些标签）
 - [roadmap-label-management.md](roadmap-label-management.md) - 如何使用标签管理 roadmap
-- [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) - 状态同步标准
+- [v3/command-standard.md](v3/command-standard.md) - 共享状态命令与状态同步标准
 - [issue-standard.md](issue-standard.md) - Issue 标准
-- [v3/command-standard.md](v3/command-standard.md) - 命令设计标准
+- [../../AGENTS.md](../../AGENTS.md) - 项目导览与操作手册
 - [v3/handoff-store-standard.md](v3/handoff-store-standard.md) - Handoff 存储标准
