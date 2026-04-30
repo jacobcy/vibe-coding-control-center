@@ -158,11 +158,11 @@ def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(
         git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
-    store.add_event(branch, "run_recorded", "codex/gpt-5.4", detail="auto run")
+    store.add_event(branch, "report_recorded", "codex/gpt-5.4", detail="auto run")
 
     events = service.get_handoff_events(branch)
 
-    assert [event.event_type for event in events] == ["run_recorded"]
+    assert [event.event_type for event in events] == ["report_recorded"]
 
 
 def test_get_success_handoff_events_filters_passive_only(
