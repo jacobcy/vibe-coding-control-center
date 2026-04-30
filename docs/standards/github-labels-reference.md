@@ -33,14 +33,22 @@
 | `type/test` | 测试 | `gh issue edit 123 --add-label "type/test"` |
 | `type/chore` | 杂项 | `gh issue edit 123 --add-label "type/chore"` |
 | `type/task` | 综合型任务 | `gh issue edit 123 --add-label "type/task"` |
+| `type/perf` | 性能优化 | `gh issue edit 123 --add-label "type/perf"` |
 
 #### 优先级标签 (priority/*)
 
 | 标签名称 | 描述 | 示例命令 |
 |---------|------|----------|
+| `priority/critical` | 紧急阻断性问题 | `gh issue edit 123 --add-label "priority/critical"` |
 | `priority/high` | 高优先级 | `gh issue edit 123 --add-label "priority/high"` |
 | `priority/medium` | 中优先级 | `gh issue edit 123 --add-label "priority/medium"` |
 | `priority/low` | 低优先级 | `gh issue edit 123 --add-label "priority/low"` |
+| `priority/0` ~ `priority/9` | 数值优先级（推荐） | `gh issue edit 123 --add-label "priority/7"` |
+
+**说明**：
+- 数值优先级（`priority/0-9`）为推荐格式，更精确
+- Legacy 文本优先级（`priority/critical/high/medium/low`）保持兼容
+- 数值越大优先级越高
 
 #### 范围标签 (scope/*)
 
@@ -64,7 +72,20 @@
 | `component/client` | Client 层 | `gh issue edit 123 --add-label "component/client"` |
 | `component/config` | 配置层 | `gh issue edit 123 --add-label "component/config"` |
 
-### 2.2 路线图标签 (roadmap/*)
+### 2.2 特殊用途标签
+
+| 标签名称 | 描述 | 使用场景 |
+|---------|------|----------|
+| `supervisor` | Supervisor-governed orchestration issue | 标记需要 Supervisor 治理的编排问题 |
+| `orchestra` | Orchestra scheduling and automation | 标记 Orchestra 调度和自动化相关 issue |
+| `tech-debt` | Technical debt tracking | 追踪技术债务和需要优化的代码 |
+| `improvement` | Non-urgent improvements | 非紧急的改进和增强项 |
+
+**说明**：
+- 这些标签用于特定的治理和追踪场景
+- 可以与 `type/*`、`scope/*` 等标签组合使用
+
+### 2.3 路线图标签 (roadmap/*)
 
 | 标签名称 | 描述 | 示例命令 |
 |---------|------|----------|
@@ -75,7 +96,7 @@
 | `roadmap/future` | 未来考虑 | `gh issue edit 123 --add-label "roadmap/future"` |
 | `roadmap/rfc` | RFC/设计阶段 | `gh issue edit 123 --add-label "roadmap/rfc"` |
 
-### 2.3 关系镜像标签
+### 2.4 关系镜像标签
 
 | 标签名称 | 描述 | 示例命令 |
 |---------|------|----------|
@@ -85,7 +106,7 @@
 - `vibe-task` 是 `vibe3 flow bind` 绑定的自动镜像（副作用）。
 - 它不是 Governance 判定的真源，仅用于 GitHub 视角过滤。
 
-### 2.4 编排状态标签 (state/*)
+### 2.5 编排状态标签 (state/*)
 
 | 标签名称 | 含义 | 示例命令 |
 |---------|------|----------|
@@ -101,6 +122,28 @@
 **说明**：
 - `state/*` 标签是执行状态的**可选镜像**，不是执行态主真源。
 - `assignee issue` 的真实执行状态优先以 flow 状态与 orchestration scene 为准。
+
+### 2.6 触发器标签 (trigger/*)
+
+| 标签名称 | 描述 | 使用场景 |
+|---------|------|----------|
+| `trigger/ai-review` | 触发 AI PR 审查流程 | 开发者完成 PR 后手动添加，触发自动审查 |
+
+**说明**：
+- Trigger 标签是**一次性触发器**，由开发者手动添加
+- Workflow 完成后会自动移除 trigger 标签
+- 用于触发自动化流程，不作为长期状态标记
+
+**使用流程**：
+1. 开发者完成 PR，添加 `trigger/ai-review` 标签
+2. 触发 `ai-pr-review.yml` workflow
+3. Workflow 发送 AI 审查请求（`@codex review` 或 `@copilot review`）
+4. Workflow 自动移除 `trigger/ai-review` 标签
+5. 后续再次添加标签时，workflow 会检查 PR comments 防止重复请求
+
+**防重复机制**：
+- Workflow 检查 PR comments 是否已有 `@codex review`
+- 已发送过审查请求的 PR 不会重复触发
 
 ---
 
@@ -151,16 +194,37 @@ gh issue edit 123 --milestone "Phase 1: 基础设施"
 gh issue list --milestone "Phase 1: 基础设施"
 ```
 
+### 3.4 标签同步
+
+**自动同步标准标签**：
+
+```bash
+# 同步所有标准标签到 repo（幂等，不删除现有标签）
+./scripts/sync-labels.sh
+```
+
+**脚本特性**：
+- ✅ **幂等性**：可以重复运行，不会重复创建
+- ✅ **非破坏性**：只创建/更新标签，从不删除
+- ✅ **自动更新**：更新已存在标签的描述和颜色
+- ✅ **保留默认**：保留 GitHub 默认标签（bug、documentation、enhancement、question）
+
 ---
 
 ## 4. 标签组合速查表
 
 | 场景 | 推荐标签组合 |
 |------|-------------|
-| 高优先级功能开发 | `type/feature` + `priority/high` + `roadmap/p0` |
-| 中优先级 bug 修复 | `type/fix` + `priority/medium` + `roadmap/p1` |
-| 低优先级文档更新 | `type/docs` + `priority/low` + `roadmap/p2` |
+| 高优先级功能开发 | `type/feature` + `priority/9` + `roadmap/p0` |
+| 中优先级 bug 修复 | `type/fix` + `priority/5` + `roadmap/p1` |
+| 低优先级文档更新 | `type/docs` + `priority/3` + `roadmap/p2` |
 | 需要讨论的设计 | `type/feature` + `roadmap/rfc` |
+| 性能优化 | `type/perf` + `priority/7` + `roadmap/p0` |
+| 技术债务清理 | `tech-debt` + `priority/5` + `roadmap/p1` |
+| 编排系统改进 | `orchestra` + `type/feature` + `roadmap/p1` |
+| Supervisor 治理问题 | `supervisor` + `priority/7` + `roadmap/p0` |
+| 非紧急改进 | `improvement` + `priority/3` + `roadmap/p2` |
+| 完成 PR 需要AI审查 | `trigger/ai-review`（手动添加，workflow自动移除） |
 | 正在执行的任务 | `vibe-task`（flow bind 自动镜像）+ `state/in-progress`（可选） |
 | 被阻塞的任务 | `vibe-task`（flow bind 自动镜像）+ `state/blocked`（可选） |
 | 待 review 的任务 | `vibe-task`（flow bind 自动镜像）+ `state/review`（可选） |

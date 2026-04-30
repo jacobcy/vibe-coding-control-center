@@ -126,24 +126,27 @@ gh issue edit <issue_number> --add-label "priority/3"
 **Legacy Priority (兼容支持)**:
 
 ```bash
-# 高优先级 - 核心功能、关键 bug 修复
+# 紧急阻断性问题 - 等同于 priority/9
+gh issue edit <issue_number> --add-label "priority/critical"
+
+# 高优先级 - 核心功能、关键 bug 修复，等同于 priority/7
 gh issue edit <issue_number> --add-label "priority/high"
 
-# 中优先级 - 重要但非紧急的功能
+# 中优先级 - 重要但非紧急的功能，等同于 priority/5
 gh issue edit <issue_number> --add-label "priority/medium"
 
-# 低优先级 - 优化、改进等非关键任务
+# 低优先级 - 优化、改进等非关键任务，等同于 priority/3
 gh issue edit <issue_number> --add-label "priority/low"
-
-# 紧急问题 - 等同于 priority/9
-gh issue edit <issue_number> --add-label "priority/critical"
 ```
 
-**Legacy 标签映射**:
-- `priority/critical` → 等同于 `priority/9`
-- `priority/high` → 等同于 `priority/7`
-- `priority/medium` → 等同于 `priority/5`
-- `priority/low` → 等同于 `priority/3`
+**优先级映射表**:
+
+| Legacy 标签 | 映射到 Numeric | 说明 |
+|-------------|---------------|------|
+| `priority/critical` | `priority/9` | 紧急阻断性问题、系统崩溃 |
+| `priority/high` | `priority/7` | 核心功能、关键 bug 修复 |
+| `priority/medium` | `priority/5` | 重要但非紧急的功能 |
+| `priority/low` | `priority/3` | 优化、改进等非关键任务 |
 
 **决策标准**:
 - 9: 紧急阻断性问题、系统崩溃、核心功能失效
@@ -296,10 +299,14 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 | 优先级 | 使用场景 | 示例 |
 |--------|----------|------|
 | `priority/9` | 紧急阻断性问题、系统崩溃、核心功能失效 | 支付功能失效、数据库损坏 |
-| `priority/7-8` | 核心功能、关键 bug 修复、影响大量用户 | 登录失败、性能严重下降 |
-| `priority/5-6` | 重要但非紧急的功能 | 性能优化、用户体验改进 |
-| `priority/3-4` | 一般功能、改进项 | 代码清理、小优化 |
-| `priority/1-2` | 低优先级改进 | 次要文档完善、边缘 case 处理 |
+| `priority/8` | 极高优先级、重要功能阻断 | 关键 API 失效 |
+| `priority/7` | 核心功能、关键 bug 修复、影响大量用户 | 登录失败、性能严重下降 |
+| `priority/6` | 重要功能改进、影响部分用户 | 功能缺失、用户体验问题 |
+| `priority/5` | 重要但非紧急的功能 | 性能优化、用户体验改进 |
+| `priority/4` | 一般功能改进 | 功能增强、小改进 |
+| `priority/3` | 一般功能、改进项 | 代码清理、小优化 |
+| `priority/2` | 低优先级改进 | 次要改进 |
+| `priority/1` | 最低优先级改进 | nice-to-have |
 | `priority/0` | 默认优先级（无标签） | - |
 
 **Legacy Priority (兼容支持)**:
@@ -440,31 +447,162 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 
 ---
 
-## 8. 最佳实践
+## 8. 特殊用途标签
 
-### 8.1 定期审查
+### 8.1 治理与编排标签
+
+除了常规的 roadmap、priority、type 标签，项目还使用以下特殊用途标签：
+
+#### supervisor 标签
+
+**用途**：标记需要 Supervisor 治理的编排问题
+
+**使用场景**：
+- Supervisor 层的架构决策
+- 治理流程改进
+- Policy/rules 变更
+- 编排系统的治理级问题
+
+**示例**：
+```bash
+# 标记 Supervisor 治理问题
+gh issue edit 123 --add-label "supervisor" --add-label "priority/7" --add-label "roadmap/p0"
+```
+
+#### orchestra 标签
+
+**用途**：标记 Orchestra 谘度和自动化相关 issue
+
+**使用场景**：
+- Orchestra 谘度逻辑改进
+- 分诊和 dispatch 机制
+- Queue ordering 优化
+- 自动化流程改进
+
+**示例**：
+```bash
+# 标记 Orchestra 谘度问题
+gh issue edit 124 --add-label "orchestra" --add-label "type/feature" --add-label "roadmap/p1"
+```
+
+#### tech-debt 标签
+
+**用途**：追踪技术债务和需要优化的代码
+
+**使用场景**：
+- 代码重构需求
+- 架构优化
+- 依赖更新
+- 代码质量问题
+
+**示例**：
+```bash
+# 标记技术债务
+gh issue edit 125 --add-label "tech-debt" --add-label "priority/5" --add-label "roadmap/p1"
+```
+
+#### improvement 标签
+
+**用途**：标记非紧急的改进和增强项
+
+**使用场景**：
+- 用户体验改进
+- 边缘 case 处理
+- 小功能增强
+- 非阻断性改进
+
+**示例**：
+```bash
+# 标记非紧急改进
+gh issue edit 126 --add-label "improvement" --add-label "priority/3" --add-label "roadmap/p2"
+```
+
+### 8.2 触发器标签 (trigger/*)
+
+**用途**：触发自动化工作流
+
+**与常规标签的区别**：
+- 常规标签：长期状态标记，手动添加/移除
+- 触发器标签：一次性触发器，workflow 自动移除
+
+#### trigger/ai-review 标签
+
+**用途**：触发 AI PR 审查流程
+
+**使用场景**：
+- 开发者完成 PR 后手动添加
+- 触发 Codex/Copilot 自动审查
+- Workflow 完成后自动移除
+
+**工作流程**：
+1. 开发者添加 `trigger/ai-review` 标签
+2. 触发 `.github/workflows/ai-pr-review.yml`
+3. Workflow 发送审查请求（`@codex review` 或 `@copilot review`）
+4. Workflow 移除 `trigger/ai-review`
+5. Workflow 检查 PR comments 防止重复请求（无需额外标签）
+
+**示例**：
+```bash
+# 完成 PR 后触发 AI 审查
+gh pr edit <pr_number> --add-label "trigger/ai-review"
+# Workflow 会自动移除此标签
+```
+
+**防重复机制**：
+- Workflow 直接检查 PR comments 是否已有 `@codex review`
+- 不需要额外的辅助标签
+- 利用 GitHub 现有数据（comments）而非创建新标签
+
+### 8.3 与常规标签的关系
+
+**组合使用原则**：
+- 特殊用途标签可以与 `type/*`、`scope/*`、`roadmap/*`、`priority/*` 组合
+- `supervisor` 和 `orchestra` 通常配合 `roadmap/p0` 或 `roadmap/p1`
+- `tech-debt` 和 `improvement` 通常配合 `roadmap/p1` 或 `roadmap/p2`
+
+**标签层级**：
+```
+特殊用途标签 (治理维度)
+    ↓
+roadmap/* (何时做)
+    ↓
+priority/* (多紧急)
+    ↓
+type/* (做什么)
+    ↓
+scope/* (影响范围)
+```
+
+---
+
+## 9. 最佳实践
+
+### 9.1 定期审查
 
 - **每周**: 审查 `roadmap/p0` issues，确保按计划推进
 - **每月**: 审查 `roadmap/p1` 和 `roadmap/p2` issues，调整优先级
 - **每季度**: 审查 `roadmap/future` issues，评估是否纳入规划
+- **定期**: 审查 `tech-debt` 和 `improvement` issues，评估是否需要提升优先级
 
-### 8.2 标签维护
+### 9.2 标签维护
 
 - 保持标签的准确性和时效性
 - 及时更新已完成 issues 的状态
 - 定期清理过时标签
+- 检查特殊用途标签（`supervisor`、`orchestra`、`tech-debt`、`improvement`）是否准确
 
-### 8.3 沟通协作
+### 9.3 沟通协作
 
 - 在 issue 中说明标签变更的原因
 - 使用 handoff 记录标签变更的上下文
 - 与团队成员共享 roadmap 状态
+- 特殊用途标签的变更需要团队讨论
 
 ---
 
-## 9. 故障处理
+## 10. 故障处理
 
-### 9.1 标签冲突
+### 10.1 标签冲突
 
 当发现标签冲突时：
 
@@ -473,7 +611,7 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 3. 添加正确的标签
 4. 记录变更原因
 
-### 9.2 状态不一致
+### 10.2 状态不一致
 
 当发现本地状态与 GitHub 标签不一致时：
 
@@ -481,7 +619,7 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 2. 更新本地状态
 3. 检查同步机制
 
-### 9.3 查询失败
+### 10.3 查询失败
 
 当查询命令失败时：
 
@@ -489,9 +627,18 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 2. 验证 GitHub CLI 配置
 3. 使用备选查询方式
 
+### 10.4 特殊用途标签误用
+
+当发现特殊用途标签误用时：
+
+1. 确认 issue 的实际性质
+2. 移除不合适的特殊标签（`supervisor`、`orchestra` 等）
+3. 添加合适的 `type/*` 和 `scope/*` 标签
+4. 在 issue comment 中说明变更原因
+
 ---
 
-## 10. 参考文档
+## 11. 参考文档
 
 - [github-labels-reference.md](github-labels-reference.md) - 标签速查手册（有哪些标签）
 - [github-labels-standard.md](github-labels-standard.md) - 标签语义和真源标准

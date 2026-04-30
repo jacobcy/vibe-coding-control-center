@@ -335,7 +335,6 @@ Steps:
 
 4.5. **依赖检查**：检查 Issue 是否有未解决的依赖：
    - 检查 issue body 和 comments 中引用的其他 issue（如 "Depends on #123"、"blocked by #456"）
-   - 检查 issue labels 中是否有依赖标记（如 `dependency/*`）
    - 对每个被依赖的 issue，检查其状态是否已关闭或处于 `state/done`
    - 如果存在未解除的依赖：
      - comment 当前 issue，列出未解除的依赖项
