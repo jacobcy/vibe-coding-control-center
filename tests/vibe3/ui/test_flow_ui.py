@@ -123,7 +123,8 @@ def test_render_flow_timeline_distinguishes_handoff_and_system_audit(capsys) -> 
 
     output = capsys.readouterr().out
     assert "Audit Handoff" in output
-    assert "Audit Auto-Recorded" in output
+    # audit_recorded should be filtered out when handoff_audit exists
+    assert "Audit Auto-Recorded" not in output
 
 
 def test_render_flow_status_shows_handoff_commands_for_artifacts(capsys) -> None:
