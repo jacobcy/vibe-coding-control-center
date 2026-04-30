@@ -171,6 +171,9 @@ code_limits:
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 480
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
+      - path: "tests/vibe3/execution/test_noop_gate_unit.py"
+        limit: 450
+        reason: "Noop gate 三分支语义测试，15 个测试围绕同一 gate 函数，共享 mock fixture，拆分收益低"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
