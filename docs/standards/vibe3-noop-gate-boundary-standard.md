@@ -123,20 +123,27 @@ related_docs:
 
 对 `planner / executor / reviewer` 三类 worker，正确语义是：
 
-- agent 执行后 **state 未改变** → `blocked`
-- agent 执行后 **state 已改变**（由 agent 自己完成） → 通过
+- agent 执行后 **required_ref 缺失** → `blocked`（agent 未按 contract 产出 authoritative ref）
+- agent 执行后 **state 未改变** → `blocked`（agent 未按 contract 推进状态）
+- agent 执行后 **两项都满足** → 通过
 
 也就是说：
 
 - planner 跑完但还在 `state/claimed` → `blocked`
 - executor 跑完但还在 `state/in-progress` → `blocked`
 - reviewer 跑完但还在 `state/review` → `blocked`
+- planner 跑完但没有 `plan_ref` → `blocked`
+- executor 跑完但没有 `report_ref` → `blocked`
+- reviewer 跑完但没有 `audit_ref` → `blocked`
 
-gate 只检查 state change，不检查 ref 是否存在。ref 是 agent 的内部产出，
-ref 检查应由 agent 自身负责，不属于 orchestration 层的 gate 职责。
+gate 同时检查 required_ref 存在性和 state change：
+1. required_ref 缺失 → block（agent 未按 contract 产出 authoritative ref）
+2. state 未变 → block（agent 未按 contract 推进状态）
+3. 两项都满足 → pass
 
-如果只做”缺 ref 才 block”而忽略 state change，就会出现 silent hang：
-ref 存在但 agent 没改 state，dispatch 不再派发，系统也不 block，issue 停滞。
+manager 角色不受 ref 检查约束（只有 state change 检查）。
+
+保留原有的 “authoritative ref 不是成功推进的替代品” 原则不变。
 
 ### 3.2 manager 不再保留独立的 must-change completion gate
 

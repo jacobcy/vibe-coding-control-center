@@ -27,6 +27,24 @@ def get_role_section(
     return ROLE_TO_SECTION[role]
 
 
+# Role to required ref key mapping for no-op gate
+# Used by unified no-op gate to check if agent produced required ref
+ROLE_TO_REQUIRED_REF_KEY: dict[str, str | None] = {
+    "planner": "plan_ref",
+    "executor": "report_ref",
+    "reviewer": "audit_ref",
+    "manager": None,  # manager 不受 ref 检查约束
+}
+
+
+def get_role_required_ref_key(role: "ExecutionRole | str") -> str | None:
+    """Get the required ref key for a given role's no-op gate check.
+
+    Returns None for roles that should skip the ref check (e.g., manager).
+    """
+    return ROLE_TO_REQUIRED_REF_KEY.get(role)
+
+
 # Handoff kind to actor state key mapping
 # Used by handoff recorder to write latest_actor to flow state
 KIND_TO_ACTOR_KEY: dict[str, str] = {
