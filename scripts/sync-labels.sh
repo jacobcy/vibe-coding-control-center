@@ -34,6 +34,9 @@ fi
 echo -e "${GREEN}✓ Pre-flight checks passed${NC}"
 echo ""
 
+# Track sync failures
+FAILURES=0
+
 # Function to create or update label (idempotent)
 sync_label() {
     local name="$1"
@@ -44,7 +47,8 @@ sync_label() {
     if gh label create "$name" --description "$description" --color "$color" --force 2>/dev/null; then
         echo -e "${GREEN}✓${NC} $name"
     else
-        echo -e "${YELLOW}⚠${NC} $name (synced)"
+        echo -e "${RED}✗${NC} $name (FAILED)"
+        FAILURES=$((FAILURES + 1))
     fi
 }
 
@@ -157,4 +161,11 @@ echo ""
 echo "Total labels in repo:"
 gh label list --limit 100 --json name | jq 'length'
 echo ""
-echo -e "${GREEN}✓ Done${NC}"
+
+# Report failures and exit with appropriate code
+if [ $FAILURES -gt 0 ]; then
+    echo -e "${RED}✗ Failed to sync $FAILURES label(s)${NC}"
+    exit 1
+else
+    echo -e "${GREEN}✓ All labels synced successfully${NC}"
+fi
