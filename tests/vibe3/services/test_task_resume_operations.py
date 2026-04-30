@@ -92,15 +92,20 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
         }
         mock_cleanup_cls.return_value = mock_cleanup_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state=None,  # ← No --label
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state=None,  # ← No --label
+            )
 
         # Verify: cleanup_flow_scene was called (via reset_task_scene)
         mock_cleanup_instance.cleanup_flow_scene.assert_called_once()
@@ -120,15 +125,20 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="handoff",  # ← --label (defaults to handoff)
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="handoff",  # ← --label (defaults to handoff)
+            )
 
         # Verify: worktree NOT deleted (reset_task_scene NOT called)
         operations.git_client.remove_worktree.assert_not_called()
@@ -155,15 +165,20 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="ready",  # ← --label ready
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="ready",  # ← --label ready
+            )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
@@ -194,15 +209,20 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="handoff",  # ← --label handoff (explicit)
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="handoff",  # ← --label handoff (explicit)
+            )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
@@ -228,15 +248,20 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="claimed",  # ← --label claimed
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="claimed",  # ← --label claimed
+            )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
@@ -259,15 +284,20 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="in-progress",  # ← --label in-progress
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="in-progress",  # ← --label in-progress
+            )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
@@ -290,15 +320,20 @@ def test_reset_issue_to_ready_with_label_review() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="review",  # ← --label review
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="review",  # ← --label review
+            )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
@@ -321,15 +356,20 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        operations.reset_issue_to_ready(
-            issue_number=303,
-            resume_kind="blocked",
-            flow=mock_flow,
-            repo=None,
-            reason="test resume",
-            worktree_path="/tmp/issue-303",
-            label_state="merge-ready",  # ← --label merge-ready
-        )
+        with patch(
+            "vibe3.services.worktree_ownership_guard.get_current_session_id"
+        ) as mock_session:
+            mock_session.return_value = None  # Outside tmux
+
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test resume",
+                worktree_path="/tmp/issue-303",
+                label_state="merge-ready",  # ← --label merge-ready
+            )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()

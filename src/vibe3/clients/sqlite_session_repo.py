@@ -176,3 +176,33 @@ class SQLiteSessionRepo:
                     except (ValueError, TypeError):
                         pass
         return result
+
+    def get_worktree_owner_session(self, worktree_path: str) -> dict[str, Any] | None:
+        """Return the most recent live session owning this worktree.
+
+        Queries runtime_session for sessions with matching worktree_path
+        and status in ('starting', 'running'), ordered by updated_at DESC.
+
+        Args:
+            worktree_path: Absolute path to the worktree directory.
+
+        Returns:
+            Session dict if a live owner exists, None otherwise.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM runtime_session
+                WHERE worktree_path = ?
+                  AND status IN ('starting', 'running')
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (worktree_path,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
