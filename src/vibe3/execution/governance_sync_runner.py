@@ -76,6 +76,7 @@ def run_governance_sync(
         result = CodeagentBackend().run(
             prompt=prompt_content,
             options=options,
+            task="governance scan",
             dry_run=False,
             session_id=session_id,
             cwd=None,  # Governance runs in current worktree

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+import typer
+
 from vibe3.services.check_remote import InitResult
 from vibe3.services.check_service import CheckResult, CheckService
 
@@ -26,6 +28,7 @@ def execute_check_mode(
     ] = "default",
     *,
     branch: str | None = None,
+    verbose: bool = False,
 ) -> ExecuteCheckResult:
     """Run command-oriented check modes
     using CheckService primitives."""
@@ -86,9 +89,14 @@ def execute_check_mode(
                 summary=f"All {len(results)} active flows passed",
             )
 
+        if not verbose:
+            typer.echo(f"Checking {len(invalid_fix)} flows with issues...")
+
         fixed_count = 0
         failed: list[str] = []
-        for check_result in invalid_fix:
+        for idx, check_result in enumerate(invalid_fix, 1):
+            if verbose:
+                typer.echo(f"  [{idx}/{len(invalid_fix)}] {check_result.branch}")
             fix_result = service.auto_fix(
                 check_result.issues, branch=check_result.branch
             )

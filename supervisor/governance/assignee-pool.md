@@ -41,16 +41,24 @@ Allowed:
 - `handoff`: read（读取交接上下文）
 - `scene`: read（读取现场信息）
 - `comment.write`: 写治理建议评论（格式为 `[governance suggest]`）
-- `state/labels.write`: 仅限一个极窄补偿动作：
-  - 当前 issue 已在 `state/blocked`
-  - `blocked_reason` 明确为 `state unchanged`
-  - `flow show` 能确认 authoritative ref 已存在
-  - 仅允许把 state 恢复到 `state/handoff`
-  - 恢复后必须写 comment 说明是 governance 自动补偿
+- `state/labels.write`: 仅限两个极窄补偿动作：
+  1. **漏改 blocked 恢复**：
+     - 当前 issue 已在 `state/blocked`
+     - `blocked_reason` 明确为 `state unchanged`
+     - `flow show` 能确认 authoritative ref 已存在
+     - 仅允许把 state 恢复到 `state/handoff`
+     - 恢复后必须写 comment 说明是 governance 自动补偿
+  2. **遗漏 state/ready 补齐**：
+     - 当前 issue 有 manager assignee
+     - 缺少任何 `state/*` label
+     - 没有活跃的 flow scene（`has_flow=False`）
+     - 仅允许设置为 `state/ready`
+     - 设置后必须写 comment 说明原因
+     - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest]` 建议而非直接拒绝
 
 Forbidden:
 
-- `state/labels.write`: 除上面的单一补偿动作外，其他任何 `state/*` label 的修改都禁止（包括设置 `state/ready`、`state/claimed`、`state/in-progress`、`state/blocked`、`state/done`）
+- `state/labels.write`: 除上面的两个补偿动作外，其他任何 `state/*` label 的修改都禁止（包括设置 `state/claimed`、`state/in-progress`、`state/blocked`、`state/done`）
 - `issue.resume`: 恢复 blocked 或 failed issue（这是人类专属动作，通过 `vibe3 task resume`）
 - `issue.close`: 关闭 issue（只建议关闭，由 Manager 执行）
 - `code.write`: 任何形式的代码修改
@@ -89,7 +97,9 @@ Forbidden:
 - 最小 non-state label 调整建议（仅 `milestone`、`roadmap/*`、`priority/[0-9]`）
 - start / wait / defer recommendations with short reasons
 - `[governance suggest]` 格式的治理建议评论
-- 极窄的 `state unchanged` 自动补偿恢复（仅 `state/blocked` → `state/handoff`）
+- 极窄的自动补偿动作：
+  - `state unchanged` 恢复（`state/blocked` → `state/handoff`）
+  - 遗漏 `state/ready` 补齐（有 assignee 但无 state label → `state/ready`）
 
 ## Hard Boundary
 
@@ -104,7 +114,9 @@ Forbidden:
 - 不负责写代码
 - **不负责一般性的 `state/*` label 修改**
 - **不负责一般性的 blocked/failed resume**
-- **只允许修正一种明确的漏改 state 场景：`state unchanged` 且 authoritative ref 已存在**
+- **只允许修正两种明确的漏改 state 场景**：
+  1. `state unchanged` 且 authoritative ref 已存在
+  2. 有 manager assignee 但缺少 state label 且无活跃 flow
 
 ## Execution Pattern
 

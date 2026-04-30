@@ -125,7 +125,7 @@ def check(
         else:
             mode = "fix_all"
 
-        result = execute_check_mode(service, mode)
+        result = execute_check_mode(service, mode, verbose=trace)
 
         if result.success:
             typer.echo(f"✓ {result.summary}")
