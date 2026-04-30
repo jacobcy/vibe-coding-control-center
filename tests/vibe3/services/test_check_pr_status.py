@@ -203,7 +203,6 @@ class TestMergedPRCacheIntegration:
 
     def test_cache_hit_skips_api_call(self, tmp_path: Path) -> None:
         """When cache hits, get_merged_pr_for_issue should skip API call."""
-        # Setup: Create cache with pre-populated data
         from vibe3.clients.merged_pr_cache import MergedPRCache
         from vibe3.services.pr_status_checker import get_merged_pr_for_issue
 
@@ -214,34 +213,29 @@ class TestMergedPRCacheIntegration:
                 "prs": {
                     "100": {
                         "number": 100,
-                        "merged_at": "2024-01-10T12:00:00Z",
-                        "issue": 456,
+                        "mergedAt": "2024-01-10T12:00:00Z",
+                        "issues": [456],
                     }
                 },
             }
         )
 
-        # Mock get_git_common_dir to return tmp_path
         with patch(
             "vibe3.services.pr_status_checker.get_git_common_dir"
         ) as mock_git_dir:
             mock_git_dir.return_value = str(tmp_path / ".git")
 
-            # Mock GitHubClient to track calls
             with patch(
                 "vibe3.services.pr_status_checker.GitHubClient"
             ) as mock_client_class:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
 
-                # Call the function
                 result = get_merged_pr_for_issue(456)
 
-                # Assert: Should return cached result without calling API
                 assert result is not None
                 assert result["number"] == 100
-                assert result["issue"] == 456
-                # API should NOT be called
+                assert 456 in result["issues"]
                 mock_client.list_merged_prs.assert_not_called()
 
     def test_cache_miss_triggers_sync(self, tmp_path: Path) -> None:

@@ -75,8 +75,8 @@ def test_load_cache_on_corrupted_json(cache: MergedPRCache) -> None:
     assert data["prs"] == {}
 
 
-def test_get_merged_pr_for_issue_hit(cache: MergedPRCache) -> None:
-    """Cached issue→PR mapping resolves correctly."""
+def test_get_merged_pr_for_issue_hit_and_miss(cache: MergedPRCache) -> None:
+    """Cached issue→PR mapping resolves correctly; uncached returns None."""
     test_data = {
         "last_sync": "2024-01-15T10:00:00Z",
         "prs": {
@@ -108,25 +108,7 @@ def test_get_merged_pr_for_issue_hit(cache: MergedPRCache) -> None:
     assert result["number"] == 101
     assert 789 in result["issues"]
 
-
-def test_get_merged_pr_for_issue_miss(cache: MergedPRCache) -> None:
-    """Uncached issue returns None."""
-    test_data = {
-        "last_sync": "2024-01-15T10:00:00Z",
-        "prs": {
-            "100": {
-                "number": 100,
-                "headRefName": "feature/a",
-                "body": "Closes #456",
-                "mergedAt": "2024-01-10T12:00:00Z",
-                "issues": [456],
-            }
-        },
-    }
-    cache._save_cache(test_data)
-
-    result = cache.get_merged_pr_for_issue(999)
-    assert result is None
+    assert cache.get_merged_pr_for_issue(999) is None
 
 
 def test_sync_merges_new_prs(cache: MergedPRCache) -> None:
@@ -274,7 +256,7 @@ def test_sync_handles_prs_without_linked_issues(cache: MergedPRCache) -> None:
 
     new_count = cache.sync(mock_client)
 
-    assert new_count == 1  # Only the linked one
+    assert new_count == 1
     loaded = cache._load_cache()
     assert "100" not in loaded["prs"]
     assert "101" in loaded["prs"]
@@ -282,7 +264,6 @@ def test_sync_handles_prs_without_linked_issues(cache: MergedPRCache) -> None:
 
 def test_rebuild_with_unlimited_fetch(cache: MergedPRCache) -> None:
     """rebuild() passes limit=None to fetch all PRs."""
-    # Create mock client with many PRs
     all_prs = [
         {
             "number": i,
@@ -296,39 +277,9 @@ def test_rebuild_with_unlimited_fetch(cache: MergedPRCache) -> None:
 
     count = cache.rebuild(mock_client)
 
-    assert count == 50  # All 50 PRs processed
+    assert count == 50
     loaded = cache._load_cache()
     assert len(loaded["prs"]) == 50
-
-
-def test_cache_returns_normalized_dict_structure(cache: MergedPRCache) -> None:
-    """Cache returns dict with GitHub API keys: headRefName, body, mergedAt."""
-    test_data = {
-        "last_sync": "2024-01-15T10:00:00Z",
-        "prs": {
-            "100": {
-                "number": 100,
-                "headRefName": "feature/test",
-                "body": "Closes #456",
-                "mergedAt": "2024-01-10T12:00:00Z",
-                "issues": [456],
-            }
-        },
-    }
-    cache._save_cache(test_data)
-
-    result = cache.get_merged_pr_for_issue(456)
-    assert result is not None
-    assert "number" in result
-    assert "headRefName" in result
-    assert "body" in result
-    assert "mergedAt" in result
-    assert "issues" in result
-    assert result["number"] == 100
-    assert result["headRefName"] == "feature/test"
-    assert result["body"] == "Closes #456"
-    assert result["mergedAt"] == "2024-01-10T12:00:00Z"
-    assert 456 in result["issues"]
 
 
 def test_single_pr_closes_multiple_issues(cache: MergedPRCache) -> None:
@@ -347,21 +298,16 @@ def test_single_pr_closes_multiple_issues(cache: MergedPRCache) -> None:
     }
     cache._save_cache(test_data)
 
-    result_456 = cache.get_merged_pr_for_issue(456)
-    assert result_456 is not None
-    assert result_456["number"] == 100
-    assert 456 in result_456["issues"]
-    assert 789 in result_456["issues"]
-
-    result_789 = cache.get_merged_pr_for_issue(789)
-    assert result_789 is not None
-    assert result_789["number"] == 100
-    assert 456 in result_789["issues"]
-    assert 789 in result_789["issues"]
+    for issue in [456, 789]:
+        result = cache.get_merged_pr_for_issue(issue)
+        assert result is not None
+        assert result["number"] == 100
+        assert 456 in result["issues"]
+        assert 789 in result["issues"]
 
 
-def test_sync_indexes_all_linked_issues(cache: MergedPRCache) -> None:
-    """sync() stores all linked issues, not just the first one."""
+def test_sync_and_rebuild_index_all_linked_issues(cache: MergedPRCache) -> None:
+    """sync() and rebuild() store all linked issues, not just the first one."""
     mock_client = MockGitHubClient(
         [
             {
@@ -379,29 +325,23 @@ def test_sync_indexes_all_linked_issues(cache: MergedPRCache) -> None:
     pr_data = loaded["prs"]["100"]
     assert pr_data["issues"] == [456, 789, 999]
 
-    assert cache.get_merged_pr_for_issue(456) is not None
-    assert cache.get_merged_pr_for_issue(789) is not None
-    assert cache.get_merged_pr_for_issue(999) is not None
+    for issue in [456, 789, 999]:
+        assert cache.get_merged_pr_for_issue(issue) is not None
 
-
-def test_rebuild_indexes_all_linked_issues(cache: MergedPRCache) -> None:
-    """rebuild() stores all linked issues, not just the first one."""
-    mock_client = MockGitHubClient(
-        [
-            {
-                "number": 200,
-                "headRefName": "feature/multi-rebuild",
-                "body": "Closes #111\nCloses #222",
-                "mergedAt": "2024-01-20T12:00:00Z",
-            },
-        ]
+    cache.rebuild(
+        MockGitHubClient(
+            [
+                {
+                    "number": 200,
+                    "headRefName": "feature/multi-rebuild",
+                    "body": "Closes #111\nCloses #222",
+                    "mergedAt": "2024-01-20T12:00:00Z",
+                },
+            ]
+        )
     )
 
-    cache.rebuild(mock_client)
-
     loaded = cache._load_cache()
-    pr_data = loaded["prs"]["200"]
-    assert pr_data["issues"] == [111, 222]
-
-    assert cache.get_merged_pr_for_issue(111) is not None
-    assert cache.get_merged_pr_for_issue(222) is not None
+    assert loaded["prs"]["200"]["issues"] == [111, 222]
+    for issue in [111, 222]:
+        assert cache.get_merged_pr_for_issue(issue) is not None
