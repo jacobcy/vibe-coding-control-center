@@ -20,6 +20,7 @@ _CREATE_FLOW_STATE = """
         plan_ref TEXT,
         report_ref TEXT,
         audit_ref TEXT,
+        indicate_ref TEXT,
         pr_ref TEXT,
         planner_actor TEXT,
         executor_actor TEXT,
@@ -254,6 +255,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN latest_indicate_action TEXT")
         logger.bind(external="sqlite", operation="migration").info(
             "Added latest_indicate_action column to flow_state"
+        )
+
+    # Migration: add indicate_ref column for indicate handoff tracking
+    if "indicate_ref" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN indicate_ref TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added indicate_ref column to flow_state"
         )
 
     # Migration: migrate existing blocked_by data to new fields
