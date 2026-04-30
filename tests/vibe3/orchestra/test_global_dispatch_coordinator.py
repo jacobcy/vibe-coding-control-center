@@ -19,6 +19,7 @@ def make_issue(number: int, priority: int = 5) -> MagicMock:
     issue.number = number
     issue.labels = [f"priority/{priority}"]
     issue.milestone = None
+    issue.assignees = ["manager-bot"]  # Default assignee for dispatch tests
     return issue
 
 
@@ -59,10 +60,12 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service.role_def.trigger_state = IssueState(trigger_state)
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
-    service.config.repo = "owner/repo"
+    # Configure manager_usernames to match test assignees
     service.config.manager_usernames = ["manager-bot"]
     service.config.supervisor_handoff.issue_label = "supervisor"
+    service.config.repo = "owner/repo"
     service._github = MagicMock()
+    return service
     return service
 
 
@@ -73,9 +76,14 @@ def make_capacity(remaining: int = 1) -> MagicMock:
         return_value={
             "remaining": remaining,
             "active_count": 0,
-            "max_capacity": 5,
+            "max_capacity": max(remaining, 1),
         }
     )
+    # Mock _run_command to avoid tmux check and use capacity status directly
+    capacity._run_command = MagicMock(
+        side_effect=Exception("tmux not available in tests")
+    )
+    capacity._backend = None
     return capacity
 
 
@@ -157,9 +165,10 @@ class TestGlobalDispatchCoordinator:
         assert coordinator._frozen_queue == []
 
     @pytest.mark.asyncio
-    async def test_unassigned_handoff_issue_kept_in_existing_frozen_queue(
+    async def test_unassigned_handoff_issue_removed_from_frozen_queue(
         self,
     ) -> None:
+        """Unassigned issues are now removed from queue at all stages (fix for #305)."""
         issue = make_issue(469)
         service = make_service("handoff-manager", [issue])
         capacity = make_capacity(remaining=1)
@@ -171,14 +180,14 @@ class TestGlobalDispatchCoordinator:
         coordinator._load_issue = lambda issue_number: make_issue_info(  # type: ignore[method-assign]
             issue_number,
             IssueState.HANDOFF,
-            assignees=[],
+            assignees=[],  # No assignee -> should be removed
         )
 
         await coordinator.coordinate()
 
-        service._emit_dispatch_intent.assert_called_once()
-        assert coordinator._frozen_queue is not None
-        assert coordinator._frozen_queue[0].issue_number == 469
+        # Unassigned issue should be removed, not dispatched
+        service._emit_dispatch_intent.assert_not_called()
+        assert coordinator._frozen_queue == []
 
     @pytest.mark.asyncio
     async def test_skip_when_capacity_full(self) -> None:

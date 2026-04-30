@@ -210,15 +210,20 @@ class TestManagerBlockedIssueNotDispatched:
 
         assert ready_issues == []
 
-    def test_unassigned_issue_allowed_by_handoff_dispatcher(
+    def test_unassigned_issue_filtered_by_handoff_dispatcher(
         self,
     ) -> None:
-        """已进入 handoff 的 issue 不应再受 manager assignee 限制。"""
+        """All stages now require manager assignee (fix for #305).
+
+        Previously handoff issues bypassed assignee check, causing dispatch failures
+        for issues that lost their assignee mid-workflow. Now unified to enforce
+        assignee at all stages for consistent behavior.
+        """
         issue_data = {
             "number": 205,
             "title": "Unassigned handoff issue",
             "labels": [{"name": IssueState.HANDOFF.to_label()}],
-            "assignees": [],
+            "assignees": [],  # No assignee -> should be filtered
             "state": "open",
         }
 
@@ -243,7 +248,8 @@ class TestManagerBlockedIssueNotDispatched:
 
             ready_issues = asyncio.run(dispatcher.collect_ready_issues())
 
-        assert [issue.number for issue in ready_issues] == [205]
+        # Unassigned issue should be filtered out
+        assert [issue.number for issue in ready_issues] == []
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:
