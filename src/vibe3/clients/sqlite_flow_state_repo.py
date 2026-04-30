@@ -19,6 +19,7 @@ class SQLiteFlowStateRepo:
         "plan_ref",
         "report_ref",
         "audit_ref",
+        "indicate_ref",
         "pr_ref",  # PR URL as proof of PR creation
         "planner_actor",
         "executor_actor",
