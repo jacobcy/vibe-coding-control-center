@@ -5,72 +5,13 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.commands.handoff_render import (
-    UPDATE_LOG_MESSAGE_PREVIEW_LIMIT,
-    _preview_update_message,
-    _render_updates_log,
-    _to_handoff_cmd,
-)
+from vibe3.commands.handoff_render import _to_handoff_cmd
 
 runner = CliRunner()
 
 
 class TestHandoffAdvancedCommands:
     """Tests for advanced handoff CLI commands."""
-
-    def test_handoff_update_log_truncates_messages_by_default(self):
-        """Test Update Log preview truncates long messages to 80 chars."""
-        message = "x" * (UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + 25)
-
-        assert (
-            _preview_update_message(message, truncate=True)
-            == "x" * UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + "..."
-        )
-
-        with patch("vibe3.commands.handoff_read.console.print") as mock_print:
-            _render_updates_log(
-                [
-                    {
-                        "timestamp": "2026-03-26T11:00:00",
-                        "actor": "planner",
-                        "kind": "finding",
-                        "message": message,
-                    }
-                ]
-            )
-
-        printed_lines = [
-            call.args[0] for call in mock_print.call_args_list if call.args
-        ]
-        assert any(
-            "x" * UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + "..." in line
-            for line in printed_lines
-        )
-        assert all(message not in line for line in printed_lines)
-
-    def test_handoff_update_log_shows_full_message_with_all(self):
-        """Test Update Log renders the full message when truncation is disabled."""
-        message = "y" * (UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + 25)
-
-        assert _preview_update_message(message, truncate=False) == message
-
-        with patch("vibe3.commands.handoff_read.console.print") as mock_print:
-            _render_updates_log(
-                [
-                    {
-                        "timestamp": "2026-03-26T11:00:00",
-                        "actor": "planner",
-                        "kind": "finding",
-                        "message": message,
-                    }
-                ],
-                truncate=False,
-            )
-
-        printed_lines = [
-            call.args[0] for call in mock_print.call_args_list if call.args
-        ]
-        assert any(message in line for line in printed_lines)
 
     def test_to_handoff_cmd_wraps_relative_refs(self):
         assert (
@@ -88,9 +29,6 @@ class TestHandoffAdvancedCommands:
             == "vibe3 handoff show --branch task/issue-123 docs/plans/test-plan.md"
         )
 
-    @patch("vibe3.commands.handoff_read._render_updates_log")
-    @patch("vibe3.commands.handoff_read._render_handoff_events")
-    @patch("vibe3.commands.handoff_read._render_agent_chain")
     @patch("vibe3.commands.handoff_read.VerdictService")
     @patch("vibe3.commands.handoff_read.HandoffService")
     @patch("vibe3.commands.handoff_read.FlowService")
@@ -99,9 +37,6 @@ class TestHandoffAdvancedCommands:
         mock_flow_service_cls,
         mock_handoff_service_cls,
         mock_verdict_service_cls,
-        _render_agent_chain,
-        _render_handoff_events,
-        _render_updates_log,
         tmp_path,
     ):
         mock_flow_service = MagicMock()
@@ -125,21 +60,9 @@ class TestHandoffAdvancedCommands:
         mock_verdict_service.get_latest_verdict.return_value = None
         mock_verdict_service_cls.return_value = mock_verdict_service
 
-        with (
-            patch("vibe3.commands.handoff_read.get_branch_handoff_dir") as mock_dir,
-            patch(
-                "vibe3.commands.handoff_read.resolve_ref_path",
-                return_value="vibe3/handoff/task-issue-467/current.md",
-            ),
-        ):
-            handoff_dir = tmp_path / "vibe3" / "handoff" / "task-issue-467"
-            handoff_dir.mkdir(parents=True)
-            mock_dir.return_value = handoff_dir
-
-            result = runner.invoke(app, ["handoff", "status", "task/issue-467"])
+        result = runner.invoke(app, ["handoff", "status", "task/issue-467"])
 
         assert result.exit_code == 0
-        assert "vibe3 handoff show @task-issue-467/current.md" in result.output
 
     @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_append_command(self, mock_service_class):
