@@ -56,7 +56,7 @@ def test_save_and_load_roundtrip(cache: MergedPRCache) -> None:
                 "headRefName": "feature/foo",
                 "body": "Closes #456",
                 "mergedAt": "2024-01-10T12:00:00Z",
-                "issue": 456,
+                "issues": [456],
             }
         },
     }
@@ -85,14 +85,14 @@ def test_get_merged_pr_for_issue_hit(cache: MergedPRCache) -> None:
                 "headRefName": "feature/a",
                 "body": "Closes #456",
                 "mergedAt": "2024-01-10T12:00:00Z",
-                "issue": 456,
+                "issues": [456],
             },
             "101": {
                 "number": 101,
                 "headRefName": "feature/b",
                 "body": "Fixes #789",
                 "mergedAt": "2024-01-11T12:00:00Z",
-                "issue": 789,
+                "issues": [789],
             },
         },
     }
@@ -101,12 +101,12 @@ def test_get_merged_pr_for_issue_hit(cache: MergedPRCache) -> None:
     result = cache.get_merged_pr_for_issue(456)
     assert result is not None
     assert result["number"] == 100
-    assert result["issue"] == 456
+    assert 456 in result["issues"]
 
     result = cache.get_merged_pr_for_issue(789)
     assert result is not None
     assert result["number"] == 101
-    assert result["issue"] == 789
+    assert 789 in result["issues"]
 
 
 def test_get_merged_pr_for_issue_miss(cache: MergedPRCache) -> None:
@@ -119,7 +119,7 @@ def test_get_merged_pr_for_issue_miss(cache: MergedPRCache) -> None:
                 "headRefName": "feature/a",
                 "body": "Closes #456",
                 "mergedAt": "2024-01-10T12:00:00Z",
-                "issue": 456,
+                "issues": [456],
             }
         },
     }
@@ -131,7 +131,6 @@ def test_get_merged_pr_for_issue_miss(cache: MergedPRCache) -> None:
 
 def test_sync_merges_new_prs(cache: MergedPRCache) -> None:
     """sync() adds new PRs without losing existing ones."""
-    # Pre-populate cache with one PR
     cache._save_cache(
         {
             "last_sync": "2024-01-10T10:00:00Z",
@@ -141,13 +140,12 @@ def test_sync_merges_new_prs(cache: MergedPRCache) -> None:
                     "headRefName": "feature/old",
                     "body": "Closes #456",
                     "mergedAt": "2024-01-09T12:00:00Z",
-                    "issue": 456,
+                    "issues": [456],
                 }
             },
         }
     )
 
-    # Mock client with new PRs
     mock_client = MockGitHubClient(
         [
             {
@@ -167,17 +165,16 @@ def test_sync_merges_new_prs(cache: MergedPRCache) -> None:
 
     new_count = cache.sync(mock_client, limit=200)
 
-    assert new_count == 1  # Only the new one
+    assert new_count == 1
     loaded = cache._load_cache()
     assert "100" in loaded["prs"]
     assert "101" in loaded["prs"]
-    assert loaded["prs"]["100"]["issue"] == 456
-    assert loaded["prs"]["101"]["issue"] == 789
+    assert 456 in loaded["prs"]["100"]["issues"]
+    assert 789 in loaded["prs"]["101"]["issues"]
 
 
 def test_sync_no_duplicates(cache: MergedPRCache) -> None:
     """sync() does not duplicate already-cached PRs."""
-    # Pre-populate cache
     cache._save_cache(
         {
             "last_sync": "2024-01-10T10:00:00Z",
@@ -187,13 +184,12 @@ def test_sync_no_duplicates(cache: MergedPRCache) -> None:
                     "headRefName": "feature/old",
                     "body": "Closes #456",
                     "mergedAt": "2024-01-09T12:00:00Z",
-                    "issue": 456,
+                    "issues": [456],
                 }
             },
         }
     )
 
-    # Mock client with same PR
     mock_client = MockGitHubClient(
         [
             {
@@ -207,14 +203,13 @@ def test_sync_no_duplicates(cache: MergedPRCache) -> None:
 
     new_count = cache.sync(mock_client)
 
-    assert new_count == 0  # No new PRs
+    assert new_count == 0
     loaded = cache._load_cache()
     assert len(loaded["prs"]) == 1
 
 
 def test_rebuild_replaces_cache(cache: MergedPRCache) -> None:
     """rebuild() clears old entries and writes fresh data."""
-    # Pre-populate cache with old data
     cache._save_cache(
         {
             "last_sync": "2024-01-01T10:00:00Z",
@@ -224,13 +219,12 @@ def test_rebuild_replaces_cache(cache: MergedPRCache) -> None:
                     "headRefName": "feature/old",
                     "body": "Closes #123",
                     "mergedAt": "2023-12-01T12:00:00Z",
-                    "issue": 123,
+                    "issues": [123],
                 }
             },
         }
     )
 
-    # Mock client with new data
     mock_client = MockGitHubClient(
         [
             {
@@ -252,11 +246,11 @@ def test_rebuild_replaces_cache(cache: MergedPRCache) -> None:
 
     assert count == 2
     loaded = cache._load_cache()
-    assert "50" not in loaded["prs"]  # Old entry removed
+    assert "50" not in loaded["prs"]
     assert "100" in loaded["prs"]
     assert "101" in loaded["prs"]
-    assert loaded["prs"]["100"]["issue"] == 456
-    assert loaded["prs"]["101"]["issue"] == 789
+    assert 456 in loaded["prs"]["100"]["issues"]
+    assert 789 in loaded["prs"]["101"]["issues"]
 
 
 def test_sync_handles_prs_without_linked_issues(cache: MergedPRCache) -> None:
@@ -317,7 +311,7 @@ def test_cache_returns_normalized_dict_structure(cache: MergedPRCache) -> None:
                 "headRefName": "feature/test",
                 "body": "Closes #456",
                 "mergedAt": "2024-01-10T12:00:00Z",
-                "issue": 456,
+                "issues": [456],
             }
         },
     }
@@ -325,14 +319,89 @@ def test_cache_returns_normalized_dict_structure(cache: MergedPRCache) -> None:
 
     result = cache.get_merged_pr_for_issue(456)
     assert result is not None
-    # Verify all GitHub API keys are present
     assert "number" in result
     assert "headRefName" in result
     assert "body" in result
     assert "mergedAt" in result
-    assert "issue" in result
+    assert "issues" in result
     assert result["number"] == 100
     assert result["headRefName"] == "feature/test"
     assert result["body"] == "Closes #456"
     assert result["mergedAt"] == "2024-01-10T12:00:00Z"
-    assert result["issue"] == 456
+    assert 456 in result["issues"]
+
+
+def test_single_pr_closes_multiple_issues(cache: MergedPRCache) -> None:
+    """Cache correctly indexes all issues closed by a single PR."""
+    test_data = {
+        "last_sync": "2024-01-15T10:00:00Z",
+        "prs": {
+            "100": {
+                "number": 100,
+                "headRefName": "feature/multi",
+                "body": "Closes #456\nCloses #789",
+                "mergedAt": "2024-01-10T12:00:00Z",
+                "issues": [456, 789],
+            }
+        },
+    }
+    cache._save_cache(test_data)
+
+    result_456 = cache.get_merged_pr_for_issue(456)
+    assert result_456 is not None
+    assert result_456["number"] == 100
+    assert 456 in result_456["issues"]
+    assert 789 in result_456["issues"]
+
+    result_789 = cache.get_merged_pr_for_issue(789)
+    assert result_789 is not None
+    assert result_789["number"] == 100
+    assert 456 in result_789["issues"]
+    assert 789 in result_789["issues"]
+
+
+def test_sync_indexes_all_linked_issues(cache: MergedPRCache) -> None:
+    """sync() stores all linked issues, not just the first one."""
+    mock_client = MockGitHubClient(
+        [
+            {
+                "number": 100,
+                "headRefName": "feature/multi",
+                "body": "Closes #456\nFixes #789\nResolves #999",
+                "mergedAt": "2024-01-15T12:00:00Z",
+            },
+        ]
+    )
+
+    cache.sync(mock_client)
+
+    loaded = cache._load_cache()
+    pr_data = loaded["prs"]["100"]
+    assert pr_data["issues"] == [456, 789, 999]
+
+    assert cache.get_merged_pr_for_issue(456) is not None
+    assert cache.get_merged_pr_for_issue(789) is not None
+    assert cache.get_merged_pr_for_issue(999) is not None
+
+
+def test_rebuild_indexes_all_linked_issues(cache: MergedPRCache) -> None:
+    """rebuild() stores all linked issues, not just the first one."""
+    mock_client = MockGitHubClient(
+        [
+            {
+                "number": 200,
+                "headRefName": "feature/multi-rebuild",
+                "body": "Closes #111\nCloses #222",
+                "mergedAt": "2024-01-20T12:00:00Z",
+            },
+        ]
+    )
+
+    cache.rebuild(mock_client)
+
+    loaded = cache._load_cache()
+    pr_data = loaded["prs"]["200"]
+    assert pr_data["issues"] == [111, 222]
+
+    assert cache.get_merged_pr_for_issue(111) is not None
+    assert cache.get_merged_pr_for_issue(222) is not None
