@@ -215,6 +215,33 @@ uv run ruff check
 
 只运行与本次改动相称的验证，但没有验证证据，不得声称完成。
 
+## 必须使用 Handoff Append 的触发场景
+
+以下情况**必须**立即 `handoff append`：
+
+### 所有 Agent 都必须记录的场景
+
+1. **发现系统性改进点**（工具、规则、流程可优化）
+   ```bash
+   uv run python src/vibe3/cli.py handoff append "系统改进建议：<建议内容>" --kind finding
+   ```
+
+2. **发现代码模式问题**（可能影响其他模块）
+   ```bash
+   uv run python src/vibe3/cli.py handoff append "发现代码模式问题：<问题描述>" --kind finding
+   ```
+
+3. **发现配置与实现不一致**（系统性问题）
+   ```bash
+   uv run python src/vibe3/cli.py handoff append "配置不一致：<具体问题>" --kind finding
+   ```
+
+### Manager 会读取这些记录
+
+- Review PASS 时创建改进 issue
+- Review MAJOR 时汇总在 audit feedback 中
+- 不要因为不是当前 scope 就忽略系统性问题
+
 ## 禁止事项
 
 - 不要把 `rg` 当主分析工具。
@@ -223,3 +250,5 @@ uv run ruff check
 - 不要默认所有问题都需要大范围搜索；先选最能回答当前问题的最小工具。
 - 不要把本地草稿文件当当前 flow 的主 handoff 入口。
 - 不要把执行过程中的 findings / bug 直接写进流程正文代替 handoff 记录。
+- 不要盲目执行有缺陷的 plan — 必须验证前提成立（见各角色 policy）。
+- 不要凭经验判断而不验证 — 必须基于代码实际（见各角色 policy）。

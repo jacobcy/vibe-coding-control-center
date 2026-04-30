@@ -22,9 +22,9 @@ related_docs:
 
 # 文档组织标准
 
-本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
+本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`PRD`、`Spec`、`Plan`、`Code`、`Audit` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
-本文档定义 Vibe Center 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式对齐。
+本文档定义 Vibe Center 的文档组织标准，旨在建立清晰的文档交付链。
 任务身份以 GitHub issue 为准；正式 Spec / Plan / Report 分别落在 `docs/specs/`、`docs/plans/`、`docs/reports/`。
 旧的统一任务镜像目录不再作为默认组织方式；若历史文件仍存在，仅作为归档参考。
 
@@ -116,16 +116,16 @@ audit-{YYYY-MM-DD}.md
 - audit-2024-01-15.md
 ```
 
-## Vibe Guard 对应关系
+## 文档交付层级
 
-| 层级 | 文档类型 | 阶段 | 验证标准 |
+| 层级 | 文档类型 | 主要内容 | 验证标准 |
 |------|---------|------|---------|
-| PRD（认知层） | prd-*.md | Scope | 业务目标、绝对边界、核心数据流、成功判据 |
-| Spec（规范层） | spec-*.md | Spec | 接口契约、核心不变量、边界行为、非功能约束 |
-| Plan（执行计划层） | plan-*.md | Plan | 上下文圈定、任务拆分、风险对策 |
-| Test（测试层） | test-*.md | Test | 测试策略、断言来源、TDD 流程记录 |
-| Code（代码实现层） | code-*.md | Code | 实现概述、复杂度报告、AST 约束检查 |
-| Review（AI 审计层） | audit-*.md | Audit | 目标对齐、规范遵守、路径一致、架构纯洁 |
+| PRD（认知层） | prd-*.md | 业务目标、绝对边界、核心数据流、成功判据 | 语义完整、无歧义、符合 SOUL.md |
+| Spec（规范层） | spec-*.md | 接口契约、核心不变量、边界行为、非功能约束 | 逻辑自洽、技术可行、符合 PRD |
+| Plan（执行计划层） | plan-*.md | 上下文圈定、任务拆分、风险对策 | 步骤清晰、依赖明确、符合 Spec |
+| Test（测试层） | test-*.md | 测试策略、断言来源、TDD 流程记录 | 覆盖核心路径、边界条件完备 |
+| Code（代码实现层） | code-*.md | 实现概述、复杂度报告、AST 约束检查 | 结构清晰、符合规范、通过测试 |
+| Audit（审计层） | audit-*.md | 目标对齐、规范遵守、架构纯洁 | 满足 PRD/Spec 要求、无技术债引入 |
 
 ## 使用指南
 
@@ -145,7 +145,7 @@ audit-{YYYY-MM-DD}.md
 
 3. **替换占位符并填写内容**
 
-4. **按 Vibe Guard 流程逐步推进**
+4. **按文档交付层级逐步推进**
    - 临时草稿优先写入 `.agent/plans/`、`.agent/reports/`
    - 需要长期保留的正式版本写入 `docs/plans/`、`docs/reports/`
    - 长期结论写入 issue comment 或 PR comment

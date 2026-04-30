@@ -30,6 +30,50 @@
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
 
+## 独立判断强制验证点
+
+规划完成后，必须停下来回答以下问题：
+
+### 1. 现有代码是否与我的假设一致？
+
+- **验证 imports、naming、patterns 是否与假设冲突**
+  - 检查目标文件的 import 语句（`from X import Y` vs `import X`）
+  - 检查现有代码使用的命名模式
+  - 检查是否有已存在的相似解决方案
+
+- **如果发现冲突**：
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Plan 前提不成立：<具体冲突点>" --kind finding --actor "<actor>"
+  ```
+  - 不要继续规划，等待 manager 指示
+  - 或者调整方案以匹配现有代码模式
+
+### 2. 我的方案是否过于复杂？
+
+- **是否因为忽略现有模式而引入不必要的新设计？**
+  - 优先复用现有测试模式（如：检查同文件的其他测试）
+  - 优先复用现有的 monkeypatch/mock 模式
+  - 不要因为"不熟悉现有模式"就发明新方案
+
+- **如果发现可以复用**：
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "发现可复用模式：<模式位置和用法>" --kind finding --actor "<actor>"
+  ```
+
+### 3. 每一步都可执行且可验证吗？
+
+- **检查步骤依赖关系**：
+  - 每一步是否依赖前一步完成？
+  - 是否存在循环依赖或跳步？
+
+- **检查验证方式**：
+  - 每一步是否都指定了验证方式？
+  - 验证方式是否与改动类型匹配？
+
+**违反独立判断的后果**：
+- Plan 前提错误 → Executor 执行失败 → Retry 浪费
+- 忽略现有模式 → 引入不必要复杂度 → 维护成本增加
+
 ## 任务分型
 
 先判断任务类型，再决定 plan 粒度。

@@ -319,3 +319,4 @@ agent 认领 issue 时：
 - [v3/command-standard.md](v3/command-standard.md) - 共享状态命令与状态同步标准
 - [issue-standard.md](issue-standard.md) - Issue 标准
 - [../../AGENTS.md](../../AGENTS.md) - 项目导览与操作手册
+- [v3/handoff-store-standard.md](v3/handoff-store-standard.md) - Handoff 存储标准

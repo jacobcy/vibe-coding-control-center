@@ -20,7 +20,7 @@ related_docs:
 
 # Document Quality Standards
 
-本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`规范层`、`执行计划层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
+本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`PRD`、`Spec`、`Plan`、`Audit` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
 ## 概述
 
@@ -483,9 +483,9 @@ related_docs:
 - 正文中的"当前状态"部分应使用指引文本：`见 frontmatter \`status\` 字段（唯一真源）`
 - 不要在正文中重复或冗余状态值，避免双头真源问题
 
-**`gates`**（仅用于 task-readme，*注：当前 Gate 范式已废弃，此字段为历史遗留/可选，具体见 glossary.md*）
-- 记录任务各个 Gate 的状态
-- 每个 Gate 包含：
+**`gates`**（历史遗留字段，仅用于 task-readme 兼容）
+- *注：该字段对应已废弃的 Gate 范式。当前任务进度追踪应使用 `current_layer` 字段。*
+- 历史语义：记录任务各个阶段的状态
   - `status`：`pending` / `passed` / `failed`
   - `timestamp`：ISO 8601 格式的时间戳
   - `reason`：通过或失败的原因

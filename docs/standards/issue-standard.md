@@ -224,6 +224,6 @@ dependencies:
 ---
 
 **参考文档**：
-- [vibe3-command-standard.md](vibe3-command-standard.md)
+- [v3/command-standard.md](v3/command-standard.md)
 - [github-labels-standard.md](github-labels-standard.md)
 - [glossary.md](glossary.md)

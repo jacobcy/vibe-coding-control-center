@@ -55,55 +55,44 @@ src/vibe3/
 
 ## 分层架构与职责 (强制)
 
-### Layer 1: CLI (cli.py)
-- **职责**：创建 Typer app，注册子命令。
-- **要求**：禁止包含任何业务逻辑，代码量 < 50 行。
+Vibe 3.0 采用 domain-first 架构，收敛为以下六层：
 
-### Layer 2: Commands (commands/)
-- **职责**：定义命令参数，参数验证（Pydantic），格式化输出（Rich）。
-- **要求**：禁止直接调用 subprocess 或操作数据库，每个文件 < 100 行。
+### Layer 1: Server (server/)
+- **职责**：HTTP/Webhook 暴露、进程级驱动装配、Runtime 启停。
+- **要求**：禁止包含业务判断或角色特定逻辑。
 
-### Layer 3: Services (services/)
-- **职责**：业务逻辑编排，调用 Client。
-- **要求**：禁止直接 I/O 或 UI 逻辑，每个文件 < 300 行。
+### Layer 2: Runtime (runtime/)
+- **职责**：Heartbeat、事件路由、将外部 Observation 翻译并交给 Domain。
+- **要求**：不持有角色编排逻辑。
 
-### Layer 4: Engine (engine/)
-- **职责**：DAG 流程定义、状态机管理。
-- **要求**：所有 flow 必须可追踪（--trace）。
+### Layer 3: Domain (domain/)
+- **职责**：定义领域事件、处理业务逻辑编排、驱动状态机。
+- **要求**：业务语义判断的唯一真源。
 
-### Layer 5: Runtime (runtime/)
-- **职责**：执行引擎、调度器、分发器。
-- **要求**：所有执行必须经过 runtime/，调用 Client。
+### Layer 4: Execution (execution/)
+- **职责**：统一执行控制面（Capacity, Lifecycle, Session, Agent Launch）。
+- **要求**：所有角色执行（Plan/Run/Review）的唯一启动入口。
 
-### Layer 6: Clients (clients/)
-- **职责**：封装外部系统（Git, GitHub, SQLite）。
-- **要求**：必须提供 Protocol 接口，支持单元测试 Mock。
-- **约束**：见 [github-remote-call-standard.md](../../standards/v3/github-remote-call-standard.md)
+### Layer 5: Environment (environment/)
+- **职责**：资源原语（Worktree 管理、Tmux Session 隔离）。
+- **要求**：不涉及业务状态逻辑。
 
-### Layer 7: Observability (observability/)
-- **职责**：日志、追踪、审计。
-- **要求**：支持 --trace 参数，输出调用链路。
-
-### Layer 8: Models (models/)
-- **职责**：Pydantic 数据验证模型。
-- **要求**：必须带有完整类型注解。
-
-### Layer 9: Exceptions (exceptions/)
-- **职责**：统一异常定义。
-- **要求**：所有异常继承 VibeError。
+### Layer 6: Role Adapters (manager/, orchestra/, etc.)
+- **职责**：角色特定输入/输出处理、Prompt 渲染。
+- **要求**：薄层适配器，不复写执行框架。
 
 ---
 
 ## 依赖流向
 
 ```
-CLI → Commands → Services → Clients → Models
-                ↓
-                UI
+Server → Runtime → Domain → Execution → Environment
+                            ↓
+                      Role Adapters
 ```
 
 - **禁止反向依赖**：高层不依赖低层具体实现。
-- **Client 隔离**：只有 Client 层允许执行外部系统调用（subprocess/SQL）。
+- **唯一入口原则**：业务编排必经 Domain，执行启动必经 Execution。
 
 ---
 
@@ -111,16 +100,12 @@ CLI → Commands → Services → Clients → Models
 
 | 层级 | 目录 | 职责 | 允许调用 | 禁止调用 |
 |------|------|------|---------|---------|
-| CLI | cli.py | 参数解析 | Commands, Models, UI | Services, Clients |
-| Commands | commands/ | 参数验证 | Services, Models, UI | Clients |
-| Services | services/ | 业务逻辑 | Engine, Runtime, Clients, Models | Commands, UI |
-| Engine | engine/ | DAG 流程定义 | Runtime, Models | Commands, Services |
-| Runtime | runtime/ | 执行引擎 | Clients, Models, Observability | Commands, Services |
-| Clients | clients/ | 外部封装 | Models | Commands, Services |
-| Observability | observability/ | 日志追踪审计 | 无 | 所有层 |
-| Models | models/ | 数据模型 | 无 | 所有层 |
-| Exceptions | exceptions/ | 异常定义 | 无 | 所有层 |
-| UI | ui/ | 输出展示 | Models | Services, Clients |
+| Server | server/ | 传输与驱动 | Runtime, Models | Domain, Execution |
+| Runtime | runtime/ | 调度与路由 | Domain, Models | Environment, Clients |
+| Domain | domain/ | 业务编排 | Execution, Models | Server, UI |
+| Execution | execution/ | 执行控制 | Environment, Role Adapters, Models | Server, UI |
+| Environment | environment/ | 资源原语 | Models | Domain, Execution |
+| Role Adapters | manager/ orchestra/ | 角色逻辑 | Models | Runtime, Server |
 
 ---
 
