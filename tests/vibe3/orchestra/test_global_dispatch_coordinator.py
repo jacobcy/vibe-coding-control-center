@@ -19,6 +19,7 @@ def make_issue(number: int, priority: int = 5) -> MagicMock:
     issue.number = number
     issue.labels = [f"priority/{priority}"]
     issue.milestone = None
+    issue.assignees = ["manager-bot"]  # Default assignee for dispatch tests
     return issue
 
 
@@ -59,6 +60,11 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service.role_def.trigger_state = IssueState(trigger_state)
     service.collect_ready_issues = AsyncMock(return_value=ready_issues)
     service._emit_dispatch_intent = MagicMock()
+    # Configure manager_usernames to match test assignees
+    service.config.manager_usernames = ["manager-bot"]
+    service.config.supervisor_handoff.issue_label = "supervisor"
+    service._github = None
+    return service
     service.config.repo = "owner/repo"
     service.config.manager_usernames = ["manager-bot"]
     service.config.supervisor_handoff.issue_label = "supervisor"
@@ -73,9 +79,14 @@ def make_capacity(remaining: int = 1) -> MagicMock:
         return_value={
             "remaining": remaining,
             "active_count": 0,
-            "max_capacity": 5,
+            "max_capacity": max(remaining, 1),
         }
     )
+    # Mock _run_command to avoid tmux check and use capacity status directly
+    capacity._run_command = MagicMock(
+        side_effect=Exception("tmux not available in tests")
+    )
+    capacity._backend = None
     return capacity
 
 
