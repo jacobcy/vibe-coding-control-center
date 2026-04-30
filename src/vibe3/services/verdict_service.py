@@ -136,11 +136,12 @@ class VerdictService:
         )
 
         # 7. Persist event to event log
+        # Only store verdict in refs, not in detail to avoid duplicate rendering
         self.store.add_event(
             target_branch,
             "handoff_verdict",
             actor,
-            detail=f"Verdict: {verdict}",
+            detail="",  # Empty detail, verdict value in refs only
             refs={"verdict": verdict, "reason": reason or ""},
         )
 

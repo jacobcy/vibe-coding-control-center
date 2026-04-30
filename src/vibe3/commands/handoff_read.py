@@ -11,7 +11,6 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
-    _render_agent_chain,
     _render_handoff_events,
     _render_updates_log,
     _to_handoff_cmd,
@@ -230,13 +229,6 @@ def status(
             if latest_verdict.issues:
                 console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
             console.print()
-
-        _render_agent_chain(
-            state,
-            store=service.store,
-            live_sessions=live_sessions,
-            worktree_root=worktree_root,
-        )
 
         # Show resume hints from registry only (registry is source of truth)
         if live_sessions:

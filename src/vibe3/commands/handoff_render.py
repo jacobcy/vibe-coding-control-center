@@ -143,7 +143,11 @@ def _render_handoff_events(
     worktree_root: str | None = None,
     branch: str | None = None,
 ) -> None:
-    """Render successful handoff events in reverse chronological order."""
+    """Render successful handoff events in reverse chronological order.
+
+    Filters out *_recorded events when corresponding handoff_* events exist
+    to avoid duplicate display.
+    """
     if not events:
         console.print("[dim]  no handoff events[/]")
         return
@@ -153,13 +157,34 @@ def _render_handoff_events(
         "handoff_report": "Run Handoff",
         "handoff_audit": "Audit Handoff",
         "handoff_indicate": "Manager Handoff",
-        "handoff_verdict": "Verdict",
+        "handoff_verdict": "Verdict Handoff",
         "plan_recorded": "Plan Auto-Recorded",
         "run_recorded": "Run Auto-Recorded",
         "audit_recorded": "Audit Auto-Recorded",
     }
 
-    for event in reversed(events):
+    # Filter out recorded events if handoff events exist for same kind
+    handoff_kinds = {"plan", "report", "audit"}
+    has_handoff = {kind: False for kind in handoff_kinds}
+
+    # First pass: detect which handoff types exist
+    for event in events:
+        for kind in handoff_kinds:
+            if event.event_type == f"handoff_{kind}":
+                has_handoff[kind] = True
+
+    # Second pass: filter recorded events if handoff exists
+    filtered_events = []
+    for event in events:
+        skip = False
+        for kind in handoff_kinds:
+            if event.event_type == f"{kind}_recorded" and has_handoff[kind]:
+                skip = True
+                break
+        if not skip:
+            filtered_events.append(event)
+
+    for event in reversed(filtered_events):
         time_str = event.created_at[:19].replace("T", " ")
         event_name = display_names.get(event.event_type, event.event_type)
 
@@ -175,7 +200,8 @@ def _render_handoff_events(
 
         console.print(f"[dim]{time_str}[/]  [magenta]{event_name}[/]  {actor_label}")
 
-        if event.detail:
+        # Skip detail rendering for handoff_verdict (verdict shown in refs)
+        if event.detail and event.event_type != "handoff_verdict":
             sanitized = sanitize_event_detail_paths(
                 event.detail, event.refs, worktree_root
             )
@@ -187,7 +213,16 @@ def _render_handoff_events(
                 display_detail = f"[yellow]{sanitized}[/]"
 
             console.print(f"  {display_detail}")
-        if event.refs:
+
+        # Special rendering for handoff_verdict: show verdict value from refs
+        if event.event_type == "handoff_verdict" and event.refs:
+            verdict_value = (
+                event.refs.get("verdict") if isinstance(event.refs, dict) else None
+            )
+            if verdict_value:
+                console.print(f"  Verdict: {verdict_value}")
+
+        if event.refs and event.event_type != "handoff_verdict":
             files = event.refs.get("files") if isinstance(event.refs, dict) else None
             if files and isinstance(files, list):
                 for f in files:

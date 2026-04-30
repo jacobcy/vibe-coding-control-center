@@ -209,15 +209,20 @@ def _render_timeline(
         console.print(
             f"[dim]{time_str}[/]  [{color}]{event_display}[/]  [dim]{actor_short}[/]"
         )
-        if event.detail:
+        # Skip detail rendering for handoff_verdict (verdict shown in refs)
+        if event.detail and event.event_type != "handoff_verdict":
             console.print(f"  {event.detail}")
         _render_event_refs(event, worktree_root, branch)
         console.print()
 
 
-def _render_refs(state: FlowStatusResponse) -> None:
+def _render_refs(
+    state: FlowStatusResponse, issue_titles: dict[int, str] | None = None
+) -> None:
     """Render reference links (spec_ref, plan_ref, report_ref, audit_ref)."""
     refs_shown = False
+    titles = issue_titles or {}
+
     for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:
         val = getattr(state, label, None)
         if val:
@@ -227,6 +232,20 @@ def _render_refs(state: FlowStatusResponse) -> None:
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
+
+            # Special handling for spec_ref: resolve issue number to title
+            if label == "spec_ref":
+                import re
+
+                issue_match = re.match(r"^#?(\d+)$", val.strip())
+                if issue_match:
+                    issue_number = int(issue_match.group(1))
+                    title = titles.get(issue_number, "")
+                    display_path = f"#{issue_number}"
+                    if title:
+                        display_path = f"#{issue_number} - {title}"
+                    console.print(f"  [dim]{label:10}[/]  {display_path}{actor_str}")
+                    continue
 
             # Use unified check_ref_exists for consistent worktree resolution
             display_path, exists = check_ref_exists(val, state.branch)
@@ -254,6 +273,7 @@ def render_flow_timeline(
     state: FlowStatusResponse,
     events: list[FlowEvent],
     parent_branch: str | None = None,
+    issue_titles: dict[int, str] | None = None,
 ) -> None:
     """Render complete flow timeline with header, actors, timeline, and refs."""
     _render_header(state, parent_branch)
@@ -262,6 +282,6 @@ def render_flow_timeline(
     console.print()
     _render_timeline(events, state.worktree_root, state.branch)
 
-    _render_refs(state)
+    _render_refs(state, issue_titles)
     _render_state_summary(state)
     console.print()
