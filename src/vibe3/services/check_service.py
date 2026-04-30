@@ -11,6 +11,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.check_remote import (
@@ -62,6 +63,13 @@ class CheckService(CheckRemote):
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
         self._branch_to_pr: dict[str, PRResponse] = {}
+        # Load config for protected branches
+        self._vibe_config = VibeConfig()
+
+    @property
+    def protected_branches(self) -> set[str]:
+        """Get protected branches from config (main, master, develop, etc.)."""
+        return set(self._vibe_config.flow.protected_branches)
 
     def _initialize_pr_cache(self) -> None:
         """Initialize PR cache with batch fetch (1 API call instead of N).
@@ -490,9 +498,6 @@ class CheckService(CheckRemote):
             branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
 
-    # Reserved branches that should never be checked as flows
-    RESERVED_BRANCHES = {"main", "master", "develop", "staging", "production"}
-
     def verify_all_flows(
         self, status: str | list[str] | None = "active"
     ) -> list[CheckResult]:
@@ -505,11 +510,12 @@ class CheckService(CheckRemote):
             statuses = [status] if isinstance(status, str) else status
             all_flows = [f for f in all_flows if f.get("flow_status") in statuses]
 
-        # Filter out reserved branches (main, master, develop, etc.)
+        # Filter out protected branches (main, master, develop, etc.)
+        # These should never be treated as flow branches
         all_flows = [
             f
             for f in all_flows
-            if f.get("branch") not in self.RESERVED_BRANCHES
+            if f.get("branch") not in self.protected_branches
             and not str(f.get("branch", "")).startswith("origin/")
         ]
 
