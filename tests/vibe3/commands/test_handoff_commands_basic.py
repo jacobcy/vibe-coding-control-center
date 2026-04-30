@@ -54,12 +54,7 @@ class TestHandoffBasicCommands:
         mock_handoff_service.get_success_handoff_events.return_value = []
         mock_handoff_service_class.return_value = mock_handoff_service
 
-        with patch(
-            "vibe3.commands.handoff_read.get_branch_handoff_dir"
-        ) as mock_get_dir:
-            mock_get_dir.return_value = Path("/path/to/handoff")
-            with patch.object(Path, "exists", return_value=False):
-                result = runner.invoke(app, ["handoff", "status"])
+        result = runner.invoke(app, ["handoff", "status"])
 
         assert result.exit_code == 0
         assert "Handoff" in result.output
@@ -84,12 +79,7 @@ class TestHandoffBasicCommands:
         mock_handoff_service.get_success_handoff_events.return_value = []
         mock_handoff_service_class.return_value = mock_handoff_service
 
-        with patch(
-            "vibe3.commands.handoff_read.get_branch_handoff_dir"
-        ) as mock_get_dir:
-            mock_get_dir.return_value = Path("/path/to/handoff")
-            with patch.object(Path, "exists", return_value=False):
-                result = runner.invoke(app, ["handoff", "status", "436"])
+        result = runner.invoke(app, ["handoff", "status", "436"])
 
         assert result.exit_code == 0
         mock_flow_service.get_flow_state.assert_any_call("task/issue-436")

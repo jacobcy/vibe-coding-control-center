@@ -5,6 +5,41 @@ from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
 from vibe3.utils.path_helpers import check_ref_exists, ref_to_handoff_cmd
 
+
+def _filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]:
+    """Filter passive recorded events when corresponding active events exist.
+
+    When a handoff_plan/report/run/audit event exists, suppress the matching
+    plan_recorded/run_recorded/audit_recorded passive event to avoid duplication.
+
+    Args:
+        events: List of flow events to filter.
+
+    Returns:
+        Filtered list with passive events removed when active counterparts exist.
+    """
+    active_kind = {
+        "handoff_plan": "plan",
+        "handoff_report": "report",
+        "handoff_run": "report",  # legacy
+        "handoff_audit": "audit",
+    }
+    passive_kind = {
+        "plan_recorded": "plan",
+        "report_recorded": "report",
+        "run_recorded": "report",  # legacy
+        "audit_recorded": "audit",
+    }
+
+    has_active: set[str] = set()
+    for event in events:
+        kind = active_kind.get(event.event_type)
+        if kind:
+            has_active.add(kind)
+
+    return [e for e in events if passive_kind.get(e.event_type) not in has_active]
+
+
 _EVENT_COLOR: dict[str, str] = {
     "flow_created": "cyan",
     "task_bound": "cyan",
@@ -53,9 +88,10 @@ _EVENT_COLOR: dict[str, str] = {
     "resumed": "green bold",
     "handoff_plan": "blue",
     "handoff_report": "blue",
-    "handoff_run": "blue",  # backward-compat: old event type
+    "handoff_run": "blue",  # backward-compat: legacy event type
     "plan_recorded": "dim blue",
-    "run_recorded": "dim blue",
+    "report_recorded": "dim blue",  # new canonical name
+    "run_recorded": "dim blue",  # backward-compat: legacy event type
     "handoff_audit": "magenta bold",  # reviewer-initiated authoritative audit
     "audit_recorded": "magenta",  # legacy: system auto-generated / backward-compat
     "handoff_indicate": "cyan bold",
@@ -87,7 +123,8 @@ def _format_event_type(event_type: str) -> str:
         # Audit Events — semantic names
         "handoff_audit": "Audit Handoff",  # reviewer-initiated authoritative audit
         "plan_recorded": "Plan Auto-Recorded",
-        "run_recorded": "Run Auto-Recorded",
+        "report_recorded": "Run Auto-Recorded",  # new canonical name
+        "run_recorded": "Run Auto-Recorded",  # backward-compat: legacy event type
         "audit_recorded": "Audit Auto-Recorded",  # system auto-generated
         "handoff_audit_fallback": "Audit Auto-Recorded",  # backward compatibility
     }
@@ -198,6 +235,11 @@ def _render_timeline(
         console.print("[dim]  no events[/]")
         return
 
+    events = _filter_passive_if_active_exists(events)
+
+    # Filter out orchestra:* actor events (internal orchestration)
+    events = [e for e in events if not (e.actor and e.actor.startswith("orchestra:"))]
+
     console.print("[bold]--- Timeline ---[/]")
     console.print()
 
@@ -209,15 +251,20 @@ def _render_timeline(
         console.print(
             f"[dim]{time_str}[/]  [{color}]{event_display}[/]  [dim]{actor_short}[/]"
         )
-        if event.detail:
+        # Skip detail rendering for handoff_verdict (verdict shown in refs)
+        if event.detail and event.event_type != "handoff_verdict":
             console.print(f"  {event.detail}")
         _render_event_refs(event, worktree_root, branch)
         console.print()
 
 
-def _render_refs(state: FlowStatusResponse) -> None:
+def _render_refs(
+    state: FlowStatusResponse, issue_titles: dict[int, str] | None = None
+) -> None:
     """Render reference links (spec_ref, plan_ref, report_ref, audit_ref)."""
     refs_shown = False
+    titles = issue_titles or {}
+
     for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:
         val = getattr(state, label, None)
         if val:
@@ -227,6 +274,20 @@ def _render_refs(state: FlowStatusResponse) -> None:
             actor_field = label.replace("_ref", "_actor")
             actor = getattr(state, actor_field, None) or ""
             actor_str = f"  [dim]{actor}[/]" if actor else ""
+
+            # Special handling for spec_ref: resolve issue number to title
+            if label == "spec_ref":
+                import re
+
+                issue_match = re.match(r"^#?(\d+)$", val.strip())
+                if issue_match:
+                    issue_number = int(issue_match.group(1))
+                    title = titles.get(issue_number, "")
+                    display_path = f"#{issue_number}"
+                    if title:
+                        display_path = f"#{issue_number} - {title}"
+                    console.print(f"  [dim]{label:10}[/]  {display_path}{actor_str}")
+                    continue
 
             # Use unified check_ref_exists for consistent worktree resolution
             display_path, exists = check_ref_exists(val, state.branch)
@@ -254,6 +315,7 @@ def render_flow_timeline(
     state: FlowStatusResponse,
     events: list[FlowEvent],
     parent_branch: str | None = None,
+    issue_titles: dict[int, str] | None = None,
 ) -> None:
     """Render complete flow timeline with header, actors, timeline, and refs."""
     _render_header(state, parent_branch)
@@ -262,6 +324,6 @@ def render_flow_timeline(
     console.print()
     _render_timeline(events, state.worktree_root, state.branch)
 
-    _render_refs(state)
+    _render_refs(state, issue_titles)
     _render_state_summary(state)
     console.print()

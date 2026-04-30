@@ -11,10 +11,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
-    _render_agent_chain,
     _render_handoff_events,
-    _render_updates_log,
-    _to_handoff_cmd,
 )
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.exceptions import SystemError, UserError
@@ -22,9 +19,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.ui.handoff_ui import render_handoff_detail
-from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
@@ -46,41 +41,6 @@ def _get_live_sessions_for_branch(
     backend = CodeagentBackend()
     registry = SessionRegistryService(store=store, backend=backend)
     return registry.get_truly_live_sessions_for_branch(branch)
-
-
-def _parse_updates_section(content: str) -> list[dict[str, str]]:
-    """Parse Updates section from current.md content."""
-    updates: list[dict[str, str]] = []
-    in_updates = False
-
-    for line in content.split("\n"):
-        if line.strip() == "## Updates":
-            in_updates = True
-            continue
-        if in_updates and line.startswith("## "):
-            break
-        if in_updates and line.startswith("### "):
-            try:
-                header = line[4:].strip()
-                parts = header.split(" | ")
-                if len(parts) >= 3:
-                    updates.append(
-                        {
-                            "timestamp": parts[0].strip(),
-                            "actor": parts[1].strip(),
-                            "kind": parts[2].strip(),
-                            "message": "",
-                        }
-                    )
-            except Exception as e:
-                logger.debug(f"Skipping item: {e}")
-                continue
-        elif in_updates and updates and line.strip():
-            if updates[-1]["message"]:
-                updates[-1]["message"] += "\n" + line
-            else:
-                updates[-1]["message"] = line
-    return updates
 
 
 _HANDOFF_SHOW_HELP = """\
@@ -231,13 +191,6 @@ def status(
                 console.print(f"  [cyan]issues:[/] {latest_verdict.issues}")
             console.print()
 
-        _render_agent_chain(
-            state,
-            store=service.store,
-            live_sessions=live_sessions,
-            worktree_root=worktree_root,
-        )
-
         # Show resume hints from registry only (registry is source of truth)
         if live_sessions:
             hints_shown = False
@@ -258,37 +211,3 @@ def status(
         _render_handoff_events(
             handoff_events, worktree_root=worktree_root, branch=target_branch
         )
-
-        # Show current.md updates in log format
-        git_dir = service.get_git_common_dir()
-        handoff_dir = get_branch_handoff_dir(git_dir, target_branch)
-        current_md = handoff_dir / "current.md"
-
-        console.print("[bold]--- Update Log (current.md) ---[/]")
-        current_md_display = resolve_ref_path(
-            str(current_md), worktree_root=worktree_root
-        )
-        console.print(
-            f"  [dim]path[/]  {_to_handoff_cmd(current_md_display, target_branch)}"
-        )
-        console.print()
-
-        if current_md.exists():
-            content = current_md.read_text(encoding="utf-8")
-            updates = _parse_updates_section(content)
-            _render_updates_log(updates, truncate=not show_all)
-
-            # Show full content hint
-            console.print("[dim]---[/]")
-            artifact_cmd = _to_handoff_cmd(current_md_display, target_branch)
-            console.print(f"[dim]Artifact: {artifact_cmd}[/]")
-            console.print(
-                "[dim]Use `vibe3 handoff show @key` or "
-                "`vibe3 handoff show --branch <branch> <ref>` "
-                "to inspect artifacts through the unified reader[/]"
-            )
-        else:
-            console.print(
-                "[dim]  (current.md not found — run `vibe3 handoff init` to create)[/]"
-            )
-        console.print()
