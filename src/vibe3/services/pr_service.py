@@ -6,7 +6,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.exceptions import GitError, UserError
+from vibe3.exceptions import GitError, PRNotFoundError, UserError
 from vibe3.models.pr import (
     CreatePRRequest,
     PRResponse,
@@ -58,9 +58,7 @@ class PRService:
         ).info("Creating draft PR")
 
         if not self.github_client.check_auth():
-            raise RuntimeError(
-                "Not authenticated to GitHub. Run 'gh auth login' first."
-            )
+            raise UserError("Not authenticated to GitHub. Run 'gh auth login' first.")
 
         check_upstream_conflicts(
             self.git_client,
@@ -153,13 +151,11 @@ class PRService:
         ).info("Marking PR as ready")
 
         if not self.github_client.check_auth():
-            raise RuntimeError(
-                "Not authenticated to GitHub. Run 'gh auth login' first."
-            )
+            raise UserError("Not authenticated to GitHub. Run 'gh auth login' first.")
 
         pr = self.github_client.get_pr(pr_number)
         if not pr:
-            raise RuntimeError(f"PR #{pr_number} not found")
+            raise PRNotFoundError(pr_number)
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
             pr.head_branch,
@@ -252,13 +248,11 @@ class PRService:
         )
 
         if not self.github_client.check_auth():
-            raise RuntimeError(
-                "Not authenticated to GitHub. Run 'gh auth login' first."
-            )
+            raise UserError("Not authenticated to GitHub. Run 'gh auth login' first.")
 
         pr = self.github_client.get_pr(pr_number)
         if not pr:
-            raise RuntimeError(f"PR #{pr_number} not found")
+            raise PRNotFoundError(pr_number)
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
             pr.head_branch,
@@ -304,7 +298,7 @@ class PRService:
 
         pr = self.github_client.get_pr(pr_number)
         if not pr:
-            raise RuntimeError(f"PR #{pr_number} not found")
+            raise PRNotFoundError(pr_number)
         return self.version_service.calculate_bump(group)
 
     def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
@@ -324,9 +318,7 @@ class PRService:
         ).info("Closing PR")
 
         if not self.github_client.check_auth():
-            raise RuntimeError(
-                "Not authenticated to GitHub. Run 'gh auth login' first."
-            )
+            raise UserError("Not authenticated to GitHub. Run 'gh auth login' first.")
 
         return self.github_client.close_pr(pr_number, comment=comment)
 

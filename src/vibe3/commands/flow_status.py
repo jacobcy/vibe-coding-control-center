@@ -8,6 +8,7 @@ from loguru import logger
 
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.exceptions import SystemError, UserError
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_binding_guard import build_bind_task_hint
@@ -48,7 +49,7 @@ def show(
         if branch:
             try:
                 target_branch = resolve_issue_branch_input(branch, service) or branch
-            except RuntimeError as error:
+            except (UserError, SystemError) as error:
                 typer.echo(f"Error: {error}", err=True)
                 raise typer.Exit(1) from error
         else:

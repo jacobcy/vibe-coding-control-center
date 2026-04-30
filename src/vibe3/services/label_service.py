@@ -16,7 +16,7 @@ from vibe3.domain.state_machine import (
     VIBE_TASK_LABEL,
     validate_transition,
 )
-from vibe3.exceptions import InvalidTransitionError
+from vibe3.exceptions import InvalidTransitionError, SystemError
 from vibe3.models.orchestration import (
     IssueState,
     StateTransition,
@@ -123,7 +123,7 @@ class LabelService:
             return "confirmed"
         try:
             self.transition(issue_number, to_state, actor=actor, force=force)
-        except (InvalidTransitionError, RuntimeError):
+        except (InvalidTransitionError, SystemError):
             return "blocked"
         return "advanced"
 
@@ -189,15 +189,13 @@ class LabelService:
         """[Internal] Add label to issue."""
         ok = self.issue_port.add_issue_label(issue_number, label)
         if not ok:
-            raise RuntimeError(
-                f"Failed to add label '{label}' on issue #{issue_number}"
-            )
+            raise SystemError(f"Failed to add label '{label}' on issue #{issue_number}")
 
     def _remove_label(self, issue_number: int, label: str) -> None:
         """[Internal] Remove label from issue."""
         ok = self.issue_port.remove_issue_label(issue_number, label)
         if not ok:
-            raise RuntimeError(
+            raise SystemError(
                 f"Failed to remove label '{label}' on issue #{issue_number}"
             )
 
@@ -209,4 +207,4 @@ class LabelService:
             description=description,
         )
         if not ok:
-            raise RuntimeError(f"Failed to ensure label '{state.to_label()}' exists")
+            raise SystemError(f"Failed to ensure label '{state.to_label()}' exists")

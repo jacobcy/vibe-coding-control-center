@@ -9,12 +9,14 @@ import typer
 from loguru import logger
 
 from vibe3.commands.pr_helpers import build_base_resolution_usecase, noop_context
+from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
+from vibe3.services.task_binding_guard import MissingTaskIssueError
 from vibe3.ui.pr_ui import render_pr_confirmed, render_pr_created
 
 
@@ -170,7 +172,7 @@ def register_create_command(app: typer.Typer) -> None:
             try:
                 # Bypass task binding check for agent mode (--agent or --yes)
                 usecase.check_flow_task(branch, yes=yes or agent)
-            except RuntimeError as error:
+            except (UserError, MissingTaskIssueError) as error:
                 typer.echo(str(error), err=True)
                 raise typer.Exit(1) from error
 

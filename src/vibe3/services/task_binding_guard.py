@@ -1,14 +1,12 @@
 """Shared guard utilities for flow task-binding checks."""
 
-from dataclasses import dataclass
 from typing import Any
 
+from vibe3.exceptions import UserError
 
-@dataclass(frozen=True)
-class MissingTaskIssueError(RuntimeError):
+
+class MissingTaskIssueError(UserError):
     """Raised when current flow has no bound task issue."""
-
-    message: str
 
     def __str__(self) -> str:
         return self.message

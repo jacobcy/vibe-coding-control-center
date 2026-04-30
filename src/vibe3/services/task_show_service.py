@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.exceptions import GitError
+from vibe3.exceptions import GitError, UserError
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
@@ -115,7 +115,7 @@ class TaskShowService:
         try:
             return self.flow_service.get_current_branch()
         except GitError as exc:
-            raise RuntimeError(f"unable to resolve current branch ({exc})") from exc
+            raise UserError(f"unable to resolve current branch ({exc})") from exc
 
     @staticmethod
     def _summarize_text(text: str, *, limit: int = 1200) -> str:

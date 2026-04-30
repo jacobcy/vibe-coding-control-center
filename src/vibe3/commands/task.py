@@ -7,6 +7,7 @@ from typing import Annotated, Iterator
 
 import typer
 
+from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
@@ -51,7 +52,7 @@ def show(
 
     try:
         target_branch = task_svc.resolve_branch(issue)
-    except RuntimeError as error:
+    except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 

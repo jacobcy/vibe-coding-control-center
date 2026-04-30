@@ -14,6 +14,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_write_mixin import FlowWriteMixin
 from vibe3.services.issue_flow_service import IssueFlowService
@@ -225,13 +226,13 @@ class FlowTransitionMixin(FlowWriteMixin):
         # Verify flow exists before reactivation
         existing_state = self.store.get_flow_state(branch)
         if not existing_state:
-            raise RuntimeError(f"Flow not found for branch {branch}")
+            raise UserError(f"Flow not found for branch {branch}")
 
         # Resolve flow_slug: use explicit value or extract from existing state
         if flow_slug is None:
             flow_slug = existing_state.get("flow_slug")
             if not flow_slug:
-                raise RuntimeError(f"Flow for branch {branch} has no flow_slug set")
+                raise UserError(f"Flow for branch {branch} has no flow_slug set")
         else:
             # Validate provided flow_slug matches existing state
             existing_slug = existing_state.get("flow_slug")
@@ -287,6 +288,6 @@ class FlowTransitionMixin(FlowWriteMixin):
 
         status = self.get_flow_status(branch)
         if not status:
-            raise RuntimeError(f"Failed to reactivate flow for branch {branch}")
+            raise UserError(f"Failed to reactivate flow for branch {branch}")
 
         return status

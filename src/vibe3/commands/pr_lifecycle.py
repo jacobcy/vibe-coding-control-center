@@ -11,6 +11,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.pr_helpers import noop_context
+from vibe3.exceptions import UserError
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
@@ -47,7 +48,7 @@ def _resolve_ready_pr_number(
     if pr is not None:
         return pr.number
 
-    raise RuntimeError(
+    raise UserError(
         f"No PR found for current branch '{branch}'.\n"
         "可显式指定：vibe3 pr ready <PR_NUMBER>"
     )
@@ -99,7 +100,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                 pr_service=pr_service,
                 flow_service=flow_service,
             )
-        except RuntimeError as error:
+        except UserError as error:
             typer.echo(f"Error: {error}", err=True)
             raise typer.Exit(1) from error
 

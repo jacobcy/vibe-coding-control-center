@@ -2,13 +2,14 @@
 
 from typing import TYPE_CHECKING, Callable
 
+from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse
 
 if TYPE_CHECKING:
     from vibe3.services.pr_service import PRService
 
 
-class PrReadyAbortedError(RuntimeError):
+class PrReadyAbortedError(UserError):
     """Raised when user cancels PR ready confirmation."""
 
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 
 from vibe3.clients.git_client import GitClient, GitClientProtocol
+from vibe3.exceptions import UserError
 from vibe3.models.change_source import BranchSource
 from vibe3.utils.branch_utils import find_parent_branch
 
@@ -100,7 +101,7 @@ class BaseResolutionUsecase:
         if token == "parent":
             inferred = self.parent_branch_finder(current_branch)
             if inferred is None:
-                raise RuntimeError(
+                raise UserError(
                     "Could not auto-detect parent branch. "
                     "Please specify base branch explicitly."
                 )
