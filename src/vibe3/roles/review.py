@@ -207,17 +207,6 @@ def build_review_sync_request(
     )
 
 
-def _process_review_sync_result(
-    *, issue_number: int, branch: str, actor: str, stdout: str
-) -> None:
-    """Process sync review output and write audit_ref to flow_state."""
-    finalize_review_output(
-        review_output=stdout,
-        branch=branch,
-        actor=actor,
-    )
-
-
 REVIEW_SYNC_SPEC = build_issue_sync_spec(
     role_name="reviewer",
     resolve_options=resolve_review_options,
@@ -349,7 +338,6 @@ def execute_manual_review_sync(
         config=cfg,
         branch=branch,
         issue_number=issue_number,
-        pre_gate_callback=_process_review_sync_result,
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:
