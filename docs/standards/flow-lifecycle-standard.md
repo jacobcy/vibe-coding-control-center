@@ -219,6 +219,59 @@ PR closed (GitHub webhook)
 - keep_flow_record = False（删除记录）
 - 恢复 issue 到 READY（被动清理）
 
+### 5.4 Issue 自动关闭机制
+
+**与 GitHub 原生关闭关键字的区别**：
+
+GitHub 原生关闭关键字（`closes #N`、`fixes #N` 在 PR body 中）与 vibe3 flow done 是**两个独立机制**：
+
+| 机制 | 触发时机 | 控制方式 |
+|------|----------|----------|
+| GitHub 原生关键字 | PR merge 时自动触发 | PR body 中的关键字 |
+| vibe3 flow done | `vibe check` 检测到 merged PR | `close_issue_if_open` API 调用 |
+
+两者**互不干扰**：
+- PR body 不会被 vibe3 修改以注入关闭关键字
+- vibe3 通过 GitHub API 独立执行关闭操作
+- 如果 PR body 已有关闭关键字，issue 会被 GitHub 先关闭，vibe3 检测到 `already_closed` 状态
+
+**vibe3 自动关闭条件**：
+
+`_mark_flow_done` 在以下全部满足时才自动关闭 task issue：
+
+1. **Flow 有 `role=task` 的 issue 链接**
+   - `role=related` 或 `role=dependency` 的 issue 不会被关闭
+2. **无其他 active flow 绑定同一 issue**（多 flow 保护）
+   - 如果 issue #123 同时绑定 `task/issue-123` 和 `dev/issue-123`，只有当两者都完成时才关闭
+   - 防止因一个分支合并而过早关闭还在其他分支上工作的 issue
+3. **Issue 在 GitHub 上仍处于 open 状态**
+   - 如果已被关闭（通过 GitHub 关键字或其他方式），返回 `already_closed`
+
+**多 Flow 绑定保护**：
+
+```
+Issue #123 绑定两个 flow:
+  ├─ task/issue-123 (flow_status: active)
+  └─ dev/issue-123   (flow_status: active)
+
+当 task/issue-123 的 PR merged:
+  ├─ flow_status → done
+  └─ Issue #123 NOT closed (因为 dev/issue-123 仍 active)
+
+当 dev/issue-123 的 PR 也 merged:
+  ├─ flow_status → done
+  └─ Issue #123 closed ✅ (无其他 active flow)
+```
+
+**幂等性保证**：
+
+`close_issue_if_open` 返回值：
+- `"closed"`: 本次成功关闭
+- `"already_closed"`: issue 已处于关闭状态
+- `"failed"`: 关闭失败（API 错误等）
+
+实现不关心返回值类型，只保证无副作用重复调用。
+
 ## 6. 资源回收机制
 
 ### 6.1 统一清理入口
