@@ -1,6 +1,7 @@
 """Tests for PR status detection and flow auto-completion."""
 
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
@@ -195,3 +196,86 @@ class TestPRStatusDetection:
         # ASSERT: Flow should remain active and no exception should be raised
         flow = store.get_flow_state("task/my-feature")
         assert flow["flow_status"] == "active"
+
+
+class TestMergedPRCacheIntegration:
+    """Test MergedPRCache integration with pr_status_checker."""
+
+    def test_cache_hit_skips_api_call(self, tmp_path: Path) -> None:
+        """When cache hits, get_merged_pr_for_issue should skip API call."""
+        # Setup: Create cache with pre-populated data
+        from vibe3.clients.merged_pr_cache import MergedPRCache
+        from vibe3.services.pr_status_checker import get_merged_pr_for_issue
+
+        cache = MergedPRCache(tmp_path)
+        cache._save_cache(
+            {
+                "last_sync": "2024-01-15T10:00:00Z",
+                "prs": {
+                    "100": {
+                        "number": 100,
+                        "merged_at": "2024-01-10T12:00:00Z",
+                        "issue": 456,
+                    }
+                },
+            }
+        )
+
+        # Mock get_git_common_dir to return tmp_path
+        with patch(
+            "vibe3.services.pr_status_checker.get_git_common_dir"
+        ) as mock_git_dir:
+            mock_git_dir.return_value = str(tmp_path / ".git")
+
+            # Mock GitHubClient to track calls
+            with patch(
+                "vibe3.services.pr_status_checker.GitHubClient"
+            ) as mock_client_class:
+                mock_client = MagicMock()
+                mock_client_class.return_value = mock_client
+
+                # Call the function
+                result = get_merged_pr_for_issue(456)
+
+                # Assert: Should return cached result without calling API
+                assert result is not None
+                assert result["number"] == 100
+                assert result["issue"] == 456
+                # API should NOT be called
+                mock_client.list_merged_prs.assert_not_called()
+
+    def test_cache_miss_triggers_sync(self, tmp_path: Path) -> None:
+        """When cache misses, get_merged_pr_for_issue should sync and return result."""
+        from vibe3.services.pr_status_checker import get_merged_pr_for_issue
+
+        # Mock get_git_common_dir to return tmp_path
+        with patch(
+            "vibe3.services.pr_status_checker.get_git_common_dir"
+        ) as mock_git_dir:
+            mock_git_dir.return_value = str(tmp_path / ".git")
+
+            # Mock GitHubClient
+            with patch(
+                "vibe3.services.pr_status_checker.GitHubClient"
+            ) as mock_client_class:
+                mock_client = MagicMock()
+                mock_client_class.return_value = mock_client
+
+                # Mock list_merged_prs to return a merged PR
+                mock_client.list_merged_prs.return_value = [
+                    {
+                        "number": 100,
+                        "headRefName": "feature/test",
+                        "body": "Closes #456",
+                        "mergedAt": "2024-01-10T12:00:00Z",
+                    }
+                ]
+
+                # Call the function
+                result = get_merged_pr_for_issue(456)
+
+                # Assert: Should call sync and return result
+                assert result is not None
+                assert result["number"] == 100
+                # Sync should have been called (via list_merged_prs)
+                mock_client.list_merged_prs.assert_called()

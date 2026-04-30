@@ -8,12 +8,15 @@ Do NOT rely on:
 - local flow records (are cache, not source of truth)
 """
 
+from pathlib import Path
 from typing import Any, cast
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.clients.merged_pr_cache import MergedPRCache
+from vibe3.utils.path_helpers import get_git_common_dir
 
 
 def get_merged_pr_for_issue(
@@ -37,9 +40,51 @@ def get_merged_pr_for_issue(
         >>> if pr:
         ...     print(f"Issue #123 has merged PR #{pr['number']}")
     """
+    # Step 1: Resolve repo path for cache
+    try:
+        git_common_dir = get_git_common_dir()
+        if git_common_dir:
+            repo_path = Path(git_common_dir).parent
+        else:
+            # Fallback to cwd if git common dir unavailable
+            repo_path = Path.cwd()
+    except Exception:
+        repo_path = Path.cwd()
+
+    # Step 2: Check cache first
+    cache = MergedPRCache(repo_path)
+    cached_pr = cache.get_merged_pr_for_issue(issue_number)
+    if cached_pr:
+        logger.bind(
+            domain="pr_status",
+            issue_number=issue_number,
+            pr_number=cached_pr.get("number"),
+            source="cache",
+        ).debug("Found merged PR for issue in cache")
+        return cached_pr
+
+    # Step 3: Cache miss - sync cache with latest merged PRs
     github_client = GitHubClient()
+    logger.bind(
+        domain="pr_status",
+        issue_number=issue_number,
+    ).debug("Cache miss, syncing cache")
 
     try:
+        cache.sync(github_client, limit=200)
+
+        # Step 4: Check cache again after sync
+        cached_pr = cache.get_merged_pr_for_issue(issue_number)
+        if cached_pr:
+            logger.bind(
+                domain="pr_status",
+                issue_number=issue_number,
+                pr_number=cached_pr.get("number"),
+                source="sync",
+            ).debug("Found merged PR for issue after sync")
+            return cached_pr
+
+        # Step 5: Fall through to direct API call (defense-in-depth)
         merged_prs = github_client.list_merged_prs(limit=100)
 
         for pr in merged_prs:
@@ -54,7 +99,8 @@ def get_merged_pr_for_issue(
                     domain="pr_status",
                     issue_number=issue_number,
                     pr_number=pr.get("number"),
-                ).debug("Found merged PR for issue")
+                    source="api",
+                ).debug("Found merged PR for issue via API")
                 return cast(dict[str, Any], pr)
 
         logger.bind(domain="pr_status", issue_number=issue_number).debug(

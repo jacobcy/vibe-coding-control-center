@@ -72,11 +72,11 @@ def parse_linked_issues(body: str) -> list[int]:
 class IssuesMixin(IssueAdminMixin):
     """Mixin for issues-related operations."""
 
-    def list_merged_prs(self: Any, limit: int = 100) -> list[dict[str, Any]]:
+    def list_merged_prs(self: Any, limit: int | None = 100) -> list[dict[str, Any]]:
         """List merged PRs with branch name and body.
 
         Args:
-            limit: Maximum number of PRs to fetch
+            limit: Maximum number of PRs to fetch. If None, fetch up to 5000 results.
 
         Returns:
             List of dicts with keys: number, headRefName, body, mergedAt
@@ -87,21 +87,23 @@ class IssuesMixin(IssueAdminMixin):
             limit=limit,
         ).debug("Calling GitHub API: list merged PRs")
 
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--state",
-                "merged",
-                "--limit",
-                str(limit),
-                "--json",
-                "number,headRefName,body,mergedAt",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        # Use large explicit limit for "fetch all" case instead of omitting flag
+        # (gh defaults to 30 when --limit is absent, does NOT auto-paginate)
+        effective_limit = limit if limit is not None else 5000
+
+        cmd = [
+            "gh",
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--limit",
+            str(effective_limit),
+            "--json",
+            "number,headRefName,body,mergedAt",
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(
                 "Failed to list merged PRs"
