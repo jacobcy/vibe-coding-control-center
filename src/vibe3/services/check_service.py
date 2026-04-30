@@ -121,7 +121,7 @@ class CheckService(CheckRemote):
         Returns CheckResult if PR is merged or closed, None otherwise.
 
         - PR MERGED: flow is successfully completed → mark done.
-          If branch is task/issue-N, also auto-close the linked issue.
+          Also auto-closes any linked task issues when no other active flows exist.
         - PR CLOSED (without merge): PR was abandoned → mark aborted.
         """
         result_issues: list[str] = []
@@ -408,8 +408,12 @@ class CheckService(CheckRemote):
     ) -> dict[str, int | None]:
         """Mark a flow as done and record the event.
 
-        For task/issue-N auto-flow branches, also closes the linked
-        GitHub issue since the PR was successfully merged.
+        For flows with role=task issue links, auto-closes the linked GitHub issue
+        when no other active flows exist for the same issue.
+
+        Multi-flow binding protection: If the same task issue is linked to multiple
+        active flows (e.g., task/issue-123 and dev/issue-123), the issue is NOT
+        closed until all active flows are done.
 
         Note: Branch cleanup is deferred to 'vibe3 check --clean-branch'.
         This keeps check fast and allows code reuse.
@@ -432,24 +436,45 @@ class CheckService(CheckRemote):
         suggestions: dict[str, int | None] = {"issue_to_close": None}
         issue_links = self.store.get_issue_links(branch)
         task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
-        if task_issues:
-            task_issue = task_issues[0]["issue_number"]
-            if self._is_task_branch(branch):
-                self.github_client.close_issue_if_open(
-                    issue_number=task_issue,
-                    closing_comment=(
-                        f"PR merged. Flow '{branch}' completed. "
-                        "Closed automatically by vibe check."
-                    ),
-                )
-            else:
-                issue = self.github_client.view_issue(task_issue)
-                if (
-                    issue
-                    and isinstance(issue, dict)
-                    and str(issue.get("state", "")).upper() != "CLOSED"
-                ):
-                    suggestions["issue_to_close"] = task_issue
+        if not task_issues:
+            return suggestions
+
+        task_issue = task_issues[0]["issue_number"]
+
+        # Multi-flow binding protection: Check if other active flows exist
+        # for the same task issue before closing.
+        all_task_flows = self.store.get_flows_by_issue(task_issue, role="task")
+        other_active_flows = [
+            f
+            for f in all_task_flows
+            if f["branch"] != branch and f.get("flow_status") == "active"
+        ]
+
+        if other_active_flows:
+            logger.bind(
+                domain="check",
+                action="auto_complete_flow",
+                branch=branch,
+                issue_number=task_issue,
+                other_active_count=len(other_active_flows),
+            ).warning(
+                f"Skipping auto-close for issue #{task_issue}: "
+                f"other active flows exist ({len(other_active_flows)}"
+            )
+            return suggestions
+
+        # Safe to close: this is the only active flow for this task issue
+        close_result = self.github_client.close_issue_if_open(
+            issue_number=task_issue,
+            closing_comment=(
+                f"PR merged. Flow '{branch}' completed. "
+                "Closed automatically by vibe check."
+            ),
+        )
+
+        # Track if issue was actually closed (vs already_closed)
+        if close_result == "closed":
+            suggestions["issue_to_close"] = task_issue
 
         return suggestions
 
