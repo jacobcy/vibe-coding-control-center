@@ -29,13 +29,16 @@ class MergedPRCache:
         "123": {
           "number": 123,
           "headRefName": "feature/foo",
-          "body": "Closes #456",
+          "body": "Closes #456\nCloses #789",
           "mergedAt": "2024-01-10T...",
-          "issue": 456,
+          "issues": [456, 789],
         },
         ...
       }
     }
+
+    Note: 'issues' field contains ALL linked issues from PR body.
+    This ensures cache can answer queries for any issue closed by a PR.
     """
 
     CACHE_FILE = ".git/vibe3/merged_prs.json"
@@ -97,15 +100,18 @@ class MergedPRCache:
             issue_number: GitHub issue number
 
         Returns:
-            PR dict with keys: number, headRefName, body, mergedAt, issue
+            PR dict with keys: number, headRefName, body, mergedAt, issues
             Returns None if issue not in cache
         """
         cache = self._load_cache()
         prs = cache.get("prs", {})
 
-        # Linear scan for matching issue
         for pr_data in prs.values():
-            if isinstance(pr_data, dict) and pr_data.get("issue") == issue_number:
+            if not isinstance(pr_data, dict):
+                continue
+
+            issues = pr_data.get("issues", [])
+            if issue_number in issues:
                 logger.bind(
                     domain="merged_pr_cache",
                     issue_number=issue_number,
@@ -155,22 +161,18 @@ class MergedPRCache:
 
             pr_number = str(pr.get("number"))
             if pr_number in prs:
-                # Already cached, skip
                 continue
 
-            # Parse linked issues from body
             body = pr.get("body") or ""
             linked_issues = parse_linked_issues(body)
 
-            # Store first linked issue as the task issue
             if linked_issues:
-                # Store full PR dict with issue field added
                 prs[pr_number] = {
                     "number": pr["number"],
                     "headRefName": pr.get("headRefName"),
                     "body": body,
                     "mergedAt": pr.get("mergedAt"),
-                    "issue": linked_issues[0],
+                    "issues": linked_issues,
                 }
                 new_count += 1
 
@@ -215,19 +217,16 @@ class MergedPRCache:
 
             pr_number = str(pr.get("number"))
 
-            # Parse linked issues from body
             body = pr.get("body") or ""
             linked_issues = parse_linked_issues(body)
 
-            # Store first linked issue as the task issue
             if linked_issues:
-                # Store full PR dict with issue field added
                 prs[pr_number] = {
                     "number": pr["number"],
                     "headRefName": pr.get("headRefName"),
                     "body": body,
                     "mergedAt": pr.get("mergedAt"),
-                    "issue": linked_issues[0],
+                    "issues": linked_issues,
                 }
                 count += 1
 
