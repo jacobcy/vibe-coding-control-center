@@ -47,12 +47,6 @@ class ArtifactParser:
         return [path.strip() for path in file_matches if path.strip()]
 
     @classmethod
-    def parse_review_verdict(cls, content: str) -> str | None:
-        """Extract verdict token from review content."""
-        match = re.search(r"VERDICT:\s*(PASS|MAJOR|BLOCK)", content, re.IGNORECASE)
-        return match.group(1).upper() if match else None
-
-    @classmethod
     def build_artifact_detail(
         cls,
         kind: str,
@@ -60,7 +54,11 @@ class ArtifactParser:
         artifact_file: Path,
         metadata: dict[str, str] | None = None,
     ) -> tuple[str, dict[str, str]]:
-        """Build event detail and refs from artifact content."""
+        """Build event detail and refs from artifact content.
+
+        Note: Only called for kind="plan" or kind="run" (record_passive_artifact).
+        Review verdict is never parsed here — agent writes via handoff commands.
+        """
         refs: dict[str, str] = {}
         detail_parts = [f"{kind.capitalize()} completed: {artifact_file.name}"]
 
@@ -76,16 +74,6 @@ class ArtifactParser:
                     detail_parts.append(f"  - {file_path}")
                 if len(modified_files) > 3:
                     detail_parts.append(f"  ... and {len(modified_files) - 3} more")
-
-        if kind == "review":
-            verdict = cls.parse_review_verdict(content) or metadata.get("verdict")
-            if verdict:
-                refs["verdict"] = verdict
-                comment_count = metadata.get("comment_count")
-                if comment_count:
-                    detail_parts.append(f"Verdict: {verdict}, {comment_count} comments")
-                else:
-                    detail_parts.append(f"Verdict: {verdict}")
 
         for key, value in metadata.items():
             if key != "comment_count" and key not in cls._RESERVED_REF_KEYS:
