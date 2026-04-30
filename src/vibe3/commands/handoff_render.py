@@ -154,15 +154,11 @@ def _render_handoff_events(
 
     display_names = {
         "handoff_plan": "Plan Handoff",
-        "handoff_report": "Run Handoff",
-        "handoff_run": "Run Handoff",  # backward-compat: legacy event type
+        "handoff_report": "Report Handoff",
+        "handoff_run": "Run Handoff",  # backward-compat: legacy name for handoff_report
         "handoff_audit": "Audit Handoff",
         "handoff_indicate": "Manager Handoff",
         "handoff_verdict": "Verdict Handoff",
-        "plan_recorded": "Plan Auto-Recorded",
-        "report_recorded": "Run Auto-Recorded",  # new canonical name
-        "run_recorded": "Run Auto-Recorded",  # backward-compat: legacy event type
-        "audit_recorded": "Audit Auto-Recorded",
     }
 
     # Filter out recorded events if handoff events exist for same kind
