@@ -29,8 +29,6 @@ class TestHandoffAdvancedCommands:
             == "vibe3 handoff show --branch task/issue-123 docs/plans/test-plan.md"
         )
 
-    @patch("vibe3.commands.handoff_read._render_handoff_events")
-    @patch("vibe3.commands.handoff_read._render_agent_chain")
     @patch("vibe3.commands.handoff_read.VerdictService")
     @patch("vibe3.commands.handoff_read.HandoffService")
     @patch("vibe3.commands.handoff_read.FlowService")
@@ -39,8 +37,6 @@ class TestHandoffAdvancedCommands:
         mock_flow_service_cls,
         mock_handoff_service_cls,
         mock_verdict_service_cls,
-        _render_agent_chain,
-        _render_handoff_events,
         tmp_path,
     ):
         mock_flow_service = MagicMock()
