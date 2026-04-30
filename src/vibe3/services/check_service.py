@@ -490,6 +490,9 @@ class CheckService(CheckRemote):
             branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
 
+    # Reserved branches that should never be checked as flows
+    RESERVED_BRANCHES = {"main", "master", "develop", "staging", "production"}
+
     def verify_all_flows(
         self, status: str | list[str] | None = "active"
     ) -> list[CheckResult]:
@@ -501,6 +504,14 @@ class CheckService(CheckRemote):
         if status:
             statuses = [status] if isinstance(status, str) else status
             all_flows = [f for f in all_flows if f.get("flow_status") in statuses]
+
+        # Filter out reserved branches (main, master, develop, etc.)
+        all_flows = [
+            f
+            for f in all_flows
+            if f.get("branch") not in self.RESERVED_BRANCHES
+            and not str(f.get("branch", "")).startswith("origin/")
+        ]
 
         results = []
         for flow in all_flows:
