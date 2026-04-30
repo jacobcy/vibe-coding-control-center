@@ -23,8 +23,8 @@ related_docs:
 
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
-- 用户主视角 `repo issue -> flow -> plan/spec -> commit -> PR -> done` 应如何推进
-- 内部桥接链 `repo issue -> roadmap item -> task -> flow` 应如何配合
+- 用户主视角 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done` 应如何推进
+- 内部桥接链 `GitHub issue -> roadmap item -> task -> flow` 应如何配合
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
@@ -52,7 +52,7 @@ related_docs:
 
 默认交付模型如下：
 
-- `repo issue` 负责来源层需求与讨论事实
+- `GitHub issue` 负责来源层需求与讨论事实
 - `roadmap item` 负责规划窗口与 GitHub Project item 镜像，是 planning 中间层
 - `task` 负责 execution record，是 flow 建立后的 execution bridge
 - `flow` 负责当前交付切片与 runtime 现场
@@ -136,7 +136,7 @@ related_docs:
 
 用户主视角：
 
-1. 从 `repo issue` 确认当前要推进的目标
+1. 从 `GitHub issue` 确认当前要推进的目标
 2. 进入或切换到对应 `flow`
 3. 在该 `flow` 中挂接 plan/spec 作为 execution spec
 4. 在对应 `branch` 上提交本地 commit
@@ -151,7 +151,7 @@ closeout 约束：
 
 内部桥接链：
 
-1. 从 `repo issue` 确认来源层目标
+1. 从 `GitHub issue` 确认来源层目标
 2. 创建、选择或同步对应的 `roadmap item`
 3. 通过 `vibe-new` 确认/创建目标 issue、创建/注册 flow、绑定 issue 并创建 PR draft
 4. 进入新 flow 后，通过 `vibe-start` 确认并补齐 flow 环境（恢复开发场景）
@@ -199,7 +199,7 @@ closeout 约束：
 
 默认恢复动作：
 
-- 保留上层 `roadmap item` / `repo issue`
+- 保留上层 `roadmap item` / `GitHub issue`
 - 将新的交付切片切到新的 `branch`
 - 让新的 `flow` 对应新的当前 `pr` 目标
 - 若复用当前目录，使用 `/vibe-new (skill)` 一类显式 flow 切换能力进入新 `flow`
@@ -265,7 +265,7 @@ closeout 约束：
 - 若该 PR 已完成且相关 follow-up 已收束，应进入 `vibe3-done` 或等价收口流程
 - 若当前 PR 已 merged，则该 PR 对应的 plan 进入 terminal state
 - merged 后只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接，不允许把新需求继续写回旧 plan
-- merged 后若出现新的 feature、补丁或治理项，必须重新进入用户主链 `repo issue -> flow -> plan/spec -> commit -> PR -> done`，并按需重建内部桥接链 `repo issue -> roadmap item -> task -> flow`
+- merged 后若出现新的 feature、补丁或治理项，必须重新进入用户主链 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done`，并按需重建内部桥接链 `GitHub issue -> roadmap item -> task -> flow`
 
 ### 6.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
 

@@ -18,17 +18,17 @@
 
 ## 2. GitHub 标准语义
 
-### 2.1 Repo Issue
+### 2.1 GitHub Issue
 
 GitHub 仓库中的 issue 是需求、问题、讨论结果和追踪项的基础对象。
 
 在本项目里，后续统一称为：
 
 ```text
-repo issue
+GitHub issue
 ```
 
-这样可以避免把“GitHub repo issue”和我们本地的执行任务混叫成 `issue`。
+这样可以避免把“GitHub issue”和我们本地的执行任务混叫成 `issue`。
 
 ### 2.2 GitHub Project Item
 
@@ -99,13 +99,13 @@ PR 不负责需求建模，也不负责长期规划。
 
 ## 3. 我们项目里的对齐语义
 
-### 3.1 Repo Issue = 来源层对象
+### 3.1 GitHub Issue = 来源层对象
 
 在我们项目里：
 
-- `repo issue` 是来源
-- `repo issue` 是需求入口
-- `repo issue` 是讨论和追踪对象
+- `GitHub issue` 是来源
+- `GitHub issue` 是需求入口
+- `GitHub issue` 是讨论和追踪对象
 
 它不是本地执行单元，也不是 flow runtime 的主语。
 
@@ -225,7 +225,7 @@ sync local roadmap items <-> GitHub Project items
 
 - 维护 roadmap item
 - 维护 roadmap item 的 type
-- 维护 roadmap item 和 milestone / repo issue / task 的关系
+- 维护 roadmap item 和 milestone / GitHub issue / task 的关系
 - 决定哪些 item 应进入当前规划窗口
 
 ### 5.3 `vibe-task`
@@ -267,7 +267,7 @@ execution record for roadmap items
 如果按 GitHub 标准语义校正项目心智，推荐链路应为：
 
 ```text
-repo issue
+GitHub issue
   -> GitHub Project item
   -> local roadmap item
   -> local execution task
@@ -277,7 +277,7 @@ repo issue
 
 对应到我们项目：
 
-1. 创建或接收 `repo issue`
+1. 创建或接收 `GitHub issue`
 2. 将其纳入 GitHub Project
 3. `roadmap sync` 同步本地 roadmap item
 4. 明确该 item 的 `type`
@@ -303,7 +303,7 @@ repo issue
 这版参考文档的核心结论只有 4 句：
 
 ```text
-repo issue 是来源层对象
+GitHub issue 是来源层对象
 roadmap item 是 GitHub Project item 的本地镜像
 feature / task / bug 是 roadmap item 的 type
 flow 和 PR 是执行与交付层对象
