@@ -115,6 +115,14 @@ def _build_server_with_launch_cwd(
             )
         )
 
+    # Worktree cleanup service for do/* worktrees
+    if config.cleanup.enabled:
+        from vibe3.orchestra.services.worktree_cleanup import WorktreeCleanupService
+
+        heartbeat.register(
+            WorktreeCleanupService(config, repo_path=launch_cwd or Path.cwd())
+        )
+
     # Build dispatch services for all trigger states.
     # These are NOT registered directly with the heartbeat — instead they are
     # passed to OrchestrationFacade and called concurrently from its on_tick(),
