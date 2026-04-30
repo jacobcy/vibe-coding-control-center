@@ -28,10 +28,11 @@ uv run python src/vibe3/cli.py handoff status
 
 Manager 可能已写入质量审查意见、重点关注区域、具体修复要求等指令。
 
-### 2. 读取 Task Show + Comments
+### 2. 读取 Task Show + Issue Comments
 
 ```bash
-uv run python src/vibe3/cli.py task show --comments
+uv run python src/vibe3/cli.py task show
+gh issue view <ISSUE_NUMBER> --comments
 ```
 
 必须查看 issue comments 部分，特别是：
