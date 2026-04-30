@@ -384,10 +384,14 @@ run:
 
     ## RETRY MODE REQUIREMENTS
     **You are in RETRY mode.** You MUST:
-    1. Check $handoff status and $task show for manager instructions first using commands below
-    2. If you cannot determine your task for this round, write an issue comment explaining why
-    3. Set the issue state to `state/blocked` for human intervention
-    4. **NEVER exit with zero work done** — always leave a trace of what you attempted or why you are blocked
+    1. **Understand your current position and task** — Run `task show` and `handoff status` first
+    2. **If you cannot clearly answer "where am I" and "what should I do"** — Block immediately
+       - Write blocker explaining confusion: `uv run python src/vibe3/cli.py handoff append "任务理解困难：<具体困惑点>" --kind blocker --actor "<actor>"`
+       - Set to blocked: `gh issue edit <ISSUE_NUMBER> --add-label "state/blocked" --remove-label "state/in-progress"`
+       - Comment explaining situation: `gh issue comment <ISSUE_NUMBER> --body "[run] 无法理解当前任务：\n\n<具体困惑点>\n\n需要人类澄清后才能继续。"`
+       - **Then stop working and exit** — do not attempt any implementation
+    3. **If you can determine your task** — Read manager instructions in handoff
+    4. **NEVER exit with zero work done** — Always leave a trace (blocker comment or completed work)
 
     ## Quick Scene Commands
     - Read current task context: `uv run python src/vibe3/cli.py task show`
@@ -482,10 +486,14 @@ plan:
 
     ## RETRY MODE REQUIREMENTS
     **You are in RETRY mode.** You MUST:
-    1. Check $handoff status and $task show for manager instructions first using commands below
-    2. If you cannot determine your task for this round, write an issue comment explaining why
-    3. Set the issue state to `state/blocked` for human intervention
-    4. **NEVER exit with zero work done** — always leave a trace of what you attempted or why you are blocked
+    1. **Understand your current position and task** — Run `task show` and `handoff status` first
+    2. **If you cannot clearly answer "where am I" and "what should I do"** — Block immediately
+       - Write blocker explaining confusion: `uv run python src/vibe3/cli.py handoff append "任务理解困难：<具体困惑点>" --kind blocker --actor "<actor>"`
+       - Set to blocked: `gh issue edit <ISSUE_NUMBER> --add-label "state/blocked" --remove-label "state/claimed"`
+       - Comment explaining situation: `gh issue comment <ISSUE_NUMBER> --body "[plan] 无法理解当前任务：\n\n<具体困惑点>\n\n需要人类澄清后才能继续。"`
+       - **Then stop working and exit** — do not attempt any planning
+    3. **If you can determine your task** — Read manager instructions in handoff
+    4. **NEVER exit with zero work done** — Always leave a trace (blocker comment or completed plan)
 
     ## Quick Scene Commands
     - Read current task context: `uv run python src/vibe3/cli.py task show`
@@ -583,10 +591,14 @@ review:
 
     ## RETRY MODE REQUIREMENTS
     **You are in RETRY mode.** You MUST:
-    1. Check $handoff status and $task show for manager instructions first using commands below
-    2. If you cannot determine your task for this round, write an issue comment explaining why
-    3. Set the issue state to `state/blocked` for human intervention
-    4. **NEVER exit with zero work done** — always leave a trace of what you attempted or why you are blocked
+    1. **Understand your current position and task** — Run `task show` and `handoff status` first
+    2. **If you cannot clearly answer "where am I" and "what should I do"** — Block immediately
+       - Write blocker explaining confusion: `uv run python src/vibe3/cli.py handoff append "任务理解困难：<具体困惑点>" --kind blocker --actor "<actor>"`
+       - Set to blocked: `gh issue edit <ISSUE_NUMBER> --add-label "state/blocked" --remove-label "state/review"`
+       - Comment explaining situation: `gh issue comment <ISSUE_NUMBER> --body "[review] 无法理解当前任务：\n\n<具体困惑点>\n\n需要人类澄清后才能继续。"`
+       - **Then stop working and exit** — do not attempt any review
+    3. **If you can determine your task** — Read manager instructions in handoff
+    4. **NEVER exit with zero work done** — Always leave a trace (blocker comment or completed review)
 
     ## Quick Scene Commands
     - Read current task context: `uv run python src/vibe3/cli.py task show`

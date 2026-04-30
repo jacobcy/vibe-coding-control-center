@@ -18,6 +18,80 @@
 - 如果发现计划与现场不符，先收敛问题，再继续。
 - 执行过程中出现 finding、bug、blocker、next step 等事项，优先用 `uv run python src/vibe3/cli.py handoff append` 记录，不要把这些临时记录混进主体交付内容。
 
+### 指令验证要求
+
+执行 plan 前，必须回答以下问题：
+
+#### 1. Plan 逻辑是否清晰？
+
+- **每一步是否可执行？**
+  - 步骤描述是否明确到可以直接操作？
+  - 是否需要补充上下文或前提条件？
+
+- **步骤之间依赖关系是否合理？**
+  - 是否存在需要跳步的情况？
+  - 是否存在可以并行的步骤被写成串行？
+
+#### 2. Plan 前提是否成立？
+
+- **是否假设了可能不存在的条件？**
+  - 检查 Plan 中提到的函数、类、文件是否存在
+  - 检查 Plan 中提到的代码模式是否存在（如："patch X.Y" 但代码是 `from X import Y`）
+
+- **是否与现有代码模式冲突？**
+  - 检查现有代码的 import 模式、命名规范
+  - 检查同文件中是否有类似实现可以参考
+
+#### 3. Plan 是否需要调整？
+
+- **如果发现前提不成立**：
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Plan 步骤前提不成立：<步骤编号> - <具体问题>" --kind finding --actor "<actor>"
+  ```
+  - 不要盲目继续执行有缺陷的 plan
+  - 等待 manager 指示或调整执行方案
+
+- **如果发现可以优化**：
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Plan 优化建议：<优化点>" --kind note --actor "<actor>"
+  ```
+
+### 独立判断强制验证点
+
+执行每一步前，必须回答：
+
+#### 1. 这一步前提是否成立？
+
+- **Plan 假设的代码模式是否存在？**
+  - 如：Plan 说"patch X.Y"，但代码是 `from X import Y` → patch 目标应该是 using_module.Y
+  - 如：Plan 说"调用函数 A"，但函数签名已变化 → 需要调整调用方式
+
+- **如果不存在**：
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "步骤前提不成立：<步骤编号> - <原因>" --kind finding --actor "<actor>"
+  ```
+  - 停止当前步骤，等待 manager 指示
+  - 不要继续下一步，避免扩大问题
+
+#### 2. 执行结果是否符合预期？
+
+- **每一步执行后验证效果**：
+  - 运行测试确认改动正确
+  - 运行 lint/type check 确认没有引入新问题
+  - 检查是否影响了其他模块
+
+- **如果不符合预期**：
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "执行结果不符预期：<步骤编号> - <预期> vs <实际>" --kind finding --actor "<actor>"
+  ```
+  - 回滚当前步骤的改动
+  - 分析原因后再继续
+
+**违反独立判断的后果**：
+- 盲目执行有缺陷的 plan → 引入 bug → Retry 浪费
+- 不验证执行结果 → 质量问题 → Review 失败
+- 忽略现场约束 → 破坏共享状态 → 系统性故障
+
 ### 先看影响，再改实现
 
 执行前优先用项目工具确认影响面：
