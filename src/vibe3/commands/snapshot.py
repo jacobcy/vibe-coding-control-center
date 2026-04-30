@@ -11,7 +11,28 @@ from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage structure snapshots for code quality tracking",
+    help="""Project-level structure tracking (persistent).
+
+When to use snapshot:
+  - Tracking project structure evolution (save points)
+  - Comparing structure vs baseline / branches
+  - Finding structural changes (module, dependency, LOC growth)
+
+Subcommands:
+  build                     Build current structure (memory only)
+  save [--as-baseline]      Persist structure (use --as-baseline for diff)
+  list                      List all saved snapshots
+  show [<snapshot-id>]      Show structure details
+  diff [<snapshot-id>]      Compare structure vs baseline
+
+For single-file analysis → use:
+  vibe3 inspect              (real-time file & change analysis)
+
+Examples:
+  vibe3 snapshot save --as-baseline    # Save as branch baseline
+  vibe3 snapshot diff                  # Compare with branch baseline
+  vibe3 snapshot diff latest           # Compare with latest snapshot
+  vibe3 snapshot show --branch main    # Show baseline for 'main' branch""",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -67,6 +88,10 @@ def build(
 
 @app.command()
 def save(
+    as_baseline: Annotated[
+        bool,
+        typer.Option("--as-baseline", help="Save as branch baseline for diff"),
+    ] = False,
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
@@ -74,21 +99,43 @@ def save(
 
     This is the canonical command for creating and saving a snapshot to disk.
 
+    Use --as-baseline to save as the branch's baseline for `snapshot diff`.
+    This is automatically called at development start points (vibe-new, state/claimed).
+
     Examples:
         vibe3 snapshot save
+        vibe3 snapshot save --as-baseline
         vibe3 snapshot save --json
     """
+    from vibe3.clients.git_client import GitClient
+
     if trace:
         enable_trace()
 
     try:
-        snapshot = snapshot_service.build_snapshot()
-        filepath = snapshot_service.save_snapshot(snapshot)
+        if as_baseline:
+            # Save as branch baseline (for diff workflow)
+            git = GitClient()
+            current_branch = git.get_current_branch()
+            filepath = snapshot_service.save_branch_baseline(current_branch)
+            if filepath is None:
+                typer.echo("Error: Failed to save baseline", err=True)
+                raise typer.Exit(1)
+            snapshot = snapshot_service.load_branch_baseline(current_branch)
+            if snapshot is None:
+                typer.echo("Error: Saved baseline could not be loaded", err=True)
+                raise typer.Exit(1)
+            action = "saved as baseline"
+        else:
+            # Save regular snapshot
+            snapshot = snapshot_service.build_snapshot()
+            filepath = snapshot_service.save_snapshot(snapshot)
+            action = "saved"
 
         if json_out:
             typer.echo(snapshot.model_dump_json(indent=2))
         else:
-            typer.echo(f"✓ Snapshot saved: {snapshot.snapshot_id}")
+            typer.echo(f"✓ Snapshot {action}: {snapshot.snapshot_id}")
             typer.echo(f"  Branch: {snapshot.branch}")
             typer.echo(f"  Commit: {snapshot.commit_short}")
             typer.echo(f"  Files: {snapshot.metrics.total_files}")
@@ -142,6 +189,9 @@ def show(
         typer.Option("--branch", help="Show baseline for specific branch"),
     ] = None,
     json_out: _JSON_OPT = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", help="Suppress next step suggestions")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Show snapshot details.
@@ -193,6 +243,10 @@ def show(
             for m in snapshot.modules:
                 typer.echo(f"    {m.module}: {m.file_count} files, {m.total_loc} LOC")
 
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("snapshot_show", quiet)
+
     except snapshot_service.SnapshotNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -205,6 +259,9 @@ def diff(
         typer.Argument(help="Baseline snapshot ID (default: current branch baseline)"),
     ] = None,
     json_out: _JSON_OPT = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", help="Suppress next step suggestions")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Compare current codebase with a baseline snapshot.
@@ -234,6 +291,7 @@ def diff(
                 typer.echo(
                     f"No baseline found for current branch '{current_branch}'.\n"
                     "Either:\n"
+                    "  - Create a branch baseline: vibe3 snapshot save --as-baseline\n"
                     "  - Specify a baseline snapshot ID: vibe3 snapshot diff <id>\n"
                     "  - Create a baseline by completing the flow "
                     "(PR merge/auto-complete)\n",
@@ -293,6 +351,10 @@ def diff(
                 typer.echo(f"\n  Warnings ({len(result.warnings)}):")
                 for w in result.warnings:
                     typer.echo(f"    [{w.severity}] {w.message}")
+
+            from vibe3.commands.inspect_helpers import suggest_next_step
+
+            suggest_next_step("snapshot_diff", quiet)
 
     except snapshot_service.SnapshotNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)

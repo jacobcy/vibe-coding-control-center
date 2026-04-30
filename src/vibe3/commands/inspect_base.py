@@ -34,6 +34,9 @@ def register(app: typer.Typer) -> None:
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
+        quiet: Annotated[
+            bool, typer.Option("--quiet", help="Suppress next step suggestions")
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
@@ -141,3 +144,7 @@ def register(app: typer.Typer) -> None:
             deleted_files=deleted_files,
             core_files=core_files,
         )
+
+        from vibe3.commands.inspect_helpers import suggest_next_step
+
+        suggest_next_step("inspect_base", quiet)

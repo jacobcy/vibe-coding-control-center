@@ -17,7 +17,8 @@ def test_inspect_commands_no_args_lists_available():
     """commands 不传参数时列出可分析的顶层命令，不报错。"""
     result = runner.invoke(app, ["commands"])
     assert result.exit_code == 0
-    assert "Available commands:" in result.output
+    assert "=== vibe3 command structure ===" in result.output
+    assert "Top-level commands:" in result.output
     assert "flow" in result.output
     assert "pr" in result.output
     assert "review" in result.output

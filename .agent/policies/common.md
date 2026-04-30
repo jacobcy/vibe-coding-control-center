@@ -85,7 +85,55 @@ uv run python src/vibe3/cli.py inspect base --json
 
 注意：
 - 当前实际 CLI 中**没有** `inspect structure` 子命令，不要继续引用它。
-- `inspect symbols` 的稳定用法是 `<file>` 或 `<file>:<symbol>`；不要把“symbol-only 全仓搜索”当默认能力。
+- `inspect symbols` 的稳定用法是 `<file>` 或 `<file>:<symbol>`；不要把"symbol-only 全仓搜索"当默认能力。
+
+### 1.5. 结构变化追踪与对比
+
+使用 `vibe3 snapshot` 追踪项目结构的演进。
+
+**适用场景**：
+- 查看开发过程中代码库结构的变化（模块、依赖、LOC）
+- 对比当前分支与 baseline（开发起点）的结构差异
+- 在 review 前评估结构变化是否合理
+
+**常用命令**：
+
+```bash
+# 保存当前结构快照
+uv run python src/vibe3/cli.py snapshot save
+
+# 保存为分支 baseline（用于后续 diff）
+uv run python src/vibe3/cli.py snapshot save --as-baseline
+
+# 对比当前结构与分支 baseline（开发起点）
+uv run python src/vibe3/cli.py snapshot diff
+
+# 对比当前结构与最新快照
+uv run python src/vibe3/cli.py snapshot diff latest
+
+# 查看指定分支的 baseline
+uv run python src/vibe3/cli.py snapshot show --branch main
+
+# 查看当前结构详情
+uv run python src/vibe3/cli.py snapshot show
+
+# 列出所有已保存的快照
+uv run python src/vibe3/cli.py snapshot list
+```
+
+**与 inspect 的关系**：
+- `inspect`：单文件/单变更的实时分析（无持久化）
+- `snapshot`：项目级结构的持久化追踪（可对比历史）
+
+**自动化集成**：
+- `state/claimed` 时自动保存 baseline（记录开发起点）
+- `state/merge-ready` 前自动检查 baseline 变化
+- PR merge 时自动更新 baseline
+
+**使用规则**：
+- 开发起点：`vibe-new` 创建分支时会自动保存 baseline
+- 开发过程中：可随时 `snapshot diff` 查看相对起点的变化
+- Review 前：检查 baseline 变化，确认结构演进合理
 
 ### 2. 精确字符串与配置项查找
 

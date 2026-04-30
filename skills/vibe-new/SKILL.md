@@ -56,10 +56,12 @@ description: Use when starting or switching to a new human-collaboration task. C
   │   ├─ 场景A：需要新分支
   │   │   ├─ git checkout -b dev/issue-<id>
   │   │   ├─ vibe3 flow update
-  │   │   └─ vibe3 flow bind <issue> --role task
+  │   │   ├─ vibe3 flow bind <issue> --role task
+  │   │   └─ vibe3 snapshot save --as-baseline  # 保存开发起点 baseline
   │   ├─ 场景B：已在目标分支，首次注册
   │   │   ├─ vibe3 flow update
-  │   │   └─ vibe3 flow bind <issue> --role task
+  │   │   ├─ vibe3 flow bind <issue> --role task
+  │   │   └─ vibe3 snapshot save --as-baseline  # 保存开发起点 baseline
   │   └─ 场景C：已有 flow，只需绑定新 issue
   │       └─ vibe3 flow bind <issue> --role task
   │
@@ -118,11 +120,16 @@ vibe3 flow update --actor <your-identity>
 
 # 3. 绑定 task issue
 vibe3 flow bind 123 --role task
+
+# 4. 保存开发起点 baseline（用于后续结构对比）
+vibe3 snapshot save --as-baseline
 ```
 
 **重要**：`--actor` 参数用于记录当前操作的执行者，是 Contributors 块的数据来源。建议格式：
 - Agent: `claude/sonnet-4.6`、`gemini`、`codex`
 - Human: `jacob`、`username`
+
+**baseline 用途**：记录开发起点的代码库结构，供 `vibe3 snapshot diff` 对比分析开发过程中的结构变化（模块增删、依赖变化、LOC 增长等）。
 
 **场景 B：已经 `git checkout -b` 切到新分支，需要注册 flow**
 
@@ -132,6 +139,9 @@ vibe3 flow update --actor <your-identity>
 
 # 绑定 task issue
 vibe3 flow bind <issue-number> --role task
+
+# 保存开发起点 baseline
+vibe3 snapshot save --as-baseline
 ```
 
 **场景 C：已有 flow，需要追加绑定更多 issue**
