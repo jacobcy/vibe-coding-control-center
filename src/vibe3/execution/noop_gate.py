@@ -30,6 +30,8 @@ def apply_unified_noop_gate(
     role: ExecutionRole,
     before_state_label: str | None,
     repo: str | None = None,
+    required_ref_key: str | None = None,
+    flow_state: dict | None = None,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -37,11 +39,13 @@ def apply_unified_noop_gate(
 
     Rules:
     - if the issue has no state/ label, skip (not managed by state machine)
+    - if required_ref is missing (for worker roles), block
     - if the agent did not change the issue's state/ label, block
     - if the agent changed the issue's state/ label, record and pass
     """
     from vibe3.utils.constants import (
         EVENT_CANNOT_VERIFY_REMOTE_STATE,
+        EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
         EVENT_STATE_UNCHANGED,
     )
@@ -150,6 +154,43 @@ def apply_unified_noop_gate(
             actor=actor,
         )
         return
+
+    # --- NEW: required_ref check ---
+    # Only check ref for worker roles (planner/executor/reviewer).
+    # Manager skips this check (required_ref_key is None).
+    if required_ref_key is not None and flow_state is not None:
+        ref_value = flow_state.get(required_ref_key)
+        if not ref_value:
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"No-op gate BLOCK: required ref {required_ref_key} "
+                f"missing after {role}"
+            )
+            store.add_event(
+                branch,
+                EVENT_REQUIRED_REF_MISSING,
+                actor,
+                detail=(
+                    f"Required ref {required_ref_key} missing after {role}: "
+                    f"state was {before_state_label}"
+                ),
+                refs={
+                    "before_state": str(before_state_label or ""),
+                    "issue": str(issue_number),
+                    "required_ref": required_ref_key,
+                },
+            )
+            _block_fn(
+                issue_number=issue_number,
+                repo=repo,
+                reason=f"required ref missing: {required_ref_key}",
+                actor=actor,
+            )
+            return
 
     if before_state_label == after_state_label:
         state_desc = before_state_label or "(no state)"

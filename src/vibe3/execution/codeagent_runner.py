@@ -26,7 +26,7 @@ from vibe3.execution.execution_lifecycle import (
     persist_execution_lifecycle_event,
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
-from vibe3.execution.role_policy import get_role_section
+from vibe3.execution.role_policy import get_role_required_ref_key, get_role_section
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
@@ -194,6 +194,12 @@ class CodeagentExecutionService:
                 event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
             )
 
+            # Read flow state ONCE here, used by both ref check and passive recording
+            flow_state = ctx.store.get_flow_state(ctx.branch) if ctx.store else {}
+
+            # Get required ref key for this role
+            required_ref_key = get_role_required_ref_key(command.role)
+
             # Unified no-op gate: single hard logic check after agent completion.
             # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).
             # Supervisor (L2) is lightweight: no flow, no state machine, skip gate.
@@ -207,6 +213,8 @@ class CodeagentExecutionService:
                     role=command.role,
                     before_state_label=ctx.before_state_label,
                     repo=getattr(self.config, "repo", None),
+                    required_ref_key=required_ref_key,
+                    flow_state=flow_state,
                 )
 
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
@@ -221,10 +229,8 @@ class CodeagentExecutionService:
             # (i.e., agent did NOT call `handoff plan` or `handoff report`)
             if passive_kind and agent_result.stdout.strip() and handoff_file is None:
                 ref_field = f"{passive_kind}_ref"
-                existing_state = (
-                    ctx.store.get_flow_state(ctx.branch) if ctx.store else None
-                )
-                if existing_state and existing_state.get(ref_field):
+                # Reuse flow_state read above for gate, avoid duplicate SQLite read
+                if flow_state and flow_state.get(ref_field):
                     log.info(
                         f"Skipping passive {passive_kind} recording: "
                         f"{ref_field} already set"

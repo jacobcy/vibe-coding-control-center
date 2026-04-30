@@ -64,6 +64,7 @@ L3_AGENT_ROLES: Final[frozenset[str]] = frozenset({"manager", "plan", "run", "re
 EVENT_STATE_TRANSITIONED: Final[str] = "state_transitioned"
 EVENT_STATE_UNCHANGED: Final[str] = "state_unchanged"
 EVENT_CANNOT_VERIFY_REMOTE_STATE: Final[str] = "cannot_verify_remote_state"
+EVENT_REQUIRED_REF_MISSING: Final[str] = "required_ref_missing"
 
 # =============================================================================
 # Flow State Ref Fields
