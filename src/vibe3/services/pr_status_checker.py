@@ -9,12 +9,11 @@ Do NOT rely on:
 """
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.clients.merged_pr_cache import MergedPRCache
 from vibe3.utils.path_helpers import get_git_common_dir
 
@@ -73,7 +72,6 @@ def get_merged_pr_for_issue(
     try:
         cache.sync(github_client, limit=200)
 
-        # Step 4: Check cache again after sync
         cached_pr = cache.get_merged_pr_for_issue(issue_number)
         if cached_pr:
             logger.bind(
@@ -83,25 +81,6 @@ def get_merged_pr_for_issue(
                 source="sync",
             ).debug("Found merged PR for issue after sync")
             return cached_pr
-
-        # Step 5: Fall through to direct API call (defense-in-depth)
-        merged_prs = github_client.list_merged_prs(limit=100)
-
-        for pr in merged_prs:
-            if not isinstance(pr, dict):
-                continue
-
-            body = pr.get("body") or ""
-            linked_issues = parse_linked_issues(body)
-
-            if issue_number in linked_issues:
-                logger.bind(
-                    domain="pr_status",
-                    issue_number=issue_number,
-                    pr_number=pr.get("number"),
-                    source="api",
-                ).debug("Found merged PR for issue via API")
-                return cast(dict[str, Any], pr)
 
         logger.bind(domain="pr_status", issue_number=issue_number).debug(
             "No merged PR found for issue"
