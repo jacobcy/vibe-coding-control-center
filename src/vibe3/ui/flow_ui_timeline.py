@@ -66,6 +66,13 @@ _EVENT_COLOR: dict[str, str] = {
     "codeagent_manager_aborted": "red",
 }
 
+# Explicit mapping from ref field names to their corresponding actor field names
+REF_TO_ACTOR_FIELD: dict[str, str] = {
+    "plan_ref": "planner_actor",
+    "report_ref": "executor_actor",
+    "audit_ref": "reviewer_actor",
+}
+
 
 def _format_event_type(event_type: str) -> str:
     """Format event type for display with friendly names.
@@ -224,8 +231,9 @@ def _render_refs(state: FlowStatusResponse) -> None:
             if not refs_shown:
                 console.print("[bold]--- Refs ---[/]")
                 refs_shown = True
-            actor_field = label.replace("_ref", "_actor")
-            actor = getattr(state, actor_field, None) or ""
+            # Use explicit mapping; only plan_ref has a corresponding actor field
+            actor_field = REF_TO_ACTOR_FIELD.get(label)
+            actor = getattr(state, actor_field, None) if actor_field else None
             actor_str = f"  [dim]{actor}[/]" if actor else ""
 
             # Use unified check_ref_exists for consistent worktree resolution
