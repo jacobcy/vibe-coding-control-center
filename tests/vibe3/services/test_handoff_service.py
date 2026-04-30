@@ -216,3 +216,20 @@ def test_get_success_handoff_events_applies_limit(tmp_path: Path) -> None:
     # Should return newest first (audit, report)
     assert events[0].event_type == "handoff_audit"
     assert events[1].event_type == "handoff_report"
+
+
+def test_success_events_includes_legacy_handoff_run(tmp_path: Path) -> None:
+    """Verify legacy handoff_run events are included in success events."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-581"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(branch, "handoff_run", "codex/gpt-5.4", detail="legacy report")
+
+    events = service.get_success_handoff_events(branch)
+
+    assert len(events) == 1
+    assert events[0].event_type == "handoff_run"
