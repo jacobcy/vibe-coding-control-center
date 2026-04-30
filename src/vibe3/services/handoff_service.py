@@ -41,7 +41,7 @@ class HandoffService:
         "handoff_report",
         "handoff_audit",
         "handoff_indicate",
-        "verdict_recorded",
+        "handoff_verdict",
     }
 
     def __init__(
@@ -84,10 +84,10 @@ class HandoffService:
         branch: str,
         limit: int | None = None,
     ) -> list[FlowEvent]:
-        """Return only successful artifact handoff events (plan/run/audit).
+        """Return only successful artifact handoff events (plan/report/audit).
 
-        Excludes passive *_recorded fallback events and handoff_indicate
-        manager events, which belong to flow show timeline.
+        Includes active handoff events (handoff_plan/report/audit) plus
+        handoff_indicate (manager) and handoff_verdict (review verdict).
 
         Args:
             branch: Branch name to query events for.
