@@ -51,7 +51,7 @@ class TestHandoffBasicCommands:
         mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
         mock_flow_service_class.return_value = mock_flow_service
         mock_handoff_service = MagicMock()
-        mock_handoff_service.get_handoff_events.return_value = []
+        mock_handoff_service.get_success_handoff_events.return_value = []
         mock_handoff_service_class.return_value = mock_handoff_service
 
         with patch(
@@ -64,7 +64,7 @@ class TestHandoffBasicCommands:
         assert result.exit_code == 0
         assert "Handoff" in result.output
         mock_flow_service.get_flow_state.assert_called_once()
-        mock_handoff_service.get_handoff_events.assert_called_once()
+        mock_handoff_service.get_success_handoff_events.assert_called_once()
 
     @patch("vibe3.commands.handoff_read.HandoffService")
     @patch("vibe3.commands.handoff_read.FlowService")
@@ -81,7 +81,7 @@ class TestHandoffBasicCommands:
         mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
         mock_flow_service_class.return_value = mock_flow_service
         mock_handoff_service = MagicMock()
-        mock_handoff_service.get_handoff_events.return_value = []
+        mock_handoff_service.get_success_handoff_events.return_value = []
         mock_handoff_service_class.return_value = mock_handoff_service
 
         with patch(
@@ -93,7 +93,7 @@ class TestHandoffBasicCommands:
 
         assert result.exit_code == 0
         mock_flow_service.get_flow_state.assert_any_call("task/issue-436")
-        mock_handoff_service.get_handoff_events.assert_called_once_with(
+        mock_handoff_service.get_success_handoff_events.assert_called_once_with(
             "task/issue-436", limit=5
         )
 

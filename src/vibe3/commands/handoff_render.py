@@ -143,7 +143,7 @@ def _render_handoff_events(
     worktree_root: str | None = None,
     branch: str | None = None,
 ) -> None:
-    """Render handoff events in reverse chronological order."""
+    """Render successful handoff events in reverse chronological order."""
     if not events:
         console.print("[dim]  no handoff events[/]")
         return

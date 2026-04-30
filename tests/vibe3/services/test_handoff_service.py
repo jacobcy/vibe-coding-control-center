@@ -163,3 +163,53 @@ def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(
     events = service.get_handoff_events(branch)
 
     assert [event.event_type for event in events] == ["run_recorded"]
+
+
+def test_get_success_handoff_events_filters_passive_and_manager_events(
+    tmp_path: Path,
+) -> None:
+    """Verify get_success_handoff_events excludes *_recorded and handoff_indicate."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-304"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    # Add a mix of event types
+    store.add_event(branch, "plan_recorded", "codex/gpt-5.4", detail="auto plan")
+    store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="plan ready")
+    store.add_event(branch, "handoff_indicate", "manager", detail="manager indicate")
+    store.add_event(branch, "handoff_audit", "codex/gpt-5.4", detail="audit ready")
+    store.add_event(branch, "audit_recorded", "codex/gpt-5.4", detail="auto audit")
+
+    success_events = service.get_success_handoff_events(branch)
+    event_types = {e.event_type for e in success_events}
+
+    # Only success handoff events should be present
+    assert "plan_recorded" not in event_types
+    assert "audit_recorded" not in event_types
+    assert "handoff_indicate" not in event_types
+    assert "handoff_plan" in event_types
+    assert "handoff_audit" in event_types
+
+
+def test_get_success_handoff_events_applies_limit(tmp_path: Path) -> None:
+    """Verify limit is applied after success filter."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-304"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(branch, "handoff_plan", "codex/gpt-5.4", detail="oldest")
+    store.add_event(branch, "handoff_report", "codex/gpt-5.4", detail="middle")
+    store.add_event(branch, "handoff_audit", "codex/gpt-5.4", detail="newest")
+
+    events = service.get_success_handoff_events(branch, limit=2)
+
+    assert len(events) == 2
+    # Should return newest first (audit, report)
+    assert events[0].event_type == "handoff_audit"
+    assert events[1].event_type == "handoff_report"
