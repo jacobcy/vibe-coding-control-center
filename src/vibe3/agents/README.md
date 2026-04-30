@@ -7,7 +7,7 @@
 - 定义 backend 协议
 - 提供具体 backend 实现
 - 保留 prompt body / context builder
-- 保留 review parser 与 review 辅助分析逻辑
+- 保留 review 辅助分析逻辑
 
 ## 关键组件
 
@@ -20,7 +20,6 @@
 | `plan_prompt.py` | plan prompt body / context builder |
 | `run_prompt.py` | run prompt body / context builder |
 | `review_prompt.py` | review prompt body / context builder |
-| `review_parser.py` | review 输出解析 |
 | `review_pipeline_helpers.py` | review 分析辅助 |
 
 ## 不再属于 agents 的内容

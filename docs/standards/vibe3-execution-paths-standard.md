@@ -29,20 +29,19 @@ related_docs:
 当前架构已遵循的原则：
 1. **Orchestration 只派发**：coordinator/domain handlers 只负责 session/capacity check + dispatch，不接管 state，不做业务判断
 2. **Async wrapper 只防阻塞**：tmux 容器不承载业务逻辑，只包裹同步链
-3. **Sync chain 内做业务**：gate/callback/handoff/lifecycle 都在 `execute_sync`（同步链）内执行，无论是 orchestration sync 还是 async child
+3. **Sync chain 内做业务**：gate/handoff/lifecycle 都在 `execute_sync`（同步链）内执行，无论是 orchestration sync 还是 async child
 4. **tmux 观测只是 checkpoint**：async wrapper 可以记录容器已启动，但这不是业务 lifecycle，也不推进 state
 
 ## 1. 术语定义
 
 ### 1.1 同步链（Sync Chain）
 
-**定义**：`codeagent_runner.execute_sync()` 是真正的业务执行单元，包含完整的 gate/callback/handoff/lifecycle。
+**定义**：`codeagent_runner.execute_sync()` 是真正的业务执行单元，包含完整的 gate/handoff/lifecycle。
 
 **职责**：
 - 执行 agent（CodeagentBackend.run）
 - 记录 handoff
 - 记录 lifecycle events（started/completed）
-- 执行 pre_gate_callback（如 reviewer 解析 stdout → audit_ref）
 - 执行 no-op gate（state unchanged → block）
 
 **位置**：无论从哪里调用，同步链都在 `execute_sync` 内，不在 orchestration 层。
@@ -62,7 +61,6 @@ orchestra dispatch
         -> execute_sync()  ← 同步链开始
           -> agent run
           -> handoff
-          -> pre_gate_callback
           -> no-op gate  ← 同步链结束
     -> return result
 ```
@@ -91,7 +89,6 @@ tmux wrapper 内部:
   -> execute_sync()  ← 同步链开始（与容器外路径完全相同）
     -> agent run
     -> handoff
-    -> pre_gate_callback
     -> no-op gate  ← 同步链结束
   -> exit
 ```
@@ -144,25 +141,6 @@ if command.issue_number is not None:
 
 ---
 
-### 2.2 pre_gate_callback 在同步链内
-
-**位置**：`execute_sync()` 第272行
-
-```python
-# execute_sync (同步链)
-if command.pre_gate_callback:
-    command.pre_gate_callback(stdout=agent_result.stdout)
-    # reviewer callback → parse stdout → write audit_ref → handoff
-```
-
-**执行路径**：
-- orchestration sync → execute_sync → callback
-- async child → execute_sync → callback
-
-**两者完全相同，callback 都在同步链内。**
-
----
-
 ## 3. 当前实现的职责落点
 
 ### 3.1 domain/handlers 只派发
@@ -191,12 +169,11 @@ store.add_event("tmux_*_started")  # checkpoint only
 # execute_sync
 record_handoff_unified(...)  # handoff
 persist_execution_lifecycle_event(...)  # lifecycle
-_process_review_sync_result(...)  # callback (reviewer)
 _apply_unified_noop_gate(...)  # gate
 ```
 
 **当前实现事实**：
-- orchestration 层没有 gate/callback/state 推进逻辑
+- orchestration 层没有 gate/state 推进逻辑
 - `VIBE3_ASYNC_CHILD` 只服务 outer coordinator 的防重/容量判断
 - tmux wrapper 只保留容器 checkpoint，不承载业务 lifecycle
 - 真正的业务收口仍在 sync shell 内完成

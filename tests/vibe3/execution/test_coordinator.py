@@ -336,10 +336,10 @@ def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
     )
 
 
-def test_sync_reviewer_uses_unified_execution_shell_for_pre_gate_callback(
+def test_sync_reviewer_uses_unified_execution_shell(
     mock_dependencies,
 ):
-    """Reviewer sync requests should rely on the unified shell for pre-gate work."""
+    """Reviewer sync requests use the unified execution shell."""
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 

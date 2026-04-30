@@ -26,10 +26,7 @@ from vibe3.execution.execution_lifecycle import (
     persist_execution_lifecycle_event,
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
-from vibe3.execution.role_policy import (
-    get_role_pre_gate_callback,
-    get_role_section,
-)
+from vibe3.execution.role_policy import get_role_section
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
@@ -174,7 +171,7 @@ class CodeagentExecutionService:
         ctx: SyncExecutionContext,
         agent_result: AgentResult,
     ) -> Path | None:
-        """Finalize sync execution: handoff, lifecycle, callback, gate."""
+        """Finalize sync execution: handoff, lifecycle, gate."""
         log = logger.bind(
             domain="codeagent",
             role=command.role,
@@ -196,23 +193,6 @@ class CodeagentExecutionService:
                 refs={"status": "completed"},
                 event_type=f"codeagent_{execution_prefix(command.role)}_completed",  # type: ignore[arg-type]
             )
-
-            # pre_gate_callback: role-specific business callback that must
-            # run BEFORE the gate (e.g., reviewer writes audit_ref from stdout).
-            if (
-                command.pre_gate_callback is not None
-                and command.issue_number is not None
-                and agent_result.stdout
-            ):
-                try:
-                    command.pre_gate_callback(
-                        issue_number=command.issue_number,
-                        branch=ctx.branch,
-                        actor=ctx.actor,
-                        stdout=agent_result.stdout,
-                    )
-                except Exception as cb_exc:
-                    log.warning(f"pre_gate_callback failed: {cb_exc}")
 
             # Unified no-op gate: single hard logic check after agent completion.
             # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).
@@ -413,6 +393,5 @@ class CodeagentExecutionService:
             fallback_prompt=request.fallback_prompt,
             fallback_include_global_notice=request.fallback_include_global_notice,
             dry_run_summary=request.dry_run_summary,
-            pre_gate_callback=get_role_pre_gate_callback(role),
         )
         return self.execute_sync(command)

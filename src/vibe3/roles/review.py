@@ -158,8 +158,6 @@ def build_issue_review_request(
     if report_ref:
         async_refs["report_ref"] = report_ref
     command_args = ["review", "--branch", target_branch, "--no-async"]
-    if report_ref:
-        command_args.extend(["--report-ref", report_ref])
 
     return build_issue_async_cli_request(
         role="reviewer",
@@ -206,17 +204,6 @@ def build_review_sync_request(
         show_prompt=show_prompt,
         sync=True,
         config=config,
-    )
-
-
-def _process_review_sync_result(
-    *, issue_number: int, branch: str, actor: str, stdout: str
-) -> None:
-    """Process sync review output and write audit_ref to flow_state."""
-    finalize_review_output(
-        review_output=stdout,
-        branch=branch,
-        actor=actor,
     )
 
 
@@ -351,7 +338,6 @@ def execute_manual_review_sync(
         config=cfg,
         branch=branch,
         issue_number=issue_number,
-        pre_gate_callback=_process_review_sync_result,
     )
     result = CodeagentExecutionService(cfg).execute_sync(command)
     if dry_run:

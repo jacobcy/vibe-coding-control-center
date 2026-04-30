@@ -29,7 +29,6 @@ class CodeagentCommand:
     config: VibeConfig | None = None
     branch: str | None = None
     issue_number: int | None = None
-    pre_gate_callback: Callable[..., None] | None = None
     cli_args: list[str] | None = None
     resolved_options: Any | None = None
     actor: str | None = None
@@ -53,7 +52,7 @@ class CodeagentResult:
     session_id: str | None = None
     pid: int | None = None
     tmux_session: str | None = None
-    log_path: Path | None = None
+    log_path: str | None = None
 
 
 def create_codeagent_command(
@@ -70,7 +69,6 @@ def create_codeagent_command(
     config: VibeConfig | None = None,
     branch: str | None = None,
     issue_number: int | None = None,
-    pre_gate_callback: Callable[..., None] | None = None,
     cli_args: list[str] | None = None,
     resolved_options: Any | None = None,
     actor: str | None = None,
@@ -97,9 +95,6 @@ def create_codeagent_command(
         config: VibeConfig instance
         branch: Current branch (for async execution)
         issue_number: GitHub issue number (for no-op gate)
-        pre_gate_callback: Optional callback invoked after agent completes
-            but before the no-op gate fires. Receives (issue_number, branch,
-            actor, stdout). Used by reviewer to write audit_ref from stdout.
         cli_args: Optional explicit CLI args used for async self-invocation
         resolved_options: Pre-resolved agent options for shared execution paths
         actor: Explicit actor override for shared execution paths
@@ -136,7 +131,6 @@ def create_codeagent_command(
         config=config,
         branch=branch,
         issue_number=issue_number,
-        pre_gate_callback=pre_gate_callback,
         cli_args=cli_args,
         resolved_options=resolved_options,
         actor=actor,

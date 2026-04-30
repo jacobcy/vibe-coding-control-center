@@ -474,9 +474,10 @@ def check_progress_gate(flow_branch: str) -> bool:
 
 ### Phase 3：清理旧逻辑（长期）
 
-**移除**：
-- `src/vibe3/agents/review_parser.py` 中的 VERDICT 解析逻辑
-- 任何在代码中判断 verdict 的逻辑
+**已完成**：
+- `review_parser.py` 已删除（无生产调用者）
+- `pre_gate_callback` infrastructure 已移除
+- `finalize_review_output` 已重构为纯被动读取器
 
 **保留**：
 - No-op gate 的观测逻辑

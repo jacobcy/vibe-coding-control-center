@@ -350,7 +350,7 @@ def execute_spec_plan_async(
         success=launch.launched,
         stderr=launch.reason or "",
         tmux_session=launch.tmux_session,
-        log_path=Path(launch.log_path) if launch.log_path else None,
+        log_path=launch.log_path,
     )
 
 
