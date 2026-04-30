@@ -459,7 +459,7 @@ IGNORE_FILES=(
 - [SOUL.md](../../SOUL.md) - 项目宪法
 - [error-handling.md](./error-handling.md) - 错误处理规范
 - [github-code-review-standard.md](./github-code-review-standard.md) - 代码审查标准
-- [vibe3-command-standard.md](./vibe3-command-standard.md) - 命令设计标准
+- [v3/command-standard.md](./v3/command-standard.md) - 命令设计标准
 
 ---
 

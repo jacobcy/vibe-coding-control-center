@@ -1,6 +1,9 @@
 # Vibe3 State Sync Standard
 
-状态：Active
+状态：Deprecated (已由 [v3/command-standard.md](v3/command-standard.md) 替代)
+
+> [!WARNING]
+> 本文档已废弃。现行规范真源请参考 [docs/standards/v3/command-standard.md](v3/command-standard.md)。
 
 ## 1. 目的
 
