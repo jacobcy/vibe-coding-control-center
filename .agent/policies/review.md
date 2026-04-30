@@ -16,6 +16,91 @@
 - 不把个人偏好包装成缺陷。
 - 不因风格差异给出高严重性结论。
 
+## 审查前强制检查清单
+
+开始 review 前，**必须完成**以下检查：
+
+### 1. 读取 Handoff 状态
+
+```bash
+uv run python src/vibe3/cli.py handoff status
+```
+
+Manager 可能已写入质量审查意见、重点关注区域、具体修复要求等指令。
+
+### 2. 读取 Task Show + Comments
+
+```bash
+uv run python src/vibe3/cli.py task show --comments
+```
+
+必须查看 issue comments 部分，特别是：
+- 最新的人类指令（`[user:xxx]` 标记）
+- 最新的 agent 状态通报
+- Manager 的具体审查要求
+
+### 3. 确认影响范围
+
+```bash
+uv run python src/vibe3/cli.py inspect base --json
+uv run python src/vibe3/cli.py inspect commit <sha>
+```
+
+- 不要只看 diff 表面，要理解符号级波及范围
+- 检查是否触及关键路径、公开入口、共享状态
+
+### 4. 确认真源
+
+- GitHub 当前 `state/*` labels（状态真源）
+- Issue comments（人类指令真源）
+- PR 现场（PR state、CI checks、review comments）
+
+如果历史 refs 与当前 GitHub scene 冲突，以当前 scene 为准。
+
+**缺少任一步骤都可能导致误判。**
+
+## 独立判断强制验证点
+
+给出 verdict 前，必须回答：
+
+### 1. 我的理解是否基于代码实际？
+
+- **是否只看 diff，没有运行 inspect 确认影响面？**
+  - 必须用 `inspect symbols/file/base` 确认符号引用关系
+  - 避免"凭经验猜风险"
+
+- **是否验证了执行效果？**
+  - 检查测试是否真的覆盖了变更点
+  - 检查 type check/lint 是否通过
+  - 不要因为"测试全部通过"就认为实现正确（可能是 mock 没生效）
+
+### 2. 我的 verdict 是否有足够证据？
+
+- **MAJOR/BLOCK 必须有明确的代码证据**
+  - 指出具体文件、行号、代码片段
+  - 说明为什么这是问题（不只是"建议更好"）
+
+- **不要因为"风格偏好"给高严重性**
+  - PASS + notes 指出风格建议
+  - MAJOR/BLOCK 保留给真正影响正确性、安全性、稳定性的问题
+
+### 3. 是否存在系统性问题？
+
+- **是否发现工具、规则、流程问题？**
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "系统改进建议：<建议内容>" --kind finding --actor "<actor>"
+  ```
+
+- **是否发现代码模式问题？**
+  - 可能影响其他模块的编码习惯
+  - 配置与实现不一致的地方
+  - 都应该记录，让 manager 决定是否创建改进 issue
+
+**违反独立判断的后果**：
+- 凭经验判断 → 不可信 review → 误判 PASS/MAJOR
+- 不验证代码实际 → 遗漏真实问题 → 合并后才发现 bug
+- 忽略系统性问题 → 质量持续下降
+
 ## 优先级
 
 ### 1. 正确性
