@@ -57,11 +57,11 @@ description: Use when starting or switching to a new human-collaboration task. C
   │   │   ├─ git checkout -b dev/issue-<id>
   │   │   ├─ vibe3 flow update
   │   │   ├─ vibe3 flow bind <issue> --role task
-  │   │   └─ vibe3 snapshot save  # 保存开发起点 baseline
+  │   │   └─ vibe3 snapshot save --as-baseline  # 保存开发起点 baseline
   │   ├─ 场景B：已在目标分支，首次注册
   │   │   ├─ vibe3 flow update
   │   │   ├─ vibe3 flow bind <issue> --role task
-  │   │   └─ vibe3 snapshot save  # 保存开发起点 baseline
+  │   │   └─ vibe3 snapshot save --as-baseline  # 保存开发起点 baseline
   │   └─ 场景C：已有 flow，只需绑定新 issue
   │       └─ vibe3 flow bind <issue> --role task
   │
