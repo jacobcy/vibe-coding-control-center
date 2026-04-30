@@ -124,77 +124,6 @@ class CheckService(CheckRemote):
         except Exception:
             return None
 
-    def _check_worktree_ownership(self, branch: str, flow_status: str) -> list[str]:
-        """Check worktree ownership consistency for a branch.
-
-        Args:
-            branch: Branch name to check.
-            flow_status: Current flow status.
-
-        Returns:
-            List of ownership-related issues found.
-        """
-        if flow_status in self.INACTIVE_FLOW_STATUSES:
-            return []  # Skip inactive flows
-
-        from vibe3.services.worktree_ownership_guard import (
-            get_current_session_id,
-            get_worktree_owner,
-        )
-        from vibe3.utils.path_helpers import find_worktree_path_for_branch
-
-        try:
-            worktree_path = find_worktree_path_for_branch(branch)
-            if worktree_path is None:
-                return []  # No worktree, skip ownership check
-
-            owner_session = get_worktree_owner(self.store, str(worktree_path))
-            if owner_session is None:
-                # Unowned worktree with active flow
-                # This could indicate a new flow that hasn't registered ownership yet
-                # or a flow created outside of the standard dispatch path
-                return [
-                    f"Worktree for branch '{branch}' has no registered owner session. "
-                    "This may indicate a flow created outside standard dispatch. "
-                    "If intentional, no action needed. Otherwise, investigate session "
-                    "registration."
-                ]
-
-            # Check if owner session is still live
-            owner_tmux_session = owner_session.get("tmux_session")
-            if not owner_tmux_session:
-                return []  # Owner session has no tmux_session field (legacy)
-
-            # Check tmux liveness
-            from vibe3.agents.backends.async_launcher import has_tmux_session
-
-            if not has_tmux_session(owner_tmux_session):
-                # Orphaned ownership: session died but worktree still claimed
-                return [
-                    f"ORPHANED_OWNERSHIP: Worktree for branch '{branch}' is claimed "
-                    f"by dead session '{owner_tmux_session}'. "
-                    "Use 'vibe3 task resume --takeover' to take over ownership, "
-                    "or manually investigate if the session should still be active."
-                ]
-
-            # Check if current session matches owner (only if in tmux)
-            current_session_id = get_current_session_id()
-            if current_session_id and current_session_id != owner_tmux_session:
-                # Session mismatch: different session trying to use the worktree
-                return [
-                    f"Session mismatch: Worktree for branch '{branch}' is owned by "
-                    f"session '{owner_tmux_session}', but current session is "
-                    f"'{current_session_id}'. "
-                    "Use 'vibe3 task resume --takeover' to take over if authorized."
-                ]
-
-            return []  # Ownership is consistent
-        except Exception as exc:
-            logger.bind(domain="check", branch=branch).debug(
-                f"Could not verify worktree ownership: {exc}"
-            )
-            return []  # Skip on errors (non-critical check)
-
     def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
         """Handle PR state changes detected during check.
 
@@ -416,7 +345,11 @@ class CheckService(CheckRemote):
                 issues.append(f"Shared handoff file not found: {handoff_path}")
 
         # Check worktree ownership consistency
-        ownership_issues = self._check_worktree_ownership(branch, flow_status)
+        from vibe3.services.check_ownership_service import check_worktree_ownership
+
+        ownership_issues = check_worktree_ownership(
+            self.store, branch, flow_status, self.INACTIVE_FLOW_STATUSES
+        )
         issues.extend(ownership_issues)
 
         is_valid = len(issues) == 0
