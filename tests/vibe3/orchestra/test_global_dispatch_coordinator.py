@@ -63,12 +63,9 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     # Configure manager_usernames to match test assignees
     service.config.manager_usernames = ["manager-bot"]
     service.config.supervisor_handoff.issue_label = "supervisor"
-    service._github = None
-    return service
     service.config.repo = "owner/repo"
-    service.config.manager_usernames = ["manager-bot"]
-    service.config.supervisor_handoff.issue_label = "supervisor"
     service._github = MagicMock()
+    return service
     return service
 
 
