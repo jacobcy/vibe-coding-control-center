@@ -252,7 +252,10 @@ class TestAutoFix:
             result = execute_check_mode(check_service, "fix_all")
 
         assert result.success
-        mock_verify.assert_called_once_with(status=["active", "stale"])
+        mock_verify.assert_called_once()
+        call_kwargs = mock_verify.call_args.kwargs
+        assert call_kwargs["status"] == ["active", "stale"]
+        assert "on_progress" in call_kwargs
 
     def test_auto_fix_creates_handoff_file(self, check_service, mock_git_client):
         """Test that auto_fix creates missing handoff file."""

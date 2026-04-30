@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import typer
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+)
 
 from vibe3.services.check_remote import InitResult
 from vibe3.services.check_service import CheckResult, CheckService
@@ -21,6 +28,42 @@ class ExecuteCheckResult:
     details: dict = field(default_factory=dict)
 
 
+def _run_with_progress(
+    service: CheckService,
+    status: str | list[str],
+) -> list[CheckResult]:
+    """Run verify_all_flows with Rich Progress display.
+
+    Args:
+        service: CheckService instance.
+        status: Status filter for verify_all_flows.
+
+    Returns:
+        List of CheckResult objects.
+    """
+    results = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+    ) as progress:
+        task_id = progress.add_task("Checking flows", total=None)
+
+        def on_progress(current: int, total: int, branch: str) -> None:
+            if total > 0:
+                progress.update(
+                    task_id,
+                    total=total,
+                    advance=1,
+                    description=f"Checking {branch}",
+                )
+
+        results = service.verify_all_flows(status=status, on_progress=on_progress)
+
+    return results
+
+
 def execute_check_mode(
     service: CheckService,
     mode: Literal[
@@ -29,9 +72,18 @@ def execute_check_mode(
     *,
     branch: str | None = None,
     verbose: bool = False,
+    show_progress: bool = True,
 ) -> ExecuteCheckResult:
     """Run command-oriented check modes
-    using CheckService primitives."""
+    using CheckService primitives.
+
+    Args:
+        service: CheckService instance.
+        mode: Check mode to execute.
+        branch: Branch to check (for single-branch modes).
+        verbose: Enable verbose output.
+        show_progress: Show progress bar for 'all' and 'fix_all' modes.
+    """
     if mode == "init":
         init_result: InitResult = service.init_remote_index()
         summary = (
@@ -66,7 +118,11 @@ def execute_check_mode(
         )
 
     if mode == "all":
-        results = service.verify_all_flows(status="active")
+        if show_progress:
+            results = _run_with_progress(service, status="active")
+        else:
+            results = service.verify_all_flows(status="active")
+
         invalid = [r for r in results if not r.is_valid]
         return ExecuteCheckResult(
             mode="all",
@@ -80,7 +136,11 @@ def execute_check_mode(
         )
 
     if mode == "fix_all":
-        results = service.verify_all_flows(status=["active", "stale"])
+        if show_progress:
+            results = _run_with_progress(service, status=["active", "stale"])
+        else:
+            results = service.verify_all_flows(status=["active", "stale"])
+
         invalid_fix: list[CheckResult] = [r for r in results if not r.is_valid]
         if not invalid_fix:
             return ExecuteCheckResult(
