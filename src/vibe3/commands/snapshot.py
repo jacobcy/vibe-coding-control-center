@@ -121,8 +121,10 @@ def save(
             if filepath is None:
                 typer.echo("Error: Failed to save baseline", err=True)
                 raise typer.Exit(1)
-            # Build snapshot for display (already saved by save_branch_baseline)
-            snapshot = snapshot_service.build_snapshot()
+            snapshot = snapshot_service.load_branch_baseline(current_branch)
+            if snapshot is None:
+                typer.echo("Error: Saved baseline could not be loaded", err=True)
+                raise typer.Exit(1)
             action = "saved as baseline"
         else:
             # Save regular snapshot
@@ -289,6 +291,7 @@ def diff(
                 typer.echo(
                     f"No baseline found for current branch '{current_branch}'.\n"
                     "Either:\n"
+                    "  - Create a branch baseline: vibe3 snapshot save --as-baseline\n"
                     "  - Specify a baseline snapshot ID: vibe3 snapshot diff <id>\n"
                     "  - Create a baseline by completing the flow "
                     "(PR merge/auto-complete)\n",

@@ -81,16 +81,23 @@ Before assigning severity, collect impact evidence with `inspect`:
 # Branch-level risk and changed symbols
 uv run python src/vibe3/cli.py inspect base --json
 
+# Project-level structure change vs branch baseline, when a baseline exists
+uv run python src/vibe3/cli.py snapshot diff --quiet
+
 # Commit-level impact when reviewing specific commits
 uv run python src/vibe3/cli.py inspect commit <sha> --json
 
-# Symbol usage and file structure
+# Symbol usage and Python file structure
 uv run python src/vibe3/cli.py inspect symbols <file>
 uv run python src/vibe3/cli.py inspect symbols <file>:<symbol>
-uv run python src/vibe3/cli.py inspect files <file>
+uv run python src/vibe3/cli.py inspect files <python-file-or-python-dir>
 ```
 
 Use `rg` only for exact literals such as error messages, command names, config keys, paths, or prompt text. Do not replace impact analysis with plain text search.
+
+`inspect files` is a Python structure tool. For Markdown, YAML, JSON, shell snippets, or other non-Python files, review the diff directly and use `rg` plus the relevant standards instead of forcing `inspect files`.
+
+If `snapshot diff` reports that no branch baseline exists, do not block the review solely on that. Fall back to `uv run python src/vibe3/cli.py snapshot diff latest --quiet` when a latest snapshot comparison is useful, and record the missing baseline as a verification limitation.
 
 For CLI changes, also use:
 
