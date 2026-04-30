@@ -151,9 +151,9 @@ def _render_handoff_events(
     display_names = {
         "handoff_plan": "Plan Handoff",
         "handoff_report": "Run Handoff",
-        "handoff_run": "Run Handoff",
         "handoff_audit": "Audit Handoff",
         "handoff_indicate": "Manager Handoff",
+        "verdict_recorded": "Verdict",
         "plan_recorded": "Plan Auto-Recorded",
         "run_recorded": "Run Auto-Recorded",
         "audit_recorded": "Audit Auto-Recorded",

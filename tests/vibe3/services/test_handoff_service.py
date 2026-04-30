@@ -165,10 +165,10 @@ def test_get_handoff_events_keeps_recorded_run_when_no_active_handoff(
     assert [event.event_type for event in events] == ["run_recorded"]
 
 
-def test_get_success_handoff_events_filters_passive_and_manager_events(
+def test_get_success_handoff_events_filters_passive_only(
     tmp_path: Path,
 ) -> None:
-    """Verify get_success_handoff_events excludes *_recorded and handoff_indicate."""
+    """Verify get_success_handoff_events excludes *_recorded passive fallbacks."""
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     branch = "task/issue-304"
     service = HandoffService(
@@ -182,16 +182,19 @@ def test_get_success_handoff_events_filters_passive_and_manager_events(
     store.add_event(branch, "handoff_indicate", "manager", detail="manager indicate")
     store.add_event(branch, "handoff_audit", "codex/gpt-5.4", detail="audit ready")
     store.add_event(branch, "audit_recorded", "codex/gpt-5.4", detail="auto audit")
+    store.add_event(branch, "verdict_recorded", "manager", detail="verdict: MAJOR")
 
     success_events = service.get_success_handoff_events(branch)
     event_types = {e.event_type for e in success_events}
 
-    # Only success handoff events should be present
+    # Only success handoff events should be present (exclude passive *_recorded)
     assert "plan_recorded" not in event_types
     assert "audit_recorded" not in event_types
-    assert "handoff_indicate" not in event_types
+    # Active events should be present
     assert "handoff_plan" in event_types
     assert "handoff_audit" in event_types
+    assert "handoff_indicate" in event_types
+    assert "verdict_recorded" in event_types
 
 
 def test_get_success_handoff_events_applies_limit(tmp_path: Path) -> None:

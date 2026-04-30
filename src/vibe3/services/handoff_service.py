@@ -39,8 +39,9 @@ class HandoffService:
     _SUCCESS_HANDOFF_EVENT_TYPES = {
         "handoff_plan",
         "handoff_report",
-        "handoff_run",
         "handoff_audit",
+        "handoff_indicate",
+        "verdict_recorded",
     }
 
     def __init__(
