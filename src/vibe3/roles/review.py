@@ -158,8 +158,6 @@ def build_issue_review_request(
     if report_ref:
         async_refs["report_ref"] = report_ref
     command_args = ["review", "--branch", target_branch, "--no-async"]
-    if report_ref:
-        command_args.extend(["--report-ref", report_ref])
 
     return build_issue_async_cli_request(
         role="reviewer",
