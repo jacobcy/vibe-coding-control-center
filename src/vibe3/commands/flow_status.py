@@ -167,6 +167,30 @@ def show(
             logger.error(f"Flow not found: {target_branch}")
             raise typer.Exit(1)
 
+        # Fetch issue titles for timeline rendering
+        issue_numbers = set()
+        state = timeline["state"]
+
+        # Collect issue numbers from all sources
+        if state.task_issue_number:
+            issue_numbers.add(state.task_issue_number)
+        for link in state.issues:
+            issue_numbers.add(link.issue_number)
+
+        # Parse spec_ref if it's an issue number (e.g., "#545" or "545")
+        if state.spec_ref:
+            import re
+
+            issue_match = re.match(r"^#?(\d+)$", state.spec_ref.strip())
+            if issue_match:
+                issue_numbers.add(int(issue_match.group(1)))
+
+        # Fetch issue titles using projection service
+        issue_titles = {}
+        if issue_numbers:
+            projection_service = FlowProjectionService(store=service.store)
+            issue_titles, _ = projection_service.get_issue_titles(list(issue_numbers))
+
         if json_output:
             json_data = {
                 "state": timeline["state"].model_dump(),
@@ -179,6 +203,7 @@ def show(
                 timeline["state"],
                 timeline["events"],
                 parent_branch=parent_branch,
+                issue_titles=issue_titles,
             )
             if timeline["state"].task_issue_number is None:
                 console.print(

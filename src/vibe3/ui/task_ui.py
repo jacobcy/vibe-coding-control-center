@@ -114,8 +114,13 @@ def render_task_show(
         ref_cmd = ref_to_handoff_cmd(display_ref, task.branch)
         console.print("\n[bold]Latest Work[/]")
         console.print(f"Ref:     {latest_ref.kind}  {ref_cmd}")
-        console.print("Summary:")
-        console.print(latest_ref.summary)
+
+        # Show only first 3 lines of summary for readability
+        if latest_ref.summary:
+            summary_lines = latest_ref.summary.strip().split("\n")[:3]
+            console.print("Summary:")
+            for line in summary_lines:
+                console.print(f"  {line}")
 
     # Comments will be shown via render_task_comments(), not here
     # Removed: Latest Instruction/Comment section (consolidated into comments view)
