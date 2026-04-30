@@ -21,7 +21,7 @@
 **本文档不回答的问题**:
 - 有哪些标签？→ 见 [github-labels-reference.md](github-labels-reference.md)
 - 标签的语义是什么？→ 见 [github-labels-standard.md](github-labels-standard.md)
-- 具体命令怎么用？→ 见 [vibe3-user-guide.md](vibe3-user-guide.md)
+- 具体命令怎么用？→ 见 [v3/command-standard.md](v3/command-standard.md)
 
 ---
 
@@ -495,6 +495,6 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 
 - [github-labels-reference.md](github-labels-reference.md) - 标签速查手册（有哪些标签）
 - [github-labels-standard.md](github-labels-standard.md) - 标签语义和真源标准
-- [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) - 状态同步标准
+- [v3/command-standard.md](v3/command-standard.md) - 共享状态命令与状态同步标准
 - [issue-standard.md](issue-standard.md) - Issue 标准
-- [vibe3-user-guide.md](vibe3-user-guide.md) - 用户操作手册
+- [../../AGENTS.md](../../AGENTS.md) - 项目导览与操作手册
