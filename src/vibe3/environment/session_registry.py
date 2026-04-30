@@ -242,6 +242,31 @@ class SessionRegistryService:
                 done_ids.append(session_id)
         return done_ids
 
+    def mark_worker_sessions_done_when_tmux_gone(self) -> list[int]:
+        """Mark worker sessions whose tmux is gone as done.
+
+        Called before reconcile_live_state() so worker completions are
+        recorded as 'done' rather than 'orphaned'.
+
+        Returns:
+            List of session_ids transitioned to done.
+        """
+        worker_roles = ["manager", "planner", "executor", "reviewer"]
+        done_ids: list[int] = []
+        for role in worker_roles:
+            sessions = self._store.list_live_runtime_sessions(role=role)
+            for session in sessions:
+                tmux = session.get("tmux_session")
+                if not tmux:
+                    continue
+                if not self._has_tmux_session(tmux):
+                    session_id = session["id"]
+                    self._store.update_runtime_session(
+                        session_id, status="done", ended_at=_now_iso()
+                    )
+                    done_ids.append(session_id)
+        return done_ids
+
     def reconcile_live_state(self) -> list[int]:
         """Mark starting|running sessions whose tmux is gone as orphaned.
 
@@ -295,6 +320,34 @@ class SessionRegistryService:
         except Exception:
             # Best-effort cleanup only; orphan reconciliation should still succeed.
             pass
+
+    def get_live_sessions_for_issue(
+        self,
+        issue_number: int,
+        roles: list[str],
+    ) -> list[dict[str, Any]]:
+        """Return truly live sessions for a given issue number across specified roles.
+
+        Checks tmux liveness to avoid counting stale DB records.
+        Does not filter by branch — issue_number is the dispatch key.
+
+        Args:
+            issue_number: The issue number to filter sessions by.
+            roles: List of roles to check (e.g., ["manager", "planner", "executor"]).
+
+        Returns:
+            List of session dicts that are truly live and match the issue number.
+        """
+        result: list[dict[str, Any]] = []
+        for role in roles:
+            sessions = self._store.list_live_runtime_sessions(role=role)
+            for session in sessions:
+                if str(session.get("target_id", "")) != str(issue_number):
+                    continue
+                tmux = session.get("tmux_session")
+                if tmux and self._has_tmux_session(tmux):
+                    result.append(session)
+        return result
 
     def get_truly_live_sessions_for_branch(self, branch: str) -> list[dict[str, Any]]:
         """Return truly live sessions for a branch, confirming tmux liveness.
