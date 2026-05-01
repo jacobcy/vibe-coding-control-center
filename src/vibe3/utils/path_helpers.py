@@ -163,6 +163,13 @@ def _resolve_absolute_path(
     except (OSError, ValueError):
         pass
 
+    # Priority 3: Pattern-based extraction for cross-machine handoff paths
+    path_str = str(ref_path)
+    if _SHARED_HANDOFF_PREFIX in path_str:
+        # Extract relative path starting from vibe3/handoff/
+        idx = path_str.find(_SHARED_HANDOFF_PREFIX)
+        return path_str[idx:]
+
     return str(ref_path)
 
 

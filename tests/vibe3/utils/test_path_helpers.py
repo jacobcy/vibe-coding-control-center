@@ -7,6 +7,7 @@ from vibe3.utils.path_helpers import (
     is_shared_handoff_ref,
     ref_to_handoff_cmd,
     resolve_handoff_target,
+    resolve_ref_path,
     sanitize_event_detail_paths,
     to_display_target,
 )
@@ -223,3 +224,24 @@ def test_resolve_handoff_target_branch_no_worktree_raises(tmp_path: Path) -> Non
         resolve_handoff_target(
             "docs/report.md", branch="task/issue-99", git_client=client
         )
+
+
+# --- resolve_ref_path ---
+
+
+def test_resolve_ref_path_cross_machine_handoff_path(tmp_path: Path) -> None:
+    """Handoff paths from other machines should be converted to relative."""
+    # Path from different machine (not current git_common)
+    cross_machine_path = (
+        "/Users/other/src/repo/.git/vibe3/handoff/task-123/run-2026-03-27.md"
+    )
+    result = resolve_ref_path(cross_machine_path, worktree_root=str(tmp_path))
+    assert result == "vibe3/handoff/task-123/run-2026-03-27.md"
+
+
+def test_resolve_ref_path_non_handoff_absolute_path(tmp_path: Path) -> None:
+    """Non-handoff absolute paths should stay absolute."""
+    non_handoff_path = "/Users/other/src/repo/docs/report.md"
+    result = resolve_ref_path(non_handoff_path, worktree_root=str(tmp_path))
+    # Should return as absolute since it doesn't match any pattern
+    assert result == non_handoff_path
