@@ -10,6 +10,14 @@ description: |
 model: haiku
 tools: Read, Grep, Glob, Bash
 extends: code-reviewer  # 继承全局 code-reviewer 的基础能力
+# 安全限制：禁止修改文件和执行危险操作
+forbidden_commands:
+  - "git push*"
+  - "git commit*"
+  - "git reset*"
+  - "rm -rf*"
+  - "*DROP*"
+  - "*DELETE*"
 ---
 
 你是 PR 代码分析员，负责分析代码实现和技术债。

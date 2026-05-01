@@ -11,6 +11,14 @@ description: |
 model: sonnet
 tools: Read, Grep, Glob, Bash
 extends: security-reviewer  # 继承全局 security-reviewer 的基础能力
+# 安全限制：禁止修改文件和执行危险操作
+forbidden_commands:
+  - "git push*"
+  - "git commit*"
+  - "git reset*"
+  - "rm -rf*"
+  - "*DROP*"
+  - "*DELETE*"
 ---
 
 你是安全审查专家，负责深度审查 PR 的安全性。

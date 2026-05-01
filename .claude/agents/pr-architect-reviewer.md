@@ -11,6 +11,7 @@ description: |
 model: sonnet
 tools: Read, Grep, Glob, WebSearch
 extends: architect  # 继承全局 architect 的基础能力
+# 安全限制：此 agent 无 Bash 工具，仅声明继承关系
 ---
 
 你是架构审查专家，负责评估 PR 对项目架构的影响。

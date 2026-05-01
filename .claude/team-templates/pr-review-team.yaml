@@ -115,6 +115,7 @@ workflow:
 
   phase_4:
     name: 写回与改进
+    executor: team-lead  # 明确执行主体：由 team-lead 执行所有 Phase 4 操作
     agents: []
     actions:
       - write_review_comment  # 写入 PR 评论（必须）
