@@ -320,19 +320,19 @@ def resume_issue(
 def fail_reviewer_issue(
     *, issue_number: int, reason: str, actor: str = "agent:review"
 ) -> None:
-    """Convenience wrapper for fail_issue(role="reviewer")."""
+    """Convenience wrapper for fail_issue(role="review")."""
     fail_issue(issue_number=issue_number, reason=reason, role="review", actor=actor)
 
 
 def fail_planner_issue(
     *, issue_number: int, reason: str, actor: str = "agent:plan"
 ) -> None:
-    """Convenience wrapper for fail_issue(role="planner")."""
+    """Convenience wrapper for fail_issue(role="plan")."""
     fail_issue(issue_number=issue_number, reason=reason, role="plan", actor=actor)
 
 
 def fail_executor_issue(*, issue_number: int, reason: str, actor: str) -> None:
-    """Convenience wrapper for fail_issue(role="executor")."""
+    """Convenience wrapper for fail_issue(role="run")."""
     fail_issue(issue_number=issue_number, reason=reason, role="run", actor=actor)
 
 
@@ -364,7 +364,7 @@ def block_planner_noop_issue(
     actor: str = "agent:plan",
     repo: str | None = None,
 ) -> None:
-    """Convenience wrapper for block_issue(role="planner", is_noop=True)."""
+    """Convenience wrapper for block_issue(role="plan", is_noop=True)."""
     block_issue(
         issue_number=issue_number,
         reason=reason,
@@ -378,7 +378,7 @@ def block_planner_noop_issue(
 def block_executor_noop_issue(
     *, issue_number: int, reason: str, actor: str = "agent:run", repo: str | None = None
 ) -> None:
-    """Convenience wrapper for block_issue(role="executor", is_noop=True)."""
+    """Convenience wrapper for block_issue(role="run", is_noop=True)."""
     block_issue(
         issue_number=issue_number,
         reason=reason,
@@ -396,7 +396,7 @@ def block_reviewer_noop_issue(
     actor: str = "agent:review",
     repo: str | None = None,
 ) -> None:
-    """Convenience wrapper for block_issue(role="reviewer", is_noop=True)."""
+    """Convenience wrapper for block_issue(role="review", is_noop=True)."""
     block_issue(
         issue_number=issue_number,
         reason=reason,
