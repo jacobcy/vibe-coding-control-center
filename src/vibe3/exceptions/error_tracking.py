@@ -37,6 +37,9 @@ class ErrorTrackingService:
     # Threshold count in time window
     THRESHOLD_COUNT = 2
 
+    # Default retention period (days)
+    DEFAULT_RETENTION_DAYS = 7
+
     # Global singleton instance (backward compatibility)
     _instance: ErrorTrackingService | None = None
 
@@ -90,15 +93,23 @@ class ErrorTrackingService:
             # Clear specific db_path instance
             cls._registry.pop(db_path, None)
 
-    def __init__(self, store: SQLiteClient | None = None) -> None:
+    def __init__(
+        self, store: SQLiteClient | None = None, retention_days: int | None = None
+    ) -> None:
         """Initialize error tracking service.
 
         Args:
             store: SQLiteClient for persistence
+            retention_days: Days to retain error records (default: 7)
         """
         self.store = store or SQLiteClient()
         # Access db_path from base class
         self.db_path = self.store.db_path
+        self.retention_days = (
+            self.DEFAULT_RETENTION_DAYS if retention_days is None else retention_days
+        )
+        if self.retention_days <= 0:
+            raise ValueError(f"retention_days must be positive, got {retention_days}")
 
     def record_error(
         self,
@@ -248,6 +259,23 @@ class ErrorTrackingService:
             cleared_by=cleared_by,
             reason=reason,
         ).info("Error log cleared")
+
+    def cleanup_old_errors(self) -> int:
+        """Delete error records older than retention period.
+
+        Returns:
+            Number of deleted records
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute(
+                """
+                DELETE FROM error_log
+                WHERE created_at < datetime('now', ? || ' days')
+                """,
+                (f"-{self.retention_days}",),
+            )
+            conn.commit()
+            return result.rowcount
 
     def get_status(self) -> dict[str, Any]:
         """Get error tracking status for display.

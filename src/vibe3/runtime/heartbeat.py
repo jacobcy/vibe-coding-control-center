@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.exceptions.error_tracking import ErrorTrackingService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_orchestra_event,
@@ -180,6 +181,35 @@ class HeartbeatServer:
                     continue
 
             # Gate is OPEN (or no gate) - proceed with normal dispatch
+
+            # Cleanup old error records (maintenance)
+            try:
+                error_tracking = ErrorTrackingService.get_instance()
+                deleted = error_tracking.cleanup_old_errors()
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} cleanup failed: {exc}",
+                    level="WARNING",
+                )
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    f"cleanup_old_errors failed: {exc}"
+                )
+            else:
+                if deleted > 0:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} cleanup: deleted {deleted} "
+                            "old error records"
+                        ),
+                        level="DEBUG",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").debug(
+                        f"Cleaned up {deleted} old error records "
+                        f"(retention={error_tracking.retention_days}d)"
+                    )
+
             tasks = []
             tick_services: list[str] = []
             for svc in self._services:
