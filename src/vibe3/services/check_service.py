@@ -344,6 +344,14 @@ class CheckService(CheckRemote):
             if not handoff_path.exists():
                 issues.append(f"Shared handoff file not found: {handoff_path}")
 
+        # Check worktree ownership consistency
+        from vibe3.services.check_ownership_service import check_worktree_ownership
+
+        ownership_issues = check_worktree_ownership(
+            self.store, branch, flow_status, self.INACTIVE_FLOW_STATUSES
+        )
+        issues.extend(ownership_issues)
+
         is_valid = len(issues) == 0
         logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).debug(
             "Check completed"

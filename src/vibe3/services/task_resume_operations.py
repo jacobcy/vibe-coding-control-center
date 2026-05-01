@@ -57,6 +57,7 @@ class TaskResumeOperations:
         reason: str,
         worktree_path: str | None = None,
         label_state: str | None = None,
+        allow_takeover: bool = False,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state.
@@ -70,6 +71,7 @@ class TaskResumeOperations:
             worktree_path: Optional worktree path (for optimization)
             label_state: Optional state to restore (None=delete worktree,
                 empty/"handoff"=restore to handoff, "ready"=restore to ready)
+            allow_takeover: If True, allow taking over worktree ownership
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,
                     status: str) -> None
@@ -91,6 +93,28 @@ class TaskResumeOperations:
                     "Use 'vibe check --clean-branch' to clean physical resources, "
                     "or close the linked issue manually if still open."
                 )
+
+        # Verify worktree ownership before modifying flow state
+        if isinstance(branch, str):
+            try:
+                from vibe3.utils.path_helpers import find_worktree_path_for_branch
+
+                wt_path = worktree_path or find_worktree_path_for_branch(branch)
+                if wt_path:
+                    from vibe3.services.worktree_ownership_guard import (
+                        ensure_worktree_ownership,
+                    )
+
+                    ensure_worktree_ownership(
+                        self.flow_service.store,
+                        str(wt_path),
+                        allow_takeover=allow_takeover,
+                        takeover_reason=reason or "task resume",
+                    )
+            except (ImportError, ValueError):
+                # find_worktree_path_for_branch may fail for branches without worktrees
+                # In such cases, skip ownership check (legacy behavior)
+                pass
 
         def emit_progress(step: str, status: str = "running") -> None:
             if progress_callback:

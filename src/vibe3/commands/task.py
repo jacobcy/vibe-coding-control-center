@@ -146,6 +146,13 @@ def resume(
         ),
     ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
+    takeover: Annotated[
+        bool,
+        typer.Option(
+            "--takeover",
+            help="Explicitly take over worktree ownership from another session",
+        ),
+    ] = False,
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Execute the resume (default dry-run)")
     ] = False,
@@ -324,6 +331,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
+            allow_takeover=takeover,
             progress_callback=progress_callback if yes else None,
         )
     else:
@@ -336,6 +344,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
+            allow_takeover=takeover,
             progress_callback=progress_callback if yes else None,
         )
 

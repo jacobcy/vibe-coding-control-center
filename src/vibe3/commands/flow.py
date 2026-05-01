@@ -12,6 +12,10 @@ from vibe3.commands.flow_lifecycle import blocked
 from vibe3.commands.flow_status import show, status
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
+from vibe3.services.worktree_ownership_guard import (
+    WorktreeOwnerMismatchError,
+    ensure_worktree_ownership,
+)
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_flow_created
 
@@ -135,6 +139,21 @@ def update(
         if not branch:
             branch = flow_service.get_current_branch()
 
+        # Verify worktree ownership before modifying flow state
+        try:
+            from vibe3.utils.path_helpers import find_worktree_path_for_branch
+
+            wt_path = find_worktree_path_for_branch(branch)
+            if wt_path:
+                ensure_worktree_ownership(flow_service.store, str(wt_path))
+        except (ImportError, ValueError):
+            # find_worktree_path_for_branch may fail for branches without worktrees
+            # In such cases, skip ownership check (legacy behavior)
+            pass
+        except WorktreeOwnerMismatchError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(1) from e
+
         # Register/Ensure flow
         flow = flow_service.ensure_flow_for_branch(branch=branch, slug=name)
 
@@ -208,6 +227,21 @@ def bind(
             flow_service = FlowService()
             task_service = TaskService()
             target_branch = _resolve_bind_branch(flow_service, branch)
+
+            # Verify worktree ownership before binding issues
+            try:
+                from vibe3.utils.path_helpers import find_worktree_path_for_branch
+
+                wt_path = find_worktree_path_for_branch(target_branch)
+                if wt_path:
+                    ensure_worktree_ownership(flow_service.store, str(wt_path))
+            except (ImportError, ValueError):
+                # find_worktree_path_for_branch may fail for branches without worktrees
+                # In such cases, skip ownership check (legacy behavior)
+                pass
+            except WorktreeOwnerMismatchError as e:
+                typer.echo(f"Error: {e}", err=True)
+                raise typer.Exit(1) from e
 
             links = []
             for ref in refs:
