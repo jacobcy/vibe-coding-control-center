@@ -403,3 +403,28 @@ class TaskService:
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state."""
         return self._show_service.show_task(branch)
+
+    def search_issues(
+        self,
+        query: str,
+        limit: int = 30,
+        state: str = "open",
+        label: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search GitHub issues for potential duplicates.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results
+            state: Issue state filter (open, closed, all)
+            label: Optional label filter
+
+        Returns:
+            List of issue dicts with number, title, state, labels
+        """
+        return self.github_client.search_issues(
+            query=query,
+            limit=limit,
+            state=state,
+            label=label,
+        )

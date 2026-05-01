@@ -16,6 +16,7 @@ from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
     render_task_comments,
+    render_task_search,
     render_task_show,
 )
 
@@ -414,3 +415,44 @@ def resume(
                 "\nTip: If all failed issues are resumed, "
                 "the failed gate will automatically unblock."
             )
+
+
+@app.command()
+def search(
+    query: Annotated[
+        str,
+        typer.Argument(help="Search query for issues"),
+    ],
+    state: Annotated[
+        str,
+        typer.Option("--state", help="Issue state: open, closed, all"),
+    ] = "open",
+    label: Annotated[
+        str | None,
+        typer.Option("--label", help="Filter by label"),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option("--limit", help="Maximum results"),
+    ] = 30,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Search existing GitHub issues for potential duplicates.
+
+    Use before creating new tasks to avoid duplicates.
+
+    Examples:
+        vibe3 task search "review"
+        vibe3 task search "vibe3 task" --state all
+        vibe3 task search "bug" --label bug --limit 10
+    """
+    task_svc = TaskService()
+
+    results = task_svc.search_issues(
+        query=query,
+        limit=limit,
+        state=state,
+        label=label,
+    )
+
+    render_task_search(results, query, json_output)

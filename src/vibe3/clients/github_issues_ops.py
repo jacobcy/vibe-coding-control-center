@@ -270,3 +270,52 @@ class IssuesMixin(IssueAdminMixin):
             )
             return []
         return cast(list[dict[str, Any]], json.loads(result.stdout))
+
+    def search_issues(
+        self,
+        query: str,
+        limit: int = 30,
+        state: str = "open",
+        label: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search GitHub issues using gh issue list --search.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results
+            state: Issue state filter (open, closed, all)
+            label: Optional label filter
+
+        Returns:
+            List of issue dicts with number, title, state, labels
+        """
+        logger.bind(
+            external="github",
+            operation="search_issues",
+            query=query,
+            limit=limit,
+            state=state,
+            label=label,
+        ).debug("Calling GitHub API: search_issues")
+        cmd = [
+            "gh",
+            "issue",
+            "list",
+            "--search",
+            query,
+            "--limit",
+            str(limit),
+            "--state",
+            state,
+            "--json",
+            "number,title,state,labels",
+        ]
+        if label:
+            cmd.extend(["--label", label])
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.bind(external="github", error=result.stderr).error(
+                "Failed to search issues"
+            )
+            return []
+        return cast(list[dict[str, Any]], json.loads(result.stdout))

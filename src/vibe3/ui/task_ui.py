@@ -191,3 +191,50 @@ def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> Non
 
         console.print(body)
         console.print()  # Empty line between comments
+
+
+def render_task_search(
+    results: list[dict[str, object]],
+    query: str,
+    json_output: bool = False,
+) -> None:
+    """Render task search results.
+
+    Args:
+        results: List of issue dicts from search
+        query: The search query string
+        json_output: If True, output as JSON; otherwise formatted table
+    """
+    if json_output:
+        console.print(
+            json.dumps(results, indent=2, default=str),
+            markup=False,
+            highlight=False,
+            soft_wrap=True,
+        )
+        return
+
+    # Human-readable format
+    count = len(results)
+    console.print(f'\n[bold]Found {count} issue(s) matching "{query}":[/]\n')
+
+    if not results:
+        return
+
+    for issue in results:
+        if not isinstance(issue, dict):
+            continue
+
+        number = issue.get("number")
+        title = issue.get("title", "")
+        state = str(issue.get("state", "OPEN")).upper()
+
+        # State color
+        state_color = "green" if state == "OPEN" else "red"
+
+        # Format: #237  [OPEN]   Split review/plan/run agent contracts...
+        console.print(
+            f"  [bold]#{number}[/]  [{state_color}][{state}][/{state_color}]   {title}"
+        )
+
+    console.print()  # Empty line at end
