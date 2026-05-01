@@ -32,18 +32,22 @@ preflight_checks:
       - 复用：SendMessage 唤醒现有 teammates
       - 不复用：cleanup_phase 清理后重新 spawn
 
-# Team-lead 负责收集 shell 上下文，并把结果传给无 Bash 权限的 teammates
+# Team-lead 负责收集 shell 上下文，并把结果传给 teammates
 context_bundle:
   executor: team-lead
   commands:
-    pr_info: "gh pr view <number> --json headRefName,title,body"
+    pr_info: "gh pr view <number> --json headRefName,title,body,comments"
     pr_branch: "gh pr view <number> --json headRefName -q .headRefName"
     handoff_status: "uv run python src/vibe3/cli.py handoff status <pr-branch> 2>/dev/null || echo 'handoff not available'"
     issue_comments: |
-      ISSUE_NUM=$(echo "<pr-branch>" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
-      if [ -n "$ISSUE_NUM" ]; then
+      PR_BRANCH="<pr-branch>"
+      if echo "$PR_BRANCH" | grep -qE '^(task|dev)/issue-[0-9]+'; then
+        ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
         gh issue view "$ISSUE_NUM" --comments
+      else
+        echo "issue comments unavailable for non-flow branch: $PR_BRANCH"
       fi
+    pr_comments: "gh pr view <number> --comments"
   provided_to:
     - context-researcher
     - architect-reviewer
@@ -157,21 +161,46 @@ workflow:
     agents: []
     actions:
       - write_review_comment  # 写入 PR 评论（必须）
-      - check_fixable_issues  # 检查是否有可修复问题
+      - create_follow_up_issues  # 为范围外发现创建 issue（需去重并标注来源）
     conditions:
       APPROVE:
         - 写评论，说明建议
         - 无需修改代码
+        - 如有范围外发现，可创建 follow-up issue
       NEEDS_INFO:
         - 写评论，请求更多信息
         - 等待作者响应
+        - 如有范围外发现，可创建 follow-up issue
       REJECT:
         - 写评论，说明拒绝理由
-        - 如有小问题可修复：提交修复代码到 PR 分支
+        - 不直接修改 PR 分支；需要修复时交给后续执行流程
       has_fixable_issues:
         - 写评论，列出问题
-        - 创建修复分支或直接提交到 PR 分支
-        - 示例：`git checkout task/issue-xxx && git commit --amend`
+        - 不提交、amend、push 或修改 PR 分支
+        - 需要代码变更时，交给 vibe-commit / executor 或等待用户明确授权
+
+  # Follow-up Issue 创建规则
+  follow_up_issue_policy:
+    trigger: when_out_of_scope_findings_exist
+    requirements:
+      - 先搜索现有 issue，避免重复
+      - issue body 必须标注来源 PR、审查角色、问题范围和建议优先级
+      - 不把需要当前 PR 修复的阻塞问题转成 follow-up issue
+    template:
+      title: "[follow-up] <简短描述>"
+      body: |
+        ## 来源
+        PR #<number> 审查中发现
+
+        ## 问题描述
+        [具体描述]
+
+        ## 建议处理方式
+        [可选]
+
+        ## 优先级建议
+        - [ ] 高 / 中 / 低
+    labels: ["type/follow-up", "scope/<component>"]
 
   phase_5:
     name: 清理与复用准备

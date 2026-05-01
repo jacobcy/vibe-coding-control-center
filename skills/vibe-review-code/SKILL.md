@@ -64,7 +64,11 @@ For opened PRs, GitHub PR metadata and PR diff are the source of truth for what 
 
 ### 2. Gather Project Context
 
-Use the shared state commands only as context, not as proof that code is correct:
+**关键区分**：本地开发 vs 远程审查
+
+#### 本地开发（当前 worktree = PR 开发分支）
+
+使用共享状态命令获取上下文：
 
 ```bash
 uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
@@ -72,6 +76,39 @@ uv run python src/vibe3/cli.py task show
 ```
 
 If these commands fail because the branch has no bound flow, continue reviewing the requested diff and state the limitation.
+
+#### 远程审查（当前 worktree ≠ PR 开发分支）
+
+远程审查时，GitHub comments 是跨机器、跨 agent 的共享现场。不要把本地 handoff 当作唯一真源。
+
+**自动 flow 分支**：
+
+- `task/issue-123` and `dev/issue-123`: infer the issue number and read issue
+  comments as the remote handoff / decision history.
+
+```bash
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+if echo "$PR_BRANCH" | grep -qE '^(task|dev)/issue-[0-9]+'; then
+  ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+  gh issue view "$ISSUE_NUM" --comments
+fi
+gh pr view <number> --comments
+```
+
+**人机合作分支**：
+
+- Branch names such as `codex/pr-123-*` do not imply an issue number.
+- Do not infer an issue number from these branch names.
+- Treat PR body, PR comments, and human review comments as the primary remote
+  context.
+- Explicitly state that issue comments are unavailable for a non-flow branch.
+
+**远程审查上下文优先级**：
+
+1. **PR comments** — 审查历史、人类意见和团队共享现场
+2. **Issue comments** — 仅自动 flow 分支的 agent 决策过程
+3. **PR description** — 改动摘要
+4. **Local handoff** — 仅本地开发分支可用，不作为远程审查前提
 
 ### 3. Run Impact Analysis
 

@@ -26,13 +26,14 @@ extends: architect  # 继承全局 architect 的基础能力
 
 ```yaml
 context_bundle:
-  pr_info: "gh pr view <number> --json headRefName,title,body"
+  pr_info: "gh pr view <number> --json headRefName,title,body,comments"
   pr_branch: "PR 开发分支名"
   handoff_status: "handoff status 输出；不可用时标注 handoff not available"
-  issue_comments: "从分支名推断 issue 编号后读取的 issue comments；无编号时标注 unavailable"
+  issue_comments: "仅 task/issue-* 或 dev/issue-* 分支自动读取；人机合作分支标注不适用"
+  pr_comments: "PR review history and human collaboration context"
 ```
 
-如果 `handoff_status` 不可用，使用 `issue_comments` 和 `pr_info` 作为 fallback 上下文。不要读取 `.git/vibe3` 共享文件。
+如果 `handoff_status` 不可用，自动 flow 分支使用 `issue_comments` 和 `pr_info` 作为 fallback；人机合作分支使用 `pr_info`、`pr_comments` 和人类 review 意见作为真源。不要读取 `.git/vibe3` 共享文件。
 
 阅读关键架构文档：
 - `SOUL.md` — 项目宪法和核心原则
@@ -64,6 +65,65 @@ src/vibe3/
 - PR 可能基于过时的架构假设
 - 可能有更简单的替代方案
 - 可能引入不必要的复杂性
+- 可能错误地在底层包装已有能力
+
+### 底层能力扩充必要性检查（关键）
+
+核心问题：PR 是否在 Shell 能力层（`vibe3` 命令）包装了已有能力？
+
+必须回答：
+1. 这个能力是否已经被 `git` / `gh` / 其他 CLI 覆盖？
+2. 这个能力是否更适合在 Skill 层实现？
+3. 增加底层命令是否会带来长期维护负担？
+
+检查步骤：
+1. 阅读 `docs/standards/v3/command-standard.md` 禁止条款
+2. 检查 PR 是否包装了 `git` / `gh` 已有能力
+3. 评估 `skills/` 目录是否已有类似能力或更合适的编排位置
+
+### 反面范例：PR #614
+
+PR #614 新增 `vibe3 task search <query>` 命令，本质上包装了 `gh issue list --search`。
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| 是否包装 gh 已有能力 | 是 | 包装了 `gh issue list --search` |
+| Skill 层是否已有相近能力 | 是 | `skills/vibe-issue/SKILL.md` 已有查重/语义判断流程 |
+| 是否增加维护负担 | 是 | 底层命令扩张会让 Shell 层承担语义工作流职责 |
+
+正确做法：
+- 直接使用 `gh issue list --search`
+- 或增强 `skills/vibe-issue/SKILL.md` 的查重和语义分析
+
+错误做法：
+- 在 Shell 层新增 `vibe3 task search`
+- 用 `vibe3` 重新包装 `gh` 已覆盖的常规查询能力
+- 把应该留在 Skill 层的语义判断下沉到底层命令
+
+能力分层原则：
+
+```text
+Tier 3: Policies / Rules
+  - 质量标准、治理原则、边界约束
+
+Tier 2: Skills / Workflows
+  - 理解上下文、调度、编排
+  - 语义分析、相似度判断、决策建议
+  - 调用多个 shell 命令组合成复杂流程
+
+Tier 1: Shell Commands / git / gh
+  - 原子操作、确定性状态修改
+  - 只提供可验证的输入输出
+  - 不做业务判断或语义分析
+```
+
+| 能力类型 | 应该放在 | 原因 |
+|----------|----------|------|
+| 纯数据查询/聚合 | 直接用 `gh` / `git` 或 Shell 层 | 无业务判断，可验证输出 |
+| 语义分析/相似度判断 | Skill 层 | 涉及业务决策 |
+| 编排多个命令 | Skill 层 | 组合逻辑属于工作流 |
+| 用户交互/确认 | Skill 层 | 交互属于工作流 |
+| 状态修改 + 回滚 | Shell 层 | 需要原子操作 |
 
 ## 审查流程
 
@@ -91,11 +151,15 @@ src/vibe3/
 - 是否有更简单的实现方式？
 - 是否有现有组件可以复用？
 - 是否有行业标准方案？
+- 这个能力是否已被 `git` / `gh` / 其他 CLI 覆盖？
+- 是否应该放在 Skill 层而非 Shell 层？
 
 **替代方案搜索**：
 - Glob 搜索项目内类似实现
 - WebSearch 搜索行业最佳实践
 - 检查是否有废弃的路径
+- 阅读 `docs/standards/v3/command-standard.md` 禁止条款
+- 检查 `skills/` 目录是否已有类似功能
 
 ### 4. 价值评估
 
