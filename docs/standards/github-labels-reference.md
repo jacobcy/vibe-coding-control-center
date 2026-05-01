@@ -236,5 +236,5 @@ gh issue list --milestone "Phase 1: 基础设施"
 
 - [github-labels-standard.md](github-labels-standard.md) - 标签语义和真源标准
 - [roadmap-label-management.md](roadmap-label-management.md) - 如何使用标签管理 roadmap
-- [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) - 状态同步标准
+- [v3/command-standard.md](v3/command-standard.md) - 命令与状态同步标准
 - [issue-standard.md](issue-standard.md) - Issue 标准

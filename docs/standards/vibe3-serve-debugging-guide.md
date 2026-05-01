@@ -13,7 +13,7 @@ related_docs:
   - docs/standards/agent-debugging-standard.md
   - docs/standards/vibe3-orchestra-runtime-standard.md
   - docs/standards/vibe3-noop-gate-boundary-standard.md
-  - docs/standards/vibe3-state-sync-standard.md
+  - docs/standards/v3/command-standard.md
 ---
 
 # Vibe3 Serve 调试指南
@@ -41,7 +41,7 @@ related_docs:
    - blocked 作为调试信号的正确理解
    - gate/block/fail 的区别与处理
 
-4. **[vibe3-state-sync-standard.md](./vibe3-state-sync-standard.md)**：状态同步与真源定义
+4. **[v3/command-standard.md](./v3/command-standard.md)**：命令与状态同步标准
    - authoritative ref 的定义
    - 状态一致性检查方法
 
