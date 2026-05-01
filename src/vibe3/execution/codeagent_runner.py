@@ -307,13 +307,14 @@ class CodeagentExecutionService:
             )
         except Exception as exc:
             from vibe3.exceptions import AgentExecutionError
-            from vibe3.exceptions.error_classification import classify_error
+            from vibe3.exceptions.error_classification import (
+                classify_error_hybrid,
+            )
             from vibe3.exceptions.error_tracking import ErrorTrackingService
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.
-            error_output = f"{type(exc).__name__}: {exc}"
-            error_code = classify_error(error_output)
+            error_code = classify_error_hybrid(exc)
 
             error_tracking = ErrorTrackingService.get_instance()
             error_tracking.record_error(error_code, str(exc))
