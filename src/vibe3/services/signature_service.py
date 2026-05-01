@@ -3,6 +3,7 @@
 from typing import Any
 
 from vibe3.clients.git_client import GitClient
+from vibe3.utils.actor_utils import normalize_actor as _normalize_actor_for_display
 
 WORKFLOW_ACTOR = "workflow"
 AI_ASSISTANT_ACTORS = {"ai-assistant", "ai_assistant"}
@@ -13,21 +14,6 @@ MANUAL_INITIATOR = "manual"
 # Placeholder actors for FLOW OPERATIONS (resolve_actor / _is_placeholder).
 # These signal "no meaningful actor has claimed this operation."
 _PLACEHOLDER_ACTORS = {"", "unknown", "server", "system", "workflow"}
-
-# Placeholder actors for DISPLAY / PR BODY (normalize_actor).
-# Wider set: also includes generic AI labels that carry no specific identity.
-_DISPLAY_PLACEHOLDER_ACTORS = frozenset(
-    {*_PLACEHOLDER_ACTORS, "ai_assistant", "ai-assistant"}
-)
-
-# Actor alias → normalized identifier (for display layer).
-_ACTOR_ALIAS_MAP: dict[str, str] = {
-    "agent-claude": "claude",
-    "claude-ai": "claude",
-    "agent-codex": "codex",
-    "openai-code-agent[bot]": "openai",
-    "openai-code-agent": "openai",
-}
 
 
 class SignatureService:
@@ -76,15 +62,10 @@ class SignatureService:
         This is the single source of truth for actor normalisation at the
         display / PR-body layer.  Use ``resolve_actor`` / ``resolve_for_branch``
         for flow-state mutations.
+
+        Delegates to utils.actor_utils.normalize_actor for implementation.
         """
-        if not actor or not actor.strip():
-            return None
-        key = actor.strip().lower()
-        if key in _DISPLAY_PLACEHOLDER_ACTORS:
-            return None
-        if key in _ACTOR_ALIAS_MAP:
-            return _ACTOR_ALIAS_MAP[key]
-        return actor.strip()
+        return _normalize_actor_for_display(actor)
 
     @classmethod
     def get_worktree_actor(cls) -> str:
