@@ -178,6 +178,31 @@ def build_manager_request(
                 "Failed to resolve manager agent options, using defaults"
             )
 
+    # Check async_execution config to determine dispatch mode
+    if not config.async_execution:
+        # Sync mode: blocking execution for debugging
+        logger.bind(domain="manager", issue_number=issue.number).info(
+            "Using synchronous execution mode (async_execution=False)"
+        )
+        options = resolve_manager_options(config)
+        request = build_manager_sync_request(
+            config=config,
+            issue=issue,
+            branch=flow_branch,
+            flow_state=None,
+            session_id=None,
+            options=options,
+            actor=actor,
+            dry_run=False,
+            show_prompt=False,
+        )
+        if request.env is None:
+            request.env = env
+        else:
+            request.env.update(env)
+        return request
+
+    # Async mode: non-blocking tmux execution (default)
     request = build_issue_async_cli_request(
         role="manager",
         issue=issue,
@@ -189,7 +214,9 @@ def build_manager_request(
         worktree_requirement=MANAGER_ROLE.worktree,
         repo_path=repo_path,
     )
-    if request.env is not None:
+    if request.env is None:
+        request.env = env
+    else:
         request.env.update(env)
     return request
 

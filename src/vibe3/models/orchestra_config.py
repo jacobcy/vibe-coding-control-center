@@ -222,6 +222,13 @@ class OrchestraConfig(BaseModel):
     scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
+    async_execution: bool = Field(
+        default=True,
+        description=(
+            "If True, manager dispatch runs via tmux (non-blocking). "
+            "If False, runs synchronously (blocking, for debugging)."
+        ),
+    )
 
     # Per-role capacity configuration
     governance_max_concurrent: int = Field(
