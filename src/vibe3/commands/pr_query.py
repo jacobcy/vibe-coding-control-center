@@ -23,6 +23,10 @@ from vibe3.analysis.inspect_output_adapter import (
     pr_analysis_summary,
     score,
 )
+from vibe3.analysis.local_review_report import (
+    LocalReviewReport,
+    find_latest_prepush_report,
+)
 from vibe3.commands.output_format import (
     add_execution_step,
     create_trace_output,
@@ -36,7 +40,7 @@ from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.pr_service import PRService
-from vibe3.ui.pr_ui import render_pr_details
+from vibe3.ui.pr_ui import render_local_review_summary, render_pr_details
 
 
 @dataclass(frozen=True)
@@ -200,12 +204,32 @@ def _fetch_and_record_external_events(
 def _build_pr_output_payload(
     pr: "PRResponse",
     analysis_summary: dict[str, Any] | None = None,
+    local_review: "LocalReviewReport | None" = None,
 ) -> dict[str, Any]:
-    """Merge PR data with optional analysis summary for structured output."""
+    """Merge PR data with optional analysis summary and local review.
+
+    Args:
+        pr: PR response data
+        analysis_summary: Optional analysis summary from inspect
+        local_review: Optional local review report data
+
+    Returns:
+        Dictionary with merged payload for structured output
+    """
     payload = pr.model_dump()
     if analysis_summary:
         payload["analysis"] = {
             key: value for key, value in analysis_summary.items() if key != "raw"
+        }
+    if local_review:
+        payload["local_review"] = {
+            "risk_level": local_review.risk_level,
+            "risk_score": local_review.risk_score,
+            "verdict": local_review.verdict,
+            "report_path": str(local_review.report_path),
+            "created_at": (
+                local_review.created_at.isoformat() if local_review.created_at else None
+            ),
         }
     return payload
 
@@ -310,8 +334,15 @@ def register_query_commands(app: typer.Typer) -> None:
                 )
                 logger.debug("Successfully retrieved change analysis")
 
+            # Find local pre-push review report
+            local_review = find_latest_prepush_report()
+            if local_review:
+                logger.debug(
+                    f"Found local review report: {local_review.report_path.name}"
+                )
+
             if trace_output or json_output or yaml_output:
-                result = _build_pr_output_payload(pr, analysis_summary)
+                result = _build_pr_output_payload(pr, analysis_summary, local_review)
                 output_result(
                     result=result,
                     trace_output=trace_output,
@@ -367,3 +398,6 @@ def register_query_commands(app: typer.Typer) -> None:
                         console.print("\n[bold]### Top Changed Files[/]")
                         for file in changed_files[:5]:
                             console.print(f"  - {file}")
+
+                # Show local review summary
+                render_local_review_summary(local_review)
