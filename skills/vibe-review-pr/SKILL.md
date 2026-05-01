@@ -19,6 +19,27 @@ description: |
 
 ---
 
+## 执行流程概述
+
+**关键指令**：读取 template 后，按 `workflow.execution` 配置执行 Agent 调用。
+
+```
+1. TeamCreate(team_name="pr-review-team") → 创建 team
+2. 读取 template.agents → 确定 subagent_type 和 spawn_config
+3. Phase 1: Agent(name="context-researcher", subagent_type="pr-context-researcher", ...)
+4. Phase 2: 并行 spawn 3 个 agents（单次响应中多个 Agent 调用）
+5. Phase 3: 收集结果，仲裁，决策
+6. Phase 4: team-lead 执行写回（Bash tool）
+7. Phase 5: 清理或复用
+```
+
+**重要**：
+- `subagent_type` 必须匹配项目 `.claude/agents/pr-*.md` 定义
+- Phase 2 并行 spawn 需要在**单次响应**中发起多个 Agent tool 调用
+- Phase 4/5 由 team-lead（当前 session）执行，不 spawn 新 agent
+
+---
+
 ## Step 1: 环境检查
 
 **必须先检查环境是否支持 Team 功能。**
@@ -51,6 +72,60 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
 不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
 team cleanup 状态；环境不满足时，直接转入 `vibe-review-code` 单 agent 审查。
+
+---
+
+## Step 1.5: 选择执行模式
+
+**在开始审查前，询问用户执行模式**（除非用户已指定）。
+
+### 执行模式选项
+
+| 模式 | 描述 | 风险 | 适用场景 |
+|------|------|------|----------|
+| **auto-fix** | 自动修复审核发现的问题并提交 | 高 | 用户明确要求自动修复 |
+| **comment-only** | 只发布审核意见，不修改代码 | 无 | 用户要求只审核不修复 |
+| **auto-decide** | team-lead 根据PR复杂度自动决定 | 中 | 用户授权自动决策 |
+| **ask-each** | 每次审核完毕后询问用户（默认） | 无 | 最安全，推荐 |
+
+### 询问方式
+
+```yaml
+# 使用 AskUserQuestion tool
+question: |
+  请选择审核后的执行模式：
+
+  1. auto-fix - 自动修复问题并提交
+  2. comment-only - 只发布审核意见
+  3. auto-decide - 由 team-lead 根据复杂度决定
+  4. ask-each - 每次审核完询问（默认）
+
+  输入数字 (1/2/3/4) 或模式名称：
+
+options:
+  - key: "1"
+    value: "auto-fix"
+    description: "自动修复并提交（高风险）"
+  - key: "2"
+    value: "comment-only"
+    description: "只写 comment（安全）"
+  - key: "3"
+    value: "auto-decide"
+    description: "team-lead 自动决策"
+  - key: "4"
+    value: "ask-each"
+    description: "每次询问（推荐）"
+```
+
+### 保存选择
+
+将用户选择保存到 team context，供 Phase 4 使用：
+
+```yaml
+execution_context:
+  mode: user_selected_mode
+  pr_number: target_pr
+```
 
 ---
 
@@ -88,7 +163,7 @@ gh pr view <number> --json baseRefName,headRefName
 
 ---
 
-## Step 3: 加载 Team Template
+## Step 3: 加载 Team Template 并创建 Team
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -97,10 +172,27 @@ gh pr view <number> --json baseRefName,headRefName
 cat .claude/team-templates/pr-review-team.yaml
 ```
 
+**Template 是可执行配置**：
+- `team_create_config` — TeamCreate 参数
+- `agents` — 定义 subagent_type 和 spawn_config
+- `workflow.execution` — 每个 phase 的具体执行步骤
+
+**创建 Team**（使用 template.team_create_config）：
+
+```yaml
+# 从 template 读取配置
+team_create_config:
+  team_name: pr-review-team
+  agent_type: general-purpose
+
+# 执行 TeamCreate
+TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
+```
+
 **Template 包含**：
-- Agent 定义（model, tools, description）
+- Agent 定义（subagent_type, model, spawn_config）
 - PR 类型判断规则
-- 工作流程（Phase 1 -> Phase 2 -> Phase 3）
+- 工作流程（每个 phase 的 execution 步骤）
 - 防幻觉机制
 - 输出格式
 
@@ -125,60 +217,146 @@ gh pr view <number> --json title,labels,additions
 
 ## Step 5: 按流程启动 Agent
 
-**Phase 1（必须先完成）**：
-```
-PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+**重要**：读取 template 中的 `workflow.execution` 配置，按步骤执行。
 
-# 仅自动 flow 分支可推断 issue：task/issue-123 或 dev/issue-123。
-# 人机合作分支（如 codex/pr-123-*）不自动推断 issue，优先使用 PR body/comments。
-if echo "$PR_BRANCH" | grep -qE '^(task|dev)/issue-[0-9]+'; then
-  ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
-  gh issue view "$ISSUE_NUM" --comments
-else
-  echo "issue comments unavailable for non-flow branch: $PR_BRANCH"
-  gh pr view <number> --comments
-fi
+### Phase 1: 背景调研
 
-Agent(context-researcher, model=haiku, prompt="收集 PR 背景...")
-v 等待 teammate-message
-```
+**执行步骤**（从 template.workflow.phase_1.execution）：
 
-**Phase 2（收到背景后）**：
-```
-SendMessage(to=architect-reviewer, message=背景报告)
-Agent(architect-reviewer, model=sonnet, prompt=带背景的prompt)
+```yaml
+# Step 1: spawn context-researcher
+- tool: Agent
+  params:
+    team_name: pr-review-team
+    name: context-researcher
+    subagent_type: pr-context-researcher  # 引用项目 agent 定义
+    model: haiku
+    prompt: |
+      收集 PR #{pr_number} 的背景信息：
+      1. 阅读 CLAUDE.md, AGENTS.md, docs/standards/glossary.md
+      2. 获取 issue comments（如果是 task/issue-* 分支）
+      3. 分析依赖关系和时效性
+      输出结构化背景报告。
+  wait: true  # 必须等待结果
 
-SendMessage(to=code-analyst, message=背景报告)
-Agent(code-analyst, model=haiku, prompt=带背景的prompt)
+# Step 2: 接收背景报告
+- action: 等待 teammate-message，获取 context-researcher 的背景报告
 
-# 仅安全相关 PR
-if security_related:
-    Agent(security-reviewer, ...)
+# Step 3: 准备 Phase 2 上下文
+- action: 将背景报告保存为 phase_1_output，用于 SendMessage
 ```
 
-**Phase 3（综合判断）**：
-```
-收集结果 -> 差异检测 -> 仲裁 -> 最终决策
+### Phase 2: 专项审查
+
+**执行步骤**（从 template.workflow.phase_2.execution）：
+
+```yaml
+# Step 1: 并行 spawn Phase 2 agents
+# 注意：在单次响应中发起多个 Agent 调用实现并行
+- tool: Agent
+  params:
+    team_name: pr-review-team
+    name: code-analyst
+    subagent_type: pr-code-analyst
+    model: haiku
+    prompt: |
+      分析 PR #{pr_number} 的代码质量：
+      背景信息：{phase_1_output}
+      1. 检查代码风格和规范符合性
+      2. 识别技术债
+      3. 评估可维护性
+    run_in_background: true
+
+- tool: Agent
+  params:
+    team_name: pr-review-team
+    name: architect-reviewer
+    subagent_type: pr-architect-reviewer
+    model: sonnet
+    prompt: |
+      评估 PR #{pr_number} 的架构影响：
+      背景信息：{phase_1_output}
+      1. 检查架构符合性
+      2. 评估扩展性影响
+      3. 判断是否有替代方案
+    run_in_background: true
+
+- tool: Agent
+  params:
+    team_name: pr-review-team
+    name: security-reviewer
+    subagent_type: pr-security-reviewer
+    model: sonnet
+    prompt: |
+      评估 PR #{pr_number} 的安全性：
+      背景信息：{phase_1_output}
+      1. 检查安全漏洞
+      2. 进行红队测试
+      3. 评估敏感信息泄露风险
+    run_in_background: true
+
+# Step 2-4: 发送上下文（agents 启动后自动接收 team broadcast）
+# 注意：run_in_background 的 agents 会自动收到 team context
+
+# Step 5: 等待所有结果
+- action: 等待所有 Phase 2 agents 返回 idle notification
 ```
 
-**Phase 4（写回与改进）**：
-```
-team-lead 执行：
-- write_review_comment -> gh pr comment
-- create_follow_up_issues -> 为范围外发现创建 issue（需要去重、标注来源和优先级）
-- 不直接提交、amend、push 或修改 PR 分支；需要代码修复时，写明建议并交给后续执行流程
+### Phase 3: 综合判断
+
+**执行步骤**（从 template.workflow.phase_3.execution）：
+
+```yaml
+# Step 1: 收集所有报告
+- action: 从 idle notifications 获取各 agent 报告
+
+# Step 2: 检测冲突
+- action: 对比各报告，找出差异点
+  example: |
+    code-analyst: "建议使用 logger.bind()"
+    architect-reviewer: "当前实现已足够，无需修改"
+    → 记录差异，需要仲裁
+
+# Step 3: 仲裁
+- condition: 存在冲突
+  action: 进行仲裁并记录理由
+
+# Step 4: 最终决策
+- action: 生成 APPROVE / REJECT / NEEDS_INFO 决策
 ```
 
-**Phase 5（清理与复用准备）**：
+### Phase 4: 写回与改进
+
+**执行步骤**（由 team-lead 执行，非 spawn）：
+
+```yaml
+# Step 1: 写 PR 评论
+- tool: Bash
+  params:
+    command: gh pr comment {pr_number} --body "{review_report}"
+
+# Step 2: 创建 follow-up issues（条件执行）
+- condition: has_out_of_scope_findings
+  tool: Bash
+  params:
+    command: gh issue create --title "[follow-up] {title}" --body "{body}"
 ```
-team-lead 执行：
-- 如果继续审查下一个 PR：
-  - 清空 inbox 文件（保留 tmux panes）
-  - 重置 tasks 状态
-- 如果结束本次审查会话：
-  - 杀死所有 teammate panes
-  - 删除 teams 和 tasks 目录
-  - 释放资源
+
+### Phase 5: 清理与复用准备
+
+**执行步骤**（由 team-lead 执行）：
+
+```yaml
+- condition: continue_next_pr
+  actions:
+    - 清空 inboxes: rm ~/.claude/teams/pr-review-team/inboxes/*.json
+    - 重置 tasks: rm ~/.claude/tasks/pr-review-team/*
+
+- condition: full_cleanup
+  actions:
+    - 杀死 panes: 从 config.json 读取 paneId 并 kill-pane
+    - 删除 team: rm -rf ~/.claude/teams/pr-review-team
+    - 删除 tasks: rm -rf ~/.claude/tasks/pr-review-team
 ```
 
 ---
