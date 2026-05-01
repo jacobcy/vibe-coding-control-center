@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from vibe3.config.orchestra_config import OrchestraConfig
 from vibe3.config.settings import VibeConfig
-from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def load_orchestra_config() -> OrchestraConfig:
