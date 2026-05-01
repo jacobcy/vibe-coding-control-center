@@ -126,7 +126,11 @@ def test_inspect_files_yaml_produces_valid_yaml():
 
 
 def test_inspect_base_yaml_produces_valid_yaml():
-    """Verify inspect base --yaml produces valid parseable YAML."""
+    """Verify inspect base --yaml produces valid parseable YAML.
+
+    Uses HEAD as base to work in both local and CI environments
+    (CI uses shallow clones where remote branch refs may not exist).
+    """
     result = subprocess.run(
         [
             "uv",
@@ -135,7 +139,7 @@ def test_inspect_base_yaml_produces_valid_yaml():
             "src/vibe3/cli.py",
             "inspect",
             "base",
-            "main",
+            "HEAD",
             "--yaml",
         ],
         capture_output=True,
