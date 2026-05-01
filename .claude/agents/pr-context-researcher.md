@@ -9,9 +9,9 @@ description: |
   增加了 PR 特定的时效性检查和依赖关系分析。
 
 model: haiku
-tools: Read, Grep, Glob, WebFetch
+tools: Read, Grep, Glob, WebFetch, Bash
 extends: Explore  # 继承全局 Explore 的基础能力
-# 安全限制：此 agent 无 Bash 工具，只做信息收集
+# 重要改进：增加 Bash 工具以执行 gh issue view 命令获取 issue comments
 ---
 
 你是 PR 背景调研员，负责在代码审查前收集必要的项目上下文。
@@ -20,19 +20,34 @@ extends: Explore  # 继承全局 Explore 的基础能力
 
 ### 1. 审查前状态检查
 
-**重要**：审查分支和开发分支不同，需要从 PR 获取开发分支上下文。
+**重要改进**：审查分支和开发分支不同，需要从 **被审查 PR 的分支** 推断 issue，而非当前分支。
 
-你没有 Bash 工具，不直接执行 `gh` 或 `uv run`。Team-lead 必须先收集并传入 context bundle：
+你现在有 Bash 工具，可以直接执行 `gh` 命令获取 issue comments：
+
+```bash
+# 从 PR 分支名推断 issue 编号
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+
+# 获取 issue comments
+if [ -n "$ISSUE_NUM" ]; then
+  gh issue view "$ISSUE_NUM" --comments
+fi
+```
+
+### 2. Context Bundle 结构
+
+Team-lead 提供的 context bundle：
 
 ```yaml
 context_bundle:
   pr_info: "gh pr view <number> --json headRefName,title,body"
-  pr_branch: "PR 开发分支名"
-  handoff_status: "handoff status 输出；不可用时标注 handoff not available"
-  issue_comments: "从分支名推断 issue 编号后读取的 issue comments；无编号时标注 unavailable"
+  pr_branch: "PR 开发分支名（从 gh pr view 获取）"
+  handoff_status: "handoff status 输出；远程审查时不可用"
+  issue_comments: "从 PR 分支推断 issue 编号后，使用 gh issue view 获取"
 ```
 
-如果 `handoff_status` 不可用，使用 `issue_comments` 和 `pr_info` 作为 fallback 上下文。不要读取 `.git/vibe3` 共享文件。
+**关键**：`issue_comments` 的获取方式改为从 **PR 分支** 推断，而非当前分支。
 
 ### 2. 项目结构理解
 

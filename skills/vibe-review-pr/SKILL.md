@@ -10,47 +10,106 @@ description: |
 ## 职责
 
 **本 Skill 只负责**：
-1. 环境检查
-2. 加载 Team Template
-3. 启动审查团队
+1. 环境检查与模式选择
+2. PR 队列排序与选择
+3. 加载 Team Template
+4. 启动审查团队
 
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
 ---
 
-## Step 1: 环境检查
+## Step 1: 环境检查与模式选择
 
-**必须先检查环境是否支持 Team 功能。**
+**检查环境是否支持 Team 功能，并决定审查模式。**
 
 ```bash
 # 检查 tmux
-echo "TMUX: ${TMUX:-未设置}"
+TMUX_STATUS="${TMUX:-未设置}"
 
 # 检查团队模式
-env | grep -i "CLAUDE.*TEAM" || echo "未设置"
+TEAM_MODE=$(env | grep -i "CLAUDE.*TEAM" || echo "未设置")
 ```
 
-### 环境要求
+### 环境状态判断
 
-| 条件 | 要求 | 不满足时 |
-|------|------|----------|
-| TMUX | 必须设置 | 提示用户 + 回退到 vibe-review-code |
-| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 提示用户 + 回退 |
+| TMUX | TEAM_MODE | 结果 |
+|------|-----------|------|
+| 已设置 | =1 | tmux 模式可用 |
+| 已设置 | 未设置 | 询问是否启用非 tmux 团队审查 |
+| 未设置 | =1 | 询问是否启用非 tmux 团队审查 |
+| 未设置 | 未设置 | 询问是否启用非 tmux 团队审查 |
 
-**回退处理**：
+**关键改进**：tmux 不可用时，**询问用户**而非直接回退：
+
 ```
-"Team 功能需要在 tmux session 内运行。
- 请运行: tmux new-session -s vibe-review
- 然后重新启动 Claude Code。
- 
- 当前回退到单 agent 审查模式..."
- 
--> 使用 vibe-review-code
+"检测到 tmux session 未运行或团队模式未启用。
+
+ 可选审查模式：
+ 1. 非 tmux 团队审查（使用 Agent 工具串行启动多个审查 agent）
+ 2. 单 agent 审查（使用 vibe-review-code skill）
+
+ 请选择审查模式 [1/2]？"
+```
+
+### 非 tmux 团队审查模式
+
+当用户选择非 tmux 模式时：
+- 使用 Agent 工具串行启动审查 agent（Phase 1 → Phase 2 → Phase 3）
+- 不使用 SendMessage（因为没有 tmux panes）
+- 通过主对话上下文传递信息
+- 保留完整的审查流程和仲裁机制
+
+---
+
+## Step 2: PR 队列排序与选择
+
+**检查当前 repo 的所有未合并 PR，排序后确定审查顺序。**
+
+```bash
+# 获取所有未合并 PR
+gh pr list --state open --json number,title,labels,additions,deletions,baseRefName,headRefName,updatedAt
+```
+
+### PR 排序规则
+
+**优先级从高到低**：
+
+1. **merge-ready 状态**：标签含 `state/merge-ready`
+2. **最小改动优先**：additions + deletions 行数最小
+3. **无依赖优先**：检查 PR 分支是否依赖其他未合并 PR
+4. **范围重叠处理**：
+   - 复杂 PR（改动更多文件）先审查
+   - 简单 PR（改动较少文件）后审查
+   - 同一文件的多个改动：先审查改动量大的
+
+### PR 依赖关系检测
+
+```bash
+# 检查 PR 分支的 merge base
+for each PR:
+  gh pr view <number> --json baseRefName,headRefName
+  # 如果 baseRefName 不是 main，检查是否依赖其他 PR
+```
+
+**依赖判断**：
+- `baseRefName == main`：无依赖，优先审查
+- `baseRefName == task/issue-xxx`：可能依赖另一个 PR 的分支，需先审查那个 PR
+
+### 用户确认
+
+```
+"发现 N 个未合并 PR，按优先级排序：
+
+ [排列表格]
+
+ 建议从 PR #xxx 开始审查。是否同意？[y/n]
+ 或指定要审查的 PR 编号。"
 ```
 
 ---
 
-## Step 2: 加载 Team Template
+## Step 3: 加载 Team Template
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -68,7 +127,7 @@ cat .claude/team-templates/pr-review-team.yaml
 
 ---
 
-## Step 3: 判断 PR 类型
+## Step 4: 判断 PR 类型
 
 根据 Template 中的 `pr_classification` 规则：
 
@@ -85,13 +144,21 @@ gh pr view <number> --json title,labels,additions
 
 ---
 
-## Step 4: 按流程启动 Agent
+## Step 5: 按流程启动 Agent
+
+**关键改进**：从被审查 PR 的分支推断 issue，而非当前分支。
 
 **Phase 1（必须先完成）**：
 ```
+# 从 PR 分支获取 issue 编号
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+
 Agent(context-researcher, model=haiku, prompt="收集 PR 背景...")
 v 等待 teammate-message
 ```
+
+**重要**：context-researcher 需要 Bash 工具权限来执行 `gh issue view` 命令。
 
 **Phase 2（收到背景后）**：
 ```
@@ -116,6 +183,38 @@ if security_related:
 team-lead 执行：
 - write_review_comment -> gh pr comment
 - check_fixable_issues -> 如需修复，提交代码
+- create_follow_up_issues -> 为发现但未处理的事项创建 issue
+```
+
+### 创建 Follow-up Issue 规则
+
+**当发现以下内容时，应创建 follow-up issue**：
+
+1. **范围外问题**：审查中发现但不属于当前 PR 范围的问题
+2. **改进建议**：可优化但非阻塞性的建议
+3. **技术债识别**：发现的现有技术债
+4. **安全增强**：非紧急但可加强的安全措施
+
+**创建方式**：
+```bash
+gh issue create --title "<title>" --body "<description>" --label "type/follow-up,scope/<component>"
+```
+
+**Issue body 模板**：
+```markdown
+## 来源
+PR #<number> 审查中发现
+
+## 问题描述
+[具体描述]
+
+## 建议处理方式
+[可选]
+
+## 优先级
+- [ ] 高
+- [ ] 中
+- [ ] 低
 ```
 
 **Phase 5（清理与复用准备）**：

@@ -158,20 +158,48 @@ workflow:
     actions:
       - write_review_comment  # 写入 PR 评论（必须）
       - check_fixable_issues  # 检查是否有可修复问题
+      - create_follow_up_issues  # 创建 follow-up issue 记录范围外发现
     conditions:
       APPROVE:
         - 写评论，说明建议
         - 无需修改代码
+        - 为发现的技术债/改进建议创建 follow-up issue
       NEEDS_INFO:
         - 写评论，请求更多信息
         - 等待作者响应
+        - 为发现的技术债/改进建议创建 follow-up issue
       REJECT:
         - 写评论，说明拒绝理由
         - 如有小问题可修复：提交修复代码到 PR 分支
+        - 为发现的架构问题/替代方案创建 follow-up issue
       has_fixable_issues:
         - 写评论，列出问题
         - 创建修复分支或直接提交到 PR 分支
         - 示例：`git checkout task/issue-xxx && git commit --amend`
+
+  # Follow-up Issue 创建规则
+  follow_up_issue_policy:
+    trigger: always  # 不论 APPROVE/REJECT/NEEDS_INFO，都检查是否需要创建
+    conditions:
+      - 发现技术债但不在当前 PR 范围
+      - 发现可改进但非阻塞性建议
+      - 发现安全增强机会但非紧急
+      - 发现架构优化建议但超出当前改动
+    template:
+      title: "[follow-up] <简短描述>"
+      body: |
+        ## 来源
+        PR #<number> 审查中发现
+
+        ## 问题描述
+        [具体描述]
+
+        ## 建议处理方式
+        [可选]
+
+        ## 优先级建议
+        - [ ] 高 / 中 / 低
+    labels: ["type/follow-up", "scope/<component>"]
 
   phase_5:
     name: 清理与复用准备
