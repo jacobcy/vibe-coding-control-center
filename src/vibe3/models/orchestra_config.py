@@ -198,6 +198,15 @@ class SupervisorHandoffConfig(BaseModel):
     )
 
 
+class WorktreeCleanupConfig(BaseModel):
+    """Configuration for temporary worktree cleanup (do/* worktrees)."""
+
+    enabled: bool = True
+    ttl_hours: int = Field(default=72, ge=1)
+    on_pr_closed: bool = True
+    dry_run: bool = False
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -256,3 +265,4 @@ class OrchestraConfig(BaseModel):
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
     )
+    cleanup: WorktreeCleanupConfig = Field(default_factory=WorktreeCleanupConfig)
