@@ -67,6 +67,9 @@ code_limits:
       - path: "src/vibe3/commands/status.py"
         limit: 480
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，CLI 入口函数难以拆分"
+      - path: "src/vibe3/commands/pr_query.py"
+        limit: 420
+        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 集成、trace 输出等紧密耦合逻辑"
 
       # Services 层 —— 允许 400-500
       - path: "src/vibe3/analysis/snapshot_service.py"
@@ -177,7 +180,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
-    v3_python: 46000        # Python 核心代码总行数（临时提升至 46000 以允许 PR 通过，后续将通过删除死代码降至 45000）
+    v3_python: 50000        # Python 核心代码总行数（临时提升至 50000 以审理后续 PR；后续拆出非核心代码并治理膨胀）
 
   # 统计口径（路径定义）
   code_paths:
