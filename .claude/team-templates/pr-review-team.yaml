@@ -1,0 +1,161 @@
+# PR Review Team Template
+# 用于 vibe-review-pr skill 加载团队配置
+
+name: pr-review-team
+description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
+
+# 环境要求
+requirements:
+  tmux: required  # 必须在 tmux session 内
+  team_mode: required  # CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
+# 启动前检查
+preflight_checks:
+  - name: 检查已有 agent
+    command: "ls ~/.claude/agents/*.md | xargs -I {} basename {} .md"
+    action: |
+      如果全局已有类似功能的 agent：
+      - 优先复用全局 agent（设置 agentType）
+      - 或继承其定义，添加项目特定的 prompt 扩展
+      - 不要创建重复功能的 agent
+  - name: 检查团队成员
+    command: "cat ~/.claude/teams/{team-name}/config.json | jq '.members | length'"
+    action: |
+      如果团队成员超过 10 个：
+      - 提示用户清理历史遗留成员
+      - 或手动 TeamDelete 重建团队
+
+# Agent 定义
+agents:
+  context-researcher:
+    agentType: Explore
+    model: haiku
+    description: 背景调研员，收集项目背景和领域知识
+    tools: [Read, Grep, Glob, WebFetch]
+    output_format:
+      required_fields: [时效性, 依赖关系, 类似实现]
+
+  code-analyst:
+    agentType: Explore
+    model: haiku
+    description: 代码分析员，分析代码框架和技术债
+    tools: [Read, Grep, Glob, Bash]
+    output_format:
+      required_fields: [技术债列表, 架构符合性, 代码质量]
+
+  architect-reviewer:
+    agentType: architect
+    model: sonnet
+    description: 架构审查专家，评估 PR 对项目架构的影响
+    tools: [Read, Grep, Glob, WebSearch]
+    output_format:
+      required_fields: [结论, 置信度, 关键发现]
+
+  security-reviewer:
+    agentType: code-reviewer
+    model: sonnet
+    description: 安全审查专家，红队测试和安全评估
+    tools: [Read, Grep, Glob, Bash]
+    output_format:
+      required_fields: [安全等级, 绕过方式, 修复建议]
+    trigger: always  # 始终参与审查（即使非安全 PR）
+
+# Codex 配置（外部专家）
+codex:
+  model: gpt-5.4
+  trigger: [security_pr, conflict_arbitration]
+  call_method: bash  # 通过 codex-companion.mjs 调用
+
+# PR 类型判断
+pr_classification:
+  simple:
+    condition: "additions < 50 and not security_related"
+    flow: single_reviewer
+    agents: []
+
+  refactor:
+    condition: "'refactor' in title.lower()"
+    flow: standard
+    agents: [context-researcher, code-analyst, architect-reviewer]
+
+  security:
+    condition: "has_security_label or 'fix' in labels"
+    flow: full_with_codex
+    agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
+
+  standard:
+    condition: default
+    flow: standard
+    agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
+
+# 工作流程
+workflow:
+  phase_1:
+    name: 背景调研
+    agents: [context-researcher]
+    parallel: false
+    output_to_phase_2: true
+
+  phase_2:
+    name: 专项审查
+    agents: [code-analyst, architect-reviewer, security-reviewer]
+    parallel: true
+    requires_phase_1_output: true
+    message_passing: SendMessage
+
+  phase_3:
+    name: 综合判断与改进
+    agents: []
+    actions:
+      - collect_results
+      - detect_conflicts
+      - arbitrate_if_needed
+      - final_decision
+      - generate_improvement_plan  # 生成改进建议
+
+  phase_4:
+    name: 写回与改进
+    agents: []
+    actions:
+      - write_review_comment  # 写入 PR 评论（必须）
+      - check_fixable_issues  # 检查是否有可修复问题
+    conditions:
+      APPROVE:
+        - 写评论，说明建议
+        - 无需修改代码
+      NEEDS_INFO:
+        - 写评论，请求更多信息
+        - 等待作者响应
+      REJECT:
+        - 写评论，说明拒绝理由
+        - 如有小问题可修复：提交修复代码到 PR 分支
+      has_fixable_issues:
+        - 写评论，列出问题
+        - 创建修复分支或直接提交到 PR 分支
+        - 示例：`git checkout task/issue-xxx && git commit --amend`
+
+# 防幻觉机制
+anti_hallucination:
+  evidence_required:
+    "已合并": "gh pr view output"
+    "CI 通过": "gh pr checks output"
+    "无漏洞": "检查的文件和函数列表"
+    "符合架构": "架构文档引用位置"
+
+# 输出格式
+output_format: |
+  ## PR #<number> Team 审查报告
+
+  ### Phase 1: 背景调研
+  [context-researcher 的关键发现]
+
+  ### Phase 2: 专项审查
+  [各审查员的发现]
+
+  ### Phase 3: 交叉验证
+  [差异检测和仲裁]
+
+  ### 综合结论
+  **决策**: APPROVE / REJECT / NEEDS_INFO
+  **关键发现**: [列表]
+  **技术债识别**: [列表]
