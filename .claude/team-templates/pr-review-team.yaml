@@ -32,6 +32,24 @@ preflight_checks:
       - 复用：SendMessage 唤醒现有 teammates
       - 不复用：cleanup_phase 清理后重新 spawn
 
+# Team-lead 负责收集 shell 上下文，并把结果传给无 Bash 权限的 teammates
+context_bundle:
+  executor: team-lead
+  commands:
+    pr_info: "gh pr view <number> --json headRefName,title,body"
+    pr_branch: "gh pr view <number> --json headRefName -q .headRefName"
+    handoff_status: "uv run python src/vibe3/cli.py handoff status <pr-branch> 2>/dev/null || echo 'handoff not available'"
+    issue_comments: |
+      ISSUE_NUM=$(echo "<pr-branch>" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+      if [ -n "$ISSUE_NUM" ]; then
+        gh issue view "$ISSUE_NUM" --comments
+      fi
+  provided_to:
+    - context-researcher
+    - architect-reviewer
+    - code-analyst
+    - security-reviewer
+
 # 复用策略
 reuse_policy:
   enabled: true
@@ -206,10 +224,11 @@ cleanup_commands:
     rm -f ~/.claude/teams/{team-name}/inboxes/*.json
     echo "Cleared all inboxes"
   kill_teammates: |
-    tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{pane_current_command}' | \
-    grep -v 'zsh\|bash\|fish' | \
-    awk '{print $1}' | \
-    xargs -I {} tmux kill-pane -t {}
+    jq -r '.members[] | .pane_id // .paneId // empty' \
+      ~/.claude/teams/{team-name}/config.json | \
+    while read -r pane_id; do
+      [ -n "$pane_id" ] && tmux kill-pane -t "$pane_id"
+    done
   full_cleanup: |
     rm -rf ~/.claude/teams/{team-name}
     rm -rf ~/.claude/tasks/{team-name}

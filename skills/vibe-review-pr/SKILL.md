@@ -45,7 +45,7 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
  
  当前回退到单 agent 审查模式..."
  
-→ 使用 vibe-review-code
+-> 使用 vibe-review-code
 ```
 
 ---
@@ -62,7 +62,7 @@ cat .claude/team-templates/pr-review-team.yaml
 **Template 包含**：
 - Agent 定义（model, tools, description）
 - PR 类型判断规则
-- 工作流程（Phase 1 → Phase 2 → Phase 3）
+- 工作流程（Phase 1 -> Phase 2 -> Phase 3）
 - 防幻觉机制
 - 输出格式
 
@@ -90,7 +90,7 @@ gh pr view <number> --json title,labels,additions
 **Phase 1（必须先完成）**：
 ```
 Agent(context-researcher, model=haiku, prompt="收集 PR 背景...")
-↓ 等待 teammate-message
+v 等待 teammate-message
 ```
 
 **Phase 2（收到背景后）**：
@@ -108,14 +108,14 @@ if security_related:
 
 **Phase 3（综合判断）**：
 ```
-收集结果 → 差异检测 → 仲裁 → 最终决策
+收集结果 -> 差异检测 -> 仲裁 -> 最终决策
 ```
 
 **Phase 4（写回与改进）**：
 ```
 team-lead 执行：
-- write_review_comment → gh pr comment
-- check_fixable_issues → 如需修复，提交代码
+- write_review_comment -> gh pr comment
+- check_fixable_issues -> 如需修复，提交代码
 ```
 
 **Phase 5（清理与复用准备）**：

@@ -22,26 +22,17 @@ extends: Explore  # 继承全局 Explore 的基础能力
 
 **重要**：审查分支和开发分支不同，需要从 PR 获取开发分支上下文。
 
-```bash
-# 获取 PR 信息
-gh pr view <number> --json headRefName,title,body,comments
+你没有 Bash 工具，不直接执行 `gh` 或 `uv run`。Team-lead 必须先收集并传入 context bundle：
 
-# 尝试检查开发分支的 handoff（仅本地可用）
-PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
-uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available"
+```yaml
+context_bundle:
+  pr_info: "gh pr view <number> --json headRefName,title,body"
+  pr_branch: "PR 开发分支名"
+  handoff_status: "handoff status 输出；不可用时标注 handoff not available"
+  issue_comments: "从分支名推断 issue 编号后读取的 issue comments；无编号时标注 unavailable"
 ```
 
-**Fallback**：如果 handoff 不可用（远程审查），从 issue comments 获取上下文：
-```bash
-# 从分支名推断 issue 编号（如 task/issue-123 → issue #123）
-ISSUE_NUM=$(echo $PR_BRANCH | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
-if [ -n "$ISSUE_NUM" ]; then
-  gh issue view $ISSUE_NUM --comments
-fi
-
-# 同时获取 PR 信息
-gh pr view <number> --json title,body
-```
+如果 `handoff_status` 不可用，使用 `issue_comments` 和 `pr_info` 作为 fallback 上下文。不要读取 `.git/vibe3` 共享文件。
 
 ### 2. 项目结构理解
 
@@ -145,7 +136,7 @@ gh pr view <number> --json title,body
 ## 工作方式
 
 1. 接收 PR 编号
-2. 使用 WebFetch 获取 `gh pr view <number>` 信息
+2. 读取 team-lead 传入的 context bundle 和 PR 信息
 3. 根据涉及的文件，Read 相关文档
 4. Grep 搜索历史 PR 和 issue 引用
 5. 整理发现，输出结构化报告

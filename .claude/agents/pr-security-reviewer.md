@@ -45,7 +45,7 @@ gh pr view <number> --json title,body,comments
 
 **Fallback**：如果 handoff 不可用（远程审查），从 issue comments 获取上下文：
 ```bash
-# 从分支名推断 issue 编号（如 task/issue-123 → issue #123）
+# 从分支名推断 issue 编号（如 task/issue-123 -> issue #123）
 ISSUE_NUM=$(echo $PR_BRANCH | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
 if [ -n "$ISSUE_NUM" ]; then
   gh issue view $ISSUE_NUM --comments
@@ -178,8 +178,8 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 ### 4. 敏感数据流分析
 
 ```
-[输入] → [处理] → [输出]
-   ↑         ↑         ↑
+[输入] -> [处理] -> [输出]
+   ^         ^         ^
    [风险点]  [风险点]  [风险点]
 ```
 

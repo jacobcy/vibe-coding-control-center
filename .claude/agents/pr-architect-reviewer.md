@@ -22,20 +22,17 @@ extends: architect  # 继承全局 architect 的基础能力
 
 **重要**：审查分支和开发分支不同，需要从 PR 获取开发分支上下文。
 
-```bash
-# 获取 PR 信息
-gh pr view <number> --json headRefName,title,body
+你没有 Bash 工具，不直接执行 `gh` 或 `uv run`。Team-lead 必须先收集并传入 context bundle：
 
-# 尝试检查开发分支的 handoff（仅本地可用）
-PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
-uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available"
-
-# Fallback：从 issue comments 获取上下文
-ISSUE_NUM=$(echo $PR_BRANCH | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
-if [ -n "$ISSUE_NUM" ]; then
-  gh issue view $ISSUE_NUM --comments
-fi
+```yaml
+context_bundle:
+  pr_info: "gh pr view <number> --json headRefName,title,body"
+  pr_branch: "PR 开发分支名"
+  handoff_status: "handoff status 输出；不可用时标注 handoff not available"
+  issue_comments: "从分支名推断 issue 编号后读取的 issue comments；无编号时标注 unavailable"
 ```
+
+如果 `handoff_status` 不可用，使用 `issue_comments` 和 `pr_info` 作为 fallback 上下文。不要读取 `.git/vibe3` 共享文件。
 
 阅读关键架构文档：
 - `SOUL.md` — 项目宪法和核心原则
@@ -47,12 +44,12 @@ fi
 使用 Glob 检查文件位置：
 ```
 src/vibe3/
-├── cli.py          # CLI 入口（<20行）
-├── commands/       # 命令调度（<50行）
-├── services/       # 业务逻辑（<80行）
-├── clients/        # 外部依赖封装
-├── models/         # 数据模型
-└── ui/             # 展示层
+- cli.py          # CLI 入口（<20行）
+- commands/       # 命令调度（<50行）
+- services/       # 业务逻辑（<80行）
+- clients/        # 外部依赖封装
+- models/         # 数据模型
+- ui/             # 展示层
 ```
 
 ### 3. 模块职责分析
@@ -122,9 +119,11 @@ src/vibe3/
 
 ```
 Tier 3: Supervisor / Policies / Rules (认知与治理)
-    ↓
+    |
+    v
 Tier 2: Skills / Workflows (Skill 层)
-    ↓
+    |
+    v
 Tier 1: Shell Commands (Shell 能力层)
 ```
 
@@ -145,9 +144,10 @@ Tier 1: Shell Commands (Shell 能力层)
 
 **架构位置**：
 ```
-Tier 3 (Policies) ←→ Tier 2 (Skills) ←→ Tier 1 (Shell)
-                        ↑
-                   [PR 修改位置]
+Tier 3 (Policies) <-> Tier 2 (Skills) <-> Tier 1 (Shell)
+                        ^
+                        |
+                  [PR 修改位置]
 ```
 
 **分层验证**：
