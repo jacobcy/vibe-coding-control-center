@@ -34,6 +34,7 @@ from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.handoff_service import HandoffService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_details
 
@@ -129,6 +130,73 @@ def _load_pr_analysis_summary(
     return pr_analysis_summary(analysis)
 
 
+def _fetch_and_record_external_events(
+    pr_number: int,
+    branch: str,
+    github_client: Any,
+    handoff_svc: HandoffService,
+) -> None:
+    """Fetch CI status and comments from GitHub, record as external events.
+
+    This is a best-effort operation - failures are logged but not raised.
+
+    Args:
+        pr_number: PR number
+        branch: Branch name
+        github_client: GitHub client with list_pr_comments/list_pr_review_comments
+        handoff_svc: Handoff service for recording events
+    """
+    try:
+        # Fetch CI status (already in PRResponse, but we need to fetch it)
+        # Note: We could pass it from the caller, but re-fetching ensures fresh data
+        pr = github_client.get_pr(pr_number, None)
+        if pr and pr.ci_status:
+            handoff_svc.record_ci_status(
+                branch=branch,
+                pr_number=pr_number,
+                status=pr.ci_status,
+            )
+
+        # Fetch general comments
+        comments = []
+        try:
+            comments = github_client.list_pr_comments(pr_number)
+        except Exception as e:
+            logger.bind(
+                domain="pr",
+                action="fetch_comments",
+                pr_number=pr_number,
+            ).warning(f"Failed to fetch PR comments: {e}")
+
+        # Fetch review comments
+        review_comments = []
+        try:
+            review_comments = github_client.list_pr_review_comments(pr_number)
+        except Exception as e:
+            logger.bind(
+                domain="pr",
+                action="fetch_review_comments",
+                pr_number=pr_number,
+            ).warning(f"Failed to fetch PR review comments: {e}")
+
+        # Record comments
+        if comments or review_comments:
+            handoff_svc.record_pr_comments(
+                branch=branch,
+                pr_number=pr_number,
+                comments=comments,
+                review_comments=review_comments,
+            )
+
+    except Exception as e:
+        logger.bind(
+            domain="pr",
+            action="record_external_events",
+            pr_number=pr_number,
+            branch=branch,
+        ).warning(f"Failed to record external events: {e}")
+
+
 def _build_pr_output_payload(
     pr: "PRResponse",
     analysis_summary: dict[str, Any] | None = None,
@@ -218,6 +286,22 @@ def register_query_commands(app: typer.Typer) -> None:
                     err=True,
                 )
                 raise typer.Exit(1) from None
+
+            # Record external events (best-effort, non-blocking)
+            try:
+                if pr and pr_number:
+                    effective_branch = branch or target.current_branch
+                    if effective_branch:
+                        _fetch_and_record_external_events(
+                            pr_number=pr_number,
+                            branch=effective_branch,
+                            github_client=pr_svc.github_client,
+                            handoff_svc=HandoffService(store=pr_svc.store),
+                        )
+            except Exception as exc:
+                logger.bind(domain="pr", action="record_external_events").warning(
+                    f"Failed to record external events: {exc}"
+                )
 
             analysis_summary = None
             if pr_number:

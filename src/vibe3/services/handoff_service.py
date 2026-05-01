@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, Callable, cast
 
 from loguru import logger
 
@@ -14,7 +15,9 @@ from vibe3.execution.actor_support import (
 from vibe3.models.flow import FlowEvent
 from vibe3.models.verdict import VerdictRecord
 from vibe3.services.artifact_parser import ArtifactParser
+from vibe3.services.external_events import ExternalEventRecorder
 from vibe3.services.handoff_storage import HandoffStorage
+from vibe3.services.handoff_validation import validate_authoritative_ref
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.path_helpers import (
     _SHARED_HANDOFF_PREFIX,
@@ -36,6 +39,8 @@ class HandoffService:
         "report_recorded",  # new canonical name
         "run_recorded",  # backward-compat: legacy event type
         "audit_recorded",
+        "handoff_ci_status",
+        "handoff_pr_comment",
     }
     _SUCCESS_HANDOFF_EVENT_TYPES = {
         "handoff_plan",
@@ -44,6 +49,8 @@ class HandoffService:
         "handoff_audit",
         "handoff_indicate",
         "handoff_verdict",
+        "handoff_ci_status",
+        "handoff_pr_comment",
     }
 
     def __init__(
@@ -54,6 +61,16 @@ class HandoffService:
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
         self.storage = HandoffStorage(self.git_client)
+        self.external_recorder = ExternalEventRecorder(
+            self.store,
+            self.storage,
+            cast(
+                Callable[[str, str | None, int | None], list[FlowEvent]],
+                lambda branch, event_type_prefix=None, limit=None: self.get_handoff_events(  # noqa: E501
+                    branch, event_type_prefix, limit
+                ),
+            ),
+        )
 
     def get_handoff_events(
         self,
@@ -134,44 +151,6 @@ class HandoffService:
 
         raise UserError("Cannot validate handoff ref without a worktree root")
 
-    @staticmethod
-    def _is_log_like_path(path: Path) -> bool:
-        lowered_parts = [part.lower() for part in path.parts]
-        for idx in range(len(lowered_parts) - 1):
-            if lowered_parts[idx] == "temp" and lowered_parts[idx + 1] == "logs":
-                return True
-        return path.name.endswith(".async.log")
-
-    def _validate_authoritative_ref(
-        self, ref_kind: str, ref_value: str, branch: str
-    ) -> None:
-        if ref_kind.lower() not in self._AUTHORITATIVE_REF_KINDS:
-            return
-
-        worktree_root = self._resolve_branch_worktree_root(branch).resolve()
-        ref_path = Path(ref_value).expanduser()
-        resolved = (
-            ref_path.resolve(strict=False)
-            if ref_path.is_absolute()
-            else (worktree_root / ref_path).resolve(strict=False)
-        )
-
-        if self._is_log_like_path(resolved):
-            raise UserError(
-                f"{ref_kind}_ref cannot point to execution logs under temp/logs: "
-                f"{ref_value}"
-            )
-        git_common = Path(self.git_client.get_git_common_dir()).resolve()
-        if resolved.is_relative_to(git_common):
-            raise UserError(
-                f"{ref_kind}_ref must point to an agent worktree document, "
-                f"not shared handoff store: {ref_value}"
-            )
-        if not resolved.is_relative_to(worktree_root):
-            raise UserError(
-                f"{ref_kind}_ref must stay inside the agent worktree: {ref_value}"
-            )
-
     def _record_ref(
         self,
         ref_kind: str,
@@ -187,7 +166,14 @@ class HandoffService:
         This method only handles active handoff events (handoff_plan/report/audit).
         """
         branch = self.git_client.get_current_branch()
-        self._validate_authoritative_ref(ref_kind, ref_value, branch)
+        validate_authoritative_ref(
+            ref_kind,
+            ref_value,
+            branch,
+            self.git_client,
+            self._AUTHORITATIVE_REF_KINDS,
+            self._resolve_branch_worktree_root,
+        )
         # Inlined _normalize_ref_value
         ref_value = self.storage.normalize_ref_value(ref_value, branch)
         effective_actor = SignatureService.resolve_for_branch(
@@ -447,3 +433,51 @@ class HandoffService:
             refs=refs,
         )
         return artifact_path
+
+    def record_ci_status(
+        self,
+        branch: str,
+        pr_number: int,
+        status: str,
+        actor: str = "system/github",
+    ) -> bool:
+        """Record CI status as external event.
+
+        Only records if status changed from last recorded status.
+
+        Args:
+            branch: Branch name
+            pr_number: PR number
+            status: CI status string (e.g., "SUCCESS", "FAILURE", "PENDING")
+            actor: Actor string (defaults to "system/github")
+
+        Returns:
+            True if event was recorded, False if skipped (no change)
+        """
+        return self.external_recorder.record_ci_status(branch, pr_number, status, actor)
+
+    def record_pr_comments(
+        self,
+        branch: str,
+        pr_number: int,
+        comments: list[dict[str, Any]],
+        review_comments: list[dict[str, Any]] | None = None,
+        actor: str = "system/github",
+    ) -> int:
+        """Record PR comments as external events.
+
+        Only records comments not already recorded (dedup by comment ID).
+
+        Args:
+            branch: Branch name
+            pr_number: PR number
+            comments: List of general comments (each has 'id' or 'number' field)
+            review_comments: List of review comments (each has 'id' field)
+            actor: Actor string (defaults to "system/github")
+
+        Returns:
+            Number of new comments recorded
+        """
+        return self.external_recorder.record_pr_comments(
+            branch, pr_number, comments, review_comments, actor
+        )
