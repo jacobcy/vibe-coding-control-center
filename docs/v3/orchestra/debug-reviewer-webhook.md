@@ -1,5 +1,7 @@
 # Reviewer Webhook 调试手册
 
+> **导航入口**：本手册是 reviewer webhook 专项调试指南。通用 serve 调试请参考 [vibe3-serve-debugging-guide.md](../../standards/vibe3-serve-debugging-guide.md)。
+
 本手册用于调试 Orchestra 的 reviewer 触发链路（`pull_request/review_requested`）。
 
 目标：确认 GitHub webhook 事件能够触发本地 `vibe3 review pr <number>`，并生成可观测产物。
@@ -36,22 +38,17 @@ orchestra:
 
 ## 2. 启动与状态检查
 
-建议用 `-v` 启动，确保能看到触发日志：
+建议用 `-v` 启动，确保能看到触发日志（async 是默认模式）：
 
 ```bash
+# Async 模式（默认，推荐）
 uv run python src/vibe3/cli.py serve start -v --port 8080 --repo jacobcy/vibe-coding-control-center
-```
 
-后台模式（tmux）：
+# Sync 模式（调试特定场景）
+uv run python src/vibe3/cli.py serve start --no-async -v --port 8080 --repo jacobcy/vibe-coding-control-center
 
-```bash
-uv run python src/vibe3/cli.py serve start --async -v --port 8080 --repo jacobcy/vibe-coding-control-center
-```
-
-临时公网联调用（自动调用仓库 `scripts/tsu.sh`）：
-
-```bash
-uv run python src/vibe3/cli.py serve start --async -v --ts
+# 临时公网联调（自动调用仓库 `scripts/tsu.sh`）
+uv run python src/vibe3/cli.py serve start --ts
 ```
 
 检查健康状态：
@@ -105,7 +102,7 @@ Review execution completed successfully
 说明：
 - `Resolved PR review to matching worktree` 表示已根据 PR `head_branch` 找到对应 worktree。
 - 找不到时会回退到 `serve` 进程启动目录。
-- 若 `pr_review_dispatch.async_mode=true`，命令会追加 `--async` 并转入 tmux 后台执行。
+- `pr_review_dispatch.async_mode` 配置项控制是否使用 async 执行（默认为 true）。
 - 若 `pr_review_dispatch.use_worktree=true`，命令会追加 `--worktree`（不走 PR worktree 匹配路径）。
 
 ## 5. 结果验收
