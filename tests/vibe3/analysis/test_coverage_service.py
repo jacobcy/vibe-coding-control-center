@@ -54,7 +54,12 @@ def test_run_pytest_cov_success(
 
     def fake_subprocess_run(*args, **kwargs):
         cov_file = (
-            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+            mock_project_root
+            / ".agent"
+            / "reports"
+            / "coverage"
+            / "test-branch"
+            / "coverage.json"
         )
         cov_file.parent.mkdir(parents=True, exist_ok=True)
         cov_file.write_text(json.dumps(sample_coverage_data))
@@ -95,7 +100,12 @@ def test_subprocess_command_construction(
 
     def fake_subprocess_run(*args, **kwargs):
         cov_file = (
-            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+            mock_project_root
+            / ".agent"
+            / "reports"
+            / "coverage"
+            / "test-branch"
+            / "coverage.json"
         )
         cov_file.parent.mkdir(parents=True, exist_ok=True)
         cov_file.write_text(json.dumps(sample_coverage_data))

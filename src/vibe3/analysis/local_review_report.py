@@ -34,13 +34,13 @@ class LocalReviewReport:
 def find_latest_prepush_report() -> LocalReviewReport | None:
     """Find the most recent local pre-push review report.
 
-    Scans `.agent/reports/` for files matching `pre-push-review-*.md`
+    Scans `.agent/reports/review/` for files matching `pre-push-review-*.md`
     and returns the most recent one by file modification time.
 
     Returns:
         LocalReviewReport if a report is found, None otherwise
     """
-    reports_dir = Path(".agent/reports")
+    reports_dir = Path(".agent/reports/review")
 
     if not reports_dir.exists() or not reports_dir.is_dir():
         return None
