@@ -11,8 +11,9 @@ description: |
 
 **本 Skill 只负责**：
 1. 环境检查
-2. 加载 Team Template
-3. 启动审查团队
+2. PR 队列排序与选择
+3. 加载 Team Template
+4. 启动审查团队
 
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -53,7 +54,41 @@ team cleanup 状态；环境不满足时，直接转入 `vibe-review-code` 单 a
 
 ---
 
-## Step 2: 加载 Team Template
+## Step 2: PR 队列排序与选择
+
+当用户没有指定 PR 编号时，先检查当前 repo 的所有未合并 PR，排序后建议审查顺序。
+
+```bash
+gh pr list --state open --json number,title,labels,additions,deletions,baseRefName,headRefName,updatedAt
+```
+
+### PR 排序规则
+
+优先级从高到低：
+
+1. **merge-ready 状态**：标签含 `state/merge-ready`
+2. **最小改动优先**：`additions + deletions` 行数最小
+3. **无依赖优先**：`baseRefName == main` 优先于依赖其他 PR 分支
+4. **范围重叠处理**：
+   - 复杂 PR（改动更多文件）先审查
+   - 简单 PR（改动较少文件）后审查
+   - 同一文件的多个改动：先审查改动量大的
+
+### PR 依赖关系检测
+
+```bash
+gh pr view <number> --json baseRefName,headRefName
+```
+
+依赖判断：
+- `baseRefName == main`：无依赖，优先审查
+- `baseRefName == task/issue-xxx` 或其他 PR 分支：可能依赖另一个 PR，需先审查依赖来源
+
+如果用户已经明确指定 PR 编号，直接审查该 PR，不重新路由到其他 PR。
+
+---
+
+## Step 3: 加载 Team Template
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -71,7 +106,7 @@ cat .claude/team-templates/pr-review-team.yaml
 
 ---
 
-## Step 3: 判断 PR 类型
+## Step 4: 判断 PR 类型
 
 根据 Template 中的 `pr_classification` 规则：
 
@@ -88,7 +123,7 @@ gh pr view <number> --json title,labels,additions
 
 ---
 
-## Step 4: 按流程启动 Agent
+## Step 5: 按流程启动 Agent
 
 **Phase 1（必须先完成）**：
 ```
