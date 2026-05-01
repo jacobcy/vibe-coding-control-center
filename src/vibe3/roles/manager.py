@@ -26,7 +26,16 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
+from vibe3.roles.manager_scene_capabilities import ManagerSceneCapabilities
 from vibe3.services.issue_failure_service import fail_manager_issue
+
+# Expose scene capabilities for orchestrator/agent/skill usage
+__all__ = [
+    "MANAGER_ROLE",
+    "HANDOFF_MANAGER_ROLE",
+    "MANAGER_SYNC_SPEC",
+    "ManagerSceneCapabilities",
+]
 
 MANAGER_ROLE = TriggerableRoleDefinition(
     name="manager",
