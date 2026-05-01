@@ -20,6 +20,17 @@ extends: architect  # 继承全局 architect 的基础能力
 
 ### 1. 审查前架构检查
 
+**重要**：审查分支和开发分支不同，需要从 PR 获取开发分支上下文。
+
+```bash
+# 获取 PR 信息
+gh pr view <number> --json headRefName,title,body,comments
+
+# 尝试检查开发分支的 handoff（仅本地可用）
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available"
+```
+
 阅读关键架构文档：
 - `SOUL.md` — 项目宪法和核心原则
 - `STRUCTURE.md` — 项目结构定义

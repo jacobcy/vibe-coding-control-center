@@ -27,18 +27,23 @@ forbidden_commands:
 
 ### 1. 审查前强制检查
 
-开始安全审查前，**必须完成**以下检查：
+**重要**：审查分支和开发分支不同，需要指定开发分支名。
 
 ```bash
-# 检查当前 flow 状态（可能有 manager 的安全审查要求）
-uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
+# 获取 PR 的开发分支名
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
 
-# 检查任务上下文
+# 尝试检查开发分支的 handoff 状态（仅本地可用）
+uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available (remote review)"
+
+# 检查任务上下文（基本信息）
 uv run python src/vibe3/cli.py task show
 
-# 查看影响范围
-uv run python src/vibe3/cli.py inspect base --json
+# 从 PR 获取更多上下文
+gh pr view <number> --json title,body,comments
 ```
+
+**Fallback**：如果 handoff 不可用（远程审查），从 PR description 和 comments 获取上下文。
 
 ### 2. 安全相关影响分析
 
@@ -119,11 +124,14 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 
 ### 0. 审查前检查
 
-| 检查项 | 结果 |
-|--------|------|
-| handoff status | [状态] |
-| inspect base 风险 | [高/中/低] |
-| 敏感模块触及 | [是/否] |
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| PR 开发分支 | [分支名] | `gh pr view` 获取 |
+| handoff status | 可用/不可用 | 仅本地可用，远程审查需 fallback |
+| task show | [基本信息] | 任务标题和状态 |
+| PR comments | [数量] | 安全相关指令 |
+| inspect base 风险 | [高/中/低] | 分支级影响 |
+| 敏感模块触及 | [是/否] | 安全相关模块 |
 
 ### 1. 保护机制理解
 

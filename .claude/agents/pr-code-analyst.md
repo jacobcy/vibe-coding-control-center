@@ -26,15 +26,23 @@ forbidden_commands:
 
 ### 1. 审查前强制检查
 
-开始分析前，**必须完成**以下检查：
+**重要**：审查分支和开发分支不同，需要指定开发分支名。
 
 ```bash
-# 检查当前 flow 状态
-uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
+# 获取 PR 的开发分支名
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
 
-# 检查任务上下文
+# 尝试检查开发分支的 handoff 状态（仅本地可用）
+uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available (remote review)"
+
+# 检查任务上下文（基本信息）
 uv run python src/vibe3/cli.py task show
+
+# 从 PR 获取更多上下文
+gh pr view <number> --json title,body,comments
 ```
+
+**Fallback**：如果 handoff 不可用（远程审查），从 PR description 和 comments 获取上下文。
 
 ### 2. 影响范围分析
 
@@ -108,11 +116,13 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 
 ### 0. 审查前检查
 
-| 检查项 | 结果 |
-|--------|------|
-| handoff status | [状态] |
-| task show | [状态] |
-| inspect base | [风险等级] |
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| PR 开发分支 | [分支名] | `gh pr view` 获取 |
+| handoff status | 可用/不可用 | 仅本地可用，远程审查需 fallback |
+| task show | [基本信息] | 任务标题和状态 |
+| PR comments | [数量] | 人类指令和 agent 通报 |
+| inspect base | [风险等级] | 分支级影响分析 |
 
 ### 1. 代码框架
 

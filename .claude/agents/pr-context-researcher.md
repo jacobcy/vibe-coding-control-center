@@ -20,14 +20,18 @@ extends: Explore  # 继承全局 Explore 的基础能力
 
 ### 1. 审查前状态检查
 
-开始调研前，检查当前 flow 状态：
+**重要**：审查分支和开发分支不同，需要从 PR 获取开发分支上下文。
 
 ```bash
-# 注意：作为 context-researcher 你没有 Bash 工具
-# 这一步由 team-lead 在 Phase 0 完成，你直接从 handoff 读取
+# 获取 PR 信息
+gh pr view <number> --json headRefName,title,body,comments
+
+# 尝试检查开发分支的 handoff（仅本地可用）
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available"
 ```
 
-读取 `.git/vibe3/handoff/<branch>/current.md`（如果存在）获取已有上下文。
+**Fallback**：如果 handoff 不可用（远程审查），从 PR description 和 comments 获取上下文。
 
 ### 2. 项目结构理解
 
@@ -77,11 +81,15 @@ extends: Explore  # 继承全局 Explore 的基础能力
 
 ### 0. 项目真源检查
 
-| 文档 | 状态 | 关键发现 |
-|------|------|----------|
-| CLAUDE.md | 已读/未读 | [关键硬规则] |
-| AGENTS.md | 已读/未读 | [Agent 入口信息] |
-| glossary.md | 已读/未读 | [相关术语] |
+| 文档 | 状态 | 来源 |
+|------|------|------|
+| CLAUDE.md | 已读/未读 | 项目根目录 |
+| AGENTS.md | 已读/未读 | 项目根目录 |
+| glossary.md | 已读/未读 | docs/standards/ |
+| PR description | 已读/未读 | GitHub |
+| PR comments | 已读/未读 | GitHub |
+
+**注意**：审查分支 ≠ 开发分支，handoff 仅在本地可用。
 
 ### 1. 项目上下文
 
