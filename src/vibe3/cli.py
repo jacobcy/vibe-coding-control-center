@@ -22,6 +22,7 @@ from vibe3.commands import (
     internal,
     plan,
     pr,
+    reports,
     review,
     run,
     snapshot,
@@ -63,6 +64,7 @@ app.add_typer(review.app, name="review")
 app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
+app.add_typer(reports.app, name="reports")
 app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")
 

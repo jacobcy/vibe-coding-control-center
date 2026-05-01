@@ -226,11 +226,39 @@ class QualityConfig(BaseModel):
     test_coverage: TestCoverageConfig = Field(default_factory=TestCoverageConfig)
 
 
+class ReportsRetentionTypeConfig(BaseModel):
+    """Report retention configuration for a specific report type."""
+
+    max_count: int | None = Field(
+        default=None, ge=1, description="Maximum reports to keep"
+    )
+    max_age_days: int | None = Field(
+        default=None, ge=1, description="Maximum age in days"
+    )
+
+
+class ReportsRetentionConfig(BaseModel):
+    """Reports retention policy configuration."""
+
+    max_count: int = Field(default=10, ge=1, description="Default max reports per type")
+    max_age_days: int = Field(default=30, ge=1, description="Default max age in days")
+    types: dict[str, ReportsRetentionTypeConfig] = Field(
+        default_factory=dict, description="Type-specific retention overrides"
+    )
+
+
+class ReportsConfig(BaseModel):
+    """Reports management configuration."""
+
+    retention: ReportsRetentionConfig = Field(default_factory=ReportsRetentionConfig)
+
+
 class VibeConfig(BaseModel):
     """Root configuration model."""
 
     agent_prompt: AgentPromptConfig = Field(default_factory=AgentPromptConfig)
     flow: FlowConfig = Field(default_factory=FlowConfig)
+    reports: ReportsConfig = Field(default_factory=ReportsConfig)
     doc_limits: DocLimitsConfig = Field(default_factory=DocLimitsConfig)
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)

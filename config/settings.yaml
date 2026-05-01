@@ -11,6 +11,23 @@ flow:
     - "master"
     - "develop"
 
+# Reports cleanup configuration
+# Controls retention policy for .agent/reports/ directory
+reports:
+  retention:
+    # Maximum number of reports to keep per type
+    max_count: 10
+    # Maximum age in days (reports older than this are deleted)
+    max_age_days: 30
+    # Report types with specific retention (optional)
+    types:
+      pre-push-review:
+        max_count: 5
+      skills-state:
+        max_count: 3
+      coverage:
+        max_count: 3
+
 # GitHub Projects v2 配置（Task Bridge 真源）
 # project_number 和 owner 是 task bridge 的远端真源配置
 # owner_type: "user" 表示个人账号，"org" 表示组织
