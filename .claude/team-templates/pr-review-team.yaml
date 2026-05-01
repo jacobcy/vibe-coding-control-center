@@ -1,8 +1,98 @@
 # PR Review Team Template
 # 用于 vibe-review-pr skill 加载团队配置
+#
+# === 执行说明 ===
+# 1. Skill 读取此配置后，应按 workflow.phases 顺序执行
+# 2. 每个 phase 的 agents 列表指示需要 spawn 的 teammates
+# 3. 使用 Agent tool spawn teammate:
+#    Agent(team_name="pr-review-team", name="<agent-name>",
+#          subagent_type="<subagent_type>", model="<model>", prompt="<prompt>")
+# 4. 使用 SendMessage 在 teammates 间传递 context bundle
+# 5. Phase 4 由 team-lead 执行（当前 session），不需要 spawn
 
 name: pr-review-team
 description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
+
+# Team 创建配置（供 TeamCreate 使用）
+team_create_config:
+  team_name: pr-review-team
+  agent_type: general-purpose  # team-lead 类型
+
+# 执行模式配置
+execution_mode:
+  # 可选值：auto-fix, comment-only, auto-decide, ask-each
+  # 默认 ask-each（最安全）
+  default: ask-each
+
+  # 模式说明
+  modes:
+    auto-fix:
+      description: 自动修复审核发现的问题并提交
+      trigger: 用户明确要求自动修复
+      workflow: review → fix → commit → comment
+      risk: 高（可能引入新问题）
+
+    comment-only:
+      description: 只发布审核意见，不修改代码
+      trigger: 用户要求只审核不修复
+      workflow: review → comment
+      risk: 无
+
+    auto-decide:
+      description: team-lead 根据PR复杂度自动决定
+      trigger: 用户授权自动决策
+      workflow: review → lead判断 → fix或comment
+      risk: 中（依赖lead判断）
+      decision_criteria:
+        # 复杂度评估指标
+        complexity_factors:
+          - name: 改动行数
+            weight: 0.3
+            thresholds:
+              low: "< 50 行"
+              medium: "50-200 行"
+              high: "> 200 行"
+          - name: 文件数
+            weight: 0.2
+            thresholds:
+              low: "1-2 个文件"
+              medium: "3-5 个文件"
+              high: "> 5 个文件"
+          - name: 安全相关
+            weight: 0.4
+            thresholds:
+              low: "无安全标签"
+              medium: "涉及认证/授权"
+              high: "安全修复或敏感数据处理"
+          - name: 测试覆盖
+            weight: 0.1
+            thresholds:
+              low: "有完整测试"
+              medium: "部分测试"
+              high: "无测试"
+
+        # 决策矩阵
+        decision_matrix:
+          auto_fix:
+            condition: "复杂度得分 < 0.3 且无安全相关改动"
+            confidence_threshold: 0.85
+          ask_user:
+            condition: "复杂度得分 >= 0.3 或有安全相关改动"
+          comment_only:
+            condition: "复杂度得分 >= 0.7 或 lead 置信度 < 0.6"
+
+    ask-each:
+      description: 每次审核完毕后询问用户
+      trigger: 默认模式
+      workflow: review → 询问用户 → 执行用户选择
+      risk: 无（用户决策）
+      prompt: |
+        审核完成。请选择后续操作：
+        1. 直接根据审核意见修复代码
+        2. 将意见写回 PR comments
+        3. 由 team-lead 协助决定
+
+        输入数字 (1/2/3) 或描述你的需求：
 
 # 环境要求
 requirements:
@@ -67,40 +157,67 @@ reuse_policy:
     3. 使用 SendMessage(to=agent_name, message={type: "new_task", pr_number, context})
     4. 如无可复用 teammate，才 spawn 新的
 
-# Agent 定义
+# Agent 定义（项目自定义 agents）
+# 注意：使用项目 .claude/agents/pr-*.md 定义，而非全局 agent
 agents:
   context-researcher:
-    agentType: Explore
+    # 引用项目 agent 定义文件
+    agent_definition: .claude/agents/pr-context-researcher.md
+    subagent_type: pr-context-researcher
     model: haiku
     description: 背景调研员，收集项目背景和领域知识
-    tools: [Read, Grep, Glob, WebFetch]
+    spawn_config:
+      tools: [Read, Grep, Glob, WebFetch, Bash]
+      run_in_background: false  # Phase 1 需等待结果
     output_format:
       required_fields: [时效性, 依赖关系, 类似实现]
 
   code-analyst:
-    agentType: Explore
+    agent_definition: .claude/agents/pr-code-analyst.md
+    subagent_type: pr-code-analyst
     model: haiku
     description: 代码分析员，分析代码框架和技术债
-    tools: [Read, Grep, Glob, Bash]
+    spawn_config:
+      tools: [Read, Grep, Glob, Bash]
+      run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [技术债列表, 架构符合性, 代码质量]
 
   architect-reviewer:
-    agentType: architect
+    agent_definition: .claude/agents/pr-architect-reviewer.md
+    subagent_type: pr-architect-reviewer
     model: sonnet
     description: 架构审查专家，评估 PR 对项目架构的影响
-    tools: [Read, Grep, Glob, WebSearch]
+    spawn_config:
+      tools: [Read, Grep, Glob, WebSearch]
+      run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [结论, 置信度, 关键发现]
 
   security-reviewer:
-    agentType: code-reviewer
+    agent_definition: .claude/agents/pr-security-reviewer.md
+    subagent_type: pr-security-reviewer
     model: sonnet
     description: 安全审查专家，红队测试和安全评估
-    tools: [Read, Grep, Glob, Bash]
+    spawn_config:
+      tools: [Read, Grep, Glob, Bash]
+      run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [安全等级, 绕过方式, 修复建议]
     trigger: always  # 始终参与审查（即使非安全 PR）
+
+  # 执行角色：修复 review 发现的问题
+  fix-executor:
+    agent_definition: .claude/agents/pr-fix-executor.md
+    subagent_type: pr-fix-executor
+    model: sonnet
+    description: 代码修复执行者，根据审核意见修复代码并提交
+    spawn_config:
+      tools: [Read, Edit, Write, Bash, Grep, Glob]
+      run_in_background: false  # Phase 4 需等待修复完成
+    output_format:
+      required_fields: [修复列表, 提交记录, 验证结果]
+    trigger: on_demand  # 仅在 auto-fix 或用户选择修复时 spawn
 
 # Codex 配置（外部专家）
 codex:
@@ -130,13 +247,28 @@ pr_classification:
     flow: standard
     agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
 
-# 工作流程
+# 工作流程（可执行配置）
 workflow:
   phase_1:
     name: 背景调研
     agents: [context-researcher]
     parallel: false
     output_to_phase_2: true
+    # 执行指令
+    execution:
+      - step: spawn_context_researcher
+        tool: Agent
+        params:
+          team_name: pr-review-team
+          name: context-researcher
+          subagent_type: pr-context-researcher
+          model: haiku
+          prompt: "收集 PR #{pr_number} 的背景信息..."
+        wait_for_result: true  # 必须等待 Phase 1 完成
+      - step: receive_context_report
+        action: 等待 teammate-message，获取背景报告
+      - step: prepare_phase_2_context
+        action: 将背景报告通过 SendMessage 传给 Phase 2 agents
 
   phase_2:
     name: 专项审查
@@ -144,6 +276,48 @@ workflow:
     parallel: true
     requires_phase_1_output: true
     message_passing: SendMessage
+    # 执行指令
+    execution:
+      - step: spawn_phase_2_agents
+        tool: Agent  # 单次调用，并行 spawn 多个 agents
+        params:
+          # 注意：parallel spawn 需要在单次消息中发起多个 Agent 调用
+          agents:
+            - team_name: pr-review-team
+              name: code-analyst
+              subagent_type: pr-code-analyst
+              model: haiku
+              prompt: "分析 PR #{pr_number} 的代码质量..."
+              run_in_background: true
+            - team_name: pr-review-team
+              name: architect-reviewer
+              subagent_type: pr-architect-reviewer
+              model: sonnet
+              prompt: "评估 PR #{pr_number} 的架构影响..."
+              run_in_background: true
+            - team_name: pr-review-team
+              name: security-reviewer
+              subagent_type: pr-security-reviewer
+              model: sonnet
+              prompt: "评估 PR #{pr_number} 的安全性..."
+              run_in_background: true
+      - step: send_context_to_phase_2
+        tool: SendMessage
+        params:
+          to: code-analyst
+          message: "{phase_1_output}"
+      - step: send_context_to_phase_2
+        tool: SendMessage
+        params:
+          to: architect-reviewer
+          message: "{phase_1_output}"
+      - step: send_context_to_phase_2
+        tool: SendMessage
+        params:
+          to: security-reviewer
+          message: "{phase_1_output}"
+      - step: wait_for_phase_2_results
+        action: 等待所有 Phase 2 agents 返回结果
 
   phase_3:
     name: 综合判断与改进
@@ -153,31 +327,137 @@ workflow:
       - detect_conflicts
       - arbitrate_if_needed
       - final_decision
-      - generate_improvement_plan  # 生成改进建议
+      - generate_improvement_plan
+    # 执行指令
+    execution:
+      - step: collect_all_reports
+        action: 从 idle notifications 获取各 agent 报告
+      - step: detect_conflicts
+        action: 对比各报告，找出差异点
+      - step: arbitrate
+        action: 如有冲突，进行仲裁并记录理由
+      - step: make_decision
+        action: 生成最终决策（APPROVE/REJECT/NEEDS_INFO）
 
   phase_4:
     name: 写回与改进
-    executor: team-lead  # 明确执行主体：由 team-lead 执行所有 Phase 4 操作
+    executor: team-lead  # 由当前 session（team-lead）执行
     agents: []
     actions:
-      - write_review_comment  # 写入 PR 评论（必须）
-      - create_follow_up_issues  # 为范围外发现创建 issue（需去重并标注来源）
+      - evaluate_execution_mode  # 根据配置决定执行路径
+      - write_review_comment
+      - fix_issues_or_skip       # 根据模式分支
+      - create_follow_up_issues
+    # 执行指令（根据 execution_mode 分支）
+    execution:
+      # Step 1: 评估执行模式
+      - step: evaluate_mode
+        action: |
+          根据 execution_mode 配置选择执行路径：
+          - auto-fix → 直接执行修复流程
+          - comment-only → 只写 comment
+          - auto-decide → team-lead 评估复杂度后决定
+          - ask-each → 询问用户
+
+      # Step 2: auto-decide 模式评估复杂度
+      - step: evaluate_complexity
+        condition: execution_mode == "auto-decide"
+        action: |
+          计算复杂度得分（0-1）：
+          1. 改动行数（weight 0.3）
+          2. 文件数（weight 0.2）
+          3. 安全相关（weight 0.4）
+          4. 测试覆盖（weight 0.1）
+
+          决策：
+          - 得分 < 0.3 且无安全相关 → auto_fix
+          - 得分 >= 0.3 或有安全相关 → ask_user
+          - 得分 >= 0.7 或置信度 < 0.6 → comment_only
+
+      # Step 3: ask-each 模式询问用户
+      - step: ask_user
+        condition: execution_mode == "ask-each" OR (auto-decide && need_user_input)
+        tool: AskUserQuestion
+        params:
+          question: |
+            审核完成。请选择后续操作：
+
+            1. 直接根据审核意见修复代码
+            2. 将意见写回 PR comments
+            3. 由 team-lead 协助决定
+
+            输入数字 (1/2/3) 或描述你的需求：
+          options:
+            - key: "1"
+              value: "auto_fix"
+              description: "自动修复并提交"
+            - key: "2"
+              value: "comment_only"
+              description: "只写 comment"
+            - key: "3"
+              value: "lead_decide"
+              description: "由 lead 根据复杂度决定"
+
+      # Step 4a: comment-only 路径
+      - step: write_comment_only
+        condition: mode == "comment_only"
+        tool: Bash
+        params:
+          command: gh pr comment {pr_number} --body "{review_report}"
+
+      # Step 4b: auto-fix 路径
+      - step: spawn_fix_executor
+        condition: mode == "auto_fix"
+        tool: Agent
+        params:
+          team_name: pr-review-team
+          name: fix-executor
+          subagent_type: pr-fix-executor
+          model: sonnet
+          prompt: |
+            根据 PR #{pr_number} 的审核意见修复代码：
+
+            审核报告：{review_report}
+
+            需要修复的问题：{fixable_issues}
+
+            请：
+            1. 评估修复风险
+            2. 执行修复（遵守 Git 纪律）
+            3. 提交并验证
+
+            输出修复报告。
+        wait_for_result: true
+
+      # Step 5: 写 comment（所有模式都需要）
+      - step: write_pr_comment
+        condition: mode != "comment_only"  # comment_only 已在 Step 4a 执行
+        tool: Bash
+        params:
+          command: gh pr comment {pr_number} --body "{final_report}"
+          # final_report 包含审核报告 + 修复报告（如果有）
+
+      # Step 6: 创建 follow-up issues
+      - step: create_follow_up_issues
+        condition: has_out_of_scope_findings
+        tool: Bash
+        params:
+          command: gh issue create --title "{issue_title}" --body "{issue_body}"
+
     conditions:
       APPROVE:
         - 写评论，说明建议
-        - 无需修改代码
-        - 如有范围外发现，可创建 follow-up issue
+        - auto-fix 模式：无阻塞问题，可选修复改进项
+        - 如有范围外发现，创建 follow-up issue
       NEEDS_INFO:
         - 写评论，请求更多信息
-        - 等待作者响应
-        - 如有范围外发现，可创建 follow-up issue
+        - 不执行修复，等待作者响应
       REJECT:
         - 写评论，说明拒绝理由
-        - 不直接修改 PR 分支；需要修复时交给后续执行流程
+        - 不执行修复，交给后续流程
       has_fixable_issues:
-        - 写评论，列出问题
-        - 不提交、amend、push 或修改 PR 分支
-        - 需要代码变更时，交给 vibe-commit / executor 或等待用户明确授权
+        - 根据执行模式决定：修复或写 comment
+        - 修复后验证测试通过
 
   # Follow-up Issue 创建规则
   follow_up_issue_policy:
