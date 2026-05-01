@@ -24,6 +24,26 @@ preflight_checks:
       如果团队成员超过 10 个：
       - 提示用户清理历史遗留成员
       - 或手动 TeamDelete 重建团队
+  - name: 检查现有 teammates
+    command: "tmux list-panes -a 2>/dev/null | grep -c '\\%' || echo 0"
+    action: |
+      如果已有运行中的 teammates（pane 数 > 1）：
+      - 确认是否复用于当前 PR
+      - 复用：SendMessage 唤醒现有 teammates
+      - 不复用：cleanup_phase 清理后重新 spawn
+
+# 复用策略
+reuse_policy:
+  enabled: true
+  conditions:
+    - "相同 agentType"
+    - "teammate 状态为 idle"
+    - "上一个 PR 已完成 Phase 4"
+  action: |
+    1. 检查 ~/.claude/teams/{team-name}/config.json 中 members
+    2. 对每个需要的 agentType，查找匹配的 idle teammate
+    3. 使用 SendMessage(to=agent_name, message={type: "new_task", pr_number, context})
+    4. 如无可复用 teammate，才 spawn 新的
 
 # Agent 定义
 agents:
@@ -135,6 +155,25 @@ workflow:
         - 创建修复分支或直接提交到 PR 分支
         - 示例：`git checkout task/issue-xxx && git commit --amend`
 
+  phase_5:
+    name: 清理与复用准备
+    executor: team-lead
+    agents: []
+    actions:
+      - clear_inboxes  # 清空 inbox 为下一个 PR 准备
+      - kill_idle_teammates  # 杀死 idle 状态的 tmux panes（可选）
+      - reset_team_state  # 重置 tasks 状态
+    conditions:
+      continue_next_pr:
+        - 保留 tmux panes（复用模式）
+        - 清空 inbox 文件
+        - 重置 tasks 目录
+      full_cleanup:
+        - 杀死所有 teammate panes
+        - 删除 ~/.claude/teams/{team-name}/
+        - 删除 ~/.claude/tasks/{team-name}/
+        - 释放资源，下次重新 spawn
+
 # 防幻觉机制
 anti_hallucination:
   evidence_required:
@@ -160,3 +199,18 @@ output_format: |
   **决策**: APPROVE / REJECT / NEEDS_INFO
   **关键发现**: [列表]
   **技术债识别**: [列表]
+
+# 清理命令参考
+cleanup_commands:
+  clear_inboxes: |
+    rm -f ~/.claude/teams/{team-name}/inboxes/*.json
+    echo "Cleared all inboxes"
+  kill_teammates: |
+    tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{pane_current_command}' | \
+    grep -v 'zsh\|bash\|fish' | \
+    awk '{print $1}' | \
+    xargs -I {} tmux kill-pane -t {}
+  full_cleanup: |
+    rm -rf ~/.claude/teams/{team-name}
+    rm -rf ~/.claude/tasks/{team-name}
+    echo "Full cleanup complete"

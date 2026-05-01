@@ -111,6 +111,25 @@ if security_related:
 收集结果 → 差异检测 → 仲裁 → 最终决策
 ```
 
+**Phase 4（写回与改进）**：
+```
+team-lead 执行：
+- write_review_comment → gh pr comment
+- check_fixable_issues → 如需修复，提交代码
+```
+
+**Phase 5（清理与复用准备）**：
+```
+team-lead 执行：
+- 如果继续审查下一个 PR：
+  - 清空 inbox 文件（保留 tmux panes）
+  - 重置 tasks 状态
+- 如果结束本次审查会话：
+  - 杀死所有 teammate panes
+  - 删除 teams 和 tasks 目录
+  - 释放资源
+```
+
 ---
 
 ## Team-lead 控制规则
