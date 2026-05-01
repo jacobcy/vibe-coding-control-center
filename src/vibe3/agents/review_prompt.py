@@ -135,14 +135,21 @@ def build_review_task_section(task_text: str | None) -> str:
     if task_text:
         return f"## Review Task\n{task_text}"
 
-    # Default task guidance
+    # Default: findings-first task guidance
     return """## Review Task
 
+**Prioritize**: correctness → regression risk → API breaks → missing tests
+
+**Focus on**:
 - Run `git diff <base>...HEAD` to see file changes
 - Review only changed code, not the entire codebase
 - Use AST analysis to understand function-level impact
-- Prioritize: correctness, regression risk, API breaks
-- Focus on actionable, specific findings"""
+- Give findings first, then verdict with brief rationale
+
+**Skip**:
+- Generic architecture commentary unrelated to this diff
+- Praise/description paragraphs
+- Style suggestions unless they affect correctness"""
 
 
 def build_output_contract_section(output_format: str | None) -> str:
@@ -159,19 +166,29 @@ def build_output_contract_section(output_format: str | None) -> str:
     if output_format:
         return f"## Output format requirements\n{output_format}"
 
-    # Default output format
+    # Default: findings-first output format
     return """## Output format requirements
 
-Each finding should follow this format:
-path/to/file.py:42 [MAJOR] concise issue description
+**FINDINGS FIRST — No praise, no generic commentary.**
 
-The final line must be:
+The first line must be exactly:
 VERDICT: PASS | MAJOR | BLOCK
 
-Where:
-- PASS: No significant issues found
-- MAJOR: Issues found that should be addressed before merge
-- BLOCK: Critical issues that must be fixed before merge"""
+If findings exist, list them concisely:
+path/to/file.py:42 [BLOCK] <specific issue with code evidence>
+path/to/file.py:100 [MAJOR] <specific issue with code evidence>
+
+Then provide a brief rationale (1-2 sentences):
+- PASS: "Why no blocking/major issue was found for this diff"
+- MAJOR: "Summary of what should be addressed before merge"
+- BLOCK: "Summary of critical issues that must be fixed"
+
+The final line must repeat the same VERDICT.
+
+**DO NOT**:
+- Write lengthy summary before findings
+- Include "Strength" / "Positive" / "Praise" paragraphs
+- Give generic architecture commentary unrelated to the diff"""
 
 
 def _review_variant(mode: ReviewPromptMode, context_mode: PromptContextMode) -> str:

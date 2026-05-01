@@ -536,19 +536,27 @@ review:
   # Target recipe section name: review.output_format
   # Unlike plan/run output shape guidance, this is a hard behavioral contract.
   output_format: |
+    **FINDINGS FIRST — No praise, no generic commentary.**
+
     The first line must be exactly:
     VERDICT: PASS | MAJOR | BLOCK
 
-    Each finding should follow this format:
-    path/to/file.py:42 [MAJOR] concise issue description
+    If findings exist, list them concisely:
+    path/to/file.py:42 [BLOCK] <specific issue with code evidence>
+    path/to/file.py:100 [MAJOR] <specific issue with code evidence>
 
-    The final line must repeat the same `VERDICT:`:
-    VERDICT: PASS | MAJOR | BLOCK
+    Then provide a brief rationale (1-2 sentences):
+    - PASS: "Why no blocking/major issue was found for this diff"
+    - MAJOR: "Summary of what should be addressed before merge"
+    - BLOCK: "Summary of critical issues that must be fixed"
 
-    Where:
-    - PASS: No significant issues found
-    - MAJOR: Issues found that should be addressed before merge
-    - BLOCK: Critical issues that must be fixed before merge
+    The final line must repeat the same VERDICT.
+
+    **DO NOT**:
+    - Write lengthy summary before findings
+    - Include "Strength" / "Positive" / "Praise" paragraphs
+    - Give generic architecture commentary unrelated to the diff
+    - Use template-style phrases like "code quality is good"
 
   # Static: reviewer exit contract plus default review guidance.
   # Target recipe section name: review.exit_contract
