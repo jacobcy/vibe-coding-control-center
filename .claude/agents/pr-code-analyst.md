@@ -42,7 +42,17 @@ uv run python src/vibe3/cli.py task show
 gh pr view <number> --json title,body,comments
 ```
 
-**Fallback**：如果 handoff 不可用（远程审查），从 PR description 和 comments 获取上下文。
+**Fallback**：如果 handoff 不可用（远程审查），从 issue comments 获取上下文：
+```bash
+# 从分支名推断 issue 编号（如 task/issue-123 → issue #123）
+ISSUE_NUM=$(echo $PR_BRANCH | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+if [ -n "$ISSUE_NUM" ]; then
+  gh issue view $ISSUE_NUM --comments
+fi
+
+# 同时获取 PR 信息
+gh pr view <number> --json title,body
+```
 
 ### 2. 影响范围分析
 
@@ -119,9 +129,9 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 | 检查项 | 结果 | 说明 |
 |--------|------|------|
 | PR 开发分支 | [分支名] | `gh pr view` 获取 |
-| handoff status | 可用/不可用 | 仅本地可用，远程审查需 fallback |
+| handoff status | 可用/不可用 | 仅本地可用 |
 | task show | [基本信息] | 任务标题和状态 |
-| PR comments | [数量] | 人类指令和 agent 通报 |
+| issue comments | [数量] | 从分支名推断 issue 编号 |
 | inspect base | [风险等级] | 分支级影响分析 |
 
 ### 1. 代码框架

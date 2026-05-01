@@ -24,11 +24,17 @@ extends: architect  # 继承全局 architect 的基础能力
 
 ```bash
 # 获取 PR 信息
-gh pr view <number> --json headRefName,title,body,comments
+gh pr view <number> --json headRefName,title,body
 
 # 尝试检查开发分支的 handoff（仅本地可用）
 PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
 uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available"
+
+# Fallback：从 issue comments 获取上下文
+ISSUE_NUM=$(echo $PR_BRANCH | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+if [ -n "$ISSUE_NUM" ]; then
+  gh issue view $ISSUE_NUM --comments
+fi
 ```
 
 阅读关键架构文档：

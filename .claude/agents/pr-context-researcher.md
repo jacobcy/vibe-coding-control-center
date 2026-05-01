@@ -31,7 +31,17 @@ PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
 uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "handoff not available"
 ```
 
-**Fallback**：如果 handoff 不可用（远程审查），从 PR description 和 comments 获取上下文。
+**Fallback**：如果 handoff 不可用（远程审查），从 issue comments 获取上下文：
+```bash
+# 从分支名推断 issue 编号（如 task/issue-123 → issue #123）
+ISSUE_NUM=$(echo $PR_BRANCH | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+if [ -n "$ISSUE_NUM" ]; then
+  gh issue view $ISSUE_NUM --comments
+fi
+
+# 同时获取 PR 信息
+gh pr view <number> --json title,body
+```
 
 ### 2. 项目结构理解
 
@@ -87,9 +97,9 @@ uv run python src/vibe3/cli.py handoff status $PR_BRANCH 2>/dev/null || echo "ha
 | AGENTS.md | 已读/未读 | 项目根目录 |
 | glossary.md | 已读/未读 | docs/standards/ |
 | PR description | 已读/未读 | GitHub |
-| PR comments | 已读/未读 | GitHub |
+| issue comments | 已读/未读 | 从分支名推断 issue 编号 |
 
-**注意**：审查分支 ≠ 开发分支，handoff 仅在本地可用。
+**注意**：审查分支 ≠ 开发分支，handoff 仅在本地可用，fallback 从 issue comments 获取上下文。
 
 ### 1. 项目上下文
 
