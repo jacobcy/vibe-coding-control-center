@@ -64,12 +64,55 @@ For opened PRs, GitHub PR metadata and PR diff are the source of truth for what 
 
 ### 2. Gather Project Context
 
-Use the shared state commands only as context, not as proof that code is correct:
+**关键区分**：本地开发 vs 远程审查
+
+#### 本地开发（当前 worktree = PR 开发分支）
+
+使用共享状态命令获取上下文：
 
 ```bash
 uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
 uv run python src/vibe3/cli.py task show
 ```
+
+#### 远程审查（当前 worktree ≠ PR 开发分支）
+
+**远程真源原则**：远程审查时，issue comments 是决策过程的真源。
+
+Agent 关键结论应发 comments，从 comments 就能清楚看到 PR 决策过程。
+
+**从 PR 分支推断 issue 并读取 comments**：
+
+```bash
+# 1. 获取 PR 分支名
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+
+# 2. 从分支名推断 issue 编号（分支名格式：task/issue-xxx 或 dev/issue-xxx）
+ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+
+# 3. 读取 issue comments 获取决策上下文
+if [ -n "$ISSUE_NUM" ]; then
+  gh issue view "$ISSUE_NUM" --comments
+fi
+
+# 4. 读取 PR comments 获取审查历史
+gh pr view <number> --comments
+```
+
+**为什么 issue comments 可以替代本地 handoff**：
+
+| 本地 handoff | 远程 issue comments |
+|--------------|---------------------|
+| 记录 agent 间上下文传递 | 记录 agent 决策过程 |
+| 仅本地可见 | 远程可见，团队共享 |
+| 需要 worktree 访问权限 | 只需要 GitHub 访问权限 |
+| handoff status 命令 | gh issue view --comments |
+
+**远程审查上下文优先级**：
+1. **PR comments** — 审查历史和决策
+2. **Issue comments** — 开发过程和 agent 决策
+3. **PR description** — 改动摘要
+4. **本地 handoff** — 仅当本地开发时可用
 
 If these commands fail because the branch has no bound flow, continue reviewing the requested diff and state the limitation.
 
