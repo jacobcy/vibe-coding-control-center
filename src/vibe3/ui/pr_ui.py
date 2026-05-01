@@ -1,7 +1,12 @@
 """PR UI components."""
 
+from typing import TYPE_CHECKING
+
 from vibe3.models.pr import PRResponse
 from vibe3.ui.console import console
+
+if TYPE_CHECKING:
+    from vibe3.analysis.local_review_report import LocalReviewReport
 
 
 def render_pr_created(pr: PRResponse) -> None:
@@ -107,3 +112,40 @@ def render_pr_ready(
         reviewers_str = ", ".join(requested_reviewers)
         console.print(f"[yellow]🤖[/] AI review requested: {reviewers_str}")
     console.print(f"[dim]{pr.url}[/]")
+
+
+def render_local_review_summary(
+    local_review: "LocalReviewReport | None",
+) -> None:
+    """Render local pre-push review summary.
+
+    Args:
+        local_review: LocalReviewReport if found, None otherwise
+    """
+    console.print("\n[bold]### Local Review[/]")
+
+    if not local_review:
+        console.print("- [dim]无本地 review evidence[/]")
+        return
+
+    console.print("- [cyan]Status[/]: Found")
+    if local_review.risk_level:
+        console.print(f"- [cyan]Risk Level[/]: {local_review.risk_level}")
+    else:
+        console.print("- [cyan]Risk Level[/]: [dim]N/A[/]")
+
+    if local_review.risk_score:
+        console.print(f"- [cyan]Risk Score[/]: {local_review.risk_score}")
+    else:
+        console.print("- [cyan]Risk Score[/]: [dim]N/A[/]")
+
+    if local_review.verdict:
+        console.print(f"- [cyan]Verdict[/]: {local_review.verdict}")
+    else:
+        console.print("- [cyan]Verdict[/]: [dim]N/A[/]")
+
+    console.print(f"- [cyan]Report[/]: {local_review.report_path}")
+
+    if local_review.created_at:
+        created_str = local_review.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        console.print(f"- [cyan]Created At[/]: {created_str}")
