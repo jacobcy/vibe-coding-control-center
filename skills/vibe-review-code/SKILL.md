@@ -73,6 +73,16 @@ uv run python src/vibe3/cli.py task show
 
 If these commands fail because the branch has no bound flow, continue reviewing the requested diff and state the limitation.
 
+For remote PR review, distinguish automatic flow branches from human-collaboration
+branches:
+
+- `task/issue-123` and `dev/issue-123`: infer the issue number and read issue
+  comments as the remote handoff / decision history.
+- other branch names such as `codex/pr-123-*`: do not infer an issue number from
+  the branch name. Treat PR body, PR comments, and human review comments as the
+  primary remote context, and explicitly state that issue comments are
+  unavailable for a non-flow branch.
+
 ### 3. Run Impact Analysis
 
 Before assigning severity, collect impact evidence with `inspect`:

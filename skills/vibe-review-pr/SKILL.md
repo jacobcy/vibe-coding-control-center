@@ -42,11 +42,14 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 "Team 功能需要在 tmux session 内运行。
  请运行: tmux new-session -s vibe-review
  然后重新启动 Claude Code。
- 
+
  当前回退到单 agent 审查模式..."
- 
+
 -> 使用 vibe-review-code
 ```
+
+不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
+team cleanup 状态；环境不满足时，直接转入 `vibe-review-code` 单 agent 审查。
 
 ---
 
@@ -89,6 +92,18 @@ gh pr view <number> --json title,labels,additions
 
 **Phase 1（必须先完成）**：
 ```
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+
+# 仅自动 flow 分支可推断 issue：task/issue-123 或 dev/issue-123。
+# 人机合作分支（如 codex/pr-123-*）不自动推断 issue，优先使用 PR body/comments。
+if echo "$PR_BRANCH" | grep -qE '^(task|dev)/issue-[0-9]+'; then
+  ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+  gh issue view "$ISSUE_NUM" --comments
+else
+  echo "issue comments unavailable for non-flow branch: $PR_BRANCH"
+  gh pr view <number> --comments
+fi
+
 Agent(context-researcher, model=haiku, prompt="收集 PR 背景...")
 v 等待 teammate-message
 ```
@@ -115,7 +130,8 @@ if security_related:
 ```
 team-lead 执行：
 - write_review_comment -> gh pr comment
-- check_fixable_issues -> 如需修复，提交代码
+- create_follow_up_issues -> 为范围外发现创建 issue（需要去重、标注来源和优先级）
+- 不直接提交、amend、push 或修改 PR 分支；需要代码修复时，写明建议并交给后续执行流程
 ```
 
 **Phase 5（清理与复用准备）**：
