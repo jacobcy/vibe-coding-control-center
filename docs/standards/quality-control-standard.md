@@ -251,6 +251,44 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 
 ---
 
+### 2.5.1 LOC Governance Protocol
+
+**分级预警机制**（Issue #625）：
+
+LOC检查采用三级预警系统，提前发现潜在问题：
+
+| 级别 | 条件 | 行为 | 输出示例 |
+|------|------|------|----------|
+| 🟢 GREEN | LOC < 90% × limit | 正常通过，无警告 | `🟢 Total Python LOC: 42000 / 50000 (84%)` |
+| 🟡 YELLOW | 90% × limit ≤ LOC < limit | 警告提示，允许推送 | `🟡 WARNING: Total Python LOC: 46500 / 50000 (93%) - approaching limit` |
+| 🔴 RED | LOC ≥ limit | CI阻断，本地警告 | `🔴 ALERT: Total Python LOC: 51000 / 50000 (102%) - exceeds limit` |
+
+**Monthly Review**:
+- On the first week of each month, review current LOC vs limit
+- If usage > 80%, evaluate whether limit should increase or code should decrease
+- Update `last_reviewed` field in config/loc_limits.yaml
+
+**Adjustment Criteria**:
+- Limit may increase if: new features added, test coverage improved
+- Code should decrease if: dead code detected, features removed
+- Any adjustment requires comment in config explaining rationale
+
+**Escalation Path**:
+1. Warning threshold hit (90%): Create reminder issue
+2. Limit exceeded: Block CI, require explicit decision (raise limit or reduce code)
+
+**配置示例**：
+```yaml
+# config/loc_limits.yaml
+code_limits:
+  total_file_loc:
+    v3_python: 50000
+    warning_threshold_percent: 90  # Trigger warning at 90% of limit
+    last_reviewed: "2026-05-01"    # Track last governance review
+```
+
+---
+
 ### 2.6 Review Gate（风险驱动审查）
 
 **目的**：高风险代码必须经过review
