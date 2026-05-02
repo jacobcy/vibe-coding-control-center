@@ -9,7 +9,7 @@ authority:
   - vibe3-read-write-rules
 author: GPT-5 Codex
 created: 2026-03-14
-last_updated: 2026-03-23
+last_updated: 2026-05-02
 related_docs:
   - docs/prds/vibe-session-governance.md
   - docs/standards/v3/handoff-governance-standard.md
@@ -23,11 +23,11 @@ related_docs:
 它只负责记录：
 
 - flow 责任链
-- `plan / report / audit` ref
+- `plan / run / review` 阶段 ref（存储列名仍为 `plan_ref / report_ref / audit_ref`）
 - `planner / executor / reviewer` 署名
 - 最小阻塞与下一步信息
 - 共享 handoff 中间态文件的位置约定
-- `plan / report / audit` 文档只作为临时工作产物，不承担长期语义真源职责
+- `plan / run / review` 文档只作为临时工作产物，不承担长期语义真源职责
 
 它不负责：
 
@@ -233,8 +233,9 @@ CREATE TABLE flow_events (
 
 **Handoff 事件**：
 - `handoff_plan` - plan handoff
-- `handoff_report` - report handoff
-- `handoff_audit` - audit handoff
+- `handoff_report` - run handoff（兼容历史 report 命名）
+- `handoff_audit` - review handoff（兼容历史 audit 命名）
+- `handoff_indicate` - manager indicate handoff
 
 **PR 相关事件**：
 - `pr_draft` - draft PR 创建
@@ -273,7 +274,7 @@ CREATE TABLE flow_events (
 不允许记录：
 
 - issue / PR / Project 正文镜像
-- `plan / report / audit` 全文
+- `plan / run / review` 全文
 - 可覆盖 SQLite 的正式责任链字段
 - 与 GitHub / git 冲突的事实副本
 
@@ -356,8 +357,9 @@ CREATE TABLE flow_events (
 **Handoff 记录**：
 - `handoff init` - 初始化当前 branch 的 handoff 文档
 - `handoff plan` - 记录 plan handoff
-- `handoff report` - 记录 report handoff
-- `handoff audit` - 记录 audit handoff
+- `handoff report` - 记录 run handoff 到 `report_ref`
+- `handoff audit` - 记录 review handoff 到 `audit_ref`
+- `handoff indicate` - 记录 manager 指令 handoff 到 `indicate_ref`
 - `handoff append` - 追加轻量更新到 current.md
 
 **共享 handoff 读取**：

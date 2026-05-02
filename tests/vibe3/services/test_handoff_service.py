@@ -82,6 +82,41 @@ def test_record_report_accepts_worktree_relative_canonical_doc(tmp_path: Path) -
     assert flow_state["report_ref"] == "docs/reports/issue-304-report.md"
 
 
+def test_record_indicate_writes_indicate_ref(tmp_path: Path) -> None:
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    indicate_path = worktree_root / "docs" / "indicate.md"
+    indicate_path.parent.mkdir(parents=True)
+    indicate_path.write_text("manager direction", encoding="utf-8")
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    service.record_indicate("docs/indicate.md", actor="codex/gpt-5.4")
+
+    flow_state = store.get_flow_state("task/issue-304")
+    assert flow_state is not None
+    assert flow_state["indicate_ref"] == "docs/indicate.md"
+
+
+def test_record_ref_rejects_unknown_active_kind(tmp_path: Path) -> None:
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    service = HandoffService(
+        store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
+        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    with pytest.raises(UserError, match="Unsupported handoff kind: mystery"):
+        service._record_ref("mystery", "docs/unknown.md", None, None, "codex/gpt-5.4")
+
+
 def test_get_handoff_events_excludes_non_handoff_runtime_events(tmp_path: Path) -> None:
     store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
     branch = "task/issue-304"

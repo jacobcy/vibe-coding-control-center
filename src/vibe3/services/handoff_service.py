@@ -34,6 +34,10 @@ class HandoffService:
         "run": "report_ref",
         "review": "audit_ref",
     }
+    _ACTIVE_KIND_TO_REF_FIELD: dict[str, str] = {
+        **_KIND_TO_REF_FIELD,
+        "indicate": "indicate_ref",
+    }
     # Canonical kind → actor state column
     _KIND_TO_ACTOR_FIELD: dict[str, str] = {
         "plan": "planner_actor",
@@ -94,8 +98,10 @@ class HandoffService:
             self.storage,
             cast(
                 Callable[[str, str | None, int | None], list[FlowEvent]],
-                lambda branch, event_type_prefix=None, limit=None: self.get_handoff_events(  # noqa: E501
-                    branch, event_type_prefix, limit
+                lambda branch, event_type_prefix=None, limit=None: (
+                    self.get_handoff_events(  # noqa: E501
+                        branch, event_type_prefix, limit
+                    )
                 ),
             ),
         )
@@ -214,10 +220,9 @@ class HandoffService:
 
         # Normalize kind and lookup ref field
         normalized_kind = self._normalize_kind(ref_kind)
-        ref_field = self._KIND_TO_REF_FIELD.get(normalized_kind)
+        ref_field = self._ACTIVE_KIND_TO_REF_FIELD.get(normalized_kind)
         if not ref_field:
-            # Fallback for unknown kinds (shouldn't happen in practice)
-            ref_field = f"{normalized_kind}_ref"
+            raise UserError(f"Unsupported handoff kind: {ref_kind}")
 
         # Build flow state updates
         flow_updates = {ref_field: ref_value}
