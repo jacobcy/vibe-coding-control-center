@@ -37,8 +37,11 @@ TaskCreate(
 ### PR 文档审查
 
 ```bash
-gh pr diff <number> --name-only | grep '\.md$'
-gh pr diff <number>
+PR_BASE=$(gh pr view <number> --json baseRefName -q .baseRefName)
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+git fetch origin "$PR_BASE" "$PR_BRANCH" --quiet
+git diff --name-only "origin/$PR_BASE...origin/$PR_BRANCH" -- '*.md'
+git diff "origin/$PR_BASE...origin/$PR_BRANCH" -- '*.md'
 ```
 
 ### 本地文档审查

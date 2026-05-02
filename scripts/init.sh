@@ -146,38 +146,29 @@ echo "📦 Initializing OpenSpec (optional)..."
 if [[ -d "openspec/specs" || -f "openspec/config.yaml" ]]; then
   echo "✅ OpenSpec already initialized"
 elif command -v openspec &> /dev/null; then
-  openspec init --tools claude,codex,opencode,qoder,codebuddy,trae
+  if openspec init --tools claude,codex,opencode,qoder,codebuddy,trae; then
+    echo "✅ OpenSpec initialized"
+  else
+    echo -e "\033[1;33m⚠️  Warning: openspec init failed. Continuing (non-blocking).\033[0m"
+    echo "   Run 'vibe doctor' to check optional tools status"
+  fi
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping (non-blocking).\033[0m"
   echo "   Install via: pnpm add -g @openspec/tools"
   echo "   Run 'vibe doctor' to check optional tools status"
 fi
 
-# ── 3. Symlink local project skills to agent directories ─────────────────────
-echo "🔗 Creating symlinks for local skills..."
-
-# Link skills/vibe-* (project-owned skills)
-_symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".gemini/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".copilot/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".qoder/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".codebuddy/skills" "identity" "dir"
-
-#  Symlink workflows
-echo "🔗 Creating symlinks for workflows..."
-_symlink_files ".agent/workflows/vibe:*.md" ".claude/commands" "identity" "file"
-
 echo "✅ Environment setup complete!"
 
 # ── 5. Install git hooks (pre-commit, optional, non-blocking) ─────────────────
 echo "🪝 Installing git hooks (optional)..."
 if command -v pre-commit &> /dev/null; then
-  pre-commit install
-  pre-commit install --hook-type pre-push
-  echo "✅ Pre-commit and pre-push hooks installed"
+  if pre-commit install && pre-commit install --hook-type pre-push; then
+    echo "✅ Pre-commit and pre-push hooks installed"
+  else
+    echo -e "\033[1;33m⚠️  Warning: pre-commit hook installation failed. Continuing (non-blocking).\033[0m"
+    echo "   Run 'vibe doctor' to check optional tools status"
+  fi
 else
   echo -e "\033[1;33m⚠️  Warning: 'pre-commit' not found. Skipping (non-blocking).\033[0m"
   echo "   Install via: uv pip install pre-commit"
