@@ -1,8 +1,10 @@
 """Inspect change commands."""
 
+import json
 from typing import Annotated
 
 import typer
+import yaml
 
 from vibe3.analysis.inspect_query_service import (
     build_change_analysis,
@@ -20,12 +22,14 @@ def register(app: typer.Typer) -> None:
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
+        yaml_out: Annotated[
+            bool, typer.Option("--yaml", help="Output as YAML")
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
     ) -> None:
         """Run PR change analysis."""
-        import json
 
         if trace:
             enable_trace()
@@ -37,6 +41,13 @@ def register(app: typer.Typer) -> None:
         if json_out:
             typer.echo(json.dumps(result, indent=2, default=str))
             return
+        elif yaml_out:
+            # Convert to JSON-serializable dict first (handles enums, etc.)
+            clean_result = json.loads(json.dumps(result, default=str))
+            typer.echo(
+                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
+            )
+            return
 
         _print_change_analysis("pr", str(pr_number), result)
 
@@ -46,12 +57,14 @@ def register(app: typer.Typer) -> None:
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
+        yaml_out: Annotated[
+            bool, typer.Option("--yaml", help="Output as YAML")
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
     ) -> None:
         """Run commit change analysis."""
-        import json
 
         if trace:
             enable_trace()
@@ -61,6 +74,13 @@ def register(app: typer.Typer) -> None:
         if json_out:
             typer.echo(json.dumps(result, indent=2, default=str))
             return
+        elif yaml_out:
+            # Convert to JSON-serializable dict first (handles enums, etc.)
+            clean_result = json.loads(json.dumps(result, default=str))
+            typer.echo(
+                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
+            )
+            return
 
         _print_change_analysis("commit", sha, result)
 
@@ -69,12 +89,14 @@ def register(app: typer.Typer) -> None:
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
+        yaml_out: Annotated[
+            bool, typer.Option("--yaml", help="Output as YAML")
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
     ) -> None:
         """Run analysis for uncommitted working tree changes."""
-        import json
 
         if trace:
             enable_trace()
@@ -83,6 +105,13 @@ def register(app: typer.Typer) -> None:
 
         if json_out:
             typer.echo(json.dumps(result, indent=2, default=str))
+            return
+        elif yaml_out:
+            # Convert to JSON-serializable dict first (handles enums, etc.)
+            clean_result = json.loads(json.dumps(result, default=str))
+            typer.echo(
+                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
+            )
             return
 
         _print_change_analysis("uncommitted", "working-tree", result)

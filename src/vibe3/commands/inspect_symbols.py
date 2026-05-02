@@ -6,6 +6,7 @@ from io import StringIO
 from typing import Annotated
 
 import typer
+import yaml
 from loguru import logger
 
 from vibe3.analysis.serena_service import SerenaService
@@ -23,6 +24,9 @@ def register(app: typer.Typer) -> None:
         ] = "",
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
+        ] = False,
+        yaml_out: Annotated[
+            bool, typer.Option("--yaml", help="Output as YAML")
         ] = False,
         quiet: Annotated[
             bool, typer.Option("--quiet", help="Suppress next step suggestions")
@@ -92,6 +96,11 @@ def register(app: typer.Typer) -> None:
             if json_out:
                 typer.echo(json.dumps(result, indent=2))
                 return
+            elif yaml_out:
+                typer.echo(
+                    yaml.dump(result, default_flow_style=False, allow_unicode=True)
+                )
+                return
 
             if "symbols" in result:
                 _print_symbols_table(result)
@@ -134,7 +143,7 @@ def _print_symbol_references(result: dict) -> None:
 
 
 def _print_symbols_table(result: dict) -> None:
-    """Print file symbols in simple format (like inspect structure)."""
+    """Print file symbols in simple format (like inspect files)."""
     typer.echo(f"=== Symbols: {result['file']} ===")
     symbols = result.get("symbols", [])
     typer.echo(f"  Total symbols: {len(symbols)}")
