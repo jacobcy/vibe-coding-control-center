@@ -547,7 +547,7 @@ LabelService().transition(
 
 - **[vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md)**: 定义执行层级与 worktree 语义，本文件补充事件语义。
 - **[vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)**: 定义 driver/tick/async child 架构，事件发布时机参考该文件。
-- **[vibe3-state-sync-standard.md](vibe3-state-sync-standard.md)**: 定义 flow 状态机，事件触发条件参考该文件。
+- **[v3/command-standard.md](v3/command-standard.md)**: 定义 flow 状态机，事件触发条件参考该文件。
 - **[agent-debugging-standard.md](agent-debugging-standard.md)**: 调试手册，事件日志规范以本文件为准。
 
 ### 11.2 术语真源

@@ -23,7 +23,7 @@
 
 本标准不定义：
 
-- `state/*` 业务含义细节（见 `docs/standards/vibe3-state-sync-standard.md`）
+- `state/*` 业务含义细节（见 `docs/standards/v3/command-standard.md`）
 - handoff 正文格式
 - skill / supervisor 具体 prompt 文案
 - 日志读取与调试方法（见 `docs/standards/agent-debugging-standard.md`）

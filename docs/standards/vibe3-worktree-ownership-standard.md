@@ -157,6 +157,6 @@ find . -name ".git" -type f | grep -v "^./.git$" | head -20
 ## 六、与其他标准的关系
 
 - **[vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)**：定义 driver/tick/async child 架构，本文件补充其 worktree 语义。
-- **[vibe3-state-sync-standard.md](vibe3-state-sync-standard.md)**：定义 flow 状态机，worktree 生命周期与 flow 状态绑定。
+- **[v3/command-standard.md](v3/command-standard.md)**：定义 flow 状态机，worktree 生命周期与 flow 状态绑定。
 - **[agent-debugging-standard.md](agent-debugging-standard.md)**：调试手册，§5.3 apply 步骤以本文件语义为准。
 - **[agent-workflow-standard.md](agent-workflow-standard.md)**：Agent 工作流规范，`cwd` 参数传递细节参考本文件。
