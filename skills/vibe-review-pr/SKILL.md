@@ -259,7 +259,6 @@ gh pr view <number> --json title,labels,additions
 # Step 3: 准备 Phase 2 上下文
 - action: 将背景报告保存为 phase_1_output，用于 SendMessage
 ```
-```
 
 ### Phase 2: 专项审查
 
