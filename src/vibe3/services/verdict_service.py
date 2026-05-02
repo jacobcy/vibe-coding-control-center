@@ -19,7 +19,7 @@ from vibe3.models.verdict import VerdictRecord
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
-from vibe3.utils.path_helpers import GitClientProtocol
+from vibe3.utils.git_path_client import GitPathProtocol
 
 
 class VerdictService:
@@ -42,7 +42,7 @@ class VerdictService:
     def __init__(
         self,
         store: SQLiteClient | None = None,
-        git_client: GitClientProtocol | None = None,
+        git_client: GitPathProtocol | None = None,
         flow_service: FlowService | None = None,
         handoff_storage: HandoffStorage | None = None,
     ) -> None:

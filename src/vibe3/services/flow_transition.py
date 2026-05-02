@@ -19,7 +19,7 @@ from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 from vibe3.services.flow_write_mixin import FlowWriteMixin
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.signature_service import SignatureService
-from vibe3.utils.path_helpers import GitClientProtocol
+from vibe3.utils.git_path_client import GitPathProtocol
 
 
 class FlowTransitionMixin(FlowWriteMixin):
@@ -33,7 +33,7 @@ class FlowTransitionMixin(FlowWriteMixin):
     """
 
     store: SQLiteClient
-    git_client: GitClientProtocol
+    git_client: GitPathProtocol
     config: VibeConfig
 
     def ensure_flow_for_branch(

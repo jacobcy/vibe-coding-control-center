@@ -7,11 +7,8 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.utils.git_helpers import get_branch_handoff_dir
-from vibe3.utils.path_helpers import (
-    GitClientProtocol,
-    get_git_common_dir,
-    normalize_ref_path,
-)
+from vibe3.utils.git_path_client import GitPathProtocol
+from vibe3.utils.path_helpers import get_git_common_dir, normalize_ref_path
 
 
 def _get_handoff_template(branch: str) -> str:
@@ -60,7 +57,7 @@ def _get_handoff_template(branch: str) -> str:
 class HandoffStorage:
     """Handles filesystem operations for handoff records."""
 
-    def __init__(self, git_client: GitClientProtocol | None = None) -> None:
+    def __init__(self, git_client: GitPathProtocol | None = None) -> None:
         """Initialize handoff storage.
 
         Args:

@@ -1,83 +1,23 @@
 """Path helper utilities for normalization and resolution."""
 
 from pathlib import Path
-from typing import Protocol
 
+from vibe3.utils.git_path_client import (
+    GitPathProtocol,
+    _get_git_client,
+    find_worktree_path_for_branch,
+    get_git_common_dir,
+    get_worktree_root,
+)
 
-class GitClientProtocol(Protocol):
-    """Protocol for git client operations."""
-
-    def get_git_common_dir(self) -> str: ...
-    def get_worktree_root(self) -> str: ...
-    def find_worktree_path_for_branch(self, branch: str) -> Path | None: ...
-    def get_current_branch(self) -> str: ...
-
-
-def _get_git_client(git_client: GitClientProtocol | None = None) -> GitClientProtocol:
-    """Get or create a GitClient instance.
-
-    Factory function to avoid repeating GitClient initialization logic.
-    """
-    if git_client is None:
-        from vibe3.clients.git_client import GitClient
-
-        return GitClient()
-    return git_client
-
-
-def get_git_common_dir(git_client: GitClientProtocol | None = None) -> str:
-    """Get the shared git common directory (.git/)."""
-    git_client = _get_git_client(git_client)
-    try:
-        return git_client.get_git_common_dir()
-    except (OSError, ValueError):
-        return ""
-
-
-def get_worktree_root(git_client: GitClientProtocol | None = None) -> str:
-    """Get the current worktree root."""
-    git_client = _get_git_client(git_client)
-    try:
-        return git_client.get_worktree_root()
-    except (OSError, ValueError):
-        return ""
-
-
-def find_worktree_path_for_branch(
-    branch: str, git_client: GitClientProtocol | None = None
-) -> Path | None:
-    """Find the worktree path for a specific branch."""
-    git_client = _get_git_client(git_client)
-    try:
-        return git_client.find_worktree_path_for_branch(branch)
-    except (OSError, ValueError):
-        return None
-
-
-class BranchBoundGitClient:
-    """Git client shim that pins operations to an explicit branch."""
-
-    def __init__(self, branch: str) -> None:
-        self._branch = branch
-        self._delegate = _get_git_client()
-
-    def get_current_branch(self) -> str:
-        return self._branch
-
-    def get_git_common_dir(self) -> str:
-        return self._delegate.get_git_common_dir()
-
-    def get_worktree_root(self) -> str:
-        return self._delegate.get_worktree_root()
-
-    def find_worktree_path_for_branch(self, branch: str) -> Path | None:
-        return self._delegate.find_worktree_path_for_branch(branch)
+# Backward compatibility alias
+GitClientProtocol = GitPathProtocol
 
 
 def normalize_ref_path(
     ref_value: str,
     branch: str,
-    git_client: GitClientProtocol | None = None,
+    git_client: GitPathProtocol | None = None,
 ) -> str:
     """Normalize a path for storage in the database.
 
@@ -244,7 +184,7 @@ _SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
 def check_ref_exists(
     ref_value: str,
     branch: str | None = None,
-    git_client: GitClientProtocol | None = None,
+    git_client: GitPathProtocol | None = None,
 ) -> tuple[str, bool]:
     """Check if a reference path exists, unified method for all callers.
 
@@ -303,7 +243,7 @@ def check_ref_exists(
 
 def _resolve_shared_artifact(
     target: str,
-    git_client: GitClientProtocol,
+    git_client: GitPathProtocol,
 ) -> Path:
     """Resolve @prefix shared artifact path.
 
@@ -332,7 +272,7 @@ def _resolve_shared_artifact(
 def _resolve_worktree_artifact(
     target: str,
     branch: str | None,
-    git_client: GitClientProtocol,
+    git_client: GitPathProtocol,
 ) -> Path:
     """Resolve worktree-relative artifact path.
 
@@ -379,7 +319,7 @@ def _resolve_worktree_artifact(
 def resolve_handoff_target(
     target: str,
     branch: str | None = None,
-    git_client: GitClientProtocol | None = None,
+    git_client: GitPathProtocol | None = None,
 ) -> Path:
     """Resolve a handoff show target into an absolute file path.
 

@@ -19,10 +19,8 @@ from vibe3.services.external_events import ExternalEventRecorder
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.handoff_validation import validate_authoritative_ref
 from vibe3.services.signature_service import SignatureService
-from vibe3.utils.path_helpers import (
-    _SHARED_HANDOFF_PREFIX,
-    GitClientProtocol,
-)
+from vibe3.utils.git_path_client import GitPathProtocol
+from vibe3.utils.path_helpers import _SHARED_HANDOFF_PREFIX
 
 
 class HandoffService:
@@ -56,7 +54,7 @@ class HandoffService:
     def __init__(
         self,
         store: SQLiteClient | None = None,
-        git_client: GitClientProtocol | None = None,
+        git_client: GitPathProtocol | None = None,
     ) -> None:
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
