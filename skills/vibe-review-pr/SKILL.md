@@ -620,7 +620,7 @@ Agent(team_name="pr-review-team", ...)
 **预防措施**：
 1. 每次会话结束时确保 TeamDelete 正确执行
 2. 启动前检查 `~/.claude/teams/pr-review-team/` 是否存在残留
-3. 如发现残留，先清理再创建
+3. **如发现残留，建议重启 Claude Code 会话**（最干净的解决方式）
 
 ### 问题 6：Team 清理不完整（会话残留）
 
@@ -666,12 +666,18 @@ TeamDelete(team_name="pr-review-team")
 # 3. 清除会话中的 team context
 ```
 
-**补救措施**（如果已手动删除）：
-```bash
-# 方案 A：重启 Claude Code 会话（推荐）
-# 退出并重新启动，创建新会话
+**补救措施**（如果已手动删除或发现残留）：
 
-# 方案 B：清除会话文件中的 teamName 引用
+**推荐：重启 Claude Code 会话**
+```
+这是最干净、最可靠的解决方式：
+1. 输入 /exit 或 Ctrl+D 退出当前会话
+2. 重新启动 Claude Code
+3. 新会话不会有残留的 team context
+```
+
+**备选：手动清理会话文件**（不推荐，可能影响其他功能）：
+```bash
 sed -i '' 's/"teamName":"pr-review-team"//g' \
   ~/.claude/projects/-*/{session-id}.jsonl
 ```
