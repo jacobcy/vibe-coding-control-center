@@ -26,19 +26,21 @@ description: |
 **关键指令**：读取 template 后，按 `workflow.execution` 配置执行 Agent 调用。
 
 ```
-0. TeamCreate(team_name="pr-review-team") → 收到任务立即创建（一次性）
-1. 环境检查（如果失败，删除 team 后回退）
-2. 选择执行模式
-3. PR 队列排序与选择
-4. 循环审查每个 PR（不检查 team，假设已存在）
+1. 环境检查（必须先检查，不满足则直接回退）
+2. TeamCreate(team_name="pr-review-team") → 环境通过后创建（一次性）
+3. 选择执行模式
+4. PR 队列排序与选择
+5. 循环审查每个 PR（不检查 team，假设已存在）
    - Phase 1-4: 审查流程
    - Phase 5: 只清理 inboxes/tasks（不删除 team）
    - 询问是否继续下一个 PR
-5. 人类确认结束审查 → 删除 team
+6. 人类确认结束审查 → 删除 team
 ```
 
 **重要**：
-- Team 在收到任务时立即创建，整个审查周期只创建一次
+- 环境检查必须在 TeamCreate 之前执行
+- Team 只在环境检查通过后创建，避免无效创建
+- Team 创建是**一次性操作**，整个审查周期只执行一次
 - 循环中不检查/创建/删除 Team，假设 Team 已存在
 - Team 只在人类明确确认结束审查后才删除
 - `subagent_type` 必须匹配项目 `.claude/agents/pr-*.md` 定义
@@ -47,24 +49,9 @@ description: |
 
 ---
 
-## Step 0: 立即创建团队（一次性）
+## Step 1: 环境检查（必须最先执行）
 
-**收到任务就创建 Team**，不等待环境检查或其他步骤。
-
-```yaml
-TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
-```
-
-**关键原则**：
-- Team 创建是**一次性操作**，整个审查周期只执行一次
-- 创建后 Team 持续存在，直到人类确认结束审查
-- 即使环境检查失败需要回退，也要先删除 Team 再回退
-
----
-
-## Step 1: 环境检查
-
-**必须先检查环境是否支持 Team 功能。**
+**必须先检查环境是否支持 Team 功能，不满足则直接回退，不创建 Team。**
 
 ```bash
 # 检查 tmux
@@ -78,8 +65,8 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
 | 条件 | 要求 | 不满足时 |
 |------|------|----------|
-| TMUX | 必须设置 | 提示用户 + 回退到 vibe-review-code |
-| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 提示用户 + 回退 |
+| TMUX | 必须设置 | 提示用户 + 直接回退到 vibe-review-code（不创建 Team） |
+| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 提示用户 + 直接回退 |
 
 **回退处理**：
 ```
@@ -89,16 +76,30 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
  当前回退到单 agent 审查模式..."
 
-→ TeamDelete(team_name="pr-review-team")
-→ 使用 vibe-review-code
+→ 直接使用 vibe-review-code（不创建/删除 Team）
 ```
 
 不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
-team cleanup 状态；环境不满足时，先删除已创建的 Team，再回退到 `vibe-review-code` 单 agent 审查。
+team cleanup 状态；环境不满足时，**直接回退**，不需要 TeamDelete。
 
 ---
 
-## Step 1.5: 选择执行模式
+## Step 2: 创建团队（环境通过后）
+
+**环境检查通过后才创建 Team**。
+
+```yaml
+TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
+```
+
+**关键原则**：
+- Team 创建是**一次性操作**，整个审查周期只执行一次
+- 创建后 Team 持续存在，直到人类确认结束审查
+- 环境检查失败时不创建 Team，直接回退
+
+---
+
+## Step 3: 选择执行模式
 
 **在开始审查前，询问用户执行模式**（除非用户已指定）。
 
@@ -154,12 +155,12 @@ execution_context:
 
 | 概念 | 决定什么 | 在哪个 Step |
 |------|----------|-------------|
-| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 1.5 询问用户 |
-| **PR 类型** | 启动多少 agent（agents 数量） | Step 4 自动判定 |
+| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 3 询问用户 |
+| **PR 类型** | 启动多少 agent（agents 数量） | Step 6 自动判定 |
 
 ---
 
-## Step 2: PR 队列排序与选择
+## Step 4: PR 队列排序与选择
 
 当用户没有指定 PR 编号时，先检查当前 repo 的所有未合并 PR，排序后建议审查顺序。
 
@@ -193,9 +194,9 @@ gh pr view <number> --json baseRefName,headRefName
 
 ---
 
-## Step 3: 加载 Team Template
+## Step 5: 加载 Team Template
 
-**Team 已在 Step 0 创建**，这里只加载配置。
+**Team 已在 Step 2 创建**，这里只加载配置。
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -218,10 +219,10 @@ cat .claude/team-templates/pr-review-team.yaml
 
 ---
 
-## Step 4: 判断 PR 类型
+## Step 6: 判断 PR 类型
 
 **自动判定**：根据 PR 行数和标签自动分类，无需用户选择。
-**注意**：PR 类型决定启动多少 agent；执行模式在 Step 1.5 已选择。
+**注意**：PR 类型决定启动多少 agent；执行模式在 Step 3 已选择。
 
 根据 Template 中的 `pr_classification` 规则：
 
@@ -240,7 +241,7 @@ gh pr view <number> --json title,labels,additions
 - 不启动 team，根据 PR 标签选择单 agent 审查：
   - `scope/documentation` → 使用 `vibe-review-docs`
   - 其他（`scope/python`、`scope/shell` 等）→ 使用 `vibe-review-code`
-- 审查完成后返回 Step 2 处理队列中的下一个 PR
+- 审查完成后返回 Step 4 处理队列中的下一个 PR
 
 ### 复杂情况使用 Codex
 
@@ -289,7 +290,7 @@ gh pr view <number> --json title,labels,additions
 
 ---
 
-## Step 5: 按流程启动 Agent
+## Step 7: 按流程启动 Agent
 
 **重要**：读取 template 中的 `workflow.execution` 配置，按步骤执行。
 
@@ -460,7 +461,7 @@ SendMessage(
 
 ---
 
-## Step 6: 询问是否继续
+## Step 8: 询问是否继续
 
 **每个 PR 审查完成后询问用户**：
 
@@ -480,12 +481,12 @@ AskUserQuestion:
       description: "结束审查，删除团队"
 ```
 
-- **选择 continue**：返回 Step 2 处理下一个 PR
-- **选择 end**：进入 Step 7（删除 Team）
+- **选择 continue**：返回 Step 4 处理下一个 PR
+- **选择 end**：进入 Step 9（删除 Team）
 
 ---
 
-## Step 7: 人类确认后删除 Team（最终步骤）
+## Step 9: 人类确认后删除 Team（最终步骤）
 
 **只在人类明确确认结束审查后执行**：
 
