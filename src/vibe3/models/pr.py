@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from vibe3.services.signature_service import SignatureService
+from vibe3.utils.actor_utils import normalize_actor
 
 
 class PRState(str, Enum):
@@ -47,7 +47,7 @@ class PRMetadata(BaseModel):
         field_order: list[str] = []
 
         for raw in (self.planner, self.executor, self.reviewer, self.latest):
-            normalized = SignatureService.normalize_actor(raw) if raw else None
+            normalized = normalize_actor(raw) if raw else None
             if not normalized:
                 continue
             backend = normalized.split("/")[0]
@@ -64,7 +64,7 @@ class PRMetadata(BaseModel):
             try:
                 worktree_actor = GitClient().get_config("user.name")
                 if worktree_actor:
-                    normalized = SignatureService.normalize_actor(worktree_actor)
+                    normalized = normalize_actor(worktree_actor)
                     if normalized:
                         return [normalized]
             except Exception:
