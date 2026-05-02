@@ -597,6 +597,31 @@ Agent(..., run_in_background=true)  # security-reviewer
 3. 在报告中说明仲裁理由
 4. 不要假设缺失的 agent 同意其他结论
 
+### 问题 5：TeamCreate 与 Agent spawn 状态不一致
+
+**现象**：
+- TeamCreate 报错：`Already leading team "pr-review-team"`
+- Agent spawn 报错：`Team "pr-review-team" does not exist`
+
+**根因**：
+- 系统状态残留：会话记录显示 team 存在，但实际配置文件不存在
+- 可能原因：之前 team cleanup 不完整，或会话中断
+
+**解决方案**：
+```bash
+# 临时方案：手动创建 team 配置
+mkdir -p ~/.claude/teams/pr-review-team
+echo '{"team_name":"pr-review-team","members":[]}' > ~/.claude/teams/pr-review-team/config.json
+
+# 然后正常 spawn agents
+Agent(team_name="pr-review-team", ...)
+```
+
+**预防措施**：
+1. 每次会话结束时确保 TeamDelete 正确执行
+2. 启动前检查 `~/.claude/teams/pr-review-team/` 是否存在残留
+3. 如发现残留，先清理再创建
+
 ---
 
 ## 文件位置
