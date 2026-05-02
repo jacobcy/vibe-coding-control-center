@@ -317,12 +317,26 @@ workflow:
           to: security-reviewer
           message: "{phase_1_output}"
       - step: wait_for_phase_2_results
-        action: 等待所有 Phase 2 agents 返回结果
+        action: |
+          等待所有 Phase 2 agents 返回结果。
+
+          **必须等待**：
+          - code-analyst
+          - architect-reviewer
+          - security-reviewer
+
+          超时：5 分钟
+
+          如果超时仍有 agent 未返回：
+          - 记录 WARNING
+          - 在报告中标注"部分审查未完整"
+          - 不要假设未返回的 agent 同意其他结论
 
   phase_3:
     name: 综合判断与改进
     agents: []
     actions:
+      - verify_all_reports_received  # 新增：前置检查
       - collect_results
       - detect_conflicts
       - arbitrate_if_needed
@@ -330,6 +344,20 @@ workflow:
       - generate_improvement_plan
     # 执行指令
     execution:
+      # Step 0: 前置检查（新增）
+      - step: verify_all_reports
+        action: |
+          验证所有 Phase 2 agents 已返回报告：
+
+          required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
+          received_agents = [从 idle notifications 获取]
+
+          missing = set(required_agents) - set(received_agents)
+          if missing:
+            log_warning(f"缺失审查报告: {missing}")
+            在最终报告中标注"审查不完整：缺失 {missing}"
+            # 重要：不要假设缺失的 agent 同意其他结论
+
       - step: collect_all_reports
         action: 从 idle notifications 获取各 agent 报告
       - step: detect_conflicts

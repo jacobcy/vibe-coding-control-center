@@ -402,8 +402,24 @@ SendMessage(
 # Step 2-4: 发送上下文（agents 启动后自动接收 team broadcast）
 # 注意：run_in_background 的 agents 会自动收到 team context
 
-# Step 5: 等待所有结果
-- action: 等待所有 Phase 2 agents 返回 idle notification
+# Step 5: 等待所有结果（必须等待全部返回）
+- action: |
+    等待所有 Phase 2 agents 返回 idle notification。
+    
+    **重要**：必须等待以下全部 agents 返回：
+    - code-analyst
+    - architect-reviewer  
+    - security-reviewer
+    
+    等待机制：
+    1. 检查 ~/.claude/teams/pr-review-team/ 目录下的状态
+    2. 或等待系统通知（idle notification）
+    3. 超时设置：5 分钟
+    
+    如果超时仍有 agent 未返回：
+    - 记录 WARNING
+    - 在报告中标注"部分审查未完成"
+    - 不要假设未返回的 agent 同意其他 agent 的结论
 ```
 
 ### Phase 3: 综合判断
@@ -411,6 +427,19 @@ SendMessage(
 **执行步骤**（从 template.workflow.phase_3.execution）：
 
 ```yaml
+# Step 0: 前置检查（新增）
+- action: |
+    在进入 Phase 3 前，验证所有 Phase 2 agents 已返回：
+    
+    required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
+    received_agents = [从 idle notifications 获取]
+    
+    missing = set(required_agents) - set(received_agents)
+    if missing:
+      log_warning(f"缺失审查报告: {missing}")
+      在最终报告中标注"审查不完整"
+      # 不要假设缺失的 agent 同意其他结论
+
 # Step 1: 收集所有报告
 - action: 从 idle notifications 获取各 agent 报告
 
@@ -513,6 +542,60 @@ TeamDelete(team_name="pr-review-team")
 2. **Phase 1 完成后才启动 Phase 2**
 3. **用 SendMessage 传递背景**
 4. **差异必须仲裁**
+
+---
+
+## 常见问题与处理
+
+### 问题 1：Context-researcher 报告 "Invalid tool parameters"
+
+**原因**：Agent 尝试调用未授权工具或参数格式错误
+
+**解决方案**：
+```yaml
+# 确保只调用授权工具
+tools: [Read, Grep, Glob, WebFetch, Bash]
+
+# prompt 中明确禁止
+prompt: |
+  只使用授权工具：Read, Grep, Glob, WebFetch, Bash
+  禁止调用：Agent, Edit, Write, TeamCreate, TeamDelete
+```
+
+### 问题 2：Architect/Security Reviewer 延迟返回
+
+**现象**：报告已发布后，延迟的 agent 返回重要发现
+
+**解决方案**：
+1. 在 Phase 3 前置检查中验证所有 agents 已返回
+2. 如有缺失，在报告中明确标注"审查不完整"
+3. 设置 5 分钟超时，超时后记录 WARNING
+
+### 问题 3：Phase 2 并行 Spawn 不完整
+
+**现象**：只启动了部分 agents
+
+**解决方案**：
+```yaml
+# 在单次响应中发起所有 Agent 调用
+# 错误：分多次响应
+# 正确：在同一条消息中调用 3 个 Agent tools
+
+Agent(..., run_in_background=true)  # code-analyst
+Agent(..., run_in_background=true)  # architect-reviewer
+Agent(..., run_in_background=true)  # security-reviewer
+# 三个调用必须在同一响应中
+```
+
+### 问题 4：报告冲突处理
+
+**现象**：不同 agents 给出矛盾结论
+
+**解决方案**：
+1. 记录冲突点
+2. 进行仲裁（team-lead 负责或请求人类判断）
+3. 在报告中说明仲裁理由
+4. 不要假设缺失的 agent 同意其他结论
 
 ---
 
