@@ -2,7 +2,7 @@
 
 > **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
 > **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试。
-> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义与 authoritative ref 定义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
+> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义与 authoritative ref 定义以 [v3/command-standard.md](v3/command-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
 > **实践入口**：快速上手请参考 [vibe3-serve-debugging-guide.md](vibe3-serve-debugging-guide.md)。
 
 ---
