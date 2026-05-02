@@ -524,10 +524,15 @@ AskUserQuestion:
 TeamDelete(team_name="pr-review-team")
 ```
 
-**清理步骤**：
+**TeamDelete 自动执行的清理**（无需手动操作）：
 1. 杀死 tmux panes（从 config.json 读取 paneId）
-2. 删除 team 目录：`rm -rf ~/.claude/teams/pr-review-team`
-3. 删除 tasks 目录：`rm -rf ~/.claude/tasks/pr-review-team`
+2. 删除 team 目录：`~/.claude/teams/pr-review-team/`
+3. 删除 tasks 目录：`~/.claude/tasks/pr-review-team/`
+4. 清除会话中的 team context
+
+**重要**：
+- ❌ 不要手动执行上述步骤
+- ✅ 只调用 TeamDelete 工具，它会自动完成全部清理
 
 **关键原则**：
 - Team 删除是**最终步骤**，只在人类确认后执行一次
