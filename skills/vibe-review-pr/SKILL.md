@@ -40,6 +40,21 @@ description: |
 
 ---
 
+## Step 0: 初始化任务跟踪
+
+**启动时创建 task 跟踪进度**（使用 TaskCreate tool）：
+
+```yaml
+TaskCreate(
+  title: "PR Review Queue",
+  description: "审查 PR 队列：自动排序并依次审查"
+)
+```
+
+创建后后续步骤标记为 in_progress/completed。
+
+---
+
 ## Step 1: 环境检查
 
 **必须先检查环境是否支持 Team 功能。**
@@ -127,6 +142,13 @@ execution_context:
   pr_number: target_pr
 ```
 
+### 概念区分
+
+| 概念 | 决定什么 | 在哪个 Step |
+|------|----------|-------------|
+| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 1.5 询问用户 |
+| **PR 类型** | 启动多少 agent（agents 数量） | Step 4 自动判定 |
+
 ---
 
 ## Step 2: PR 队列排序与选择
@@ -200,18 +222,27 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 
 ## Step 4: 判断 PR 类型
 
+**自动判定**：根据 PR 行数和标签自动分类，无需用户选择。
+**注意**：PR 类型决定启动多少 agent；执行模式在 Step 1.5 已选择。
+
 根据 Template 中的 `pr_classification` 规则：
 
-| 类型 | 条件 | 流程 |
-|------|------|------|
-| simple | <50行, 非安全相关 | 单人审查 |
-| refactor | 标题含 refactor | standard 流程 |
-| security | 安全标签或 fix 标签 | 全流程 + Codex |
-| standard | 其他 | standard 流程 |
+| 类型 | 条件 | 流程 | agents |
+|------|------|------|--------|
+| simple | <50行, 非安全相关 | 回退 vibe-review-code | **0（不启动）** |
+| refactor | 标题含 refactor | standard 多人流程 | 3 |
+| security | 安全标签或 fix 标签 | 全流程 + Codex | 4 |
+| standard | 其他 | standard 多人流程 | 4 |
 
 ```bash
 gh pr view <number> --json title,labels,additions
 ```
+
+**simple 类型处理**：
+- 不启动 team，根据 PR 标签选择单 agent 审查：
+  - `scope/documentation` → 使用 `vibe-review-docs`
+  - 其他（`scope/python`、`scope/shell` 等）→ 使用 `vibe-review-code`
+- 审查完成后返回 Step 2 处理队列中的下一个 PR
 
 ---
 

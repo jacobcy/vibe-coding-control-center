@@ -5,61 +5,173 @@ description: Use when the user wants to review documentation changes, audit entr
 
 # Vibe Documentation Review Protocol
 
-> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
+## 职责
 
-**核心职责**: 文档概念审查（检查错误概念和过时信息）
+**本 Skill 只负责**：
+1. 文档概念审查（检查错误概念和过时信息）
+2. 入口文件审查（CLAUDE.md, SOUL.md, STRUCTURE.md 等）
+3. docs/ 目录审查
+4. 概念对齐（确保文档与代码实际状态一致）
 
-**使用场景**:
+**语义边界**：
+- `vibe-review-docs` 负责 docs、standards、task/readme、changelog 与入口文件的概念和表达审查
+- source code diff、实现正确性与测试风险审查交给 `vibe-review-code`
 
-1. **入口文件审查**: 检查 CLAUDE.md, SOUL.md, STRUCTURE.md 等入口文件
-2. **docs/ 目录审查**: 审计 docs/ 目录下的文档质量
-3. **概念对齐**: 确保文档中的概念与代码实际状态一致
+---
 
-语义边界：
+## Step 0: 初始化任务跟踪
 
-- `vibe-review-docs` 负责 docs、standards、task/readme、changelog 与入口文件的概念和表达审查。
-- 仅当对象是文档、标准、说明文字或文档治理问题时介入。
-- source code diff、实现正确性与测试风险审查交给 `vibe-review-code`。
+**启动时创建 task 跟踪进度**（使用 TaskCreate tool）：
 
-When invoked to review documentation, your goal is to ensure clarity, consistency, and alignment with the Vibe Center architecture layout.
-## 1. Context Gathering (Align Truth)
+```yaml
+TaskCreate(
+  title: "Doc Review",
+  description: "文档审查：检查概念对齐和引用正确性"
+)
+```
 
-- **Identify Intent**: Run `vibe3 review base` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
-- **Identify Files**:
-  - Use `gh pr diff --name-only` or `git diff main...HEAD --name-only` and filter for `\.md$`.
-  - For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
-- **Review Context**: Check if `CHANGELOG.md` has been reasonably updated.
+---
 
-## 2. Review Standards
+## Step 1: 确定审查范围
 
-Evaluate the documentation against the following checklist:
-
-1. **Completeness**: Are `docs/prds/` following standard conventions (Background, Goals, Acceptance Criteria)?
-2. **Language & Clarity**: Is the writing concise? Remove overly generic AI-speak ("In today's fast-paced digital world...").
-3. **Accuracy**: Do the documented CLI commands and architecture match the current V3 state? (Check `vibe3 --help`).
-4. **Git Constraints**: Are we strictly distinguishing `.agents/` (disposable global tools directory) from `.agent/` (managed project-specific workflows)?
-
-## 3. Output: The Doc Review Report
-...
-## 4. Handoff 记录
-
-完成审查后，更新 handoff：
+### PR 文档审查
 
 ```bash
-vibe3 handoff append "vibe-review-docs: Documentation review completed" --actor vibe-review-docs --kind milestone
+PR_BASE=$(gh pr view <number> --json baseRefName -q .baseRefName)
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+git fetch origin "$PR_BASE" "$PR_BRANCH" --quiet
+git diff --name-only "origin/$PR_BASE...origin/$PR_BRANCH" -- '*.md'
+git diff "origin/$PR_BASE...origin/$PR_BRANCH" -- '*.md'
 ```
-### 🔴 Required Edits (Blockers)
 
-- **[File:Line]** Detail what must be fixed (e.g. incorrect terminology, missing CHANGELOG entry).
+### 本地文档审查
 
-### 🟡 Formatting & Clarity Suggestions
+```bash
+git diff main...HEAD --name-only | grep '\.md$'
+git diff main...HEAD -- '*.md'
+```
 
-- **[File:Line]** Suggestions for better outline structure, markdown linting, or brevity.
+---
 
-## 4. Handoff 记录
+## Step 2: 收集项目上下文
+
+**关键区分**：本地开发 vs 远程审查
+
+### 本地开发
+
+```bash
+uv run python src/vibe3/cli.py handoff status $(git branch --show-current)
+```
+
+### 远程审查
+
+```bash
+PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
+gh pr view <number> --comments
+```
+
+---
+
+## Step 3: 审查标准
+
+检查以下维度：
+
+| 维度 | 检查项 |
+|------|--------|
+| **Completeness** | PRD 是否遵循标准格式（Background, Goals, Acceptance Criteria） |
+| **Language & Clarity** | 是否简洁，去除泛化 AI 语言 |
+| **Accuracy** | CLI 命令和架构描述是否与当前 V3 状态一致 |
+| **References** | 引用的文件是否存在，路径是否正确 |
+| **Deprecation** | 废弃文件是否有明确的 deprecation notice |
+
+### 验证引用
+
+```bash
+# 检查引用文件是否存在
+ls -la docs/standards/v3/command-standard.md
+
+# 检查废弃文件状态
+head -10 docs/standards/vibe3-state-sync-standard.md
+```
+
+---
+
+## Step 4: 验证
+
+运行相关检查：
+
+```bash
+# CLI 命令验证
+uv run python src/vibe3/cli.py --help
+
+# 特定命令验证
+uv run python src/vibe3/cli.py <command> --help
+```
+
+---
+
+## Step 5: 输出审查报告
+
+### 格式
+
+```markdown
+## Findings
+
+- [Blocking] path:line
+  - Issue:
+  - Failure mode:
+  - Minimal fix:
+
+## Verification
+
+- Passed:
+- Not run:
+
+## Verdict
+
+PASS | MAJOR | BLOCK
+```
+
+### 严重级别
+
+| 级别 | 定义 |
+|------|------|
+| **Blocking** | 错误概念、指向不存在文件的引用、缺失 deprecation notice |
+| **Major** | 应在合并前修复；描述与代码不一致、缺失关键文档 |
+| **Minor** | 有限影响的问题；格式、措辞优化 |
+| **Nit** | 小的清晰度问题 |
+
+---
+
+## Step 6: Handoff 记录
 
 完成审查后，更新 handoff：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-review-docs: Documentation review completed" --actor vibe-review-docs --kind milestone
+```
+
+---
+
+## 文件位置
+
+| 文件 | 职责 |
+|------|------|
+| `skills/vibe-review-docs/SKILL.md` | 本文件：文档审查流程 |
+| `skills/vibe-review-code/SKILL.md` | 代码审查流程 |
+| `docs/standards/quality-control-standard.md` | QC 标准 |
+
+---
+
+## 使用方式
+
+```
+/vibe-review-docs
+/vibe-review-docs 637
+```
+
+或
+
+```
+用 vibe-review-docs 审查 PR #637
 ```
