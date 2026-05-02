@@ -8,9 +8,6 @@ from vibe3.exceptions import UserError
 class MissingTaskIssueError(UserError):
     """Raised when current flow has no bound task issue."""
 
-    def __str__(self) -> str:
-        return self.message
-
 
 def has_task_issue(flow_status: Any | None) -> bool:
     """Return True when flow status includes a task_issue_number."""
