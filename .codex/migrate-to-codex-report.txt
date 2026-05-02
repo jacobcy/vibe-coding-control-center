@@ -1,0 +1,29 @@
+Migration inventory:
+  active: instruction files - 2 found
+    - CLAUDE.md
+    - AGENTS.md
+  inactive: skills - none found
+  inactive: command sources - none found
+  active: subagents - 5 found
+    - pr-architect-reviewer
+    - pr-code-analyst
+    - pr-context-researcher
+    - pr-fix-executor
+    - pr-security-reviewer
+Migration surfaces:
+  active: AGENTS.md - 1 instruction file(s) found.
+  inactive: skills - No skills found.
+  inactive: MCP config - No settings or MCP config found.
+  active: subagents - 5 subagent(s) converted.
+Migration report:
+  symlinked: AGENTS.md - Linked to CLAUDE.md.
+  manual_fix_required: .codex/agents/pr-architect-reviewer.toml - Manual review required for Claude subagent fields: `tools`, `extends`.
+  manual_fix_required: .codex/agents/pr-code-analyst.toml - Manual review required for Claude subagent fields: `tools`, `extends`, `forbidden_commands`.
+  manual_fix_required: .codex/agents/pr-context-researcher.toml - Manual review required for Claude subagent fields: `tools`, `extends`.
+  manual_fix_required: .codex/agents/pr-fix-executor.toml - Manual review required for Claude subagent fields: `tools`.
+  manual_fix_required: .codex/agents/pr-security-reviewer.toml - Manual review required for Claude subagent fields: `tools`, `extends`, `forbidden_commands`.
+  overwritten: .codex/agents/pr-security-reviewer.toml - Existing Codex subagent will be replaced.
+  overwritten: .codex/agents/pr-fix-executor.toml - Existing Codex subagent will be replaced.
+  overwritten: .codex/agents/pr-code-analyst.toml - Existing Codex subagent will be replaced.
+  overwritten: .codex/agents/pr-architect-reviewer.toml - Existing Codex subagent will be replaced.
+  overwritten: .codex/agents/pr-context-researcher.toml - Existing Codex subagent will be replaced.

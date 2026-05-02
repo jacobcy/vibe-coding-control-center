@@ -125,7 +125,7 @@ openspec/
 .agent/skills/
 .agents/
 .github/prompts/
-.codex/
+.codex/skills/
 .gemini/
 .opencode/
 .copilot/
