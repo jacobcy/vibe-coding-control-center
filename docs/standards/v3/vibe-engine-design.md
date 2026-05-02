@@ -24,10 +24,10 @@ related_docs:
 - 该文档是历史架构蓝图与背景叙事，不是现行标准体裁
 - 其中 `Stage 1/2/3/4`、`Execution Gate`、`Review Gate`、统一编排器等表述容易被误读为当前强制标准
 - 当前正式语义已经由以下标准承接：
-  - [glossary.md](glossary.md)
-  - [command-standard.md](command-standard.md)
-  - [skill-standard.md](skill-standard.md)
-  - [skill-trigger-standard.md](skill-trigger-standard.md)
+  - [glossary.md](../glossary.md)
+  - [command-standard.md](./command-standard.md)
+  - [skill-standard.md](./skill-standard.md)
+  - [skill-trigger-standard.md](./skill-trigger-standard.md)
 
 使用规则：
 
