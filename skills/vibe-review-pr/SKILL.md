@@ -10,10 +10,12 @@ description: |
 ## 职责
 
 **本 Skill 只负责**：
-1. 环境检查
-2. PR 队列排序与选择
-3. 加载 Team Template
-4. 启动审查团队
+1. 创建审查团队（一次性，收到任务就创建）
+2. 环境检查
+3. PR 队列排序与选择
+4. 加载 Team Template
+5. 循环审查直到人类确认结束
+6. 人类确认后删除团队
 
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -24,34 +26,39 @@ description: |
 **关键指令**：读取 template 后，按 `workflow.execution` 配置执行 Agent 调用。
 
 ```
-1. TeamCreate(team_name="pr-review-team") → 创建 team
-2. 读取 template.agents → 确定 subagent_type 和 spawn_config
-3. Phase 1: Agent(name="context-researcher", subagent_type="pr-context-researcher", ...)
-4. Phase 2: 并行 spawn 3 个 agents（单次响应中多个 Agent 调用）
-5. Phase 3: 收集结果，仲裁，决策
-6. Phase 4: team-lead 执行写回（Bash tool）
-7. Phase 5: 清理或复用
+0. TeamCreate(team_name="pr-review-team") → 收到任务立即创建（一次性）
+1. 环境检查（如果失败，删除 team 后回退）
+2. 选择执行模式
+3. PR 队列排序与选择
+4. 循环审查每个 PR（不检查 team，假设已存在）
+   - Phase 1-4: 审查流程
+   - Phase 5: 只清理 inboxes/tasks（不删除 team）
+   - 询问是否继续下一个 PR
+5. 人类确认结束审查 → 删除 team
 ```
 
 **重要**：
+- Team 在收到任务时立即创建，整个审查周期只创建一次
+- 循环中不检查/创建/删除 Team，假设 Team 已存在
+- Team 只在人类明确确认结束审查后才删除
 - `subagent_type` 必须匹配项目 `.claude/agents/pr-*.md` 定义
 - Phase 2 并行 spawn 需要在**单次响应**中发起多个 Agent tool 调用
 - Phase 4/5 由 team-lead（当前 session）执行，不 spawn 新 agent
 
 ---
 
-## Step 0: 初始化任务跟踪
+## Step 0: 立即创建团队（一次性）
 
-**启动时创建 task 跟踪进度**（使用 TaskCreate tool）：
+**收到任务就创建 Team**，不等待环境检查或其他步骤。
 
 ```yaml
-TaskCreate(
-  title: "PR Review Queue",
-  description: "审查 PR 队列：自动排序并依次审查"
-)
+TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 ```
 
-创建后后续步骤标记为 in_progress/completed。
+**关键原则**：
+- Team 创建是**一次性操作**，整个审查周期只执行一次
+- 创建后 Team 持续存在，直到人类确认结束审查
+- 即使环境检查失败需要回退，也要先删除 Team 再回退
 
 ---
 
@@ -82,11 +89,12 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
  当前回退到单 agent 审查模式..."
 
--> 使用 vibe-review-code
+→ TeamDelete(team_name="pr-review-team")
+→ 使用 vibe-review-code
 ```
 
 不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
-team cleanup 状态；环境不满足时，直接转入 `vibe-review-code` 单 agent 审查。
+team cleanup 状态；环境不满足时，先删除已创建的 Team，再回退到 `vibe-review-code` 单 agent 审查。
 
 ---
 
@@ -185,7 +193,9 @@ gh pr view <number> --json baseRefName,headRefName
 
 ---
 
-## Step 3: 加载 Team Template 并创建 Team
+## Step 3: 加载 Team Template
+
+**Team 已在 Step 0 创建**，这里只加载配置。
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -195,21 +205,9 @@ cat .claude/team-templates/pr-review-team.yaml
 ```
 
 **Template 是可执行配置**：
-- `team_create_config` — TeamCreate 参数
 - `agents` — 定义 subagent_type 和 spawn_config
 - `workflow.execution` — 每个 phase 的具体执行步骤
-
-**创建 Team**（使用 template.team_create_config）：
-
-```yaml
-# 从 template 读取配置
-team_create_config:
-  team_name: pr-review-team
-  agent_type: general-purpose
-
-# 执行 TeamCreate
-TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
-```
+- `pr_classification` — PR 类型判断规则
 
 **Template 包含**：
 - Agent 定义（subagent_type, model, spawn_config）
@@ -373,22 +371,64 @@ gh pr view <number> --json title,labels,additions
     command: gh issue create --title "[follow-up] {title}" --body "{body}"
 ```
 
-### Phase 5: 清理与复用准备
+### Phase 5: 循环清理（不删除 Team）
 
 **执行步骤**（由 team-lead 执行）：
 
 ```yaml
-- condition: continue_next_pr
-  actions:
+# 只清理当前 PR 的 inboxes/tasks，Team 继续存在
+- actions:
     - 清空 inboxes: rm ~/.claude/teams/pr-review-team/inboxes/*.json
     - 重置 tasks: rm ~/.claude/tasks/pr-review-team/*
-
-- condition: full_cleanup
-  actions:
-    - 杀死 panes: 从 config.json 读取 paneId 并 kill-pane
-    - 删除 team: rm -rf ~/.claude/teams/pr-review-team
-    - 删除 tasks: rm -rf ~/.claude/tasks/pr-review-team
 ```
+
+**重要**：Phase 5 **不删除 Team**，Team 保持存在供下一个 PR 审查使用。
+
+---
+
+## Step 6: 询问是否继续
+
+**每个 PR 审查完成后询问用户**：
+
+```yaml
+AskUserQuestion:
+  question: |
+    PR #{pr_number} 审查完成。是否继续审查队列中的下一个 PR？
+
+    当前队列：{remaining_prs}
+
+  options:
+    - key: "y"
+      value: "continue"
+      description: "继续审查下一个 PR"
+    - key: "n"
+      value: "end"
+      description: "结束审查，删除团队"
+```
+
+- **选择 continue**：返回 Step 2 处理下一个 PR
+- **选择 end**：进入 Step 7（删除 Team）
+
+---
+
+## Step 7: 人类确认后删除 Team（最终步骤）
+
+**只在人类明确确认结束审查后执行**：
+
+```yaml
+# 人类确认结束审查
+TeamDelete(team_name="pr-review-team")
+```
+
+**清理步骤**：
+1. 杀死 tmux panes（从 config.json 读取 paneId）
+2. 删除 team 目录：`rm -rf ~/.claude/teams/pr-review-team`
+3. 删除 tasks 目录：`rm -rf ~/.claude/tasks/pr-review-team`
+
+**关键原则**：
+- Team 删除是**最终步骤**，只在人类确认后执行一次
+- 整个审查周期中 Team 只创建一次、删除一次
+- 循环中不检查/创建/删除 Team
 
 ---
 
