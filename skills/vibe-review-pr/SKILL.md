@@ -293,6 +293,35 @@ gh pr view <number> --json title,labels,additions
 
 **重要**：读取 template 中的 `workflow.execution` 配置，按步骤执行。
 
+### 检查是否需要 Spawn 或复用
+
+**在每个 PR 审查开始前检查**：
+
+```bash
+# 检查现有 teammates
+cat ~/.claude/teams/pr-review-team/config.json | jq '.members[] | select(.name != "team-lead") | {name, isActive}'
+```
+
+**复用策略**（来自 template.reuse_policy）：
+- 如果存在 idle 状态的 teammates → **SendMessage 唤醒**
+- 如果不存在需要的 agent 类型 → spawn 新的
+
+**SendMessage 唤醒方式**：
+```yaml
+SendMessage(
+  to: "context-researcher",  # 使用现有 teammate 名称
+  message: |
+    新任务：审查 PR #{pr_number}
+    
+    请收集背景信息并输出报告。
+)
+```
+
+**关键原则**：
+- **第一个 PR**：spawn agents
+- **后续 PR**：复用已有 teammates（SendMessage 唤醒）
+- 不要为每个 PR spawn 新 agents
+
 ### Phase 1: 背景调研
 
 **执行步骤**（从 template.workflow.phase_1.execution）：
