@@ -242,6 +242,51 @@ gh pr view <number> --json title,labels,additions
   - 其他（`scope/python`、`scope/shell` 等）→ 使用 `vibe-review-code`
 - 审查完成后返回 Step 2 处理队列中的下一个 PR
 
+### 复杂情况使用 Codex
+
+**当 PR 满足以下任一条件时，启用 Codex 辅助审查**：
+
+| 复杂度指标 | 条件 | 说明 |
+|------------|------|------|
+| **代码量** | >500 行 | 大规模改动需更深入分析 |
+| **安全相关** | 标签含 `security` 或 `fix` | 安全漏洞需专业审查 |
+| **架构影响** | 标题含 `refactor` + >10 文件 | 架构变更需多方评估 |
+| **核心模块** | 修改 `src/vibe3/core/` | 核心逻辑需额外验证 |
+| **多领域交叉** | 跨 Python/Shell/Config | 多语言需交叉检查 |
+| **复杂逻辑** | Agent 报告 flagged as complex | 团队判断需 Codex 深入 |
+
+**Codex 调用方式**：
+
+```yaml
+# 在 Phase 2 并行审查中添加 Codex agent
+- tool: Agent
+  params:
+    team_name: pr-review-team
+    name: codex-reviewer
+    subagent_type: codex:codex-rescue  # 使用 Codex 救援 agent
+    model: opus  # Codex 使用 Opus 模型
+    prompt: |
+      深入分析 PR #{pr_number} 的复杂问题：
+      背景信息：{phase_1_output}
+      
+      重点检查：
+      1. 潜在的设计缺陷
+      2. 边界条件和异常处理
+      3. 性能瓶颈
+      4. 安全隐患
+      
+      提供：
+      - 问题诊断
+      - 改进建议
+      - 风险评估
+    run_in_background: true
+```
+
+**Codex 结果处理**：
+- Codex 报告与其他 agent 报告一起提交给 Phase 3 仲裁
+- 如果 Codex 发现严重问题，优先级高于其他 agent
+- Codex 建议需要 team-lead 人工确认后才执行
+
 ---
 
 ## Step 5: 按流程启动 Agent
