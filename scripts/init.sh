@@ -93,6 +93,7 @@ else
 fi
 
 # ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
+# IMPORTANT: Skills installation should NOT be blocked by openspec/pre-commit issues
 if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
   echo "📦 Installing approved third-party skills from ~/.vibe/skills.json..."
 
@@ -118,16 +119,38 @@ else
   echo "📦 Installing Superpowers (fallback)..."
   npx skills add obra/superpowers -g --agent codex gemini-cli opencode github-copilot qoder codebuddy trae-cn -y
 fi
+echo "✅ Skills installation complete"
 
-# ── 2. Initialize OpenSpec ────────────────────────────────────────────────────
-echo "📦 Initializing OpenSpec..."
+# ── 2. Symlink local project skills to agent directories ─────────────────────
+# IMPORTANT: Symlinks should NOT be blocked by openspec/pre-commit issues
+echo "🔗 Creating symlinks for local skills..."
+
+# Link skills/vibe-* (project-owned skills)
+_symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".gemini/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".copilot/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".qoder/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".codebuddy/skills" "identity" "dir"
+
+#  Symlink workflows
+echo "🔗 Creating symlinks for workflows..."
+_symlink_files ".agent/workflows/vibe:*.md" ".claude/commands" "identity" "file"
+
+echo "✅ Symlinks complete"
+
+# ── 3. Initialize OpenSpec (Optional, non-blocking) ────────────────────────────
+echo "📦 Initializing OpenSpec (optional)..."
 if [[ -d "openspec/specs" || -f "openspec/config.yaml" ]]; then
   echo "✅ OpenSpec already initialized"
 elif command -v openspec &> /dev/null; then
   openspec init --tools claude,codex,opencode,qoder,codebuddy,trae
 else
-  echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping.\033[0m"
+  echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping (non-blocking).\033[0m"
   echo "   Install via: pnpm add -g @openspec/tools"
+  echo "   Run 'vibe doctor' to check optional tools status"
 fi
 
 # ── 3. Symlink local project skills to agent directories ─────────────────────
@@ -149,16 +172,17 @@ _symlink_files ".agent/workflows/vibe:*.md" ".claude/commands" "identity" "file"
 
 echo "✅ Environment setup complete!"
 
-# ── 5. Install git hooks (pre-commit) ────────────────────────────────────────
-echo "🪝 Installing git hooks..."
+# ── 5. Install git hooks (pre-commit, optional, non-blocking) ─────────────────
+echo "🪝 Installing git hooks (optional)..."
 if command -v pre-commit &> /dev/null; then
   pre-commit install
   pre-commit install --hook-type pre-push
   echo "✅ Pre-commit and pre-push hooks installed"
 else
-  echo -e "\033[1;33m⚠️  Warning: 'pre-commit' not found. Skipping git hooks installation.\033[0m"
+  echo -e "\033[1;33m⚠️  Warning: 'pre-commit' not found. Skipping (non-blocking).\033[0m"
   echo "   Install via: uv pip install pre-commit"
   echo "   Then run: pre-commit install && pre-commit install --hook-type pre-push"
+  echo "   Run 'vibe doctor' to check optional tools status"
 fi
 
 # ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────

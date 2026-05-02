@@ -188,6 +188,19 @@ vibe_doctor() {
     _doctor_check_plugins "$config_output"
     echo ""
 
+    # OpenSpec Check (Optional)
+    echo "${BOLD}Optional Tools (Non-blocking):${NC}"
+    if command -v openspec &> /dev/null; then
+        local openspec_version
+        openspec_version=$(openspec --version 2>/dev/null | head -1)
+        printf "  ${GREEN}✓${NC} %-15s %s\n" "openspec" "${openspec_version:-installed}"
+    else
+        printf "  ${CYAN}○${NC} %-15s 未安装（可选）\n" "openspec"
+        echo "      用途：OpenAPI 规范管理与 Gate 产物生成"
+        echo "      安装：pnpm add -g @openspec/tools"
+    fi
+    echo ""
+
     # Manager Token Check (Optional)
     echo "${BOLD}Role-Specific Tokens:${NC}"
     if [ -n "$VIBE_MANAGER_GITHUB_TOKEN" ]; then
