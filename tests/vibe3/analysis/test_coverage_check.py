@@ -25,7 +25,12 @@ def test_run_coverage_check_success(
 
     def fake_subprocess_run(*args, **kwargs):
         cov_file = (
-            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+            mock_project_root
+            / ".agent"
+            / "reports"
+            / "coverage"
+            / "test-branch"
+            / "coverage.json"
         )
         cov_file.parent.mkdir(parents=True, exist_ok=True)
         cov_file.write_text(json.dumps(sample_coverage_data))
@@ -81,7 +86,12 @@ def test_run_coverage_check_with_failures(
 
     def fake_subprocess_run(*args, **kwargs):
         cov_file = (
-            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+            mock_project_root
+            / ".agent"
+            / "reports"
+            / "coverage"
+            / "test-branch"
+            / "coverage.json"
         )
         cov_file.parent.mkdir(parents=True, exist_ok=True)
         cov_file.write_text(json.dumps(low_coverage_data))
@@ -117,7 +127,12 @@ def test_run_coverage_check_empty_project(
 
     def fake_subprocess_run(*args, **kwargs):
         cov_file = (
-            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+            mock_project_root
+            / ".agent"
+            / "reports"
+            / "coverage"
+            / "test-branch"
+            / "coverage.json"
         )
         cov_file.parent.mkdir(parents=True, exist_ok=True)
         cov_file.write_text(json.dumps(empty_data))
