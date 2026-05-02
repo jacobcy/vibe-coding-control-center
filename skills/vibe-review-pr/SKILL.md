@@ -622,6 +622,60 @@ Agent(team_name="pr-review-team", ...)
 2. 启动前检查 `~/.claude/teams/pr-review-team/` 是否存在残留
 3. 如发现残留，先清理再创建
 
+### 问题 6：Team 清理不完整（会话残留）
+
+**现象**：
+- UI 显示团队成员仍在 running
+- 但 `~/.claude/teams/` 目录已删除
+- tmux panes 已杀死
+
+**根因**：
+- 直接手动删除目录和杀死 panes
+- **会话文件中的 teamName 引用未清除**
+- TeamDelete 工具会自动清除会话 context，手动删除不会
+
+**正确的清理顺序**（重要）：
+```
+1. 等待所有 teammates 完成（idle 状态）
+2. 调用 TeamDelete 工具（自动清理会话 context）
+3. 不要手动删除目录或杀死 panes
+```
+
+**TeamDelete 工具说明**：
+```
+TeamDelete will fail if the team still has active members.
+Gracefully terminate teammates first, then call TeamDelete after all teammates have shut down.
+```
+
+**错误做法**（会导致会话残留）：
+```bash
+# ❌ 错误：直接杀死 panes
+tmux kill-pane -t %42
+
+# ❌ 错误：直接删除目录
+rm -rf ~/.claude/teams/pr-review-team
+```
+
+**正确做法**：
+```yaml
+# ✅ 正确：使用 TeamDelete 工具
+TeamDelete(team_name="pr-review-team")
+# 工具会自动：
+# 1. 杀死 tmux panes
+# 2. 删除 team 目录
+# 3. 清除会话中的 team context
+```
+
+**补救措施**（如果已手动删除）：
+```bash
+# 方案 A：重启 Claude Code 会话（推荐）
+# 退出并重新启动，创建新会话
+
+# 方案 B：清除会话文件中的 teamName 引用
+sed -i '' 's/"teamName":"pr-review-team"//g' \
+  ~/.claude/projects/-*/{session-id}.jsonl
+```
+
 ---
 
 ## 文件位置
