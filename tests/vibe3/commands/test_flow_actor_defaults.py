@@ -10,8 +10,8 @@ from vibe3.models.flow import FlowState
 runner = CliRunner()
 
 
-@patch("vibe3.commands.flow.render_flow_created")
-@patch("vibe3.commands.flow.FlowService")
+@patch("vibe3.commands.flow_manage.render_flow_created")
+@patch("vibe3.commands.flow_manage.FlowService")
 def test_flow_update_idempotent(
     flow_service_cls,
     _render_flow_created,
@@ -38,8 +38,8 @@ def test_flow_update_idempotent(
     )
 
 
-@patch("vibe3.commands.flow.TaskService")
-@patch("vibe3.commands.flow.FlowService")
+@patch("vibe3.commands.flow_manage.TaskService")
+@patch("vibe3.commands.flow_manage.FlowService")
 def test_flow_bind_defaults_to_task_role(flow_service_cls, task_service_cls) -> None:
     """flow bind without --role should bind as task with system ownership."""
     flow_service = MagicMock()
@@ -57,8 +57,8 @@ def test_flow_bind_defaults_to_task_role(flow_service_cls, task_service_cls) -> 
     )
 
 
-@patch("vibe3.commands.flow.TaskService")
-@patch("vibe3.commands.flow.FlowService")
+@patch("vibe3.commands.flow_manage.TaskService")
+@patch("vibe3.commands.flow_manage.FlowService")
 def test_flow_bind_accepts_dependency_role(flow_service_cls, task_service_cls) -> None:
     """flow bind should allow binding dependency and related roles."""
     flow_service = MagicMock()
@@ -76,8 +76,8 @@ def test_flow_bind_accepts_dependency_role(flow_service_cls, task_service_cls) -
     )
 
 
-@patch("vibe3.commands.flow.TaskService")
-@patch("vibe3.commands.flow.FlowService")
+@patch("vibe3.commands.flow_manage.TaskService")
+@patch("vibe3.commands.flow_manage.FlowService")
 def test_flow_bind_supports_multiple_dependency_issues(
     flow_service_cls, task_service_cls
 ) -> None:
