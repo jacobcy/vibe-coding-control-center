@@ -70,15 +70,11 @@ _EVENT_COLOR: dict[str, str] = {
     "reviewer_started": "yellow",
     "reviewer_completed": "green",
     "reviewer_aborted": "red",
-    # Dispatch Intent Events (new names)
+    # Dispatch Intent Events
     "manager_dispatch_intent": "green bold",
     "planner_dispatch_intent": "green bold",
     "executor_dispatch_intent": "green bold",
     "reviewer_dispatch_intent": "green bold",
-    # Dispatch Intent Events (backward compatibility)
-    "planner_dispatched": "green bold",
-    "executor_dispatched": "green bold",
-    "reviewer_dispatched": "green bold",
     # Audit Events (new name) — kept here for ordering, actual color defined below
     "state_transitioned": "cyan bold",
     "state_unchanged": "yellow",
@@ -122,11 +118,6 @@ def _format_event_type(event_type: str) -> str:
         "planner_dispatch_intent": "Planner Dispatch",
         "executor_dispatch_intent": "Executor Dispatch",
         "reviewer_dispatch_intent": "Reviewer Dispatch",
-        # Backward compatibility (old names)
-        "manager_dispatched": "Manager Dispatch",
-        "planner_dispatched": "Planner Dispatch",
-        "executor_dispatched": "Executor Dispatch",
-        "reviewer_dispatched": "Reviewer Dispatch",
         # Audit Events — semantic names
         "handoff_audit": "Audit Handoff",  # reviewer-initiated authoritative audit
         "plan_recorded": "Plan Auto-Recorded",

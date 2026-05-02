@@ -170,10 +170,5 @@ def register_issue_state_dispatch_handlers() -> None:
         "ManagerDispatchIntent",
         cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
     )
-    # Backward compatibility: subscribe to old event name
-    subscribe(
-        "ManagerDispatched",
-        cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
-    )
 
     logger.bind(domain="events").info("Issue-state role dispatch handlers registered")

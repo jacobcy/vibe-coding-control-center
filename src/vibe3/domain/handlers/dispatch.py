@@ -257,18 +257,4 @@ def register_dispatch_handlers() -> None:
         cast(Callable[[DomainEvent], None], handle_reviewer_dispatch_intent),
     )
 
-    # Backward compatibility: subscribe to old event names
-    subscribe(
-        "PlannerDispatched",
-        cast(Callable[[DomainEvent], None], handle_planner_dispatch_intent),
-    )
-    subscribe(
-        "ExecutorDispatched",
-        cast(Callable[[DomainEvent], None], handle_executor_dispatch_intent),
-    )
-    subscribe(
-        "ReviewerDispatched",
-        cast(Callable[[DomainEvent], None], handle_reviewer_dispatch_intent),
-    )
-
     logger.bind(domain="events").info("Dispatch-intent event handlers registered")

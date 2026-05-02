@@ -23,15 +23,11 @@ class DomainEvent:
 
 # Import from submodules
 from vibe3.domain.events.flow_lifecycle import (  # noqa: E402
-    ExecutorDispatched,  # Backward compatibility alias
     ExecutorDispatchIntent,
     IssueFailed,
     IssueStateChanged,
-    ManagerDispatched,  # Backward compatibility alias
     ManagerDispatchIntent,
-    PlannerDispatched,  # Backward compatibility alias
     PlannerDispatchIntent,
-    ReviewerDispatched,  # Backward compatibility alias
     ReviewerDispatchIntent,
 )
 from vibe3.domain.events.governance import (  # noqa: E402
@@ -54,16 +50,11 @@ __all__ = [
     # L3 Flow Lifecycle Events
     "IssueStateChanged",
     "IssueFailed",
-    # L3 Dispatch-Intent Events (new names)
+    # L3 Dispatch-Intent Events
     "ManagerDispatchIntent",
     "PlannerDispatchIntent",
     "ExecutorDispatchIntent",
     "ReviewerDispatchIntent",
-    # L3 Dispatch-Intent Events (backward compatibility)
-    "ManagerDispatched",
-    "PlannerDispatched",
-    "ExecutorDispatched",
-    "ReviewerDispatched",
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
@@ -77,21 +68,16 @@ __all__ = [
     "SupervisorApplyDelegated",
 ]
 
-# Event type registry with backward compatibility
+# Event type registry
 EVENT_TYPES = {
     # L3 Flow Lifecycle
     "issue_state_changed": IssueStateChanged,
     "issue_failed": IssueFailed,
-    # L3 Dispatch-Intent (new names)
+    # L3 Dispatch-Intent
     "manager_dispatch_intent": ManagerDispatchIntent,
     "planner_dispatch_intent": PlannerDispatchIntent,
     "executor_dispatch_intent": ExecutorDispatchIntent,
     "reviewer_dispatch_intent": ReviewerDispatchIntent,
-    # L3 Dispatch-Intent (backward compatibility)
-    "manager_dispatched": ManagerDispatchIntent,
-    "planner_dispatched": PlannerDispatchIntent,
-    "executor_dispatched": ExecutorDispatchIntent,
-    "reviewer_dispatched": ReviewerDispatchIntent,
     # L1 Governance
     "governance_scan_started": GovernanceScanStarted,
     "governance_scan_completed": GovernanceScanCompleted,

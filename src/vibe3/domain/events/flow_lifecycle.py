@@ -67,10 +67,6 @@ class ManagerDispatchIntent(DomainEvent):
     timestamp: str | None = None
 
 
-# Backward compatibility alias
-ManagerDispatched = ManagerDispatchIntent
-
-
 @dataclass(frozen=True)
 class PlannerDispatchIntent(DomainEvent):
     """Planner dispatch intent event.
@@ -87,10 +83,6 @@ class PlannerDispatchIntent(DomainEvent):
     trigger_state: str  # "claimed"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
-
-
-# Backward compatibility alias
-PlannerDispatched = PlannerDispatchIntent
 
 
 @dataclass(frozen=True)
@@ -114,10 +106,6 @@ class ExecutorDispatchIntent(DomainEvent):
     timestamp: str | None = None
 
 
-# Backward compatibility alias
-ExecutorDispatched = ExecutorDispatchIntent
-
-
 @dataclass(frozen=True)
 class ReviewerDispatchIntent(DomainEvent):
     """Reviewer dispatch intent event.
@@ -137,7 +125,3 @@ class ReviewerDispatchIntent(DomainEvent):
     trigger_state: str  # "review"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
-
-
-# Backward compatibility alias
-ReviewerDispatched = ReviewerDispatchIntent
