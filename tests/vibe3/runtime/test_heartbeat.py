@@ -208,6 +208,46 @@ async def test_tick_loop_ignores_failed_gate_and_still_ticks(monkeypatch) -> Non
 
 
 @pytest.mark.asyncio
+async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None:
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            server.stop()
+
+    cleanup_service = MagicMock()
+    cleanup_service.cleanup_old_errors.side_effect = RuntimeError("db locked")
+
+    from vibe3.runtime import heartbeat
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    monkeypatch.setattr(
+        heartbeat.ErrorTrackingService,
+        "get_instance",
+        staticmethod(lambda: cleanup_service),
+    )
+    server._running = True
+
+    await server._tick_loop()
+
+    assert svc.ticks == 1
+    assert any("server:tick #1 cleanup failed: db locked" == item for item in events)
+
+
+@pytest.mark.asyncio
 async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
     server = HeartbeatServer(
         OrchestraConfig(
