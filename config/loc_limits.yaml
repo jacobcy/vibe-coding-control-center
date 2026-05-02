@@ -185,7 +185,7 @@ code_limits:
     # Milestone 1: 45,000 LOC (intermediate target)
     # Milestone 2: 40,000 LOC (stretch target)
     # Final target: 35,000 LOC (governance goal)
-    v3_python: 50000        # Python 核心代码总行数（临时提升至 50000 以审理后续 PR；后续拆出非核心代码并治理膨胀）
+    v3_python: 49000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:

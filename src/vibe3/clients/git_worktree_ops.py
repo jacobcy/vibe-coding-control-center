@@ -107,7 +107,7 @@ def get_safe_main_branch_name(run: Callable[[list[str]], str]) -> str:
     return branch_name
 
 
-def _parse_worktree_list(output: str) -> list[tuple[str, str]]:
+def parse_worktree_list(output: str) -> list[tuple[str, str]]:
     """Parse ``git worktree list --porcelain`` output.
 
     Returns:
@@ -151,7 +151,7 @@ def find_worktree_path_for_branch(
         return None
     output = run(["worktree", "list", "--porcelain"])
     ref = f"refs/heads/{branch_name}"
-    for wt_path, wt_branch in _parse_worktree_list(output):
+    for wt_path, wt_branch in parse_worktree_list(output):
         if wt_branch == ref:
             return Path(wt_path)
     return None
@@ -169,7 +169,7 @@ def is_branch_occupied_by_worktree(
     current_branch = run(["branch", "--show-current"])
     output = run(["worktree", "list", "--porcelain"])
 
-    for wt_path, wt_branch in _parse_worktree_list(output):
+    for wt_path, wt_branch in parse_worktree_list(output):
         if wt_branch != f"refs/heads/{branch_name}":
             continue
         if branch_name == current_branch:
@@ -211,7 +211,7 @@ def get_worktrees_for_branch(
     ref = f"refs/heads/{branch_name}"
 
     occupied: list[str] = []
-    for wt_path, wt_branch in _parse_worktree_list(output):
+    for wt_path, wt_branch in parse_worktree_list(output):
         if wt_branch != ref:
             continue
         if branch_name == current_branch:
