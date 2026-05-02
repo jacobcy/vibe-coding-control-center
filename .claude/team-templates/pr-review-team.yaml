@@ -515,17 +515,18 @@ workflow:
     executor: team-lead
     agents: []
     actions:
-      - clear_inboxes  # 清空 inbox 为下一个 PR 准备
-      - kill_idle_teammates  # 杀死 idle 状态的 tmux panes（可选）
+      - clear_inboxes  # 清空 inbox 为下一��� PR 准备
       - reset_team_state  # 重置 tasks 状态
+      # 注意：不执行 kill_idle_teammates，保留 panes 供下一个 PR 复用
     conditions:
       continue_next_pr:
         - 保留 tmux panes（复用模式）
         - 清空 inbox 文件
         - 重置 tasks 目录
-      full_cleanup:
-        - 杀死所有 teammate panes
-        - 删除 ~/.claude/teams/{team-name}/
+      end_session:  # 改名：从 full_cleanup 改为 end_session
+        - 调用 TeamDelete 工具（由 Step 9 执行）
+        - TeamDelete 自动完成：杀死 panes + 删除��录 + 清除会话 context
+        - ❌ 不要手动执行清理命令（会导致会话残留）
         - 删除 ~/.claude/tasks/{team-name}/
         - 释放资源，下次重新 spawn
 
@@ -555,18 +556,25 @@ output_format: |
   **关键发现**: [列表]
   **技术债识别**: [列表]
 
-# 清理命令参考
+# 清理命令参考（仅供 TeamDelete 工具内部使用）
+# ⚠️ 警告：手动执行这些命令会导致会话残留，应使用 TeamDelete 工具
 cleanup_commands:
   clear_inboxes: |
+    # Phase 5 使用：清空 inbox 为下一个 PR 准备
     rm -f ~/.claude/teams/{team-name}/inboxes/*.json
     echo "Cleared all inboxes"
   kill_teammates: |
+    # ⚠️ 警告：此命令仅供 TeamDelete 工具内部调用
+    # 手动执行会导致会话残留
     jq -r '.members[] | .pane_id // .paneId // empty' \
       ~/.claude/teams/{team-name}/config.json | \
     while read -r pane_id; do
       [ -n "$pane_id" ] && tmux kill-pane -t "$pane_id"
     done
   full_cleanup: |
+    # ⚠️ 警告：此命令仅供 TeamDelete 工具内部调用
+    # 手动执行会导致会话残留
+    # 正确做法：调用 TeamDelete(team_name="pr-review-team")
     rm -rf ~/.claude/teams/{team-name}
     rm -rf ~/.claude/tasks/{team-name}
     echo "Full cleanup complete"
