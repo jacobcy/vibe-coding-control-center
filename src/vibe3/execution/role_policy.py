@@ -45,15 +45,6 @@ def get_role_required_ref_key(role: "ExecutionRole | str") -> str | None:
     return ROLE_TO_REQUIRED_REF_KEY.get(role)
 
 
-# Handoff kind to actor state key mapping
-# Used by handoff recorder to write latest_actor to flow state
-KIND_TO_ACTOR_KEY: dict[str, str] = {
-    "plan": "planner_actor",
-    "run": "executor_actor",
-    "review": "reviewer_actor",
-}
-
-
 # Lazy import to avoid circular dependencies
 def _get_block_functions() -> dict[str, Callable[..., None]]:
     """Get role-specific block functions (lazy import to avoid cycles)."""
