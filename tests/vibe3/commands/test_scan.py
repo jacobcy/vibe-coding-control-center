@@ -1,5 +1,6 @@
 """Tests for scan CLI command."""
 
+import re
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,6 +9,12 @@ from typer.testing import CliRunner
 from vibe3.cli import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Strip ANSI escape sequences from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 class TestScanCommand:
@@ -26,24 +33,27 @@ class TestScanCommand:
         """Test scan governance subcommand help."""
         result = runner.invoke(app, ["scan", "governance", "--help"])
         assert result.exit_code == 0
-        assert "Run governance scan once" in result.output
-        assert "--tick" in result.output
-        assert "--dry-run" in result.output
+        output = _strip_ansi(result.output)
+        assert "Run governance scan once" in output
+        assert "--tick" in output
+        assert "--dry-run" in output
 
     def test_scan_supervisor_help(self):
         """Test scan supervisor subcommand help."""
         result = runner.invoke(app, ["scan", "supervisor", "--help"])
         assert result.exit_code == 0
-        assert "Run supervisor scan once" in result.output
-        assert "--dry-run" in result.output
+        output = _strip_ansi(result.output)
+        assert "Run supervisor scan once" in output
+        assert "--dry-run" in output
 
     def test_scan_all_help(self):
         """Test scan all subcommand help."""
         result = runner.invoke(app, ["scan", "all", "--help"])
         assert result.exit_code == 0
-        assert "Run both governance and supervisor scans once" in result.output
-        assert "--tick" in result.output
-        assert "--dry-run" in result.output
+        output = _strip_ansi(result.output)
+        assert "Run both governance and supervisor scans once" in output
+        assert "--tick" in output
+        assert "--dry-run" in output
 
 
 class TestGovernanceScan:
