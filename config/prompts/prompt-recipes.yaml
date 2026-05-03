@@ -34,8 +34,26 @@ recipes:
         sections:
           - key: manager.supervisor_content
             source:
-              kind: file
-              path: supervisor/manager.md
+              kind: literal
+              value: |
+                ## Manager 执行指南
+
+                你的完整执行指令和决策规则在以下文件中：
+                `supervisor/manager.md` (约 1000 行)
+
+                **请立即使用 Read tool 阅读此文件**：
+                ```
+                Read("supervisor/manager.md")
+                ```
+
+                该文件包含：
+                - **Role 定义**：Issue Owner 职责边界
+                - **Permission Contract**：允许/禁止的操作
+                - **核心决策逻辑**：做 vs 不做，无中间地带
+                - **State 机器**：ready → claimed → in_progress → review → done/blocked
+                - **Exit 条件**：何时停止执行
+
+                阅读后，按照其中的规则执行 manager 职责。
           - key: manager.target
           - key: manager.quick_commands
 
