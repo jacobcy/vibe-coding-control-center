@@ -6,7 +6,7 @@ category: standards
 status: active
 version: 1.0
 related_docs:
-  - config/settings.yaml
+  - config/v3/settings.yaml
   - config/models.json
   - docs/standards/github-code-review-standard.md
 ---
@@ -15,7 +15,7 @@ related_docs:
 
 ## 概述
 
-Vibe Center 使用 `config/settings.yaml` 作为核心配置文件。本文档说明各配置项的作用和使用场景，具体数值请参考配置文件本身。
+Vibe Center 使用 `config/v3/settings.yaml` 作为核心配置文件。本文档说明各配置项的作用和使用场景，具体数值请参考配置文件本身。
 
 ---
 
@@ -225,6 +225,6 @@ vibe review base origin/main
 
 ## 相关文档
 
-- [配置文件](../../config/settings.yaml) - 查看具体配置值
+- [配置文件](../../config/v3/settings.yaml) - 查看具体配置值
 - [GitHub 智能代码审查系统](./github-code-review-standard.md)
 - [Common Rules And Tools](../../.agent/policies/common.md)

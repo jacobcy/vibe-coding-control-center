@@ -30,7 +30,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 
 满足以下任一条件时，除了 review evidence，还必须再做一轮代码质量复查：
 
-- 当前分支会让核心代码总量超过 `config/loc_limits.yaml` 中的总量阈值
+- 当前分支会让核心代码总量超过 `config/v3/loc_limits.yaml` 中的总量阈值
 - 某个单文件超过默认 LOC 限制或 max 限制
 
 这轮复查的目标不是机械阻断，而是确认：
@@ -42,7 +42,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 
 真源约束：
 
-- 所有总量阈值、单文件阈值、exception 都以 `config/loc_limits.yaml` 为准。
+- 所有总量阈值、单文件阈值、exception 都以 `config/v3/loc_limits.yaml` 为准。
 - `/vibe-integrate` 不自行发明阈值，也不凭口头结论接受超限。
 
 ## 停止点
@@ -205,7 +205,7 @@ uv run python src/vibe3/cli.py review pr <pr>
 LOC / 代码质量证据入口：
 
 ```bash
-cat config/settings.yaml
+cat config/v3/settings.yaml
 bash scripts/hooks/check-python-loc.sh
 bash scripts/hooks/check-per-file-loc.sh
 uv run python src/vibe3/cli.py review base
@@ -214,13 +214,13 @@ uv run python src/vibe3/cli.py review base
 判断原则：
 
 - **总量超限**：先开展一轮代码质量复查。若复查没有明显问题，包括没有业务逻辑越界、没有明显可拆分的脏聚合、没有无调用死代码，则允许提升代码总量。
-- **单文件超限**：先判断是否值得拆分。若值得拆分，应优先拆分后再 merge；若不值得拆分，且职责仍单一、边界清楚、拆分只会放大耦合，则把该文件加入 `config/loc_limits.yaml` 的 exception 处理，并写明 reason。
+- **单文件超限**：先判断是否值得拆分。若值得拆分，应优先拆分后再 merge；若不值得拆分，且职责仍单一、边界清楚、拆分只会放大耦合，则把该文件加入 `config/v3/loc_limits.yaml` 的 exception 处理，并写明 reason。
 - **不要**为了压 LOC 机械拆分单一职责但强耦合的聚合文件。
-- **例外处理必须落配置**：无论是提升总量阈值还是单文件例外，只要结论是"允许超限"，都必须把对应配置与 reason 一起落到 `config/loc_limits.yaml`，不能只在 PR comment 或 handoff 里口头说明。
+- **例外处理必须落配置**：无论是提升总量阈值还是单文件例外，只要结论是"允许超限"，都必须把对应配置与 reason 一起落到 `config/v3/loc_limits.yaml`，不能只在 PR comment 或 handoff 里口头说明。
 
 ### Step 3.5: 总量上限触发时的死代码审计
 
-当 `bash scripts/hooks/check-python-loc.sh` 报告 Python 总量触及或超过 `config/loc_limits.yaml` 中的 `total_file_loc.v3_python` 阈值时，**必须**先开展一轮死代码审计，而不是直接要求提升阈值。
+当 `bash scripts/hooks/check-python-loc.sh` 报告 Python 总量触及或超过 `config/v3/loc_limits.yaml` 中的 `total_file_loc.v3_python` 阈值时，**必须**先开展一轮死代码审计，而不是直接要求提升阈值。
 
 审计目标：
 
@@ -298,7 +298,7 @@ Issue 内容模板：
   - 兼容层/过时路径未清理
 - 若没有明显问题，再决定：
   - 总量超限：允许提升总量阈值
-  - 单文件超限：评估是否拆分；不值得拆分则进入 `config/loc_limits.yaml` 例外
+  - 单文件超限：评估是否拆分；不值得拆分则进入 `config/v3/loc_limits.yaml` 例外
 
 执行细则：
 
@@ -316,7 +316,7 @@ Issue 内容模板：
 
 ### Step 4.5: 单文件 exception 容量约束
 
-将文件加入 `config/loc_limits.yaml` 的 exception 清单时，必须遵守容量约束：
+将文件加入 `config/v3/loc_limits.yaml` 的 exception 清单时，必须遵守容量约束：
 
 - **exception 文件的 limit 不得超过 max 阈值**（当前 `code_limits.single_file_loc.max = 400`，orchestra 类文件允许到 650 属已批准的例外）
 - **新增 exception 必须写明 reason**，说明为什么职责单一、边界清楚、拆分只会放大耦合
@@ -384,7 +384,7 @@ uv run python src/vibe3/cli.py handoff append "vibe-integrate: PR review complet
 - 不得直接关闭 task 或 issue
 - 不得因为总量超限就机械要求压行；必须先做质量复查
 - 不得因为单文件超限就机械拆分；必须先判断是否值得拆分
-- 不得在需要进 `config/loc_limits.yaml` 例外时只口头说明，必须把 exception 和 reason 一起落到配置
+- 不得在需要进 `config/v3/loc_limits.yaml` 例外时只口头说明，必须把 exception 和 reason 一起落到配置
 - 不得在发现明显业务逻辑越界时，仍以"允许提升总量/允许例外"为结论继续 merge
 - 不得跳过总量上限触发时的死代码审计；触及阈值必须先审计再决定
 - 不得在 exception 文件中无限制增长 LOC；exception 是安全阀不是免死金牌

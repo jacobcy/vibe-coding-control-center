@@ -224,7 +224,7 @@ Required approving reviews: 0  # 允许self-merge，但需CI通过
 
 **例外登记机制**：
 ```yaml
-# config/settings.yaml
+# config/v3/settings.yaml
 code_limits:
   single_file_loc:
     exceptions:
@@ -247,7 +247,7 @@ bash scripts/hooks/check-python-loc.sh  # exits 0
 ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if over
 ```
 
-**配置**：`config/loc_limits.yaml` → `code_limits`
+**配置**：`config/v3/loc_limits.yaml` → `code_limits`
 
 ---
 
@@ -389,7 +389,7 @@ code_limits:
 | Format | ✅ | - | ✅ | `.pre-commit-config.yaml` |
 | Type | ✅ | ✅ | ✅ | `.pre-commit-config.yaml` |
 | Test | - | ✅ | ✅ | `.pre-commit-config.yaml` |
-| LOC | - | ⚠️ | ✅ | `config/loc_limits.yaml` |
+| LOC | - | ⚠️ | ✅ | `config/v3/loc_limits.yaml` |
 | Review | - | ✅ | - | `scripts/hooks/pre-push.sh` |
 | Coverage | - | - | ✅ | `CI / Manual` |
 
@@ -397,7 +397,7 @@ code_limits:
 
 **LOC限制调整**：
 ```yaml
-# config/loc_limits.yaml
+# config/v3/loc_limits.yaml
 code_limits:
   total_file_loc:
     v3_python: 50000  # 当前临时上限；治理目标和调整理由见 config 注释
@@ -416,7 +416,7 @@ BLOCK_THRESHOLD = 12  # 可调整风险敏感度
 
 **Coverage阈值调整**：
 ```yaml
-# config/settings.yaml
+# config/v3/settings.yaml
 coverage:
   threshold: 80  # 覆盖率要求
 ```

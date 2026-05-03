@@ -49,7 +49,7 @@ def test_loc_settings_parser_reads_unified_exceptions() -> None:
 def test_runtime_config_loads_same_loc_exceptions() -> None:
     module = _load_loc_settings_module()
     settings = module.load_loc_settings()
-    config = VibeConfig.from_yaml(Path("config/settings.yaml"))
+    config = VibeConfig.from_yaml(Path("config/v3/settings.yaml"))
     exceptions = {
         entry.path: entry for entry in config.code_limits.single_file_loc.exceptions
     }

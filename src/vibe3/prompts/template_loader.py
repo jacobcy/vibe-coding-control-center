@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-DEFAULT_PROMPTS_PATH = Path("config/prompts.yaml")
+DEFAULT_PROMPTS_PATH = Path("config/prompts/prompts.yaml")
 
 
 def _resolve_prompts_path() -> Path:
@@ -17,13 +17,22 @@ def _resolve_prompts_path() -> Path:
     # src/vibe3/prompts/template_loader.py -> parent x4 -> root
     try:
         repo_root = Path(__file__).resolve().parent.parent.parent.parent
-        repo_path = repo_root / "config" / "prompts.yaml"
-        if repo_path.exists():
-            return repo_path
+        # Try new path first
+        new_repo_path = repo_root / "config" / "prompts" / "prompts.yaml"
+        if new_repo_path.exists():
+            return new_repo_path
+        # Fallback to old path with deprecation warning
+        old_repo_path = repo_root / "config" / "prompts.yaml"
+        if old_repo_path.exists():
+            logger.bind(domain="prompt_templates", path=str(old_repo_path)).warning(
+                "Using deprecated prompts path config/prompts.yaml. "
+                "Please migrate to config/prompts/prompts.yaml"
+            )
+            return old_repo_path
     except Exception:  # pragma: no cover
         pass
 
-    # 2. Fallback to CWD-relative path
+    # 2. Fallback to CWD-relative path (already updated to new location)
     return DEFAULT_PROMPTS_PATH
 
 
