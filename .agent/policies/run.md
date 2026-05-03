@@ -11,6 +11,29 @@
 
 ## 执行方式
 
+### Plan Requirements 提取
+
+执行前必须完成：
+
+#### 提取 Verification 要求
+
+- **扫描 Plan 中的 Verification 标记**
+  - 查找所有 "Verification:" 或 "验证：" 开头的行
+  - 查找 "Risks & Considerations" / "风险与回滚" 部分的每个 Risk 的 Verification 条目
+  - 查找 "Success Criteria" / "验收标准" / "验证清单" 部分的检查项
+
+- **形成 Requirements Checklist**
+  - 每个 Verification 要求作为独立条目
+  - 标注来源位置（如 "Risk 4"、"验收标准 #3"）
+  - 评估验证难度（简单检查 vs 需要测试）
+
+- **如果发现 Requirements 不清晰**
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Plan Verification 要求不清晰：<具体问题>" --kind finding --actor "executor"
+  ```
+  - 不要跳过验证步骤
+  - 不要自行假设验证方法
+
 ### 严格按计划推进
 
 - 先完成当前步骤，再进入下一步。
@@ -105,6 +128,29 @@
 ## 验证原则
 
 验证不是固定模板，而是必须与改动类型匹配。
+
+### Requirements Checklist 验证
+
+验证不仅是测试通过，还要确认 Plan 的明确要求已落实。
+
+#### 逐项验证
+
+- **对每个 Verification 要求**
+  - 检查代码改动是否满足该要求
+  - 提供验证证据（代码位置、测试输出、日志等）
+  - 如果无法满足，必须记录 finding
+
+- **验证证据类型**
+  - 代码位置引用：`file.py:L<line>` 并说明如何满足要求
+  - 测试证据：测试命令 + 输出片段
+  - 行为证据：手动验证步骤 + 观察结果
+
+- **如果发现无法满足的 Verification**
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Verification 无法满足：<要求> - <原因>" --kind finding --actor "executor"
+  ```
+  - 不要跳过或弱化该要求
+  - 等待 manager 指示是否调整 scope
 
 ### Python 实现改动
 
