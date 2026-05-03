@@ -1,0 +1,78 @@
+# Vibe Center Dependencies Configuration
+# Shell 环境建议真源：工具、插件与密钥配置
+# 职责：仅用于 shell 环境检查与建议输出
+
+# ── Tools ──────────────────────────────────────────────────────────────
+
+[tools]
+# 必要工具（缺失会阻塞核心功能）
+required = [
+  { name = "git", check = "git --version", install = "brew install git", description = "版本控制核心" },
+  { name = "uv", check = "uv --version", install = "brew install uv", description = "Python 包管理器" },
+  { name = "gh", check = "gh --version", install = "brew install gh", description = "GitHub CLI" },
+  { name = "tmux", check = "tmux -V", install = "brew install tmux", description = "Worktree 工作流核心" },
+  { name = "lazygit", check = "lazygit --version", install = "brew install lazygit", description = "Git 终端 UI" },
+  { name = "claude", check = "claude --version", install = "claude.ai", description = "Claude Code（至少需要一个 AI 工具）" },
+  { name = "codeagent-wrapper", check = "command -v codeagent-wrapper", install = "见 codeagent-wrapper 文档", description = "AI Agent 执行 wrapper" },
+]
+
+# 可选工具（提升开发效率，按需求安装）
+optional = [
+  { name = "cc-switch", check = "brew list --cask cc-switch 2>/dev/null && echo installed", install = "brew install --cask cc-switch", description = "Claude 配置切换工具" },
+  { name = "rtk", check = "rtk --version", install = "见 RTK.md", description = "Token 优化代理" },
+  { name = "codex", check = "codex --version", install = "见 OpenAI Codex 文档", description = "OpenAI GPT-5.4 CLI wrapper" },
+  { name = "opencode", check = "opencode --version", install = "npm install -g opencode", description = "OpenCode（开源 AI 工具）" },
+  { name = "gemini", check = "gemini --version", install = "brew install gemini", description = "Gemini API CLI" },
+  { name = "pre-commit", check = "pre-commit --version", install = "brew install pre-commit", description = "Git hooks 检查（仅开发需要）" },
+  { name = "direnv", check = "direnv version", install = "brew install direnv", description = "自动环境加载" },
+  { name = "tailscale", check = "command -v tailscale", install = "brew install tailscale", description = "Tailscale VPN（远程开发）" },
+  { name = "ncat", check = "ncat --version", install = "brew install nmap", description = "SSH ProxyCommand（远程开发）" },
+]
+
+# ── Plugins ────────────────────────────────────────────────────────────
+
+[plugins]
+# 必要插件（缺失会影响推荐工作流，但 doctor 只给建议，不自动安装）
+required = [
+  { name = "context7@claude-plugins-official", scope = "user", description = "实时文档检索" },
+  { name = "code-review@claude-plugins-official", scope = "project", description = "Claude Code 代码审查命令" },
+  { name = "claude-code-setup@claude-plugins-official", scope = "project", description = "Claude Code 项目配置" },
+  { name = "claude-md-management@claude-plugins-official", scope = "project", description = "项目 Markdown 管理" },
+]
+
+# 建议插件（推荐安装，缺失不阻塞核心流程）
+recommended = [
+  { name = "pyright-lsp@claude-plugins-official", scope = "user", description = "Python LSP 支持" },
+  { name = "security-guidance@claude-plugins-official", scope = "user", description = "安全建议与审查辅助" },
+]
+
+# 可选插件（按开发需求安装）
+optional = [
+  { name = "linear@claude-plugins-official", scope = "user", description = "Linear 集成" },
+  { name = "codex@openai-codex", scope = "user", description = "OpenAI Codex 集成" },
+  { name = "commit-commands@claude-plugins-official", scope = "project", description = "Claude 提交辅助命令" },
+  { name = "claude-mem@thedotmack", scope = "user", description = "Claude 记忆增强" },
+  { name = "discord@claude-plugins-official", scope = "user", description = "Discord 集成" },
+  { name = "prompt-improver@severity1-marketplace", scope = "user", description = "Prompt 优化辅助" },
+  { name = "telegram@claude-plugins-official", scope = "user", description = "Telegram 集成" },
+]
+
+# ── Keys ───────────────────────────────────────────────────────────────
+
+[keys]
+# 必要密钥（缺失会阻塞核心功能）
+required = [
+  { name = "GH_TOKEN", env_var = "GH_TOKEN", description = "GitHub API Token", get_from = "gh auth login 或 GitHub token", used_by = ["tool:gh"], resolution = ["gh_auth", "env"], activation = "always" },
+]
+
+# 可选密钥（按需求配置，部分支持 OAuth）
+optional = [
+  { name = "ANTHROPIC_AUTH_TOKEN", env_var = "ANTHROPIC_AUTH_TOKEN", description = "Claude 第三方 API 或手动认证", get_from = "Anthropic 登录、cc-switch 或第三方 Claude API 提供商", note = "原生 Claude 登录可替代；第三方 Provider 通常还需配合 ANTHROPIC_BASE_URL", used_by = ["tool:claude"], resolution = ["claude_settings", "env", "claude_auth"], activation = "any_used" },
+  { name = "OPENAI_API_KEY", env_var = "OPENAI_API_KEY", description = "OpenAI API", get_from = "platform.openai.com", note = "Codex 登录可替代", used_by = ["tool:codex", "plugin:codex@openai-codex"], resolution = ["codex_auth", "env"], activation = "any_used" },
+  { name = "EXA_API_KEY", env_var = "EXA_API_KEY", description = "Exa Search API", get_from = "https://exa.ai", used_by = [], resolution = ["env"], activation = "explicit_only" },
+  { name = "CONTEXT7_API_KEY", env_var = "CONTEXT7_API_KEY", description = "Context7 文档检索", get_from = "https://context7.com", used_by = ["plugin:context7@claude-plugins-official"], resolution = ["env"], activation = "any_used" },
+  { name = "LINEAR_API_KEY", env_var = "LINEAR_API_KEY", description = "Linear API", get_from = "https://linear.app/settings/api", used_by = ["plugin:linear@claude-plugins-official"], resolution = ["env"], activation = "any_used" },
+  { name = "DEEPSEEK_API_KEY", env_var = "DEEPSEEK_API_KEY", description = "DeepSeek API", get_from = "https://api.deepseek.com", used_by = [], resolution = ["env"], activation = "explicit_only" },
+  { name = "GEMINI_API_KEY", env_var = "GEMINI_API_KEY", description = "Gemini API", get_from = "https://ai.google.dev", note = "Gemini 登录可替代", used_by = ["tool:gemini", "plugin:claude-mem@thedotmack"], resolution = ["gemini_auth", "env"], activation = "any_used" },
+  { name = "VIBE_MANAGER_GITHUB_TOKEN", env_var = "VIBE_MANAGER_GITHUB_TOKEN", description = "Manager Bot GitHub Token", get_from = "GitHub Bot 账号的 Personal Access Token", note = "用于区分人类和 Manager Bot 的 GitHub 操作", used_by = [], resolution = ["env"], activation = "explicit_only" },
+]

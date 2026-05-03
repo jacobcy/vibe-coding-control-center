@@ -18,6 +18,9 @@ from vibe3.models.review_runner import AgentOptions
 # Path to codeagent models config
 MODELS_JSON_PATH: Final[Path] = Path.home() / ".codeagent" / "models.json"
 REPO_MODELS_JSON_PATH: Final[Path] = (
+    Path(__file__).resolve().parents[4] / "config" / "v3" / "models.json"
+)
+LEGACY_REPO_MODELS_JSON_PATH: Final[Path] = (
     Path(__file__).resolve().parents[4] / "config" / "models.json"
 )
 BACKEND_COMMANDS: Final[dict[str, str]] = {
@@ -32,8 +35,15 @@ def repo_models_json_path() -> Path:
     """Resolve repo-local models.json with optional orchestra root override."""
     override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
     if override_root:
-        return Path(override_root).expanduser().resolve() / "config" / "models.json"
-    return REPO_MODELS_JSON_PATH
+        root = Path(override_root).expanduser().resolve()
+        new_path = root / "config" / "v3" / "models.json"
+        legacy_path = root / "config" / "models.json"
+        if new_path.exists() or not legacy_path.exists():
+            return new_path
+        return legacy_path
+    if REPO_MODELS_JSON_PATH.exists() or not LEGACY_REPO_MODELS_JSON_PATH.exists():
+        return REPO_MODELS_JSON_PATH
+    return LEGACY_REPO_MODELS_JSON_PATH
 
 
 def _read_models_json(path: Path) -> dict[str, Any]:

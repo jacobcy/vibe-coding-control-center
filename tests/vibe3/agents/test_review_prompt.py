@@ -209,6 +209,7 @@ class TestBuildReviewPromptBody:
         forbidden_tokens = (
             "common.md",
             "config/settings.yaml",
+            "config/v3/settings.yaml",
             ".agent/rules",
             "Follow policy at",
         )

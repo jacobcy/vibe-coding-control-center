@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompt-recipes.yaml")
+DEFAULT_PROMPT_RECIPES_PATH = Path("config/v3/prompt-recipes.yaml")
 
 PromptProvider = Callable[[], str | None]
 

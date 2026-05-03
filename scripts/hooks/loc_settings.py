@@ -100,7 +100,17 @@ def _parse_settings(path: Path) -> tuple[dict[str, str], dict[str, list[str]], d
     return scalars, string_lists, object_lists
 
 
-def load_loc_settings(config_path: str = "config/loc_limits.yaml") -> LocSettings:
+def load_loc_settings(config_path: str | None = None) -> LocSettings:
+    # Try new path first, then fallback to old path
+    if config_path is None:
+        new_path = Path("config/v3/loc_limits.yaml")
+        old_path = Path("config/loc_limits.yaml")
+        if new_path.exists():
+            config_path = str(new_path)
+        elif old_path.exists():
+            config_path = str(old_path)
+        else:
+            config_path = "config/v3/loc_limits.yaml"  # Default to new path
     scalars, string_lists, object_lists = _parse_settings(Path(config_path))
     exceptions = tuple(
         LocException(

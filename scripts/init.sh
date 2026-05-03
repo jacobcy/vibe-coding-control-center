@@ -28,7 +28,9 @@ for arg in "$@"; do
     esac
 done
 
-if [[ -f "config/skills.json" ]]; then
+if [[ -f "config/v3/skills.json" ]]; then
+  VIBE_SKILLS_CONFIG="config/v3/skills.json"
+elif [[ -f "config/skills.json" ]]; then
   VIBE_SKILLS_CONFIG="config/skills.json"
 else
   VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"

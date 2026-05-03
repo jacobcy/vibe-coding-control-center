@@ -3,12 +3,6 @@
 
 # Flow 配置
 # 控制流程管理行为
-# DEPRECATED: This file will be removed in a future release.
-# Please use config/v3/settings.yaml instead.
-#
-# For now, this file is maintained for backward compatibility.
-# Loaders will automatically try config/v3/settings.yaml first.
-
 flow:
   # 受保护的主分支列表
   # 这些分支禁止创建 flow，强制在特性分支上工作
@@ -328,10 +322,3 @@ orchestra:
     #   覆盖最终模型；但执行入口仍以 agent 优先
     backend:
     model:
-
-  # Temporary worktree cleanup (do/* worktrees from manager/reviewer)
-  cleanup:
-    enabled: true
-    ttl_hours: 72
-    on_pr_closed: true
-    dry_run: false

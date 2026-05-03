@@ -14,8 +14,9 @@ def find_config_file() -> Path | None:
 
     Search order:
     1. .vibe/config.yaml (project-specific)
-    2. config/settings.yaml (default config)
-    3. ~/.vibe/config.yaml (global config)
+    2. config/v3/settings.yaml (new default config)
+    3. config/settings.yaml (deprecated fallback)
+    4. ~/.vibe/config.yaml (global config)
 
     Returns:
         Path to config file or None if not found
@@ -28,13 +29,22 @@ def find_config_file() -> Path | None:
         )
         return project_config
 
-    # Check for config/settings.yaml
-    default_config = Path("config/settings.yaml")
-    if default_config.exists():
-        logger.bind(domain="config", action="find", path=str(default_config)).debug(
-            "Found default config"
+    # Check for config/v3/settings.yaml (new path)
+    new_config = Path("config/v3/settings.yaml")
+    if new_config.exists():
+        logger.bind(domain="config", action="find", path=str(new_config)).debug(
+            "Found new default config"
         )
-        return default_config
+        return new_config
+
+    # Check for config/settings.yaml (deprecated path)
+    old_config = Path("config/settings.yaml")
+    if old_config.exists():
+        logger.bind(domain="config", action="find", path=str(old_config)).warning(
+            "Using deprecated config path config/settings.yaml. "
+            "Please migrate to config/v3/settings.yaml"
+        )
+        return old_config
 
     # Check global config
     global_config = Path.home() / ".vibe" / "config.yaml"

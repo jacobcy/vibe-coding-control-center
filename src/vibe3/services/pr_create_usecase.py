@@ -1,7 +1,6 @@
 """Usecase layer for pr create command orchestration."""
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 from loguru import logger
@@ -10,6 +9,7 @@ from rich.prompt import Prompt
 
 from vibe3.clients.ai_suggestion_client import AISuggestionClient
 from vibe3.config.settings import VibeConfig
+from vibe3.prompts.template_loader import _resolve_prompts_path
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_binding_guard import ensure_task_issue_bound
@@ -82,7 +82,7 @@ class PRCreateUsecase:
             return ("", "")
 
         config = VibeConfig.get_defaults()
-        prompts_path = Path("config/prompts.yaml")
+        prompts_path = _resolve_prompts_path()
         ai_client = AISuggestionClient(config.ai, prompts_path=prompts_path)
         result = ai_client.suggest_pr_content(commits, changed_files)
 

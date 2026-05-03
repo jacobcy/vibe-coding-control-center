@@ -160,8 +160,12 @@ if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
 fi
 
 # 4.5 Sync canonical skills manifest
-if [[ -f "$SOURCE_ROOT/config/skills.json" ]]; then
+if [[ -f "$SOURCE_ROOT/config/v3/skills.json" ]]; then
     log_info "Syncing canonical skills manifest..."
+    cp "$SOURCE_ROOT/config/v3/skills.json" "$INSTALL_DIR/skills.json"
+    chmod 644 "$INSTALL_DIR/skills.json"
+elif [[ -f "$SOURCE_ROOT/config/skills.json" ]]; then
+    log_info "Syncing legacy skills manifest..."
     cp "$SOURCE_ROOT/config/skills.json" "$INSTALL_DIR/skills.json"
     chmod 644 "$INSTALL_DIR/skills.json"
 fi

@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.prompts.manifest import PromptManifest
+from vibe3.prompts.manifest import (
+    DEFAULT_PROMPT_RECIPES_PATH,
+    PromptManifest,
+    _resolve_repo_path,
+)
 
 
 def test_prompt_manifest_loads_recipe_variants_from_yaml(tmp_path: Path) -> None:
@@ -28,6 +32,14 @@ recipes:
     recipe = manifest.recipe("demo.recipe")
     assert recipe.template_key == "demo.template"
     assert recipe.variant("default").sections == ("demo.first", "demo.second")
+
+
+def test_prompt_manifest_resolves_migrated_default_path() -> None:
+    assert DEFAULT_PROMPT_RECIPES_PATH == Path("config/v3/prompt-recipes.yaml")
+
+    resolved = _resolve_repo_path(DEFAULT_PROMPT_RECIPES_PATH)
+
+    assert resolved == Path.cwd() / "config/v3/prompt-recipes.yaml"
 
 
 def test_prompt_manifest_renders_configured_sections(tmp_path: Path) -> None:

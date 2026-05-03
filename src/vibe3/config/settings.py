@@ -246,10 +246,24 @@ class VibeConfig(BaseModel):
     def _load_supplementary(cls, data: dict) -> dict:
         """Merge config/loc_limits.yaml and prompt fields from prompts.yaml."""
         import yaml  # type: ignore[import-untyped]
+        from loguru import logger
 
         # Load loc_limits.yaml for code_limits and doc_limits
-        loc_limits_path = Path("config/loc_limits.yaml")
-        if loc_limits_path.exists():
+        # Try new path first, then fallback to old path
+        new_loc_limits_path = Path("config/v3/loc_limits.yaml")
+        old_loc_limits_path = Path("config/loc_limits.yaml")
+        loc_limits_path = None
+
+        if new_loc_limits_path.exists():
+            loc_limits_path = new_loc_limits_path
+        elif old_loc_limits_path.exists():
+            logger.bind(domain="config", path=str(old_loc_limits_path)).warning(
+                "Using deprecated loc_limits path config/loc_limits.yaml. "
+                "Please migrate to config/v3/loc_limits.yaml"
+            )
+            loc_limits_path = old_loc_limits_path
+
+        if loc_limits_path:
             with open(loc_limits_path) as f:
                 supp = yaml.safe_load(f) or {}
             for key in ("doc_limits", "code_limits"):
@@ -257,8 +271,17 @@ class VibeConfig(BaseModel):
                     data[key] = supp[key]
 
         # Load prompt content from prompts.yaml into VibeConfig fields
-        prompts_path = Path("config/prompts.yaml")
-        if prompts_path.exists():
+        # Try new path first, then fallback to old path
+        new_prompts_path = Path("config/prompts/prompts.yaml")
+        old_prompts_path = Path("config/prompts.yaml")
+        prompts_path = None
+
+        if new_prompts_path.exists():
+            prompts_path = new_prompts_path
+        elif old_prompts_path.exists():
+            prompts_path = old_prompts_path
+
+        if prompts_path:
             with open(prompts_path) as f:
                 prompts = yaml.safe_load(f) or {}
             _merge_prompt_fields(data, prompts)

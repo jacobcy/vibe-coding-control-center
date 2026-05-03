@@ -1,0 +1,128 @@
+# Configuration Governance Registry
+# See docs/standards/configuration-standard.md for field definitions
+
+flow:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:FlowConfig"
+  consumers:
+    - "src/vibe3/services/flow_service.py"
+  tests:
+    - "tests/vibe3/services/test_flow_service.py"
+  status: "active"
+
+ai:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:AIConfig"
+  consumers:
+    - "src/vibe3/clients/ai_suggestion_client.py"
+    - "src/vibe3/services/pr_create_usecase.py"
+  tests:
+    - "tests/vibe3/clients/test_ai_suggestion_client.py"
+  status: "active"
+
+code_limits:
+  source_file: "config/v3/loc_limits.yaml"
+  schema: "src/vibe3/config/settings.py:CodeLimitsConfig"
+  consumers:
+    - "scripts/hooks/check-python-loc.sh"
+    - "scripts/hooks/check-shell-loc.sh"
+    - "scripts/hooks/check-per-file-loc.sh"
+    - "scripts/hooks/check-test-file-loc.sh"
+  tests:
+    - "tests/vibe3/hooks/test_loc_settings.py"
+  status: "active"
+
+doc_limits:
+  source_file: "config/v3/loc_limits.yaml"
+  schema: "src/vibe3/config/settings.py:DocLimitsConfig"
+  consumers: []
+  tests: []
+  status: "active"
+  notes:
+    - "Wired via VibeConfig._load_supplementary()"
+    - "No direct consumers yet - used for documentation LOC checks"
+
+review_scope:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:ReviewScopeConfig"
+  consumers:
+    - "src/vibe3/services/pr_scoring_service.py"
+    - "src/vibe3/commands/inspect_cmd.py"
+  tests:
+    - "tests/vibe3/services/test_pr_scoring_service.py"
+  status: "active"
+
+quality:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:QualityConfig"
+  consumers: []
+  tests: []
+  status: "active"
+  notes:
+    - "Test coverage requirements - not yet enforced in CI"
+
+pr_scoring:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:PRScoringConfig"
+  consumers:
+    - "src/vibe3/services/pr_scoring_service.py"
+    - "scripts/hooks/pre-push.sh"
+  tests:
+    - "tests/vibe3/services/test_pr_scoring_service.py"
+  status: "active"
+
+review:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:ReviewConfig"
+  consumers:
+    - "src/vibe3/agents/review_prompt.py"
+    - "src/vibe3/commands/review_cmd.py"
+  tests:
+    - "tests/vibe3/agents/test_review_prompt.py"
+  status: "active"
+
+plan:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:PlanConfig"
+  consumers:
+    - "src/vibe3/commands/plan_cmd.py"
+  tests: []
+  status: "active"
+
+run:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/config/settings.py:RunConfig"
+  consumers:
+    - "src/vibe3/commands/run_cmd.py"
+  tests: []
+  status: "active"
+
+orchestra:
+  source_file: "config/v3/settings.yaml"
+  schema: "src/vibe3/models/orchestra_config.py:OrchestraConfig"
+  consumers:
+    - "src/vibe3/orchestra/serve.py"
+    - "src/vibe3/orchestra/dispatch.py"
+  tests:
+    - "tests/vibe3/orchestra/test_serve.py"
+  status: "active"
+
+models:
+  source_file: "config/v3/models.json"
+  schema: "N/A (JSON schema)"
+  consumers:
+    - "src/vibe3/agents/preset_resolver.py"
+  tests:
+    - "tests/vibe3/agents/test_agent_preset_resolution.py"
+  status: "active"
+
+github_project:
+  source_file: "config/v3/settings.yaml"
+  schema: "N/A (not wired)"
+  consumers: []
+  tests: []
+  status: "dead"
+  notes:
+    - "Defined in settings.yaml but not in VibeConfig schema"
+    - "Appears to be legacy task-bridge config"
+    - "Remove in next cleanup cycle"
