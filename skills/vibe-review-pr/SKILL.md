@@ -528,11 +528,28 @@ TeamDelete(team_name="pr-review-team")
 1. 杀死 tmux panes（从 config.json 读取 paneId）
 2. 删除 team 目录：`~/.claude/teams/pr-review-team/`
 3. 删除 tasks 目录：`~/.claude/tasks/pr-review-team/`
-4. 清除会话中的 team context
+
+**TeamDelete 的局限性**：
+- ✓ 能删除目录和杀死 tmux panes
+- ❌ **不能清除 session JSONL 中已写入的 teamName 字段**
+- 这是 append-only 日志格式的设计限制
+
+**完整清理流程**（重要）：
+```yaml
+1. 等待所有 teammates 进入 idle 状态
+2. 调用 TeamDelete(team_name="pr-review-team")
+3. ✅ 建议：重启 Claude Code 会话（清除 UI 残留显示）
+```
+
+**为什么需要重启会话**：
+- TeamDelete 成功后，session JSONL 中仍有 teamName 历史记录
+- UI 可能继续显示 "teammates running"（从 session 文件推断状态）
+- 新会话从空白状态开始，不会有残留 team context
 
 **重要**：
-- ❌ 不要手动执行上述步骤
-- ✅ 只调用 TeamDelete 工具，它会自动完成全部清理
+- ❌ 不要手动执行 rm -rf 或 tmux kill-pane
+- ❌ 不要依赖 TeamDelete 后 UI 立即更新
+- ✅ TeamDelete + 重启会话 = 完整清理
 
 **关键原则**：
 - Team 删除是**最终步骤**，只在人类确认后执行一次
@@ -635,15 +652,15 @@ Agent(team_name="pr-review-team", ...)
 - tmux panes 已杀死
 
 **根因**：
-- 直接手动删除目录和杀死 panes
-- **会话文件中的 teamName 引用未清除**
-- TeamDelete 工具会自动清除会话 context，手动删除不会
+- 直接手动删除目录和杀死 panes，或仅调用 TeamDelete 但未重启会话
+- **会话 JSONL 文件中的 teamName 历史记录无法被修改**（append-only 日志）
+- TeamDelete 能删除目录，但**不能清除 session JSONL 中已写入的 teamName 字段**
 
 **正确的清理顺序**（重要）：
 ```
 1. 等待所有 teammates 完成（idle 状态）
-2. 调用 TeamDelete 工具（自动清理会话 context）
-3. 不要手动删除目录或杀死 panes
+2. 调用 TeamDelete 工具（删除目录和 tmux panes）
+3. ✅ 重启 Claude Code 会话（清除 UI 残留显示）
 ```
 
 **TeamDelete 工具说明**：
@@ -652,6 +669,10 @@ TeamDelete will fail if the team still has active members.
 Gracefully terminate teammates first, then call TeamDelete after all teammates have shut down.
 ```
 
+**TeamDelete 的局限性**：
+- ✓ 能删除目录和杀死 tmux panes
+- ❌ **不能清除 session JSONL 中已写入的 teamName 字段**
+
 **错误做法**（会导致会话残留）：
 ```bash
 # ❌ 错误：直接杀死 panes
@@ -659,16 +680,25 @@ tmux kill-pane -t %42
 
 # ❌ 错误：直接删除目录
 rm -rf ~/.claude/teams/pr-review-team
+
+# ❌ 错误：仅调用 TeamDelete 后期望 UI 立即更新
+TeamDelete(team_name="pr-review-team")
+# UI 可能仍显示 "teammates running"
 ```
 
 **正确做法**：
 ```yaml
-# ✅ 正确：使用 TeamDelete 工具
+# ✅ 正确：TeamDelete + 重启会话
 TeamDelete(team_name="pr-review-team")
 # 工具会自动：
 # 1. 杀死 tmux panes
 # 2. 删除 team 目录
-# 3. 清除会话中的 team context
+# 3. 删除 tasks 目录
+# 但不会清除 session JSONL 中的 teamName
+
+# ✅ 然后重启会话
+/exit  # 或 Ctrl+D
+# 新会话不会有残留的 team context
 ```
 
 **补救措施**（如果已手动删除或发现残留）：
