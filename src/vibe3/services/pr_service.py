@@ -12,6 +12,7 @@ from vibe3.models.pr import (
     PRResponse,
     VersionBumpResponse,
 )
+from vibe3.services.pr_loc_comment_service import PRLocCommentService
 from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
 from vibe3.services.pr_utils import (
     build_pr_body,
@@ -31,6 +32,7 @@ class PRService:
         git_client: GitClient | None = None,
         store: SQLiteClient | None = None,
         version_service: VersionService | None = None,
+        loc_comment_service: PRLocCommentService | None = None,
     ) -> None:
         """Initialize PR service."""
         self.github_client = GitHubClient() if github_client is None else github_client
@@ -40,6 +42,9 @@ class PRService:
             VersionService() if version_service is None else version_service
         )
         self.briefing_service = PRReviewBriefingService(self.github_client)
+        self.loc_comment_service = loc_comment_service or PRLocCommentService(
+            self.github_client
+        )
 
     def create_draft_pr(
         self,
@@ -208,6 +213,15 @@ class PRService:
             action = "update" if is_already_ready else "publication"
             logger.bind(pr_number=pr_number).warning(
                 f"Briefing {action} failed (PR ready): {e}"
+            )
+
+        # Publish LOC summary comment
+        try:
+            if self.loc_comment_service:
+                self.loc_comment_service.publish_loc_summary(pr_number)
+        except Exception as e:
+            logger.bind(pr_number=pr_number).warning(
+                f"LOC summary publication failed (PR ready): {e}"
             )
 
         # Request AI review if specified
