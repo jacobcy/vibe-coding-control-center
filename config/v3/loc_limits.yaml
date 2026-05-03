@@ -33,8 +33,8 @@ code_limits:
         limit: 450
         reason: "Task resume 操作聚合，包含 reset、label resume 等内聚操作"
       - path: "src/vibe3/services/handoff_service.py"
-        limit: 500
-        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生"
+        limit: 530
+        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑"
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/git_client.py"
@@ -67,6 +67,9 @@ code_limits:
       - path: "src/vibe3/commands/status.py"
         limit: 480
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，CLI 入口函数难以拆分"
+      - path: "src/vibe3/commands/pr_query.py"
+        limit: 420
+        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 集成、trace 输出等紧密耦合逻辑"
 
       # Services 层 —— 允许 400-500
       - path: "src/vibe3/analysis/snapshot_service.py"

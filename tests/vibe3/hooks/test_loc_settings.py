@@ -80,6 +80,14 @@ def test_migrated_loc_configs_keep_total_limits_in_sync() -> None:
     )
     assert new_settings.last_reviewed == legacy_settings.last_reviewed
 
+    new_exceptions = {
+        entry.path: (entry.limit, entry.reason) for entry in new_settings.exceptions
+    }
+    legacy_exceptions = {
+        entry.path: (entry.limit, entry.reason) for entry in legacy_settings.exceptions
+    }
+    assert new_exceptions == legacy_exceptions
+
 
 def test_runtime_defaults_align_with_hook_fallbacks() -> None:
     config = VibeConfig()
