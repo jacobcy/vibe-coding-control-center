@@ -2,7 +2,7 @@
 
 Re-exports from analysis/service layers for backward compatibility.
 The actual implementation lives in:
-- vibe3.analysis.inspect_query_service  (build_change_analysis, validate_pr_number)
+- vibe3.analysis.inspect_query_service  (build_change_analysis)
 - vibe3.services.pr_analysis_service   (PR analysis helpers)
 - vibe3.commands.inspect_pr_helpers     (build_pr_analysis re-export)
 """
@@ -11,7 +11,6 @@ import typer
 
 from vibe3.analysis.inspect_query_service import (  # noqa: F401
     build_change_analysis,
-    validate_pr_number,
 )
 from vibe3.commands.inspect_pr_helpers import build_pr_analysis  # noqa: F401
 from vibe3.models.pr_analysis import (  # noqa: F401
@@ -61,7 +60,6 @@ __all__ = [
     "CommitInfo",
     "PRCriticalAnalysis",
     "build_change_analysis",
-    "validate_pr_number",
     "build_pr_analysis",
     "_get_pr_changed_files",
     "_filter_critical_files",

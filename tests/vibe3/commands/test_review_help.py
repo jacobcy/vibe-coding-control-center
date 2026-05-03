@@ -3,8 +3,7 @@
 Tests CLI surface: argument validation, help output, exit codes.
 All external services (codeagent-wrapper, GitHub, Git) are mocked.
 
-Note: This file only contains general help tests. Subcommand tests are split into:
-- test_review_pr.py
+Note: This file only contains general help tests. Subcommand tests are in:
 - test_review_base.py
 """
 
@@ -30,23 +29,32 @@ def test_review_no_args_shows_help():
     """
     result = runner.invoke(app, [])
     assert result.exit_code in (0, 2)
-    assert "Usage" in result.output or "pr" in result.output
+    assert "Usage" in result.output or "base" in result.output
 
 
 def test_review_help_only_shows_supported_commands():
-    """vibe review --help should only show supported commands: base, pr.
+    """vibe review --help should only show supported command: base.
 
-    Removed commands: commit, uncommitted, analyze-commit
+    Removed commands: commit, uncommitted, analyze-commit, pr
     """
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     # Supported commands
     assert "base" in result.output
-    assert "pr" in result.output
-    # Removed commands - should NOT appear
+    # Removed commands - should NOT appear as command names
     assert "commit" not in result.output.lower()
     assert "uncommitted" not in result.output.lower()
     assert "analyze-commit" not in result.output.lower()
+    # Check Commands section specifically
+    lines = result.output.split("\n")
+    commands_section = False
+    for line in lines:
+        if "Commands" in line:
+            commands_section = True
+            continue
+        if commands_section and line.strip():
+            # In Commands section, check no 'pr' command listed
+            assert not line.strip().startswith("pr")
     assert "--message" not in result.output
 
 
@@ -80,16 +88,6 @@ def test_review_analyze_commit_command_removed():
 def test_review_base_help_mentions_dry_run_option():
     """vibe review base --help should mention --dry-run option."""
     result = runner.invoke(app, ["base", "--help"])
-    assert result.exit_code == 0
-    # Strip ANSI codes before checking
-    output = _strip_ansi(result.output)
-    assert "--dry-run" in output
-    assert "--message" not in output
-
-
-def test_review_pr_help_mentions_dry_run_option():
-    """vibe review pr --help should mention --dry-run option."""
-    result = runner.invoke(app, ["pr", "--help"])
     assert result.exit_code == 0
     # Strip ANSI codes before checking
     output = _strip_ansi(result.output)

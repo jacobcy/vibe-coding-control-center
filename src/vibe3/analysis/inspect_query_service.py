@@ -146,33 +146,3 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     except Exception:
         sys.stderr = old_stderr
         raise
-
-
-def validate_pr_number(pr_number: int) -> None:
-    """Validate that an identifier refers to an existing PR."""
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.exceptions import UserError
-
-    gh = GitHubClient()
-
-    pr = gh.get_pr(pr_number)
-    if pr is not None:
-        return
-
-    issue = gh.view_issue(pr_number)
-    if issue == "network_error":
-        raise UserError(
-            f"Cannot verify #{pr_number}: network or authentication error.\n"
-            f"  Please check your network connection and GitHub authentication."
-        )
-    if isinstance(issue, dict):
-        raise UserError(
-            f"#{pr_number} is an issue, not a PR.\n"
-            f"  Use 'vibe inspect pr <number>' only for pull requests.\n"
-            f"  Issue title: {issue.get('title', 'N/A')}"
-        )
-
-    raise UserError(
-        f"#{pr_number} does not exist or is not accessible.\n"
-        f"  Please verify the number and ensure you have access to this repository."
-    )
