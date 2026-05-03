@@ -14,6 +14,7 @@
 - 当前 flow 的共享 handoff 文件路径模式为 `.git/vibe3/handoff/<branch-safe>-<hash>/current.md`。
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
+- 凡是依赖环境变量/外部 API 的逻辑，必须验证语义假设，不能只凭文档或经验猜测。
 
 ## 工作前必读：Handoff + Task Show 双通道
 
