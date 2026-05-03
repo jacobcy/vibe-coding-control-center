@@ -9,13 +9,12 @@ Removed from public CLI:
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any
 
 import typer
 from loguru import logger
 from rich.console import Console
 
-from vibe3.agents.review_pipeline_helpers import run_inspect_json
 from vibe3.analysis.inspect_output_adapter import (
     as_list,
     dag,
@@ -125,12 +124,11 @@ def _build_missing_pr_message(
     return f"{target} not found"
 
 
-def _load_pr_analysis_summary(
-    pr_number: int,
-    inspect_runner: Callable[[list[str]], dict[str, object]],
-) -> dict[str, Any]:
+def _load_pr_analysis_summary(pr_number: int) -> dict[str, Any]:
     """Load inspect summary used by command outputs."""
-    analysis = inspect_runner(["pr", str(pr_number)])
+    from vibe3.analysis.inspect_query_service import build_change_analysis
+
+    analysis = build_change_analysis("pr", str(pr_number))
     return pr_analysis_summary(analysis)
 
 
@@ -329,9 +327,7 @@ def register_query_commands(app: typer.Typer) -> None:
 
             analysis_summary = None
             if pr_number:
-                analysis_summary = _load_pr_analysis_summary(
-                    pr_number, run_inspect_json
-                )
+                analysis_summary = _load_pr_analysis_summary(pr_number)
                 logger.debug("Successfully retrieved change analysis")
 
             # Find local pre-push review report

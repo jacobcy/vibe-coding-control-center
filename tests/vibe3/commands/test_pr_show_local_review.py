@@ -69,7 +69,7 @@ verdict: PASS
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
@@ -123,7 +123,7 @@ verdict: PASS
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
@@ -195,7 +195,7 @@ verdict: PASS
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
@@ -259,7 +259,7 @@ verdict: PASS
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
