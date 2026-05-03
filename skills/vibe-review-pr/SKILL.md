@@ -194,6 +194,62 @@ gh pr view <number> --json baseRefName,headRefName
 
 ---
 
+## Step 4.5: 检查 PR 是否已有审查记录
+
+**在开始审查前，检查 PR 是否已有 review comments**。
+
+```bash
+# 检查 PR comments 数量
+gh pr view <number> --json comments --jq '.comments | length'
+
+# 检查是否有 bot 或 agent 的审查评论
+gh pr view <number> --json comments --jq '.comments[].author.login'
+```
+
+### 处理逻辑
+
+| 情况 | 操作 |
+|------|------|
+| 无 review comments | 直接进入 Step 5 |
+| 有 review comments（用户） | 询问是否重新审查 |
+| 有 review comments（agent/bot） | 询问是否补充审查 |
+
+### 询问方式
+
+```yaml
+# 使用 AskUserQuestion tool
+question: |
+  PR #{pr_number} 已有 {count} 条评论。
+  
+  是否重新审查？
+  
+  选项：
+  1. 重新审查 - 忽略已有评论，完整审查
+  2. 补充审查 - 只审查未覆盖的部分
+  3. 跳过 - 跳过此 PR，处理下一个
+
+options:
+  - key: "1"
+    value: "full-review"
+    description: "完整重新审查"
+  - key: "2"
+    value: "supplement"
+    description: "补充审查未覆盖部分"
+  - key: "3"
+    value: "skip"
+    description: "跳过此 PR"
+```
+
+### 选择处理
+
+```yaml
+# full-review: 正常进入 Step 5
+# supplement: 调整 prompt，让 agents 关注未覆盖部分
+# skip: 返回 Step 4 处理队列中的下一个 PR
+```
+
+---
+
 ## Step 5: 加载 Team Template
 
 **Team 已在 Step 2 创建**，这里只加载配置。
