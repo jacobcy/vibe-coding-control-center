@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.config.settings import VibeConfig
 from vibe3.models.change_source import BranchSource, ChangeSource, PRSource
 
 
@@ -22,15 +23,24 @@ class LOCStats:
 class LocService:
     """Service for computing LOC statistics for diffs filtered by core code paths."""
 
-    def __init__(self, git_client: GitClient | None = None) -> None:
+    def __init__(
+        self,
+        git_client: GitClient | None = None,
+        code_paths: tuple[str, ...] | None = None,
+    ) -> None:
         """Initialize LocService.
 
         Args:
             git_client: Optional GitClient instance
+            code_paths: Optional core code path override for tests or custom callers
         """
         self.git_client = git_client or GitClient()
-        # Core code paths from config/loc_limits.yaml
-        self.code_paths = ("src/vibe3/",)
+        if code_paths is None:
+            configured_paths = (
+                VibeConfig.get_defaults().code_limits.code_paths.v3_python
+            )
+            code_paths = tuple(configured_paths) or ("src/vibe3/",)
+        self.code_paths = code_paths
 
     def get_pr_loc_stats(self, pr_number: int) -> LOCStats:
         """Get LOC stats for a PR diff, filtered by core code paths.
@@ -66,69 +76,57 @@ class LocService:
         Returns:
             LOCStats with aggregated statistics
         """
-        try:
-            # Use git diff --numstat for efficient line counting
-            # Format: added deleted filename
-            numstat_output = self._get_numstat(source)
+        # Use git diff --numstat for efficient line counting
+        # Format: added deleted filename
+        numstat_output = self._get_numstat(source)
 
-            added_total = 0
-            deleted_total = 0
-            files_count = 0
+        added_total = 0
+        deleted_total = 0
+        files_count = 0
 
-            for line in numstat_output.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
+        for line in numstat_output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
 
-                parts = line.split("\t")
-                if len(parts) < 3:
-                    # Malformed line, skip
-                    logger.bind(line=line).warning("Malformed numstat line, skipping")
-                    continue
+            parts = line.split("\t")
+            if len(parts) < 3:
+                # Malformed line, skip
+                logger.bind(line=line).warning("Malformed numstat line, skipping")
+                continue
 
-                added_str, deleted_str, filepath = parts[0], parts[1], parts[2]
+            added_str, deleted_str, filepath = parts[0], parts[1], parts[2]
 
-                # Filter by core code paths
-                if not self._is_core_code_file(filepath):
-                    continue
+            # Filter by core code paths
+            if not self._is_core_code_file(filepath):
+                continue
 
-                # Parse added/deleted counts
-                # Note: Binary files show as "-" in numstat
-                try:
-                    added = int(added_str) if added_str != "-" else 0
-                    deleted = int(deleted_str) if deleted_str != "-" else 0
-                except ValueError:
-                    logger.bind(
-                        added=added_str, deleted=deleted_str, file=filepath
-                    ).warning("Failed to parse numstat counts, skipping")
-                    continue
+            # Parse added/deleted counts
+            # Note: Binary files show as "-" in numstat
+            try:
+                added = int(added_str) if added_str != "-" else 0
+                deleted = int(deleted_str) if deleted_str != "-" else 0
+            except ValueError:
+                logger.bind(
+                    added=added_str, deleted=deleted_str, file=filepath
+                ).warning("Failed to parse numstat counts, skipping")
+                continue
 
-                # Skip binary files (both counts are "-")
-                if added_str == "-" and deleted_str == "-":
-                    continue
+            # Skip binary files (both counts are "-")
+            if added_str == "-" and deleted_str == "-":
+                continue
 
-                added_total += added
-                deleted_total += deleted
-                files_count += 1
+            added_total += added
+            deleted_total += deleted
+            files_count += 1
 
-            return LOCStats(
-                added=added_total,
-                deleted=deleted_total,
-                total=added_total + deleted_total,
-                files_count=files_count,
-                scope=", ".join(self.code_paths),
-            )
-
-        except Exception as e:
-            logger.bind(source=source).error(f"Failed to compute LOC stats: {e}")
-            # Return zero stats on error
-            return LOCStats(
-                added=0,
-                deleted=0,
-                total=0,
-                files_count=0,
-                scope=", ".join(self.code_paths),
-            )
+        return LOCStats(
+            added=added_total,
+            deleted=deleted_total,
+            total=added_total + deleted_total,
+            files_count=files_count,
+            scope=", ".join(self.code_paths),
+        )
 
     def _get_numstat(self, source: ChangeSource) -> str:
         """Get git diff numstat output for a source.

@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.services.loc_service import LocService
 
 
@@ -26,6 +28,27 @@ class TestLocService:
         assert stats.deleted == 8  # 5 + 3
         assert stats.total == 26
         assert stats.files_count == 2  # Only 2 core code files
+
+    def test_uses_configured_code_paths_by_default(self) -> None:
+        """Test that default LOC scope comes from VibeConfig."""
+        config = MagicMock()
+        config.code_limits.code_paths.v3_python = ["custom/core/"]
+
+        with patch(
+            "vibe3.services.loc_service.VibeConfig.get_defaults", return_value=config
+        ):
+            service = LocService()
+
+        numstat_output = """4\t1\tcustom/core/service.py
+10\t0\tsrc/vibe3/ignored.py"""
+
+        with patch.object(service, "_get_numstat", return_value=numstat_output):
+            stats = service.get_pr_loc_stats(123)
+
+        assert stats.added == 4
+        assert stats.deleted == 1
+        assert stats.files_count == 1
+        assert stats.scope == "custom/core/"
 
     def test_get_pr_loc_stats_aggregates_correctly(self) -> None:
         """Test that added/deleted totals are correct."""
@@ -108,14 +131,10 @@ invalid line here
         assert stats.deleted == 7  # 5 + 2
         assert stats.files_count == 2
 
-    def test_returns_zero_stats_on_error(self) -> None:
-        """Test that zero stats are returned on error."""
+    def test_raises_when_numstat_cannot_be_loaded(self) -> None:
+        """Test that diff loading failures are surfaced to the caller."""
         service = LocService()
 
         with patch.object(service, "_get_numstat", side_effect=Exception("Git error")):
-            stats = service.get_pr_loc_stats(300)
-
-        assert stats.added == 0
-        assert stats.deleted == 0
-        assert stats.total == 0
-        assert stats.files_count == 0
+            with pytest.raises(Exception, match="Git error"):
+                service.get_pr_loc_stats(300)

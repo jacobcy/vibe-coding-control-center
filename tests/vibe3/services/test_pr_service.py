@@ -235,7 +235,9 @@ def test_pr_service_close_open_pr_for_flow(pr_service: PRService) -> None:
     gh_instance.close_pr.assert_called_once_with(123, comment="Abandoning flow")
 
 
-def test_mark_ready_publishes_loc_comment(pr_service: PRService) -> None:
+def test_mark_ready_publishes_loc_comment(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
     """Test that mark_ready publishes LOC comment."""
     from vibe3.services.pr_loc_comment_service import PRLocCommentService
 
@@ -268,7 +270,8 @@ def test_mark_ready_publishes_loc_comment(pr_service: PRService) -> None:
     pr_service.loc_comment_service = loc_service_mock
 
     # Call mark_ready
-    result = pr_service.mark_ready(123)
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        result = pr_service.mark_ready(123)
 
     # Verify LOC comment was published
     loc_service_mock.publish_loc_summary.assert_called_once_with(123)
@@ -278,7 +281,9 @@ def test_mark_ready_publishes_loc_comment(pr_service: PRService) -> None:
     assert result.draft is False
 
 
-def test_loc_comment_idempotent_update(pr_service: PRService) -> None:
+def test_loc_comment_idempotent_update(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
     """Test that LOC comment updates existing comment on re-run."""
     from vibe3.services.pr_loc_comment_service import PRLocCommentService
 
@@ -301,7 +306,8 @@ def test_loc_comment_idempotent_update(pr_service: PRService) -> None:
     pr_service.loc_comment_service = loc_service_mock
 
     # Call mark_ready on already-ready PR
-    result = pr_service.mark_ready(123)
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        result = pr_service.mark_ready(123)
 
     # Verify LOC comment was still published (idempotent update)
     loc_service_mock.publish_loc_summary.assert_called_once_with(123)
@@ -310,7 +316,9 @@ def test_loc_comment_idempotent_update(pr_service: PRService) -> None:
     assert result.draft is False
 
 
-def test_mark_ready_handles_loc_comment_failure(pr_service: PRService) -> None:
+def test_mark_ready_handles_loc_comment_failure(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
     """Test that LOC comment failure doesn't block mark_ready."""
     from vibe3.services.pr_loc_comment_service import PRLocCommentService
 
@@ -344,7 +352,8 @@ def test_mark_ready_handles_loc_comment_failure(pr_service: PRService) -> None:
     pr_service.loc_comment_service = loc_service_mock
 
     # Call mark_ready - should not fail
-    result = pr_service.mark_ready(123)
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        result = pr_service.mark_ready(123)
 
     # Verify LOC comment was attempted
     loc_service_mock.publish_loc_summary.assert_called_once_with(123)
