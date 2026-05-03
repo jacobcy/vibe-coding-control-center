@@ -274,6 +274,28 @@ manager:
   # Dynamic: supervisor file content (loaded at runtime)
   # Section name: manager.supervisor_content
   # Source: config.assignee_dispatch.supervisor_file (e.g., supervisor/manager.md)
+  #
+  # NOTE: When include_supervisor_content=false, this section provides a file reference
+  # instead of inline content. Agent will use Read tool to access full instructions.
+  supervisor_content: |
+    ## Manager 执行指南
+
+    你的完整执行指令和决策规则在以下文件中：
+    `supervisor/manager.md` (994 行)
+
+    **请立即使用 Read tool 阅读此文件**：
+    ```
+    Read("supervisor/manager.md")
+    ```
+
+    该文件包含：
+    - **Role 定义**：Issue Owner 职责边界
+    - **Permission Contract**：允许/禁止的操作
+    - **核心决策逻辑**：做 vs 不做，无中间地带
+    - **State 机器**：ready → claimed → in_progress → review → done/blocked
+    - **Exit 条件**：何时停止执行
+
+    阅读后，按照其中的规则执行 manager 职责。
 
   # Static: manager target and role definition
   # NOTE: No variable substitution needed - agent gets issue info from task show
