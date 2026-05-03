@@ -1,11 +1,22 @@
 ---
 name: vibe-review-pr
 description: |
-  Use when the user wants a comprehensive PR review using multi-agent team workflow.
-  Loads team configuration from .claude/team-templates/ and starts phased review.
+  Use only in Claude Code environments with Agent Teams enabled when the user wants
+  a comprehensive PR review using the multi-agent team workflow.
 ---
 
 # Vibe PR Review Skill
+
+## Overview
+
+`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。它依赖
+Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
+能力，以及 `.claude/team-templates/` 和 `.claude/agents/pr-*.md`。
+
+非 Claude team 环境（包括 Codex）不要模拟本 workflow，也不要用本 skill
+启动替代性 subagent 编排。Codex 审核 PR 时直接走：
+- `vibe-review-docs`：docs-only PR
+- `vibe-review-code`：源码、脚本、配置、测试，或代码与文档混合 PR
 
 ## 职责
 
@@ -18,6 +29,18 @@ description: |
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
 ---
+
+## When to Use
+
+使用本 skill 之前必须同时满足：
+- 当前 host 是 Claude Code
+- `TMUX` 已设置
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- 当前工具面提供 TeamCreate / Agent / SendMessage / teammate-message 等 team 能力
+
+不满足任一条件时，停止本 skill，并按 PR 文件范围分流：
+- docs-only：使用 `vibe-review-docs`
+- 其他：使用 `vibe-review-code`
 
 ## 执行流程概述
 
@@ -57,7 +80,7 @@ TaskCreate(
 
 ## Step 1: 环境检查
 
-**必须先检查环境是否支持 Team 功能。**
+**必须先检查环境是否支持 Claude Code Team 功能。**
 
 ```bash
 # 检查 tmux
@@ -71,22 +94,31 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
 | 条件 | 要求 | 不满足时 |
 |------|------|----------|
-| TMUX | 必须设置 | 提示用户 + 回退到 vibe-review-code |
-| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 提示用户 + 回退 |
+| Host | Claude Code | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| Team tools | TeamCreate / Agent / SendMessage 可用 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| TMUX | 必须设置 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 分流到 `vibe-review-docs` / `vibe-review-code` |
 
 **回退处理**：
 ```
-"Team 功能需要在 tmux session 内运行。
+"Claude Code Team 功能需要在 tmux session 内运行。
  请运行: tmux new-session -s vibe-review
  然后重新启动 Claude Code。
 
  当前回退到单 agent 审查模式..."
 
--> 使用 vibe-review-code
+-> docs-only PR 使用 vibe-review-docs
+-> 其他 PR 使用 vibe-review-code
 ```
 
 不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
-team cleanup 状态；环境不满足时，直接转入 `vibe-review-code` 单 agent 审查。
+team cleanup 状态；环境不满足时，直接转入 `vibe-review-docs` 或
+`vibe-review-code` 单 agent 审查。
+
+**Codex 规则**：
+- Codex 中遇到 `pr review <number>`、`review PR #<number>` 等请求时，不使用本 skill。
+- Codex 先读取 PR metadata/diff/comments，再根据文件范围使用 `vibe-review-docs` 或 `vibe-review-code`。
+- Codex 不得用 `spawn_agent`、`multi_tool_use` 或其他工具模拟 `.claude/team-templates/` workflow。
 
 ---
 
@@ -231,7 +263,7 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 |------|------|------|--------|
 | simple | <50行, 非安全相关 | 回退 vibe-review-code | **0（不启动）** |
 | refactor | 标题含 refactor | standard 多人流程 | 3 |
-| security | 安全标签或 fix 标签 | 全流程 + Codex | 4 |
+| security | 安全标签或 fix 标签 | 全流程 + security-reviewer | 4 |
 | standard | 其他 | standard 多人流程 | 4 |
 
 ```bash
@@ -239,9 +271,9 @@ gh pr view <number> --json title,labels,additions
 ```
 
 **simple 类型处理**：
-- 不启动 team，根据 PR 标签选择单 agent 审查：
-  - `scope/documentation` → 使用 `vibe-review-docs`
-  - 其他（`scope/python`、`scope/shell` 等）→ 使用 `vibe-review-code`
+- 不启动 team，根据 PR 文件范围选择单 agent 审查：
+  - 仅文档变更 → 使用 `vibe-review-docs`
+  - 其他（`scope/python`、`scope/shell`、`scope/infrastructure`、配置/测试/混合变更等）→ 使用 `vibe-review-code`
 - 审查完成后返回 Step 2 处理队列中的下一个 PR
 
 ---
