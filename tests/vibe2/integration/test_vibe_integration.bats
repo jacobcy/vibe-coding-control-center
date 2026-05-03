@@ -43,3 +43,12 @@ SH
   [ "$status" -eq 0 ]
   [[ ! "$output" =~ "lib/alias/loader.sh not found" ]]
 }
+
+@test "config shell aliases shim resolves repo root after migration" {
+  local repo_root
+  repo_root="$BATS_TEST_DIRNAME/../../.."
+
+  run zsh -c 'source "'"$repo_root"'/config/shell/aliases.sh"'
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "no compatible alias loader" ]]
+}

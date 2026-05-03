@@ -67,6 +67,20 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
     assert exceptions["src/vibe3/roles/review.py"].reason != ""
 
 
+def test_migrated_loc_configs_keep_total_limits_in_sync() -> None:
+    module = _load_loc_settings_module()
+    new_settings = module.load_loc_settings("config/v3/loc_limits.yaml")
+    legacy_settings = module.load_loc_settings("config/loc_limits.yaml")
+
+    assert new_settings.total_v2_shell == legacy_settings.total_v2_shell
+    assert new_settings.total_v3_python == legacy_settings.total_v3_python
+    assert (
+        new_settings.warning_threshold_percent
+        == legacy_settings.warning_threshold_percent
+    )
+    assert new_settings.last_reviewed == legacy_settings.last_reviewed
+
+
 def test_runtime_defaults_align_with_hook_fallbacks() -> None:
     config = VibeConfig()
 
