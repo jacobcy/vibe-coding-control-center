@@ -32,4 +32,4 @@ tags: [workflow, vibe, planning, orchestration]
 - `vibe:new-feature` 是 agent workflow，不是 GitHub workflow，也不是 GitHub Project workflow。
 - 它不重新定义 `repo issue`、`roadmap item`、`task`、`flow`。
 - 它不直接承载 task binding、blocker 分类、物理 worktree 决策或 planning gates。
-- 若需要新的逻辑现场，遵循 `vibe:new` 与 `CLAUDE.md` 的规则：默认在当前目录使用 `vibe flow new`，未经人类授权不得新建物理 worktree。
+- 若需要新的逻辑现场，遵循 `vibe:new` 与 `CLAUDE.md` 的规则：默认在当前目录使用 `vibe3 flow update`，未经人类授权不得新建物理 worktree。

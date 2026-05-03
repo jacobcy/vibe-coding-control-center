@@ -16,7 +16,7 @@ def reset_error_tracking() -> Iterator[None]:
     yield
     from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-    ErrorTrackingService._instance = None
+    ErrorTrackingService.clear_instance()
 
 
 @pytest.fixture
@@ -144,3 +144,132 @@ def test_failed_gate_increment_blocked_ticks(temp_store: SQLiteClient) -> None:
     # Check status
     status = gate.get_status()
     assert status.blocked_ticks == 2
+
+
+def test_per_db_path_instance_isolation(tmp_path: Path) -> None:
+    """Different db_path instances should be isolated."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create two separate databases
+    db_path1 = tmp_path / "test1.db"
+    db_path2 = tmp_path / "test2.db"
+
+    for db_path in [db_path1, db_path2]:
+        conn = sqlite3.connect(db_path)
+        from vibe3.clients.sqlite_schema import init_schema
+
+        init_schema(conn)
+        conn.close()
+
+    store1 = SQLiteClient(db_path=str(db_path1))
+    store2 = SQLiteClient(db_path=str(db_path2))
+
+    # Get instances keyed by db_path
+    instance1 = ErrorTrackingService.get_instance(store=store1)
+    instance2 = ErrorTrackingService.get_instance(store=store2)
+
+    # Should be different instances
+    assert instance1 is not instance2
+    assert instance1.db_path != instance2.db_path
+
+    # Record error in instance1
+    instance1.record_error("E_MODEL_TEST", "Test error in db1")
+
+    # instance2 should not see the error (different database)
+    assert instance1.has_model_config_error()
+    assert not instance2.has_model_config_error()
+
+    # Clear instance1's registry entry (not the error data)
+    ErrorTrackingService.clear_instance(db_path=str(db_path1))
+
+    # Get a new instance for store1
+    instance1_new = ErrorTrackingService.get_instance(store=store1)
+
+    # New instance still sees the error data (same database)
+    # This is expected - clear_instance() only clears the in-memory instance, not the DB
+    assert instance1_new.has_model_config_error()
+
+    # instance2 still unaffected
+    assert not instance2.has_model_config_error()
+
+
+def test_clear_instance_specific_db_path(tmp_path: Path) -> None:
+    """clear_instance(db_path) should only clear that instance."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create two separate databases
+    db_path1 = tmp_path / "test1.db"
+    db_path2 = tmp_path / "test2.db"
+
+    for db_path in [db_path1, db_path2]:
+        conn = sqlite3.connect(db_path)
+        from vibe3.clients.sqlite_schema import init_schema
+
+        init_schema(conn)
+        conn.close()
+
+    store1 = SQLiteClient(db_path=str(db_path1))
+    store2 = SQLiteClient(db_path=str(db_path2))
+
+    # Create instances
+    instance1 = ErrorTrackingService.get_instance(store=store1)
+    instance2 = ErrorTrackingService.get_instance(store=store2)
+
+    # Record errors in both
+    instance1.record_error("E_API_TEST1", "Error 1")
+    instance2.record_error("E_API_TEST2", "Error 2")
+
+    # Clear instance1's registry entry (not the error data)
+    ErrorTrackingService.clear_instance(db_path=str(db_path1))
+
+    # Get new instances
+    instance1_new = ErrorTrackingService.get_instance(store=store1)
+    instance2_new = ErrorTrackingService.get_instance(store=store2)
+
+    # Both still see their error data (same databases)
+    # clear_instance() only clears in-memory instance, not DB
+    assert instance1_new.get_api_error_count() == 1
+    assert instance2_new.get_api_error_count() == 1
+
+    # But instance2 is still the same object (not cleared)
+    assert instance2_new is instance2
+
+
+def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
+    """get_instance() without store should return default instance."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Clear any existing state
+    ErrorTrackingService.clear_instance()
+
+    # Get default instance
+    default_instance = ErrorTrackingService.get_instance()
+    assert default_instance is not None
+
+    # Get default instance again - should be same object
+    default_instance2 = ErrorTrackingService.get_instance()
+    assert default_instance is default_instance2
+
+    # Create a separate db_path instance
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    from vibe3.clients.sqlite_schema import init_schema
+
+    init_schema(conn)
+    conn.close()
+
+    store = SQLiteClient(db_path=str(db_path))
+    custom_instance = ErrorTrackingService.get_instance(store=store)
+
+    # Should be different from default instance
+    assert custom_instance is not default_instance
+    assert custom_instance.db_path != default_instance.db_path
+
+    # Clear default instance
+    ErrorTrackingService.clear_instance()
+    default_instance3 = ErrorTrackingService.get_instance()
+    assert default_instance3 is not default_instance
+
+    # Custom instance should still be accessible
+    custom_instance2 = ErrorTrackingService.get_instance(store=store)
+    assert custom_instance2 is custom_instance

@@ -37,25 +37,79 @@ class ErrorTrackingService:
     # Threshold count in time window
     THRESHOLD_COUNT = 2
 
-    # Global singleton instance
+    # Default retention period (days)
+    DEFAULT_RETENTION_DAYS = 7
+
+    # Global singleton instance (backward compatibility)
     _instance: ErrorTrackingService | None = None
 
-    @classmethod
-    def get_instance(cls) -> ErrorTrackingService:
-        """Get global singleton instance."""
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+    # Per-db-path registry for multi-instance support
+    _registry: dict[str, ErrorTrackingService] = {}
 
-    def __init__(self, store: SQLiteClient | None = None) -> None:
+    # Default instance for backward compatibility
+    _default_instance: ErrorTrackingService | None = None
+
+    @classmethod
+    def get_instance(cls, store: SQLiteClient | None = None) -> ErrorTrackingService:
+        """Get error tracking instance.
+
+        Args:
+            store: Optional SQLiteClient for persistence. If None, returns/creates
+                   the default instance for backward compatibility.
+
+        Returns:
+            ErrorTrackingService instance keyed by store.db_path if store provided,
+            otherwise the default instance.
+        """
+        if store is None:
+            # Backward compatibility: check _instance first (tests may set it directly)
+            if cls._instance is not None:
+                return cls._instance
+            # If no _instance, create default instance
+            if cls._default_instance is None:
+                cls._default_instance = cls()
+                cls._instance = cls._default_instance  # Keep _instance in sync
+            return cls._default_instance
+        else:
+            # Per-db-path instance
+            db_path = store.db_path
+            if db_path not in cls._registry:
+                cls._registry[db_path] = cls(store=store)
+            return cls._registry[db_path]
+
+    @classmethod
+    def clear_instance(cls, db_path: str | None = None) -> None:
+        """Clear instance(s) for testing.
+
+        Args:
+            db_path: If provided, clear only the instance for that db_path.
+                     If None, clear only the default instance.
+        """
+        if db_path is None:
+            # Clear default instance
+            cls._default_instance = None
+            cls._instance = None  # Keep _instance in sync
+        else:
+            # Clear specific db_path instance
+            cls._registry.pop(db_path, None)
+
+    def __init__(
+        self, store: SQLiteClient | None = None, retention_days: int | None = None
+    ) -> None:
         """Initialize error tracking service.
 
         Args:
             store: SQLiteClient for persistence
+            retention_days: Days to retain error records (default: 7)
         """
         self.store = store or SQLiteClient()
         # Access db_path from base class
         self.db_path = self.store.db_path
+        self.retention_days = (
+            self.DEFAULT_RETENTION_DAYS if retention_days is None else retention_days
+        )
+        if self.retention_days <= 0:
+            raise ValueError(f"retention_days must be positive, got {retention_days}")
 
     def record_error(
         self,
@@ -205,6 +259,23 @@ class ErrorTrackingService:
             cleared_by=cleared_by,
             reason=reason,
         ).info("Error log cleared")
+
+    def cleanup_old_errors(self) -> int:
+        """Delete error records older than retention period.
+
+        Returns:
+            Number of deleted records
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute(
+                """
+                DELETE FROM error_log
+                WHERE created_at < datetime('now', ? || ' days')
+                """,
+                (f"-{self.retention_days}",),
+            )
+            conn.commit()
+            return result.rowcount
 
     def get_status(self) -> dict[str, Any]:
         """Get error tracking status for display.

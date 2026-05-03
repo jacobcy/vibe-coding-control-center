@@ -1,63 +1,80 @@
 ---
 name: vibe-review-pr
 description: |
-  Use when the user wants a comprehensive PR review using multi-agent team workflow.
-  Loads team configuration from .claude/team-templates/ and starts phased review.
+  Use only in Claude Code environments with Agent Teams enabled when the user wants
+  a comprehensive PR review using the multi-agent team workflow.
 ---
 
 # Vibe PR Review Skill
 
+## Overview
+
+`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。它依赖
+Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
+能力，以及 `.claude/team-templates/` 和 `.claude/agents/pr-*.md`。
+
+非 Claude team 环境（包括 Codex）不要模拟本 workflow，也不要用本 skill
+启动替代性 subagent 编排。Codex 审核 PR 时直接走：
+- `vibe-review-docs`：docs-only PR
+- `vibe-review-code`：源码、脚本、配置、测试，或代码与文档混合 PR
+
 ## 职责
 
 **本 Skill 只负责**：
-1. 环境检查
-2. PR 队列排序与选择
-3. 加载 Team Template
-4. 启动审查团队
+1. 环境检查（必须最先执行）
+2. 创建审查团队（环境通过后，一次性）
+3. PR 队列排序与选择
+4. 加载 Team Template
+5. 循环审查直到人类确认结束
+6. 人类确认后删除团队
 
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
 ---
+
+## When to Use
+
+使用本 skill 之前必须同时满足：
+- 当前 host 是 Claude Code
+- `TMUX` 已设置
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- 当前工具面提供 TeamCreate / Agent / SendMessage / teammate-message 等 team 能力
+
+不满足任一条件时，停止本 skill，并按 PR 文件范围分流：
+- docs-only：使用 `vibe-review-docs`
+- 其他：使用 `vibe-review-code`
 
 ## 执行流程概述
 
 **关键指令**：读取 template 后，按 `workflow.execution` 配置执行 Agent 调用。
 
 ```
-1. TeamCreate(team_name="pr-review-team") → 创建 team
-2. 读取 template.agents → 确定 subagent_type 和 spawn_config
-3. Phase 1: Agent(name="context-researcher", subagent_type="pr-context-researcher", ...)
-4. Phase 2: 并行 spawn 3 个 agents（单次响应中多个 Agent 调用）
-5. Phase 3: 收集结果，仲裁，决策
-6. Phase 4: team-lead 执行写回（Bash tool）
-7. Phase 5: 清理或复用
+1. 环境检查（必须先检查，不满足则直接回退）
+2. TeamCreate(team_name="pr-review-team") → 环境通过后创建（一次性）
+3. 选择执行模式
+4. PR 队列排序与选择
+5. 循环审查每个 PR（不检查 team，假设已存在）
+   - Phase 1-4: 审查流程
+   - Phase 5: 只清理 inboxes/tasks（不删除 team）
+   - 询问是否继续下一个 PR
+6. 人类确认结束审查 → 删除 team
 ```
 
 **重要**：
+- 环境检查必须在 TeamCreate 之前执行
+- Team 只在环境检查通过后创建，避免无效创建
+- Team 创建是**一次性操作**，整个审查周期只执行一次
+- 循环中不检查/创建/删除 Team，假设 Team 已存在
+- Team 只在人类明确确认结束审查后才删除
 - `subagent_type` 必须匹配项目 `.claude/agents/pr-*.md` 定义
 - Phase 2 并行 spawn 需要在**单次响应**中发起多个 Agent tool 调用
 - Phase 4/5 由 team-lead（当前 session）执行，不 spawn 新 agent
 
 ---
 
-## Step 0: 初始化任务跟踪
+## Step 1: 环境检查（必须最先执行）
 
-**启动时创建 task 跟踪进度**（使用 TaskCreate tool）：
-
-```yaml
-TaskCreate(
-  title: "PR Review Queue",
-  description: "审查 PR 队列：自动排序并依次审查"
-)
-```
-
-创建后后续步骤标记为 in_progress/completed。
-
----
-
-## Step 1: 环境检查
-
-**必须先检查环境是否支持 Team 功能。**
+**必须先检查环境是否支持 Claude Code Team 功能，不满足则直接分流，不创建 Team。**
 
 ```bash
 # 检查 tmux
@@ -71,26 +88,50 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
 | 条件 | 要求 | 不满足时 |
 |------|------|----------|
-| TMUX | 必须设置 | 提示用户 + 回退到 vibe-review-code |
-| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 提示用户 + 回退 |
+| Host | Claude Code | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| Team tools | TeamCreate / Agent / SendMessage 可用 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| TMUX | 必须设置 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 分流到 `vibe-review-docs` / `vibe-review-code` |
 
 **回退处理**：
 ```
-"Team 功能需要在 tmux session 内运行。
+"Claude Code Team 功能需要在 tmux session 内运行。
  请运行: tmux new-session -s vibe-review
  然后重新启动 Claude Code。
 
  当前回退到单 agent 审查模式..."
 
--> 使用 vibe-review-code
+-> docs-only PR 使用 vibe-review-docs
+-> 其他 PR 使用 vibe-review-code
 ```
 
 不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
-team cleanup 状态；环境不满足时，直接转入 `vibe-review-code` 单 agent 审查。
+team cleanup 状态；环境不满足时，直接转入 `vibe-review-docs` 或
+`vibe-review-code` 单 agent 审查，不需要 TeamDelete。
+
+**Codex 规则**：
+- Codex 中遇到 `pr review <number>`、`review PR #<number>` 等请求时，不使用本 skill。
+- Codex 先读取 PR metadata/diff/comments，再根据文件范围使用 `vibe-review-docs` 或 `vibe-review-code`。
+- Codex 不得用 `spawn_agent`、`multi_tool_use` 或其他工具模拟 `.claude/team-templates/` workflow。
 
 ---
 
-## Step 1.5: 选择执行模式
+## Step 2: 创建团队（环境通过后）
+
+**环境检查通过后才创建 Team**。
+
+```yaml
+TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
+```
+
+**关键原则**：
+- Team 创建是**一次性操作**，整个审查周期只执行一次
+- 创建后 Team 持续存在，直到人类确认结束审查
+- 环境检查失败时不创建 Team，直接回退
+
+---
+
+## Step 3: 选择执行模式
 
 **在开始审查前，询问用户执行模式**（除非用户已指定）。
 
@@ -146,12 +187,12 @@ execution_context:
 
 | 概念 | 决定什么 | 在哪个 Step |
 |------|----------|-------------|
-| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 1.5 询问用户 |
-| **PR 类型** | 启动多少 agent（agents 数量） | Step 4 自动判定 |
+| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 3 询问用户 |
+| **PR 类型** | 启动多少 agent（agents 数量） | Step 6 自动判定 |
 
 ---
 
-## Step 2: PR 队列排序与选择
+## Step 4: PR 队列排序与选择
 
 当用户没有指定 PR 编号时，先检查当前 repo 的所有未合并 PR，排序后建议审查顺序。
 
@@ -185,7 +226,65 @@ gh pr view <number> --json baseRefName,headRefName
 
 ---
 
-## Step 3: 加载 Team Template 并创建 Team
+## Step 4.5: 检查 PR 是否已有审查记录
+
+**在开始审查前，检查 PR 是否已有 review comments**。
+
+```bash
+# 检查 PR comments 数量
+gh pr view <number> --json comments --jq '.comments | length'
+
+# 检查是否有 bot 或 agent 的审查评论
+gh pr view <number> --json comments --jq '.comments[].author.login'
+```
+
+### 处理逻辑
+
+| 情况 | 操作 |
+|------|------|
+| 无 review comments | 直接进入 Step 5 |
+| 有 review comments（用户） | 询问是否重新审查 |
+| 有 review comments（agent/bot） | 询问是否补充审查 |
+
+### 询问方式
+
+```yaml
+# 使用 AskUserQuestion tool
+question: |
+  PR #{pr_number} 已有 {count} 条评论。
+
+  是否重新审查？
+
+  选项：
+  1. 重新审查 - 忽略已有评论，完整审查
+  2. 补充审查 - 只审查未覆盖的部分
+  3. 跳过 - 跳过此 PR，处理下一个
+
+options:
+  - key: "1"
+    value: "full-review"
+    description: "完整重新审查"
+  - key: "2"
+    value: "supplement"
+    description: "补充审查未覆盖部分"
+  - key: "3"
+    value: "skip"
+    description: "跳过此 PR"
+```
+
+### 选择处理
+
+```yaml
+# full-review: 正常进入 Step 5
+# supplement: 调整 prompt，让 agents 关注未覆盖部分
+# skip: 返回 Step 4 处理队列中的下一个 PR
+```
+
+---
+
+## Step 5: 加载 Team Template
+
+**Team 已在 Step 2 创建**，这里只加载配置。
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -195,21 +294,9 @@ cat .claude/team-templates/pr-review-team.yaml
 ```
 
 **Template 是可执行配置**：
-- `team_create_config` — TeamCreate 参数
 - `agents` — 定义 subagent_type 和 spawn_config
 - `workflow.execution` — 每个 phase 的具体执行步骤
-
-**创建 Team**（使用 template.team_create_config）：
-
-```yaml
-# 从 template 读取配置
-team_create_config:
-  team_name: pr-review-team
-  agent_type: general-purpose
-
-# 执行 TeamCreate
-TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
-```
+- `pr_classification` — PR 类型判断规则
 
 **Template 包含**：
 - Agent 定义（subagent_type, model, spawn_config）
@@ -220,10 +307,10 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 
 ---
 
-## Step 4: 判断 PR 类型
+## Step 6: 判断 PR 类型
 
 **自动判定**：根据 PR 行数和标签自动分类，无需用户选择。
-**注意**：PR 类型决定启动多少 agent；执行模式在 Step 1.5 已选择。
+**注意**：PR 类型决定启动多少 agent；执行模式在 Step 3 已选择。
 
 根据 Template 中的 `pr_classification` 规则：
 
@@ -231,7 +318,7 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 |------|------|------|--------|
 | simple | <50行, 非安全相关 | 回退 vibe-review-code | **0（不启动）** |
 | refactor | 标题含 refactor | standard 多人流程 | 3 |
-| security | 安全标签或 fix 标签 | 全流程 + Codex | 4 |
+| security | 安全标签或 fix 标签 | 全流程 + security-reviewer | 4 |
 | standard | 其他 | standard 多人流程 | 4 |
 
 ```bash
@@ -239,16 +326,45 @@ gh pr view <number> --json title,labels,additions
 ```
 
 **simple 类型处理**：
-- 不启动 team，根据 PR 标签选择单 agent 审查：
-  - `scope/documentation` → 使用 `vibe-review-docs`
-  - 其他（`scope/python`、`scope/shell` 等）→ 使用 `vibe-review-code`
-- 审查完成后返回 Step 2 处理队列中的下一个 PR
+- 不启动 team，根据 PR 文件范围选择单 agent 审查：
+  - 仅文档变更 → 使用 `vibe-review-docs`
+  - 其他（`scope/python`、`scope/shell`、`scope/infrastructure`、配置/测试/混合变更等）→ 使用 `vibe-review-code`
+- 审查完成后返回 Step 4 处理队列中的下一个 PR
 
 ---
 
-## Step 5: 按流程启动 Agent
+## Step 7: 按流程启动 Agent
 
 **重要**：读取 template 中的 `workflow.execution` 配置，按步骤执行。
+
+### 检查是否需要 Spawn 或复用
+
+**在每个 PR 审查开始前检查**：
+
+```bash
+# 检查现有 teammates
+cat ~/.claude/teams/pr-review-team/config.json | jq '.members[] | select(.name != "team-lead") | {name, isActive}'
+```
+
+**复用策略**（来自 template.reuse_policy）：
+- 如果存在 idle 状态的 teammates → **SendMessage 唤醒**
+- 如果不存在需要的 agent 类型 → spawn 新的
+
+**SendMessage 唤醒方式**：
+```yaml
+SendMessage(
+  to: "context-researcher",  # 使用现有 teammate 名称
+  message: |
+    新任务：审查 PR #{pr_number}
+
+    请收集背景信息并输出报告。
+)
+```
+
+**关键原则**：
+- **第一个 PR**：spawn agents
+- **后续 PR**：复用已有 teammates（SendMessage 唤醒）
+- 不要为每个 PR spawn 新 agents
 
 ### Phase 1: 背景调研
 
@@ -329,8 +445,24 @@ gh pr view <number> --json title,labels,additions
 # Step 2-4: 发送上下文（agents 启动后自动接收 team broadcast）
 # 注意：run_in_background 的 agents 会自动收到 team context
 
-# Step 5: 等待所有结果
-- action: 等待所有 Phase 2 agents 返回 idle notification
+# Step 5: 等待所有结果（必须等待全部返回）
+- action: |
+    等待所有 Phase 2 agents 返回 idle notification。
+
+    **重要**：必须等待以下全部 agents 返回：
+    - code-analyst
+    - architect-reviewer
+    - security-reviewer
+
+    等待机制：
+    1. 检查 ~/.claude/teams/pr-review-team/ 目录下的状态
+    2. 或等待系统通知（idle notification）
+    3. 超时设置：5 分钟
+
+    如果超时仍有 agent 未返回：
+    - 记录 WARNING
+    - 在报告中标注"部分审查未完成"
+    - 不要假设未返回的 agent 同意其他 agent 的结论
 ```
 
 ### Phase 3: 综合判断
@@ -338,6 +470,19 @@ gh pr view <number> --json title,labels,additions
 **执行步骤**（从 template.workflow.phase_3.execution）：
 
 ```yaml
+# Step 0: 前置检查（新增）
+- action: |
+    在进入 Phase 3 前，验证所有 Phase 2 agents 已返回：
+
+    required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
+    received_agents = [从 idle notifications 获取]
+
+    missing = set(required_agents) - set(received_agents)
+    if missing:
+      log_warning(f"缺失审查报告: {missing}")
+      在最终报告中标注"审查不完整"
+      # 不要假设缺失的 agent 同意其他结论
+
 # Step 1: 收集所有报告
 - action: 从 idle notifications 获取各 agent 报告
 
@@ -373,22 +518,86 @@ gh pr view <number> --json title,labels,additions
     command: gh issue create --title "[follow-up] {title}" --body "{body}"
 ```
 
-### Phase 5: 清理与复用准备
+### Phase 5: 循环清理（不删除 Team）
 
 **执行步骤**（由 team-lead 执行）：
 
 ```yaml
-- condition: continue_next_pr
-  actions:
+# 只清理当前 PR 的 inboxes/tasks，Team 继续存在
+- actions:
     - 清空 inboxes: rm ~/.claude/teams/pr-review-team/inboxes/*.json
     - 重置 tasks: rm ~/.claude/tasks/pr-review-team/*
-
-- condition: full_cleanup
-  actions:
-    - 杀死 panes: 从 config.json 读取 paneId 并 kill-pane
-    - 删除 team: rm -rf ~/.claude/teams/pr-review-team
-    - 删除 tasks: rm -rf ~/.claude/tasks/pr-review-team
 ```
+
+**重要**：Phase 5 **不删除 Team**，Team 保持存在供下一个 PR 审查使用。
+
+---
+
+## Step 8: 询问是否继续
+
+**每个 PR 审查完成后询问用户**：
+
+```yaml
+AskUserQuestion:
+  question: |
+    PR #{pr_number} 审查完成。是否继续审查队列中的下一个 PR？
+
+    当前队列：{remaining_prs}
+
+  options:
+    - key: "y"
+      value: "continue"
+      description: "继续审查下一个 PR"
+    - key: "n"
+      value: "end"
+      description: "结束审查，删除团队"
+```
+
+- **选择 continue**：返回 Step 4 处理下一个 PR
+- **选择 end**：进入 Step 9（删除 Team）
+
+---
+
+## Step 9: 人类确认后删除 Team（最终步骤）
+
+**只在人类明确确认结束审查后执行**：
+
+```yaml
+# 人类确认结束审查
+TeamDelete(team_name="pr-review-team")
+```
+
+**TeamDelete 自动执行的清理**（无需手动操作）：
+1. 杀死 tmux panes（从 config.json 读取 paneId）
+2. 删除 team 目录：`~/.claude/teams/pr-review-team/`
+3. 删除 tasks 目录：`~/.claude/tasks/pr-review-team/`
+
+**TeamDelete 的局限性**：
+- ✓ 能删除目录和杀死 tmux panes
+- ❌ **不能清除 session JSONL 中已写入的 teamName 字段**
+- 这是 append-only 日志格式的设计限制
+
+**完整清理流程**（重要）：
+```yaml
+1. 等待所有 teammates 进入 idle 状态
+2. 调用 TeamDelete(team_name="pr-review-team")
+3. ✅ 建议：重启 Claude Code 会话（清除 UI 残留显示）
+```
+
+**为什么需要重启会话**：
+- TeamDelete 成功后，session JSONL 中仍有 teamName 历史记录
+- UI 可能继续显示 "teammates running"（从 session 文件推断状态）
+- 新会话从空白状态开始，不会有残留 team context
+
+**重要**：
+- ❌ 不要手动执行 rm -rf 或 tmux kill-pane
+- ❌ 不要依赖 TeamDelete 后 UI 立即更新
+- ✅ TeamDelete + 重启会话 = 完整清理
+
+**关键原则**：
+- Team 删除是**最终步骤**，只在人类确认后执行一次
+- 整个审查周期中 Team 只创建一次、删除一次
+- 循环中不检查/创建/删除 Team
 
 ---
 
@@ -398,6 +607,158 @@ gh pr view <number> --json title,labels,additions
 2. **Phase 1 完成后才启动 Phase 2**
 3. **用 SendMessage 传递背景**
 4. **差异必须仲裁**
+
+---
+
+## 常见问题与处理
+
+### 问题 1：Context-researcher 报告 "Invalid tool parameters"
+
+**原因**：Agent 尝试调用未授权工具或参数格式错误
+
+**解决方案**：
+```yaml
+# 确保只调用授权工具
+tools: [Read, Grep, Glob, WebFetch, Bash]
+
+# prompt 中明确禁止
+prompt: |
+  只使用授权工具：Read, Grep, Glob, WebFetch, Bash
+  禁止调用：Agent, Edit, Write, TeamCreate, TeamDelete
+```
+
+### 问题 2：Architect/Security Reviewer 延迟返回
+
+**现象**：报告已发布后，延迟的 agent 返回重要发现
+
+**解决方案**：
+1. 在 Phase 3 前置检查中验证所有 agents 已返回
+2. 如有缺失，在报告中明确标注"审查不完整"
+3. 设置 5 分钟超时，超时后记录 WARNING
+
+### 问题 3：Phase 2 并行 Spawn 不完整
+
+**现象**：只启动了部分 agents
+
+**解决方案**：
+```yaml
+# 在单次响应中发起所有 Agent 调用
+# 错误：分多次响应
+# 正确：在同一条消息中调用 3 个 Agent tools
+
+Agent(..., run_in_background=true)  # code-analyst
+Agent(..., run_in_background=true)  # architect-reviewer
+Agent(..., run_in_background=true)  # security-reviewer
+# 三个调用必须在同一响应中
+```
+
+### 问题 4：报告冲突处理
+
+**现象**：不同 agents 给出矛盾结论
+
+**解决方案**：
+1. 记录冲突点
+2. 进行仲裁（team-lead 负责或请求人类判断）
+3. 在报告中说明仲裁理由
+4. 不要假设缺失的 agent 同意其他结论
+
+### 问题 5：TeamCreate 与 Agent spawn 状态不一致
+
+**现象**：
+- TeamCreate 报错：`Already leading team "pr-review-team"`
+- Agent spawn 报错：`Team "pr-review-team" does not exist`
+
+**根因**：
+- 系统状态残留：会话记录显示 team 存在，但实际配置文件不存在
+- 可能原因：之前 team cleanup 不完整，或会话中断
+
+**解决方案**：
+```bash
+# 临时方案：手动创建 team 配置
+mkdir -p ~/.claude/teams/pr-review-team
+echo '{"team_name":"pr-review-team","members":[]}' > ~/.claude/teams/pr-review-team/config.json
+
+# 然后正常 spawn agents
+Agent(team_name="pr-review-team", ...)
+```
+
+**预防措施**：
+1. 每次会话结束时确保 TeamDelete 正确执行
+2. 启动前检查 `~/.claude/teams/pr-review-team/` 是否存在残留
+3. **如发现残留，建议重启 Claude Code 会话**（最干净的解决方式）
+
+### 问题 6：Team 清理不完整（会话残留）
+
+**现象**：
+- UI 显示团队成员仍在 running
+- 但 `~/.claude/teams/` 目录已删除
+- tmux panes 已杀死
+
+**根因**：
+- 直接手动删除目录和杀死 panes，或仅调用 TeamDelete 但未重启会话
+- **会话 JSONL 文件中的 teamName 历史记录无法被修改**（append-only 日志）
+- TeamDelete 能删除目录，但**不能清除 session JSONL 中已写入的 teamName 字段**
+
+**正确的清理顺序**（重要）：
+```
+1. 等待所有 teammates 完成（idle 状态）
+2. 调用 TeamDelete 工具（删除目录和 tmux panes）
+3. ✅ 重启 Claude Code 会话（清除 UI 残留显示）
+```
+
+**TeamDelete 工具说明**：
+```
+TeamDelete will fail if the team still has active members.
+Gracefully terminate teammates first, then call TeamDelete after all teammates have shut down.
+```
+
+**TeamDelete 的局限性**：
+- ✓ 能删除目录和杀死 tmux panes
+- ❌ **不能清除 session JSONL 中已写入的 teamName 字段**
+
+**错误做法**（会导致会话残留）：
+```bash
+# ❌ 错误：直接杀死 panes
+tmux kill-pane -t %42
+
+# ❌ 错误：直接删除目录
+rm -rf ~/.claude/teams/pr-review-team
+
+# ❌ 错误：仅调用 TeamDelete 后期望 UI 立即更新
+TeamDelete(team_name="pr-review-team")
+# UI 可能仍显示 "teammates running"
+```
+
+**正确做法**：
+```yaml
+# ✅ 正确：TeamDelete + 重启会话
+TeamDelete(team_name="pr-review-team")
+# 工具会自动：
+# 1. 杀死 tmux panes
+# 2. 删除 team 目录
+# 3. 删除 tasks 目录
+# 但不会清除 session JSONL 中的 teamName
+
+# ✅ 然后重启会话
+/exit  # 或 Ctrl+D
+# 新会话不会有残留的 team context
+```
+
+**补救措施**（如果已手动删除或发现残留）：
+
+**推荐：重启 Claude Code 会话**
+```
+这是最干净、最可靠的解决方式：
+1. 输入 /exit 或 Ctrl+D 退出当前会话
+2. 重新启动 Claude Code
+3. 新会话不会有残留的 team context
+```
+
+**备选：手动清理会话文件**（不推荐，可能影响其他功能）：
+```bash
+sed -i '' 's/"teamName":"pr-review-team"//g' \
+  ~/.claude/projects/-*/{session-id}.jsonl
+```
 
 ---
 

@@ -12,7 +12,7 @@
 - **Token 成本**: 非常高（读取大量代码文件）
 - **执行时间**: 长（几分钟）
 - **优化策略**:
-  - **优先**: 使用 `vibe flow review --local` (codex 本地审查)
+  - **优先**: 使用 `codex review --uncommitted` (codex 本地审查)
   - **次选**: 使用 subagent + AI 审查
   - **Fallback**: copilot 本地审查（如果 codex 不可用）
 
@@ -67,7 +67,7 @@ AI 会根据 skill description 中的 `**RECOMMENDED: Run as subagent to save to
 
 ## 最佳实践
 
-1. **代码审查**: 优先使用 `vibe flow review --local` (codex)
+1. **代码审查**: 优先使用 `codex review --uncommitted` (codex)
 2. **大型扫描**: 使用 subagent 隔离执行
 3. **交互任务**: 主会话执行
 4. **快速查询**: 主会话执行
@@ -75,5 +75,6 @@ AI 会根据 skill description 中的 `**RECOMMENDED: Run as subagent to save to
 ## 更新日志
 
 - 2026-03-07: 初始版本，标记 vibe-review-code, vibe-review-docs, vibe-roadmap, vibe-skills-manager
-- 2026-03-07: 增强 `vibe flow review --local` 支持 codex/copilot fallback
+- 2026-03-07: 增强 `codex review --uncommitted` 支持 codex/copilot fallback
+- 2026-05-03: 对齐 deprecated `vibe flow` patterns，更新为 `codex review` CLI
 

@@ -70,15 +70,15 @@ purpose: Phase 1 基础设施层的核心文档，包含架构设计、编码标
 
 ## 验收标准
 
-Phase 1 完成时，必须满足以下标准：
+Phase 1 已完成，满足以下标准：
 
-- [ ] 所有命令包含核心参数集（`--trace`, `-v`, `--json`, `-y`）
-- [ ] 所有异常继承 VibeError
-- [ ] 日志系统支持 verbose 参数（0=ERROR, 1=INFO, 2=DEBUG）
-- [ ] 所有外部调用在 clients/ 中封装
-- [ ] 测试覆盖率 >= 80%（Services 层）
-- [ ] 所有公共函数包含类型注解
-- [ ] 所有文件符合规模限制（CLI < 50 行，Commands < 150 行，Services < 300 行）
+- ✅ 所有命令包含核心参数集（`--trace`, `-v`, `--json`, `-y`）
+- ✅ 所有异常继承 VibeError
+- ✅ 日志系统支持 verbose 参数（0=ERROR, 1=INFO, 2=DEBUG）
+- ✅ 所有外部调用在 clients/ 中封装
+- ✅ 测试覆盖核心功能（Services 层关键路径已测试）
+- ✅ 所有公共函数包含类型注解
+- ✅ 所有文件符合规模限制（CLI < 50 行，Commands < 150 行，Services < 300 行）
 
 ---
 

@@ -107,3 +107,8 @@ def blocked(
         if blocked_by_issue:
             msg += f" (blocked by #{blocked_by_issue})"
         typer.echo(msg)
+
+
+def register_lifecycle_commands(app: typer.Typer) -> None:
+    """Register flow lifecycle commands."""
+    app.command(name="blocked")(blocked)

@@ -12,7 +12,7 @@ from time import time
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.git_worktree_ops import parse_worktree_list, remove_worktree
+from vibe3.clients.git_worktree_ops import remove_worktree
 from vibe3.exceptions import GitError
 from vibe3.models.orchestra_config import OrchestraConfig, WorktreeCleanupConfig
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
@@ -59,9 +59,8 @@ def list_do_worktrees(repo_path: Path) -> list[WorktreeInfo]:
         List of WorktreeInfo for matching worktrees.
     """
     try:
-        git_client = GitClient(cwd=repo_path)
-        output = git_client._run(["worktree", "list", "--porcelain"])
-        worktree_entries = parse_worktree_list(output)
+        git_client = GitClient()
+        worktree_entries = git_client.list_worktrees(cwd=repo_path)
     except Exception as exc:
         logger.bind(domain="orchestra").warning(
             "Exception listing worktrees", error=str(exc)

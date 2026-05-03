@@ -4,6 +4,7 @@ import json
 from typing import Annotated, Any, cast
 
 import typer
+import yaml
 
 from vibe3.analysis import command_analyzer, dag_service, structure_service
 from vibe3.analysis.command_analyzer_helpers import find_command_file
@@ -74,6 +75,7 @@ register_change(app)
 def files_(
     file: Annotated[str, typer.Argument(help="File to analyze")] = "",
     json_out: _JSON_OPT = False,
+    yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
     quiet: Annotated[
         bool, typer.Option("--quiet", help="Suppress next step suggestions")
     ] = False,
@@ -105,6 +107,12 @@ def files_(
 
         if json_out:
             typer.echo(json.dumps(result.model_dump(), indent=2))
+        elif yaml_out:
+            typer.echo(
+                yaml.dump(
+                    result.model_dump(), default_flow_style=False, allow_unicode=True
+                )
+            )
         else:
             typer.echo(f"=== File: {file} ===")
             typer.echo(f"  Language  : {result.language}")
@@ -130,6 +138,8 @@ def files_(
 
         if json_out:
             typer.echo(json.dumps(results, indent=2))
+        elif yaml_out:
+            typer.echo(yaml.dump(results, default_flow_style=False, allow_unicode=True))
         else:
             typer.echo("=== Python Files Summary ===")
             for r in results:

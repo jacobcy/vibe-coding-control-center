@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+import yaml
 from loguru import logger
 
 from vibe3.commands.inspect_base_helpers import (
@@ -33,6 +34,9 @@ def register(app: typer.Typer) -> None:
         ] = None,
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
+        ] = False,
+        yaml_out: Annotated[
+            bool, typer.Option("--yaml", help="Output as YAML")
         ] = False,
         quiet: Annotated[
             bool, typer.Option("--quiet", help="Suppress next step suggestions")
@@ -133,6 +137,24 @@ def register(app: typer.Typer) -> None:
                 changed_lines=changed_lines,
             )
             typer.echo(json.dumps(result, indent=2, default=str))
+            return
+        elif yaml_out:
+            result = build_json_output(
+                git=git,
+                source=source,
+                current_branch=current_branch,
+                base_branch=resolved_base,
+                all_changed_files=all_changed_files,
+                existing_files=existing_files,
+                deleted_files=deleted_files,
+                core_files=core_files,
+                changed_lines=changed_lines,
+            )
+            # Convert to JSON-serializable dict first (handles enums, etc.)
+            clean_result = json.loads(json.dumps(result, default=str))
+            typer.echo(
+                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
+            )
             return
 
         # Human-readable output

@@ -115,11 +115,12 @@ class GitClient:
         self._cwd = Path(cwd) if cwd else None
         self._pr_diff_cache: dict[int, str] = {}
 
-    def _run(self, args: list[str]) -> str:
+    def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
 
         Args:
             args: git 子命令及参数列表
+            cwd: Optional per-command working directory override.
 
         Returns:
             命令标准输出
@@ -128,13 +129,14 @@ class GitClient:
             GitError: git 命令执行失败
         """
         cmd = ["git", *args]
+        effective_cwd = Path(cwd) if cwd else self._cwd
         try:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 check=True,
-                cwd=str(self._cwd) if self._cwd else None,
+                cwd=str(effective_cwd) if effective_cwd else None,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
@@ -179,13 +181,19 @@ class GitClient:
         """Return paths of worktrees that have the given branch checked out."""
         return _get_worktrees_for_branch(self._run, branch_name)
 
-    def list_worktrees(self) -> list[tuple[str, str]]:
+    def list_worktrees(self, cwd: Path | str | None = None) -> list[tuple[str, str]]:
         """List all worktrees.
+
+        Args:
+            cwd: Optional working directory for this list operation.
 
         Returns:
             List of (worktree_path, branch_ref) tuples.
         """
-        output = self._run(["worktree", "list", "--porcelain"])
+        if cwd is None:
+            output = self._run(["worktree", "list", "--porcelain"])
+        else:
+            output = self._run(["worktree", "list", "--porcelain"], cwd=cwd)
         return parse_worktree_list(output)
 
     def remove_worktree(self, wt_path: Path | str, force: bool = False) -> None:
