@@ -215,7 +215,7 @@ vibe_doctor() {
             if [ -n "$manager_username" ] && [ "$manager_username" != "null" ]; then
                 # Cross-check with settings.yaml manager_usernames
                 local expected_usernames
-                expected_usernames=$(grep -A 10 "manager_usernames:" "$VIBE_ROOT/config/settings.yaml" 2>/dev/null | grep -E '^\s*-\s+"' | sed 's/.*"\([^"]*\)".*/\1/' | tr '\n' ' ')
+                expected_usernames=$(grep -A 10 "manager_usernames:" "$VIBE_ROOT/config/v3/settings.yaml" 2>/dev/null | grep -E '^\s*-\s+"' | sed 's/.*"\([^"]*\)".*/\1/' | tr '\n' ' ')
 
                 if [ -z "$expected_usernames" ]; then
                     # Bug 6: Warn if token is set but whitelist is empty

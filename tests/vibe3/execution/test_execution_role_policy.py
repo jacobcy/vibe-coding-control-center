@@ -30,7 +30,6 @@ def sample_config() -> OrchestraConfig:
             backend="claude",
             prompt_template="orchestra.assignee_dispatch.manager",
             supervisor_file="supervisor/manager.md",
-            include_supervisor_content=True,
             timeout_seconds=3600,
         ),
         governance=GovernanceConfig(
@@ -38,7 +37,6 @@ def sample_config() -> OrchestraConfig:
             backend="openai",
             prompt_template="orchestra.governance.plan",
             supervisor_file="supervisor/governance/assignee-pool.md",
-            include_supervisor_content=True,
         ),
         supervisor_handoff=SupervisorHandoffConfig(
             enabled=True,
@@ -78,7 +76,6 @@ def test_resolve_prompt_contract_manager(sample_config: OrchestraConfig) -> None
     assert isinstance(contract, PromptContract)
     assert contract.template == "orchestra.assignee_dispatch.manager"
     assert contract.supervisor_file == "supervisor/manager.md"
-    assert contract.include_supervisor_content is True
 
 
 def test_resolve_prompt_contract_supervisor(sample_config: OrchestraConfig) -> None:

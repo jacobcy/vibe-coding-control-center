@@ -254,15 +254,17 @@ def build_manager_sync_request(
         ),
     }
 
-    # Add supervisor_content provider if configured
+    # The recipe owns whether supervisor content is rendered. The settings
+    # layer only binds the material source used by this provider.
     ad = config.assignee_dispatch
-    if ad.include_supervisor_content and ad.supervisor_file:
-        supervisor_path = Path(ad.supervisor_file)
+    supervisor_path = Path(ad.supervisor_file) if ad.supervisor_file else None
 
-        def _read_supervisor() -> str:
-            return supervisor_path.read_text()
+    def _read_supervisor() -> str:
+        if supervisor_path is None:
+            return ""
+        return supervisor_path.read_text()
 
-        providers["manager.supervisor_content"] = _read_supervisor
+    providers["manager.supervisor_content"] = _read_supervisor
 
     # Render prompt using manifest
     manifest = PromptManifest.load_default()

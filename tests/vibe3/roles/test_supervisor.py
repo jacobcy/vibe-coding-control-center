@@ -107,7 +107,6 @@ class TestBuildSupervisorHandoffPayload:
         assert handoff_config.governance.supervisor_file == "supervisor/apply.md"
         assert handoff_config.governance.supervisor_files == []
         assert handoff_config.governance.prompt_template == "orchestra.supervisor.apply"
-        assert handoff_config.governance.include_supervisor_content is True
         assert handoff_config.governance.dry_run is False
 
 

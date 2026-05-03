@@ -27,19 +27,20 @@ SH
   [ "$output" = "LOCAL-REPO-VIBE" ]
 }
 
-@test "config aliases shim supports installed aliases directory without alias loader" {
-  local fixture home_dir config_dir aliases_dir
+@test "config shell aliases shim supports installed aliases directory without alias loader" {
+  local fixture home_dir config_dir shell_config_dir aliases_dir
   fixture="$(mktemp -d)"
   home_dir="$fixture/home"
   config_dir="$home_dir/.vibe/config"
-  aliases_dir="$config_dir/aliases"
+  shell_config_dir="$config_dir/shell"
+  aliases_dir="$shell_config_dir/aliases"
 
   mkdir -p "$aliases_dir"
-  cp "$BATS_TEST_DIRNAME/../../../config/aliases.sh" "$config_dir/aliases.sh"
+  cp "$BATS_TEST_DIRNAME/../../../config/shell/aliases.sh" "$shell_config_dir/aliases.sh"
   cp "$BATS_TEST_DIRNAME/../../../lib/alias/git.sh" "$aliases_dir/git.sh"
   cp "$BATS_TEST_DIRNAME/../../../lib/alias/vibe.sh" "$aliases_dir/vibe.sh"
 
-  run env HOME="$home_dir" zsh -c 'source "'"$config_dir"'/aliases.sh"'
+  run env HOME="$home_dir" zsh -c 'source "'"$shell_config_dir"'/aliases.sh"'
   [ "$status" -eq 0 ]
   [[ ! "$output" =~ "lib/alias/loader.sh not found" ]]
 }

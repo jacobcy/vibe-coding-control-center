@@ -1,7 +1,9 @@
 """Configuration models using pydantic for type safety.
 
 配置真源原则：
-- config/settings.yaml 是配置的真源
+- config/v3/settings.yaml 是运行时开关、agent preset、policy 路径等配置真源
+- config/prompts/prompts.yaml 是 prompt 文案真源
+- config/prompts/prompt-recipes.yaml 是 role prompt section 装配顺序真源
 - Pydantic 模型只提供最小安全默认值（用于降级场景）
 - 正常情况下所有配置都从 YAML 文件读取
 """
@@ -58,7 +60,7 @@ __all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
            "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig"]
 # fmt: on
 
-# Prompt fields in prompts.yaml that map to VibeConfig sections.
+# Prompt content fields in prompts.yaml that map to VibeConfig sections.
 # Template-only keys (like "default", "plan", "skill") are excluded.
 _PROMPT_KEYS: dict[str, set[str]] = {
     "agent_prompt": {"global_notice"},
@@ -75,14 +77,23 @@ _PROMPT_KEYS: dict[str, set[str]] = {
 
 
 def _merge_prompt_fields(data: dict, prompts: dict) -> None:
-    """Merge VibeConfig-compatible prompt fields from prompts.yaml into data."""
+    """Merge prompt content from prompts.yaml into VibeConfig-compatible sections.
+
+    Prompt text belongs in config/prompts/prompts.yaml. If config/v3/settings.yaml
+    also defines these fields, it creates a dual source of truth, so fail fast.
+    """
     for section, allowed in _PROMPT_KEYS.items():
         src = prompts.get(section)
         if not isinstance(src, dict):
             continue
         dst = data.setdefault(section, {})
         for key in allowed:
-            if key in src and key not in dst:
+            if key in dst:
+                raise ValueError(
+                    f"Prompt field '{section}.{key}' must live in "
+                    "config/prompts/prompts.yaml, not config/v3/settings.yaml"
+                )
+            if key in src:
                 dst[key] = src[key]
 
 
@@ -244,7 +255,7 @@ class VibeConfig(BaseModel):
 
     @classmethod
     def _load_supplementary(cls, data: dict) -> dict:
-        """Merge config/loc_limits.yaml and prompt fields from prompts.yaml."""
+        """Merge LOC limits and prompt content from their migrated config files."""
         import yaml  # type: ignore[import-untyped]
         from loguru import logger
 
@@ -305,8 +316,11 @@ class VibeConfig(BaseModel):
 
     @classmethod
     def get_defaults(cls) -> "VibeConfig":
-        """从 config/settings.yaml 读取配置（标准方式）。"""
-        default_path = Path("config/settings.yaml")
-        if default_path.exists():
-            return cls.from_yaml(default_path)
+        """从迁移后的默认配置路径读取配置。"""
+        new_default_path = Path("config/v3/settings.yaml")
+        if new_default_path.exists():
+            return cls.from_yaml(new_default_path)
+        legacy_default_path = Path("config/settings.yaml")
+        if legacy_default_path.exists():
+            return cls.from_yaml(legacy_default_path)
         return cls()

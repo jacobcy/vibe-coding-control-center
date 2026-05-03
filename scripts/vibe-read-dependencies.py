@@ -14,9 +14,12 @@ from typing import Any
 def load_dependencies() -> dict[str, Any]:
     """加载 dependencies.toml 配置文件"""
     # 优先从项目根目录查找，fallback 到脚本相对路径
+    repo_root = Path(__file__).parent.parent
     config_paths = [
+        Path.cwd() / "config" / "v3" / "dependencies.toml",
         Path.cwd() / "config" / "dependencies.toml",
-        Path(__file__).parent.parent / "config" / "dependencies.toml",
+        repo_root / "config" / "v3" / "dependencies.toml",
+        repo_root / "config" / "dependencies.toml",
     ]
 
     for config_path in config_paths:

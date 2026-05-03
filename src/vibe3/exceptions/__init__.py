@@ -50,10 +50,10 @@ class ConfigError(UserError):
 
 
 class AgentPresetNotFoundError(UserError):
-    """Agent preset not found in repo config/models.json.
+    """Agent preset not found in repo config/v3/models.json.
 
     Raised when an agent preset name is specified but cannot be resolved
-    to backend/model from config/models.json.
+    to backend/model from config/v3/models.json.
 
     This indicates a configuration error that must be fixed before execution.
     """
@@ -65,7 +65,7 @@ class AgentPresetNotFoundError(UserError):
             preset_name: The agent preset name that was not found
         """
         super().__init__(
-            f"Agent preset '{preset_name}' not found in config/models.json"
+            f"Agent preset '{preset_name}' not found in config/v3/models.json"
         )
         self.preset_name = preset_name
 

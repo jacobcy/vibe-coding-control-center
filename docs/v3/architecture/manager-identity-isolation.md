@@ -143,7 +143,6 @@ class AssigneeDispatchConfig(BaseModel):
     timeout_seconds: int = Field(default=3600, ge=60)
     prompt_template: str = Field(default="orchestra.assignee_dispatch.manager")
     supervisor_file: str | None = Field(default="supervisor/manager.md")
-    include_supervisor_content: bool = Field(default=True)
 
     # NEW: Role-specific token configuration
     token_env: str | None = Field(

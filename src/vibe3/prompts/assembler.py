@@ -70,7 +70,8 @@ class PromptAssembler:
         resolved: dict[str, str] = {}
         provenance_list: list[PromptVariableProvenance] = []
 
-        for var, source in recipe.variables.items():
+        for var in sorted(required_vars):
+            source = recipe.variables[var]
             value = resolve_source(source, runtime_context, self._registry)
             resolved[var] = value
             resolved_from = _describe_source(source)

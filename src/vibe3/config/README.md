@@ -4,7 +4,7 @@
 
 ## 职责
 
-- 加载 config/settings.yaml 配置文件
+- 加载 config/v3/settings.yaml 配置文件
 - Pydantic schema 验证和类型安全
 - 运行时配置访问 (get_config/reload_config)
 - 子配置域：Orchestra, PR, AI, Code Limits
@@ -21,10 +21,10 @@
 
 ## 注意
 
-配置 YAML 文件位于仓库根目录 `config/settings.yaml`，不在 `src/vibe3/config/` 下。
+配置 YAML 文件位于仓库根目录 `config/v3/settings.yaml`，不在 `src/vibe3/config/` 下。
 本模块（`src/vibe3/config/`）负责**加载和验证**，不存储配置文件本身。
 
 ## 依赖关系
 
-- 依赖: (无内部依赖，读取仓库根 config/settings.yaml)
+- 依赖: (无内部依赖，读取仓库根 config/v3/settings.yaml)
 - 被依赖: 几乎所有模块

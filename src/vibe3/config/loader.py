@@ -96,8 +96,8 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
             )
             raise ConfigError(f"Failed to load config file {config_path}: {e}") from e
 
-    # Return default config (from config/settings.yaml if exists)
-    logger.info("Using default configuration from config/settings.yaml")
+    # Return default config (from migrated config paths when available)
+    logger.info("Using default configuration")
     return VibeConfig.get_defaults()
 
 

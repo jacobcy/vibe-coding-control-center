@@ -36,7 +36,6 @@ def _make_snapshot(**overrides: object) -> OrchestraSnapshot:
 def _make_config(**overrides) -> OrchestraConfig:
     gov_defaults = dict(
         prompt_template="orchestra.governance.plan",
-        include_supervisor_content=False,
         dry_run=False,
     )
     gov_overrides = overrides.pop("governance", {})
@@ -219,7 +218,6 @@ class TestBuildGovernanceRecipe:
     def test_supervisor_content_file_source(self):
         config = _make_config(
             governance=dict(
-                include_supervisor_content=True,
                 supervisor_file="supervisor/governance/assignee-pool.md",
             ),
         )
@@ -229,14 +227,6 @@ class TestBuildGovernanceRecipe:
         src = recipe.variables["supervisor_content"]
         assert src.kind == VariableSourceKind.FILE
         assert src.path == "supervisor/governance/assignee-pool.md"
-
-    def test_supervisor_content_literal_when_disabled(self):
-        config = _make_config(
-            governance=dict(include_supervisor_content=False),
-        )
-        recipe = build_governance_recipe(config)
-        src = recipe.variables["supervisor_content"]
-        assert src.kind.value == "literal"
 
 
 class TestRenderGovernancePrompt:
@@ -259,6 +249,23 @@ class TestRenderGovernancePrompt:
             "Supervisor=supervisor/governance/assignee-pool.md" in result.rendered_text
         )
         assert "Status=running" in result.rendered_text
+
+    def test_template_controls_whether_supervisor_content_is_rendered(self, tmp_path):
+        supervisor_file = tmp_path / "supervisor.md"
+        supervisor_file.write_text("SUPERVISOR BODY", encoding="utf-8")
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(textwrap.dedent("""\
+            orchestra:
+              governance:
+                plan: |
+                  Supervisor={supervisor_name}
+                  Status={server_status}
+        """))
+        config = _make_config(governance=dict(supervisor_file=str(supervisor_file)))
+        ctx = build_governance_snapshot_context(_make_snapshot())
+        result = render_governance_prompt(config, ctx, prompts_path)
+
+        assert "SUPERVISOR BODY" not in result.rendered_text
 
 
 class TestBuildGovernanceRequest:

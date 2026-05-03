@@ -77,7 +77,7 @@ def start(
             "-i",
             help=(
                 "Polling interval override in seconds. "
-                "Default uses orchestra.polling_interval from config/settings.yaml"
+                "Default uses orchestra.polling_interval from config/v3/settings.yaml"
             ),
         ),
     ] = None,
@@ -88,7 +88,7 @@ def start(
             "-p",
             help=(
                 "Webhook receiver port override. "
-                "Default uses orchestra.port from config/settings.yaml"
+                "Default uses orchestra.port from config/v3/settings.yaml"
             ),
         ),
     ] = None,
@@ -143,7 +143,7 @@ def start(
 ) -> None:
     """Start Orchestra server (webhook receiver + heartbeat polling).
 
-    Defaults from config/settings.yaml; repo defaults to current repository.
+    Defaults from config/v3/settings.yaml; repo defaults to current repository.
     """
     # Inherit global verbose if not specified locally
     if verbose == 0 and "verbose" in ctx.meta:
@@ -241,7 +241,7 @@ def start(
             typer.echo(f"- {backend}: expected `{command}` in PATH")
         typer.echo(
             "\nFix the shell environment used to launch serve, or update "
-            "`config/models.json` to use only installed backends, then retry."
+            "`config/v3/models.json` to use only installed backends, then retry."
         )
         raise typer.Exit(1)
 

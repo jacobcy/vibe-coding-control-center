@@ -288,13 +288,11 @@ def build_governance_recipe(
     """Build the PromptRecipe for governance dispatch."""
     materials = config.governance.get_supervisor_materials()
     current_material = materials[tick_count % len(materials)]
-    supervisor_content_source = (
-        PromptVariableSource(
-            kind=VariableSourceKind.FILE,
-            path=current_material,
-        )
-        if config.governance.include_supervisor_content
-        else PromptVariableSource(kind=VariableSourceKind.LITERAL, value="")
+    # The prompt template owns whether supervisor content is rendered. The
+    # settings layer only selects the supervisor material file to bind.
+    supervisor_content_source = PromptVariableSource(
+        kind=VariableSourceKind.FILE,
+        path=current_material,
     )
     variables: dict[str, PromptVariableSource] = {
         "supervisor_name": PromptVariableSource(

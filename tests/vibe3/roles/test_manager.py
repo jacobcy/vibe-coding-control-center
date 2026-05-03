@@ -10,9 +10,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestra_config import AssigneeDispatchConfig, OrchestraConfig
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.roles.manager import HANDOFF_MANAGER_ROLE, MANAGER_ROLE
+from vibe3.roles.manager import (
+    HANDOFF_MANAGER_ROLE,
+    MANAGER_ROLE,
+    build_manager_sync_request,
+)
 
 
 class TestManagerBlockedIssueNotDispatched:
@@ -250,6 +255,55 @@ class TestManagerBlockedIssueNotDispatched:
 
         # Unassigned issue should be filtered out
         assert [issue.number for issue in ready_issues] == []
+
+
+class TestManagerPromptAssembly:
+    """Manager prompt output is controlled by prompt-recipes.yaml sections."""
+
+    def test_bootstrap_recipe_renders_supervisor_section(self, tmp_path):
+        supervisor_file = tmp_path / "manager.md"
+        supervisor_file.write_text("MANAGER SUPERVISOR BODY", encoding="utf-8")
+        config = OrchestraConfig(
+            assignee_dispatch=AssigneeDispatchConfig(
+                supervisor_file=str(supervisor_file),
+            )
+        )
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id=None,
+            options=object(),
+            actor="test",
+            dry_run=False,
+            show_prompt=False,
+        )
+
+        assert "MANAGER SUPERVISOR BODY" in (request.prompt or "")
+
+    def test_retry_resume_recipe_does_not_render_supervisor_section(self, tmp_path):
+        missing_supervisor_file = tmp_path / "missing.md"
+        config = OrchestraConfig(
+            assignee_dispatch=AssigneeDispatchConfig(
+                supervisor_file=str(missing_supervisor_file),
+            )
+        )
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id="session-1",
+            options=object(),
+            actor="test",
+            dry_run=False,
+            show_prompt=False,
+        )
+
+        assert str(missing_supervisor_file) not in (request.prompt or "")
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:

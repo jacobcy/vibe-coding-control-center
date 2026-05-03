@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-DEFAULT_PROMPT_RECIPES_PATH = Path("config/v3/prompt-recipes.yaml")
+DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
 
 PromptProvider = Callable[[], str | None]
 
@@ -63,7 +63,8 @@ class PromptManifest:
         if not recipes_path.exists():
             raise FileNotFoundError(
                 f"Prompt recipes file not found: {recipes_path}. "
-                "Please ensure config/prompt-recipes.yaml exists in the repository."
+                "Please ensure config/prompts/prompt-recipes.yaml exists "
+                "in the repository."
             )
 
         recipes_raw = _read_yaml(recipes_path).get("recipes", {})

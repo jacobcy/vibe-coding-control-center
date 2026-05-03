@@ -1,7 +1,7 @@
 # Prompt Assembly Recipes
 #
 # 本文件只描述”角色 prompt 的 section 装配顺序”，不保存 prompt 正文。
-# prompt 正文和模板在 config/prompts.yaml。
+# prompt 正文和模板在 config/prompts/prompts.yaml。
 #
 # 重要边界：
 # - 这里覆盖 manager / planner / executor / reviewer 这类 role prompt。

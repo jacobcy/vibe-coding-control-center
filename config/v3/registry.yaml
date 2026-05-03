@@ -80,6 +80,10 @@ review:
   tests:
     - "tests/vibe3/agents/test_review_prompt.py"
   status: "active"
+  notes:
+    - "Owns review policy path and agent execution config only."
+    - "Prompt text fields are merged from config/prompts/prompts.yaml."
+    - "Section order is owned by config/prompts/prompt-recipes.yaml."
 
 plan:
   source_file: "config/v3/settings.yaml"
@@ -88,6 +92,10 @@ plan:
     - "src/vibe3/commands/plan_cmd.py"
   tests: []
   status: "active"
+  notes:
+    - "Owns plan policy path and agent execution config only."
+    - "Prompt text fields are merged from config/prompts/prompts.yaml."
+    - "Section order is owned by config/prompts/prompt-recipes.yaml."
 
 run:
   source_file: "config/v3/settings.yaml"
@@ -96,6 +104,10 @@ run:
     - "src/vibe3/commands/run_cmd.py"
   tests: []
   status: "active"
+  notes:
+    - "Owns run policy path and agent execution config only."
+    - "Prompt text fields are merged from config/prompts/prompts.yaml."
+    - "Section order is owned by config/prompts/prompt-recipes.yaml."
 
 orchestra:
   source_file: "config/v3/settings.yaml"
@@ -115,6 +127,43 @@ models:
   tests:
     - "tests/vibe3/agents/test_agent_preset_resolution.py"
   status: "active"
+
+prompt_recipes:
+  source_file: "config/prompts/prompt-recipes.yaml"
+  schema: "src/vibe3/prompts/manifest.py:PromptManifest"
+  consumers:
+    - "src/vibe3/prompts/manifest.py"
+    - "src/vibe3/roles/manager.py"
+    - "src/vibe3/agents/run_prompt.py"
+    - "src/vibe3/agents/plan_prompt.py"
+    - "src/vibe3/agents/review_prompt.py"
+  tests:
+    - "tests/vibe3/prompts/test_prompt_manifest.py"
+  status: "active"
+  notes:
+    - "Owns section ordering only; prompt body text remains in config/prompts/prompts.yaml."
+    - "Manager supervisor output is controlled by the manager.supervisor_content section, not by settings.yaml."
+
+prompt_text:
+  source_file: "config/prompts/prompts.yaml"
+  schema: "src/vibe3/config/settings.py:_PROMPT_KEYS"
+  consumers:
+    - "src/vibe3/config/settings.py"
+    - "src/vibe3/prompts/template_loader.py"
+    - "src/vibe3/agents/run_prompt.py"
+    - "src/vibe3/agents/plan_prompt.py"
+    - "src/vibe3/agents/review_prompt.py"
+    - "src/vibe3/roles/governance.py"
+    - "src/vibe3/roles/manager.py"
+  tests:
+    - "tests/vibe3/config/test_migrated_config_paths.py"
+    - "tests/vibe3/agents/test_run_prompt.py"
+    - "tests/vibe3/agents/test_review_prompt.py"
+    - "tests/vibe3/agents/test_plan_prompt.py"
+  status: "active"
+  notes:
+    - "Owns prompt text/output contracts/retry guidance."
+    - "config/v3/settings.yaml must not define these fields; loader fails fast."
 
 github_project:
   source_file: "config/v3/settings.yaml"

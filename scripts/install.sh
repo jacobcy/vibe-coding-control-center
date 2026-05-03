@@ -173,7 +173,7 @@ fi
 # 5. Bootstrap loader.sh
 LOADER_DST="$INSTALL_DIR/loader.sh"
 log_info "Installing loader at $LOADER_DST..."
-cp "$SOURCE_ROOT/config/loader.sh" "$LOADER_DST"
+cp "$SOURCE_ROOT/config/shell/loader.sh" "$LOADER_DST"
 chmod 755 "$LOADER_DST"
 log_success "Loader installed"
 

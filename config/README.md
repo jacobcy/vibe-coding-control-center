@@ -9,23 +9,17 @@ config/
 ├── shell/              # V2 shell compatibility layer
 │   ├── aliases.sh      # Shell aliases
 │   ├── loader.sh       # Shell initialization
-│   └── keys.template.env # API key template
 ├── prompts/            # V3 prompt templates
-│   └── prompts.yaml    # Prompt templates for agents
+│   ├── prompts.yaml        # Prompt templates for agents
+│   └── prompt-recipes.yaml # Prompt recipe definitions
 ├── v3/                 # V3 runtime configuration
 │   ├── settings.yaml       # Main configuration file
 │   ├── registry.yaml       # Configuration governance registry
 │   ├── loc_limits.yaml     # LOC limits configuration
 │   ├── models.json         # Agent preset mappings
 │   ├── skills.json         # Skills configuration
-│   ├── prompt-recipes.yaml # Prompt recipes
 │   └── dependencies.toml   # Shell dependencies
-├── aliases.sh          # [DEPRECATED] Use config/shell/aliases.sh
-├── loader.sh           # [DEPRECATED] Use config/shell/loader.sh
-├── keys.template.env   # [DEPRECATED] Use config/shell/keys.template.env
-├── prompts.yaml        # [DEPRECATED] Use config/prompts/prompts.yaml
-├── settings.yaml       # [DEPRECATED] Use config/v3/settings.yaml
-├── loc_limits.yaml     # [DEPRECATED] Use config/v3/loc_limits.yaml
+├── keys.template.env   # API key template
 └── ...
 ```
 
@@ -36,12 +30,12 @@ config/
 Files for V2 shell compatibility:
 - **aliases.sh**: Shell aliases for common tasks
 - **loader.sh**: Shell initialization script
-- **keys.template.env**: Template for API keys
 
 ### 2. Prompts Layer (`config/prompts/`)
 
 Prompt templates for V3 agents:
 - **prompts.yaml**: Defines prompt templates for plan, run, review, and orchestra agents
+- **prompt-recipes.yaml**: Prompt recipe definitions for run/plan/review section assembly
 
 ### 3. V3 Runtime Layer (`config/v3/`)
 
@@ -51,8 +45,26 @@ Core runtime configuration:
 - **loc_limits.yaml**: LOC limits for code and documentation
 - **models.json**: Agent preset to backend/model mappings
 - **skills.json**: Skills configuration
-- **prompt-recipes.yaml**: Prompt recipe definitions
 - **dependencies.toml**: Shell dependency declarations
+
+## Prompt Configuration Boundaries
+
+Prompt configuration has three separate sources of truth:
+
+- `config/v3/settings.yaml`: runtime selectors and execution configuration.
+  It owns agent presets, policy/common rule paths, and orchestra template keys
+  such as `orchestra.governance.prompt_template`. It may bind supervisor
+  material paths, but it must not decide whether those materials are rendered.
+- `config/prompts/prompts.yaml`: prompt text and template bodies. It owns
+  `agent_prompt.global_notice`, `run.*_task`, `plan.*_task`,
+  `review.*_task`, `*.output_format`, manual role prompt strings, and whether
+  template variables such as `{supervisor_content}` appear in governance output.
+- `config/prompts/prompt-recipes.yaml`: role prompt section ordering. It owns
+  which sections are assembled for each manager/run/plan/review variant,
+  including whether manager renders the `manager.supervisor_content` section.
+
+Do not define prompt text fields in `config/v3/settings.yaml`; loaders fail fast
+when those fields appear there to prevent dual sources of truth.
 
 ## Configuration Registry
 
@@ -65,24 +77,28 @@ The `config/v3/registry.yaml` file tracks:
 
 ## Migration Status
 
-**Current Phase**: Migration with backward compatibility
+**Current Phase**: Migrated repository paths
 
-Old paths still work but are deprecated:
-- `config/settings.yaml` → `config/v3/settings.yaml`
-- `config/prompts.yaml` → `config/prompts/prompts.yaml`
-- `config/loc_limits.yaml` → `config/v3/loc_limits.yaml`
-- `config/aliases.sh` → `config/shell/aliases.sh`
-- `config/loader.sh` → `config/shell/loader.sh`
-- `config/keys.template.env` → `config/shell/keys.template.env`
+The repository no longer keeps duplicate root-level copies for migrated config:
+- `config/v3/settings.yaml`
+- `config/prompts/prompts.yaml`
+- `config/v3/loc_limits.yaml`
+- `config/shell/aliases.sh`
+- `config/shell/loader.sh`
+- `config/v3/models.json`
+- `config/v3/skills.json`
+- `config/prompts/prompt-recipes.yaml`
+- `config/v3/dependencies.toml`
 
-Loaders will try new paths first and fall back to old paths with deprecation warnings.
+Some loaders still retain legacy fallback logic for external installs or older
+checkouts, but this repository should update only the migrated paths above.
 
 ## Configuration Loading
 
 Configuration is loaded in this order:
 1. `.vibe/config.yaml` (project-specific override)
 2. `config/v3/settings.yaml` (new default)
-3. `config/settings.yaml` (deprecated fallback)
+3. `config/settings.yaml` (legacy fallback for older checkouts)
 4. `~/.vibe/config.yaml` (global config)
 
 See `src/vibe3/config/loader.py` for implementation details.

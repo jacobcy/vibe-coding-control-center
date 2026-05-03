@@ -132,7 +132,9 @@ pr_scoring:
 # - Runtime: Injected by code (e.g., changed_symbols from inspect)
 #
 # Configuration boundaries:
-# - This file: Static policy/agent/output config
+# - This file: Static policy path and agent execution config
+# - config/prompts/prompts.yaml: Prompt text/output contracts/retry guidance
+# - config/prompts/prompt-recipes.yaml: Prompt section assembly order
 # - Runtime code: AST analysis (changed_symbols, symbol_dag)
 # - Command line: Task guidance (--message option)
 review:
@@ -162,7 +164,9 @@ review:
 # Plan command configuration
 # Plan Configuration
 # =====================
-# Similar structure to review for consistency
+# This file owns policy path and agent execution config.
+# Prompt text lives in config/prompts/prompts.yaml.
+# Prompt section order lives in config/prompts/prompt-recipes.yaml.
 plan:
   # Static: Path to plan policy markdown file
   policy_file: ".agent/policies/plan.md"
@@ -187,7 +191,9 @@ plan:
 # Run command configuration
 # Run Configuration
 # =====================
-# Similar structure to review for consistency
+# This file owns policy path and agent execution config.
+# Prompt text lives in config/prompts/prompts.yaml.
+# Prompt section order lives in config/prompts/prompt-recipes.yaml.
 run:
   # Static: Path to run policy markdown file
   policy_file: ".agent/policies/run.md"
@@ -252,7 +258,7 @@ orchestra:
     # manager 默认在独立临时 worktree 中执行（codeagent-wrapper --worktree）
     use_worktree: true
     # manager 支持两种写法：
-    # - 配置 agent：走 preset 模式，preset 从 config/models.json 解析
+    # - 配置 agent：走 preset 模式，preset 从 config/v3/models.json 解析
     # - 只配置 backend/model：走 backend 直连模式
     # 如果同时配置 agent 和 backend/model，manager 执行时 agent 优先。
     agent: "vibe-manager"
@@ -263,9 +269,9 @@ orchestra:
     #   选择，backend/model 不只是注释字段。
     backend:
     model:
-    # manager 角色材料真源，由 prompt 组装时内联
+    # manager 角色材料路径真源；是否输出由 config/prompts/prompt-recipes.yaml
+    # 的 manager.default variant sections 决定。
     supervisor_file: "supervisor/manager.md"
-    include_supervisor_content: true
 
   # PR reviewer-triggered review execution
   pr_review_dispatch:
@@ -286,20 +292,20 @@ orchestra:
   governance:
     enabled: true
     interval_ticks: 4
-    # Supervisor file source: supervisor/<name>.md
+    # Supervisor material path source: supervisor/<name>.md
+    # 是否输出 supervisor_content 由 config/prompts/prompts.yaml 中选中的
+    # prompt_template 是否引用 {supervisor_content} 决定。
     supervisor_file: "supervisor/governance/assignee-pool.md"
     supervisor_files:
       - "supervisor/governance/assignee-pool.md"
       - "supervisor/governance/roadmap-intake.md"
       - "supervisor/governance/cron-supervisor.md"
-    # Template selector: config/prompts.yaml under this dotted key
+    # Template selector: config/prompts/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
-    # Whether to inline the supervisor file into the composed governance prompt
-    include_supervisor_content: true
     dry_run: false
     # Governance agent configuration (independent from run/manager)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "vibe-governance"  # Maps in config/models.json
+    agent: "vibe-governance"  # Maps in config/v3/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：governance resolver 会先解析 preset，再允许 model
@@ -315,7 +321,7 @@ orchestra:
     prompt_template: "orchestra.supervisor.apply"
     # Supervisor handoff agent configuration (independent from run/manager/governance)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
-    agent: "vibe-supervisor"  # Maps in config/models.json
+    agent: "vibe-supervisor"  # Maps in config/v3/models.json
     # backend/model 支持两种用途：
     # - 只写 backend/model：直连 backend
     # - 同时写 agent 和 model：supervisor resolver 会先解析 preset，再允许 model
