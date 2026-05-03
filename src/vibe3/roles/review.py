@@ -16,8 +16,6 @@ from vibe3.agents.review_prompt import (
     make_review_context_builder,
 )
 from vibe3.analysis.inspect_output_adapter import changed_symbols
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
@@ -241,25 +239,6 @@ def build_manual_review_request_payload(
     return request, issue_number, head_branch
 
 
-def build_pr_review_request(
-    pr_number: int,
-    *,
-    github_client: GitHubClient | None = None,
-    inspect_runner: Callable[[list[str]], dict[str, object]] = run_inspect_json,
-) -> tuple[ReviewRequest, int | None, str | None]:
-    """Build request payload for PR review."""
-    client = github_client or GitHubClient()
-    pr_data = client.get_pr(pr_number)
-    linked_issues = parse_linked_issues(pr_data.body) if pr_data else []
-    return build_manual_review_request_payload(
-        scope=ReviewScope.for_pr(pr_number),
-        issue_number=linked_issues[0] if linked_issues else None,
-        head_branch=pr_data.head_branch if pr_data else None,
-        inspect_args=["pr", str(pr_number)],
-        inspect_runner=inspect_runner,
-    )
-
-
 def build_base_review_request(
     current_branch: str,
     base_branch: str,
@@ -400,12 +379,9 @@ def _build_manual_review_async_cli_args(
     request: ReviewRequest,
     instructions: str | None,
 ) -> list[str]:
-    if request.scope.kind == "pr":
-        args = ["review", "pr", str(request.scope.pr_number)]
-    else:
-        args = ["review", "base"]
-        if request.scope.base_branch:
-            args.append(request.scope.base_branch)
+    args = ["review", "base"]
+    if request.scope.base_branch:
+        args.append(request.scope.base_branch)
     if instructions:
         args.append(instructions)
     return args
@@ -418,16 +394,6 @@ def _build_manual_review_task(
     pr_number: int | None,
     log: Any,
 ) -> str | None:
-    if pr_number:
-        if instructions:
-            task = f"审查 PR #{pr_number}: {instructions}"
-        elif config.review.review_prompt:
-            task = f"审查 PR #{pr_number}: {config.review.review_prompt}"
-        else:
-            task = f"审查 PR #{pr_number} 的变更"
-        log.info("Using PR-specific task")
-        typer.echo(f"→ Task: {task}")
-        return task
     if instructions:
         log.info("Using custom task message")
         truncated = instructions[:60]

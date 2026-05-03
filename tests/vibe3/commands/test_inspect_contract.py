@@ -50,8 +50,6 @@ def test_all_inspect_subcommands_have_json_option():
         "files",
         "symbols",
         "base",
-        "pr",
-        "commit",
         "uncommit",
         "commands",
         "dead-code",
@@ -78,8 +76,6 @@ def test_all_inspect_subcommands_have_yaml_option():
         "files",
         "symbols",
         "base",
-        "pr",
-        "commit",
         "uncommit",
         "commands",
     ]
@@ -183,33 +179,6 @@ def test_inspect_symbols_yaml_produces_valid_yaml():
     assert "symbols" in data, "YAML should contain symbols list"
 
 
-def test_inspect_commit_yaml_produces_valid_yaml():
-    """Verify inspect commit --yaml produces valid parseable YAML."""
-    result = subprocess.run(
-        [
-            "uv",
-            "run",
-            "python",
-            "src/vibe3/cli.py",
-            "inspect",
-            "commit",
-            "HEAD",
-            "--yaml",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    # Parse YAML output
-    data = yaml.safe_load(result.stdout)
-
-    # Verify expected structure
-    assert isinstance(data, dict), "YAML output should be a dict"
-    assert "score" in data, "YAML should contain score"
-    assert "dag" in data, "YAML should contain dag"
-
-
 def test_inspect_commands_yaml_produces_valid_yaml():
     """Verify inspect commands --yaml produces valid parseable YAML."""
     result = subprocess.run(
@@ -239,8 +208,6 @@ def test_inspect_json_and_yaml_both_available():
         "files",
         "symbols",
         "base",
-        "pr",
-        "commit",
         "uncommit",
         "commands",
     ]

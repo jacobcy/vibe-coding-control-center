@@ -6,83 +6,12 @@ from typing import Annotated
 import typer
 import yaml
 
-from vibe3.analysis.inspect_query_service import (
-    build_change_analysis,
-    validate_pr_number,
-)
+from vibe3.analysis.inspect_query_service import build_change_analysis
 from vibe3.utils.trace import enable_trace
 
 
 def register(app: typer.Typer) -> None:
     """Register change analysis commands."""
-
-    @app.command()
-    def pr(
-        pr_number: Annotated[int, typer.Argument(help="PR number")],
-        json_out: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        yaml_out: Annotated[
-            bool, typer.Option("--yaml", help="Output as YAML")
-        ] = False,
-        trace: Annotated[
-            bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
-        ] = False,
-    ) -> None:
-        """Run PR change analysis."""
-
-        if trace:
-            enable_trace()
-
-        validate_pr_number(pr_number)
-
-        result = build_change_analysis("pr", str(pr_number))
-
-        if json_out:
-            typer.echo(json.dumps(result, indent=2, default=str))
-            return
-        elif yaml_out:
-            # Convert to JSON-serializable dict first (handles enums, etc.)
-            clean_result = json.loads(json.dumps(result, default=str))
-            typer.echo(
-                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
-            )
-            return
-
-        _print_change_analysis("pr", str(pr_number), result)
-
-    @app.command()
-    def commit(
-        sha: Annotated[str, typer.Argument(help="Commit SHA")],
-        json_out: Annotated[
-            bool, typer.Option("--json", help="Output as JSON")
-        ] = False,
-        yaml_out: Annotated[
-            bool, typer.Option("--yaml", help="Output as YAML")
-        ] = False,
-        trace: Annotated[
-            bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
-        ] = False,
-    ) -> None:
-        """Run commit change analysis."""
-
-        if trace:
-            enable_trace()
-
-        result = build_change_analysis("commit", sha)
-
-        if json_out:
-            typer.echo(json.dumps(result, indent=2, default=str))
-            return
-        elif yaml_out:
-            # Convert to JSON-serializable dict first (handles enums, etc.)
-            clean_result = json.loads(json.dumps(result, default=str))
-            typer.echo(
-                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
-            )
-            return
-
-        _print_change_analysis("commit", sha, result)
 
     @app.command(name="uncommit")
     def uncommit(
@@ -128,12 +57,7 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
     changed_symbols = result.get("changed_symbols", {})
     assert isinstance(changed_symbols, dict)
 
-    if source_type == "pr":
-        typer.echo(f"=== PR #{identifier} Analysis ===")
-    elif source_type == "commit":
-        typer.echo(f"=== Commit {identifier} Analysis ===")
-    else:
-        typer.echo(f"=== Branch {identifier} Analysis ===")
+    typer.echo(f"=== Branch {identifier} Analysis ===")
 
     impact = result.get("impact", {})
     skipped_files = []
@@ -165,9 +89,6 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
             typer.echo(f"    ... and {len(impacted) - 10} more")
 
     typer.echo(f"\n  Risk score: {score['score']} ({score['level']})")
-
-    if source_type == "pr":
-        typer.echo(f"  Block: {score['block']}")
 
     if skipped_files:
         typer.echo(

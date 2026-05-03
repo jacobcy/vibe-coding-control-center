@@ -21,14 +21,12 @@ When to use inspect:
   - Analyzing one file structure (LOC, functions, imports)
   - Looking up where a symbol is used
   - Finding dead code
-  - Analyzing impact of a single change (PR / commit / branch)
+  - Analyzing impact of a single change (branch / uncommitted)
 
 Subcommands:
   files [<file>]             Structure of one file (default: all Python files)
   symbols <file>:<symbol>    Find symbol references
   base [<branch>]            Key impact vs base branch
-  pr <number>                Impact analysis of a GitHub PR
-  commit <sha>               Impact analysis of one commit
   uncommit                   Impact analysis of uncommitted changes
   dead-code [<root>]         Find unused functions
   commands [<cmd> <subcmd>]  Static analysis of CLI command structure
