@@ -271,7 +271,9 @@ orchestra:
     model:
     # manager 角色材料真源，由 prompt 组装时内联
     supervisor_file: "supervisor/manager.md"
-    include_supervisor_content: true
+    # DISABLED: 40KB inline triggers codeagent-wrapper stdin mode failure
+    # Agent will read supervisor_file via Read tool when needed
+    include_supervisor_content: false
 
   # PR reviewer-triggered review execution
   pr_review_dispatch:
@@ -301,7 +303,8 @@ orchestra:
     # Template selector: config/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
     # Whether to inline the supervisor file into the composed governance prompt
-    include_supervisor_content: true
+    # DISABLED: 40KB inline triggers codeagent-wrapper stdin mode failure
+    include_supervisor_content: false
     dry_run: false
     # Governance agent configuration (independent from run/manager)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
