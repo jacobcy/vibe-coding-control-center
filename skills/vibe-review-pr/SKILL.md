@@ -1,11 +1,22 @@
 ---
 name: vibe-review-pr
 description: |
-  Use when the user wants a comprehensive PR review using multi-agent team workflow.
-  Loads team configuration from .claude/team-templates/ and starts phased review.
+  Use only in Claude Code environments with Agent Teams enabled when the user wants
+  a comprehensive PR review using the multi-agent team workflow.
 ---
 
 # Vibe PR Review Skill
+
+## Overview
+
+`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。它依赖
+Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
+能力，以及 `.claude/team-templates/` 和 `.claude/agents/pr-*.md`。
+
+非 Claude team 环境（包括 Codex）不要模拟本 workflow，也不要用本 skill
+启动替代性 subagent 编排。Codex 审核 PR 时直接走：
+- `vibe-review-docs`：docs-only PR
+- `vibe-review-code`：源码、脚本、配置、测试，或代码与文档混合 PR
 
 ## 职责
 
@@ -20,6 +31,18 @@ description: |
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
 ---
+
+## When to Use
+
+使用本 skill 之前必须同时满足：
+- 当前 host 是 Claude Code
+- `TMUX` 已设置
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- 当前工具面提供 TeamCreate / Agent / SendMessage / teammate-message 等 team 能力
+
+不满足任一条件时，停止本 skill，并按 PR 文件范围分流：
+- docs-only：使用 `vibe-review-docs`
+- 其他：使用 `vibe-review-code`
 
 ## 执行流程概述
 
@@ -51,7 +74,7 @@ description: |
 
 ## Step 1: 环境检查（必须最先执行）
 
-**必须先检查环境是否支持 Team 功能，不满足则直接回退，不创建 Team。**
+**必须先检查环境是否支持 Claude Code Team 功能，不满足则直接分流，不创建 Team。**
 
 ```bash
 # 检查 tmux
@@ -65,22 +88,31 @@ env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 
 | 条件 | 要求 | 不满足时 |
 |------|------|----------|
-| TMUX | 必须设置 | 提示用户 + 直接回退到 vibe-review-code（不创建 Team） |
-| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 提示用户 + 直接回退 |
+| Host | Claude Code | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| Team tools | TeamCreate / Agent / SendMessage 可用 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| TMUX | 必须设置 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 分流到 `vibe-review-docs` / `vibe-review-code` |
 
 **回退处理**：
 ```
-"Team 功能需要在 tmux session 内运行。
+"Claude Code Team 功能需要在 tmux session 内运行。
  请运行: tmux new-session -s vibe-review
  然后重新启动 Claude Code。
 
  当前回退到单 agent 审查模式..."
 
-→ 直接使用 vibe-review-code（不创建/删除 Team）
+-> docs-only PR 使用 vibe-review-docs
+-> 其他 PR 使用 vibe-review-code
 ```
 
 不要启动非 tmux team 模式。Team workflow 依赖 tmux panes、SendMessage 和
-team cleanup 状态；环境不满足时，**直接回退**，不需要 TeamDelete。
+team cleanup 状态；环境不满足时，直接转入 `vibe-review-docs` 或
+`vibe-review-code` 单 agent 审查，不需要 TeamDelete。
+
+**Codex 规则**：
+- Codex 中遇到 `pr review <number>`、`review PR #<number>` 等请求时，不使用本 skill。
+- Codex 先读取 PR metadata/diff/comments，再根据文件范围使用 `vibe-review-docs` 或 `vibe-review-code`。
+- Codex 不得用 `spawn_agent`、`multi_tool_use` 或其他工具模拟 `.claude/team-templates/` workflow。
 
 ---
 
@@ -220,9 +252,9 @@ gh pr view <number> --json comments --jq '.comments[].author.login'
 # 使用 AskUserQuestion tool
 question: |
   PR #{pr_number} 已有 {count} 条评论。
-  
+
   是否重新审查？
-  
+
   选项：
   1. 重新审查 - 忽略已有评论，完整审查
   2. 补充审查 - 只审查未覆盖的部分
@@ -286,7 +318,7 @@ cat .claude/team-templates/pr-review-team.yaml
 |------|------|------|--------|
 | simple | <50行, 非安全相关 | 回退 vibe-review-code | **0（不启动）** |
 | refactor | 标题含 refactor | standard 多人流程 | 3 |
-| security | 安全标签或 fix 标签 | 全流程 + Codex | 4 |
+| security | 安全标签或 fix 标签 | 全流程 + security-reviewer | 4 |
 | standard | 其他 | standard 多人流程 | 4 |
 
 ```bash
@@ -294,55 +326,10 @@ gh pr view <number> --json title,labels,additions
 ```
 
 **simple 类型处理**：
-- 不启动 team，根据 PR 标签选择单 agent 审查：
-  - `scope/documentation` → 使用 `vibe-review-docs`
-  - 其他（`scope/python`、`scope/shell` 等）→ 使用 `vibe-review-code`
+- 不启动 team，根据 PR 文件范围选择单 agent 审查：
+  - 仅文档变更 → 使用 `vibe-review-docs`
+  - 其他（`scope/python`、`scope/shell`、`scope/infrastructure`、配置/测试/混合变更等）→ 使用 `vibe-review-code`
 - 审查完成后返回 Step 4 处理队列中的下一个 PR
-
-### 复杂情况使用 Codex
-
-**当 PR 满足以下任一条件时，启用 Codex 辅助审查**：
-
-| 复杂度指标 | 条件 | 说明 |
-|------------|------|------|
-| **代码量** | >500 行 | 大规模改动需更深入分析 |
-| **安全相关** | 标签含 `security` 或 `fix` | 安全漏洞需专业审查 |
-| **架构影响** | 标题含 `refactor` + >10 文件 | 架构变更需多方评估 |
-| **核心模块** | 修改 `src/vibe3/core/` | 核心逻辑需额外验证 |
-| **多领域交叉** | 跨 Python/Shell/Config | 多语言需交叉检查 |
-| **复杂逻辑** | Agent 报告 flagged as complex | 团队判断需 Codex 深入 |
-
-**Codex 调用方式**：
-
-```yaml
-# 在 Phase 2 并行审查中添加 Codex agent
-- tool: Agent
-  params:
-    team_name: pr-review-team
-    name: codex-reviewer
-    subagent_type: codex:codex-rescue  # 使用 Codex 救援 agent
-    model: opus  # Codex 使用 Opus 模型
-    prompt: |
-      深入分析 PR #{pr_number} 的复杂问题：
-      背景信息：{phase_1_output}
-      
-      重点检查：
-      1. 潜在的设计缺陷
-      2. 边界条件和异常处理
-      3. 性能瓶颈
-      4. 安全隐患
-      
-      提供：
-      - 问题诊断
-      - 改进建议
-      - 风险评估
-    run_in_background: true
-```
-
-**Codex 结果处理**：
-- Codex 报告与其他 agent 报告一起提交给 Phase 3 仲裁
-- 如果 Codex 发现严重问题，优先级高于其他 agent
-- Codex 建议需要 team-lead 人工确认后才执行
 
 ---
 
@@ -369,7 +356,7 @@ SendMessage(
   to: "context-researcher",  # 使用现有 teammate 名称
   message: |
     新任务：审查 PR #{pr_number}
-    
+
     请收集背景信息并输出报告。
 )
 ```
@@ -461,17 +448,17 @@ SendMessage(
 # Step 5: 等待所有结果（必须等待全部返回）
 - action: |
     等待所有 Phase 2 agents 返回 idle notification。
-    
+
     **重要**：必须等待以下全部 agents 返回：
     - code-analyst
-    - architect-reviewer  
+    - architect-reviewer
     - security-reviewer
-    
+
     等待机制：
     1. 检查 ~/.claude/teams/pr-review-team/ 目录下的状态
     2. 或等待系统通知（idle notification）
     3. 超时设置：5 分钟
-    
+
     如果超时仍有 agent 未返回：
     - 记录 WARNING
     - 在报告中标注"部分审查未完成"
@@ -486,10 +473,10 @@ SendMessage(
 # Step 0: 前置检查（新增）
 - action: |
     在进入 Phase 3 前，验证所有 Phase 2 agents 已返回：
-    
+
     required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
     received_agents = [从 idle notifications 获取]
-    
+
     missing = set(required_agents) - set(received_agents)
     if missing:
       log_warning(f"缺失审查报告: {missing}")
