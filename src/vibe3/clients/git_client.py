@@ -42,9 +42,6 @@ from vibe3.clients.git_status_ops import (
     has_uncommitted_changes as _has_uncommitted_changes,
 )
 from vibe3.clients.git_worktree_ops import (
-    _parse_worktree_list,
-)
-from vibe3.clients.git_worktree_ops import (
     find_worktree_path_for_branch as _find_worktree_path_for_branch,
 )
 from vibe3.clients.git_worktree_ops import (
@@ -67,6 +64,9 @@ from vibe3.clients.git_worktree_ops import (
 )
 from vibe3.clients.git_worktree_ops import (
     is_branch_occupied_by_worktree as _is_branch_occupied_by_worktree,
+)
+from vibe3.clients.git_worktree_ops import (
+    parse_worktree_list,
 )
 from vibe3.clients.git_worktree_ops import (
     remove_worktree as _remove_worktree,
@@ -101,20 +101,26 @@ class GitClientProtocol(Protocol):
 class GitClient:
     """Git client，封装 git 命令操作."""
 
-    def __init__(self, github_client: "GitHubClient | None" = None) -> None:
+    def __init__(
+        self, github_client: "GitHubClient | None" = None, cwd: Path | str | None = None
+    ) -> None:
         """初始化 GitClient.
 
         Args:
             github_client: 可选的 GitHubClient 实例，用于处理 PR 相关操作
+            cwd: Optional working directory for git commands.
+                If None, uses current directory.
         """
         self._github_client = github_client
+        self._cwd = Path(cwd) if cwd else None
         self._pr_diff_cache: dict[int, str] = {}
 
-    def _run(self, args: list[str]) -> str:
+    def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
 
         Args:
             args: git 子命令及参数列表
+            cwd: Optional per-command working directory override.
 
         Returns:
             命令标准输出
@@ -123,8 +129,15 @@ class GitClient:
             GitError: git 命令执行失败
         """
         cmd = ["git", *args]
+        effective_cwd = Path(cwd) if cwd else self._cwd
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=str(effective_cwd) if effective_cwd else None,
+            )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
             raise GitError(" ".join(args), e.stderr.strip()) from e
@@ -168,14 +181,20 @@ class GitClient:
         """Return paths of worktrees that have the given branch checked out."""
         return _get_worktrees_for_branch(self._run, branch_name)
 
-    def list_worktrees(self) -> list[tuple[str, str]]:
+    def list_worktrees(self, cwd: Path | str | None = None) -> list[tuple[str, str]]:
         """List all worktrees.
+
+        Args:
+            cwd: Optional working directory for this list operation.
 
         Returns:
             List of (worktree_path, branch_ref) tuples.
         """
-        output = self._run(["worktree", "list", "--porcelain"])
-        return _parse_worktree_list(output)
+        if cwd is None:
+            output = self._run(["worktree", "list", "--porcelain"])
+        else:
+            output = self._run(["worktree", "list", "--porcelain"], cwd=cwd)
+        return parse_worktree_list(output)
 
     def remove_worktree(self, wt_path: Path | str, force: bool = False) -> None:
         """Remove a worktree.

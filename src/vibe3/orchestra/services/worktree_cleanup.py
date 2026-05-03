@@ -11,6 +11,9 @@ from time import time
 
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
+from vibe3.clients.git_worktree_ops import remove_worktree
+from vibe3.exceptions import GitError
 from vibe3.models.orchestra_config import OrchestraConfig, WorktreeCleanupConfig
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
@@ -56,19 +59,8 @@ def list_do_worktrees(repo_path: Path) -> list[WorktreeInfo]:
         List of WorktreeInfo for matching worktrees.
     """
     try:
-        result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-        if result.returncode != 0:
-            logger.bind(domain="orchestra").warning(
-                "Failed to list worktrees", error=result.stderr
-            )
-            return []
+        git_client = GitClient()
+        worktree_entries = git_client.list_worktrees(cwd=repo_path)
     except Exception as exc:
         logger.bind(domain="orchestra").warning(
             "Exception listing worktrees", error=str(exc)
@@ -76,36 +68,25 @@ def list_do_worktrees(repo_path: Path) -> list[WorktreeInfo]:
         return []
 
     worktrees: list[WorktreeInfo] = []
-    current_path: Path | None = None
-    current_branch: str | None = None
-
-    for line in result.stdout.split("\n"):
-        if line.startswith("worktree "):
-            current_path = Path(line.split(" ", 1)[1])
-        elif line.startswith("branch "):
-            current_branch = line.split(" ", 1)[1]
-        elif line == "" and current_path and current_branch:
-            # End of record
-            # Check if directory name matches do-* pattern
-            dir_name = current_path.name
-            if dir_name.startswith("do-"):
-                try:
-                    stat = current_path.stat()
-                    worktrees.append(
-                        WorktreeInfo(
-                            path=current_path,
-                            branch=current_branch,
-                            mtime=stat.st_mtime,
-                        )
+    for wt_path, wt_branch in worktree_entries:
+        path = Path(wt_path)
+        # Check if directory name matches do-* pattern
+        if path.name.startswith("do-"):
+            try:
+                stat = path.stat()
+                worktrees.append(
+                    WorktreeInfo(
+                        path=path,
+                        branch=wt_branch,
+                        mtime=stat.st_mtime,
                     )
-                except Exception as exc:
-                    logger.bind(domain="orchestra").debug(
-                        "Failed to stat worktree path",
-                        path=str(current_path),
-                        error=str(exc),
-                    )
-            current_path = None
-            current_branch = None
+                )
+            except Exception as exc:
+                logger.bind(domain="orchestra").debug(
+                    "Failed to stat worktree path",
+                    path=str(path),
+                    error=str(exc),
+                )
 
     return worktrees
 
@@ -146,6 +127,29 @@ def assess_worktree(wt: WorktreeInfo, config: WorktreeCleanupConfig) -> CleanupD
         pass
 
     # 3. Tmux session check
+    if _has_active_tmux_session(wt.path):
+        return CleanupDecision.SKIP_ACTIVE_SESSION
+
+    # 4. TTL check
+    current_time = time()
+    age_seconds = current_time - wt.mtime
+    ttl_seconds = config.ttl_hours * 3600
+
+    if age_seconds < ttl_seconds:
+        return CleanupDecision.SKIP_TTL_NOT_EXPIRED
+
+    return CleanupDecision.CLEAN
+
+
+def _has_active_tmux_session(wt_path: Path) -> bool:
+    """Check if any tmux session path matches the worktree path.
+
+    Args:
+        wt_path: Worktree path to check
+
+    Returns:
+        True if an active tmux session is found for this worktree
+    """
     try:
         sessions = subprocess.run(
             ["tmux", "list-sessions", "-F", "#{session_name}:#{session_path}"],
@@ -160,24 +164,16 @@ def assess_worktree(wt: WorktreeInfo, config: WorktreeCleanupConfig) -> CleanupD
                     continue
                 if ":" in line:
                     session_name, session_path = line.split(":", 1)
-                    if str(wt.path) in session_path or session_path.startswith(
-                        str(wt.path)
+                    if str(wt_path) in session_path or session_path.startswith(
+                        str(wt_path)
                     ):
-                        return CleanupDecision.SKIP_ACTIVE_SESSION
+                        return True
     except FileNotFoundError:
         pass
     except Exception:
         pass
 
-    # 4. TTL check
-    current_time = time()
-    age_seconds = current_time - wt.mtime
-    ttl_seconds = config.ttl_hours * 3600
-
-    if age_seconds < ttl_seconds:
-        return CleanupDecision.SKIP_TTL_NOT_EXPIRED
-
-    return CleanupDecision.CLEAN
+    return False
 
 
 def execute_cleanup(
@@ -206,30 +202,23 @@ def execute_cleanup(
         # Actual cleanup
         try:
             # Step 1: git worktree remove --force
-            result = subprocess.run(
-                ["git", "worktree", "remove", str(wt.path), "--force"],
+            remove_worktree(wt.path, force=True)
+            logger.bind(domain="orchestra").info(
+                "Removed worktree via git", path=str(wt.path)
+            )
+            results.append(
+                CleanupResult(path=wt.path, success=True, reason="git_remove")
+            )
+            # Step 2: git worktree prune (best-effort)
+            subprocess.run(
+                ["git", "worktree", "prune"],
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=60,
             )
-            if result.returncode == 0:
-                logger.bind(domain="orchestra").info(
-                    "Removed worktree via git", path=str(wt.path)
-                )
-                results.append(
-                    CleanupResult(path=wt.path, success=True, reason="git_remove")
-                )
-                # Step 2: git worktree prune (best-effort)
-                subprocess.run(
-                    ["git", "worktree", "prune"],
-                    cwd=repo_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                )
-                continue
-        except Exception as exc:
+            continue
+        except GitError as exc:
             logger.bind(domain="orchestra").warning(
                 "git worktree remove failed", path=str(wt.path), error=str(exc)
             )
