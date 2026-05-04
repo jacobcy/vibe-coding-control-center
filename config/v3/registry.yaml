@@ -134,6 +134,8 @@ prompt_recipes:
   consumers:
     - "src/vibe3/prompts/manifest.py"
     - "src/vibe3/roles/manager.py"
+    - "src/vibe3/roles/supervisor.py"
+    - "src/vibe3/roles/governance.py"
     - "src/vibe3/agents/run_prompt.py"
     - "src/vibe3/agents/plan_prompt.py"
     - "src/vibe3/agents/review_prompt.py"
@@ -141,8 +143,12 @@ prompt_recipes:
     - "tests/vibe3/prompts/test_prompt_manifest.py"
   status: "active"
   notes:
-    - "Owns section ordering only; prompt body text remains in config/prompts/prompts.yaml."
-    - "Manager supervisor output is controlled by the manager.supervisor_content section, not by settings.yaml."
+    - "Owns section ordering and material source declarations."
+    - "Supports two recipe kinds: section_recipe (manager/run/plan/review) and template_recipe (governance/supervisor)."
+    - "Manager supervisor content from manager.default.first.bootstrap.sections[].source."
+    - "Supervisor handoff content from supervisor.handoff.variables.supervisor_content."
+    - "Governance materials from governance.scan.material_catalog (round-robin tick selection)."
+    - "Prompt body text remains in config/prompts/prompts.yaml."
 
 prompt_text:
   source_file: "config/prompts/prompts.yaml"

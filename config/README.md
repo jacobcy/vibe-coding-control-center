@@ -53,15 +53,23 @@ Prompt configuration has three separate sources of truth:
 
 - `config/v3/settings.yaml`: runtime selectors and execution configuration.
   It owns agent presets, policy/common rule paths, and orchestra template keys
-  such as `orchestra.governance.prompt_template`. It may bind supervisor
-  material paths, but it must not decide whether those materials are rendered.
+  such as `orchestra.governance.prompt_template`. It does NOT own supervisor
+  material paths — those have migrated to `prompt-recipes.yaml`.
 - `config/prompts/prompts.yaml`: prompt text and template bodies. It owns
   `agent_prompt.global_notice`, `run.*_task`, `plan.*_task`,
   `review.*_task`, `*.output_format`, manual role prompt strings, and whether
   template variables such as `{supervisor_content}` appear in governance output.
-- `config/prompts/prompt-recipes.yaml`: role prompt section ordering. It owns
-  which sections are assembled for each manager/run/plan/review variant,
-  including whether manager renders the `manager.supervisor_content` section.
+- `config/prompts/prompt-recipes.yaml`: role prompt section ordering and material
+  sources. It owns which sections are assembled for each role variant, and where
+  supervisor materials come from (`section_recipe` with source declarations or
+  `template_recipe` with `material_catalog`).
+
+Key changes after prompt config unification:
+- **manager**: supervisor content from `manager.default.first.bootstrap.sections[].source`
+- **supervisor_handoff**: supervisor content from `supervisor.handoff.variables.supervisor_content`
+- **governance**: supervisor materials from `governance.scan.material_catalog` (round-robin tick selection)
+- `settings.yaml` no longer has `assignee_dispatch.supervisor_file`, `supervisor_handoff.supervisor_file`,
+  or `governance.supervisor_file(s)` fields.
 
 Do not define prompt text fields in `config/v3/settings.yaml`; loaders fail fast
 when those fields appear there to prevent dual sources of truth.
