@@ -74,8 +74,8 @@ def build_supervisor_handoff_payload(
     from vibe3.prompts.assembler import PromptAssembler
     from vibe3.prompts.manifest import PromptManifest
     from vibe3.prompts.models import PromptRecipe
-    from vibe3.prompts.provider_registry import ProviderRegistry
     from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
+    from vibe3.roles.governance import _build_runtime_registry
 
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
 
@@ -111,8 +111,8 @@ def build_supervisor_handoff_payload(
         description=recipe_def.loaded_definition.description,
     )
 
-    # Build registry for runtime providers
-    registry = ProviderRegistry()
+    # Build registry for runtime providers declared by the recipe.
+    registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
     rendered = assembler.render(recipe, runtime_context=snapshot_context)
     prompt = rendered.rendered_text

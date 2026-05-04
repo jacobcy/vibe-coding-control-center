@@ -22,7 +22,9 @@ from vibe3.orchestra.logging import (
     governance_dry_run_dir,
 )
 from vibe3.prompts.assembler import PromptAssembler
+from vibe3.prompts.manifest import PromptManifest, PromptRecipeDefinition
 from vibe3.prompts.models import (
+    PromptMaterialSpec,
     PromptRecipe,
     PromptRenderResult,
     PromptVariableSource,
@@ -131,8 +133,23 @@ def _resolve_governance_material(
     config: OrchestraConfig,
     tick_count: int,
 ) -> str:
-    materials = config.governance.get_supervisor_materials()
-    return materials[tick_count % len(materials)]
+    _ = config
+    catalog = _load_governance_material_catalog()
+    return catalog[tick_count % len(catalog)].name
+
+
+def _load_governance_recipe_definition() -> PromptRecipeDefinition:
+    return PromptManifest.load_default().recipe("governance.scan")
+
+
+def _load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
+    recipe_def = _load_governance_recipe_definition()
+    if not recipe_def.loaded_definition:
+        raise ValueError("governance.scan recipe not properly loaded")
+    catalog = recipe_def.loaded_definition.material_catalog
+    if not catalog:
+        raise ValueError("governance.scan recipe requires material_catalog")
+    return catalog
 
 
 def _is_doc_candidate(title: str, body: str, labels: list[str]) -> bool:
@@ -286,26 +303,15 @@ def build_governance_recipe(
     config: OrchestraConfig, tick_count: int = 0
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
-    from vibe3.prompts.manifest import PromptManifest
-
-    # Try to load from recipe first
-    manifest = PromptManifest.load_default()
-    recipe_def = manifest.recipe("governance.scan")
-
-    if recipe_def.loaded_definition and recipe_def.loaded_definition.material_catalog:
-        # Use material catalog from recipe
-        catalog = recipe_def.loaded_definition.material_catalog
-        current = catalog[tick_count % len(catalog)]
-        current_material = current.name
-        supervisor_content_source = current.source
-    else:
-        # Fallback to config (backward compatibility)
-        materials = config.governance.get_supervisor_materials()
-        current_material = materials[tick_count % len(materials)]
-        supervisor_content_source = PromptVariableSource(
-            kind=VariableSourceKind.FILE,
-            path=current_material,
-        )
+    recipe_def = _load_governance_recipe_definition()
+    if not recipe_def.loaded_definition:
+        raise ValueError("governance.scan recipe not properly loaded")
+    catalog = recipe_def.loaded_definition.material_catalog
+    if not catalog:
+        raise ValueError("governance.scan recipe requires material_catalog")
+    current = catalog[tick_count % len(catalog)]
+    current_material = current.name
+    supervisor_content_source = current.source
 
     variables: dict[str, PromptVariableSource] = {
         "supervisor_name": PromptVariableSource(

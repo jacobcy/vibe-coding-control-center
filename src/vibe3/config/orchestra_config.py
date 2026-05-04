@@ -140,18 +140,6 @@ class GovernanceConfig(BaseModel):
         description="Model override (leave empty to use config/v3/models.json preset)",
     )
 
-    def get_supervisor_materials(self) -> list[str]:
-        """Return the list of governance material files.
-
-        Deprecated: Materials now come from prompt-recipes.yaml material_catalog.
-        This method returns a fallback for backward compatibility.
-        """
-        return [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-            "supervisor/governance/cron-supervisor.md",
-        ]
-
 
 class SupervisorHandoffConfig(BaseModel):
     """Configuration for supervisor handoff issue consumption."""

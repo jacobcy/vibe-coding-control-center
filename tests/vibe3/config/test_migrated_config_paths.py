@@ -39,7 +39,7 @@ def test_prompt_recipes_live_in_prompts_layer() -> None:
 
 
 def test_settings_does_not_define_prompt_content_fields() -> None:
-    """Settings may bind prompt sources, but prompt output lives in prompts config."""
+    """Settings should not bind prompt source or output fields."""
     data = yaml.safe_load(Path("config/v3/settings.yaml").read_text()) or {}
     prompt_content_fields = {
         "agent_prompt": {"global_notice"},
@@ -66,6 +66,15 @@ def test_settings_does_not_define_prompt_content_fields() -> None:
     assert "supervisor_file" not in orchestra.get("supervisor_handoff", {})
     assert "supervisor_file" not in orchestra.get("governance", {})
     assert "supervisor_files" not in orchestra.get("governance", {})
+
+
+def test_prompt_docs_do_not_reference_removed_supervisor_settings() -> None:
+    """Prompt docs should not name deleted supervisor material settings fields."""
+    prompts_text = Path("config/prompts/prompts.yaml").read_text(encoding="utf-8")
+
+    assert "assignee_dispatch.supervisor_file" not in prompts_text
+    assert "governance.supervisor_file" not in prompts_text
+    assert "supervisor_handoff.supervisor_file" not in prompts_text
 
 
 def test_settings_prompt_content_fields_fail_fast(tmp_path: Path) -> None:

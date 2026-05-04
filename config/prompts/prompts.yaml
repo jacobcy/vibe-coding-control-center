@@ -257,8 +257,8 @@ orchestra:
 # 运行时状态：由 config/prompts/prompt-recipes.yaml -> manager.default 装配。
 #
 # 材料语义：
-# - supervisor_content：由 settings 的 assignee_dispatch.supervisor_file 指向的
-#   supervisor 材料文件内容；是否输出由 prompt-recipes.yaml 的 section 决定。
+# - supervisor_content：由 config/prompts/prompt-recipes.yaml 的
+#   manager.default section source 指向的 supervisor 材料文件内容。
 # - target：manager 目标和职责定义。
 # - quick_commands：快速场景读取命令（task show、handoff status 等），
 #   帮助 agent 快速获取当前 issue/flow/task 状态，无需解析完整 prompt。
@@ -268,7 +268,7 @@ orchestra:
 manager:
   # Dynamic: supervisor file content (loaded at runtime)
   # Section name: manager.supervisor_content
-  # Source: config/v3/settings.yaml -> orchestra.assignee_dispatch.supervisor_file
+  # Source: config/prompts/prompt-recipes.yaml -> manager.default section source
 
   # Static: manager target and role definition
   # NOTE: No variable substitution needed - agent gets issue info from task show

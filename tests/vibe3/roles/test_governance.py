@@ -4,6 +4,8 @@ import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.roles.governance import (
     GOVERNANCE_ROLE,
@@ -204,17 +206,34 @@ class TestBuildGovernanceRecipe:
         assert "server_status" in recipe.variables
 
     def test_supervisor_content_file_source(self):
-        config = _make_config(
-            governance=dict(
-                supervisor_file="supervisor/governance/assignee-pool.md",
-            ),
-        )
+        config = _make_config()
         recipe = build_governance_recipe(config)
         from vibe3.prompts.models import VariableSourceKind
 
         src = recipe.variables["supervisor_content"]
         assert src.kind == VariableSourceKind.FILE
         assert src.path == "supervisor/governance/assignee-pool.md"
+
+    def test_missing_material_catalog_fails_instead_of_using_python_fallback(
+        self, tmp_path, monkeypatch
+    ):
+        from vibe3.prompts import manifest
+
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text(
+            textwrap.dedent("""\
+                recipes:
+                  governance.scan:
+                    kind: template_recipe
+                    template_key: orchestra.governance.plan
+                    variables: {}
+            """),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+
+        with pytest.raises(ValueError, match="material_catalog"):
+            build_governance_recipe(_make_config())
 
 
 class TestRenderGovernancePrompt:
@@ -239,8 +258,6 @@ class TestRenderGovernancePrompt:
         assert "Status=running" in result.rendered_text
 
     def test_template_controls_whether_supervisor_content_is_rendered(self, tmp_path):
-        supervisor_file = tmp_path / "supervisor.md"
-        supervisor_file.write_text("SUPERVISOR BODY", encoding="utf-8")
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(textwrap.dedent("""\
             orchestra:
@@ -249,11 +266,11 @@ class TestRenderGovernancePrompt:
                   Supervisor={supervisor_name}
                   Status={server_status}
         """))
-        config = _make_config(governance=dict(supervisor_file=str(supervisor_file)))
+        config = _make_config()
         ctx = build_governance_snapshot_context(_make_snapshot())
         result = render_governance_prompt(config, ctx, prompts_path)
 
-        assert "SUPERVISOR BODY" not in result.rendered_text
+        assert "Assignee Pool 治理材料" not in result.rendered_text
 
 
 class TestBuildGovernanceRequest:

@@ -80,6 +80,19 @@ class TestBuildSupervisorHandoffPayload:
         assert "#42" in task
         assert "Test issue" in task
 
+    def test_default_recipe_renders_runtime_summary(self):
+        """Default provider-backed recipe should render snapshot values."""
+        config = _make_config()
+        prompt, _options, _task = build_supervisor_handoff_payload(
+            config, 42, "Test issue"
+        )
+
+        assert "- Server: running" in prompt
+        assert "- Running issues: 0" in prompt
+        assert "- Suggested issues: 0" in prompt
+        assert "- Active flows: 0" in prompt
+        assert "- Circuit breaker: closed (failures=0)" in prompt
+
     def test_uses_supervisor_recipe(self, tmp_path, monkeypatch):
         """After migration, supervisor handoff uses direct recipe."""
         from vibe3.prompts import manifest
@@ -201,7 +214,6 @@ class TestSupervisorIdentifiedEvents:
             supervisor_handoff={
                 "issue_label": "supervisor",
                 "handoff_state_label": "state/handoff",
-                "supervisor_file": "supervisor/apply.md",
             },
         )
 
