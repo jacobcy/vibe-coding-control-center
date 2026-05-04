@@ -30,6 +30,43 @@
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
 
+## 环境变量/外部 API 语义验证
+
+如果实现依赖环境变量或外部 API，plan 阶段必须：
+
+### 1. 显式写出语义假设
+
+- 环境变量名、预期格式、预期语义
+- API endpoint、参数格式、返回值格式
+
+### 2. 执行实际命令/调用验证语义
+
+- 不能只凭文档假设
+- 必须在 plan 中记录验证命令和输出结果
+- 如果无法在当前环境验证（如 CI 环境），必须标注为"未验证风险"
+
+### 3. 记录验证结果
+
+示例：
+```bash
+# 验证 TMUX 环境变量语义
+echo $TMUX
+# 输出: /private/tmp/tmux-501/default,4658,123
+# 结论: TMUX env var 是 socket path，不是 session name
+
+# 获取实际 session name
+tmux display-message -p '#{session_name}'
+# 输出: vibe3-executor-issue-42
+# 结论: 需要用 tmux display-message 获取 session name
+```
+
+### 如果跳过验证
+
+必须在 plan 的「Risks & Considerations」中标注：
+- 哪些环境变量/API 语义未验证
+- 未验证可能导致什么问题
+- 建议在什么阶段/环境补充验证
+
 ## 独立判断强制验证点
 
 规划完成后，必须停下来回答以下问题：
