@@ -10,6 +10,15 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from vibe3.prompts.models import (
+    LoadedPromptRecipeDefinition,
+    PromptRecipeKind,
+    PromptRecipeVariantSpec,
+    PromptSectionSpec,
+    PromptVariableSource,
+    VariableSourceKind,
+)
+
 DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
 
 PromptProvider = Callable[[], str | None]
@@ -31,6 +40,10 @@ class PromptRecipeDefinition:
     template_key: str
     variants: dict[str, PromptRecipeVariant]
     description: str | None = None
+    # New fields for unified schema
+    kind: PromptRecipeKind = PromptRecipeKind.SECTION
+    loaded_definition: LoadedPromptRecipeDefinition | None = None
+    variables: dict[str, PromptVariableSource] | None = None
 
     def variant(self, key: str) -> PromptRecipeVariant:
         """Return a configured variant by key."""
@@ -73,20 +86,71 @@ class PromptManifest:
         for key, value in recipes_raw.items():
             if not isinstance(value, dict):
                 continue
+
+            # Parse kind field
+            kind_str = value.get("kind", "section_recipe")
+            if kind_str in {"section_recipe", "template_recipe"}:
+                kind = PromptRecipeKind(kind_str)
+            else:
+                kind = PromptRecipeKind.SECTION
+
+            # Parse template_key
+            template_key = str(value.get("template_key", key))
+
+            # Parse variables (for template_recipe)
+            variables_raw = value.get("variables", {})
+            variables: dict[str, PromptVariableSource] | None = None
+            if variables_raw and isinstance(variables_raw, dict):
+                variables = {
+                    var_key: _parse_variable_source(var_value)
+                    for var_key, var_value in variables_raw.items()
+                    if isinstance(var_value, dict)
+                }
+
+            # Parse variants (for section_recipe)
             variants_raw = value.get("variants", {})
-            variants = {
-                variant_key: PromptRecipeVariant(
+            variants: dict[str, PromptRecipeVariant] = {}
+            loaded_variants: dict[str, PromptRecipeVariantSpec] = {}
+
+            for variant_key, variant_value in variants_raw.items():
+                if not isinstance(variant_value, dict):
+                    continue
+
+                sections_raw = variant_value.get("sections", [])
+                # Parse sections with new schema support
+                section_specs = _parse_section_specs(sections_raw)
+
+                # Build legacy variant for backward compatibility
+                sections_tuple = tuple(spec.key for spec in section_specs)
+                variants[variant_key] = PromptRecipeVariant(
                     key=variant_key,
-                    sections=_as_string_tuple(variant_value.get("sections")),
+                    sections=sections_tuple,
                 )
-                for variant_key, variant_value in variants_raw.items()
-                if isinstance(variant_value, dict)
-            }
+
+                # Build loaded variant spec
+                loaded_variants[variant_key] = PromptRecipeVariantSpec(
+                    key=variant_key,
+                    sections=section_specs,
+                )
+
+            # Build loaded definition
+            loaded_def = LoadedPromptRecipeDefinition(
+                key=key,
+                kind=kind,
+                template_key=template_key,
+                variants=loaded_variants,
+                variables=variables or {},
+                description=value.get("description"),
+            )
+
             recipes[key] = PromptRecipeDefinition(
                 key=key,
-                template_key=str(value.get("template_key", key)),
+                template_key=template_key,
                 variants=variants,
                 description=value.get("description"),
+                kind=kind,
+                loaded_definition=loaded_def,
+                variables=variables,
             )
 
         return cls(recipes=recipes)
@@ -169,3 +233,47 @@ def _as_string_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(str(item) for item in value)
+
+
+def _parse_section_specs(sections_raw: Any) -> tuple[PromptSectionSpec, ...]:
+    """Parse sections list supporting both string and object format."""
+    if not isinstance(sections_raw, list):
+        return ()
+
+    specs: list[PromptSectionSpec] = []
+    for item in sections_raw:
+        if isinstance(item, str):
+            # Legacy format: just a string key
+            specs.append(PromptSectionSpec(key=item))
+        elif isinstance(item, dict) and "key" in item:
+            # New format: object with key and optional source
+            key = str(item["key"])
+            source_raw = item.get("source")
+            if isinstance(source_raw, dict):
+                source = _parse_variable_source(source_raw)
+            else:
+                source = None
+            specs.append(PromptSectionSpec(key=key, source=source))
+
+    return tuple(specs)
+
+
+def _parse_variable_source(raw: dict[str, Any]) -> PromptVariableSource:
+    """Parse a variable source declaration."""
+    kind_str = raw.get("kind", "literal")
+    valid_kinds = {e.value for e in VariableSourceKind}
+    if kind_str in valid_kinds:
+        kind = VariableSourceKind(kind_str)
+    else:
+        kind = VariableSourceKind.LITERAL
+
+    return PromptVariableSource(
+        kind=kind,
+        value=raw.get("value"),
+        skill=raw.get("skill"),
+        path=raw.get("path"),
+        command=raw.get("command"),
+        provider=raw.get("provider"),
+        context_key=raw.get("context_key"),
+        kwargs=raw.get("kwargs", {}),
+    )

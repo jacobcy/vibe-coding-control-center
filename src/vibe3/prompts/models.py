@@ -18,6 +18,13 @@ class VariableSourceKind(str, Enum):
     PROVIDER = "provider"
 
 
+class PromptRecipeKind(str, Enum):
+    """Recipe assembly strategy."""
+
+    SECTION = "section_recipe"
+    TEMPLATE = "template_recipe"
+
+
 class PromptVariableSource(BaseModel):
     """Declares where a template variable value comes from."""
 
@@ -71,3 +78,34 @@ class PromptRenderResult(BaseModel):
     template_source: str
     rendered_text: str
     provenance: tuple[PromptVariableProvenance, ...] = ()
+
+
+class PromptSectionSpec(BaseModel):
+    """A section specification with optional source override."""
+
+    model_config = {"frozen": True}
+
+    key: str
+    source: PromptVariableSource | None = None
+
+
+class PromptRecipeVariantSpec(BaseModel):
+    """A named section ordering with optional source overrides."""
+
+    model_config = {"frozen": True}
+
+    key: str
+    sections: tuple[PromptSectionSpec, ...] = ()
+
+
+class LoadedPromptRecipeDefinition(BaseModel):
+    """Loaded recipe definition from YAML with full schema support."""
+
+    model_config = {"frozen": True}
+
+    key: str
+    kind: PromptRecipeKind = PromptRecipeKind.SECTION
+    template_key: str
+    variants: dict[str, PromptRecipeVariantSpec] = Field(default_factory=dict)
+    variables: dict[str, PromptVariableSource] = Field(default_factory=dict)
+    description: str | None = None
