@@ -278,7 +278,6 @@ class TestOrchestrationFacade:
             supervisor_handoff=MagicMock(
                 issue_label="supervisor",
                 handoff_state_label="state/handoff",
-                supervisor_file="supervisor.md",
                 interval_ticks=1,
             ),
         )
@@ -301,7 +300,8 @@ class TestOrchestrationFacade:
         assert isinstance(event, SupervisorIssueIdentified)
         assert event.issue_number == 99
         assert event.issue_title == "Governance issue"
-        assert event.supervisor_file == "supervisor.md"
+        # After migration, supervisor_file comes from recipe, not config
+        assert event.supervisor_file == "supervisor/apply.md"
 
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
@@ -319,7 +319,6 @@ class TestOrchestrationFacade:
             supervisor_handoff=MagicMock(
                 issue_label="supervisor",
                 handoff_state_label="state/handoff",
-                supervisor_file="supervisor.md",
                 interval_ticks=1,
             ),
         )
