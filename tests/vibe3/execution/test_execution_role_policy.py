@@ -29,7 +29,6 @@ def sample_config() -> OrchestraConfig:
             use_worktree=True,
             backend="claude",
             prompt_template="orchestra.assignee_dispatch.manager",
-            supervisor_file="supervisor/manager.md",
             timeout_seconds=3600,
         ),
         governance=GovernanceConfig(
@@ -75,7 +74,6 @@ def test_resolve_prompt_contract_manager(sample_config: OrchestraConfig) -> None
 
     assert isinstance(contract, PromptContract)
     assert contract.template == "orchestra.assignee_dispatch.manager"
-    assert contract.supervisor_file == "supervisor/manager.md"
 
 
 def test_resolve_prompt_contract_supervisor(sample_config: OrchestraConfig) -> None:
@@ -85,7 +83,6 @@ def test_resolve_prompt_contract_supervisor(sample_config: OrchestraConfig) -> N
 
     assert isinstance(contract, PromptContract)
     assert contract.template == "orchestra.supervisor.apply"
-    assert contract.supervisor_file == "supervisor/apply.md"
 
 
 def test_resolve_session_strategy_manager(sample_config: OrchestraConfig) -> None:

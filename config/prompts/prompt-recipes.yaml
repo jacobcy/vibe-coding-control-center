@@ -26,14 +26,18 @@ recipes:
   # - retry.resume avoids re-sending full supervisor_content and keeps only
   #   retry guidance plus quick scene commands.
   manager.default:
+    kind: section_recipe
     template_key: assignee_dispatch.manager
     description: Manager prompt assembly target.
     variants:
       first.bootstrap:
         sections:
-          - manager.supervisor_content
-          - manager.target
-          - manager.quick_commands
+          - key: manager.supervisor_content
+            source:
+              kind: file
+              path: supervisor/manager.md
+          - key: manager.target
+          - key: manager.quick_commands
 
       retry.resume:
         sections:

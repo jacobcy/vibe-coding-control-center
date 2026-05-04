@@ -65,13 +65,6 @@ class AssigneeDispatchConfig(BaseModel):
         default="orchestra.assignee_dispatch.manager",
         description="Dotted prompts.yaml path used to render the manager task prompt",
     )
-    supervisor_file: str | None = Field(
-        default="supervisor/manager.md",
-        description=(
-            "Supervisor material source for manager prompt assembly. "
-            "Prompt recipes decide whether this material is rendered."
-        ),
-    )
     token_env: str | None = Field(
         default="VIBE_MANAGER_GITHUB_TOKEN",
         description=(

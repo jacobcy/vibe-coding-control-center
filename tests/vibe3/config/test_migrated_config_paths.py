@@ -61,6 +61,8 @@ def test_settings_does_not_define_prompt_content_fields() -> None:
     orchestra = data.get("orchestra", {})
     assert "include_supervisor_content" not in orchestra.get("assignee_dispatch", {})
     assert "include_supervisor_content" not in orchestra.get("governance", {})
+    # supervisor_file migrated to prompt-recipes.yaml
+    assert "supervisor_file" not in orchestra.get("assignee_dispatch", {})
 
 
 def test_settings_prompt_content_fields_fail_fast(tmp_path: Path) -> None:

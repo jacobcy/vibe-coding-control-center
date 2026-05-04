@@ -260,14 +260,56 @@ class TestManagerBlockedIssueNotDispatched:
 class TestManagerPromptAssembly:
     """Manager prompt output is controlled by prompt-recipes.yaml sections."""
 
-    def test_bootstrap_recipe_renders_supervisor_section(self, tmp_path):
+    def test_bootstrap_recipe_renders_supervisor_from_recipe_source(
+        self, tmp_path, monkeypatch
+    ):
+        """Supervisor content comes from recipe source declaration."""
+        from vibe3.prompts import manifest
+
+        # Create supervisor file
         supervisor_file = tmp_path / "manager.md"
         supervisor_file.write_text("MANAGER SUPERVISOR BODY", encoding="utf-8")
-        config = OrchestraConfig(
-            assignee_dispatch=AssigneeDispatchConfig(
-                supervisor_file=str(supervisor_file),
-            )
+
+        # Create recipe with source declaration
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text(
+            f"""
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.supervisor_content
+            source:
+              kind: file
+              path: {supervisor_file}
+          - key: manager.target
+          - key: manager.quick_commands
+      retry.resume:
+        sections:
+          - manager.retry_task
+""",
+            encoding="utf-8",
         )
+
+        # Create prompts.yaml with minimal sections
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(
+            """
+manager:
+  target: "target section"
+  quick_commands: "quick commands"
+  retry_task: "retry task"
+""",
+            encoding="utf-8",
+        )
+
+        # Patch paths
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr("vibe3.roles.manager.DEFAULT_PROMPTS_PATH", prompts_path)
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
 
         request = build_manager_sync_request(
             config=config,
@@ -283,13 +325,48 @@ class TestManagerPromptAssembly:
 
         assert "MANAGER SUPERVISOR BODY" in (request.prompt or "")
 
-    def test_retry_resume_recipe_does_not_render_supervisor_section(self, tmp_path):
-        missing_supervisor_file = tmp_path / "missing.md"
-        config = OrchestraConfig(
-            assignee_dispatch=AssigneeDispatchConfig(
-                supervisor_file=str(missing_supervisor_file),
-            )
+    def test_retry_resume_recipe_does_not_render_supervisor_section(
+        self, tmp_path, monkeypatch
+    ):
+        """retry.resume variant does not include supervisor_content section."""
+        from vibe3.prompts import manifest
+
+        # Create recipe without supervisor_content in retry.resume
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text(
+            """
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.supervisor_content
+            source:
+              kind: literal
+              value: "SUPERVISOR CONTENT"
+          - key: manager.target
+      retry.resume:
+        sections:
+          - manager.retry_task
+""",
+            encoding="utf-8",
         )
+
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(
+            """
+manager:
+  target: "target section"
+  retry_task: "retry task"
+""",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr("vibe3.roles.manager.DEFAULT_PROMPTS_PATH", prompts_path)
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
 
         request = build_manager_sync_request(
             config=config,
@@ -303,7 +380,7 @@ class TestManagerPromptAssembly:
             show_prompt=False,
         )
 
-        assert str(missing_supervisor_file) not in (request.prompt or "")
+        assert "SUPERVISOR CONTENT" not in (request.prompt or "")
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:

@@ -243,7 +243,7 @@ def build_manager_sync_request(
         prompts_data = yaml.safe_load(f)
     manager_sections = prompts_data.get("manager", {})
 
-    # Build providers for each section
+    # Build providers for static sections (no source override)
     providers: dict[str, PromptProvider] = {
         "manager.target": _make_section_provider(manager_sections, "manager.target"),
         "manager.quick_commands": _make_section_provider(
@@ -254,20 +254,34 @@ def build_manager_sync_request(
         ),
     }
 
-    # The recipe owns whether supervisor content is rendered. The settings
-    # layer only binds the material source used by this provider.
-    ad = config.assignee_dispatch
-    supervisor_path = Path(ad.supervisor_file) if ad.supervisor_file else None
+    # Load manifest and get recipe definition with section sources
+    manifest = PromptManifest.load_default()
+    recipe_def = manifest.recipe("manager.default")
 
-    def _read_supervisor() -> str:
-        if supervisor_path is None:
-            return ""
-        return supervisor_path.read_text()
+    # Check if recipe has loaded_definition with section sources
+    if recipe_def.loaded_definition is not None:
+        variant_spec = recipe_def.loaded_definition.variants.get(variant_key)
+        if variant_spec is not None:
+            # For sections with source declarations, resolve directly
+            from vibe3.prompts.builtin_providers import resolve_source
+            from vibe3.prompts.provider_registry import ProviderRegistry
 
-    providers["manager.supervisor_content"] = _read_supervisor
+            registry = ProviderRegistry()
+            runtime_context: dict[str, Any] = {}
+
+            for section_spec in variant_spec.sections:
+                if section_spec.source is not None:
+                    # Section has explicit source - resolve it
+                    content = resolve_source(
+                        section_spec.source, runtime_context, registry
+                    )
+
+                    def _make_provider(c: str = content) -> str:
+                        return c
+
+                    providers[section_spec.key] = _make_provider
 
     # Render prompt using manifest
-    manifest = PromptManifest.load_default()
     prompt = manifest.render_sections(
         recipe_key="manager.default",
         variant_key=variant_key,
