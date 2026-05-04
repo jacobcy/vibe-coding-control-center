@@ -78,6 +78,7 @@ def test_all_inspect_subcommands_have_yaml_option():
         "base",
         "uncommit",
         "commands",
+        "dead-code",
     ]
 
     # Note: dead-code has a different output model and doesn't need --yaml
@@ -196,6 +197,25 @@ def test_inspect_commands_yaml_produces_valid_yaml():
     assert "command" in data, "YAML should contain command field"
 
 
+def test_inspect_dead_code_yaml_produces_valid_yaml():
+    """Verify inspect dead-code --yaml produces valid parseable YAML."""
+    result = subprocess.run(
+        ["uv", "run", "python", "src/vibe3/cli.py", "inspect", "dead-code", "--yaml"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    # Parse YAML output
+    data = yaml.safe_load(result.stdout)
+
+    # Verify expected structure
+    assert isinstance(data, dict), "YAML output should be a dict"
+    assert "total_symbols" in data, "YAML should contain total_symbols"
+    assert "dead_code_count" in data, "YAML should contain dead_code_count"
+    assert "findings" in data, "YAML should contain findings list"
+
+
 def test_inspect_json_and_yaml_both_available():
     """Verify that where --json is available, --yaml is also available.
 
@@ -210,6 +230,7 @@ def test_inspect_json_and_yaml_both_available():
         "base",
         "uncommit",
         "commands",
+        "dead-code",
     ]
 
     for cmd in subcommands:

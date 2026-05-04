@@ -226,6 +226,7 @@ def dead_code(
         str, typer.Argument(help="Root directory to scan (default: src/vibe3)")
     ] = "src/vibe3",
     json_out: _JSON_OPT = False,
+    yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
     min_confidence: Annotated[
         str,
         typer.Option(
@@ -256,6 +257,7 @@ def dead_code(
         vibe3 inspect dead-code
         vibe3 inspect dead-code src/vibe3 --min-confidence=high
         vibe3 inspect dead-code --json
+        vibe3 inspect dead-code --yaml
     """
     if trace:
         enable_trace()
@@ -288,6 +290,12 @@ def dead_code(
 
         if json_out:
             typer.echo(report.model_dump_json(indent=2))
+        elif yaml_out:
+            typer.echo(
+                yaml.dump(
+                    report.model_dump(), default_flow_style=False, allow_unicode=True
+                )
+            )
         else:
             typer.echo("=== Dead Code Report ===")
             typer.echo(f"  Total symbols scanned: {report.total_symbols}")
