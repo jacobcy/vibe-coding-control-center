@@ -45,7 +45,8 @@ To declare that flow A depends on issue B:
 -- In SQLite handoff.db
 INSERT INTO flow_issue_links (branch, issue_number, issue_role)
 VALUES ('task/issue-A', A, 'task');
-INSERT INTO flow_issue_links (branch, issue-A', B, 'dependency');
+INSERT INTO flow_issue_links (branch, issue_number, issue_role)
+VALUES ('task/issue-A', B, 'dependency');
 ```
 
 Or use the CLI binding when creating the flow:
