@@ -254,6 +254,8 @@ workflow:
     agents: [context-researcher]
     parallel: false
     output_to_phase_2: true
+    # 【关键】Phase 1 的输出是 Phase 2 的必要输入
+    # 如果不传递背景报告，Phase 2 agents 将处于"盲审"状态
     # 执行指令
     execution:
       - step: spawn_context_researcher
@@ -267,6 +269,11 @@ workflow:
         wait_for_result: true  # 必须等待 Phase 1 完成
       - step: receive_context_report
         action: 等待 teammate-message，获取背景报告
+      - step: save_phase_1_output
+        action: |
+          【关键步骤】将背景报告内容保存为 phase_1_output 变量
+          这是 Phase 2 SendMessage 的必要输入
+          如果不保存，Phase 2 将无法获取背景信息
       - step: prepare_phase_2_context
         action: 将背景报告通过 SendMessage 传给 Phase 2 agents
 
@@ -276,46 +283,62 @@ workflow:
     parallel: true
     requires_phase_1_output: true
     message_passing: SendMessage
+    # 【关键】必须通过 SendMessage 将 Phase 1 背景传递给 Phase 2 agents
+    # 否则 Phase 2 将处于"盲审"状态，两阶段设计失去意义
     # 执行指令
     execution:
       - step: spawn_phase_2_agents
         tool: Agent  # 单次调用，并行 spawn 多个 agents
         params:
           # 注意：parallel spawn 需要在单次消息中发起多个 Agent 调用
+          # 【重要】prompt 中不要写 {phase_1_output} 占位符
+          # 实际背景通过 SendMessage 发送，而非在 spawn prompt 中
           agents:
             - team_name: pr-review-team
               name: code-analyst
               subagent_type: pr-code-analyst
               model: haiku
-              prompt: "分析 PR #{pr_number} 的代码质量..."
+              prompt: "分析 PR #{pr_number} 的代码质量。等待接收背景信息后开始分析。"
               run_in_background: true
             - team_name: pr-review-team
               name: architect-reviewer
               subagent_type: pr-architect-reviewer
               model: sonnet
-              prompt: "评估 PR #{pr_number} 的架构影响..."
+              prompt: "评估 PR #{pr_number} 的架构影响。等待接收背景信息后开始评估。"
               run_in_background: true
             - team_name: pr-review-team
               name: security-reviewer
               subagent_type: pr-security-reviewer
               model: sonnet
-              prompt: "评估 PR #{pr_number} 的安全性..."
+              prompt: "评估 PR #{pr_number} 的安全性。等待接收背景信息后开始评估。"
               run_in_background: true
+
+      # 【关键步骤】使用 SendMessage 发送 Phase 1 背景给各 agent
+      # 这是规定动作，不可跳过！如果不发送，Phase 2 agents 无法获得背景信息
       - step: send_context_to_phase_2
         tool: SendMessage
         params:
           to: code-analyst
-          message: "{phase_1_output}"
+          message: |
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+            请基于以上背景分析代码质量。
       - step: send_context_to_phase_2
         tool: SendMessage
         params:
           to: architect-reviewer
-          message: "{phase_1_output}"
+          message: |
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+            请基于以上背景评估架构影响。
       - step: send_context_to_phase_2
         tool: SendMessage
         params:
           to: security-reviewer
-          message: "{phase_1_output}"
+          message: |
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+            请基于以上背景评估安全性。
       - step: wait_for_phase_2_results
         action: |
           等待所有 Phase 2 agents 返回结果。
@@ -511,25 +534,30 @@ workflow:
     labels: ["type/follow-up", "scope/<component>"]
 
   phase_5:
-    name: 清理与复用准备
+  phase_5:
+    name: 准备下一个 PR（不清理状态）
     executor: team-lead
     agents: []
+    # 【重要】不清理 inbox 或 tasks
+    # - idle_notification 保留用于追踪 agents 状态和 paneId
+    # - tasks 最终由 TeamDelete 处理
     actions:
-      - clear_inboxes  # 清空 inbox 为下一��� PR 准备
-      - reset_team_state  # 重置 tasks 状态
-      # 注意：不执行 kill_idle_teammates，保留 panes 供下一个 PR 复用
+      - record_current_pr_complete  # 记录当前 PR 完成
+      - preserve_agent_state        # 保留所有 teammates 状态信息
+    # 为什么不需要清理：
+    # - 清理 inbox 会丢失 idle_notification → 无法追踪 agents 状态
+    # - 清理 inbox 会丢失 paneId → 无法复用 teammates
+    # - tasks 由 TeamDelete 最终处理
     conditions:
       continue_next_pr:
         - 保留 tmux panes（复用模式）
-        - 清空 inbox 文件
-        - 重置 tasks 目录
-      end_session:  # 改名：从 full_cleanup 改为 end_session
+        - 保留 inbox 文件（保留 idle_notification 和 paneId）
+        - 不清理 tasks（TeamDelete 最终处理）
+        - 下一个 PR 通过 SendMessage 唤醒已有 teammates
+      end_session:
         - 调用 TeamDelete 工具（由 Step 9 执行）
-        - TeamDelete 自动完成：杀死 panes + 删除��录 + 清除会话 context
-        - ❌ 不要手动执行清理命令（会导致会话残留）
-        - 删除 ~/.claude/tasks/{team-name}/
-        - 释放资源，下次重新 spawn
-
+        - TeamDelete 自动完成：杀死 panes + 删除目录 + 删除 tasks
+        - 不要手动执行清理命令（会导致会话残留）
 # 防幻觉机制
 anti_hallucination:
   evidence_required:
