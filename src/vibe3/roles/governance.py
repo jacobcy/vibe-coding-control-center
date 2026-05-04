@@ -286,14 +286,27 @@ def build_governance_recipe(
     config: OrchestraConfig, tick_count: int = 0
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
-    materials = config.governance.get_supervisor_materials()
-    current_material = materials[tick_count % len(materials)]
-    # The prompt template owns whether supervisor content is rendered. The
-    # settings layer only selects the supervisor material file to bind.
-    supervisor_content_source = PromptVariableSource(
-        kind=VariableSourceKind.FILE,
-        path=current_material,
-    )
+    from vibe3.prompts.manifest import PromptManifest
+
+    # Try to load from recipe first
+    manifest = PromptManifest.load_default()
+    recipe_def = manifest.recipe("governance.scan")
+
+    if recipe_def.loaded_definition and recipe_def.loaded_definition.material_catalog:
+        # Use material catalog from recipe
+        catalog = recipe_def.loaded_definition.material_catalog
+        current = catalog[tick_count % len(catalog)]
+        current_material = current.name
+        supervisor_content_source = current.source
+    else:
+        # Fallback to config (backward compatibility)
+        materials = config.governance.get_supervisor_materials()
+        current_material = materials[tick_count % len(materials)]
+        supervisor_content_source = PromptVariableSource(
+            kind=VariableSourceKind.FILE,
+            path=current_material,
+        )
+
     variables: dict[str, PromptVariableSource] = {
         "supervisor_name": PromptVariableSource(
             kind=VariableSourceKind.LITERAL, value=current_material
@@ -304,8 +317,13 @@ def build_governance_recipe(
         variables[key] = PromptVariableSource(
             kind=VariableSourceKind.PROVIDER, provider=f"governance.{key}"
         )
+
+    template_key = config.governance.prompt_template
+    if recipe_def.loaded_definition:
+        template_key = recipe_def.loaded_definition.template_key
+
     return PromptRecipe(
-        template_key=config.governance.prompt_template,
+        template_key=template_key,
         variables=variables,
         description="Orchestra governance scan",
     )

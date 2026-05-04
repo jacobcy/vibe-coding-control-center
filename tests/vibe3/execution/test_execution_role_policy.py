@@ -35,7 +35,6 @@ def sample_config() -> OrchestraConfig:
             enabled=True,
             backend="openai",
             prompt_template="orchestra.governance.plan",
-            supervisor_file="supervisor/governance/assignee-pool.md",
         ),
         supervisor_handoff=SupervisorHandoffConfig(
             enabled=True,

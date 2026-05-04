@@ -202,3 +202,64 @@ recipes:
       truncated_note:
         kind: provider
         provider: governance.truncated_note
+
+  # Governance role.
+  #
+  # Template recipe with material catalog for round-robin tick selection.
+  # Python tick_count selects from material_catalog array.
+  governance.scan:
+    kind: template_recipe
+    template_key: orchestra.governance.plan
+    material_catalog:
+      - name: supervisor/governance/assignee-pool.md
+        source:
+          kind: file
+          path: supervisor/governance/assignee-pool.md
+      - name: supervisor/governance/roadmap-intake.md
+        source:
+          kind: file
+          path: supervisor/governance/roadmap-intake.md
+      - name: supervisor/governance/cron-supervisor.md
+        source:
+          kind: file
+          path: supervisor/governance/cron-supervisor.md
+    variables:
+      server_status:
+        kind: provider
+        provider: governance.server_status
+      active_count:
+        kind: provider
+        provider: governance.active_count
+      active_flows:
+        kind: provider
+        provider: governance.active_flows
+      active_worktrees:
+        kind: provider
+        provider: governance.active_worktrees
+      running_issue_count:
+        kind: provider
+        provider: governance.running_issue_count
+      queued_issue_count:
+        kind: provider
+        provider: governance.queued_issue_count
+      suggested_issue_count:
+        kind: provider
+        provider: governance.suggested_issue_count
+      circuit_breaker_state:
+        kind: provider
+        provider: governance.circuit_breaker_state
+      circuit_breaker_failures:
+        kind: provider
+        provider: governance.circuit_breaker_failures
+      issue_list:
+        kind: provider
+        provider: governance.issue_list
+      running_issue_details:
+        kind: provider
+        provider: governance.running_issue_details
+      suggested_issue_details:
+        kind: provider
+        provider: governance.suggested_issue_details
+      truncated_note:
+        kind: provider
+        provider: governance.truncated_note

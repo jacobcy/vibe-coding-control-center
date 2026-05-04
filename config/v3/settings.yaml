@@ -289,14 +289,6 @@ orchestra:
   governance:
     enabled: true
     interval_ticks: 4
-    # Supervisor material path source: supervisor/<name>.md
-    # 是否输出 supervisor_content 由 config/prompts/prompts.yaml 中选中的
-    # prompt_template 是否引用 {supervisor_content} 决定。
-    supervisor_file: "supervisor/governance/assignee-pool.md"
-    supervisor_files:
-      - "supervisor/governance/assignee-pool.md"
-      - "supervisor/governance/roadmap-intake.md"
-      - "supervisor/governance/cron-supervisor.md"
     # Template selector: config/prompts/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
     dry_run: false

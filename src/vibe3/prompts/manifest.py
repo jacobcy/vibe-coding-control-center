@@ -133,6 +133,24 @@ class PromptManifest:
                     sections=section_specs,
                 )
 
+            # Parse material_catalog (for governance template_recipe)
+            material_catalog_raw = value.get("material_catalog", [])
+            material_catalog: tuple[PromptMaterialSpec, ...] = ()
+            if material_catalog_raw and isinstance(material_catalog_raw, list):
+                from vibe3.prompts.models import PromptMaterialSpec
+
+                catalog_items: list[PromptMaterialSpec] = []
+                for item in material_catalog_raw:
+                    if isinstance(item, dict) and "name" in item and "source" in item:
+                        source_raw = item["source"]
+                        if isinstance(source_raw, dict):
+                            source = _parse_variable_source(source_raw)
+                            name = str(item["name"])
+                            catalog_items.append(
+                                PromptMaterialSpec(name=name, source=source)
+                            )
+                material_catalog = tuple(catalog_items)
+
             # Build loaded definition
             loaded_def = LoadedPromptRecipeDefinition(
                 key=key,
@@ -140,6 +158,7 @@ class PromptManifest:
                 template_key=template_key,
                 variants=loaded_variants,
                 variables=variables or {},
+                material_catalog=material_catalog,
                 description=value.get("description"),
             )
 

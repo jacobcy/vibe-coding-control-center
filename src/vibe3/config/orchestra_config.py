@@ -113,28 +113,6 @@ class GovernanceConfig(BaseModel):
     """Configuration for periodic governance scan service."""
 
     enabled: bool = True
-    supervisor_file: str = Field(
-        default="supervisor/governance/assignee-pool.md",
-        description=(
-            "Supervisor material source for governance prompt assembly. "
-            "Prompt templates decide whether this material is rendered."
-        ),
-    )
-    supervisor_files: list[str] = Field(
-        default=[],
-        description="Multiple governance material files for round-robin rotation. "
-        "Takes precedence over supervisor_file when non-empty.",
-    )
-
-    def get_supervisor_materials(self) -> list[str]:
-        """Return the list of governance material files to rotate through.
-
-        supervisor_files takes precedence; falls back to [supervisor_file].
-        """
-        if self.supervisor_files:
-            return list(self.supervisor_files)
-        return [self.supervisor_file]
-
     prompt_template: str = Field(
         default="orchestra.governance.plan",
         description="Dotted prompts.yaml path used to render governance prompt",
@@ -161,6 +139,18 @@ class GovernanceConfig(BaseModel):
         default=None,
         description="Model override (leave empty to use config/v3/models.json preset)",
     )
+
+    def get_supervisor_materials(self) -> list[str]:
+        """Return the list of governance material files.
+
+        Deprecated: Materials now come from prompt-recipes.yaml material_catalog.
+        This method returns a fallback for backward compatibility.
+        """
+        return [
+            "supervisor/governance/assignee-pool.md",
+            "supervisor/governance/roadmap-intake.md",
+            "supervisor/governance/cron-supervisor.md",
+        ]
 
 
 class SupervisorHandoffConfig(BaseModel):

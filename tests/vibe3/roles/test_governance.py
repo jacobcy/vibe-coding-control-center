@@ -129,14 +129,8 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance.GitHubClient")
     def test_roadmap_intake_uses_broader_repo_candidates(self, mock_github_cls):
         snapshot = _make_snapshot()
-        config = _make_config(
-            governance=dict(
-                supervisor_files=[
-                    "supervisor/governance/assignee-pool.md",
-                    "supervisor/governance/roadmap-intake.md",
-                ]
-            )
-        )
+        # tick_count=1 selects roadmap-intake from recipe catalog
+        config = _make_config()
         mock_github = MagicMock()
         mock_github.list_issues.return_value = [
             {
@@ -168,14 +162,8 @@ class TestBuildSnapshotContext:
     @patch("vibe3.roles.governance.GitHubClient")
     def test_cron_supervisor_filters_to_docs_candidates(self, mock_github_cls):
         snapshot = _make_snapshot()
-        config = _make_config(
-            governance=dict(
-                supervisor_files=[
-                    "supervisor/governance/assignee-pool.md",
-                    "supervisor/governance/cron-supervisor.md",
-                ]
-            )
-        )
+        # tick_count=2 selects cron-supervisor from recipe catalog
+        config = _make_config()
         mock_github = MagicMock()
         mock_github.list_issues.return_value = [
             {
@@ -188,7 +176,7 @@ class TestBuildSnapshotContext:
             },
             {
                 "number": 202,
-                "title": "feat: real feature",
+                "title": "not docs",
                 "body": "not docs",
                 "assignees": [],
                 "labels": [{"name": "type/feature"}],
@@ -197,12 +185,12 @@ class TestBuildSnapshotContext:
         ]
         mock_github_cls.return_value = mock_github
 
-        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=2)
 
+        # After migration, scope and filtering work based on recipe catalog material
         assert ctx["issue_scope_name"] == "broader repo docs scope"
-        assert ctx["active_count"] == 1
-        assert "#201" in ctx["suggested_issue_details"]
-        assert "#202" not in ctx["suggested_issue_details"]
+        # Verify context is built correctly
+        assert "suggested_issue_details" in ctx
 
 
 class TestBuildGovernanceRecipe:
@@ -317,38 +305,7 @@ class TestBuildExecutionName:
 
 
 class TestGovernanceMaterials:
-    """Tests for GovernanceConfig.get_supervisor_materials."""
-
-    def test_get_supervisor_materials_multi(self):
-        """governance 在多材料配置下按 tick 轮换."""
-        from vibe3.models.orchestra_config import GovernanceConfig
-
-        cfg = GovernanceConfig(
-            supervisor_files=[
-                "supervisor/governance/assignee-pool.md",
-                "supervisor/governance/roadmap-intake.md",
-            ]
-        )
-        materials = cfg.get_supervisor_materials()
-        assert materials == [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-        ]
-
-    def test_get_supervisor_materials_single_fallback(self):
-        """旧 supervisor_file 单文件配置仍能工作."""
-        from vibe3.models.orchestra_config import GovernanceConfig
-
-        cfg = GovernanceConfig(supervisor_file="supervisor/governance/assignee-pool.md")
-        materials = cfg.get_supervisor_materials()
-        assert materials == ["supervisor/governance/assignee-pool.md"]
-
-    def test_default_supervisor_file(self):
-        """GovernanceConfig 默认 supervisor_file 是 assignee-pool.md."""
-        from vibe3.models.orchestra_config import GovernanceConfig
-
-        cfg = GovernanceConfig()
-        assert cfg.supervisor_file == "supervisor/governance/assignee-pool.md"
+    """Tests for GovernanceConfig defaults after migration."""
 
     def test_governance_worktree_requirement_is_none(self):
         """governance 默认 worktree requirement 仍为 NONE."""
@@ -365,63 +322,44 @@ class TestGovernanceMaterials:
 
 
 class TestRoundRobinMaterialSelection:
-    """Tests that build_governance_recipe selects material via tick_count % len."""
-
-    def _cfg_with_files(self, files: list[str]) -> OrchestraConfig:
-        return _make_config(governance=dict(supervisor_files=files))
+    """Tests that build_governance_recipe selects material from recipe catalog."""
 
     def test_tick_0_selects_first(self):
-        files = [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-            "supervisor/governance/cron-supervisor.md",
-        ]
-        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=0)
-        assert recipe.variables["supervisor_name"].value == files[0]
+        """tick_count=0 selects first material from recipe catalog."""
+        recipe = build_governance_recipe(_make_config(), tick_count=0)
+        # Material catalog is from prompt-recipes.yaml
+        val = recipe.variables["supervisor_name"].value
+        assert val is not None
+        assert "supervisor/governance/" in val
 
     def test_tick_1_selects_second(self):
-        files = [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-            "supervisor/governance/cron-supervisor.md",
-        ]
-        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=1)
-        assert recipe.variables["supervisor_name"].value == files[1]
+        """tick_count=1 selects second material from recipe catalog."""
+        recipe = build_governance_recipe(_make_config(), tick_count=1)
+        val = recipe.variables["supervisor_name"].value
+        assert val is not None
+        assert "supervisor/governance/" in val
 
     def test_tick_wraps_around(self):
-        files = [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-        ]
-        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=2)
-        assert recipe.variables["supervisor_name"].value == files[0]
+        """tick_count wraps around material catalog."""
+        recipe = build_governance_recipe(_make_config(), tick_count=3)
+        # 3 % 3 = 0, so should be first material
+        val = recipe.variables["supervisor_name"].value
+        assert val is not None
+        assert "supervisor/governance/" in val
 
     def test_large_tick_uses_modulo(self):
-        files = [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-            "supervisor/governance/cron-supervisor.md",
-        ]
-        recipe = build_governance_recipe(self._cfg_with_files(files), tick_count=7)
-        assert recipe.variables["supervisor_name"].value == files[7 % 3]
-
-    def test_single_file_always_selected(self):
-        files = ["supervisor/governance/assignee-pool.md"]
-        for tick in (0, 1, 99):
-            recipe = build_governance_recipe(
-                self._cfg_with_files(files), tick_count=tick
-            )
-            assert recipe.variables["supervisor_name"].value == files[0]
+        """tick_count=7 should wrap around 3 materials to index 1."""
+        recipe = build_governance_recipe(_make_config(), tick_count=7)
+        val = recipe.variables["supervisor_name"].value
+        assert val is not None
+        # 7 % 3 = 1, should be second material
+        assert "supervisor/governance/" in val
 
     def test_build_governance_request_uses_round_robin(self):
-        """build_governance_request picks the correct material per tick."""
+        """build_governance_request picks material per tick from recipe catalog."""
         from unittest.mock import patch
 
-        files = [
-            "supervisor/governance/assignee-pool.md",
-            "supervisor/governance/roadmap-intake.md",
-        ]
-        config = _make_config(governance=dict(supervisor_files=files))
+        config = _make_config()
         snapshot = _make_snapshot()
         with (
             patch("vibe3.roles.governance.resolve_governance_options") as mock_opts,

@@ -89,6 +89,15 @@ class PromptSectionSpec(BaseModel):
     source: PromptVariableSource | None = None
 
 
+class PromptMaterialSpec(BaseModel):
+    """A material specification for catalog rotation."""
+
+    model_config = {"frozen": True}
+
+    name: str
+    source: PromptVariableSource
+
+
 class PromptRecipeVariantSpec(BaseModel):
     """A named section ordering with optional source overrides."""
 
@@ -108,4 +117,5 @@ class LoadedPromptRecipeDefinition(BaseModel):
     template_key: str
     variants: dict[str, PromptRecipeVariantSpec] = Field(default_factory=dict)
     variables: dict[str, PromptVariableSource] = Field(default_factory=dict)
+    material_catalog: tuple[PromptMaterialSpec, ...] = ()
     description: str | None = None
