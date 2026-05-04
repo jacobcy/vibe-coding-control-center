@@ -54,8 +54,11 @@ Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
 3. 选择执行模式
 4. PR 队列排序与选择
 5. 循环审查每个 PR（不检查 team，假设已存在）
-   - Phase 1-4: 审查流程
-   - Phase 5: 只清理 inboxes/tasks（不删除 team）
+   - Phase 1: 背景调研 → 保存 phase_1_output
+   - Phase 2: 专项审查 → 【关键】SendMessage 发送背景给 agents
+   - Phase 3: 综合判断
+   - Phase 4: 写回与改进
+   - Phase 5: 准备下一个 PR（不清理状态）
    - 询问是否继续下一个 PR
 6. 人类确认结束审查 → 删除 team
 ```
@@ -389,11 +392,15 @@ SendMessage(
 # Step 2: 接收背景报告
 - action: 等待 teammate-message，获取 context-researcher 的背景报告
 
-# Step 3: 准备 Phase 2 上下文
-- action: 将背景报告保存为 phase_1_output，用于 SendMessage
+# Step 3: 保存背景报告为 phase_1_output
+- action: |
+    将背景报告内容保存为变量 phase_1_output
+    这是 Phase 2 消息传递的关键输入
 ```
 
 ### Phase 2: 专项审查
+
+**关键：必须通过 SendMessage 传递 Phase 1 背景**
 
 **执行步骤**（从 template.workflow.phase_2.execution）：
 
@@ -407,11 +414,8 @@ SendMessage(
     subagent_type: pr-code-analyst
     model: haiku
     prompt: |
-      分析 PR #{pr_number} 的代码质量：
-      背景信息：{phase_1_output}
-      1. 检查代码风格和规范符合性
-      2. 识别技术债
-      3. 评估可维护性
+      分析 PR #{pr_number} 的代码质量。
+      等待接收背景信息后开始分析。
     run_in_background: true
 
 - tool: Agent
@@ -421,11 +425,8 @@ SendMessage(
     subagent_type: pr-architect-reviewer
     model: sonnet
     prompt: |
-      评估 PR #{pr_number} 的架构影响：
-      背景信息：{phase_1_output}
-      1. 检查架构符合性
-      2. 评估扩展性影响
-      3. 判断是否有替代方案
+      评估 PR #{pr_number} 的架构影响。
+      等待接收背景信息后开始评估。
     run_in_background: true
 
 - tool: Agent
@@ -435,17 +436,43 @@ SendMessage(
     subagent_type: pr-security-reviewer
     model: sonnet
     prompt: |
-      评估 PR #{pr_number} 的安全性：
-      背景信息：{phase_1_output}
-      1. 检查安全漏洞
-      2. 进行红队测试
-      3. 评估敏感信息泄露风险
+      评估 PR #{pr_number} 的安全性。
+      等待接收背景信息后开始评估。
     run_in_background: true
 
-# Step 2-4: 发送上下文（agents 启动后自动接收 team broadcast）
-# 注意：run_in_background 的 agents 会自动收到 team context
+# Step 2: 【关键】使用 SendMessage 发送 Phase 1 背景给各 agent
+# 这是规定动作，不可跳过！
+- tool: SendMessage
+  params:
+    to: "code-analyst"
+    message: |
+      ## PR #{pr_number} 背景报告
+      
+      {phase_1_output}
+      
+      请基于以上背景分析代码质量。
 
-# Step 5: 等待所有结果（必须等待全部返回）
+- tool: SendMessage
+  params:
+    to: "architect-reviewer"
+    message: |
+      ## PR #{pr_number} 背景报告
+      
+      {phase_1_output}
+      
+      请基于以上背景评估架构影响。
+
+- tool: SendMessage
+  params:
+    to: "security-reviewer"
+    message: |
+      ## PR #{pr_number} 背景报告
+      
+      {phase_1_output}
+      
+      请基于以上背景评估安全性。
+
+# Step 3: 等待所有结果（必须等待全部返回）
 - action: |
     等待所有 Phase 2 agents 返回 idle notification。
 
@@ -455,8 +482,8 @@ SendMessage(
     - security-reviewer
 
     等待机制：
-    1. 检查 ~/.claude/teams/pr-review-team/ 目录下的状态
-    2. 或等待系统通知（idle notification）
+    1. 检查 ~/.claude/teams/pr-review-team/inboxes/team-lead.json 中的 idle_notification
+    2. 或等待系统通知
     3. 超时设置：5 分钟
 
     如果超时仍有 agent 未返回：
@@ -464,6 +491,12 @@ SendMessage(
     - 在报告中标注"部分审查未完成"
     - 不要假设未返回的 agent 同意其他 agent 的结论
 ```
+
+**消息传递检查点**：
+- ✅ Phase 1 背景报告已保存为 phase_1_output
+- ✅ Phase 2 agents 已 spawn（run_in_background=true）
+- ✅ **SendMessage 已发送背景给每个 Phase 2 agent**
+- ✅ 所有 agents 返回 idle_notification
 
 ### Phase 3: 综合判断
 
@@ -518,18 +551,27 @@ SendMessage(
     command: gh issue create --title "[follow-up] {title}" --body "{body}"
 ```
 
-### Phase 5: 循环清理（不删除 Team）
+### Phase 5: 准备下一个 PR（不清理、不删除 Team）
 
 **执行步骤**（由 team-lead 执行）：
 
 ```yaml
-# 只清理当前 PR 的 inboxes/tasks，Team 继续存在
-- actions:
-    - 清空 inboxes: rm ~/.claude/teams/pr-review-team/inboxes/*.json
-    - 重置 tasks: rm ~/.claude/tasks/pr-review-team/*
+# 不需要清理 inbox 或 tasks
+# - idle_notification 保留用于追踪 agents 状态和 paneId
+# - tasks 最终由 TeamDelete 处理
+
+# 只需要记录当前 PR 完成，准备下一个 PR
+- action: 记录当前 PR #{pr_number} 审查完成
+- action: 保留所有 teammates 的状态信息（paneId、idle_notification）
 ```
 
-**重要**：Phase 5 **不删除 Team**，Team 保持存在供下一个 PR 审查使用。
+**为什么不需要清理**：
+- ❌ 清理 inbox 会丢失 idle_notification → 无法追踪 agents 状态
+- ❌ 清理 inbox 会丢失 paneId 信息 → 无法复用 teammates
+- ❌ 清理 tasks 没必要 → TeamDelete 最终会处理
+- ✅ 保留状态信息 → 下一个 PR 可以 SendMessage 唤醒已有 teammates
+
+**重要**：Phase 5 **不删除 Team**，Team 和所有状态信息保持存在供下一个 PR 审查使用。
 
 ---
 
