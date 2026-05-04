@@ -41,7 +41,6 @@ def sample_config() -> OrchestraConfig:
             enabled=True,
             backend="claude",
             prompt_template="orchestra.supervisor.apply",
-            supervisor_file="supervisor/apply.md",
         ),
     )
 

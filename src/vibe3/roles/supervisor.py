@@ -48,11 +48,10 @@ def build_supervisor_task_string(
     """
     repo_hint = f" in repo {config.repo}" if config.repo else ""
     title = issue_title or f"issue #{issue_number}"
-    supervisor_file = config.supervisor_handoff.supervisor_file
     return (
         f"Process governance issue #{issue_number}{repo_hint}: {title}\n"
-        f"This issue has already been handed to {supervisor_file} by the "
-        "trigger layer.\n"
+        "This issue has already been handed to the configured supervisor material "
+        "by the trigger layer.\n"
         "Read the issue directly, verify the findings, perform the "
         "allowed actions, "
         "comment the outcome on the same issue, and close it when complete."
@@ -67,23 +66,18 @@ def build_supervisor_handoff_payload(
 ) -> tuple[str, Any, str]:
     """Build payload for supervisor handoff execution.
 
-    Renders the supervisor prompt using governance prompt infrastructure
-    with supervisor-handoff config overrides.
+    Renders the supervisor prompt using direct recipe rendering.
 
     Returns:
         Tuple of (prompt, agent_options, task_string).
     """
-    from vibe3.roles.governance import render_governance_prompt
+    from vibe3.prompts.assembler import PromptAssembler
+    from vibe3.prompts.manifest import PromptManifest
+    from vibe3.prompts.models import PromptRecipe
+    from vibe3.prompts.provider_registry import ProviderRegistry
+    from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 
-    governance_cfg = config.governance.model_copy(
-        update={
-            "supervisor_file": config.supervisor_handoff.supervisor_file,
-            "supervisor_files": [],
-            "prompt_template": config.supervisor_handoff.prompt_template,
-            "dry_run": False,
-        }
-    )
-    handoff_config = config.model_copy(update={"governance": governance_cfg})
+    prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
 
     # Build empty snapshot context — supervisor handoff uses template rendering
     # without live snapshot data; the template embeds supervisor material.
@@ -103,8 +97,26 @@ def build_supervisor_handoff_payload(
         "truncated_note": "",
     }
 
-    rendered = render_governance_prompt(handoff_config, snapshot_context, prompts_path)
+    # Load recipe from manifest
+    manifest = PromptManifest.load_default()
+    recipe_def = manifest.recipe("supervisor.handoff")
+
+    if recipe_def.loaded_definition is None:
+        raise ValueError("supervisor.handoff recipe not properly loaded")
+
+    # Build PromptRecipe from loaded definition
+    recipe = PromptRecipe(
+        template_key=recipe_def.loaded_definition.template_key,
+        variables=recipe_def.loaded_definition.variables,
+        description=recipe_def.loaded_definition.description,
+    )
+
+    # Build registry for runtime providers
+    registry = ProviderRegistry()
+    assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
+    rendered = assembler.render(recipe, runtime_context=snapshot_context)
     prompt = rendered.rendered_text
+
     options = resolve_supervisor_agent_options(config)
     task = build_supervisor_task_string(
         config,
@@ -267,7 +279,8 @@ def iter_supervisor_identified_events(
     """Filter raw GitHub issues into supervisor observation events."""
     issue_label = config.supervisor_handoff.issue_label
     handoff_label = config.supervisor_handoff.handoff_state_label
-    supervisor_file = config.supervisor_handoff.supervisor_file
+    # supervisor_file is now fixed in recipe, use canonical value
+    supervisor_file = "supervisor/apply.md"
 
     events: list[SupervisorIssueIdentified] = []
     for item in raw_issues:

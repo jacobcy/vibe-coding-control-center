@@ -314,7 +314,6 @@ orchestra:
     enabled: true
     issue_label: "supervisor"
     handoff_state_label: "state/handoff"
-    supervisor_file: "supervisor/apply.md"
     prompt_template: "orchestra.supervisor.apply"
     # Supervisor handoff agent configuration (independent from run/manager/governance)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。

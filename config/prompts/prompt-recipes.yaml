@@ -148,3 +148,57 @@ recipes:
           - review.output_format
           - review.retry_task
           - review.exit_contract
+
+  # Supervisor handoff role.
+  #
+  # Direct template recipe for supervisor handoff execution.
+  # Variables are resolved at runtime from snapshot context.
+  supervisor.handoff:
+    kind: template_recipe
+    template_key: orchestra.supervisor.apply
+    variables:
+      supervisor_name:
+        kind: literal
+        value: supervisor/apply.md
+      supervisor_content:
+        kind: file
+        path: supervisor/apply.md
+      server_status:
+        kind: provider
+        provider: governance.server_status
+      active_count:
+        kind: provider
+        provider: governance.active_count
+      active_flows:
+        kind: provider
+        provider: governance.active_flows
+      active_worktrees:
+        kind: provider
+        provider: governance.active_worktrees
+      running_issue_count:
+        kind: provider
+        provider: governance.running_issue_count
+      queued_issue_count:
+        kind: provider
+        provider: governance.queued_issue_count
+      suggested_issue_count:
+        kind: provider
+        provider: governance.suggested_issue_count
+      circuit_breaker_state:
+        kind: provider
+        provider: governance.circuit_breaker_state
+      circuit_breaker_failures:
+        kind: provider
+        provider: governance.circuit_breaker_failures
+      issue_list:
+        kind: provider
+        provider: governance.issue_list
+      running_issue_details:
+        kind: provider
+        provider: governance.running_issue_details
+      suggested_issue_details:
+        kind: provider
+        provider: governance.suggested_issue_details
+      truncated_note:
+        kind: provider
+        provider: governance.truncated_note
