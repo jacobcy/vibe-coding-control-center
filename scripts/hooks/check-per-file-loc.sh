@@ -16,7 +16,7 @@
 #   Shell: lib/, lib3/, bin/vibe
 #   Python: src/vibe3/
 #
-# Scripts paths (defined in config/loc_limits.yaml:code_limits.scripts_paths):
+# Scripts paths (defined in config/v3/loc_limits.yaml:code_limits.scripts_paths):
 #   Shell: scripts/ (*.sh files)
 #   Python: scripts/ (*.py files)
 #

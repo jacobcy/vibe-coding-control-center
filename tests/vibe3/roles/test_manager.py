@@ -10,9 +10,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestra_config import AssigneeDispatchConfig, OrchestraConfig
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.roles.manager import HANDOFF_MANAGER_ROLE, MANAGER_ROLE
+from vibe3.roles.manager import (
+    HANDOFF_MANAGER_ROLE,
+    MANAGER_ROLE,
+    build_manager_sync_request,
+)
 
 
 class TestManagerBlockedIssueNotDispatched:
@@ -250,6 +255,132 @@ class TestManagerBlockedIssueNotDispatched:
 
         # Unassigned issue should be filtered out
         assert [issue.number for issue in ready_issues] == []
+
+
+class TestManagerPromptAssembly:
+    """Manager prompt output is controlled by prompt-recipes.yaml sections."""
+
+    def test_bootstrap_recipe_renders_supervisor_from_recipe_source(
+        self, tmp_path, monkeypatch
+    ):
+        """Supervisor content comes from recipe source declaration."""
+        from vibe3.prompts import manifest
+
+        # Create supervisor file
+        supervisor_file = tmp_path / "manager.md"
+        supervisor_file.write_text("MANAGER SUPERVISOR BODY", encoding="utf-8")
+
+        # Create recipe with source declaration
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text(
+            f"""
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.supervisor_content
+            source:
+              kind: file
+              path: {supervisor_file}
+          - key: manager.target
+          - key: manager.quick_commands
+      retry.resume:
+        sections:
+          - manager.retry_task
+""",
+            encoding="utf-8",
+        )
+
+        # Create prompts.yaml with minimal sections
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(
+            """
+manager:
+  target: "target section"
+  quick_commands: "quick commands"
+  retry_task: "retry task"
+""",
+            encoding="utf-8",
+        )
+
+        # Patch paths
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr("vibe3.roles.manager.DEFAULT_PROMPTS_PATH", prompts_path)
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id=None,
+            options=object(),
+            actor="test",
+            dry_run=False,
+            show_prompt=False,
+        )
+
+        assert "MANAGER SUPERVISOR BODY" in (request.prompt or "")
+
+    def test_retry_resume_recipe_does_not_render_supervisor_section(
+        self, tmp_path, monkeypatch
+    ):
+        """retry.resume variant does not include supervisor_content section."""
+        from vibe3.prompts import manifest
+
+        # Create recipe without supervisor_content in retry.resume
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text(
+            """
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.supervisor_content
+            source:
+              kind: literal
+              value: "SUPERVISOR CONTENT"
+          - key: manager.target
+      retry.resume:
+        sections:
+          - manager.retry_task
+""",
+            encoding="utf-8",
+        )
+
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(
+            """
+manager:
+  target: "target section"
+  retry_task: "retry task"
+""",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr("vibe3.roles.manager.DEFAULT_PROMPTS_PATH", prompts_path)
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id="session-1",
+            options=object(),
+            actor="test",
+            dry_run=False,
+            show_prompt=False,
+        )
+
+        assert "SUPERVISOR CONTENT" not in (request.prompt or "")
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:

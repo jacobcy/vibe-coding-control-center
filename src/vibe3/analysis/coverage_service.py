@@ -24,7 +24,7 @@ class CoverageService:
 
         Args:
             thresholds: Custom coverage thresholds per layer.
-                        If None, reads from config/settings.yaml.
+                        If None, reads from config/v3/settings.yaml.
             project_root: Project root directory (defaults to cwd)
         """
         if thresholds is not None:

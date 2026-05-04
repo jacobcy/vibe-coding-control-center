@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "config/*.sh"
+      - "config/shell/*.sh"
       - "lib/alias/*.sh"
       - "tests/test-aliases.sh"
   pull_request:
     branches: [main]
     paths:
-      - "config/*.sh"
+      - "config/shell/*.sh"
       - "lib/alias/*.sh"
       - "tests/test-aliases.sh"
 
@@ -40,8 +40,8 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           echo "Checking syntax of all alias and config files..."
-          for file in config/*.sh lib/alias/*.sh; do
-            [[ -e "$file" ]] || continue
+          setopt NULL_GLOB
+          for file in config/shell/*.sh lib/alias/*.sh; do
             echo "Checking: $file"
             zsh -n "$file"
           done

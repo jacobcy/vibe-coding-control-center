@@ -38,7 +38,7 @@ class ContextBuilderError(VibeError):
 def build_policy_section(policy_path: str) -> str:
     """Build policy section from file.
 
-    Source: config/settings.yaml (review.policy_file)
+    Source: config/v3/settings.yaml (review.policy_file)
 
     Args:
         policy_path: Path to review policy markdown file
@@ -61,7 +61,7 @@ def build_policy_section(policy_path: str) -> str:
 def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
     """Build tools guide section from file.
 
-    Source: config/settings.yaml (review.common_rules)
+    Source: config/v3/settings.yaml (review.common_rules)
 
     Args:
         tools_guide_path: Path to tools guide file (optional)
@@ -124,7 +124,8 @@ def build_ast_analysis_section(
 def build_review_task_section(task_text: str | None) -> str:
     """Build review task section.
 
-    Source: config/settings.yaml (review.review_task) or default
+    Source: config/prompts/prompts.yaml (review.review_task) via VibeConfig,
+    or default.
 
     Args:
         task_text: Task text from config (optional)
@@ -155,7 +156,8 @@ def build_review_task_section(task_text: str | None) -> str:
 def build_output_contract_section(output_format: str | None) -> str:
     """Build output contract section.
 
-    Source: config/settings.yaml (review.output_format) or default
+    Source: config/prompts/prompts.yaml (review.output_format) via VibeConfig,
+    or default.
 
     Args:
         output_format: Output format text from config (optional)
@@ -212,7 +214,7 @@ def _build_review_prompt_providers(
     request: ReviewRequest,
     config: VibeConfig,
 ) -> dict[str, PromptProvider]:
-    """Build providers used by config/prompt-recipes.yaml review sections."""
+    """Build providers used by config/prompts/prompt-recipes.yaml review sections."""
 
     def review_retry_task() -> str | None:
         return getattr(config.review, "retry_task", None)
@@ -249,7 +251,7 @@ def build_review_prompt_body(
 
     Args:
         request: Review request containing scope, symbols, and task.
-        config: VibeConfig instance (loads from settings.yaml if None).
+        config: VibeConfig instance (loads from default migrated config if None).
         mode: Prompt mode. ``retry`` revisits an existing review round.
         context_mode: ``resume`` means an existing session is available, so use
             the minimal retry prompt instead of re-sending policy/rules context.

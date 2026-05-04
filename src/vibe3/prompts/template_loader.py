@@ -119,7 +119,7 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 
 
 def load_prompt_templates(prompts_path: Path | None = None) -> dict[str, Any]:
-    """Load prompt templates from config/prompts.yaml with defaults."""
+    """Load prompt templates from config/prompts/prompts.yaml with defaults."""
     path = prompts_path or _resolve_prompts_path()
     loaded: dict[str, Any] = {}
     if path.exists():

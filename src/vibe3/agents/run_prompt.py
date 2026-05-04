@@ -78,7 +78,7 @@ def _build_run_prompt_providers(
     plan_content: str | None = None,
     skill_content: str | None = None,
 ) -> dict[str, PromptProvider]:
-    """Build providers used by config/prompt-recipes.yaml run sections.
+    """Build providers used by config/prompts/prompt-recipes.yaml run sections.
 
     Note: Imports review_prompt inline to avoid circular dependency at module level.
     If review_prompt ever needs to import run_prompt, extract shared helpers

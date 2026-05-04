@@ -82,7 +82,6 @@ orchestra:
     timeout_seconds: 1800
     prompt_template: "orchestra.assignee_dispatch.manager"
     supervisor_file: "supervisor/manager.md"
-    include_supervisor_content: true
 ```
 
 ### 使用场景

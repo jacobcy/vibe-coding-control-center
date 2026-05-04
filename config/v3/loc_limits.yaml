@@ -165,6 +165,9 @@ code_limits:
       - path: "tests/vibe3/roles/test_governance.py"
         limit: 500
         reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景"
+      - path: "tests/vibe3/roles/test_manager.py"
+        limit: 500
+        reason: "Manager 角色测试集，覆盖 dispatch blocking、prompt assembly、state transition、failure handling 四个紧密耦合场景，拆分收益低"
       - path: "tests/vibe3/roles/test_review.py"
         limit: 450
         reason: "Review 角色测试集，覆盖 request builder、sync/async dispatch、parser 集成等紧密耦合逻辑"

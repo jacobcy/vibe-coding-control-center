@@ -102,7 +102,7 @@ tmux new -d -s orchestra 'vibe3 serve start --port 8080'
 
 ## 配置
 
-`config/settings.yaml` 中的 `orchestra` 节：
+`config/v3/settings.yaml` 中的 `orchestra` 节：
 
 ```yaml
 orchestra:

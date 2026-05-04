@@ -35,11 +35,11 @@ recipes:
 
 
 def test_prompt_manifest_resolves_migrated_default_path() -> None:
-    assert DEFAULT_PROMPT_RECIPES_PATH == Path("config/v3/prompt-recipes.yaml")
+    assert DEFAULT_PROMPT_RECIPES_PATH == Path("config/prompts/prompt-recipes.yaml")
 
     resolved = _resolve_repo_path(DEFAULT_PROMPT_RECIPES_PATH)
 
-    assert resolved == Path.cwd() / "config/v3/prompt-recipes.yaml"
+    assert resolved == Path.cwd() / "config/prompts/prompt-recipes.yaml"
 
 
 def test_prompt_manifest_renders_configured_sections(tmp_path: Path) -> None:
@@ -173,3 +173,69 @@ recipes:
         assert "demo.missing" in error_msg
     else:
         pytest.fail("Expected KeyError was not raised")
+
+
+def test_prompt_manifest_loads_section_recipe_with_section_sources(
+    tmp_path: Path,
+) -> None:
+    """Verify section_recipe can have section-level source declarations."""
+    from vibe3.prompts.models import VariableSourceKind
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.supervisor_content
+            source:
+              kind: file
+              path: supervisor/manager.md
+          - key: manager.target
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+    recipe = manifest.recipe("manager.default")
+
+    assert recipe.kind == "section_recipe"
+    # Access loaded definition for full section specs
+    assert recipe.loaded_definition is not None
+    loaded_variant = recipe.loaded_definition.variants["first.bootstrap"]
+    assert loaded_variant.sections[0].key == "manager.supervisor_content"
+    assert loaded_variant.sections[0].source is not None
+    assert loaded_variant.sections[0].source.kind == VariableSourceKind.FILE
+
+
+def test_prompt_manifest_loads_template_recipe(tmp_path: Path) -> None:
+    """Verify template_recipe kind with variables mapping."""
+    from vibe3.prompts.models import VariableSourceKind
+
+    recipes_path = tmp_path / "prompt-recipes.yaml"
+    recipes_path.write_text(
+        """
+recipes:
+  governance.scan:
+    kind: template_recipe
+    template_key: orchestra.governance.plan
+    variables:
+      supervisor_content:
+        kind: file
+        path: supervisor/governance/assignee-pool.md
+""",
+        encoding="utf-8",
+    )
+
+    manifest = PromptManifest.load(recipes_path)
+    recipe = manifest.recipe("governance.scan")
+
+    assert recipe.kind == "template_recipe"
+    assert recipe.template_key == "orchestra.governance.plan"
+    # Access loaded_definition for variables
+    assert recipe.loaded_definition is not None
+    vars = recipe.loaded_definition.variables
+    assert vars["supervisor_content"].kind == VariableSourceKind.FILE

@@ -206,10 +206,10 @@ def publish_run_command_success(
 ) -> None:
     """Record run command success. State transitions are the agent's responsibility.
 
-    The agent receives run_task / output_format from settings.yaml (via
-    run.skill recipe with standard providers), which includes the instruction to change
-    issue label to state/handoff. Code layer MUST NOT auto-transition state
-    (noop-gate-boundary-standard).
+    The agent receives run_task / output_format from config/prompts/prompts.yaml
+    (via run.skill recipe with standard providers), which includes the instruction
+    to change issue label to state/handoff. Code layer MUST NOT auto-transition
+    state (noop-gate-boundary-standard).
     """
     from loguru import logger as _logger
 

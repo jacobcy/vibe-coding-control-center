@@ -17,19 +17,19 @@
 #
 # 4. Role prompt materials and templates
 #    run / plan / review
-#    保存角色 prompt 的模板和材料文本。section 装配由 config/prompt-recipes.yaml 控制。
+#    保存角色 prompt 的模板和材料文本。section 装配由 config/prompts/prompt-recipes.yaml 控制。
 #
 # =============================================================================
 # Prompt Assembly Layer - Recipe Schema and Variable Source Kinds
 # =============================================================================
 #
 # vibe3 正在收敛到统一 Prompt Assembly 层：
-# - config/prompts.yaml：保存模板文本和实际 prompt 文案。
-# - config/prompt-recipes.yaml：声明角色 prompt section 组成和顺序。
+# - config/prompts/prompts.yaml：保存模板文本和实际 prompt 文案。
+# - config/prompts/prompt-recipes.yaml：声明角色 prompt section 组成和顺序。
 # - Python 代码：读取运行时状态并选择 recipe variant。
 #
 # 当前迁移状态：
-# - run.* / plan.* / review.*：运行时已读取 config/prompt-recipes.yaml。
+# - run.* / plan.* / review.*：运行时已读取 config/prompts/prompt-recipes.yaml。
 # - pr.* / orchestra.*：不是角色 prompt recipe，不走 prompt-recipes.yaml。
 #
 # Variable source kinds（变量来源类型）:
@@ -152,7 +152,7 @@ pr:
 # =============================================================================
 #
 # 这些模板服务于治理和调度，不是 planner/executor/reviewer 的角色 prompt。
-# 使用方通常通过 PromptAssembler + config/settings.yaml 中的 prompt_template 选择。
+# 使用方通常通过 PromptAssembler + config/v3/settings.yaml 中的 prompt_template 选择。
 #
 # orchestra.governance.plan
 #   supervisor 驱动的 issue pool 治理扫描 prompt。
@@ -164,7 +164,7 @@ pr:
 #   manager 状态控制器 prompt，用于检查 scene / issue comments / refs 并做状态决策。
 orchestra:
   governance:
-    # Selected by config/settings.yaml -> orchestra.governance.prompt_template
+    # Selected by config/v3/settings.yaml -> orchestra.governance.prompt_template
     # Available template variables:
     # - {supervisor_name}
     # - {supervisor_content}
@@ -254,10 +254,11 @@ orchestra:
 # Role Prompt Materials: Manager
 # =============================================================================
 #
-# 运行时状态：由 config/prompt-recipes.yaml -> manager.default 装配。
+# 运行时状态：由 config/prompts/prompt-recipes.yaml -> manager.default 装配。
 #
 # 材料语义：
-# - supervisor_content：supervisor/manager.md 文件内容（动态加载）。
+# - supervisor_content：由 config/prompts/prompt-recipes.yaml 的
+#   manager.default section source 指向的 supervisor 材料文件内容。
 # - target：manager 目标和职责定义。
 # - quick_commands：快速场景读取命令（task show、handoff status 等），
 #   帮助 agent 快速获取当前 issue/flow/task 状态，无需解析完整 prompt。
@@ -267,7 +268,7 @@ orchestra:
 manager:
   # Dynamic: supervisor file content (loaded at runtime)
   # Section name: manager.supervisor_content
-  # Source: config.assignee_dispatch.supervisor_file (e.g., supervisor/manager.md)
+  # Source: config/prompts/prompt-recipes.yaml -> manager.default section source
 
   # Static: manager target and role definition
   # NOTE: No variable substitution needed - agent gets issue info from task show
@@ -304,7 +305,7 @@ manager:
 # Role Prompt Materials: Executor / Run
 # =============================================================================
 #
-# 运行时状态：已由 config/prompt-recipes.yaml 装配。
+# 运行时状态：已由 config/prompts/prompt-recipes.yaml 装配。
 # 模板：
 # - run.plan：executor 常规 plan/flow_plan/lightweight 模式的外层模板。
 # - run.skill：skill execution 模式的外层模板。
@@ -423,7 +424,7 @@ run:
 # Role Prompt Materials: Planner / Plan
 # =============================================================================
 #
-# 运行时状态：由 config/prompt-recipes.yaml -> plan.default 装配。
+# 运行时状态：由 config/prompts/prompt-recipes.yaml -> plan.default 装配。
 #
 # 材料语义：
 # - output_format：计划文档形状建议。对 plan 来说有帮助，但不如 exit contract 关键。
@@ -520,7 +521,7 @@ plan:
 # Role Prompt Materials: Reviewer / Review
 # =============================================================================
 #
-# 运行时状态：由 config/prompt-recipes.yaml -> review.default 装配。
+# 运行时状态：由 config/prompts/prompt-recipes.yaml -> review.default 装配。
 #
 # 材料语义：
 # - output_format：review verdict contract。对 review 来说非常重要，每轮都应强调。

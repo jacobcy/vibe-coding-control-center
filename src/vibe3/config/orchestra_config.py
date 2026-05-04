@@ -65,14 +65,6 @@ class AssigneeDispatchConfig(BaseModel):
         default="orchestra.assignee_dispatch.manager",
         description="Dotted prompts.yaml path used to render the manager task prompt",
     )
-    supervisor_file: str | None = Field(
-        default="supervisor/manager.md",
-        description="Supervisor file to include in manager prompt (None disables)",
-    )
-    include_supervisor_content: bool = Field(
-        default=True,
-        description="Whether to include supervisor file content in the manager prompt",
-    )
     token_env: str | None = Field(
         default="VIBE_MANAGER_GITHUB_TOKEN",
         description=(
@@ -121,32 +113,9 @@ class GovernanceConfig(BaseModel):
     """Configuration for periodic governance scan service."""
 
     enabled: bool = True
-    supervisor_file: str = Field(
-        default="supervisor/governance/assignee-pool.md",
-        description="Supervisor file to include in the composed governance prompt",
-    )
-    supervisor_files: list[str] = Field(
-        default=[],
-        description="Multiple governance material files for round-robin rotation. "
-        "Takes precedence over supervisor_file when non-empty.",
-    )
-
-    def get_supervisor_materials(self) -> list[str]:
-        """Return the list of governance material files to rotate through.
-
-        supervisor_files takes precedence; falls back to [supervisor_file].
-        """
-        if self.supervisor_files:
-            return list(self.supervisor_files)
-        return [self.supervisor_file]
-
     prompt_template: str = Field(
         default="orchestra.governance.plan",
         description="Dotted prompts.yaml path used to render governance prompt",
-    )
-    include_supervisor_content: bool = Field(
-        default=True,
-        description="Whether to inline the supervisor file content into the prompt",
     )
     dry_run: bool = False
     interval_ticks: int = Field(
@@ -162,11 +131,13 @@ class GovernanceConfig(BaseModel):
     )
     backend: str | None = Field(
         default=None,
-        description="Backend override (leave empty to use config/models.json preset)",
+        description=(
+            "Backend override (leave empty to use config/v3/models.json preset)"
+        ),
     )
     model: str | None = Field(
         default=None,
-        description="Model override (leave empty to use config/models.json preset)",
+        description="Model override (leave empty to use config/v3/models.json preset)",
     )
 
 
@@ -176,7 +147,6 @@ class SupervisorHandoffConfig(BaseModel):
     enabled: bool = True
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
-    supervisor_file: str = "supervisor/apply.md"
     interval_ticks: int = Field(
         default=4,
         description="Run supervisor scan every N heartbeat ticks (same as governance)",
@@ -191,11 +161,13 @@ class SupervisorHandoffConfig(BaseModel):
     )
     backend: str | None = Field(
         default=None,
-        description="Backend override (leave empty to use config/models.json preset)",
+        description=(
+            "Backend override (leave empty to use config/v3/models.json preset)"
+        ),
     )
     model: str | None = Field(
         default=None,
-        description="Model override (leave empty to use config/models.json preset)",
+        description="Model override (leave empty to use config/v3/models.json preset)",
     )
 
 

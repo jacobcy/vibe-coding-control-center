@@ -17,8 +17,6 @@ from vibe3.models.review_runner import AgentOptions
 @dataclass(frozen=True)
 class PromptContract:
     template: str
-    supervisor_file: str | None = None
-    include_supervisor_content: bool = True
 
 
 @dataclass(frozen=True)
@@ -137,14 +135,7 @@ class ExecutionRolePolicyService:
         if not template:
             raise ValueError(f"No prompt_template for role: {role}")
 
-        supervisor_file = getattr(section, "supervisor_file", None)
-        include_supervisor = getattr(section, "include_supervisor_content", True)
-
-        return PromptContract(
-            template=template,
-            supervisor_file=supervisor_file,
-            include_supervisor_content=include_supervisor,
-        )
+        return PromptContract(template=template)
 
     def resolve_session_strategy(self, role: str) -> SessionStrategy:
         section_name = self._ROLE_CONFIG_MAP.get(role)
