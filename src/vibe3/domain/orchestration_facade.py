@@ -130,6 +130,10 @@ class OrchestrationFacade(ServiceBase):
 
         # Poll issue labels for all trigger states
         if not self._dispatch_services:
+            append_orchestra_event(
+                "dispatcher",
+                "OrchestrationFacade: no dispatch services registered",
+            )
             return
 
         if self._coordinator is None:
