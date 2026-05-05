@@ -95,7 +95,7 @@ src/vibe3/
 
 ---
 
-### Phase 3: Handoff（责任链层）⏸️ 待启动
+### Phase 3: Handoff（责任链层）✅ 已完成
 
 **目标**: 实现 plan/execute/review 三阶段责任链，确保每个操作可记录
 
@@ -119,9 +119,9 @@ src/vibe3/
 
 ---
 
-### Phase 4: Orchestra（自动编排层）⏸️ 冻结
+### Phase 4: Orchestra（自动编排层）✅ 运行中
 
-**状态**: ⏸️ **冻结** - 面向未来设计，当前不实施
+**状态**: ✅ **运行中** - 已实现核心调度功能，持续优化中
 
 **目标**: 实现 agent 自动编排，借鉴 Symphony 的调度理念
 
@@ -137,9 +137,9 @@ src/vibe3/
 - [github-issue-draft.md](orchestra/github-issue-draft.md) - GitHub Issue 草稿
 
 **实施条件**:
-- ✅ Phase 1-3 完成并稳定运行
+- ✅ Phase 1-3 已完成并稳定运行
 - ✅ 有明确的 agent 自动编排需求
-- ✅ 团队有资源投入
+- 🔄 持续优化调度与容量控制
 
 ---
 
@@ -183,9 +183,18 @@ src/vibe3/
 - ✅ Handoff 责任链系统（SQLite handoff store, HandoffService）
 - ✅ Orchestra 自动编排（Manager, dispatcher, ready queue）
 
-### Phase 1 验收状态
+### Phase 2 验收状态
 
-Phase 1 基础设施层已完成所有核心交付物，验收标准已达成。
+Phase 2 Trace 层暂未启动，但不阻塞 Orchestra 运行。
+Phase 3 Handoff 层已完成所有核心交付物。
+
+### Phase 4 当前状态
+
+Orchestra 已实现核心调度功能：
+- ✅ Driver/Tick/Async Child 架构
+- ✅ Event-driven dispatch
+- ✅ Capacity control (live worker sessions)
+- 🔄 持续优化调度稳定性与恢复机制
 
 ---
 
