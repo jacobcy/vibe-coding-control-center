@@ -112,7 +112,7 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
 
 
 def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
-    """With --label= (empty value), should auto-infer target state and keep worktree."""
+    """With --label auto, should auto-infer target state and keep worktree."""
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
@@ -149,7 +149,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
                 repo=None,
                 reason="test resume",
                 worktree_path="/tmp/issue-303",
-                label_state="",  # ← --label= (empty, triggers auto-inference)
+                label_state="",  # ← --label auto (converted to empty string internally)
             )
 
         # Verify: worktree NOT deleted (reset_task_scene NOT called)
