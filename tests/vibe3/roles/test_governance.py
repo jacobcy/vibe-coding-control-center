@@ -205,14 +205,19 @@ class TestBuildGovernanceRecipe:
         assert "supervisor_name" in recipe.variables
         assert "server_status" in recipe.variables
 
-    def test_supervisor_content_file_source(self):
+    def test_supervisor_content_literal_with_read_instruction(self):
         config = _make_config()
         recipe = build_governance_recipe(config)
         from vibe3.prompts.models import VariableSourceKind
 
         src = recipe.variables["supervisor_content"]
-        assert src.kind == VariableSourceKind.FILE
-        assert src.path == "supervisor/governance/assignee-pool.md"
+        # 修复：不再注入完整 40KB+ supervisor 文件
+        # 改为 literal + Read instruction（参考 manager.default 配置）
+        assert src.kind == VariableSourceKind.LITERAL
+        assert "Read tool" in src.value
+        assert "supervisor/governance/assignee-pool.md" in src.value
+        assert "Governance 执行指南" in src.value
+        assert len(src.value) < 1000  # 轻量级指令应小于 1000 字符
 
     def test_missing_material_catalog_fails_instead_of_using_python_fallback(
         self, tmp_path, monkeypatch
