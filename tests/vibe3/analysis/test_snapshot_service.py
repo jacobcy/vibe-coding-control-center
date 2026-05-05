@@ -165,7 +165,7 @@ def test_build_snapshot_uses_shared_python_collection(
     fake_git = MagicMock()
     fake_git.get_current_branch.return_value = "task/demo"
     fake_git.get_current_commit.return_value = "abcdef1234567890"
-    monkeypatch.setattr(snapshot_service, "GitClient", lambda: fake_git)
+    monkeypatch.setattr(snapshot_service, "get_git_client", lambda: fake_git)
 
     collected = [
         FileStructure(
@@ -238,7 +238,7 @@ def test_save_and_load_branch_baseline(
     fake_git = MagicMock()
     fake_git.get_current_branch.return_value = "feature/issue-324"
     fake_git.get_current_commit.return_value = "abcdef1234567890"
-    monkeypatch.setattr(snapshot_service, "GitClient", lambda: fake_git)
+    monkeypatch.setattr(snapshot_service, "get_git_client", lambda: fake_git)
 
     # Mock the actual build - we just test saving/loading
     def fake_build() -> StructureSnapshot:

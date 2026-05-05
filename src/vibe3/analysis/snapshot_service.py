@@ -7,7 +7,7 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.analysis import dag_service, structure_service
-from vibe3.clients.git_client import GitClient
+from vibe3.clients.git_client import get_git_client
 from vibe3.exceptions import VibeError
 from vibe3.models.snapshot import (
     DependencyEdge,
@@ -39,12 +39,12 @@ LATEST_LINK_NAME = "vibe3/structure/latest.json"
 
 
 def _get_snapshot_dir() -> Path:
-    git = GitClient()
+    git = get_git_client()
     return Path(git.get_git_common_dir()) / SNAPSHOT_DIR_NAME
 
 
 def _get_latest_link_path() -> Path:
-    git = GitClient()
+    git = get_git_client()
     return Path(git.get_git_common_dir()) / LATEST_LINK_NAME
 
 
@@ -53,7 +53,7 @@ def _ensure_snapshot_dir() -> None:
 
 
 def _get_baseline_dir() -> Path:
-    git = GitClient()
+    git = get_git_client()
     return Path(git.get_git_common_dir()) / SNAPSHOT_TAG_DIR_NAME
 
 
@@ -79,7 +79,7 @@ def build_snapshot(root: str = "src/vibe3") -> StructureSnapshot:
     log.info("Building structure snapshot")
 
     try:
-        git = GitClient()
+        git = get_git_client()
         branch = git.get_current_branch()
         commit = git.get_current_commit()
         commit_short = commit[:7] if commit else "unknown"
@@ -316,7 +316,7 @@ def find_snapshot_by_branch(
     # If current_branch is provided, find snapshot closest to merge-base
     if current_branch:
         try:
-            git = GitClient()
+            git = get_git_client()
             merge_base = git.get_merge_base(branch, current_branch)
             merge_base_short = merge_base[:7] if merge_base else None
 

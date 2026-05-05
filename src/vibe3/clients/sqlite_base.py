@@ -5,7 +5,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients.git_client import get_git_client
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.exceptions import GitError
 
@@ -15,7 +15,7 @@ class SQLiteClientBase:
 
     def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
-            git_common_dir = GitClient().get_git_common_dir()
+            git_common_dir = get_git_client().get_git_common_dir()
             if not git_common_dir:
                 raise GitError("rev-parse --git-common-dir", "returned empty path")
 

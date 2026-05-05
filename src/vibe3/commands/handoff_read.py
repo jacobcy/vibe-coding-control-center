@@ -7,7 +7,7 @@ import typer
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.git_client import GitClient
+from vibe3.clients.git_client import get_git_client
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
@@ -97,7 +97,7 @@ def show(
                 raise typer.Exit(1)
         try:
             resolved_artifact = resolve_handoff_target(
-                target, resolved_branch, git_client=GitClient()
+                target, resolved_branch, git_client=get_git_client()
             )
         except FileNotFoundError as exc:
             typer.echo(f"Error: {exc}", err=True)

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.clients.git_client import GitClient
+from vibe3.clients.git_client import GitClient, clear_git_client_cache, get_git_client
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import (
     BranchSource,
@@ -234,3 +234,35 @@ class TestCheckMergeConflicts:
             ],
         ):
             assert client.check_merge_conflicts("origin/main") is True
+
+
+class TestGitClientFactory:
+    """GitClient factory caching 测试."""
+
+    def test_get_git_client_returns_cached_instance(self) -> None:
+        """测试 get_git_client 返回缓存的实例."""
+        clear_git_client_cache()
+
+        client1 = get_git_client()
+        client2 = get_git_client()
+
+        assert client1 is client2
+
+    def test_clear_git_client_cache_clears_cache(self) -> None:
+        """测试 clear_git_client_cache 清除缓存."""
+        clear_git_client_cache()
+
+        client1 = get_git_client()
+        clear_git_client_cache()
+        client2 = get_git_client()
+
+        assert client1 is not client2
+
+    def test_factory_does_not_interfere_with_direct_instantiation(self) -> None:
+        """测试工厂方法不干扰直接实例化."""
+        clear_git_client_cache()
+
+        factory_client = get_git_client()
+        direct_client = GitClient()
+
+        assert factory_client is not direct_client

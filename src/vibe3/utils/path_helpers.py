@@ -17,11 +17,12 @@ def _get_git_client(git_client: GitClientProtocol | None = None) -> GitClientPro
     """Get or create a GitClient instance.
 
     Factory function to avoid repeating GitClient initialization logic.
+    Uses cached singleton when no explicit client is provided.
     """
     if git_client is None:
-        from vibe3.clients.git_client import GitClient
+        from vibe3.clients.git_client import get_git_client
 
-        return GitClient()
+        return get_git_client()
     return git_client
 
 
