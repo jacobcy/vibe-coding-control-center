@@ -231,30 +231,29 @@ handoff 只记录流程信息。
 
 7. 本地存储
 
-建议目录：
+V3 使用 SQLite 数据库存储：
 
-.flow/
+位置：
 
-结构：
+.git/vibe3/handoff.db (位于主仓库 git common dir)
 
-.flow/
-  flows/
-    flow-124.yaml
-    flow-125.yaml
+主要表：
 
-  events/
-    handoffs.jsonl
+- flow_state: flow 元数据和状态
+- flow_issue_links: flow 与 issue 的关系
+- flow_events: 事件和 handoff 记录
 
-  config.yaml
+注意：这是历史建议文档，描述的是 V2 文件存储方案。
+当前 V3 实现使用 SQLite，详见 docs/standards/v3/data-model-standard.md。
 
 
 ⸻
 
-Flow 文件
+Flow 数据 (历史建议)
 
-.flow/flows/flow-124.yaml
+注意：以下为 V2 风格的文件存储建议，已被 V3 SQLite 实现取代。
 
-示例：
+.flow/flows/flow-124.yaml 示例：
 
 version: 1
 
@@ -281,9 +280,9 @@ flow:
 
 ⸻
 
-Handoff 事件
+Handoff 事件 (历史建议)
 
-文件：
+V2 风格：
 
 .flow/events/handoffs.jsonl
 
@@ -302,7 +301,7 @@ Handoff 事件
 
 ⸻
 
-8. CLI 设计
+8. CLI 设计 (历史建议)
 
 命令统一围绕 flow。
 
@@ -310,10 +309,13 @@ Handoff 事件
 
 flow
 
+注意：以下为 V2 风格的命令建议，已被 V3 现行命令取代。
+当前 V3 命令标准见 docs/standards/v3/command-standard.md。
+
 
 ⸻
 
-创建 Flow
+创建 Flow (历史建议)
 
 flow create --task 124 --repo owner/repo
 
@@ -322,9 +324,11 @@ flow create --task 124 --repo owner/repo
 	•	stage = plan
 	•	写 handoff
 
+V3 现行方式：使用 `vibe3 flow update` 注册 flow，然后 `vibe3 flow bind` 绑定 issue。
+
 ⸻
 
-开始执行
+开始执行 (历史建议)
 
 flow start 124
 
@@ -332,9 +336,11 @@ flow start 124
 	•	stage → execute
 	•	写 handoff
 
+V3 现行方式：flow 状态由 Orchestra 自动管理，或通过 `vibe3 task resume` 恢复。
+
 ⸻
 
-创建 Draft PR
+创建 Draft PR (历史建议)
 
 flow pr draft 124
 
@@ -344,9 +350,11 @@ gh pr create --draft
 
 然后记录 PR number。
 
+V3 现行方式：直接使用 `gh pr create --draft`，flow 自动关联 PR。
+
 ⸻
 
-进入 Review
+进入 Review (历史建议)
 
 flow handoff 124 --to review
 
@@ -354,9 +362,11 @@ flow handoff 124 --to review
 	•	stage → review
 	•	写 handoff
 
+V3 现行方式：通过 `vibe3 handoff` 记录阶段交接，flow 状态由 Orchestra 管理。
+
 ⸻
 
-完成 Flow
+完成 Flow (历史建议)
 
 flow done 124
 
@@ -367,9 +377,11 @@ gh pr merge
 
 	•	stage → done
 
+V3 现行方式：直接使用 `gh pr merge`，flow 自动进入 done 状态。
+
 ⸻
 
-9. 查询命令
+9. 查询命令 (历史建议)
 
 flow list
 
@@ -381,6 +393,8 @@ FLOW   STAGE    TASK   BRANCH                 PR
 124    execute  124    flow/124-state-sync    245
 125    review   125    flow/125-doctor        246
 126    plan     126    -                      -
+
+V3 现行方式：使用 `vibe3 flow status` 查看 flow 总览，`vibe3 task status` 查看任务总览。
 
 PR 和 branch 状态来自：
 

@@ -191,15 +191,11 @@ vibe3 flow show task/my-feature
 ### 解除阻塞
 
 ```bash
-# 方法 1: 更新 flow 状态
-vibe3 task status active
-
-# 方法 2: 切换到其他 flow
-vibe3 flow switch other-feature
+# 方法 1: 恢复 flow 状态
+vibe3 task resume
 
 # 注意：依赖关系仍保留在 flow_issue_links 表中
-# 如果依赖完成，可以手动清除：
-vibe3 task unlink 218 --role dependency
+# 依赖满足后，Orchestra 会自动检测并恢复 flow
 ```
 
 ---
