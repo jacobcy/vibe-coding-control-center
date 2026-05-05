@@ -141,8 +141,11 @@ def resume(
             metavar="[STATE]",
             help="Clear blocked_reason and restore to specified state "
             "WITHOUT deleting worktree/branch. "
-            "STATE can be: ready, claimed, in-progress, handoff, review, merge-ready. "
-            "If --label is provided without value, defaults to 'handoff'.",
+            "STATE can be: auto, ready, claimed, in-progress, handoff, "
+            "review, merge-ready. "
+            "Use 'auto' to infer target state based on flow refs "
+            "(pr_ref/audit_ref/report_ref/plan_ref). "
+            "Without --label, the original behavior deletes worktree/branch.",
         ),
     ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
@@ -168,7 +171,8 @@ def resume(
     **Label-only mode (no worktree deletion)**:
     Use --label [STATE] to clear blocked_reason and restore
     to specified state WITHOUT deleting worktree/branch.
-    - `--label` (no value) or `--label handoff` → restore to handoff
+    - `--label auto` → auto-infer target state from refs
+    - `--label handoff` → restore to handoff
     - `--label ready` → restore to ready
     - `--label claimed` → restore to claimed
     - `--label in-progress` → restore to in-progress
@@ -177,8 +181,8 @@ def resume(
     Without --label, the original behavior deletes worktree/branch.
 
     Examples:
-        vibe3 task resume 303 --label -y
-            # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label auto -y
+            # Auto-infer target state from refs (keep worktree)
         vibe3 task resume 303 --label handoff -y
             # Restore to handoff, keep worktree
         vibe3 task resume 303 --label ready -y
@@ -238,8 +242,8 @@ def resume(
     effective_label: str | None = None
     if label is not None:
         # --label flag is present
-        if label == "":
-            # --label provided without explicit value -> trigger inference in service
+        if label == "auto":
+            # --label auto -> trigger inference in service
             effective_label = ""
         elif label in valid_states:
             # --label <state> provided
@@ -247,7 +251,7 @@ def resume(
         else:
             typer.echo(
                 f"Error: Invalid state '{label}'. "
-                f"Must be one of: {', '.join(sorted(valid_states))}.",
+                f"Must be one of: auto, {', '.join(sorted(valid_states))}.",
                 err=True,
             )
             raise typer.Exit(1)

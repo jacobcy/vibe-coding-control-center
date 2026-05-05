@@ -112,13 +112,25 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
 
 
 def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
-    """With --label (no value), should NOT call reset_task_scene (keep worktree)."""
+    """With --label auto, should auto-infer target state and keep worktree."""
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
 
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
+
+    # Mock flow state for auto-inference (infer_resume_label needs FlowState)
+    mock_flow_state_dict = {
+        "branch": "task/issue-303",
+        "flow_slug": "task/issue-303",
+        "pr_ref": None,
+        "audit_ref": None,
+        "plan_ref": "docs/plans/test.md",
+        "report_ref": None,
+        "latest_verdict": None,
+    }
+    operations.flow_service.store.get_flow_state.return_value = mock_flow_state_dict
 
     with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
         mock_label_instance = MagicMock()
@@ -137,14 +149,14 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
                 repo=None,
                 reason="test resume",
                 worktree_path="/tmp/issue-303",
-                label_state="handoff",  # ← --label (defaults to handoff)
+                label_state="",  # ← --label auto (converted to empty string internally)
             )
 
         # Verify: worktree NOT deleted (reset_task_scene NOT called)
         operations.git_client.remove_worktree.assert_not_called()
         operations.git_client.delete_branch.assert_not_called()
 
-        # Verify: state restored to HANDOFF via resume_issue
+        # Verify: state restored to IN_PROGRESS (inferred from plan_ref)
         mock_label_instance.confirm_issue_state.assert_called_once()
 
     # Verify: reasons cleared (minimal cleanup, flow record preserved)
