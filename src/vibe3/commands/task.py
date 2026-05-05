@@ -142,7 +142,9 @@ def resume(
             help="Clear blocked_reason and restore to specified state "
             "WITHOUT deleting worktree/branch. "
             "STATE can be: ready, claimed, in-progress, handoff, review, merge-ready. "
-            "If --label is provided without value, defaults to 'handoff'.",
+            "Use --label= (with empty value) to auto-infer target state "
+            "based on flow refs (pr_ref/audit_ref/report_ref/plan_ref). "
+            "Without --label, the original behavior deletes worktree/branch.",
         ),
     ] = None,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
@@ -168,7 +170,8 @@ def resume(
     **Label-only mode (no worktree deletion)**:
     Use --label [STATE] to clear blocked_reason and restore
     to specified state WITHOUT deleting worktree/branch.
-    - `--label` (no value) or `--label handoff` → restore to handoff
+    - `--label=` (empty value) → auto-infer target state from refs
+    - `--label handoff` → restore to handoff
     - `--label ready` → restore to ready
     - `--label claimed` → restore to claimed
     - `--label in-progress` → restore to in-progress
@@ -177,8 +180,8 @@ def resume(
     Without --label, the original behavior deletes worktree/branch.
 
     Examples:
-        vibe3 task resume 303 --label -y
-            # Restore to handoff, keep worktree
+        vibe3 task resume 303 --label= -y
+            # Auto-infer target state from refs (keep worktree)
         vibe3 task resume 303 --label handoff -y
             # Restore to handoff, keep worktree
         vibe3 task resume 303 --label ready -y
