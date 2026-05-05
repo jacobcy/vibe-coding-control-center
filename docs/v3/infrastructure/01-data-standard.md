@@ -27,7 +27,7 @@ related_docs:
 ```
 GitHub 层（唯一真源 - gh CLI 直接访问）
 ├── GitHub Project Items (task, feature, bug) - 规划层真源
-├── GitHub Issues (repo issue) - 来源层真源
+├── GitHub Issues - 来源层真源
 ├── GitHub PRs (pr) - 交付层真源
 └── Git Branches (flow 身份锚点)
 
