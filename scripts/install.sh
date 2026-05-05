@@ -144,11 +144,16 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_D
 
 # 3. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
-for dir in bin lib lib3 config scripts alias; do
+for dir in bin lib lib3 config scripts alias src; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
     mkdir -p "$INSTALL_DIR/$dir"
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
     cp -R "$SOURCE_ROOT/$dir/." "$INSTALL_DIR/$dir/"
+done
+
+# Sync Python project files for uv run
+for file in pyproject.toml uv.lock; do
+    [[ -f "$SOURCE_ROOT/$file" ]] && cp "$SOURCE_ROOT/$file" "$INSTALL_DIR/"
 done
 log_success "Core modules synced"
 
