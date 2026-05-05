@@ -231,16 +231,65 @@ recipes:
     material_catalog:
       - name: supervisor/governance/assignee-pool.md
         source:
-          kind: file
-          path: supervisor/governance/assignee-pool.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/assignee-pool.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/assignee-pool.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：Governance 治理观察者的职责边界
+            - **观察范围**：assignee issue pool 状态分析
+            - **允许操作**：最小 label 调整、comment 建议
+            - **禁止操作**：不恢复一般 blocked issue、不执行代码变更
+
+            阅读后，按照其中的规则执行 governance 职责。
       - name: supervisor/governance/roadmap-intake.md
         source:
-          kind: file
-          path: supervisor/governance/roadmap-intake.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/roadmap-intake.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/roadmap-intake.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：roadmap intake triage 的职责边界
+            - **观察范围**：broader repo issue pool
+            - **目标**：识别适合自动化纳入 assignee issue pool 的对象
+
+            阅读后，按照其中的规则执行 governance 职责。
       - name: supervisor/governance/cron-supervisor.md
         source:
-          kind: file
-          path: supervisor/governance/cron-supervisor.md
+          kind: literal
+          value: |
+            ## Governance 执行指南
+
+            你的完整治理指令和决策规则在以下文件中：
+            `supervisor/governance/cron-supervisor.md`
+
+            **请立即使用 Read tool 阅读此文件**：
+            ```
+            Read("supervisor/governance/cron-supervisor.md")
+            ```
+
+            该文件包含：
+            - **Role 定义**：cron-supervisor 的职责边界
+            - **观察范围**：broader repo docs scope
+            - **目标**：挑选最多 5 个需要语义对齐的过时文档对象
+
+            阅读后，按照其中的规则执行 governance 职责。
     variables:
       server_status:
         kind: provider
