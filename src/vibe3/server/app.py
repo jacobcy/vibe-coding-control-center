@@ -306,86 +306,15 @@ def start(
 
 @app.command()
 def status() -> None:
-    """Show Orchestra server status and FailedGate state."""
-    from rich.console import Console
-    from rich.table import Table
-
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
-    from vibe3.orchestra.failed_gate import FailedGate
+    """Show Orchestra server status, FailedGate state, and recent activity."""
+    from vibe3.services.serve_status_service import ServeStatusService
 
     config = load_orchestra_config()
     pid, is_valid = _validate_pid_file(config.pid_file)
-    console = Console()
+    tmux_exists = _orchestra_tmux_session_exists()
 
-    # Daemon status
-    if pid is None:
-        if _orchestra_tmux_session_exists():
-            console.print("Orchestra server running in tmux session (PID file missing)")
-            raise typer.Exit(0)
-        console.print("Orchestra server is not running (no PID file)")
-        raise typer.Exit(0)
-
-    if not is_valid:
-        if _orchestra_tmux_session_exists():
-            console.print(
-                "Orchestra server running in tmux session "
-                f"(stale PID file points to non-orchestra process {pid})"
-            )
-            raise typer.Exit(0)
-        console.print(
-            f"Orchestra server is not running (stale PID file, process {pid} "
-            "is not orchestra)"
-        )
-        raise typer.Exit(0)
-
-    console.print(f"Orchestra server running (PID: {pid})\n")
-
-    # FailedGate status
-    failed_gate = FailedGate()
-    gate_status = failed_gate.get_status()
-
-    if gate_status.is_active:
-        console.print("[red]Failed Gate: ACTIVE[/red]")
-        console.print(f"  - Reason: {gate_status.reason}")
-        if gate_status.triggered_at:
-            console.print(f"  - Triggered at: {gate_status.triggered_at}")
-        if gate_status.triggered_by_error_code:
-            console.print(f"  - Error code: {gate_status.triggered_by_error_code}")
-        console.print(f"  - Blocked ticks: {gate_status.blocked_ticks}")
-        console.print(
-            '\n[yellow]To resume:[/yellow] vibe3 serve resume --reason "<reason>"'
-        )
-    else:
-        console.print("[green]Failed Gate: OPEN[/green]")
-
-    # Error tracking status
-    error_tracking = ErrorTrackingService.get_instance()
-    error_status = error_tracking.get_status()
-
-    if error_status["total_errors"] > 0:
-        console.print("\nError Statistics:")
-        console.print(f"  - Total errors: {error_status['total_errors']}")
-        console.print(f"  - Model errors: {error_status['model_errors']}")
-        console.print(f"  - API errors: {error_status['api_errors']}")
-        console.print(f"  - Execution errors: {error_status['exec_errors']}")
-
-        # Show recent errors
-        recent_errors = error_tracking.get_recent_errors(limit=5)
-        if recent_errors:
-            table = Table(title="Recent Errors (last 5)", show_lines=True)
-            table.add_column("Tick", style="cyan")
-            table.add_column("Code", style="magenta")
-            table.add_column("Message", style="white")
-
-            for err in recent_errors:
-                table.add_row(
-                    str(err["tick_id"]),
-                    err["error_code"],
-                    err["error_message"][:80],  # Truncate long messages
-                )
-
-            console.print("\n")
-            console.print(table)
+    service = ServeStatusService(config)
+    service.display_status(pid, is_valid, tmux_exists)
 
 
 @app.command()

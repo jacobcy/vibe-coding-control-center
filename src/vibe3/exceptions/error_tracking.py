@@ -226,7 +226,8 @@ class ErrorTrackingService:
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(
                 """
-                SELECT tick_id, error_code, error_message, created_at
+                SELECT tick_id, error_code, error_message,
+                       issue_number, branch, created_at
                 FROM error_log
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -239,7 +240,9 @@ class ErrorTrackingService:
                 "tick_id": row[0],
                 "error_code": row[1],
                 "error_message": row[2],
-                "created_at": row[3],
+                "issue_number": row[3],
+                "branch": row[4],
+                "created_at": row[5],
             }
             for row in rows
         ]

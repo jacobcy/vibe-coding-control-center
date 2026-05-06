@@ -126,7 +126,17 @@ class OrchestrationFacade(ServiceBase):
                 return
 
         # Scan for supervisor candidates and publish events
-        await self.on_supervisor_scan()
+        try:
+            await self.on_supervisor_scan()
+        except Exception as exc:
+            append_orchestra_event(
+                "server",
+                f"tick #{self._tick_count} supervisor scan failed: {exc}",
+            )
+            logger.bind(domain="orchestration_facade").error(
+                f"Supervisor scan failed: {exc}"
+            )
+            # Continue to dispatch even if supervisor scan fails
 
         # Poll issue labels for all trigger states
         if not self._dispatch_services:
@@ -144,17 +154,27 @@ class OrchestrationFacade(ServiceBase):
 
         # Always reconcile session state to prevent stale capacity tracking.
         if self._capacity:
-            # Reconcile session state (mark dead tmux sessions as orphaned)
-            # This ensures count_live_worker_sessions() returns accurate results.
-            from vibe3.environment.session_registry import SessionRegistryService
+            try:
+                # Reconcile session state (mark dead tmux sessions as orphaned)
+                # This ensures count_live_worker_sessions() returns accurate results.
+                from vibe3.environment.session_registry import SessionRegistryService
 
-            store = self._capacity._store
-            backend = self._capacity._backend
-            registry = SessionRegistryService(store, backend)
-            # Mark worker sessions as done (not orphaned) when tmux exits
-            registry.mark_worker_sessions_done_when_tmux_gone()
-            # Then orphan any remaining dead sessions (failed launches)
-            registry.reconcile_live_state()
+                store = self._capacity._store
+                backend = self._capacity._backend
+                registry = SessionRegistryService(store, backend)
+                # Mark worker sessions as done (not orphaned) when tmux exits
+                registry.mark_worker_sessions_done_when_tmux_gone()
+                # Then orphan any remaining dead sessions (failed launches)
+                registry.reconcile_live_state()
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{self._tick_count} session reconciliation failed: {exc}",
+                )
+                logger.bind(domain="orchestration_facade").error(
+                    f"Session reconciliation failed: {exc}"
+                )
+                # Continue to dispatch even if reconciliation fails
 
         await self._coordinator.coordinate()
 

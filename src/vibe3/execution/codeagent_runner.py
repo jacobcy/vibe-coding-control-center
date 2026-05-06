@@ -309,7 +309,14 @@ class CodeagentExecutionService:
             error_code = classify_error_hybrid(exc)
 
             error_tracking = ErrorTrackingService.get_instance()
-            error_tracking.record_error(error_code, str(exc))
+            # Record error with issue_number and branch for better diagnostics
+            error_tracking.record_error(
+                error_code=error_code,
+                error_message=str(exc),
+                tick_id=0,  # Not in tick context during execution
+                issue_number=command.issue_number,
+                branch=command.branch,
+            )
 
             # Build abort message
             abort_msg = (
