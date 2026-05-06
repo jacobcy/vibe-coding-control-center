@@ -43,7 +43,7 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 - 职责：按治理材料执行观察、纳入与派单。
 - `assignee-pool governance`：观察 assignee issue pool 状态，输出排序 / 建议 / 最小纠偏。
-- `roadmap governance`：扫描 broader repo issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool。
+- `roadmap governance`：扫描 broader GitHub issue pool，把适合自动化推进的 bug fix / small feature 纳入 assignee issue pool。
 - `cron governance`：周期性挑选过时文档，创建或更新 supervisor issue，交由 L2 apply 处理。
 - Worktree：**不需要**（`WorktreeRequirement.NONE`）。Governance 是周期扫描观察，只读取文件、操作 GitHub API，不修改代码，无临时 worktree。
 - 参数要求：`cwd=None`。可在主仓库路径或任意目录执行。禁止使用已移除的 `--worktree` 标志。
