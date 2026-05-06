@@ -129,7 +129,7 @@ bin/vibe3 check
 **实现步骤**:
 
 1. **实现 task linkage layer (Python)**
-   - 职责: 宬现 task issue / repo issue 关联与责任链引用的最小索引
+   - 职责: 实现task issue / GitHub issue 关联与责任链引用的最小索引
    - 警告: 不复制 GitHub issue 全量数据，真源仍是 GitHub issue / Project
    - 落地方式: 对 SQLite 的 `flow_issue_links` 做写入和查询，由 Python `store.py` 负责
 
@@ -172,7 +172,7 @@ bin/vibe3 task link task-456 --repo-issue 789
 **目标**: 实现 flow 和 task 的绑定关系
 
 **范围**:
-- `flow bind --issue` - 绑定 repo issue
+- `flow bind --issue` - 绑定 GitHub issue
 - `flow bind task` - 绑定 task issue
 
 **实现步骤**:

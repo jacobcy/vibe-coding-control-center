@@ -64,7 +64,7 @@
 | :--- | :--- | :--- |
 | **[/vibe-task](workflows/vibe:task.md)** | task 总览与 registry 审计 | 委托 `vibe-task` skill 处理跨 worktree 总览与 roadmap-task 修复。 |
 | **[/vibe-check](workflows/vibe:check.md)** | runtime 检查与修复 | 委托 `vibe-check` skill 处理 `task <-> flow` / runtime 问题。 |
-| **[/vibe-issue](workflows/vibe:issue.md)** | issue intake | 委托 `vibe-issue` skill 处理 repo issue 创建、查重与补全。 |
+| **[/vibe-issue](workflows/vibe:issue.md)** | issue intake | 委托 `vibe-issue` skill 处理 GitHub issue 创建、查重与补全。 |
 | **[/vibe-save](workflows/vibe:save.md)** | 会话保存 | 委托 `vibe-save` skill 写回本地 handoff。 |
 
 ---
