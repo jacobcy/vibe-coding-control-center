@@ -89,6 +89,62 @@
 3. 不替缺失 agent 推断立场
 4. 需要时人工决定是否重跑该 PR
 
+## 消息路由错误
+
+这是 Claude Code Agent Teams 的已知 bug (#40166, #39651)，不是 skill 处理错误。
+
+### 现象
+
+- teammate-message 显示错误的 PR 编号或内容
+- agent 的 session 文件中存在正确报告
+- 消息内容与实际生成内容不匹配
+
+### 恢复步骤
+
+1. **验证消息正确性**：
+   - 检查 teammate-message 中的 PR 编号
+   - 对比当前审查的 PR 编号
+   - 发现不匹配时立即停止
+
+2. **定位 session 文件**：
+   ```bash
+   # 从 team config 获取 agent 信息
+   cat ~/.claude/teams/pr-review-team/config.json | jq '.members[] | select(.name=="<agent_name>")'
+
+   # 找到 sessionId 后读取 session 文件
+   cat ~/.claude/projects/.../<sessionId>.jsonl | grep -A 10 "PR #"
+   ```
+
+3. **确认正确报告**：
+   - 在 session 文件中搜索实际输出
+   - 验证 PR 编号、结论、证据是否完整
+   - 记录正确内容来源
+
+4. **如实标注异常**：
+   - 在最终报告中注明"消息路由错误"
+   - 说明正确报告来自 session 文件而非 teammate-message
+   - 引用相关 GitHub issue 证明这是系统 bug
+
+5. **不得假装正常**：
+   - ❌ 不能忽略消息错误继续使用错误内容
+   - ❌ 不能脑补正确内容而不说明来源
+   - ❌ 不能假装收到了正确的 teammate-message
+
+### 正确示例
+
+```text
+⚠️ 消息路由错误：收到 architect-reviewer 的 teammate-message 显示 PR #690，
+但实际审查的是 PR #702。已从 session 文件 3515319b-...jsonl 中定位到正确报告。
+以下内容来自 session 文件而非 teammate-message...
+```
+
+### 禁止行为
+
+- 用错误消息内容作为审查依据
+- 不说明来源直接使用 session 文件内容
+- 假装 teammate-message 正常
+- 不标注异常继续执行
+
 ## 背景报告未送达
 
 优先级顺序：
