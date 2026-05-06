@@ -170,7 +170,7 @@ Vibe3 最终应收敛为六层。
 
 这是当前最需要显式收敛出来的一层。
 
-`execution` 不是新的业务层，而是 domain 的执行器。
+`execution` 不是新的业务层，而是 domain 的执行代理。
 
 ### 5.5 Environment
 
