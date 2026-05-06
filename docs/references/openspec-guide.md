@@ -1,3 +1,10 @@
+---
+title: OpenSpec Workflow Guide
+status: historical-reference
+scope: external-workflow-tool
+note: 本文档描述外部工作流工具 OpenSpec，使用 /opsx:* 命令，非当前 Vibe 3.0 主命令体系。当前项目能力层与编排层边界见 docs/standards/v3/skill-standard.md，技能入口见 skills/ 目录。
+---
+
 # OpenSpec Workflow Guide: From Concept to Code
 
 Welcome to **OpenSpec**, an artifact-driven development workflow designed to make software changes structured, thoughtful, and documented by default.
