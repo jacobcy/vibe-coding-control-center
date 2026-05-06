@@ -321,6 +321,25 @@ class GlobalDispatchCoordinator:
 
             current_state = issue.state.value
             if current_state == entry.waiting_state:
+                # State unchanged. Check whether the agent session that would
+                # advance it is still alive.  If no session exists the label can
+                # never change ─ promote the entry for re-dispatch so the queue
+                # can eventually drain and re-collect.
+                if self._registry is not None:
+                    active = self._registry.get_live_sessions_for_issue(
+                        issue_number=entry.issue_number,
+                        roles=["manager", "planner", "executor", "reviewer"],
+                    )
+                    if not active:
+                        entry.waiting_state = None
+                        promoted.append(entry)
+                        append_orchestra_event(
+                            "dispatcher",
+                            f"GlobalDispatchCoordinator: requeued "
+                            f"#{entry.issue_number} "
+                            f"(no active session, state={current_state})",
+                        )
+                        continue
                 retained.append(entry)
                 continue
 
