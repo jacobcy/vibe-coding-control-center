@@ -160,7 +160,7 @@ def status(
             )
         )
 
-        # 1.5 Dispatch blocking (FailedGate)
+        # 1.5 Dispatch status (FailedGate + Queue)
         if orch_snapshot.dispatch_blocked:
             console.print(
                 "Dispatch: [bold red]FROZEN[/] "
@@ -168,6 +168,8 @@ def status(
             )
             console.print(f"  [red]Issue:   #{orch_snapshot.blocked_issue_number}[/]")
             console.print(f"  [red]Reason:  {orch_snapshot.blocked_issue_reason}[/]")
+        elif not orch_snapshot.server_running:
+            console.print("Dispatch: [dim]inactive (server stopped)[/]")
         else:
             console.print("Dispatch: [green]active[/]")
 
@@ -364,19 +366,28 @@ def status(
                 blocked_by = cast(tuple[int, ...] | None, item.get("blocked_by"))
                 blocked_reason = cast(str | None, item.get("blocked_reason"))
 
-                if flow is None:
-                    flow_info = "[dim](no flow scene)[/]"
-                elif getattr(flow, "flow_status", "active") == "stale":
-                    flow_info = f"[dim]{flow.branch} (stale)[/]"
-                else:
-                    flow_info = f"[cyan]{flow.branch}[/]"
+                # Title: truncate only if needed, no forced ellipsis
+                display_title = title[:60] + ("..." if len(title) > 60 else "")
+                console.print(f"  #{number:4}  [red]BLOCKED[/]  {display_title}")
 
-                console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
+                # Flow info on separate line (consistent with other sections)
+                if flow:
+                    console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
+                else:
+                    console.print("         [dim]flow:[/] [dim](no flow scene)[/]")
+
+                # Blocked metadata
                 if blocked_by:
                     blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)
                     console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
+
+                # Blocked reason: truncate long error messages
                 if blocked_reason:
-                    console.print(f"         [yellow]reason:[/] {blocked_reason}")
+                    # Show first 80 chars for readability
+                    reason_display = blocked_reason[:80]
+                    if len(blocked_reason) > 80:
+                        reason_display += "..."
+                    console.print(f"         [yellow]reason:[/] {reason_display}")
         else:
             console.print("  [dim](none)[/]")
 
