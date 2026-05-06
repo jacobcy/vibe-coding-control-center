@@ -238,6 +238,10 @@ class GlobalDispatchCoordinator:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
         seen_issue_numbers: set[int] = set()
+        append_orchestra_event(
+            "dispatcher",
+            "GlobalDispatchCoordinator: starting queue collection",
+        )
         for state in (
             IssueState.REVIEW,
             IssueState.MERGE_READY,
@@ -263,10 +267,20 @@ class GlobalDispatchCoordinator:
                         )
                     )
             except Exception as exc:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: collect_ready_issues failed for "
+                    f"{state.value}: {exc}",
+                )
                 logger.bind(
                     domain="global_dispatch",
                     state=state.value,
                 ).error(f"collect_ready_issues failed for {state.value}: {exc}")
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: queue collection complete, "
+            f"total={len(queue)} issues",
+        )
         return queue
 
     def _promote_progressed_entries(self) -> None:
