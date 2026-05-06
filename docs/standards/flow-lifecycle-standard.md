@@ -423,7 +423,7 @@ Manager 提交 PR
   └─ issue label: state/review
   ↓ 人工审查
 PR merged
-  ├─ flow.flow_status: merged
+  ├─ flow.flow_status: done
   └─ issue.state: closed
   ↓ vibe check --clean-branch
 清理物理资源
