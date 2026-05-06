@@ -234,39 +234,3 @@ class IssuesMixin(IssueAdminMixin):
             )
             return None
         return cast("dict[str, Any] | None | str", json.loads(result.stdout))
-
-    def get_milestone_issues(self: Any, milestone_number: int) -> list[dict[str, Any]]:
-        """Get all issues in a milestone (open + closed).
-
-        Args:
-            milestone_number: GitHub milestone number
-
-        Returns:
-            List of dicts with keys: number, title, state
-        """
-        logger.bind(
-            external="github",
-            operation="get_milestone_issues",
-            milestone=milestone_number,
-        ).debug("Calling GitHub API: get_milestone_issues")
-        cmd = [
-            "gh",
-            "issue",
-            "list",
-            "--milestone",
-            str(milestone_number),
-            "--state",
-            "all",
-            "--limit",
-            "50",
-            "--json",
-            "number,title,state,labels,body",
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            err = result.stderr.strip()
-            logger.bind(external="github", error=result.stderr).warning(
-                f"Failed to get milestone {milestone_number} issues: {err}"
-            )
-            return []
-        return cast(list[dict[str, Any]], json.loads(result.stdout))

@@ -81,8 +81,11 @@ class BackendProtocol(Protocol):
         ...
 
 
-class GitHubClientProtocol(Protocol):
-    """Protocol for GitHub client."""
+# Narrow port protocols for GitHub client
+
+
+class GitHubAuthPort(Protocol):
+    """Port for GitHub authentication operations."""
 
     def check_auth(self) -> bool:
         """Check if authenticated to GitHub."""
@@ -92,66 +95,14 @@ class GitHubClientProtocol(Protocol):
         """Get current authenticated user login name."""
         ...
 
-    def create_pr(self, request: CreatePRRequest) -> PRResponse:
-        """Create a pull request."""
-        ...
+
+class PRReadPort(Protocol):
+    """Port for PR read operations."""
 
     def get_pr(
         self, pr_number: int | None = None, branch: str | None = None
     ) -> PRResponse | None:
         """Get PR by number or branch."""
-        ...
-
-    def update_pr(self, request: UpdatePRRequest) -> PRResponse:
-        """Update a pull request."""
-        ...
-
-    def mark_ready(self, pr_number: int) -> PRResponse:
-        """Mark PR as ready for review."""
-        ...
-
-    def merge_pr(self, pr_number: int) -> PRResponse:
-        """Merge a pull request."""
-        ...
-
-    def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
-        """Close a pull request.
-
-        Args:
-            pr_number: PR number to close
-            comment: Optional comment to add before closing
-
-        Returns:
-            True if PR was closed successfully
-        """
-        ...
-
-    def get_pr_diff(self, pr_number: int) -> str:
-        """Get PR diff."""
-        ...
-
-    def list_issues(
-        self,
-        limit: int = 30,
-        state: str = "open",
-        assignee: str | None = None,
-        repo: str | None = None,
-        label: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """List GitHub issues.
-
-        Args:
-            limit: Maximum number of issues to fetch
-            state: Issue state filter (open, closed, all)
-            assignee: Filter by assignee username
-            label: Server-side label filter (reduces payload vs client-side filtering)
-        """
-        ...
-
-    def view_issue(
-        self, issue_number: int, repo: str | None = None
-    ) -> "dict[str, Any] | None | str":
-        """View a GitHub issue. Returns 'network_error' string on network failure."""
         ...
 
     def list_prs_for_branch(
@@ -183,6 +134,61 @@ class GitHubClientProtocol(Protocol):
         """
         ...
 
+
+class PRWritePort(Protocol):
+    """Port for PR write operations."""
+
+    def create_pr(self, request: CreatePRRequest) -> PRResponse:
+        """Create a pull request."""
+        ...
+
+    def update_pr(self, request: UpdatePRRequest) -> PRResponse:
+        """Update a pull request."""
+        ...
+
+    def mark_ready(self, pr_number: int) -> PRResponse:
+        """Mark PR as ready for review."""
+        ...
+
+    def merge_pr(self, pr_number: int) -> PRResponse:
+        """Merge a pull request."""
+        ...
+
+    def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
+        """Close a pull request.
+
+        Args:
+            pr_number: PR number to close
+            comment: Optional comment to add before closing
+
+        Returns:
+            True if PR was closed successfully
+        """
+        ...
+
+
+class PRDiffPort(Protocol):
+    """Port for PR diff operations."""
+
+    def get_pr_diff(self, pr_number: int) -> str:
+        """Get PR diff."""
+        ...
+
+    def get_pr_files(self, pr_number: int) -> list[str]:
+        """Get list of files changed in PR.
+
+        Args:
+            pr_number: PR number
+
+        Returns:
+            List of changed file paths
+        """
+        ...
+
+
+class PRCommentPort(Protocol):
+    """Port for PR comment operations."""
+
     def list_pr_comments(self, pr_number: int) -> list[dict[str, Any]]:
         """List general comments on a PR."""
         ...
@@ -210,3 +216,98 @@ class GitHubClientProtocol(Protocol):
             Comment URL if successful, None if failed
         """
         ...
+
+
+class IssueReadPort(Protocol):
+    """Port for issue read operations."""
+
+    def view_issue(
+        self, issue_number: int, repo: str | None = None
+    ) -> "dict[str, Any] | None | str":
+        """View a GitHub issue. Returns 'network_error' string on network failure."""
+        ...
+
+    def list_issues(
+        self,
+        limit: int = 30,
+        state: str = "open",
+        assignee: str | None = None,
+        repo: str | None = None,
+        label: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List GitHub issues.
+
+        Args:
+            limit: Maximum number of issues to fetch
+            state: Issue state filter (open, closed, all)
+            assignee: Filter by assignee username
+            label: Server-side label filter (reduces payload vs client-side filtering)
+        """
+        ...
+
+
+class IssueWritePort(Protocol):
+    """Port for issue write operations."""
+
+    def close_issue(self: Any, issue_number: int, repo: str | None = None) -> bool:
+        """Close a GitHub issue.
+
+        Args:
+            issue_number: GitHub issue number
+            repo: Optional repository in owner/repo format
+
+        Returns:
+            True if issue was closed successfully
+        """
+        ...
+
+    def close_issue_if_open(
+        self: Any, issue_number: int, repo: str | None = None
+    ) -> bool:
+        """Close issue only if it's currently open.
+
+        Args:
+            issue_number: GitHub issue number
+            repo: Optional repository in owner/repo format
+
+        Returns:
+            True if issue was closed or already closed
+        """
+        ...
+
+    def add_comment(
+        self: Any, issue_number: int, body: str, repo: str | None = None
+    ) -> str | None:
+        """Add a comment to a GitHub issue.
+
+        Args:
+            issue_number: GitHub issue number
+            body: Comment body
+            repo: Optional repository in owner/repo format
+
+        Returns:
+            Comment URL if successful, None otherwise
+        """
+        ...
+
+
+# Composite protocol for backward compatibility
+
+
+class GitHubClientProtocol(
+    GitHubAuthPort,
+    PRReadPort,
+    PRWritePort,
+    PRDiffPort,
+    PRCommentPort,
+    IssueReadPort,
+    IssueWritePort,
+    Protocol,
+):
+    """Composite protocol for GitHub client combining all narrow ports.
+
+    This protocol maintains backward compatibility with existing code
+    that depends on the full GitHub client interface.
+    """
+
+    pass
