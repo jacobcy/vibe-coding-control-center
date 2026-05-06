@@ -307,7 +307,9 @@ manager:
 
         # Patch paths
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
-        monkeypatch.setattr("vibe3.roles.manager.DEFAULT_PROMPTS_PATH", prompts_path)
+        monkeypatch.setattr(
+            "vibe3.roles.manager._resolve_prompts_path", lambda: prompts_path
+        )
 
         config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
 
@@ -364,7 +366,9 @@ manager:
         )
 
         monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
-        monkeypatch.setattr("vibe3.roles.manager.DEFAULT_PROMPTS_PATH", prompts_path)
+        monkeypatch.setattr(
+            "vibe3.roles.manager._resolve_prompts_path", lambda: prompts_path
+        )
 
         config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
 

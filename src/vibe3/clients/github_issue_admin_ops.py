@@ -275,8 +275,14 @@ class IssueAdminMixin:
                 cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
             )
             if result.returncode != 0:
-                logger.bind(external="github", error=result.stderr).error(
-                    "Failed to list PRs for issue lookup"
+                logger.bind(
+                    external="github",
+                    issue_number=issue_number,
+                    repo=repo,
+                    returncode=result.returncode,
+                    stderr=result.stderr.strip() if result.stderr else None,
+                ).warning(
+                    "Failed to list PRs for issue lookup (non-blocking, returning None)"
                 )
                 return None
             prs = json.loads(result.stdout)
