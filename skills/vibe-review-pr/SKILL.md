@@ -22,11 +22,12 @@ Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
 
 **本 Skill 只负责**：
 1. 环境检查（必须最先执行）
-2. 创建审查团队（环境通过后，一次性）
+2. 选择执行模式
 3. PR 队列排序与选择
-4. 加载 Team Template
-5. 循环审查直到人类确认结束
-6. 人类确认后删除团队
+4. 加载 Team Template 并判断 PR 类型
+5. 仅对多人流程 PR 创建审查团队（延迟创建、一次性）
+6. 循环审查直到人类确认结束
+7. 人类确认后删除团队
 
 **所有配置和流程定义在**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -50,28 +51,31 @@ Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
 
 ```
 1. 环境检查（必须先检查，不满足则直接回退）
-2. TeamCreate(team_name="pr-review-team") → 环境通过后创建（一次性）
-3. 选择执行模式
-4. PR 队列排序与选择
-5. 循环审查每个 PR（不检查 team，假设已存在）
+2. 选择执行模式
+3. PR 队列排序与选择
+4. 加载 Team Template
+5. 判断 PR 类型
+6. 仅当 PR 需要多人流程时创建/复用 team
+7. 循环审查每个 PR
    - Phase 1: 背景调研 → 保存 phase_1_output
    - Phase 2: 专项审查 → 【关键】SendMessage 发送背景给 agents
    - Phase 3: 综合判断
    - Phase 4: 写回与改进
    - Phase 5: 准备下一个 PR（不清理状态）
    - 询问是否继续下一个 PR
-6. 人类确认结束审查 → 删除 team
+8. 人类确认结束审查 → 删除 team（如果本轮创建过 team）
 ```
 
 **重要**：
 - 环境检查必须在 TeamCreate 之前执行
-- Team 只在环境检查通过后创建，避免无效创建
+- Team 只在 PR 被判定为多人流程后创建，避免为 simple PR 无效创建
 - Team 创建是**一次性操作**，整个审查周期只执行一次
-- 循环中不检查/创建/删除 Team，假设 Team 已存在
+- simple PR 不创建 Team，直接分流到单 agent 审查
+- 后续多人 PR 复用已存在 Team，不重复 TeamCreate
 - Team 只在人类明确确认结束审查后才删除
 - `subagent_type` 必须匹配项目 `.claude/agents/pr-*.md` 定义
 - Phase 2 并行 spawn 需要在**单次响应**中发起多个 Agent tool 调用
-- Phase 4/5 由 team-lead（当前 session）执行，不 spawn 新 agent
+- Phase 4/5 由 team-lead（当前 session）主导；仅 `auto-fix` 分支允许额外 spawn `fix-executor`
 
 ---
 
@@ -118,7 +122,7 @@ ToolSearch(query: "TeamCreate, TeamDelete, SendMessage", max_results: 5)
 
 **重要**：
 - `ToolSearch` 返回 "Tool loaded." 表示工具定义已成功加载
-- 此时工具可用，应该继续执行 Step 2（创建团队）
+- 此时工具可用，继续执行后续路由与 PR 分类步骤
 - 不要假设工具不可用，应该尝试实际调用
 
 ### 环境要求总结
@@ -152,22 +156,7 @@ team cleanup 状态；环境不满足时，直接转入 `vibe-review-docs` 或
 
 ---
 
-## Step 2: 创建团队（环境通过后）
-
-**环境检查通过后才创建 Team**。
-
-```yaml
-TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
-```
-
-**关键原则**：
-- Team 创建是**一次性操作**，整个审查周期只执行一次
-- 创建后 Team 持续存在，直到人类确认结束审查
-- 环境检查失败时不创建 Team，直接回退
-
----
-
-## Step 3: 选择执行模式
+## Step 2: 选择执行模式
 
 **在开始审查前，询问用户执行模式**（除非用户已指定）。
 
@@ -211,7 +200,7 @@ options:
 
 ### 保存选择
 
-将用户选择保存到 team context，供 Phase 4 使用：
+将用户选择保存到当前执行上下文；如果后续进入多人流程，再写入 team context 供 Phase 4 使用：
 
 ```yaml
 execution_context:
@@ -223,12 +212,12 @@ execution_context:
 
 | 概念 | 决定什么 | 在哪个 Step |
 |------|----------|-------------|
-| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 3 询问用户 |
+| **执行模式** | 审查后如何处理（修复/评论/询问） | Step 2 询问用户 |
 | **PR 类型** | 启动多少 agent（agents 数量） | Step 6 自动判定 |
 
 ---
 
-## Step 4: PR 队列排序与选择
+## Step 3: PR 队列排序与选择
 
 当用户没有指定 PR 编号时，先检查当前 repo 的所有未合并 PR，排序后建议审查顺序。
 
@@ -262,7 +251,7 @@ gh pr view <number> --json baseRefName,headRefName
 
 ---
 
-## Step 4.5: 检查 PR 是否已有审查记录
+## Step 4: 检查 PR 是否已有审查记录
 
 **在开始审查前，检查 PR 是否已有 review comments**。
 
@@ -313,14 +302,14 @@ options:
 ```yaml
 # full-review: 正常进入 Step 5
 # supplement: 调整 prompt，让 agents 关注未覆盖部分
-# skip: 返回 Step 4 处理队列中的下一个 PR
+# skip: 返回 Step 3 处理队列中的下一个 PR
 ```
 
 ---
 
 ## Step 5: 加载 Team Template
 
-**Team 已在 Step 2 创建**，这里只加载配置。
+**此时只加载配置，不创建 Team**。是否创建 Team 由 Step 6 的 PR 分类结果决定。
 
 **读取配置文件**：`.claude/team-templates/pr-review-team.yaml`
 
@@ -346,7 +335,7 @@ cat .claude/team-templates/pr-review-team.yaml
 ## Step 6: 判断 PR 类型
 
 **自动判定**：根据 PR 行数和标签自动分类，无需用户选择。
-**注意**：PR 类型决定启动多少 agent；执行模式在 Step 3 已选择。
+**注意**：PR 类型决定启动多少 agent；执行模式在 Step 2 已选择。
 
 根据 Template 中的 `pr_classification` 规则：
 
@@ -354,7 +343,7 @@ cat .claude/team-templates/pr-review-team.yaml
 |------|------|------|--------|
 | simple | <50行, 非安全相关 | 回退 vibe-review-code | **0（不启动）** |
 | refactor | 标题含 refactor | standard 多人流程 | 3 |
-| security | 安全标签或 fix 标签 | 全流程 + security-reviewer | 4 |
+| security | 安全标签或 fix 标签 | standard 多人流程（强制 security-reviewer） | 4 |
 | standard | 其他 | standard 多人流程 | 4 |
 
 ```bash
@@ -365,11 +354,33 @@ gh pr view <number> --json title,labels,additions
 - 不启动 team，根据 PR 文件范围选择单 agent 审查：
   - 仅文档变更 → 使用 `vibe-review-docs`
   - 其他（`scope/python`、`scope/shell`、`scope/infrastructure`、配置/测试/混合变更等）→ 使用 `vibe-review-code`
-- 审查完成后返回 Step 4 处理队列中的下一个 PR
+- 审查完成后返回 Step 3 处理队列中的下一个 PR
+
+**多人流程类型处理**：
+- `refactor` / `security` / `standard` 才进入 Team workflow
+- 第一个多人流程 PR 在 Step 7 创建 Team
+- 后续多人流程 PR 复用当前会话中已存在的 Team
 
 ---
 
-## Step 7: 按流程启动 Agent
+## Step 7: 创建团队（仅多人流程）
+
+**只有在 Step 6 判定为多人流程时才执行 TeamCreate。**
+
+```yaml
+TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
+```
+
+**关键原则**：
+- Team 创建是**一次性操作**，整个审查周期只执行一次
+- simple PR 不执行 TeamCreate
+- 如果当前会话已经创建过 `pr-review-team`，直接复用，不重复创建
+- 创建后 Team 持续存在，直到人类确认结束审查
+- 不要手工创建 `~/.claude/teams/pr-review-team/` 或伪造 `config.json`
+
+---
+
+## Step 8: 按流程启动 Agent
 
 **重要**：读取 template 中的 `workflow.execution` 配置，按步骤执行。
 
@@ -600,15 +611,26 @@ SendMessage(
 
 ### Phase 4: 写回与改进
 
-**执行步骤**（由 team-lead 执行，非 spawn）：
+**执行步骤**（由 team-lead 主导；`auto-fix` 分支允许 spawn `fix-executor`）：
 
 ```yaml
-# Step 1: 写 PR 评论
+# Step 1: 根据执行模式决定路径
+- action: 评估 execution_mode（auto-fix / comment-only / auto-decide / ask-each）
+
+# Step 2: auto-fix 路径可选 spawn fix-executor
+- condition: mode == "auto_fix"
+  tool: Agent
+  params:
+    team_name: pr-review-team
+    name: fix-executor
+    subagent_type: pr-fix-executor
+
+# Step 3: 写 PR 评论
 - tool: Bash
   params:
-    command: gh pr comment {pr_number} --body "{review_report}"
+    command: gh pr comment {pr_number} --body "{final_report}"
 
-# Step 2: 创建 follow-up issues（条件执行）
+# Step 4: 创建 follow-up issues（条件执行）
 - condition: has_out_of_scope_findings
   tool: Bash
   params:
@@ -639,7 +661,7 @@ SendMessage(
 
 ---
 
-## Step 8: 询问是否继续
+## Step 9: 询问是否继续
 
 **每个 PR 审查完成后询问用户**：
 
@@ -656,15 +678,15 @@ AskUserQuestion:
       description: "继续审查下一个 PR"
     - key: "n"
       value: "end"
-      description: "结束审查，删除团队"
+      description: "结束审查；如已创建团队则删除"
 ```
 
-- **选择 continue**：返回 Step 4 处理下一个 PR
-- **选择 end**：进入 Step 9（删除 Team）
+- **选择 continue**：返回 Step 3 处理下一个 PR
+- **选择 end**：进入 Step 10（删除 Team）
 
 ---
 
-## Step 9: 人类确认后删除 Team（最终步骤）
+## Step 10: 人类确认后删除 Team（最终步骤）
 
 **只在人类明确确认结束审查后执行**：
 
@@ -703,7 +725,7 @@ TeamDelete(team_name="pr-review-team")
 **关键原则**：
 - Team 删除是**最终步骤**，只在人类确认后执行一次
 - 整个审查周期中 Team 只创建一次、删除一次
-- 循环中不检查/创建/删除 Team
+- 循环中不删除 Team；只有进入多人流程时才检查是否需要首次创建
 
 ---
 
@@ -779,14 +801,11 @@ Agent(..., run_in_background=true)  # security-reviewer
 - 可能原因：之前 team cleanup 不完整，或会话中断
 
 **解决方案**：
-```bash
-# 临时方案：手动创建 team 配置
-mkdir -p ~/.claude/teams/pr-review-team
-echo '{"team_name":"pr-review-team","members":[]}' > ~/.claude/teams/pr-review-team/config.json
-
-# 然后正常 spawn agents
-Agent(team_name="pr-review-team", ...)
-```
+1. 停止当前审查轮，不继续 spawn / SendMessage
+2. 结束当前 Claude Code 会话并重新进入
+3. 重新执行 Step 1 环境检查
+4. 回到 Step 6 重新判断目标 PR 是否需要多人流程
+5. 如仍需要多人流程，只通过 `TeamCreate(team_name="pr-review-team")` 重建 Team
 
 **预防措施**：
 1. 每次会话结束时确保 TeamDelete 正确执行
@@ -860,11 +879,9 @@ TeamDelete(team_name="pr-review-team")
 3. 新会话不会有残留的 team context
 ```
 
-**备选：手动清理会话文件**（不推荐，可能影响其他功能）：
-```bash
-sed -i '' 's/"teamName":"pr-review-team"//g' \
-  ~/.claude/projects/-*/{session-id}.jsonl
-```
+**不要手动修改会话文件**：
+- 不要编辑 `~/.claude/projects/.../*.jsonl`
+- 这不是受支持的恢复路径，可能制造更多状态漂移
 
 ---
 
