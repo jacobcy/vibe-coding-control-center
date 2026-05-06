@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的红队测试和输出格式，以及项目特有工具使用要求。
   
 model: sonnet
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, SendMessage
 extends: security-reviewer  # 继承全局 security-reviewer 的基础能力
 # 安全限制：禁止修改文件和执行危险操作
 forbidden_commands:
