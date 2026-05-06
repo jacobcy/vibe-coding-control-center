@@ -53,11 +53,33 @@ class FlowConfig(BaseModel):
     )
 
 
+class GitHubProjectConfig(BaseModel):
+    """GitHub Projects v2 configuration."""
+
+    owner_type: str = Field(default="user", description="Owner type: 'user' or 'org'")
+    owner: str = Field(default="", description="GitHub user or org name")
+    project_number: int = Field(default=0, ge=0, description="Project number")
+    org: str = Field(default="", description="Deprecated: use 'owner' instead")
+
+
 # fmt: off
-__all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
-           "PRScoringWeights", "PRScoringThresholds", "LineChangeWeights",
-           "FileChangeWeights", "ModuleChangeWeights", "SizeThreshold",
-           "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig"]
+__all__ = [
+    "AIConfig",
+    "FlowConfig",
+    "GitHubProjectConfig",
+    "PRScoringConfig",
+    "MergeGateConfig",
+    "PRScoringWeights",
+    "PRScoringThresholds",
+    "LineChangeWeights",
+    "FileChangeWeights",
+    "ModuleChangeWeights",
+    "SizeThreshold",
+    "SizeThresholds",
+    "VibeConfig",
+    "DocLimitsConfig",
+    "CodeLimitsConfig",
+]
 # fmt: on
 
 # Prompt content fields in prompts.yaml that map to VibeConfig sections.
@@ -242,6 +264,7 @@ class VibeConfig(BaseModel):
 
     agent_prompt: AgentPromptConfig = Field(default_factory=AgentPromptConfig)
     flow: FlowConfig = Field(default_factory=FlowConfig)
+    github_project: GitHubProjectConfig = Field(default_factory=GitHubProjectConfig)
     doc_limits: DocLimitsConfig = Field(default_factory=DocLimitsConfig)
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)

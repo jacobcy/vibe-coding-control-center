@@ -180,6 +180,20 @@ class WorktreeCleanupConfig(BaseModel):
     dry_run: bool = False
 
 
+class ProjectStatusSyncConfig(BaseModel):
+    """Configuration for syncing issue state to GitHub Project status."""
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable automatic sync of issue state "
+        "to GitHub Project Status field",
+    )
+    status_field_name: str = Field(
+        default="Status",
+        description="Name of the Status field in the GitHub Project",
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -246,3 +260,6 @@ class OrchestraConfig(BaseModel):
         default_factory=SupervisorHandoffConfig
     )
     cleanup: WorktreeCleanupConfig = Field(default_factory=WorktreeCleanupConfig)
+    project_status_sync: ProjectStatusSyncConfig = Field(
+        default_factory=ProjectStatusSyncConfig
+    )

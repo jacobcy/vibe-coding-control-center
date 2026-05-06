@@ -316,3 +316,16 @@ orchestra:
     #   覆盖最终模型；但执行入口仍以 agent 优先
     backend:
     model:
+
+  # Temporary worktree cleanup (do/* worktrees from manager/reviewer)
+  cleanup:
+    enabled: true
+    ttl_hours: 72
+    on_pr_closed: true
+    dry_run: false
+
+  # Project status synchronization
+  # Automatically syncs issue state labels to GitHub Project Status field
+  project_status_sync:
+    enabled: true
+    status_field_name: "Status"
