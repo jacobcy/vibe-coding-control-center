@@ -29,36 +29,27 @@ class TestHandoffAdvancedCommands:
             == "vibe3 handoff show --branch task/issue-123 docs/plans/test-plan.md"
         )
 
-    @patch("vibe3.commands.handoff_read.VerdictService")
-    @patch("vibe3.commands.handoff_read.HandoffService")
+    @patch("vibe3.commands.handoff_read.HandoffStatusService")
     @patch("vibe3.commands.handoff_read.FlowService")
     def test_handoff_status_renders_current_md_via_handoff_show(
         self,
         mock_flow_service_cls,
-        mock_handoff_service_cls,
-        mock_verdict_service_cls,
+        mock_status_service_cls,
         tmp_path,
     ):
         mock_flow_service = MagicMock()
         mock_flow_service.get_current_branch.return_value = "task/issue-467"
-        mock_flow_service.get_git_common_dir.return_value = "/tmp/repo/.git"
-        mock_flow_service.git_client.find_worktree_path_for_branch.return_value = (
-            "/tmp/repo/.worktrees/task/issue-467"
-        )
-        mock_flow_service.git_client.get_worktree_root.return_value = (
-            "/tmp/repo/.worktrees/wt-claude-v3"
-        )
-        mock_flow_service.store = MagicMock()
-        mock_flow_service.get_flow_state.return_value = MagicMock(flow_slug="issue-467")
         mock_flow_service_cls.return_value = mock_flow_service
 
-        mock_handoff_service = MagicMock()
-        mock_handoff_service.get_handoff_events.return_value = []
-        mock_handoff_service_cls.return_value = mock_handoff_service
-
-        mock_verdict_service = MagicMock()
-        mock_verdict_service.get_latest_verdict.return_value = None
-        mock_verdict_service_cls.return_value = mock_verdict_service
+        mock_status_service = MagicMock()
+        mock_status_result = MagicMock()
+        mock_status_result.flow_slug = "issue-467"
+        mock_status_result.worktree_root = "/tmp/repo/.worktrees/task/issue-467"
+        mock_status_result.events = []
+        mock_status_result.latest_verdict = None
+        mock_status_result.live_sessions = []
+        mock_status_service.get_handoff_status.return_value = mock_status_result
+        mock_status_service_cls.return_value = mock_status_service
 
         result = runner.invoke(app, ["handoff", "status", "task/issue-467"])
 

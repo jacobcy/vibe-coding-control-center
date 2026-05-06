@@ -23,6 +23,7 @@ from vibe3.roles.review import (
     build_base_review_request,
     execute_manual_review_async,
     execute_manual_review_sync,
+    validate_review_prerequisites,
 )
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.branch_arg import resolve_branch_arg
@@ -63,25 +64,11 @@ def _review_branch_impl(
         enable_trace()
 
     flow_service = FlowService()
-    flow = flow_service.get_flow_status(branch)
-
-    if not flow:
-        typer.echo(
-            f"Error: No flow for branch '{branch}'.\n"
-            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    issue_number = flow.task_issue_number
-
-    if not issue_number:
-        typer.echo(
-            f"Error: No issue linked to flow '{branch}'.\n"
-            "Run 'vibe flow bind <issue>' first.",
-            err=True,
-        )
-        raise typer.Exit(1)
+    try:
+        flow, issue_number = validate_review_prerequisites(flow_service, branch)
+    except UserError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
     if no_async:
         run_issue_role_sync(

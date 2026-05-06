@@ -16,11 +16,13 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
 )
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import UserError
 from vibe3.roles.run import (
     ensure_plan_file_exists,
     execute_manual_run,
     find_skill_file,
     resolve_run_mode,
+    validate_run_prerequisites,
 )
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.branch_arg import resolve_branch_arg
@@ -88,19 +90,11 @@ def run_command(
     target_branch = resolve_branch_arg(branch)
 
     flow_service = FlowService()
-    flow = flow_service.get_flow_status(target_branch)
-
-    if not flow:
-        typer.echo(
-            f"Error: No flow for branch '{target_branch}'.\n"
-            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first.",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    issue_number = (
-        str(flow.task_issue_number) if flow and flow.task_issue_number else None
-    )
+    try:
+        flow, issue_number = validate_run_prerequisites(flow_service, target_branch)
+    except UserError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
     if publish and skill:
         typer.echo("Error: --publish and --skill are mutually exclusive.", err=True)
@@ -123,7 +117,7 @@ def run_command(
         execute_manual_run(
             config=config,
             branch=target_branch,
-            issue_number=int(issue_number) if issue_number else None,
+            issue_number=issue_number,
             instructions=instructions,
             plan_file=None,
             skill=skill,
@@ -175,7 +169,7 @@ def run_command(
     execute_manual_run(
         config=config,
         branch=target_branch,
-        issue_number=int(issue_number) if issue_number else None,
+        issue_number=issue_number,
         instructions=instructions,
         plan_file=plan_file,
         skill=None,

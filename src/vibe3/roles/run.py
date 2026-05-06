@@ -17,6 +17,7 @@ from vibe3.agents.run_prompt import (
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import UserError
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
@@ -36,7 +37,39 @@ from vibe3.execution.session_service import load_session_id
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_executor_issue
+
+
+def validate_run_prerequisites(
+    flow_service: FlowService,
+    target_branch: str,
+) -> tuple[Any, int | None]:
+    """Validate flow exists and return flow status with issue number.
+
+    Args:
+        flow_service: FlowService instance for flow operations
+        target_branch: Target branch name
+
+    Returns:
+        Tuple of (flow status, issue number)
+
+    Raises:
+        UserError: If no flow exists for branch
+    """
+    from vibe3.models.flow import FlowStatusResponse
+
+    flow: FlowStatusResponse | None = flow_service.get_flow_status(target_branch)
+
+    if not flow:
+        raise UserError(
+            f"No flow for branch '{target_branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first."
+        )
+
+    issue_number: int | None = flow.task_issue_number
+    return flow, issue_number
+
 
 EXECUTOR_ROLE = TriggerableRoleDefinition(
     name="executor",
