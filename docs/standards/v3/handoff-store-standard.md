@@ -168,7 +168,7 @@ CREATE TABLE flow_state (
 
 ### 4.2 `flow_issue_links`
 
-这张表只记录 flow 和 repo issue 的多对多关系。
+这张表只记录 flow 和 GitHub issue 的多对多关系。
 
 ```sql
 CREATE TABLE flow_issue_links (

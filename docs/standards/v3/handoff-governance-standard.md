@@ -130,7 +130,7 @@ related_docs:
 - handoff 更正
 - follow-up 链接
 
-禁止把 merge 后出现的新需求、新目标或新开发范围继续写回旧 plan；这些内容必须进入新的 `repo issue`，并按需要重新进入 `roadmap item` 与后续 execution record。
+禁止把 merge 后出现的新需求、新目标或新开发范围继续写回旧 plan；这些内容必须进入新的 `GitHub issue`，并按需要重新进入 `roadmap item` 与后续 execution record。
 
 ## 7. Root-Doc Requirement
 
