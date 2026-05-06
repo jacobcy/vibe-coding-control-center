@@ -14,9 +14,9 @@ description: |
 1. 环境检查
 2. 选择执行模式
 3. PR 队列排序与选择
-4. 加载 team template 并判断 PR 类型
-5. 仅对多人流程 PR 创建或复用 team
-6. 驱动多阶段审查直到人类确认结束
+4. 加载 team template 并创建或复用 team
+5. 判断 PR 类型与检查深度
+6. 驱动审查直到人类确认结束
 7. 人类确认后删除 team
 
 真实流程定义在 `.claude/team-templates/pr-review-team.yaml`。本文件只保留入口路由、阶段契约和硬边界，不再内嵌长样例。
@@ -96,29 +96,11 @@ Team 工具采用 deferred tools 机制时，先确认工具名可见，再用 `
 
 ### Step 5: 加载 Team Template
 
-此步只加载配置，不创建 team。必须读取 `.claude/team-templates/pr-review-team.yaml`，后续所有 phase 行为都按其中的 `workflow.execution`、`agents`、`pr_classification` 执行。
+此步先加载配置。必须读取 `.claude/team-templates/pr-review-team.yaml`，后续所有 phase 行为都按其中的 `workflow.execution`、`agents`、`pr_classification` 执行。
 
-### Step 6: 判断 PR 类型
+### Step 6: 创建或复用 Team
 
-根据 template 中的 `pr_classification` 自动分类：
-
-| 类型 | 处理 |
-|------|------|
-| `simple` | 不创建 team，回退单 agent 审查 |
-| `refactor` | 进入多人流程 |
-| `security` | 进入多人流程，且必须包含 `security-reviewer` |
-| `standard` | 进入多人流程 |
-
-`simple` PR 的分流规则：
-
-- 仅文档变更 → `vibe-review-docs`
-- 其他 → `vibe-review-code`
-
-完成后返回 Step 3 继续队列。
-
-### Step 7: 创建或复用 Team
-
-只有在 Step 6 判定为多人流程时才执行本步。
+在判断当前 PR 类型之前，先确保当前会话已经持有 `pr-review-team`。
 
 先判断当前会话里是否已经存在可复用的 `pr-review-team`：
 
@@ -134,16 +116,54 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 
 - TeamCreate 只在 `pr-review-team` 缺席时调用
 - 整个审查周期最多创建一次
-- simple PR 不创建 team
-- 后续多人 PR 复用当前会话中的 `pr-review-team`
+- 后续 PR 复用当前会话中的 `pr-review-team`
 - 如果 Team 已存在，不要再次调用 TeamCreate 试探
 - 如果 Team 状态异常，不要发送 shutdown 指令试图“清空后重建”
 - 不要手工创建 `~/.claude/teams/pr-review-team/`
 - 不要伪造 `config.json`
 
-### Step 8: 执行多人流程
+### Step 7: 判断 PR 类型
 
-按 template 驱动 Phase 1-5。主文件只保留阶段契约：
+根据 template 中的 `pr_classification` 自动分类：
+
+| 类型 | 处理 |
+|------|------|
+| `simple` | 保留已创建的 team，只执行阶段 1 |
+| `refactor` | 进入多人流程 |
+| `security` | 进入多人流程，且必须包含 `security-reviewer` |
+| `standard` | 进入多人流程 |
+
+检查深度规则：
+
+- `simple`：**只执行阶段 1 检查**
+- `refactor` / `security` / `standard`：**执行阶段 1 + 阶段 2 的双阶段检查**
+
+`simple` PR 的分流规则：
+
+- 仅文档变更 → 由 team-lead 使用 `vibe-review-docs` 完成阶段 1 检查
+- 其他 → 由 team-lead 使用 `vibe-review-code` 完成阶段 1 检查
+
+这里的“阶段 1 检查”指：
+
+- team 已经存在
+- 由 team-lead 在当前会话中执行对应单 agent skill
+- 不启动 Phase 2 专项审查 agent
+- 仍处于当前 team 生命周期内；完成阶段 1 后直接进入写回/继续流程
+
+### Step 8: 执行审查流程
+
+按 PR 类型执行：
+
+- `simple`：只执行阶段 1 检查，由 team-lead 使用对应单 agent skill 完成
+- `refactor` / `security` / `standard`：按 template 驱动 Phase 1-5
+
+这里要明确区分：
+
+- “两步检查”只指 **Phase 1 + Phase 2**
+- Phase 3-5 是汇总、写回和收尾，不是额外检查层级
+- `simple` 没有 Phase 2；它在已存在的 team 现场中完成阶段 1 后，直接进入写回/继续流程
+
+多人流程下的阶段契约：
 
 - Phase 1：背景调研，必须产出 `phase_1_output`
 - Phase 2：专项审查，必须在**单次响应**中启动多个 Agent 调用，并用 `SendMessage` 把 `phase_1_output` 发给每个 Phase 2 agent
@@ -168,7 +188,7 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 TeamDelete(team_name="pr-review-team")
 ```
 
-如果这轮只处理了 simple PR、从未创建 team，则不需要 TeamDelete。
+如果这轮在 Step 6 之前就停止、从未创建 team，则不需要 TeamDelete。
 
 `TeamDelete` **不是**恢复工具，不用于：
 
@@ -215,10 +235,10 @@ TeamDelete(team_name="pr-review-team")
 ### Team 生命周期
 
 - 环境检查必须在 TeamCreate 之前
-- Team 只在多人流程 PR 上创建
+- Team 在当前审查会话开始后先创建或复用，再判断 PR 类型
 - 已存在的健康 Team 必须优先复用
 - Team 整个周期最多创建一次、最多删除一次
-- simple PR 直接分流，不进入 team 生命周期
+- `simple` 与复杂 PR 共用同一个 team 生命周期
 - Step 10 之外不得调用 TeamDelete
 - 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
 
@@ -243,7 +263,7 @@ TeamDelete(team_name="pr-review-team")
 ### 过早创建 Team
 
 错误：环境一通过就 `TeamCreate`。  
-正确：先分类 PR，只有多人流程 PR 才创建 team。
+正确：先加载 template，再创建或复用 team，然后才判断当前 PR 类型。
 
 ### 已有 Team 仍重复创建
 
@@ -252,8 +272,13 @@ TeamDelete(team_name="pr-review-team")
 
 ### simple PR 误入多人流程
 
-错误：对小 PR 启动整套 team。  
-正确：`simple` 一律走 `vibe-review-docs` 或 `vibe-review-code`。
+错误：把 `simple` 理解成“不创建 team”。  
+正确：`simple` 也在已创建的 team 现场中执行，只是不进入 Phase 2，且阶段 1 由 `vibe-review-docs` 或 `vibe-review-code` 完成。
+
+### 把双阶段检查套到所有 PR
+
+错误：不区分复杂度，默认所有 PR 都做 Phase 1 + Phase 2。  
+正确：只有 `refactor` / `security` / `standard` 才做双阶段检查；`simple` 只做阶段 1。
 
 ### 忘记发送 Phase 1 背景
 

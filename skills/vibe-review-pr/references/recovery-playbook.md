@@ -10,7 +10,7 @@
 
 ## 已有 Team，优先判断是否可复用
 
-当目标 PR 进入多人流程时，先不要默认调用 TeamCreate。
+在当前会话开始审查后、判断 PR 类型之前，先不要默认重复调用 TeamCreate。
 
 判断顺序：
 
@@ -22,7 +22,7 @@
 
 - 直接复用已有 team
 - 跳过 TeamCreate
-- 继续走 Phase 1-5
+- 继续进入 PR 类型判断与后续流程
 
 只有在确认 team 缺席时，才调用 `TeamCreate(team_name="pr-review-team")`。
 

@@ -6,6 +6,11 @@
 
 目标：收集 PR 背景，并把结果保存为 `phase_1_output`。
 
+适用范围：
+
+- 复杂 PR：作为双阶段检查的第一步
+- `simple` PR：这是唯一需要执行的检查阶段，但由 team-lead 使用对应单 agent skill 完成，不继续进入 Phase 2
+
 示例：
 
 ```yaml
@@ -34,6 +39,14 @@ team-lead 接收报告的首选方式：
 ## Phase 2: 专项审查
 
 目标：在同一响应中并行启动多个审查 agent，并把 `phase_1_output` 广播给它们。
+
+仅适用于：
+
+- `refactor`
+- `security`
+- `standard`
+
+`simple` PR 不进入本节。
 
 示例：
 

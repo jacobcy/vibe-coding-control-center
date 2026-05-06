@@ -13,7 +13,7 @@
 name: pr-review-team
 description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
 
-# Team 创建配置（供 Step 7 在确认 team 缺席后调用 TeamCreate 使用）
+# Team 创建配置（供 Step 6 在确认 team 缺席后调用 TeamCreate 使用）
 team_create_config:
   team_name: pr-review-team
   agent_type: general-purpose  # team-lead 类型
@@ -231,7 +231,7 @@ codex:
 pr_classification:
   simple:
     condition: "additions < 50 and not security_related"
-    flow: single_reviewer
+    flow: phase_1_only
     agents: []
 
   refactor:
