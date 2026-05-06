@@ -456,11 +456,6 @@ SendMessage(
     )
     ```
 
-    **注意**：
-    - Worktree session 可能有工具限制（Read, Grep, Bash 不可用）
-    - 如果 agent 返回空或 idle_notification 但无实际报告，说明工具限制
-    - 此时应由 team-lead 直接完成审查（fallback）
-
 # Step 3: 保存背景报告为 phase_1_output
 - action: |
     将背景报告内容保存为变量 phase_1_output
