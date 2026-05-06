@@ -4,14 +4,14 @@
 # 文本量控制
 doc_limits:
   single_file_loc:
-    default: 500           # 单文件默认限制（所有类型）
-    max: 800              # 单文件最大限制（所有类型）
+    warning_threshold: 500    # 超标触发 WARNING（建议重构）
+    ci_block_threshold: 800   # 超标触发 CI ERROR（阻塞 pipeline）
 
 # 代码量控制
 code_limits:
   single_file_loc:
-    default: 300           # 单文件默认限制（所有类型）
-    max: 400              # 单文件最大限制（所有类型）
+    warning_threshold: 300    # 超标触发 WARNING（建议重构）
+    ci_block_threshold: 400   # 超标触发 CI ERROR（阻塞 pipeline）
 
     # 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
     # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计

@@ -100,8 +100,8 @@ def _merge_prompt_fields(data: dict, prompts: dict) -> None:
 class SingleFileLocConfig(BaseModel):
     """单文件行数限制."""
 
-    default: int = Field(default=300)
-    max: int = Field(default=400)
+    warning_threshold: int = Field(default=300)
+    ci_block_threshold: int = Field(default=400)
     exceptions: list["LocExceptionConfig"] = Field(default_factory=list)
 
     @model_validator(mode="after")

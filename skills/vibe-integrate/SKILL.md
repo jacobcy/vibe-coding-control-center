@@ -318,7 +318,7 @@ Issue 内容模板：
 
 将文件加入 `config/v3/loc_limits.yaml` 的 exception 清单时，必须遵守容量约束：
 
-- **exception 文件的 limit 不得超过 max 阈值**（当前 `code_limits.single_file_loc.max = 400`，orchestra 类文件允许到 650 属已批准的例外）
+- **exception 文件的 limit 不得超过 ci_block_threshold**（当前 `code_limits.single_file_loc.ci_block_threshold = 400`，orchestra 类文件允许到 650 属已批准的例外）
 - **新增 exception 必须写明 reason**，说明为什么职责单一、边界清楚、拆分只会放大耦合
 - **已有 exception 文件如果继续增长**，需重新评估 limit 是否仍合理；如果接近新 limit 的 90%，应在 handoff 中标注预警
 - **不要**因为"反正已经在 exception 里"就无限制增长；exception 是治理触发器后的安全阀，不是免死金牌
