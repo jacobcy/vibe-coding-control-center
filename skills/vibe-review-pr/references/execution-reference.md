@@ -103,12 +103,59 @@ team-lead 接收报告的首选方式：
 
 目标：收集报告、识别缺失、处理冲突、形成最终决策。
 
+### 步骤 1：消息验证（强制）
+
+收到 teammate-message 时，必须验证 PR 编号正确性：
+
+```yaml
+# 检查 teammate-message 中的 PR 编号
+if message.pr_number != current_pr_number:
+    # 消息路由错误，触发恢复流程
+    记录异常 → 检查 session 文件 → 确认是否存在正确报告
+```
+
+**验证点**：
+- PR 编号是否匹配当前审查对象
+- Agent 名称是否与预期一致
+- 报告结构是否完整
+
+### 步骤 2：Session 文件检查
+
+发现消息错误时，按以下顺序检查：
+
+1. **定位 agent 的 session 文件**：
+   ```bash
+   # 从 team config 获取 agent 的 sessionId
+   cat ~/.claude/teams/pr-review-team/config.json | jq '.members[] | select(.name=="architect-reviewer")'
+
+   # 读取 session JSONL
+   cat ~/.claude/projects/.../<sessionId>.jsonl | grep -A 5 "PR #"
+   ```
+
+2. **验证正确报告是否存在**：
+   - 搜索 session 文件中的实际输出
+   - 确认 PR 编号和结论
+   - 与错误消息对比
+
+3. **记录异常**：
+   - 在最终报告中注明消息路由错误
+   - 说明正确报告来源（session 文件而非 teammate-message）
+   - 引用相关 GitHub issue (#40166, #39651)
+
+### 步骤 3：缺失处理
+
 最低要求：
 
 1. 检查 `required_agents - received_agents`
 2. 缺失报告时标注 `审查不完整`
 3. 记录相互矛盾的结论
 4. 由 team-lead 仲裁并说明理由
+
+**禁止**：
+- ❌ 脑补缺失 agent 的立场
+- ❌ 假装收到了完整报告
+- ❌ 忽略消息错误继续执行
+- ❌ 用错误内容作为审查依据
 
 ## Phase 4: 写回与改进
 
