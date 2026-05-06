@@ -11,8 +11,10 @@
 仓库已经具备：
 
 - `issue -> flow -> pr` 的部分主链能力
-- `flow new / bind / show / list`
-- `task show / task bridge`
+- `vibe3 flow bind / show / status` (current V3 CLI)
+- ~~`flow new / bind / show / list`~~ (deprecated)
+- `vibe3 task status` (current V3 CLI)
+- ~~`task show / task bridge`~~ (deprecated)
 - 本地 handoff 作为中间态
 - `vibe3 inspect structure` 作为结构分析入口
 
