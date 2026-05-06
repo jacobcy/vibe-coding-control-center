@@ -108,7 +108,7 @@ This handoff focuses on flow/task foundation, with PR lifecycle kept separate.
 
 **职责拆分**:
 
-- `task`：吸收 `repo issue`，做 execution record、分合、依赖、主闭环 issue 绑定
+- `task`：吸收 `GitHub issue`，做 execution record、分合、依赖、主闭环 issue 绑定
 - `flow`：把 task 带入 branch 现场，表达当前交付切片
 - `pr`：承载当前交付产物，只保留 `create` / `ready` / `show`
 - `review`：负责审查动作，不承担 PR 状态切换
@@ -116,7 +116,7 @@ This handoff focuses on flow/task foundation, with PR lifecycle kept separate.
 
 **主链**:
 
-`repo issue -> task issue -> flow new/bind -> pr create -> pr ready -> review pr -> integrate -> flow done -> close repo issue`
+`GitHub issue -> task issue -> flow update/bind -> pr create -> pr ready -> review pr -> integrate -> flow done -> close GitHub issue`
 
 **补充约束**:
 
@@ -129,10 +129,10 @@ This handoff focuses on flow/task foundation, with PR lifecycle kept separate.
 ## 5. 成功标准（验收标准）
 
 ### 5.1 功能验收
-- [ ] `vibe3 flow new test-flow --task 101` 成功插入记录到 `flow_state` 表
+- [ ] `vibe3 flow update test-flow --task 101` 成功插入记录到 `flow_state` 表
 - [ ] `vibe3 flow bind task-123` 更新 `flow_state` 表的 `current_task` 字段
 - [ ] `vibe3 flow status --json` 返回有效的 JSON，包含 `flow_slug`、`task_issue_number` 等字段
-- [ ] `vibe3 task link https://github.com/owner/repo/issues/456` 成功插入记录到 `flow_issue_links` 表
+- [ ] Issue 关联通过 `flow bind` 命令完成，成功插入记录到 `flow_issue_links` 表
 
 ### 5.2 数据库验收
 - [ ] 所有数据库事务正确关闭（无连接泄漏）

@@ -82,12 +82,12 @@ related_docs:
 
 1. `vibe-task`
    - 做什么：task-centered audit；看 task registry、`roadmap <-> task` 映射、task 数据质量、跨 worktree task 总览。
-   - 重要纠正：它不是纯只读；在审计修复模式下，可以在用户确认后执行 `vibe task add/update/remove`。
+   - 重要纠正：它不是纯只读；在审计修复模式下，可以在用户确认后执行修复操作。
    - 不做什么：不负责 runtime `task <-> flow` 修复。
 
 2. `vibe-check`
    - 做什么：runtime / recovery audit，负责 `task <-> flow`、worktree、stale binding 的现场一致性审计与修复。
-   - 重要纠正：它不是 roadmap / task registry 的历史总审计，也不是“下一个做什么”的大脑。
+   - 重要纠正：它不是 roadmap / task registry 的历史总审计，也不是”下一个做什么”的大脑。
    - 不做什么：不负责 roadmap 排期，不负责 `roadmap <-> task` 语义修复。
 
 ## 一句话版本
