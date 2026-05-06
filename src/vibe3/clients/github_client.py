@@ -1,5 +1,7 @@
 """GitHub client implementation."""
 
+import functools
+
 from vibe3.clients.github_client_base import GitHubClientBase
 from vibe3.clients.github_comment_ops import CommentMixin
 from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
@@ -27,3 +29,33 @@ class GitHubClient(
     """
 
     pass
+
+
+# ── Factory Functions for Process-Level Caching ─────────────────────────────
+
+
+@functools.lru_cache(maxsize=1)
+def get_github_client() -> GitHubClient:
+    """Get a cached GitHubClient singleton for the current process.
+
+    This factory eliminates redundant GitHubClient instantiations during a single
+    CLI invocation, reducing subprocess overhead. The cache is process-local
+    and thread-safe.
+
+    Returns:
+        Cached GitHubClient instance
+
+    Example:
+        >>> client1 = get_github_client()
+        >>> client2 = get_github_client()
+        >>> assert client1 is client2  # Same instance
+    """
+    return GitHubClient()
+
+
+def clear_github_client_cache() -> None:
+    """Clear the GitHubClient singleton cache.
+
+    This should be called in test fixtures to ensure test isolation.
+    """
+    get_github_client.cache_clear()

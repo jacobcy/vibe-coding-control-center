@@ -1,5 +1,6 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
+import functools
 import re
 import subprocess
 from pathlib import Path
@@ -432,3 +433,33 @@ class GitClient:
                 result.append(line)
 
         return "".join(result)
+
+
+# ── Factory Functions for Process-Level Caching ─────────────────────────────
+
+
+@functools.lru_cache(maxsize=1)
+def get_git_client() -> GitClient:
+    """Get a cached GitClient singleton for the current process.
+
+    This factory eliminates redundant GitClient instantiations during a single
+    CLI invocation, reducing subprocess overhead. The cache is process-local
+    and thread-safe.
+
+    Returns:
+        Cached GitClient instance
+
+    Example:
+        >>> client1 = get_git_client()
+        >>> client2 = get_git_client()
+        >>> assert client1 is client2  # Same instance
+    """
+    return GitClient()
+
+
+def clear_git_client_cache() -> None:
+    """Clear the GitClient singleton cache.
+
+    This should be called in test fixtures to ensure test isolation.
+    """
+    get_git_client.cache_clear()
