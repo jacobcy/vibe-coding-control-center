@@ -1,3 +1,11 @@
+---
+title: harness vs omo 技能对比
+status: historical-reference
+scope: external-framework-comparison
+note: 本文档对比外部框架 harness 和 omo，两者均非当前 Vibe 3.0 核心编排系统。当前项目工作流见 CLAUDE.md §Agent 工作流 和 docs/v3/README.md §实施阶段。
+generated: 2026-03-18
+---
+
 # harness vs omo 技能对比
 
 生成时间: 2026-03-18

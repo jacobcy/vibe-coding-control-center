@@ -1,4 +1,11 @@
-MetaClaw-Harness 集成规范 (v1.0)
+---
+title: MetaClaw-Harness 集成规范
+status: historical-reference
+scope: external-integration-example
+note: 本文档描述外部系统 MetaClaw-Harness 的集成规范，非当前 Vibe 3.0 核心组件。当前项目核心系统见 CLAUDE.md §项目组成 和 docs/v3/README.md §核心理念。
+---
+
+# MetaClaw-Harness 集成规范 (v1.0)
 1. 系统角色定义
 The Brain (Cloud API): 处理复杂逻辑与规划（如 GPT-4o）。
 The Cerebellum (Local MLX + LoRA): 处理风格化输出、工具调用格式、私有代码偏好。

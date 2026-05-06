@@ -3,7 +3,9 @@ title: Everything Claude Code (ECC) 安装与使用指南
 author: Claude Sonnet 4.6
 created_at: 2026-03-17
 category: guide
-status: active
+status: historical-reference
+scope: external-plugin-ecosystem
+note: 本文档描述外部插件生态 Everything Claude Code (ECC)，非当前项目核心依赖。当前项目自有技能系统见 skills/ 目录，外部依赖说明见 AGENTS.md §External Dependencies。
 version: 1.0
 related_docs:
   - docs/v3/ROADMAP.md
