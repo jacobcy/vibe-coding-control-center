@@ -191,3 +191,87 @@ class TestHandoffBasicCommands:
 
         assert result.exit_code != 0
         assert "not a file" in result.output.lower()
+
+    @patch("vibe3.commands.handoff_read.HandoffService")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_status_format_json(
+        self, mock_flow_service_class, mock_handoff_service_class
+    ):
+        """Test handoff status --format json outputs JSON."""
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "feature/test"
+        mock_flow_service.get_flow_state.return_value = FlowState(
+            branch="feature/test",
+            flow_slug="feature-test",
+            flow_status="active",
+        )
+        mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_flow_service_class.return_value = mock_flow_service
+        mock_handoff_service = MagicMock()
+        mock_handoff_service.get_success_handoff_events.return_value = []
+        mock_handoff_service_class.return_value = mock_handoff_service
+
+        result = runner.invoke(app, ["handoff", "status", "--format", "json"])
+
+        assert result.exit_code == 0
+        import json
+
+        output = json.loads(result.output)
+        assert "state" in output
+        assert "events" in output
+        assert output["state"]["branch"] == "feature/test"
+
+    @patch("vibe3.commands.handoff_read.HandoffService")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_status_format_yaml(
+        self, mock_flow_service_class, mock_handoff_service_class
+    ):
+        """Test handoff status --format yaml outputs YAML."""
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "feature/test"
+        mock_flow_service.get_flow_state.return_value = FlowState(
+            branch="feature/test",
+            flow_slug="feature-test",
+            flow_status="active",
+        )
+        mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_flow_service_class.return_value = mock_flow_service
+        mock_handoff_service = MagicMock()
+        mock_handoff_service.get_success_handoff_events.return_value = []
+        mock_handoff_service_class.return_value = mock_handoff_service
+
+        result = runner.invoke(app, ["handoff", "status", "--format", "yaml"])
+
+        assert result.exit_code == 0
+        assert "state:" in result.output
+        assert "events:" in result.output
+        assert "branch: feature/test" in result.output
+
+    @patch("vibe3.commands.handoff_read.HandoffService")
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_status_deprecated_json_flag(
+        self, mock_flow_service_class, mock_handoff_service_class
+    ):
+        """Test handoff status --json shows deprecation warning."""
+        mock_flow_service = MagicMock()
+        mock_flow_service.get_current_branch.return_value = "feature/test"
+        mock_flow_service.get_flow_state.return_value = FlowState(
+            branch="feature/test",
+            flow_slug="feature-test",
+            flow_status="active",
+        )
+        mock_flow_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_flow_service_class.return_value = mock_flow_service
+        mock_handoff_service = MagicMock()
+        mock_handoff_service.get_success_handoff_events.return_value = []
+        mock_handoff_service_class.return_value = mock_handoff_service
+
+        result = runner.invoke(app, ["handoff", "status", "--json"])
+
+        assert result.exit_code == 0
+        assert "deprecated" in result.output.lower()
+        import json
+
+        # Output should still be valid JSON
+        output = json.loads(result.output.split("Warning:", 1)[1].split("\n", 1)[1])
+        assert "state" in output

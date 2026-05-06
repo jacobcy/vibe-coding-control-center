@@ -2,6 +2,7 @@
 
 import json
 import re
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from vibe3.ui.console import console
@@ -20,13 +21,15 @@ def build_task_show_payload(task_result: "TaskShowResult") -> dict[str, object]:
 
 def render_task_show(
     task_result: "TaskShowResult",
-    json_output: bool,
+    format: str,
+    full: bool = False,
 ) -> None:
     """Render task show output.
 
     Args:
         task_result: Task show query result
-        json_output: If True, output as JSON; otherwise formatted text
+        format: Output format (json, yaml, or table)
+        full: If True, show complete summary without truncation (table mode only)
     """
     # Handle case where no flow exists
     if not task_result.local_task:
@@ -36,30 +39,96 @@ def render_task_show(
             # Branch is an issue number without flow
             # Try to fetch and display basic issue info
             if task_result.issue_title or task_result.issue_state:
-                console.print(f"[yellow]No flow found for issue #{branch}[/]")
-                console.print()
-                console.print("[bold]Issue Info[/]")
-                if task_result.issue_title:
-                    console.print(f"Title:  {task_result.issue_title}")
-                if task_result.issue_state:
-                    console.print(f"State:  {task_result.issue_state.lower()}")
-                if task_result.pr_summary:
-                    pr = task_result.pr_summary
-                    console.print("\n[bold]PR / CI[/]")
-                    console.print(f"PR: #{pr.number} {pr.state} {pr.title}")
-                    if pr.checks:
-                        console.print(f"Checks: {pr.checks}")
+                if format == "json":
+                    pr_data = (
+                        asdict(task_result.pr_summary)
+                        if task_result.pr_summary
+                        else None
+                    )
+                    console.print(
+                        json.dumps(
+                            {
+                                "branch": branch,
+                                "issue_number": int(branch),
+                                "title": task_result.issue_title,
+                                "state": task_result.issue_state,
+                                "pr": pr_data,
+                            },
+                            indent=2,
+                            default=str,
+                        ),
+                        markup=False,
+                    )
+                elif format == "yaml":
+                    import yaml
+
+                    pr_data = (
+                        asdict(task_result.pr_summary)
+                        if task_result.pr_summary
+                        else None
+                    )
+                    console.print(
+                        yaml.dump(
+                            {
+                                "branch": branch,
+                                "issue_number": int(branch),
+                                "title": task_result.issue_title,
+                                "state": task_result.issue_state,
+                                "pr": pr_data,
+                            },
+                            default_flow_style=False,
+                            allow_unicode=True,
+                        ),
+                        markup=False,
+                    )
+                else:
+                    console.print(f"[yellow]No flow found for issue #{branch}[/]")
+                    console.print()
+                    console.print("[bold]Issue Info[/]")
+                    if task_result.issue_title:
+                        console.print(f"Title:  {task_result.issue_title}")
+                    if task_result.issue_state:
+                        console.print(f"State:  {task_result.issue_state.lower()}")
+                    if task_result.pr_summary:
+                        pr = task_result.pr_summary
+                        console.print("\n[bold]PR / CI[/]")
+                        console.print(f"PR: #{pr.number} {pr.state} {pr.title}")
+                        if pr.checks:
+                            console.print(f"Checks: {pr.checks}")
                 return
             # No issue info available
-            console.print(f"[yellow]No flow found for issue #{branch}[/]")
-            console.print("Tip: Use 'vibe3 flow new' to create a flow")
+            if format in ("json", "yaml"):
+                output_data = {"branch": branch, "error": "No flow found"}
+                if format == "json":
+                    console.print(json.dumps(output_data), markup=False)
+                else:
+                    import yaml
+
+                    console.print(
+                        yaml.dump(output_data, default_flow_style=False),
+                        markup=False,
+                    )
+            else:
+                console.print(f"[yellow]No flow found for issue #{branch}[/]")
+                console.print("Tip: Use 'vibe3 flow new' to create a flow")
             return
         # Non-numeric branch without flow
-        console.print(f"[yellow]No flow found: {branch}[/]")
+        if format in ("json", "yaml"):
+            output_data = {"branch": branch, "error": "No flow found"}
+            if format == "json":
+                console.print(json.dumps(output_data), markup=False)
+            else:
+                import yaml
+
+                console.print(
+                    yaml.dump(output_data, default_flow_style=False), markup=False
+                )
+        else:
+            console.print(f"[yellow]No flow found: {branch}[/]")
         return
 
     task = task_result.local_task
-    if json_output:
+    if format == "json":
         console.print(
             json.dumps(
                 build_task_show_payload(task_result),
@@ -72,6 +141,20 @@ def render_task_show(
         )
         return
 
+    if format == "yaml":
+        import yaml
+
+        console.print(
+            yaml.dump(
+                build_task_show_payload(task_result),
+                default_flow_style=False,
+                allow_unicode=True,
+            ),
+            markup=False,
+        )
+        return
+
+    # Table format (default)
     console.print("[bold]Current Task[/]")
     console.print(f"Branch: {task.branch}")
     console.print(f"Flow:   {task.flow_slug} ({task.flow_status})")
@@ -115,12 +198,20 @@ def render_task_show(
         console.print("\n[bold]Latest Work[/]")
         console.print(f"Ref:     {latest_ref.kind}  {ref_cmd}")
 
-        # Show only first 3 lines of summary for readability
+        # Show summary (full or truncated)
         if latest_ref.summary:
-            summary_lines = latest_ref.summary.strip().split("\n")[:3]
-            console.print("Summary:")
-            for line in summary_lines:
-                console.print(f"  {line}")
+            summary_lines = latest_ref.summary.strip().split("\n")
+            if full:
+                # Show complete summary
+                console.print("Summary:")
+                for line in summary_lines:
+                    console.print(f"  {line}")
+            else:
+                # Show only first 3 lines for readability
+                summary_lines = summary_lines[:3]
+                console.print("Summary:")
+                for line in summary_lines:
+                    console.print(f"  {line}")
 
     # Comments will be shown via render_task_comments(), not here
     # Removed: Latest Instruction/Comment section (consolidated into comments view)

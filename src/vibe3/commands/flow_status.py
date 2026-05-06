@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
+from vibe3.commands.command_options import ActorFilterOption, FormatOption
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
@@ -41,9 +42,29 @@ def show(
     ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,
-    json_output: JsonOption = False,
+    format: FormatOption = "table",
+    show_all: Annotated[
+        bool, typer.Option("--show-all", help="Show orchestra actor events")
+    ] = False,
+    actor_filter: ActorFilterOption = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Show flow details."""
+    # Handle deprecated --json flag
+    if json_output and format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        format = "json"
+
     with trace_scope(trace, "flow show", domain="flow"):
         service = FlowService()
         if branch:
@@ -59,7 +80,7 @@ def show(
 
         # Handle non-registered flow or special branches
         if not flow_status or flow_status.flow_status == "aborted":
-            if not json_output:
+            if format == "table":
                 from vibe3.services.flow_service import FlowService as FlowService_
 
                 is_safe = target_branch.startswith(FlowService_.SAFE_BRANCH_PREFIX)
@@ -90,18 +111,29 @@ def show(
                 raise typer.Exit(0)
             else:
                 if not flow_status:
-                    typer.echo(
-                        json.dumps(
-                            {"error": "Flow not registered", "branch": target_branch}
+                    output_data = {
+                        "error": "Flow not registered",
+                        "branch": target_branch,
+                    }
+                    if format == "json":
+                        typer.echo(json.dumps(output_data))
+                    else:
+                        import yaml
+
+                        typer.echo(
+                            yaml.dump(
+                                output_data,
+                                default_flow_style=False,
+                                allow_unicode=True,
+                            )
                         )
-                    )
                     raise typer.Exit(1)
 
         if snapshot:
             projection_service = FlowProjectionService()
             projection = projection_service.get_projection(target_branch)
 
-            if json_output:
+            if format == "json":
                 # Convert projection to dict for JSON output
                 output = {
                     "branch": projection.branch,
@@ -118,7 +150,28 @@ def show(
                     "pr_url": projection.pr_url,
                 }
                 typer.echo(json.dumps(output, indent=2, default=str))
+            elif format == "yaml":
+                import yaml
+
+                output = {
+                    "branch": projection.branch,
+                    "flow_slug": projection.flow_slug,
+                    "flow_status": projection.flow_status,
+                    "task_issue_number": projection.task_issue_number,
+                    "pr_number": projection.pr_number,
+                    "spec_ref": projection.spec_ref,
+                    "blocked_by": projection.blocked_by,
+                    "next_step": projection.next_step,
+                    "offline_mode": projection.offline_mode,
+                    "pr_status": projection.pr_status,
+                    "pr_is_draft": projection.pr_is_draft,
+                    "pr_url": projection.pr_url,
+                }
+                typer.echo(
+                    yaml.dump(output, default_flow_style=False, allow_unicode=True)
+                )
             else:
+                # Table format
                 flow_status = service.get_flow_status(target_branch)
                 if not flow_status:
                     logger.error(f"Flow not found: {target_branch}")
@@ -191,19 +244,32 @@ def show(
             projection_service = FlowProjectionService(store=service.store)
             issue_titles, _ = projection_service.get_issue_titles(list(issue_numbers))
 
-        if json_output:
+        if format == "json":
             json_data = {
                 "state": timeline["state"].model_dump(),
                 "events": [e.model_dump() for e in timeline["events"]],
             }
             typer.echo(json.dumps(json_data, indent=2, default=str))
+        elif format == "yaml":
+            import yaml
+
+            json_data = {
+                "state": timeline["state"].model_dump(),
+                "events": [e.model_dump() for e in timeline["events"]],
+            }
+            typer.echo(
+                yaml.dump(json_data, default_flow_style=False, allow_unicode=True)
+            )
         else:
+            # Table format
             parent_branch = find_parent_branch(target_branch)
             render_flow_timeline(
                 timeline["state"],
                 timeline["events"],
                 parent_branch=parent_branch,
                 issue_titles=issue_titles,
+                show_all=show_all,
+                actor_filter=actor_filter,
             )
             if timeline["state"].task_issue_number is None:
                 console.print(

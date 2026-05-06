@@ -1,6 +1,6 @@
 """Shared CLI option definitions for all agent commands."""
 
-from typing import TYPE_CHECKING, Annotated, Optional
+from typing import TYPE_CHECKING, Annotated, Literal, Optional
 
 import typer
 
@@ -37,6 +37,22 @@ _BACKEND_OPT = Annotated[
     Optional[str], typer.Option("--backend", help="Override backend")
 ]
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
+
+# Output format options
+FormatOption = Annotated[
+    Literal["json", "yaml", "table"],
+    typer.Option("--format", help="Output format: json, yaml, or table"),
+]
+
+VerboseOption = Annotated[
+    bool,
+    typer.Option("--verbose", "-v", help="Show full details"),
+]
+
+ActorFilterOption = Annotated[
+    str | None,
+    typer.Option("--actor", help="Filter by actor pattern"),
+]
 
 
 def ensure_flow_for_current_branch() -> tuple["FlowService", str]:

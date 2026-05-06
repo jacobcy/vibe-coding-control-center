@@ -115,7 +115,13 @@ def test_task_show_json_includes_summary_fields(
     result = runner.invoke(app, ["task", "show", "--json"])
 
     assert result.exit_code == 0
-    payload = json.loads(result.output)
+    # Parse JSON output after deprecation warning
+    output_lines = result.output.split("\n", 1)
+    if output_lines[0].startswith("Warning:"):
+        json_output = output_lines[1]
+    else:
+        json_output = result.output
+    payload = json.loads(json_output)
     assert payload["issue_title"] == "JSON summary view"
     assert payload["latest_ref"]["kind"] == "plan"
     assert payload["latest_comment"]["author"] == "reviewer-bot"
@@ -159,3 +165,119 @@ def test_task_show_always_renders_comments(
 
     assert result.exit_code == 0
     mock_render_task_comments.assert_called_once_with(issue_payload)
+
+
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_format_json(mock_task_service_cls) -> None:
+    """task show --format json should output JSON."""
+    task_service = MagicMock()
+    task_service.resolve_branch.return_value = "task/issue-456"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-456",
+        local_task=FlowStatusResponse(
+            branch="task/issue-456",
+            flow_slug="format-test",
+            flow_status="active",
+            task_issue_number=456,
+        ),
+        issue_title="Format test",
+    )
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "--format", "json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["issue_title"] == "Format test"
+
+
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_format_yaml(mock_task_service_cls) -> None:
+    """task show --format yaml should output YAML."""
+    task_service = MagicMock()
+    task_service.resolve_branch.return_value = "task/issue-456"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-456",
+        local_task=FlowStatusResponse(
+            branch="task/issue-456",
+            flow_slug="format-test",
+            flow_status="active",
+            task_issue_number=456,
+        ),
+        issue_title="Format test",
+    )
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "--format", "yaml"])
+
+    assert result.exit_code == 0
+    assert "branch: task/issue-456" in result.output
+    assert "issue_title: Format test" in result.output
+
+
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_deprecated_json_flag(mock_task_service_cls) -> None:
+    """task show --json should show deprecation warning."""
+    task_service = MagicMock()
+    task_service.resolve_branch.return_value = "task/issue-456"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-456",
+        local_task=FlowStatusResponse(
+            branch="task/issue-456",
+            flow_slug="format-test",
+            flow_status="active",
+            task_issue_number=456,
+        ),
+        issue_title="Format test",
+    )
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "--json"])
+
+    assert result.exit_code == 0
+    assert "deprecated" in result.output.lower()
+    # Output should still be valid JSON
+    payload = json.loads(result.output.split("Warning:", 1)[1].split("\n", 1)[1])
+    assert payload["issue_title"] == "Format test"
+
+
+@patch("vibe3.commands.task.render_task_comments")
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_full_flag(
+    mock_task_service_cls,
+    mock_render_task_comments,
+) -> None:
+    """task show --full should show complete summary without truncation."""
+    long_summary = "\n".join([f"Line {i}" for i in range(10)])
+
+    task_service = MagicMock()
+    task_service.resolve_branch.return_value = "task/issue-123"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-123",
+        local_task=FlowStatusResponse(
+            branch="task/issue-123",
+            flow_slug="full-test",
+            flow_status="active",
+            task_issue_number=123,
+        ),
+        latest_ref=TaskRefSummary(
+            kind="report",
+            ref="notes/report.md",
+            summary=long_summary,
+        ),
+    )
+    task_service.fetch_issue_with_comments.return_value = None
+    mock_task_service_cls.return_value = task_service
+
+    # Test without --full (should truncate)
+    result = runner.invoke(app, ["task", "show"])
+    assert result.exit_code == 0
+    assert "Line 0" in result.output
+    assert "Line 2" in result.output
+    assert "Line 3" not in result.output  # Should be truncated
+
+    # Test with --full (should show all lines)
+    result_full = runner.invoke(app, ["task", "show", "--full"])
+    assert result_full.exit_code == 0
+    for i in range(10):
+        assert f"Line {i}" in result_full.output
