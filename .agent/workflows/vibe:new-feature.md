@@ -19,8 +19,8 @@ tags: [workflow, vibe, planning, orchestration]
 
 1. 回复用户：`我会先把当前目标解释为 feature 视角的规划入口，再转到统一的 vibe:new 路径。`
 2. 先确认用户当前关心的是：
-   - `repo issue` intake
-   - `roadmap item(type=feature)` 规划
+   - GitHub issue intake
+   - feature 规划与排期
    - feature 下的 task 拆分与 plan 绑定
 3. 然后统一委托 [`vibe:new`](./vibe:new.md)：
    - 由 `vibe:new` 负责后续的 roadmap / plan / task / flow 编排
@@ -30,6 +30,6 @@ tags: [workflow, vibe, planning, orchestration]
 ## Boundary
 
 - `vibe:new-feature` 是 agent workflow，不是 GitHub workflow，也不是 GitHub Project workflow。
-- 它不重新定义 `repo issue`、`roadmap item`、`task`、`flow`。
+- 它不重新定义 `GitHub issue`、`task`、`flow`。
 - 它不直接承载 task binding、blocker 分类、物理 worktree 决策或 planning gates。
 - 若需要新的逻辑现场，遵循 `vibe:new` 与 `CLAUDE.md` 的规则：默认在当前目录使用 `vibe3 flow update`，未经人类授权不得新建物理 worktree。
