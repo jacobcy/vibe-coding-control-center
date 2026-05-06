@@ -55,7 +55,7 @@ Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
 4. PR 队列排序与选择
 5. 循环审查每个 PR（不检查 team，假设已存在）
    - Phase 1-4: 审查流程
-   - Phase 5: 只清理 inboxes/tasks（不删除 team）
+   - Phase 5: 只清理 tasks（不删除 team，不清空 inboxes）
    - 询问是否继续下一个 PR
 6. 人类确认结束审查 → 删除 team
 ```
@@ -511,10 +511,38 @@ SendMessage(
       3. 评估敏感信息泄露风险
     run_in_background: true
 
-# Step 2-4: 发送上下文（agents 启动后自动接收 team broadcast）
-# 注意：run_in_background 的 agents 会自动收到 team context
+# Step 2: 【强制】发送 Context Bundle 给 Phase 2 agents
+# ⚠️ CRITICAL: Agents 不会自动接收 context，必须显式发送
+- action: |
+    **必须立即执行**：spawn 完成后，立即向每个 Phase 2 agent 发送 context bundle。
 
-# Step 5: 等待所有结果（必须等待全部返回）
+    **Context Bundle 内容**：
+    - PR 基本信息（标题、分支、改动量）
+    - Phase 1 背景报告（context-researcher 输出）
+    - PR 审查历史（已有评论、决策演变）
+
+    **发送方式**（单次响应中并发）：
+    ```yaml
+    SendMessage(
+      to: "code-analyst",
+      summary: "PR #{pr_number} 完整上下文（Phase 1 背景+PR详情）",
+      message: "{完整 context bundle}"
+    )
+
+    SendMessage(
+      to: "architect-reviewer",
+      summary: "PR #{pr_number} 完整上下文（Phase 1 背景+PR详情）",
+      message: "{完整 context bundle}"
+    )
+
+    SendMessage(
+      to: "security-reviewer",
+      summary: "PR #{pr_number} 完整上下文（Phase 1 背景+PR详情）",
+      message: "{完整 context bundle}"
+    )
+    ```
+
+# Step 3: 等待所有结果（必须等待全部返回）
 - action: |
     等待所有 Phase 2 agents 返回 idle notification。
 
@@ -587,18 +615,22 @@ SendMessage(
     command: gh issue create --title "[follow-up] {title}" --body "{body}"
 ```
 
-### Phase 5: 循环清理（不删除 Team）
+### Phase 5: 循环清理（不删除 Team，不清除 Inboxes）
 
 **执行步骤**（由 team-lead 执行）：
 
 ```yaml
-# 只清理当前 PR 的 inboxes/tasks，Team 继续存在
+# 不清理 inboxes，保留 agent 复用能力
+# Team 和 Inboxes 都保持存在，供下一个 PR 审查使用
 - actions:
-    - 清空 inboxes: rm ~/.claude/teams/pr-review-team/inboxes/*.json
     - 重置 tasks: rm ~/.claude/tasks/pr-review-team/*
+    # ❌ 不清空 inboxes（保留 agent 上下文，支持复用）
 ```
 
-**重要**：Phase 5 **不删除 Team**，Team 保持存在供下一个 PR 审查使用。
+**重要**：
+- Phase 5 **不删除 Team**
+- Phase 5 **不清空 Inboxes**（保留 agent 上下文，支持 SendMessage 复用）
+- Team 和 Inboxes 保持存在供下一个 PR 审查使用
 
 ---
 
