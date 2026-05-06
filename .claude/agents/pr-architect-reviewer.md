@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的价值评估和时效性检查。
 
 model: sonnet
-tools: Read, Grep, Glob, WebSearch
+tools: Read, Grep, Glob, WebSearch, SendMessage
 extends: architect  # 继承全局 architect 的基础能力
 # 安全限制：此 agent 无 Bash 工具，仅做架构评估
 ---

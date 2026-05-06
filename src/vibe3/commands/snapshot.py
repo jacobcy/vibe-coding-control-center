@@ -107,7 +107,7 @@ def save(
         vibe3 snapshot save --as-baseline
         vibe3 snapshot save --json
     """
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.git_client import get_git_client
 
     if trace:
         enable_trace()
@@ -115,7 +115,7 @@ def save(
     try:
         if as_baseline:
             # Save as branch baseline (for diff workflow)
-            git = GitClient()
+            git = get_git_client()
             current_branch = git.get_current_branch()
             filepath = snapshot_service.save_branch_baseline(current_branch)
             if filepath is None:
@@ -275,7 +275,7 @@ def diff(
         vibe3 snapshot diff <snapshot-id>    # Compare with specific snapshot
         vibe3 snapshot diff latest           # Compare with latest snapshot
     """
-    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.git_client import get_git_client
 
     if trace:
         enable_trace()
@@ -284,7 +284,7 @@ def diff(
         # Get baseline snapshot
         if baseline is None:
             # Default: use branch baseline
-            git = GitClient()
+            git = get_git_client()
             current_branch = git.get_current_branch()
             baseline_snapshot = snapshot_service.load_branch_baseline(current_branch)
             if not baseline_snapshot:

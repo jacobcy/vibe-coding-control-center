@@ -2,6 +2,7 @@
 
 import sqlite3
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -71,9 +72,12 @@ def test_default_db_path_uses_shared_git_common_dir(tmp_path, monkeypatch):
     shared_git_dir = tmp_path / "shared" / ".git"
     shared_git_dir.mkdir(parents=True)
     monkeypatch.chdir(repo_root)
+
+    mock_git = Mock()
+    mock_git.get_git_common_dir.return_value = str(shared_git_dir)
     monkeypatch.setattr(
-        "vibe3.clients.sqlite_base.GitClient.get_git_common_dir",
-        lambda self: str(shared_git_dir),
+        "vibe3.clients.sqlite_base.get_git_client",
+        lambda: mock_git,
     )
 
     client = SQLiteClient()
@@ -87,9 +91,12 @@ def test_default_db_path_fails_fast_on_invalid_git_common_dir(tmp_path, monkeypa
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     monkeypatch.chdir(repo_root)
+
+    mock_git = Mock()
+    mock_git.get_git_common_dir.return_value = ""
     monkeypatch.setattr(
-        "vibe3.clients.sqlite_base.GitClient.get_git_common_dir",
-        lambda self: "",
+        "vibe3.clients.sqlite_base.get_git_client",
+        lambda: mock_git,
     )
 
     with pytest.raises(GitError, match="returned empty path"):

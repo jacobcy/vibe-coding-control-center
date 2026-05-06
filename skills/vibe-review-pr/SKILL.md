@@ -79,6 +79,8 @@ Claude Code 的 TeamCreate / Agent / SendMessage / teammate-message / tmux pane
 
 **必须先检查环境是否支持 Claude Code Team 功能，不满足则直接分流，不创建 Team。**
 
+### Step 1.1: 检查环境变量
+
 ```bash
 # 检查 tmux
 echo "TMUX: ${TMUX:-未设置}"
@@ -87,14 +89,45 @@ echo "TMUX: ${TMUX:-未设置}"
 env | grep -i "CLAUDE.*TEAM" || echo "未设置"
 ```
 
-### 环境要求
+**环境变量要求**：
+- ✅ `TMUX` 必须设置（在 tmux session 内）
+- ✅ `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
 
-| 条件 | 要求 | 不满足时 |
-|------|------|----------|
-| Host | Claude Code | 分流到 `vibe-review-docs` / `vibe-review-code` |
-| Team tools | TeamCreate / Agent / SendMessage 可用 | 分流到 `vibe-review-docs` / `vibe-review-code` |
-| TMUX | 必须设置 | 分流到 `vibe-review-docs` / `vibe-review-code` |
-| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | = 1 | 分流到 `vibe-review-docs` / `vibe-review-code` |
+### Step 1.2: 检查工具可用性
+
+**Deferred tools 机制**：
+- Team 工具（TeamCreate, TeamDelete, SendMessage）在 `available-deferred-tools` 列表中
+- 工具名称可见，但参数 schema 需要通过 `ToolSearch` 加载
+
+**正确的检查流程**：
+
+```yaml
+# Step 1: 检查工具是否在 deferred tools 列表中
+# 查看 available-deferred-tools 消息中是否包含：
+# - TeamCreate
+# - TeamDelete
+# - SendMessage
+
+# Step 2: 使用 ToolSearch 加载工具定义
+ToolSearch(query: "TeamCreate, TeamDelete, SendMessage", max_results: 5)
+
+# Step 3: 判断结果
+# - 如果 ToolSearch 返回 "Tool loaded." → 工具可用，继续执行
+# - 如果 ToolSearch 返回空结果或错误 → 工具不可用，回退到单 agent 模式
+```
+
+**重要**：
+- `ToolSearch` 返回 "Tool loaded." 表示工具定义已成功加载
+- 此时工具可用，应该继续执行 Step 2（创建团队）
+- 不要假设工具不可用，应该尝试实际调用
+
+### 环境要求总结
+
+| 条件 | 检查方法 | 不满足时 |
+|------|---------|----------|
+| TMUX | `echo $TMUX` | 分流到单 agent 模式 |
+| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS | `env \| grep CLAUDE.*TEAM` | 分流到单 agent 模式 |
+| Team tools | ToolSearch 加载成功 | 分流到单 agent 模式 |
 
 **回退处理**：
 ```
@@ -386,11 +419,47 @@ SendMessage(
       1. 阅读 CLAUDE.md, AGENTS.md, docs/standards/glossary.md
       2. 获取 issue comments（如果是 task/issue-* 分支）
       3. 分析依赖关系和时效性
-      输出结构化背景报告。
+
+      【重要】完成后使用 SendMessage 发送报告给 team-lead：
+      - to: "team-lead"
+      - summary: "PR #{pr_number} 背景调研报告完成"
+      - message: 完整的结构化背景报告内容
+
+      不要只打印到终端，必须通过 SendMessage 发送。
   wait: true  # 必须等待结果
 
-# Step 2: 接收背景报告
-- action: 等待 teammate-message，获取 context-researcher 的背景报告
+# Step 2: 接收背景报告（关键方法）
+- action: |
+    【重要】Agent 输出读取方法：
+
+    **方法 1：读取 subagent session 文件（推荐）**
+    ```bash
+    # 找到最新的 subagent session 文件
+    SUBAGENT_FILE=$(ls -t ~/.claude/projects/-Users-jacobcy--claude-mem-observer-sessions/*/subagents/*.jsonl | head -1)
+
+    # 读取最后部分的消息
+    tail -100 "$SUBAGENT_FILE" | grep -o '"text":"[^"]*"' | tail -20
+    ```
+
+    **方法 2：检查 inbox（idle_notification 存储）**
+    ```bash
+    # 读取 team-lead inbox
+    cat ~/.claude/teams/pr-review-team/inboxes/team-lead.json | jq '.[] | select(.from == "context-researcher")'
+    ```
+
+    **方法 3：使用 SendMessage 请求输出**
+    ```yaml
+    SendMessage(
+      to: "context-researcher",
+      summary: "请求背景报告",
+      message: "请发送完整的背景调研报告"
+    )
+    ```
+
+    **注意**：
+    - Worktree session 可能有工具限制（Read, Grep, Bash 不可用）
+    - 如果 agent 返回空或 idle_notification 但无实际报告，说明工具限制
+    - 此时应由 team-lead 直接完成审查（fallback）
 
 # Step 3: 保存背景报告为 phase_1_output
 - action: |

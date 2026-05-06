@@ -13,6 +13,29 @@ if str(scripts_python) not in sys.path:
 
 
 # ============================================================
+# Cache Clearing Fixtures
+# ============================================================
+
+
+@pytest.fixture(autouse=True)
+def clear_client_caches():
+    """Clear GitClient and GitHubClient singleton caches before each test.
+
+    This ensures test isolation by preventing cached instances from leaking
+    between tests.
+    """
+    from vibe3.clients.git_client import clear_git_client_cache
+    from vibe3.clients.github_client import clear_github_client_cache
+
+    clear_git_client_cache()
+    clear_github_client_cache()
+    yield
+    # Clean up after test as well
+    clear_git_client_cache()
+    clear_github_client_cache()
+
+
+# ============================================================
 # Flow Service Fixtures
 # ============================================================
 

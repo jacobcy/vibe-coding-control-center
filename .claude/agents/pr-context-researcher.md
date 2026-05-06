@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的时效性检查和依赖关系分析。
 
 model: haiku
-tools: Read, Grep, Glob, WebFetch, Bash
+tools: Read, Grep, Glob, WebFetch, Bash, SendMessage
 extends: Explore  # 继承全局 Explore 的基础能力
 # Bash 仅用于只读 GitHub/context 命令，不执行写操作或本地状态修改
 ---
