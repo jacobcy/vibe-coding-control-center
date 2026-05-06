@@ -103,7 +103,14 @@ def run_governance_sync(
         error_code = classify_error_hybrid(exc)
 
         error_tracking = ErrorTrackingService.get_instance()
-        error_tracking.record_error(error_code, str(exc))
+        # Record error with tick_id (governance has no specific issue/branch)
+        error_tracking.record_error(
+            error_code=error_code,
+            error_message=str(exc),
+            tick_id=tick_count,  # Governance runs in tick context
+            issue_number=None,  # Governance is global, not issue-specific
+            branch=None,
+        )
 
         logger.bind(domain="governance", tick=tick_count).error(
             f"Governance scan failed: {error_code} - {exc}"

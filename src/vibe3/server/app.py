@@ -306,7 +306,10 @@ def start(
 
 @app.command()
 def status() -> None:
-    """Show Orchestra server status and FailedGate state."""
+    """Show Orchestra server status, FailedGate state, and recent activity."""
+    import re
+    from pathlib import Path
+
     from rich.console import Console
     from rich.table import Table
 
@@ -320,72 +323,133 @@ def status() -> None:
     # Daemon status
     if pid is None:
         if _orchestra_tmux_session_exists():
-            console.print("Orchestra server running in tmux session (PID file missing)")
-            raise typer.Exit(0)
-        console.print("Orchestra server is not running (no PID file)")
-        raise typer.Exit(0)
-
-    if not is_valid:
+            console.print(
+                "[yellow]Orchestra server running in tmux "
+                "session (PID file missing)[/yellow]"
+            )
+        else:
+            console.print("[red]Orchestra server is not running[/red]")
+    elif not is_valid:
         if _orchestra_tmux_session_exists():
             console.print(
-                "Orchestra server running in tmux session "
-                f"(stale PID file points to non-orchestra process {pid})"
+                "[yellow]Orchestra server running in tmux session "
+                f"(stale PID file points to non-orchestra process {pid})[/yellow]"
             )
-            raise typer.Exit(0)
-        console.print(
-            f"Orchestra server is not running (stale PID file, process {pid} "
-            "is not orchestra)"
-        )
-        raise typer.Exit(0)
+        else:
+            console.print(
+                f"[red]Orchestra server is not running "
+                f"(stale PID file, process {pid} is not orchestra)[/red]"
+            )
+    else:
+        console.print(f"[green]Orchestra server running (PID: {pid})[/green]")
 
-    console.print(f"Orchestra server running (PID: {pid})\n")
+    console.print(f"  - Tick interval: {config.polling_interval}s")
+    console.print(f"  - Max concurrent: {config.max_concurrent_flows}\n")
 
-    # FailedGate status
+    # Recent activity from events.log
+    events_log = Path("temp/logs/orchestra/events.log")
+    if events_log.exists():
+        try:
+            log_content = events_log.read_text()
+
+            # Extract last tick info
+            tick_matches = re.findall(
+                r"\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\] "
+                r"\[server\] tick #(\d+) (start|completed)",
+                log_content,
+            )
+            if tick_matches:
+                last_tick = tick_matches[-1]
+                tick_time, tick_num, tick_status = last_tick
+                status_str = "in progress" if tick_status == "start" else "completed"
+                console.print("[cyan]Last Tick Activity:[/cyan]")
+                console.print(f"  - Tick #{tick_num} ({status_str} at {tick_time})")
+
+                # Extract dispatcher activity for this tick
+                dispatcher_matches = re.findall(
+                    rf"\[{tick_time[:10]}.*?\] \[dispatcher\] "
+                    r"GlobalDispatchCoordinator: (.+)",
+                    log_content,
+                )
+                if dispatcher_matches:
+                    console.print("  - Dispatcher activity:")
+                    for match in dispatcher_matches[
+                        -5:
+                    ]:  # Show last 5 dispatcher events
+                        # Remove ANSI color codes for display
+                        clean_match = re.sub(r"\x1b\[[0-9;]*m", "", match)
+                        console.print(f"    • {clean_match}")
+                console.print()
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Could not parse events.log: {e}[/yellow]\n"
+            )
+
+    # FailedGate status (always show, even when stopped)
     failed_gate = FailedGate()
     gate_status = failed_gate.get_status()
 
+    console.print("[bold]FailedGate Status:[/bold]")
     if gate_status.is_active:
-        console.print("[red]Failed Gate: ACTIVE[/red]")
-        console.print(f"  - Reason: {gate_status.reason}")
+        console.print("[red]  State: ACTIVE (blocking dispatch)[/red]")
+        console.print(f"  Reason: {gate_status.reason}")
         if gate_status.triggered_at:
-            console.print(f"  - Triggered at: {gate_status.triggered_at}")
+            console.print(f"  Triggered at: {gate_status.triggered_at}")
         if gate_status.triggered_by_error_code:
-            console.print(f"  - Error code: {gate_status.triggered_by_error_code}")
-        console.print(f"  - Blocked ticks: {gate_status.blocked_ticks}")
+            console.print(f"  Error code: {gate_status.triggered_by_error_code}")
+        console.print(f"  Blocked ticks: {gate_status.blocked_ticks}")
         console.print(
             '\n[yellow]To resume:[/yellow] vibe3 serve resume --reason "<reason>"'
         )
     else:
-        console.print("[green]Failed Gate: OPEN[/green]")
+        console.print("[green]  State: OPEN (normal operation)[/green]")
+    console.print()
 
-    # Error tracking status
+    # Error tracking status (always show, even when stopped)
     error_tracking = ErrorTrackingService.get_instance()
     error_status = error_tracking.get_status()
 
+    console.print("[bold]Error Tracking:[/bold]")
     if error_status["total_errors"] > 0:
-        console.print("\nError Statistics:")
-        console.print(f"  - Total errors: {error_status['total_errors']}")
+        console.print(f"  Total errors: {error_status['total_errors']}")
         console.print(f"  - Model errors: {error_status['model_errors']}")
         console.print(f"  - API errors: {error_status['api_errors']}")
         console.print(f"  - Execution errors: {error_status['exec_errors']}")
 
         # Show recent errors
-        recent_errors = error_tracking.get_recent_errors(limit=5)
+        recent_errors = error_tracking.get_recent_errors(limit=10)
         if recent_errors:
-            table = Table(title="Recent Errors (last 5)", show_lines=True)
-            table.add_column("Tick", style="cyan")
+            table = Table(title="\n  Recent Errors (last 10)", show_lines=True)
+            table.add_column("Tick", style="cyan", width=6)
+            table.add_column("Issue", style="yellow", width=6)
             table.add_column("Code", style="magenta")
+            table.add_column("Time", style="dim", width=19)
             table.add_column("Message", style="white")
 
             for err in recent_errors:
+                # Format time as HH:MM:SS (remove date part)
+                time_str = err.get("created_at", "")
+                if time_str and len(time_str) >= 19:
+                    # Extract HH:MM:SS from "2026-05-06 09:13:19"
+                    time_display = time_str[11:19]
+                else:
+                    time_display = time_str
+
+                # Format issue number
+                issue_num = err.get("issue_number")
+                issue_display = f"#{issue_num}" if issue_num else "-"
+
                 table.add_row(
                     str(err["tick_id"]),
+                    issue_display,
                     err["error_code"],
-                    err["error_message"][:80],  # Truncate long messages
+                    time_display,
+                    err["error_message"][:60],  # Truncate long messages
                 )
 
-            console.print("\n")
             console.print(table)
+    else:
+        console.print("  No errors recorded")
 
 
 @app.command()
