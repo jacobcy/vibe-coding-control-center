@@ -2,6 +2,30 @@
 
 本文件定义 `vibe-review-pr` 的恢复边界。原则只有一条：**不要手工伪造或篡改 team 内部状态**。
 
+补充硬规则：
+
+- 不要把 `TeamDelete` 当作恢复工具
+- 不要发送 shutdown 指令试图“清空 teammates 后重建”
+- 若当前会话里的 team 无法安全复用，唯一合法恢复是退出当前会话并重建
+
+## 已有 Team，优先判断是否可复用
+
+当目标 PR 进入多人流程时，先不要默认调用 TeamCreate。
+
+判断顺序：
+
+1. 当前会话是否已经持有 `pr-review-team`
+2. team 配置是否可读
+3. teammates 是否仍可通过 inbox / config 追踪
+
+如果以上都正常：
+
+- 直接复用已有 team
+- 跳过 TeamCreate
+- 继续走 Phase 1-5
+
+只有在确认 team 缺席时，才调用 `TeamCreate(team_name="pr-review-team")`。
+
 ## TeamCreate 与 Agent 状态不一致
 
 现象：
@@ -12,11 +36,17 @@
 处理：
 
 1. 停止当前审查轮
-2. 不继续 spawn / SendMessage
+2. 不继续 spawn / SendMessage / shutdown
 3. 退出当前 Claude Code 会话
 4. 重新进入后从 Step 1 环境检查重新开始
 5. 重新判断目标 PR 是否需要多人流程
-6. 如仍需要，只通过 `TeamCreate(team_name="pr-review-team")` 重建
+6. 先判断已有 team 是否可复用
+7. 如新会话中确认 team 缺席，只通过 `TeamCreate(team_name="pr-review-team")` 创建
+
+注意：
+
+- 不要在当前会话里尝试“先删 team 再建”
+- `Already leading...` 优先解释为“当前会话已有 team”，不是清理信号
 
 禁止：
 
@@ -24,6 +54,8 @@
 - 手工写 `config.json`
 
 ## TeamDelete 后 UI 残留
+
+本节只适用于 **Step 10 已经得到人类确认并成功执行过 TeamDelete** 之后。
 
 现象：
 
@@ -38,15 +70,15 @@
 
 处理：
 
-1. 等待 teammates idle
-2. 调用 TeamDelete
-3. 退出当前会话
-4. 重新进入新会话
+1. 接受 UI 历史显示可能暂时残留
+2. 退出当前会话
+3. 重新进入新会话
 
 禁止：
 
 - 手工编辑 `~/.claude/projects/.../*.jsonl`
 - 期待 TeamDelete 立刻清除 UI 历史显示
+- 为了 UI 残留再次调用 TeamDelete
 
 ## Phase 2 agent 缺失或超时
 
@@ -79,5 +111,5 @@ rm -rf ~/.claude/tasks/pr-review-team
 
 正确做法始终是：
 
-1. 通过 TeamDelete 清理
+1. 仅在 Step 10 且得到人类确认时调用 TeamDelete
 2. 通过重启会话消除 UI 残留

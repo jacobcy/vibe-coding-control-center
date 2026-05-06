@@ -120,15 +120,24 @@ Team 工具采用 deferred tools 机制时，先确认工具名可见，再用 `
 
 只有在 Step 6 判定为多人流程时才执行本步。
 
+先判断当前会话里是否已经存在可复用的 `pr-review-team`：
+
+- 已存在且状态健康 → **直接复用**，跳过 TeamCreate
+- 不存在 → 调用 TeamCreate 创建
+- 存在但状态不一致 → **不要清理、不要关停、不要 TeamDelete**；停止当前轮次，交给人类决定是否退出并重建会话
+
 ```yaml
 TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 ```
 
 规则：
 
-- 整个审查周期只创建一次
+- TeamCreate 只在 `pr-review-team` 缺席时调用
+- 整个审查周期最多创建一次
 - simple PR 不创建 team
 - 后续多人 PR 复用当前会话中的 `pr-review-team`
+- 如果 Team 已存在，不要再次调用 TeamCreate 试探
+- 如果 Team 状态异常，不要发送 shutdown 指令试图“清空后重建”
 - 不要手工创建 `~/.claude/teams/pr-review-team/`
 - 不要伪造 `config.json`
 
@@ -160,6 +169,12 @@ TeamDelete(team_name="pr-review-team")
 ```
 
 如果这轮只处理了 simple PR、从未创建 team，则不需要 TeamDelete。
+
+`TeamDelete` **不是**恢复工具，不用于：
+
+- 处理 `Already leading team "pr-review-team"`
+- 解决 team 状态不一致
+- 为了“重新创建 team”而先删后建
 
 ## Phase Contracts
 
@@ -201,8 +216,11 @@ TeamDelete(team_name="pr-review-team")
 
 - 环境检查必须在 TeamCreate 之前
 - Team 只在多人流程 PR 上创建
-- Team 整个周期只创建一次、删除一次
+- 已存在的健康 Team 必须优先复用
+- Team 整个周期最多创建一次、最多删除一次
 - simple PR 直接分流，不进入 team 生命周期
+- Step 10 之外不得调用 TeamDelete
+- 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
 
 ### 边界
 
@@ -211,6 +229,8 @@ TeamDelete(team_name="pr-review-team")
 - 不要手工修改 `~/.claude/projects/.../*.jsonl`
 - 不要手工 `rm -rf ~/.claude/teams/pr-review-team`
 - 不要手工 `tmux kill-pane` 代替 TeamDelete
+- 不要为恢复目的发送 teammate shutdown 指令
+- 不要把 TeamDelete 当作“清场后重建”的恢复手段
 
 ### 质量控制
 
@@ -224,6 +244,11 @@ TeamDelete(team_name="pr-review-team")
 
 错误：环境一通过就 `TeamCreate`。  
 正确：先分类 PR，只有多人流程 PR 才创建 team。
+
+### 已有 Team 仍重复创建
+
+错误：看到多人流程 PR 就再次 `TeamCreate`。  
+正确：先检查 `pr-review-team` 是否已存在且健康；存在就直接复用。
 
 ### simple PR 误入多人流程
 
@@ -240,6 +265,11 @@ TeamDelete(team_name="pr-review-team")
 错误：手工建 team 目录、改 `config.json`、改 session JSONL。  
 正确：结束会话，重进后重新走 Step 1-7。
 
+### 把 TeamDelete 当恢复工具
+
+错误：`Already leading...` 后尝试 TeamDelete、shutdown teammates、再 TeamCreate。  
+正确：先检查并复用现有 team；若状态异常，停止当前轮次，由人类退出并重建会话。
+
 ### Phase 5 手工清理
 
 错误：清空 inbox、删除 tasks、手工杀 pane。  
@@ -250,6 +280,7 @@ TeamDelete(team_name="pr-review-team")
 以下情况不要在主文件中临场发明 workaround，直接按恢复手册处理：
 
 - `TeamCreate` 与 `Agent spawn` 状态不一致
+- 已有 `pr-review-team` 但需要确认是否可直接复用
 - TeamDelete 后 UI 仍显示 teammates running
 - 部分审查 agent 超时或缺失
 - 背景报告未送达 team-lead
