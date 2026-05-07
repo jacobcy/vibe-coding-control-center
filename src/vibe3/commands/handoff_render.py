@@ -13,10 +13,6 @@ from vibe3.utils.path_helpers import (
     sanitize_event_detail_paths,
 )
 
-# Preview limit for update messages
-UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
-
-
 _to_handoff_cmd = ref_to_handoff_cmd
 
 
@@ -113,17 +109,3 @@ def _render_handoff_events(
                 display_ref = resolve_ref_path(ref, worktree_root)
                 console.print(f"  [dim]- {_to_handoff_cmd(display_ref, branch)}[/]")
         console.print()
-
-
-def _preview_update_message(message: str, truncate: bool = True) -> str:
-    """Preview update message with truncation if needed."""
-    if not truncate or len(message) <= UPDATE_LOG_MESSAGE_PREVIEW_LIMIT:
-        return message
-
-    # Truncate to limit, preserving word boundaries
-    truncated = message[:UPDATE_LOG_MESSAGE_PREVIEW_LIMIT]
-    # Find last space to avoid cutting words mid-way
-    last_space = truncated.rfind(" ")
-    if last_space > 0:
-        truncated = truncated[:last_space]
-    return truncated + "..."

@@ -117,13 +117,6 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
-    failed: Annotated[
-        bool,
-        typer.Option(
-            "--failed",
-            help="[DEPRECATED] Use --blocked instead. Resume all blocked issues",
-        ),
-    ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
@@ -162,11 +155,10 @@ def resume(
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
-    """Resume failed or blocked issues to ready.
+    """Resume blocked issues to ready.
 
-    Use --failed to resume all failed issues, --blocked to resume all
-    blocked issues, or --all to reset every auto-created task/issue-*
-    scene back to ready. Or specify issue numbers directly.
+    Use --blocked to resume all blocked issues, --all to reset every
+    auto-created task/issue-* scene back to ready, or specify issue numbers directly.
 
     **Label-only mode (no worktree deletion)**:
     Use --label [STATE] to clear blocked_reason and restore
@@ -207,25 +199,25 @@ def resume(
     register_event_handlers()
 
     # Validate arguments
-    selected_modes = [failed, blocked, all_tasks]
+    selected_modes = [blocked, all_tasks]
     has_flag = any(selected_modes)
     if not has_flag and not issue_numbers:
         typer.echo(
-            "Error: Must specify --failed, --blocked, --all, or provide issue numbers",
+            "Error: Must specify --blocked, --all, or provide issue numbers",
             err=True,
         )
         raise typer.Exit(1)
 
     if sum(1 for flag in selected_modes if flag) > 1:
         typer.echo(
-            "Error: Cannot specify more than one of --failed, --blocked, and --all",
+            "Error: Cannot specify more than one of --blocked and --all",
             err=True,
         )
         raise typer.Exit(1)
 
     if has_flag and issue_numbers:
         typer.echo(
-            "Error: Cannot combine issue numbers with --failed, --blocked, or --all",
+            "Error: Cannot combine issue numbers with --blocked or --all",
             err=True,
         )
         raise typer.Exit(1)
@@ -280,7 +272,7 @@ def resume(
     if candidate_mode != "all_task":
         stale_flows = flow_service.list_flows(status="stale")
 
-    # Handle --failed/--blocked filtering by state label
+    # Handle --blocked filtering by state label
     if has_flag and candidate_mode == "resumable":
         # Fetch all orchestrated issues (not just stale)
         all_issues = usecase.status_service.fetch_orchestrated_issues(
@@ -288,13 +280,6 @@ def resume(
             queued_set=set(),
             stale_flows=stale_flows,
         )
-
-        if failed:
-            typer.echo(
-                "⚠  --failed is deprecated and will be removed in a future version. "
-                "Use --blocked instead.",
-                err=True,
-            )
 
         # Filter by state label (FAILED unified to BLOCKED)
         target_state = IssueState.BLOCKED
@@ -355,8 +340,6 @@ def resume(
     if not yes and has_flag and not result.get("candidates"):
         if all_tasks:
             typer.echo("No auto-created task scenes found.")
-        elif failed:
-            typer.echo("No failed issues found.")
         else:
             typer.echo("No blocked issues found.")
         return
@@ -370,8 +353,6 @@ def resume(
                 candidate_count = len(result.get("candidates", []))
                 if all_tasks:
                     typer.echo(f"Found {candidate_count} auto-created task scene(s)")
-                elif failed:
-                    typer.echo(f"Found {candidate_count} failed issue(s)")
                 else:
                     typer.echo(f"Found {candidate_count} blocked issue(s)")
                 typer.echo("\n[dry-run mode] Would resume the following issues:")
