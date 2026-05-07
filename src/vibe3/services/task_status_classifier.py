@@ -31,6 +31,7 @@ def classify_task_status(
     - assignee is the intake signal
     - state/ready is the queue signal
     - state/ready without assignee is an anomaly / historical debt
+    - blocked has dedicated section in status dashboard
     - non-ready states stay in intake view even if assignee is missing, because
       runtime only treats missing assignee on READY as a governance boundary
       violation
@@ -40,12 +41,16 @@ def classify_task_status(
             return TaskStatusBucket.READY_ANOMALY
         return TaskStatusBucket.READY_QUEUE
 
+    if state == IssueState.BLOCKED:
+        # Blocked issues have dedicated section in status dashboard,
+        # exclude from intake to avoid duplication
+        return TaskStatusBucket.OTHER
+
     if state in {
         IssueState.CLAIMED,
         IssueState.HANDOFF,
         IssueState.IN_PROGRESS,
         IssueState.REVIEW,
-        IssueState.BLOCKED,
     }:
         return TaskStatusBucket.ASSIGNEE_INTAKE
 

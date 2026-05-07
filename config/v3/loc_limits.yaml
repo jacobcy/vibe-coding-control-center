@@ -65,8 +65,8 @@ code_limits:
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/status.py"
-        limit: 480
-        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，CLI 入口函数难以拆分"
+        limit: 550
+        reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，6个渲染section紧密耦合，blocked_reason智能提取逻辑增加可读性，CLI 入口函数难以拆分"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 420
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 集成、trace 输出等紧密耦合逻辑"
