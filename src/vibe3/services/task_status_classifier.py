@@ -42,7 +42,8 @@ def classify_task_status(
         return TaskStatusBucket.READY_QUEUE
 
     if state == IssueState.BLOCKED:
-        # Blocked issues have dedicated section in status dashboard
+        # Blocked issues have dedicated section in status dashboard,
+        # exclude from intake to avoid duplication
         return TaskStatusBucket.OTHER
 
     if state in {
