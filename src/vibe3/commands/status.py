@@ -70,8 +70,18 @@ def _extract_blocked_reason_summary(blocked_reason: str) -> str:
     # Remove trailing pipe separators
     cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
 
-    # Truncate to 80 chars for display
-    return cleaned[:80] if len(cleaned) > 80 else cleaned
+    # Truncate to 80 chars, prefer breaking after punctuation
+    if len(cleaned) <= 80:
+        return cleaned
+
+    # Try to break after colon or period (preserve error code prefix)
+    for sep in [":", "。"]:
+        pos = cleaned.rfind(sep, 0, 80)
+        if pos > 0:
+            return cleaned[: pos + 1]
+
+    # Fallback: hard truncate
+    return cleaned[:80]
 
 
 def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
