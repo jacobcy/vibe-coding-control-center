@@ -31,6 +31,49 @@ JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
+def _extract_blocked_reason_summary(blocked_reason: str) -> str:
+    """Extract key information from blocked_reason for status display.
+
+    Filters out verbose runtime details (TMPDIR, Recent Errors, stdin mode).
+    Preserves short status messages and error codes for quick diagnosis.
+
+    Args:
+        blocked_reason: Full blocked_reason from flow state
+
+    Returns:
+        Concise summary suitable for single-line display
+    """
+    if not blocked_reason:
+        return ""
+
+    lines = blocked_reason.strip().split("\n")
+    if not lines:
+        return ""
+
+    # Get first meaningful line
+    first_line = lines[0].strip()
+
+    # For short reasons (state unchanged, required ref missing), return as-is
+    if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
+        return first_line
+
+    # Extract error code prefix and filter out TMPDIR/Recent Errors noise
+    # E.g., "E_EXEC_NO_OUTPUT:", "codeagent-wrapper failed (code 1):"
+    import re
+
+    # Remove TMPDIR and everything after it in first line
+    cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", first_line)[0].strip()
+
+    # Remove " | === Recent Errors === | Using stdin mode" suffix
+    cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
+
+    # Remove trailing pipe separators
+    cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+
+    # Truncate to 80 chars for display
+    return cleaned[:80] if len(cleaned) > 80 else cleaned
+
+
 def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     """Only auto-task flows should participate in task-oriented Issue Progress."""
     flow = cast(FlowStatusResponse | None, item.get("flow"))
@@ -381,13 +424,10 @@ def status(
                     blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)
                     console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
 
-                # Blocked reason: truncate long error messages
+                # Blocked reason: extract key information from verbose error messages
                 if blocked_reason:
-                    # Show first 80 chars for readability
-                    reason_display = blocked_reason[:80]
-                    if len(blocked_reason) > 80:
-                        reason_display += "..."
-                    console.print(f"         [yellow]reason:[/] {reason_display}")
+                    reason_summary = _extract_blocked_reason_summary(blocked_reason)
+                    console.print(f"         [yellow]reason:[/] {reason_summary}")
         else:
             console.print("  [dim](none)[/]")
 
