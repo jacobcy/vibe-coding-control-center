@@ -177,7 +177,7 @@ agents:
   code-analyst:
     agent_definition: .claude/agents/pr-code-analyst.md
     subagent_type: pr-code-analyst
-    model: haiku
+    model: sonnet
     description: 代码分析员，分析代码框架和技术债
     spawn_config:
       tools: [Read, Grep, Glob, Bash]
@@ -188,7 +188,7 @@ agents:
   architect-reviewer:
     agent_definition: .claude/agents/pr-architect-reviewer.md
     subagent_type: pr-architect-reviewer
-    model: sonnet
+    model: opus
     description: 架构审查专家，评估 PR 对项目架构的影响
     spawn_config:
       tools: [Read, Grep, Glob, WebSearch]

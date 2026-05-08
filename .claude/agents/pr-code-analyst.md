@@ -7,7 +7,7 @@ description: |
   注意：此 agent 是对全局 code-reviewer 的项目特定扩展，
   增加了技术债识别和 PR 特定输出格式，以及项目特有工具使用要求。
   
-model: haiku
+model: sonnet
 tools: Read, Grep, Glob, Bash, SendMessage
 extends: code-reviewer  # 继承全局 code-reviewer 的基础能力
 # 安全限制：禁止修改文件和执行危险操作
