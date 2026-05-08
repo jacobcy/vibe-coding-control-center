@@ -7,6 +7,7 @@ from typing import Annotated, Iterator
 
 import typer
 
+from vibe3.commands.command_options import FormatOption
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
@@ -41,13 +42,32 @@ def show(
         typer.Argument(help="Issue number (auto-resolves to task branch if exists)"),
     ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
-    json_output: Annotated[bool, typer.Option("--json")] = False,
+    format: FormatOption = "table",
+    full: Annotated[
+        bool, typer.Option("--full", help="Show complete summary without truncation")
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Show a quick current-task summary for humans and agents.
 
     This command is the fast scene entry before reading handoff details or
     entering manager/plan/executor/reviewer prompts.
     """
+    # Handle deprecated --json flag
+    if json_output and format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        format = "json"
+
     task_svc = TaskService()
 
     try:
@@ -72,10 +92,10 @@ def show(
         elif target_branch.isdigit():
             issue_number = int(target_branch)
 
-        render_task_show(task_result, json_output)
+        render_task_show(task_result, format, full=full)
 
-        # Always show recent comments (if issue exists and not json output)
-        if issue_number and not json_output:
+        # Always show recent comments (if issue exists and not json/yaml output)
+        if issue_number and format == "table":
             issue_data = task_svc.fetch_issue_with_comments(issue_number)
             if issue_data == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
@@ -136,8 +156,9 @@ def resume(
             "WITHOUT deleting worktree/branch. "
             "STATE can be: auto, ready, claimed, in-progress, handoff, "
             "review, merge-ready. "
-            "Use 'auto' to infer target state based on flow refs "
-            "(pr_ref/audit_ref/report_ref/plan_ref). "
+            "Use 'auto' to infer state from flow refs "
+            "(prefers review/merge-ready if pr_ref/audit_ref present, "
+            "else defaults to CLAIMED). "
             "Without --label, the original behavior deletes worktree/branch.",
         ),
     ] = None,

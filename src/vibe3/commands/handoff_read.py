@@ -9,6 +9,7 @@ from loguru import logger
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.command_options import FormatOption, VerboseOption
 from vibe3.commands.common import trace_scope
 from vibe3.commands.handoff_render import (
     _render_handoff_events,
@@ -118,9 +119,26 @@ def status(
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    format: FormatOption = "table",
+    verbose: VerboseOption = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
+    # Handle deprecated --json flag
+    if json_output and format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        format = "json"
+
     with trace_scope(trace, "handoff status", domain="handoff"):
         logger.bind(command="handoff status", branch=branch).info(
             "Showing handoff details"
@@ -147,7 +165,7 @@ def status(
             target_branch, limit=limit
         )
 
-        if json_output:
+        if format == "json":
             output = {
                 "state": state.model_dump(),
                 "events": [e.model_dump() for e in handoff_events],
@@ -155,6 +173,17 @@ def status(
             typer.echo(json.dumps(output, indent=2, default=str))
             return
 
+        if format == "yaml":
+            import yaml
+
+            output = {
+                "state": state.model_dump(),
+                "events": [e.model_dump() for e in handoff_events],
+            }
+            typer.echo(yaml.dump(output, default_flow_style=False, allow_unicode=True))
+            return
+
+        # Table format (default)
         # Fetch live registry sessions (preferred over deprecated FlowState fields)
         live_sessions = _get_live_sessions_for_branch(service.store, target_branch)
 
@@ -209,7 +238,10 @@ def status(
         console.print("[bold]--- Successful Handoff Events ---[/]")
         console.print()
         _render_handoff_events(
-            handoff_events, worktree_root=worktree_root, branch=target_branch
+            handoff_events,
+            worktree_root=worktree_root,
+            branch=target_branch,
+            verbose=verbose,
         )
 
 

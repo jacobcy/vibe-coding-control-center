@@ -226,17 +226,42 @@ def _render_event_refs(
 
 
 def _render_timeline(
-    events: list[FlowEvent], worktree_root: str | None, branch: str | None
+    events: list[FlowEvent],
+    worktree_root: str | None,
+    branch: str | None,
+    show_all: bool = False,
+    actor_filter: str | None = None,
 ) -> None:
-    """Render timeline events with details and references."""
+    """Render timeline events with details and references.
+
+    Args:
+        events: List of flow events to render.
+        worktree_root: Root path of the worktree for path resolution.
+        branch: Branch name for handoff command generation.
+        show_all: If True, include orchestra:* actor events (normally filtered).
+        actor_filter: If provided, filter events to those matching this pattern.
+    """
     if not events:
         console.print("[dim]  no events[/]")
         return
 
     events = _filter_passive_if_active_exists(events)
 
-    # Filter out orchestra:* actor events (internal orchestration)
-    events = [e for e in events if not (e.actor and e.actor.startswith("orchestra:"))]
+    # Filter out orchestra:* actor events unless show_all is True
+    if not show_all:
+        events = [
+            e for e in events if not (e.actor and e.actor.startswith("orchestra:"))
+        ]
+
+    # Apply actor filter if provided
+    if actor_filter:
+        import fnmatch
+
+        events = [
+            e
+            for e in events
+            if e.actor and fnmatch.fnmatch(e.actor.lower(), actor_filter.lower())
+        ]
 
     console.print("[bold]--- Timeline ---[/]")
     console.print()
@@ -315,13 +340,30 @@ def render_flow_timeline(
     events: list[FlowEvent],
     parent_branch: str | None = None,
     issue_titles: dict[int, str] | None = None,
+    show_all: bool = False,
+    actor_filter: str | None = None,
 ) -> None:
-    """Render complete flow timeline with header, actors, timeline, and refs."""
+    """Render complete flow timeline with header, actors, timeline, and refs.
+
+    Args:
+        state: Flow state information.
+        events: List of flow events to render.
+        parent_branch: Parent branch name if applicable.
+        issue_titles: Mapping of issue numbers to titles.
+        show_all: If True, include orchestra:* actor events.
+        actor_filter: If provided, filter events to those matching this pattern.
+    """
     _render_header(state, parent_branch)
     _render_actors(state)
     _render_reasons(state)
     console.print()
-    _render_timeline(events, state.worktree_root, state.branch)
+    _render_timeline(
+        events,
+        state.worktree_root,
+        state.branch,
+        show_all=show_all,
+        actor_filter=actor_filter,
+    )
 
     _render_refs(state, issue_titles)
     _render_state_summary(state)

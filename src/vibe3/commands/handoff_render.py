@@ -20,11 +20,18 @@ def _render_handoff_events(
     events: list,
     worktree_root: str | None = None,
     branch: str | None = None,
+    verbose: bool = False,
 ) -> None:
     """Render successful handoff events in reverse chronological order.
 
     Filters out *_recorded events when corresponding handoff_* events exist
     to avoid duplicate display.
+
+    Args:
+        events: List of handoff events to render.
+        worktree_root: Root path of the worktree for path resolution.
+        branch: Branch name for handoff command generation.
+        verbose: If True, show full event details including all refs fields.
     """
     if not events:
         console.print("[dim]  no handoff events[/]")
@@ -61,7 +68,11 @@ def _render_handoff_events(
             filtered_events.append(event)
 
     for event in reversed(filtered_events):
-        time_str = event.created_at[:19].replace("T", " ")
+        # Use full ISO timestamp in verbose mode, compact in normal mode
+        if verbose:
+            time_str = event.created_at
+        else:
+            time_str = event.created_at[:19].replace("T", " ")
         event_name = display_names.get(event.event_type, event.event_type)
 
         # Bug 9: Label manager handoffs vs human ones
@@ -98,14 +109,43 @@ def _render_handoff_events(
             if verdict_value:
                 console.print(f"  Verdict: {verdict_value}")
 
+        # Show refs
         if event.refs and event.event_type != "handoff_verdict":
-            files = event.refs.get("files") if isinstance(event.refs, dict) else None
-            if files and isinstance(files, list):
-                for f in files:
-                    display_f = resolve_ref_path(f, worktree_root)
-                    console.print(f"  [dim]- {_to_handoff_cmd(display_f, branch)}[/]")
-            ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            if ref:
-                display_ref = resolve_ref_path(ref, worktree_root)
-                console.print(f"  [dim]- {_to_handoff_cmd(display_ref, branch)}[/]")
+            if verbose:
+                # In verbose mode, show all refs fields
+                console.print("  [cyan]refs:[/]")
+                for key, value in event.refs.items():
+                    if key == "files" and isinstance(value, list):
+                        console.print("    [dim]files:[/]")
+                        for f in value:
+                            display_f = resolve_ref_path(f, worktree_root)
+                            console.print(
+                                f"      [dim]- "
+                                f"{_to_handoff_cmd(display_f, branch)}[/]"
+                            )
+                    elif key == "ref":
+                        display_ref = resolve_ref_path(value, worktree_root)
+                        console.print(
+                            "    [dim]ref: "
+                            f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                        )
+                    else:
+                        console.print(f"    [dim]{key}: {value}[/]")
+            else:
+                # Normal mode: show only files and ref
+                files = (
+                    event.refs.get("files") if isinstance(event.refs, dict) else None
+                )
+                if files and isinstance(files, list):
+                    for f in files:
+                        display_f = resolve_ref_path(f, worktree_root)
+                        console.print(
+                            "  [dim]- " f"{_to_handoff_cmd(display_f, branch)}[/]"
+                        )
+                ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
+                if ref:
+                    display_ref = resolve_ref_path(ref, worktree_root)
+                    console.print(
+                        "  [dim]- " f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                    )
         console.print()
