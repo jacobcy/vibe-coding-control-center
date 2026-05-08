@@ -7,358 +7,214 @@ description: |
 
 # Vibe PR Review Skill
 
-## Overview
+`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。本文件定义生命周期、执行步骤、phase 契约、审查质量标准与硬边界。消息样例与恢复细节在 `references/`。
 
-`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。它只负责：
-
-1. 环境检查
-2. 选择执行模式
-3. PR 队列排序与选择
-4. 加载 team template 并创建或复用 team
-5. 判断 PR 类型与检查深度
-6. 驱动审查直到人类确认结束
-7. 人类确认后删除 team
-
-真实流程定义在 `.claude/team-templates/pr-review-team.yaml`。本文件只保留入口路由、阶段契约和硬边界，不再内嵌长样例。
-
-非 Claude team 环境不要模拟本 workflow。包括 Codex 在内的非 Claude team host，统一分流：
-
-- docs-only PR → `vibe-review-docs`
-- 其他 PR → `vibe-review-code`
+非 Claude team 环境（含 Codex）一律分流：docs-only PR → `vibe-review-docs`；其他 → `vibe-review-code`。
 
 ## When to Use
 
-只有在以下条件同时满足时才使用本 skill：
+仅在以下条件**全部**满足时使用：
 
-- 当前 host 是 Claude Code
+- host 为 Claude Code
 - `TMUX` 已设置
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
-- 当前工具面提供 TeamCreate / Agent / SendMessage / teammate-message 等 team 能力
+- 工具面提供 TeamCreate / Agent / SendMessage / teammate-message
 
-不满足任一条件时，立即停止 team workflow，按文件范围回退到单 agent 审查。
+任一缺失 → 立即停止，按文件范围回退到单 agent 审查。
 
 ## Must Read
 
-开始执行前，至少读取这 3 处：
+启动前读取：
 
 1. `.claude/team-templates/pr-review-team.yaml`
 2. `.claude/agents/pr-*.md`
 3. `docs/references/team-guide.md`
 
-如需详细样例，继续读：
+需要消息样例或恢复路径时再读 `references/execution-reference.md` / `references/recovery-playbook.md`。
 
-- `skills/vibe-review-pr/references/execution-reference.md`
-- `skills/vibe-review-pr/references/recovery-playbook.md`
+## Session Lifecycle（强制理解，issue #742 反复踩坑）
+
+> **核心误解**：把 Team 当成"PR-级"对象。事实上 Team 是"会话级"对象。
+
+```
+环境检查 → TeamCreate（一次） → PR #A → continue → PR #B → ... → end → TeamDelete（一次）
+```
+
+| 规则 | 原因 | 易犯错误 |
+|------|------|---------|
+| 一个会话一个 Team | TeamCreate / TeamDelete 是高代价操作；teammates 状态不应跨 PR 重置 | 每审完一个 PR 就 TeamDelete，下一个又重建 |
+| 一个 Team 多个 PR | spawn agent 比 SendMessage 慢 10-100 倍且占资源 | 每个 PR 都重新 spawn `code-analyst` |
+| 切换 PR 用 SendMessage | agent 已就绪，只需告诉它"换审 PR #B" | 关闭旧 agent，spawn 新 agent |
+| TeamDelete 仅在用户 end | 用户没说结束就保留状态 | 看到"询问是否继续"以为是 TeamDelete 触发点 |
+
+Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-编号命名，会强化错误心智模型）。
 
 ## Execution Flow
 
-### Step 1: 环境检查
+| Step | 动作 | 关键约束 |
+|------|------|---------|
+| 1 | 环境检查 | 缺工具 → 立即回退，禁止模拟 |
+| 2 | 选执行模式 | `auto-fix / comment-only / auto-decide / ask-each` |
+| 3 | PR 选择/排序 | 优先 `state/merge-ready`、改动小、`base==main` |
+| 4 | 检查已有审查 | 有人类 / agent 评论时询问是否重审 |
+| 5 | 加载 template | 读 `.claude/team-templates/pr-review-team.yaml` |
+| 6 | 创建或复用 Team | 已存在且健康 → 复用；不存在 → TeamCreate；状态异常 → 停止由人类处理 |
+| 7 | 判断 PR 类型 | 多维判断（见下） |
+| 8 | 执行审查 | Phase 1 → 2 → 3 → 4，**严格串行** |
+| 9 | 询问继续 | continue → 回 Step 3，**复用** Team；end → Step 10 |
+| 10 | TeamDelete | 仅当 Step 9 选 end，整会话最多一次 |
 
-先检查环境，再决定是否继续 team workflow。
+### Step 7: PR 分类（多维判断，禁止简化）
 
-```bash
-echo "TMUX: ${TMUX:-未设置}"
-env | grep -i "CLAUDE.*TEAM" || echo "未设置"
-```
+> **常见错误**：看到"文档改动"就归类 `simple`。这是错的。
 
-Team 工具采用 deferred tools 机制时，先确认工具名可见，再用 `ToolSearch` 加载定义。若 TeamCreate / TeamDelete / SendMessage 不可用，直接回退到 `vibe-review-docs` 或 `vibe-review-code`。
+`simple` 必须**同时**满足全部 4 项：
 
-### Step 2: 选择执行模式
+- ✅ **单文件**改动
+- ✅ 改动 **< 30 行**
+- ✅ 仅文档 / 注释 / 字符串 / 重命名
+- ✅ 无 `security/*` 标签
 
-在开始审查前先确定执行模式，除非用户已明确指定：
+任一不满足 → 不是 simple。
 
-- `auto-fix`
-- `comment-only`
-- `auto-decide`
-- `ask-each`（默认）
+| 类型 | 触发 | 处理 |
+|------|------|------|
+| `simple` | 上述 4 项**全**满足 | 仅 Phase 1（team-lead 调用 `vibe-review-docs` 或 `vibe-review-code`） |
+| `security` | 涉及认证 / 授权 / 数据 / 凭据 / 输入验证 | Phase 1+2，**必须**含 `security-reviewer` |
+| `refactor` | ≥ 5 文件 **或** 大规模重构 | Phase 1+2 |
+| `standard` | 不属于上述 | Phase 1+2 |
 
-把选择保存到当前执行上下文；只有当 PR 进入多人流程时，才写入 team context 给 Phase 4 使用。
-
-### Step 3: PR 队列排序与选择
-
-当用户没有指定 PR 编号时，先列出 open PR，再按以下优先级排序：
-
-1. `state/merge-ready`
-2. 改动更小
-3. `baseRefName == main`
-4. 如范围重叠，优先审查改动更大的 PR
-
-如果用户已明确指定 PR，直接审查该 PR，不重排。
-
-### Step 4: 检查已有审查记录
-
-开始前先看 PR 是否已有评论：
-
-- 无评论：继续
-- 有人类评论：询问是否完整重审
-- 有 agent/bot 评论：询问是否补充审查
-- 用户选择 `skip`：返回 Step 3 处理下一个 PR
-
-### Step 5: 加载 Team Template
-
-此步先加载配置。必须读取 `.claude/team-templates/pr-review-team.yaml`，后续所有 phase 行为都按其中的 `workflow.execution`、`agents`、`pr_classification` 执行。
-
-### Step 6: 创建或复用 Team
-
-在判断当前 PR 类型之前，先确保当前会话已经持有 `pr-review-team`。
-
-先判断当前会话里是否已经存在可复用的 `pr-review-team`：
-
-- 已存在且状态健康 → **直接复用**，跳过 TeamCreate
-- 不存在 → 调用 TeamCreate 创建
-- 存在但状态不一致 → **不要清理、不要关停、不要 TeamDelete**；停止当前轮次，交给人类决定是否退出并重建会话
-
-```yaml
-TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
-```
-
-规则：
-
-- TeamCreate 只在 `pr-review-team` 缺席时调用
-- 整个审查周期最多创建一次
-- 后续 PR 复用当前会话中的 `pr-review-team`
-- 如果 Team 已存在，不要再次调用 TeamCreate 试探
-- 如果 Team 状态异常，不要发送 shutdown 指令试图“清空后重建”
-- 不要手工创建 `~/.claude/teams/pr-review-team/`
-- 不要伪造 `config.json`
-
-### Step 7: 判断 PR 类型
-
-根据 template 中的 `pr_classification` 自动分类：
-
-| 类型 | 处理 |
-|------|------|
-| `simple` | 保留已创建的 team，只执行阶段 1 |
-| `refactor` | 进入多人流程 |
-| `security` | 进入多人流程，且必须包含 `security-reviewer` |
-| `standard` | 进入多人流程 |
-
-检查深度规则：
-
-- `simple`：**只执行阶段 1 检查**
-- `refactor` / `security` / `standard`：**执行阶段 1 + 阶段 2 的双阶段检查**
-
-`simple` PR 的分流规则：
-
-- 仅文档变更 → 由 team-lead 使用 `vibe-review-docs` 完成阶段 1 检查
-- 其他 → 由 team-lead 使用 `vibe-review-code` 完成阶段 1 检查
-
-这里的“阶段 1 检查”指：
-
-- team 已经存在
-- 由 team-lead 在当前会话中执行对应单 agent skill
-- 不启动 Phase 2 专项审查 agent
-- 仍处于当前 team 生命周期内；完成阶段 1 后直接进入写回/继续流程
-
-### Step 8: 执行审查流程
-
-按 PR 类型执行：
-
-- `simple`：只执行阶段 1 检查，由 team-lead 使用对应单 agent skill 完成
-- `refactor` / `security` / `standard`：按 template 驱动 Phase 1-5
-
-这里要明确区分：
-
-- “两步检查”只指 **Phase 1 + Phase 2**
-- Phase 3-5 是汇总、写回和收尾，不是额外检查层级
-- `simple` 没有 Phase 2；它在已存在的 team 现场中完成阶段 1 后，直接进入写回/继续流程
-
-多人流程下的阶段契约：
-
-- Phase 1：背景调研，必须产出 `phase_1_output`
-- Phase 2：专项审查，必须在**单次响应**中启动多个 Agent 调用，并用 `SendMessage` 把 `phase_1_output` 发给每个 Phase 2 agent
-- Phase 3：综合判断，必须检查缺失报告、记录冲突、完成仲裁
-- Phase 4：写回与改进，由 team-lead 主导；仅 `auto-fix` 路径允许额外 spawn `fix-executor`
-- Phase 5：准备下一个 PR，保留 inbox / idle state / pane 信息，不做手工清理
-
-详细 phase 样例、消息格式和等待策略见 `references/execution-reference.md`。
-
-### Step 9: 询问是否继续
-
-每个 PR 审查完成后，询问用户是否继续审查下一个 PR：
-
-- `continue` → 返回 Step 3
-- `end` → 进入 Step 10
-
-### Step 10: 删除 Team
-
-只在人类明确确认结束审查后执行：
-
-```yaml
-TeamDelete(team_name="pr-review-team")
-```
-
-如果这轮在 Step 6 之前就停止、从未创建 team，则不需要 TeamDelete。
-
-`TeamDelete` **不是**恢复工具，不用于：
-
-- 处理 `Already leading team "pr-review-team"`
-- 解决 team 状态不一致
-- 为了“重新创建 team”而先删后建
+**反例**（issue #742 真实踩坑）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 + 文档 → 错误归类 `simple` → 实际应按 `standard` 处理。**只要包含代码改动或多文件，就不是 simple。**
 
 ## Phase Contracts
 
-### Phase 1
+| Phase | 强制要求 | 易错点 |
+|-------|---------|-------|
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；spawn 后**立即** SendMessage 把 `phase_1_output` 广播给每个 | **与 Phase 1 并行启动**（issue #742 真实踩坑）；忘发背景导致盲审 |
+| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标"审查不完整" | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
+| 4 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
-- 必须先于 Phase 2 完成
-- 必须把背景报告保存为 `phase_1_output`
-- 不允许只把结果打印到终端而不回传给 team-lead
+> **没有 Phase 5**。完成 Phase 4 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
 
-### Phase 2
+详细消息样例见 `references/execution-reference.md`。
 
-- 多个审查 agent 必须在同一响应中启动
-- 不能跳过 `SendMessage`
-- 不能让 Phase 2 在没有背景信息时盲审
+## Review Quality Standards（强制，写回前自查）
 
-### Phase 3
+> **针对 PR #737 暴露的 8 类审查质量问题。每条都有真实踩坑反例。任一条不满足必须先修正再写回 comment。**
 
-- 必须检查是否缺少任何审查报告
-- 有冲突必须仲裁，不做机械拼接
-- 缺失报告时只能标注“审查不完整”，不能替缺失 agent 脑补同意
+### 1. 禁虚假精度评分
 
-### Phase 4
+LLM 拟合不出小数点评分，强行打分就是幻觉。
 
-- 执行模式决定写回路径
-- `comment-only` 只写 comment
-- `auto-fix` 才能 spawn `fix-executor`
-- 范围外问题才创建 follow-up issue
+- ❌ "代码质量评分：89.75 / 100 (A-)"
+- ❌ "架构符合性：A (90)、错误处理：B+ (85)、测试覆盖：A (95)"
+- ✅ "APPROVE（已解决 3 项技术债，遗留 2 项次要问题转 follow-up）"
 
-### Phase 5
+### 2. 强制规则引用
 
-- 不删除 team
-- 不清空 inbox
-- 不清理 tasks
-- 只记录当前 PR 完成并保留可复用状态
+凡是判定为"违规 / 技术债 / 应修复"的条目，必须**引用具体规则来源**。
 
-## Guardrails
+- ❌ "异常类型不一致（ValueError 应改为 SystemError）"——没有规则依据
+- ✅ "`ValueError` 不在 `CLAUDE.md` HARD RULE 13 规定的 `SystemError / UserError / BatchError` 体系内"
 
-### Team 生命周期
+合法引用源：`CLAUDE.md` 第 N 条 / `.claude/rules/coding-standards.md § X` / `.claude/rules/python-standards.md` / `docs/standards/error-handling.md` 等。
 
-- 环境检查必须在 TeamCreate 之前
-- Team 在当前审查会话开始后先创建或复用，再判断 PR 类型
-- 已存在的健康 Team 必须优先复用
-- Team 整个周期最多创建一次、最多删除一次
-- `simple` 与复杂 PR 共用同一个 team 生命周期
-- Step 10 之外不得调用 TeamDelete
-- 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
+### 3. 验证再断言（数字基于本 PR 实际 diff）
 
-### 边界
+- ❌ 在不修改 PRService 的 PR 中报告 "PRService at 394/400 maintained"——本 PR 不改它
+- ❌ "函数大小超标（68 行，接近 100 行上限）"——project 标准是 < 100 建议，68 行**未超标**
+- ✅ "`get_numstat()` 函数体 65 行（含 docstring），Client/Utils 层建议上限 100，未超标"
 
-- 不要在 Codex 或其他非 Claude team host 中模拟这个 workflow
-- 不要绕过 `.claude/team-templates/pr-review-team.yaml` 自创 phase 顺序
-- 不要手工修改 `~/.claude/projects/.../*.jsonl`
-- 不要手工 `rm -rf ~/.claude/teams/pr-review-team`
-- 不要手工 `tmux kill-pane` 代替 TeamDelete
-- 不要为恢复目的发送 teammate shutdown 指令
-- 不要把 TeamDelete 当作“清场后重建”的恢复手段
+### 4. 禁滑动靶点（论证只针对本 PR 改动）
 
-### 质量控制
+- ❌ 本 PR 函数不直接调用 subprocess，却写"无 shell 注入风险：使用 subprocess.run 列表形式"——这是替既有代码做声明
+- ✅ "本 PR 新增的 `get_numstat()` 不直接调用 subprocess，通过注入的 `run` callable 委托；底层 `_run` 安全性属于既有代码，不在本次审查范围"
 
-- 关键结论必须有证据，不接受”已合并””CI 通过””无漏洞”这类无证据结论
-- Phase 2 的背景传递是硬要求，不是建议项
-- team-lead 必须做差异仲裁，不能只汇总 teammate 原话
-- **消息验证硬要求**：收到 teammate-message 时必须验证 PR 编号正确性
-- **诚信原则（强制）**：发现消息错误或报告缺失时，必须如实说明，禁止假装完成审核
-- **缺失标注义务**：缺失报告只能标注”审查不完整”，不能脑补结论或替缺失 agent 表态
+### 5. 禁无关指标
 
-### 诚信原则
+不要把与本 PR 无关的项目级指标作为"verification result"列出。
 
-**强制要求**：
-- 发现 teammate-message 内容错误时，必须标注异常
-- 必须说明正确内容的来源（如 session 文件路径）
-- 缺失报告时必须标注”审查不完整”
-- 不得脑补缺失 agent 的立场或结论
+- ❌ 本 PR 不改 PRService，却列 "PRService at 394/400 maintained" 作为验证结果
+- ✅ 仅列**本 PR 改动文件**的真实数据（行数、覆盖率、增删比）
 
-**禁止行为**：
-- ❌ 假装收到了正确的消息
-- ❌ 不说明来源直接使用 session 文件内容
-- ❌ 用错误内容作为审查依据
-- ❌ 缺失报告时不标注异常继续执行
-- ❌ 替缺失 agent 脑补同意或反对
+### 6. 强制识别真实重构机会
 
-## Common Mistakes
+`code-analyst` 必须做**结构性扫描**，不能只跑样板检查。重点找：重复代码段、冗余防御（discriminated union 之后又做 isinstance）、已有规则在新代码中的违反点。
 
-### 过早创建 Team
+- ❌ 在 PR #737 中遗漏 BRANCH 与 PR 分支的 `merge_base + 三点 diff` 重复
+- ✅ 明确指出"BRANCH 和 PR 两条分支共享同一 `merge_base + 三点 diff` 模式，可提取私有 helper 减少 6 行重复"
 
-错误：环境一通过就 `TeamCreate`。  
-正确：先加载 template，再创建或复用 team，然后才判断当前 PR 类型。
+### 7. 测试评估看性质而非数量
 
-### 已有 Team 仍重复创建
+- ❌ "9 个测试 → 测试覆盖 A (95)"
+- ✅ "9 个 MagicMock 单元测试，覆盖 4 种 ChangeSource + 4 种错误分支，但缺乏与真实 GitClient._run 的集成契约测试"
 
-错误：看到多人流程 PR 就再次 `TeamCreate`。  
-正确：先检查 `pr-review-team` 是否已存在且健康；存在就直接复用。
+必须区分：单元（mock） / 集成（真实依赖）、happy path / 错误分支。
 
-### simple PR 误入多人流程
+### 8. comment 格式（写回前最后一道关）
 
-错误：把 `simple` 理解成“不创建 team”。  
-正确：`simple` 也在已创建的 team 现场中执行，只是不进入 Phase 2，且阶段 1 由 `vibe-review-docs` 或 `vibe-review-code` 完成。
+**必须包含**：决策一行（APPROVE / NEEDS_CHANGES / REJECT） / 已解决技术债（带 diff 引用） / 遗留问题（每条带规则引用） / follow-up issue 链接 / 审查依据（引用了哪些规则文档）。
 
-### 把双阶段检查套到所有 PR
+**禁止包含**：
 
-错误：不区分复杂度，默认所有 PR 都做 Phase 1 + Phase 2。  
-正确：只有 `refactor` / `security` / `standard` 才做双阶段检查；`simple` 只做阶段 1。
+- ❌ 百分制 / 字母评分（除非用户明确要求）
+- ❌ "Phase 1 / Phase 2 / Phase 3" 内部流程标题作叙事结构（这是 skill 的执行结构，不是审查报告的叙事结构）
+- ❌ 已解决与未解决问题混在一起
 
-### 忘记发送 Phase 1 背景
+## Hard Rules
 
-错误：Phase 2 agent 启动后直接开审。  
-正确：必须 `SendMessage` 把 `phase_1_output` 发给每个 Phase 2 agent。
+### Team / Session
 
-### 手工修状态
+- TeamCreate 整会话最多一次；TeamDelete 仅在用户 end 时一次
+- 已存在的健康 Team 必须复用，禁止重复 TeamCreate
+- 切换 PR 用 SendMessage，禁止重新 spawn agent
+- Team 状态不一致时**不要**清理 / shutdown / TeamDelete，唯一合法恢复是退出会话重建
+- TeamDelete 不是恢复工具（看到 `Already leading...` 优先解释为"当前会话已有 team"）
 
-错误：手工建 team 目录、改 `config.json`、改 session JSONL。  
-正确：结束会话，重进后重新走 Step 1-7。
+### Phase 流程
 
-### 把 TeamDelete 当恢复工具
+- Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
+- Phase 2 spawn 后必须 SendMessage 发 `phase_1_output`，禁止盲审
+- 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
 
-错误：`Already leading...` 后尝试 TeamDelete、shutdown teammates、再 TeamCreate。  
-正确：先检查并复用现有 team；若状态异常，停止当前轮次，由人类退出并重建会话。
+### 状态操作
 
-### Phase 5 手工清理
+- 不手工编辑 `~/.claude/projects/.../*.jsonl`
+- 不手工 `rm -rf ~/.claude/teams/`
+- 不手工 `tmux kill-pane`
+- 不发送 teammate shutdown 指令
 
-错误：清空 inbox、删除 tasks、手工杀 pane。  
-正确：保留状态给下一个 PR，最终只通过 TeamDelete 清理。
+### 诚信
 
-### 忽略消息路由错误
-
-错误：收到错误的 teammate-message 后直接使用错误内容继续执行。  
-正确：立即停止，验证 PR 编号，检查 session 文件，在报告中标注消息路由错误。
-
-### 假装完成审核
-
-错误：报告缺失或消息错误时，不说明异常，假装审查正常完成。  
-正确：必须如实标注"审查不完整"或"消息路由错误"，说明实际获取到的内容和来源，不能脑补缺失结论。
+- teammate-message PR 编号不匹配时必须如实标注，并说明正确报告来源（session 文件路径）
+- 缺失报告必须标"审查不完整"，禁止脑补缺失 agent 的同意 / 反对
+- 拒绝"已合并 / CI 通过 / 无漏洞"这类无证据声明（按 yaml `anti_hallucination` 提供证据）
 
 ## Recovery
 
-以下情况不要在主文件中临场发明 workaround，直接按恢复手册处理：
+按 `references/recovery-playbook.md` 处理，不在主流程临场发明 workaround：
 
-- `TeamCreate` 与 `Agent spawn` 状态不一致
-- 已有 `pr-review-team` 但需要确认是否可直接复用
-- TeamDelete 后 UI 仍显示 teammates running
-- 部分审查 agent 超时或缺失
-- 背景报告未送达 team-lead
-
-恢复步骤见 `skills/vibe-review-pr/references/recovery-playbook.md`。
+- TeamCreate 与 Agent spawn 状态不一致
+- 已有 Team 但需确认是否可复用
+- TeamDelete 后 UI 残留
+- 部分审查 agent 超时 / 缺失
+- 背景报告未送达
+- teammate-message PR 编号路由错误（Claude Code 已知 bug #40166 / #39651）
 
 ## File Map
 
 | 文件 | 职责 |
 |------|------|
-| `skills/vibe-review-pr/SKILL.md` | 主入口：路由、阶段契约、硬边界 |
-| `skills/vibe-review-pr/references/execution-reference.md` | 详细 phase 样例和消息格式 |
-| `skills/vibe-review-pr/references/recovery-playbook.md` | 故障恢复与清理边界 |
-| `.claude/team-templates/pr-review-team.yaml` | 团队配置和执行真源 |
-| `.claude/agents/pr-*.md` | 各 teammate 的项目特定职责 |
+| `SKILL.md` | 生命周期、phase 契约、质量标准、硬边界 |
+| `references/execution-reference.md` | 消息样例与等待策略 |
+| `references/recovery-playbook.md` | 故障恢复路径 |
+| `.claude/team-templates/pr-review-team.yaml` | 团队配置真源 |
+| `.claude/agents/pr-*.md` | teammate 项目特定职责 |
 | `docs/references/team-guide.md` | Team 功能通用背景 |
 
 ## Usage
 
-```text
-/vibe-review-pr 604
 ```
-
-或：
-
-```text
-用 vibe-review-pr 审查 PR #604
+/vibe-review-pr 604
 ```

@@ -540,30 +540,12 @@ workflow:
         - [ ] 高 / 中 / 低
     labels: ["type/follow-up", "scope/<component>"]
 
-  phase_5:
-    name: 准备下一个 PR（不清理状态）
-    executor: team-lead
-    agents: []
-    # 【重要】不清理 inbox 或 tasks
-    # - idle_notification 保留用于追踪 agents 状态和 paneId
-    # - tasks 最终由 TeamDelete 处理
-    actions:
-      - record_current_pr_complete  # 记录当前 PR 完成
-      - preserve_agent_state        # 保留所有 teammates 状态信息
-    # 为什么不需要清理：
-    # - 清理 inbox 会丢失 idle_notification → 无法追踪 agents 状态
-    # - 清理 inbox 会丢失 paneId → 无法复用 teammates
-    # - tasks 由 TeamDelete 最终处理
-    conditions:
-      continue_next_pr:
-        - 保留 tmux panes（复用模式）
-        - 保留 inbox 文件（保留 idle_notification 和 paneId）
-        - 不清理 tasks（TeamDelete 最终处理）
-        - 下一个 PR 通过 SendMessage 唤醒已有 teammates
-      end_session:
-        - 调用 TeamDelete 工具（由 Step 9 执行）
-        - TeamDelete 自动完成：杀死 panes + 删除目录 + 删除 tasks
-        - 不要手动执行清理命令（会导致会话残留）
+# 注意：本 workflow 只有 4 个 phase。
+# Phase 4 完成后，控制权直接回到 SKILL.md 的 Step 9（询问继续 / 结束）。
+# 不存在 "phase_5 / 准备下一个 PR / 保留状态" 这类辅助 phase——
+# teammates 的 idle / pane / inbox 由运行时管理，skill 不感知也不操作。
+# 切换 PR 通过 SendMessage 给已有 agent 发新任务即可。
+
 # 防幻觉机制
 anti_hallucination:
   evidence_required:
@@ -572,20 +554,38 @@ anti_hallucination:
     "无漏洞": "检查的文件和函数列表"
     "符合架构": "架构文档引用位置"
 
-# 输出格式
+# 审查质量硬要求（与 SKILL.md 的 Review Quality Standards 对齐）
+review_quality_requirements:
+  forbidden:
+    - "百分制 / 字母评分（89.75/100、A-、B+ 等虚假精度）"
+    - "援引与本 PR 无关的指标（如 PR 不改 PRService 却列 PRService LOC）"
+    - "安全/架构论证滑动到本 PR 未触碰的相邻代码"
+    - "称'违规'但不引用具体规则来源"
+    - "把测试数量等同于覆盖质量"
+    - "comment 使用内部 phase 标题（Phase 1/2/3）作为叙事结构"
+  required:
+    - "每条'违规/技术债'必须引用规则来源（CLAUDE.md / coding-standards.md / 等）"
+    - "数字/行数/LOC 声明必须基于本 PR 实际 diff"
+    - "区分本 PR 改动 vs 既有代码"
+    - "code-analyst 必须扫描代码内重复模式与冗余防御"
+    - "测试评估区分单元/集成、happy path/错误分支"
+    - "范围外真实技术债转 follow-up issue"
+
+# 输出格式（最终 PR comment 结构）
 output_format: |
-  ## PR #<number> Team 审查报告
+  ## PR #<number> 审查报告
 
-  ### Phase 1: 背景调研
-  [context-researcher 的关键发现]
+  **决策**：APPROVE / NEEDS_CHANGES / REJECT
 
-  ### Phase 2: 专项审查
-  [各审查员的发现]
+  ### 已解决技术债
+  - [diff 引用 + 简述]
 
-  ### Phase 3: 交叉验证
-  [差异检测和仲裁]
+  ### 遗留问题
+  - [每条带规则引用，如 CLAUDE.md HARD RULE 13 / coding-standards.md § X]
 
-  ### 综合结论
-  **决策**: APPROVE / REJECT / NEEDS_INFO
-  **关键发现**: [列表]
-  **技术债识别**: [列表]
+  ### Follow-up Issue
+  - #<issue_number>（如适用）
+
+  ### 审查依据
+  - 引用的规则文档列表
+  - 审查方式（diff 全量阅读 / 规则交叉核查 / etc）
