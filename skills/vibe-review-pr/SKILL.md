@@ -92,7 +92,8 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 |-------|---------|-------|
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
 | 2 专项审查 | 多 agent **同一响应**内并行 spawn；spawn 后**立即** SendMessage 把 `phase_1_output` 广播给每个 | **与 Phase 1 并行启动**（issue #742 真实踩坑）；忘发背景导致盲审 |
-| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标"审查不完整" | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
+| 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**执行时机**：Phase 2完成后收集所有报告；通过 `codex:rescue` skill 调用 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用 |
+| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标"审查不完整"；如有 Phase 2.5 报告作为补充材料 | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
 | 4 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
 > **没有 Phase 5**。完成 Phase 4 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
@@ -166,11 +167,14 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 ### Team / Session
 
-- TeamCreate 整会话最多一次；TeamDelete 仅在用户 end 时一次
+- TeamCreate 整会话最多一次；TeamDelete 最多一次（任务结束时）
 - 已存在的健康 Team 必须复用，禁止重复 TeamCreate
 - 切换 PR 用 SendMessage，禁止重新 spawn agent
-- Team 状态不一致时**不要**清理 / shutdown / TeamDelete，唯一合法恢复是退出会话重建
-- TeamDelete 不是恢复工具（看到 `Already leading...` 优先解释为"当前会话已有 team"）
+- **TeamDelete 合法场景**：
+  - ✅ 任务完成时（Step 10）
+  - ✅ 状态不一致时先尝试清理（Step 6）
+- **清理优先级**：TeamDelete → rm -rf fallback → 退出重建会话
+- 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
 
 ### Phase 流程
 

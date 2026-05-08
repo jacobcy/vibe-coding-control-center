@@ -177,7 +177,7 @@ agents:
   code-analyst:
     agent_definition: .claude/agents/pr-code-analyst.md
     subagent_type: pr-code-analyst
-    model: haiku
+    model: sonnet
     description: 代码分析员，分析代码框架和技术债
     spawn_config:
       tools: [Read, Grep, Glob, Bash]
@@ -188,7 +188,7 @@ agents:
   architect-reviewer:
     agent_definition: .claude/agents/pr-architect-reviewer.md
     subagent_type: pr-architect-reviewer
-    model: sonnet
+    model: opus
     description: 架构审查专家，评估 PR 对项目架构的影响
     spawn_config:
       tools: [Read, Grep, Glob, WebSearch]
@@ -362,11 +362,54 @@ workflow:
           - 在报告中标注"部分审查未完整"
           - 不要假设未返回的 agent 同意其他结论
 
+  phase_2_5:
+    name: Codex第三方验证（可选）
+    executor: team-lead
+    agents: []
+    parallel: false
+    trigger:
+      - security_pr  # 安全PR类型
+      - large_pr     # 改动 > 500行或影响关键架构
+    execution:
+      - step: check_trigger_conditions
+        action: |
+          判断是否触发Codex验证：
+          1. PR类型为 `security`
+          2. 改动行数 > 500 或影响关键架构（inspect base风险高）
+
+          满足任一条件 → 执行Phase 2.5
+          不满足 → 跳过，直接进入Phase 3
+
+      - step: collect_phase_2_reports
+        action: |
+          打包所有Phase 2审查报告：
+          - architect-reviewer 报告
+          - code-analyst 报告
+          - security-reviewer 报告
+
+          构建完整审查材料包（markdown格式）
+
+      - step: call_codex_rescue
+        tool: Skill
+        params:
+          skill: codex:rescue
+          args: |
+            ## PR #{pr_number} 审查材料包
+
+            {phase_2_reports_bundle}
+
+            请基于以上审查报告进行独立验证，输出第三方验证意见。
+        wait_for_result: true
+
+      - step: receive_codex_report
+        action: 保存codex验证报告，作为Phase 3补充材料
+
   phase_3:
     name: 综合判断与改进
     agents: []
     actions:
       - verify_all_reports_received  # 新增：前置检查
+      - check_codex_report_if_exists  # 新增：检查Phase 2.5输出
       - collect_results
       - detect_conflicts
       - arbitrate_if_needed
