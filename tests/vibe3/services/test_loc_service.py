@@ -86,8 +86,7 @@ class TestLocService:
         """Test that branch diff works."""
         service = LocService()
         service.git_client = MagicMock()
-        service.git_client.get_merge_base.return_value = "abc123"
-        service.git_client._run.return_value = "15\t8\tsrc/vibe3/new_file.py"
+        service.git_client.get_numstat.return_value = "15\t8\tsrc/vibe3/new_file.py"
 
         stats = service.get_branch_loc_stats("feature-branch", "main")
 
@@ -138,3 +137,16 @@ invalid line here
         with patch.object(service, "_get_numstat", side_effect=Exception("Git error")):
             with pytest.raises(Exception, match="Git error"):
                 service.get_pr_loc_stats(300)
+
+    def test_get_numstat_delegates_to_git_client(self) -> None:
+        """Test that _get_numstat uses public GitClient.get_numstat()."""
+        from vibe3.models.change_source import PRSource
+
+        service = LocService()
+        service.git_client = MagicMock()
+        service.git_client.get_numstat.return_value = "10\t5\tsrc/vibe3/test.py"
+
+        result = service._get_numstat(PRSource(pr_number=1))
+
+        service.git_client.get_numstat.assert_called_once()
+        assert result == "10\t5\tsrc/vibe3/test.py"

@@ -36,6 +36,9 @@ from vibe3.clients.git_status_ops import (
     get_diff as _get_diff,
 )
 from vibe3.clients.git_status_ops import (
+    get_numstat as _get_numstat,
+)
+from vibe3.clients.git_status_ops import (
     get_untracked_files as _get_untracked_files,
 )
 from vibe3.clients.git_status_ops import (
@@ -212,6 +215,10 @@ class GitClient:
     def get_diff(self, source: ChangeSource) -> str:
         """统一接口：获取 diff 内容."""
         return _get_diff(self._run, source, self._github_client, self._pr_diff_cache)
+
+    def get_numstat(self, source: ChangeSource) -> str:
+        """Get git diff --numstat output for a change source."""
+        return _get_numstat(self._run, source, self._github_client, self.get_merge_base)
 
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""

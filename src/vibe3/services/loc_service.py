@@ -129,62 +129,8 @@ class LocService:
         )
 
     def _get_numstat(self, source: ChangeSource) -> str:
-        """Get git diff numstat output for a source.
-
-        Args:
-            source: ChangeSource (PRSource or BranchSource)
-
-        Returns:
-            Raw numstat output from git
-        """
-        if isinstance(source, PRSource):
-            # For PR, use the PR diff
-            # Note: We need to use gh pr diff to get the PR diff directly
-            # git diff --numstat doesn't work directly for PRs
-            import json
-            import subprocess
-
-            try:
-                # gh pr diff --name-only only gives filenames
-                # We need to use git diff with the PR merge base
-                # Get the PR head and base refs
-                pr_info = subprocess.run(
-                    [
-                        "gh",
-                        "pr",
-                        "view",
-                        str(source.pr_number),
-                        "--json",
-                        "baseRefName,headRefName",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                pr_data = json.loads(pr_info.stdout)
-                base_ref = pr_data["baseRefName"]
-                head_ref = pr_data["headRefName"]
-
-                # Use git diff --numstat with merge-base
-                base_commit = self.git_client.get_merge_base(head_ref, base_ref)
-                return self.git_client._run(
-                    ["diff", "--numstat", f"{base_commit}...{head_ref}"]
-                )
-            except Exception as e:
-                logger.bind(pr_number=source.pr_number).error(
-                    f"Failed to get PR numstat: {e}"
-                )
-                raise
-
-        elif isinstance(source, BranchSource):
-            # For branch, use git diff --numstat with merge-base
-            base_commit = self.git_client.get_merge_base(source.branch, source.base)
-            return self.git_client._run(
-                ["diff", "--numstat", f"{base_commit}...{source.branch}"]
-            )
-
-        else:
-            raise ValueError(f"Unsupported source type: {type(source)}")
+        """Get git diff --numstat output for a source."""
+        return self.git_client.get_numstat(source)
 
     def _is_core_code_file(self, filepath: str) -> bool:
         """Check if a file is in core code paths and not a test file.
