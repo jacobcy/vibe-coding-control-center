@@ -7,9 +7,9 @@ and ExecutionCoordinator without hand-crafting CLI commands.
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events import (
-    ExecutorDispatched,
-    PlannerDispatched,
-    ReviewerDispatched,
+    ExecutorDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
 )
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 
@@ -72,7 +72,7 @@ class TestPlannerDispatchHandler:
         mock_coordinator_cls.return_value = mock_coordinator
 
         handle_planner_dispatch_intent(
-            PlannerDispatched(
+            PlannerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="claimed",
@@ -137,7 +137,7 @@ class TestExecutorDispatchHandler:
 
         # Event no longer carries plan_ref; handler reads from flow_state
         handle_executor_dispatch_intent(
-            ExecutorDispatched(
+            ExecutorDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="in-progress",
@@ -200,7 +200,7 @@ class TestExecutorDispatchHandler:
 
         # merge-ready trigger_state drives commit_mode
         handle_executor_dispatch_intent(
-            ExecutorDispatched(
+            ExecutorDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="merge-ready",
@@ -255,7 +255,7 @@ class TestReviewerDispatchHandler:
 
         # Event no longer carries report_ref; handler reads from flow_state
         handle_reviewer_dispatch_intent(
-            ReviewerDispatched(
+            ReviewerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="review",
@@ -312,7 +312,7 @@ class TestDispatchNotLaunched:
 
         # Should not raise
         handle_planner_dispatch_intent(
-            PlannerDispatched(
+            PlannerDispatchIntent(
                 issue_number=42,
                 branch="task/issue-42",
                 trigger_state="claimed",

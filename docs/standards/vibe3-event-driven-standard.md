@@ -32,7 +32,6 @@
 - Dispatch Intent 事件使用未来式 + Intent 后缀（如 `ManagerDispatchIntent`）
 - 明确表达这是"意图"而非"完成"，避免语义混淆
 - 示例：`ManagerDispatchIntent` 表示"应该 dispatch manager"，不是"已 dispatched"
-- 向后兼容：旧事件名 `*Dispatched` 作为别名保留
 
 **Audit 事件命名**：
 - `audit_recorded` 表示系统解析并记录 audit_ref 的行为
@@ -304,49 +303,6 @@ subscribe(
 )
 ```
 
-### 5.5 向后兼容性注册
-
-**事件重命名场景**：当事件名称变更时，必须保持向后兼容。
-
-**注册方式**：同时订阅新旧事件名称。
-
-```python
-# 新事件名称
-subscribe(
-    "ManagerDispatchIntent",
-    cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
-)
-
-# 向后兼容：订阅旧事件名称
-subscribe(
-    "ManagerDispatched",  # 旧名称
-    cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
-)
-```
-
-**事件定义**：在事件类定义中提供别名。
-
-```python
-@dataclass(frozen=True)
-class ManagerDispatchIntent(DomainEvent):
-    """Manager dispatch intent event."""
-    ...
-
-# 向后兼容别名
-ManagerDispatched = ManagerDispatchIntent
-```
-
-**事件注册表**：支持新旧名称映射。
-
-```python
-EVENT_TYPES = {
-    # 新名称
-    "manager_dispatch_intent": ManagerDispatchIntent,
-    # 向后兼容
-    "manager_dispatched": ManagerDispatchIntent,
-}
-```
-
 ---
 
 ## 六、Worktree 语义与事件
@@ -602,6 +558,7 @@ LabelService().transition(
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
+| 1.3 | 2026-05-02 | 移除向后兼容别名，统一使用 *DispatchIntent 事件名称 |
 | 1.2 | 2026-04-21 | 补充 governance/apply/runtime 三层概念说明，消除混淆 |
 | 1.1 | 2026-04-21 | 重命名 Dispatch 事件为 *DispatchIntent，明确语义；添加 audit_recorded 事件；补充向后兼容性注册规范 |
 | 1.0 | 2026-04-08 | 初始版本，定义四条执行链路的事件驱动架构 |
@@ -609,4 +566,4 @@ LabelService().transition(
 ---
 
 **维护者**: Vibe Team
-**最后更新**: 2026-04-21
+**最后更新**: 2026-05-02

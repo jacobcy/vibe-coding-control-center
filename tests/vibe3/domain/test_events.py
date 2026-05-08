@@ -8,7 +8,7 @@ from vibe3.domain.events import (
     # Flow Lifecycle
     IssueFailed,
     IssueStateChanged,
-    ManagerDispatched,
+    ManagerDispatchIntent,
 )
 from vibe3.domain.publisher import get_publisher, subscribe
 
@@ -78,9 +78,9 @@ def test_event_frozen():
         event.issue_number = 100  # type: ignore[misc]
 
 
-def test_manager_dispatched_event_creation():
-    """Test creating manager dispatched event."""
-    event = ManagerDispatched(
+def test_manager_dispatch_intent_event_creation():
+    """Test creating manager dispatch intent event."""
+    event = ManagerDispatchIntent(
         issue_number=123,
         branch="task/issue-123",
         trigger_state="ready",

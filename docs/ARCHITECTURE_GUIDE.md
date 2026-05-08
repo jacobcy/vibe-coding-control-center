@@ -92,16 +92,13 @@ L4  Human collaboration            -- 人工协作流程
 - 向后兼容：`*Dispatched` 作为别名保留
 - Handler 订阅时必须使用正确的事件名称
 
-**Handler 注册示例**：
+**Handler 注册示例**:
 ```python
 # src/vibe3/domain/handlers/dispatch.py
 def register_dispatch_handlers() -> None:
     from vibe3.domain.publisher import subscribe
-    
-    # 新名称
+
     subscribe("ManagerDispatchIntent", handle_manager_dispatch_intent)
-    # 向后兼容
-    subscribe("ManagerDispatched", handle_manager_dispatch_intent)
 ```
 
 **详细文档**: [vibe3-event-driven-standard.md](standards/vibe3-event-driven-standard.md) §三
