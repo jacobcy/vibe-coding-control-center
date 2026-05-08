@@ -591,7 +591,7 @@ LabelService().transition(
 | 角色 | 处理对象 | 说明 |
 |------|---------|------|
 | governance scan | assignee issue pool | `supervisor/governance/assignee-pool.md` |
-| governance/roadmap | broader repo issue pool | 自动纳入适合自动化推进的 bug fix / small feature 到 assignee issue pool |
+| governance/roadmap | broader GitHub issue pool | 自动纳入适合自动化推进的 bug fix / small feature 到 assignee issue pool |
 | governance/cron | broader repo docs scope | 每轮最多派发 5 个过时文档到 supervisor issue |
 | supervisor/apply | supervisor issue | 显式立项的治理 issue，带 `supervisor` label |
 | manager | assignee issue | 已进入执行池的 issue，由 manager 主链推进 |

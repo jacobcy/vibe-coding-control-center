@@ -25,7 +25,7 @@ This document serves as a migration guide and reference for understanding the le
 
 本文档记录 v2 遗留 `registry.json` 的结构与迁移映射，供理解历史数据和迁移逻辑使用。v3 当前执行态真源以 [data-model-standard.md](data-model-standard.md) 定义的 SQLite 表与 GitHub 外部对象为准。
 
-本文档涉及的 `task`、`GitHub issue`（V2 称 `repo issue`）、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](../glossary.md) 为准。
+本文档涉及的 `task`、`GitHub issue`、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](../glossary.md) 为准。
 
 ## 1. V3 Architecture Change
 
@@ -53,7 +53,7 @@ This document serves as a migration guide and reference for understanding the le
 
 - task 主记录（execution record）
 - task 生命周期状态
-- task 与 roadmap / repo issue (V2 术语，对应 V3 的 GitHub issue) / PR 的关联
+- task 与 roadmap / GitHub issue / PR 的关联
 - task 的主闭环 issue 落点
 - task 采用的 spec 标准与规范引用
 - task subtasks
@@ -221,7 +221,7 @@ CREATE TABLE flow_issue_links (
 
 `source_type` 表示 execution record 的创建来源，不表示 GitHub Project item 类型：
 
-- `issue` = 由 GitHub issue (V2 称 `repo issue`) 驱动创建
+- `issue` = 由 GitHub issue 驱动创建
 - `local` = 由本地执行决策创建
 - `openspec` = 由 OpenSpec 执行输入创建
 
@@ -276,7 +276,7 @@ CREATE TABLE flow_issue_links (
 ## 9. Relationship Rules (Legacy - V2)
 
 - `roadmap_item_ids` 用于关联 roadmap item
-- `issue_refs` 用于关联 GitHub issue (V2 称 `repo issue`)
+- `issue_refs` 用于关联 GitHub issue
 - `primary_issue_ref` 用于指定当前 task 的主闭环 issue
 - `pr_ref` 只允许单值
 - `related_task_ids` 用于 task 之间的松耦合关联
