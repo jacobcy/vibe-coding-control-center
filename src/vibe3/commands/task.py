@@ -161,9 +161,9 @@ def resume(
             metavar="[STATE]",
             help="Clear blocked_reason and restore to specified state "
             "WITHOUT deleting worktree/branch. "
-            "STATE can be: ready, claimed, in-progress, handoff, "
+            "STATE can be: auto, ready, claimed, in-progress, handoff, "
             "review, merge-ready. "
-            "If provided without value, infers state from flow refs "
+            "Use 'auto' to infer state from flow refs "
             "(prefers review/merge-ready if pr_ref/audit_ref present, "
             "else defaults to CLAIMED). "
             "Without --label, the original behavior deletes worktree/branch.",
