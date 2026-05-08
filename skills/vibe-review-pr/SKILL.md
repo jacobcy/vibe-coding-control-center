@@ -184,13 +184,17 @@ TeamCreate(team_name="pr-review-team", agent_type="general-purpose")
 
 - Phase 1：背景调研，必须产出 `phase_1_output`
 - Phase 2：专项审查，必须在**单次响应**中启动多个 Agent 调用，并用 `SendMessage` 把 `phase_1_output` 发给每个 Phase 2 agent
-- Phase 3：综合判断，必须检查缺失报告、记录冲突、完成仲裁
-  - **Codex 第三方验证**（触发条件）：
+- Phase 2.5（可选）：Codex第三方验证
+  - **触发条件**：
     - 安全PR（`security` 类型）
-    - 冲突仲裁（Phase 3 检测到重大分歧）
     - 大型PR（改动 > 500 行或影响关键架构）
+  - **执行时机**：Phase 2完成后，收集所有审查报告
+  - **输入**：打包所有Phase 2审查报告（architect + code + security）
   - **调用方式**：通过 `codex:rescue` skill 进行独立验证
-  - **输出要求**：第三方验证报告作为 Phase 3 补充材料
+  - **输出要求**：第三方验证报告
+  - **执行顺序**：Phase 2 → Phase 2.5 (可选) → Phase 3
+- Phase 3：综合判断，必须检查缺失报告、记录冲突、完成仲裁
+  - 如有Phase 2.5报告，作为Phase 3补充材料
 - Phase 4：写回与改进，由 team-lead 主导；仅 `auto-fix` 路径允许额外 spawn `fix-executor`
 - Phase 5：准备下一个 PR，保留 inbox / idle state / pane 信息，不做手工清理
 
