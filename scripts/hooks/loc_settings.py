@@ -18,8 +18,8 @@ class LocException:
 
 @dataclass(frozen=True)
 class LocSettings:
-    single_file_default: int
-    single_file_max: int
+    warning_threshold: int      # 超标触发 WARNING（建议重构）
+    ci_block_threshold: int     # 超标触发 CI ERROR（阻塞 pipeline）
     total_v2_shell: int
     total_v3_python: int
     warning_threshold_percent: int
@@ -127,18 +127,38 @@ def load_loc_settings(config_path: str | None = None) -> LocSettings:
             raise ValueError(f"Duplicate LOC exception path: {entry.path}")
         seen_paths.add(entry.path)
     return LocSettings(
-        single_file_default=int(scalars.get("code_limits.single_file_loc.default", "300")),
-        single_file_max=int(scalars.get("code_limits.single_file_loc.max", "400")),
+        warning_threshold=int(
+            scalars.get("code_limits.single_file_loc.warning_threshold", "300")
+        ),
+        ci_block_threshold=int(
+            scalars.get("code_limits.single_file_loc.ci_block_threshold", "400")
+        ),
         total_v2_shell=int(scalars.get("code_limits.total_file_loc.v2_shell", "4000")),
-        total_v3_python=int(scalars.get("code_limits.total_file_loc.v3_python", "32000")),
-        warning_threshold_percent=int(scalars.get("code_limits.total_file_loc.warning_threshold_percent", "90")),
+        total_v3_python=int(
+            scalars.get("code_limits.total_file_loc.v3_python", "32000")
+        ),
+        warning_threshold_percent=int(
+            scalars.get("code_limits.total_file_loc.warning_threshold_percent", "90")
+        ),
         last_reviewed=scalars.get("code_limits.total_file_loc.last_reviewed", ""),
-        code_paths_v2_shell=tuple(string_lists.get("code_limits.code_paths.v2_shell", [])),
-        code_paths_v3_python=tuple(string_lists.get("code_limits.code_paths.v3_python", [])),
-        scripts_paths_v2_shell=tuple(string_lists.get("code_limits.scripts_paths.v2_shell", [])),
-        scripts_paths_v3_python=tuple(string_lists.get("code_limits.scripts_paths.v3_python", [])),
-        test_paths_v2_shell=tuple(string_lists.get("code_limits.test_paths.v2_shell", [])),
-        test_paths_v3_python=tuple(string_lists.get("code_limits.test_paths.v3_python", [])),
+        code_paths_v2_shell=tuple(
+            string_lists.get("code_limits.code_paths.v2_shell", [])
+        ),
+        code_paths_v3_python=tuple(
+            string_lists.get("code_limits.code_paths.v3_python", [])
+        ),
+        scripts_paths_v2_shell=tuple(
+            string_lists.get("code_limits.scripts_paths.v2_shell", [])
+        ),
+        scripts_paths_v3_python=tuple(
+            string_lists.get("code_limits.scripts_paths.v3_python", [])
+        ),
+        test_paths_v2_shell=tuple(
+            string_lists.get("code_limits.test_paths.v2_shell", [])
+        ),
+        test_paths_v3_python=tuple(
+            string_lists.get("code_limits.test_paths.v3_python", [])
+        ),
         exceptions=exceptions,
     )
 

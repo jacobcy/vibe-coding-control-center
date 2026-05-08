@@ -8,9 +8,10 @@
 - 正常情况下所有配置都从 YAML 文件读取
 """
 
+import warnings
 from pathlib import Path
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 from vibe3.config.orchestra_config import OrchestraConfig
 from vibe3.config.settings_pr import (
@@ -100,9 +101,35 @@ def _merge_prompt_fields(data: dict, prompts: dict) -> None:
 class SingleFileLocConfig(BaseModel):
     """单文件行数限制."""
 
-    default: int = Field(default=300)
-    max: int = Field(default=400)
+    warning_threshold: int = Field(
+        default=300,
+        validation_alias=AliasChoices("warning_threshold", "default"),
+        description="本地开发建议值（WARNING 级别）",
+    )
+    ci_block_threshold: int = Field(
+        default=400,
+        validation_alias=AliasChoices("ci_block_threshold", "max"),
+        description="CI 强制阻塞值（BLOCK 级别）",
+    )
     exceptions: list["LocExceptionConfig"] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_deprecated_fields(cls, data: dict) -> dict:
+        """如果使用旧字段名，发出弃用警告."""
+        if "default" in data:
+            warnings.warn(
+                "Field 'default' is deprecated, use 'warning_threshold' instead",
+                FutureWarning,
+                stacklevel=2,
+            )
+        if "max" in data:
+            warnings.warn(
+                "Field 'max' is deprecated, use 'ci_block_threshold' instead",
+                FutureWarning,
+                stacklevel=2,
+            )
+        return data
 
     @model_validator(mode="after")
     def validate_unique_exception_paths(self) -> "SingleFileLocConfig":

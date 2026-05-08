@@ -86,7 +86,7 @@ def test_migrated_loc_config_loads_total_limits() -> None:
 def test_runtime_defaults_align_with_hook_fallbacks() -> None:
     config = VibeConfig()
 
-    assert config.code_limits.single_file_loc.default == 300
-    assert config.code_limits.single_file_loc.max == 400
+    assert config.code_limits.single_file_loc.warning_threshold == 300
+    assert config.code_limits.single_file_loc.ci_block_threshold == 400
     assert config.code_limits.total_file_loc.v2_shell == 4000
     assert config.code_limits.total_file_loc.v3_python == 32000
