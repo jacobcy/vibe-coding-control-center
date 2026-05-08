@@ -28,4 +28,4 @@ tags: [workflow, vibe, planning, orchestration]
 
 - workflow 只编排，不承载 handoff mode、task gate、plan 生成细则
 - 不直接修改业务代码
-- 未经人类明确授权，不得新建物理 worktree；默认使用当前目录里的 `vibe flow new` 建立新的逻辑现场
+- 未经人类明确授权，不得新建物理 worktree；默认使用当前目录通过 `vibe3 flow update` 建立新的逻辑现场
