@@ -243,7 +243,7 @@ Steps:
    - 检查是否有必读文档部分，引用了必要的标准文件
 
 8. **术语和动作词检查**（基于 glossary.md 和 action-verbs.md）：
-   - 检查术语使用是否符合 glossary.md（例如不使用废弃术语"repo issue"）
+   - 检查术语使用是否符合 glossary.md（例如不使用废弃术语"GitHub issue"的别称）
    - 检查动作词语义是否符合 action-verbs.md（例如 `done` 是否超出边界）
    - 检查是否使用了未定义术语（例如 "Skill Governor"）
 

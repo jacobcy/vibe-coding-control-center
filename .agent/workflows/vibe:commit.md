@@ -23,7 +23,7 @@ tags: [workflow, vibe, git, commit, orchestration]
    - 格式化修改将分散到后续各功能 commit 中，不保留单独的格式化 commit
 4. 在任何 commit 分组前，先做最小 metadata preflight：
    - 读取 `vibe flow show --json`
-   - 若存在 `current_task`，继续读取 `vibe task show <task-id> --json`
+   - 若存在 `current_task`，继续读取 `vibe3 task status --json`
    - 若 `current_task` 缺失、无法解析，或 `runtime_branch` 与当前 flow branch 不一致，则 hard block
    - 若缺少 `issue_refs`、`roadmap_item_ids`、`spec_standard/spec_ref`，则至少报告 warning
 5. 由 `vibe-commit` skill 负责：
