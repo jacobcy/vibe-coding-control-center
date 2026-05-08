@@ -49,3 +49,15 @@ def find_worktree_path_for_branch(
         return git_client.find_worktree_path_for_branch(branch)
     except (OSError, ValueError):
         return None
+
+
+# Backward compatibility alias
+GitClientProtocol = GitPathProtocol
+
+__all__ = [
+    "GitPathProtocol",
+    "GitClientProtocol",
+    "get_git_common_dir",
+    "get_worktree_root",
+    "find_worktree_path_for_branch",
+]
