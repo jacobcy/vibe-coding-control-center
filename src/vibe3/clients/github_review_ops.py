@@ -12,33 +12,6 @@ from vibe3.exceptions import GitHubError, UserError
 class ReviewMixin:
     """Mixin for review-related operations."""
 
-    def list_pr_comments(self: Any, pr_number: int) -> list[dict[str, Any]]:
-        """List general comments on a PR.
-
-        Args:
-            pr_number: PR number
-
-        Returns:
-            List of comment dicts (number, author, body, createdAt)
-        """
-        logger.bind(
-            external="github",
-            operation="list_pr_comments",
-            pr_number=pr_number,
-        ).debug("Calling GitHub CLI: list pr comments")
-        try:
-            result = subprocess.run(
-                ["gh", "pr", "view", str(pr_number), "--json", "comments"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            data = json.loads(result.stdout)
-            return cast(list[dict[str, Any]], data.get("comments", []))
-        except Exception as e:
-            logger.error(f"Failed to list PR #{pr_number} comments: {e}")
-            return []
-
     def list_pr_review_comments(self: Any, pr_number: int) -> list[dict[str, Any]]:
         """List review (inline) comments on a PR via GitHub API.
 

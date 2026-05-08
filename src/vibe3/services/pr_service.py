@@ -1,5 +1,7 @@
 """PR service implementation."""
 
+from typing import cast
+
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
@@ -35,7 +37,11 @@ class PRService:
         loc_comment_service: PRLocCommentService | None = None,
     ) -> None:
         """Initialize PR service."""
-        self.github_client = GitHubClient() if github_client is None else github_client
+        self.github_client: GitHubClientProtocol = (
+            cast(GitHubClientProtocol, GitHubClient())
+            if github_client is None
+            else github_client
+        )
         self.git_client = GitClient() if git_client is None else git_client
         self.store = SQLiteClient() if store is None else store
         self.version_service = (
