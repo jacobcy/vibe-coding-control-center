@@ -339,6 +339,17 @@ run:
     - test_one.py: What is being tested
     - test_two.py: What is being tested
 
+    ## Plan Requirements Verification
+    **REQUIRED if plan contains explicit Verification requirements**
+
+    For each "Verification:" or verification requirement found in the plan:
+
+    | Requirement | Status | Evidence |
+    |-------------|--------|----------|
+    | [requirement text or reference] | ✅/❌ | [code location, test output, or manual verification steps] |
+
+    If no explicit verification requirements in plan, write: "No explicit Verification requirements in plan."
+
     ## Verification
     - [ ] All tests pass
     - [ ] No type errors
