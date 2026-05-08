@@ -15,7 +15,7 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.merged_pr_cache import MergedPRCache
-from vibe3.utils.path_helpers import get_git_common_dir
+from vibe3.utils.git_path_client import get_git_common_dir
 
 
 def get_merged_pr_for_issue(

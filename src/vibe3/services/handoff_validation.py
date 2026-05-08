@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from vibe3.exceptions import UserError
-from vibe3.utils.path_helpers import GitClientProtocol
+from vibe3.utils.git_path_client import GitPathProtocol
 
 
 def is_log_like_path(path: Path) -> bool:
@@ -20,7 +20,7 @@ def validate_authoritative_ref(
     ref_kind: str,
     ref_value: str,
     branch: str,
-    git_client: GitClientProtocol,
+    git_client: GitPathProtocol,
     authoritative_kinds: set[str],
     resolve_branch_worktree_root: Callable[[str], Path],
 ) -> None:

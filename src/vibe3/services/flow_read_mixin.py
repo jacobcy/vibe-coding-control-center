@@ -8,14 +8,14 @@ from pydantic import ValidationError
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
-from vibe3.utils.path_helpers import GitClientProtocol, get_git_common_dir
+from vibe3.utils.git_path_client import GitPathProtocol, get_git_common_dir
 
 
 class FlowReadMixin:
     """Mixin providing flow read operations."""
 
     store: SQLiteClient
-    git_client: GitClientProtocol
+    git_client: GitPathProtocol
 
     def get_flow_state(self: Self, branch: str) -> FlowState | None:
         """Get flow state for branch.
