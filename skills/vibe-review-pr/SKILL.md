@@ -219,10 +219,9 @@ TeamDelete(team_name="pr-review-team")
 
 `TeamDelete` **不是**恢复工具，不用于：
 
-- 处理 `Already leading team "pr-review-team"`
+- 处理 `Already leading team “pr-review-team”`
 - 解决 team 状态不一致
-- 为了“重新创建 team”而先删后建
->>>>>>> 57aba596 (fix(skill): correct TeamDelete rules and add codex third-party verification)
+- 为了”重新创建 team”而先删后建
 
 ## Phase Contracts
 
