@@ -15,7 +15,7 @@
 ### 1.1 已经收敛的部分
 
 - `flow` 本地执行现场已经基本可用：
-  - `flow new / bind / show / list`
+  - `vibe3 flow update / bind / show / status`
   - `flow_state` 已承接 `task_issue_number / pr_number / *_ref / next_step / blocked_by / actor`
 - `handoff` 已收敛为中间态，而不是第二真源：
   - SQLite 只做最小索引
@@ -37,7 +37,7 @@
 - GitHub Project 作为编排 UI 的稳定映射
 - `structure / snapshot / diff` 的质量控制闭环
 
-现在的 `flow` 更像本地执行现场，`issue_role` 更像关系真源，但“远端状态机”和“质量治理闭环”还没有接上。
+现在的 `flow`（通过 `vibe3 flow` 命令管理）更像本地执行现场，`issue_role` 更像关系真源，但”远端状态机”和”质量治理闭环”还没有接上。
 
 ---
 
@@ -51,8 +51,8 @@
 
 也就是说：
 
-- issue 已能通过 `flow bind` / `task link` 进入本地关系层
-- branch 上可以创建和绑定 flow
+- issue 已能通过 `vibe3 flow bind` 进入本地关系层
+- branch 上可以创建和绑定 flow（通过 `vibe3 flow update`）
 - flow 可以记录当前现场状态
 - handoff 可以给 planner / executor / reviewer 传递中间上下文
 - PR 可以写回本地 flow 最小责任链
@@ -296,14 +296,26 @@
 
 为避免把 V2 / V3 搞混，当前命令面应明确区分：
 
-- `vibe` = V2 shell 入口
-- `vibe3` = V3 Python 入口
+- `vibe` = V2 shell 入口（已稳定，不再扩展）
+- `vibe3` = V3 Python 入口（当前活跃开发）
 
-在 structure / inspect 这条线上，应统一按 V3 入口表述为：
+当前 V3 现行公共命令：
+- **Flow 管理**: `vibe3 flow update/bind/blocked/show/status`
+- **Task 总览**: `vibe3 task show/status/resume`
+- **Handoff**: `vibe3 handoff show/append`
+- **检查**: `vibe3 check`
+- **分析**: `vibe3 inspect symbols/files/base/pr/commit`
+- **Review**: `vibe3 review`
 
-- `vibe3 inspect structure`
+已废弃的旧命令面（不再使用）：
+- `vibe flow new/create/switch/list/done/aborted`
+- `vibe task show/list/status`
+- `roadmap <-> task` 同步模式
+
+在 structure / inspect 这条线上，应统一按 V3 入口表述：
+
 - `vibe3 inspect symbols`
-- `vibe3 review ...`
+- `vibe3 review`
 
 ---
 
