@@ -17,14 +17,15 @@ zsh tests/test-aliases.sh --verbose
 
 ### 1. Syntax Validation
 All alias files are checked for valid zsh syntax:
-- `config/aliases.sh` (main entry point)
-- `config/aliases/claude.sh` (Claude commands)
-- `config/aliases/opencode.sh` (OpenCode commands)
-- `config/aliases/openspec.sh` (OpenSpec commands)
-- `config/aliases/vibe.sh` (Vibe commands)
-- `config/aliases/git.sh` (Git helpers)
-- `config/aliases/tmux.sh` (Tmux commands)
-- `config/aliases/worktree.sh` (Worktree management)
+- `config/shell/aliases.sh` (main entry point - sources from lib/alias/)
+- `lib/alias/loader.sh` (alias loader)
+- `lib/alias/agent.sh` (Agent commands)
+- `lib/alias/git.sh` (Git helpers)
+- `lib/alias/openspec.sh` (OpenSpec commands)
+- `lib/alias/tmux.sh` (Tmux commands)
+- `lib/alias/vibe.sh` (Vibe commands)
+- `lib/alias/vibe3.sh` (Vibe3 commands)
+- `lib/alias/worktree.sh` (Worktree management)
 
 ### 2. Function Tests
 Key functions are tested for correct operation:
@@ -63,10 +64,10 @@ zsh -c 'source tests/test-aliases.sh; run_syntax_tests'
 If syntax check fails:
 ```bash
 # Check specific file
-zsh -n config/aliases.sh
+zsh -n config/shell/aliases.sh
 
 # Check with verbose output
-zsh -vx config/aliases.sh 2>&1 | head -50
+zsh -vx config/shell/aliases.sh 2>&1 | head -50
 ```
 
 ### Missing Dependencies

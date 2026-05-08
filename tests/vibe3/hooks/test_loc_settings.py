@@ -49,7 +49,7 @@ def test_loc_settings_parser_reads_unified_exceptions() -> None:
 def test_runtime_config_loads_same_loc_exceptions() -> None:
     module = _load_loc_settings_module()
     settings = module.load_loc_settings()
-    config = VibeConfig.from_yaml(Path("config/settings.yaml"))
+    config = VibeConfig.from_yaml(Path("config/v3/settings.yaml"))
     exceptions = {
         entry.path: entry for entry in config.code_limits.single_file_loc.exceptions
     }
@@ -65,6 +65,22 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
     # Verify the limit is reasonable (updated from 600 to 620 after refactoring)
     assert hook_exception.limit == 620
     assert exceptions["src/vibe3/roles/review.py"].reason != ""
+
+
+def test_legacy_loc_config_removed_after_migration() -> None:
+    """The root loc_limits.yaml duplicate should not remain after migration."""
+    assert not Path("config/loc_limits.yaml").exists()
+
+
+def test_migrated_loc_config_loads_total_limits() -> None:
+    module = _load_loc_settings_module()
+    new_settings = module.load_loc_settings("config/v3/loc_limits.yaml")
+
+    assert new_settings.total_v2_shell == 3000
+    assert new_settings.total_v3_python == 50000
+    assert new_settings.warning_threshold_percent == 90
+    assert new_settings.last_reviewed != ""
+    assert new_settings.exceptions
 
 
 def test_runtime_defaults_align_with_hook_fallbacks() -> None:

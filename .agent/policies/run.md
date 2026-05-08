@@ -11,6 +11,29 @@
 
 ## 执行方式
 
+### Plan Requirements 提取
+
+执行前必须完成：
+
+#### 提取 Verification 要求
+
+- **扫描 Plan 中的 Verification 标记**
+  - 查找所有 "Verification:" 或 "验证：" 开头的行
+  - 查找 "Risks & Considerations" / "风险与回滚" 部分的每个 Risk 的 Verification 条目
+  - 查找 "Success Criteria" / "验收标准" / "验证清单" 部分的检查项
+
+- **形成 Requirements Checklist**
+  - 每个 Verification 要求作为独立条目
+  - 标注来源位置（如 "Risk 4"、"验收标准 #3"）
+  - 评估验证难度（简单检查 vs 需要测试）
+
+- **如果发现 Requirements 不清晰**
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Plan Verification 要求不清晰：<具体问题>" --kind finding --actor "executor"
+  ```
+  - 不要跳过验证步骤
+  - 不要自行假设验证方法
+
 ### 严格按计划推进
 
 - 先完成当前步骤，再进入下一步。
@@ -97,7 +120,7 @@
 执行前优先用项目工具确认影响面：
 - `uv run python src/vibe3/cli.py handoff status`
 - `vibe3 inspect symbols`
-- `vibe3 inspect structure`
+- `vibe3 inspect files`
 - `vibe3 inspect base --json`
 
 如果改动触及公开入口、关键路径或 prompt contract，验证强度必须随之提高。
@@ -106,6 +129,29 @@
 
 验证不是固定模板，而是必须与改动类型匹配。
 
+### Requirements Checklist 验证
+
+验证不仅是测试通过，还要确认 Plan 的明确要求已落实。
+
+#### 逐项验证
+
+- **对每个 Verification 要求**
+  - 检查代码改动是否满足该要求
+  - 提供验证证据（代码位置、测试输出、日志等）
+  - 如果无法满足，必须记录 finding
+
+- **验证证据类型**
+  - 代码位置引用：`file.py:L<line>` 并说明如何满足要求
+  - 测试证据：测试命令 + 输出片段
+  - 行为证据：手动验证步骤 + 观察结果
+
+- **如果发现无法满足的 Verification**
+  ```bash
+  uv run python src/vibe3/cli.py handoff append "Verification 无法满足：<要求> - <原因>" --kind finding --actor "executor"
+  ```
+  - 不要跳过或弱化该要求
+  - 等待 manager 指示是否调整 scope
+
 ### Python 实现改动
 
 通常应考虑：
@@ -113,6 +159,32 @@
 - `uv run mypy src/vibe3`
 - `uv run ruff check`
 - 必要的命令级或集成级验证
+
+### 环境依赖代码的验证要求
+
+如果实现依赖环境变量或外部 API，验证必须包含：
+
+### 1. 至少一个真实环境测试
+
+- 不能只依赖 mock tests
+- 必须在实际环境执行相关命令/调用
+- 记录真实执行的命令和输出
+
+### 2. 验证方式示例
+
+| 依赖类型 | 验证方式 |
+|----------|----------|
+| 环境变量 | 打印实际值，对比假设 |
+| 外部命令 | 在实际环境执行，验证输出格式 |
+| API 调用 | 发送真实请求（可使用测试 token） |
+| 文件系统 | 检查实际路径是否存在、权限是否正确 |
+
+### 3. 如果无法在当前环境验证
+
+必须：
+- 用 `handoff append` 记录"验证受限：<原因>"
+- 在交付报告中标注"未在真实环境验证"
+- 建议后续验证步骤
 
 ### prompt / context / 配置改动
 

@@ -18,6 +18,9 @@ from vibe3.models.review_runner import AgentOptions
 # Path to codeagent models config
 MODELS_JSON_PATH: Final[Path] = Path.home() / ".codeagent" / "models.json"
 REPO_MODELS_JSON_PATH: Final[Path] = (
+    Path(__file__).resolve().parents[4] / "config" / "v3" / "models.json"
+)
+LEGACY_REPO_MODELS_JSON_PATH: Final[Path] = (
     Path(__file__).resolve().parents[4] / "config" / "models.json"
 )
 BACKEND_COMMANDS: Final[dict[str, str]] = {
@@ -32,8 +35,15 @@ def repo_models_json_path() -> Path:
     """Resolve repo-local models.json with optional orchestra root override."""
     override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
     if override_root:
-        return Path(override_root).expanduser().resolve() / "config" / "models.json"
-    return REPO_MODELS_JSON_PATH
+        root = Path(override_root).expanduser().resolve()
+        new_path = root / "config" / "v3" / "models.json"
+        legacy_path = root / "config" / "models.json"
+        if new_path.exists() or not legacy_path.exists():
+            return new_path
+        return legacy_path
+    if REPO_MODELS_JSON_PATH.exists() or not LEGACY_REPO_MODELS_JSON_PATH.exists():
+        return REPO_MODELS_JSON_PATH
+    return LEGACY_REPO_MODELS_JSON_PATH
 
 
 def _read_models_json(path: Path) -> dict[str, Any]:
@@ -103,11 +113,11 @@ def find_missing_backend_commands(
 def resolve_repo_agent_preset(
     agent_name: str,
 ) -> tuple[str | None, str | None] | None:
-    """Resolve agent preset from repo-local config/models.json with env override.
+    """Resolve agent preset from repo-local config/v3/models.json with env override.
 
     Priority:
     1. Environment variable override (VIBE_BACKEND_<ROLE>, VIBE_MODEL_<ROLE>)
-    2. Repo-local config/models.json mapping
+    2. Repo-local config/v3/models.json mapping
 
     Automatically tries with 'vibe-' prefix if direct lookup fails.
 
@@ -158,7 +168,7 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
 
     Priority:
     1. Explicit backend/model override in options
-    2. Repo-local config/models.json mapping for agent preset
+    2. Repo-local config/v3/models.json mapping for agent preset
     3. Fallback to default_backend/default_model from models.json
     4. Raise error if no fallback available
 
@@ -175,7 +185,7 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         default_model = data.get("default_model")
         if default_backend and isinstance(default_backend, str):
             logger.bind(domain="codeagent_config").warning(
-                f"Agent preset '{options.agent}' not found in config/models.json, "
+                f"Agent preset '{options.agent}' not found in config/v3/models.json, "
                 f"falling back to default: {default_backend}/{default_model}"
             )
             return AgentOptions(

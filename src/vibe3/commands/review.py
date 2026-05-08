@@ -21,7 +21,6 @@ from vibe3.execution.issue_role_sync_runner import (
 from vibe3.roles.review import (
     REVIEW_SYNC_SPEC,
     build_base_review_request,
-    build_pr_review_request,
     execute_manual_review_async,
     execute_manual_review_sync,
 )
@@ -31,9 +30,8 @@ from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
-    help="Code review with three modes:\n\n"
+    help="Code review with two modes:\n\n"
     "  --branch <b> - Review issue implementation (orchestra-driven)\n"
-    "  pr <number>  - Review existing PR from GitHub (analyzes PR diff)\n"
     "  base [branch] - Review local changes vs base branch (compares snapshots)",
     rich_markup_mode="rich",
 )
@@ -110,7 +108,7 @@ def default(
     no_async: _ASYNC_OPT = False,
     show_prompt: _SHOW_PROMPT_OPT = False,
 ) -> None:
-    """Review with --branch for orchestra-driven review, or use pr/base subcommands."""
+    """Review with --branch for orchestra-driven review, or use base subcommand."""
     if ctx.invoked_subcommand is not None:
         return
 
@@ -148,66 +146,7 @@ def issue_command(
     )
 
 
-@app.command()
-def pr(
-    pr_number: Annotated[int, typer.Argument(help="PR number")],
-    instructions: Annotated[
-        Optional[str],
-        typer.Argument(help="Custom prompt (skips context building)"),
-    ] = None,
-    trace: _TRACE_OPT = False,
-    dry_run: _DRY_RUN_OPT = False,
-    no_async: _ASYNC_OPT = False,
-) -> None:
-    """Review an existing PR by number (fetches diff from GitHub API).
-
-    This command reviews a PR that already exists on GitHub. It analyzes:
-    - Changed symbols (functions in diff hunks)
-    - Impacted modules (DAG upstream dependencies)
-    - Risk score and block status
-
-    Use this to review PRs before merging or providing feedback.
-
-    Example: vibe3 review pr 42 "Focus on security regressions"
-    """
-    if trace:
-        enable_trace()
-
-    log = logger.bind(domain="review", action="pr", pr_number=pr_number)
-    log.info("Starting PR review")
-    typer.echo(f"-> Review: PR #{pr_number}")
-    request, issue_number, head_branch = build_pr_review_request(pr_number)
-
-    if not head_branch and not dry_run:
-        typer.echo(
-            f"Error: Could not resolve head branch for PR #{pr_number}", err=True
-        )
-        raise typer.Exit(1)
-    branch = head_branch
-
-    if no_async or dry_run or not branch:
-        result = execute_manual_review_sync(
-            request=request,
-            dry_run=dry_run,
-            instructions=instructions,
-            issue_number=issue_number,
-            pr_number=pr_number,
-            branch=branch,
-        )
-    else:
-        result = execute_manual_review_async(
-            request=request,
-            instructions=instructions,
-            issue_number=issue_number,
-            pr_number=pr_number,
-            branch=branch,
-        )
-    _emit_review_result(result.verdict, result.handoff_file)
-    if result.verdict in {"BLOCK", "ERROR"}:
-        raise typer.Exit(1)
-
-
-@app.command()
+@app.command(name="base")
 def base(
     base_branch: Annotated[
         str | None,

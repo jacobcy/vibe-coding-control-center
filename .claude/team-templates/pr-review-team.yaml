@@ -13,7 +13,7 @@
 name: pr-review-team
 description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
 
-# Team 创建配置（供 TeamCreate 使用）
+# Team 创建配置（供 Step 6 在确认 team 缺席后调用 TeamCreate 使用）
 team_create_config:
   team_name: pr-review-team
   agent_type: general-purpose  # team-lead 类型
@@ -112,15 +112,16 @@ preflight_checks:
     command: "cat ~/.claude/teams/{team-name}/config.json | jq '.members | length'"
     action: |
       如果团队成员超过 10 个：
-      - 提示用户清理历史遗留成员
-      - 或手动 TeamDelete 重建团队
+      - 提示用户当前 team 现场可能复杂
+      - 优先继续复用当前 team
+      - 如人类明确决定结束当前 team，应走 Step 10，而不是恢复路径
   - name: 检查现有 teammates
     command: "tmux list-panes -a 2>/dev/null | grep -c '\\%' || echo 0"
     action: |
       如果已有运行中的 teammates（pane 数 > 1）：
       - 确认是否复用于当前 PR
       - 复用：SendMessage 唤醒现有 teammates
-      - 不复用：cleanup_phase 清理后重新 spawn
+      - 不复用：停止当前轮次，由人类决定是否退出并重建会话
 
 # Team-lead 负责收集 shell 上下文，并把结果传给 teammates
 context_bundle:
@@ -147,6 +148,7 @@ context_bundle:
 # 复用策略
 reuse_policy:
   enabled: true
+  team_level_rule: "已有健康的 pr-review-team 时，先复用 team，再复用 teammates；不要重复 TeamCreate；不要为恢复目的调用 TeamDelete"
   conditions:
     - "相同 agentType"
     - "teammate 状态为 idle"
@@ -219,7 +221,7 @@ agents:
       required_fields: [修复列表, 提交记录, 验证结果]
     trigger: on_demand  # 仅在 auto-fix 或用户选择修复时 spawn
 
-# Codex 配置（外部专家）
+# Codex 配置（预留扩展点；当前 skill 主流程不依赖）
 codex:
   model: gpt-5.4
   trigger: [security_pr, conflict_arbitration]
@@ -229,7 +231,7 @@ codex:
 pr_classification:
   simple:
     condition: "additions < 50 and not security_related"
-    flow: single_reviewer
+    flow: phase_1_only
     agents: []
 
   refactor:
@@ -239,7 +241,7 @@ pr_classification:
 
   security:
     condition: "has_security_label or 'fix' in labels"
-    flow: full_with_codex
+    flow: standard_security
     agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
 
   standard:
@@ -254,6 +256,8 @@ workflow:
     agents: [context-researcher]
     parallel: false
     output_to_phase_2: true
+    # 【关键】Phase 1 的输出是 Phase 2 的必要输入
+    # 如果不传递背景报告，Phase 2 agents 将处于"盲审"状态
     # 执行指令
     execution:
       - step: spawn_context_researcher
@@ -267,6 +271,11 @@ workflow:
         wait_for_result: true  # 必须等待 Phase 1 完成
       - step: receive_context_report
         action: 等待 teammate-message，获取背景报告
+      - step: save_phase_1_output
+        action: |
+          【关键步骤】将背景报告内容保存为 phase_1_output 变量
+          这是 Phase 2 SendMessage 的必要输入
+          如果不保存，Phase 2 将无法获取背景信息
       - step: prepare_phase_2_context
         action: 将背景报告通过 SendMessage 传给 Phase 2 agents
 
@@ -276,53 +285,88 @@ workflow:
     parallel: true
     requires_phase_1_output: true
     message_passing: SendMessage
+    # 【关键】必须通过 SendMessage 将 Phase 1 背景传递给 Phase 2 agents
+    # 否则 Phase 2 将处于"盲审"状态，两阶段设计失去意义
     # 执行指令
     execution:
-      - step: spawn_phase_2_agents
-        tool: Agent  # 单次调用，并行 spawn 多个 agents
+      - step: spawn_code_analyst
+        tool: Agent
         params:
-          # 注意：parallel spawn 需要在单次消息中发起多个 Agent 调用
-          agents:
-            - team_name: pr-review-team
-              name: code-analyst
-              subagent_type: pr-code-analyst
-              model: haiku
-              prompt: "分析 PR #{pr_number} 的代码质量..."
-              run_in_background: true
-            - team_name: pr-review-team
-              name: architect-reviewer
-              subagent_type: pr-architect-reviewer
-              model: sonnet
-              prompt: "评估 PR #{pr_number} 的架构影响..."
-              run_in_background: true
-            - team_name: pr-review-team
-              name: security-reviewer
-              subagent_type: pr-security-reviewer
-              model: sonnet
-              prompt: "评估 PR #{pr_number} 的安全性..."
-              run_in_background: true
+          # 注意：parallel spawn 需要在单次响应中发起多个 Agent 调用
+          # 【重要】prompt 中不要写 {phase_1_output} 占位符
+          # 实际背景通过 SendMessage 发送，而非在 spawn prompt 中
+          team_name: pr-review-team
+          name: code-analyst
+          subagent_type: pr-code-analyst
+          model: haiku
+          prompt: "分析 PR #{pr_number} 的代码质量。等待接收背景信息后开始分析。"
+          run_in_background: true
+      - step: spawn_architect_reviewer
+        tool: Agent
+        params:
+          team_name: pr-review-team
+          name: architect-reviewer
+          subagent_type: pr-architect-reviewer
+          model: sonnet
+          prompt: "评估 PR #{pr_number} 的架构影响。等待接收背景信息后开始评估。"
+          run_in_background: true
+      - step: spawn_security_reviewer
+        tool: Agent
+        params:
+          team_name: pr-review-team
+          name: security-reviewer
+          subagent_type: pr-security-reviewer
+          model: sonnet
+          prompt: "评估 PR #{pr_number} 的安全性。等待接收背景信息后开始评估。"
+          run_in_background: true
+
+      # 【关键步骤】使用 SendMessage 发送 Phase 1 背景给各 agent
+      # 这是规定动作，不可跳过！如果不发送，Phase 2 agents 无法获得背景信息
       - step: send_context_to_phase_2
         tool: SendMessage
         params:
           to: code-analyst
-          message: "{phase_1_output}"
+          message: |
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+            请基于以上背景分析代码质量。
       - step: send_context_to_phase_2
         tool: SendMessage
         params:
           to: architect-reviewer
-          message: "{phase_1_output}"
+          message: |
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+            请基于以上背景评估架构影响。
       - step: send_context_to_phase_2
         tool: SendMessage
         params:
           to: security-reviewer
-          message: "{phase_1_output}"
+          message: |
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+            请基于以上背景评估安全性。
       - step: wait_for_phase_2_results
-        action: 等待所有 Phase 2 agents 返回结果
+        action: |
+          等待所有 Phase 2 agents 返回结果。
+
+          **必须等待**：
+          - code-analyst
+          - architect-reviewer
+          - security-reviewer
+
+          超时：5 分钟
+
+          如果超时仍有 agent 未返回：
+          - 记录 WARNING
+          - 在报告中标注"部分审查未完整"
+          - 不要假设未返回的 agent 同意其他结论
 
   phase_3:
     name: 综合判断与改进
     agents: []
     actions:
+      - verify_all_reports_received  # 新增：前置检查
       - collect_results
       - detect_conflicts
       - arbitrate_if_needed
@@ -330,6 +374,20 @@ workflow:
       - generate_improvement_plan
     # 执行指令
     execution:
+      # Step 0: 前置检查（新增）
+      - step: verify_all_reports
+        action: |
+          验证所有 Phase 2 agents 已返回报告：
+
+          required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
+          received_agents = [从 idle notifications 获取]
+
+          missing = set(required_agents) - set(received_agents)
+          if missing:
+            log_warning(f"缺失审查报告: {missing}")
+            在最终报告中标注"审查不完整：缺失 {missing}"
+            # 重要：不要假设缺失的 agent 同意其他结论
+
       - step: collect_all_reports
         action: 从 idle notifications 获取各 agent 报告
       - step: detect_conflicts
@@ -482,24 +540,11 @@ workflow:
         - [ ] 高 / 中 / 低
     labels: ["type/follow-up", "scope/<component>"]
 
-  phase_5:
-    name: 清理与复用准备
-    executor: team-lead
-    agents: []
-    actions:
-      - clear_inboxes  # 清空 inbox 为下一个 PR 准备
-      - kill_idle_teammates  # 杀死 idle 状态的 tmux panes（可选）
-      - reset_team_state  # 重置 tasks 状态
-    conditions:
-      continue_next_pr:
-        - 保留 tmux panes（复用模式）
-        - 清空 inbox 文件
-        - 重置 tasks 目录
-      full_cleanup:
-        - 杀死所有 teammate panes
-        - 删除 ~/.claude/teams/{team-name}/
-        - 删除 ~/.claude/tasks/{team-name}/
-        - 释放资源，下次重新 spawn
+# 注意：本 workflow 只有 4 个 phase。
+# Phase 4 完成后，控制权直接回到 SKILL.md 的 Step 9（询问继续 / 结束）。
+# 不存在 "phase_5 / 准备下一个 PR / 保留状态" 这类辅助 phase——
+# teammates 的 idle / pane / inbox 由运行时管理，skill 不感知也不操作。
+# 切换 PR 通过 SendMessage 给已有 agent 发新任务即可。
 
 # 防幻觉机制
 anti_hallucination:
@@ -509,36 +554,38 @@ anti_hallucination:
     "无漏洞": "检查的文件和函数列表"
     "符合架构": "架构文档引用位置"
 
-# 输出格式
+# 审查质量硬要求（与 SKILL.md 的 Review Quality Standards 对齐）
+review_quality_requirements:
+  forbidden:
+    - "百分制 / 字母评分（89.75/100、A-、B+ 等虚假精度）"
+    - "援引与本 PR 无关的指标（如 PR 不改 PRService 却列 PRService LOC）"
+    - "安全/架构论证滑动到本 PR 未触碰的相邻代码"
+    - "称'违规'但不引用具体规则来源"
+    - "把测试数量等同于覆盖质量"
+    - "comment 使用内部 phase 标题（Phase 1/2/3）作为叙事结构"
+  required:
+    - "每条'违规/技术债'必须引用规则来源（CLAUDE.md / coding-standards.md / 等）"
+    - "数字/行数/LOC 声明必须基于本 PR 实际 diff"
+    - "区分本 PR 改动 vs 既有代码"
+    - "code-analyst 必须扫描代码内重复模式与冗余防御"
+    - "测试评估区分单元/集成、happy path/错误分支"
+    - "范围外真实技术债转 follow-up issue"
+
+# 输出格式（最终 PR comment 结构）
 output_format: |
-  ## PR #<number> Team 审查报告
+  ## PR #<number> 审查报告
 
-  ### Phase 1: 背景调研
-  [context-researcher 的关键发现]
+  **决策**：APPROVE / NEEDS_CHANGES / REJECT
 
-  ### Phase 2: 专项审查
-  [各审查员的发现]
+  ### 已解决技术债
+  - [diff 引用 + 简述]
 
-  ### Phase 3: 交叉验证
-  [差异检测和仲裁]
+  ### 遗留问题
+  - [每条带规则引用，如 CLAUDE.md HARD RULE 13 / coding-standards.md § X]
 
-  ### 综合结论
-  **决策**: APPROVE / REJECT / NEEDS_INFO
-  **关键发现**: [列表]
-  **技术债识别**: [列表]
+  ### Follow-up Issue
+  - #<issue_number>（如适用）
 
-# 清理命令参考
-cleanup_commands:
-  clear_inboxes: |
-    rm -f ~/.claude/teams/{team-name}/inboxes/*.json
-    echo "Cleared all inboxes"
-  kill_teammates: |
-    jq -r '.members[] | .pane_id // .paneId // empty' \
-      ~/.claude/teams/{team-name}/config.json | \
-    while read -r pane_id; do
-      [ -n "$pane_id" ] && tmux kill-pane -t "$pane_id"
-    done
-  full_cleanup: |
-    rm -rf ~/.claude/teams/{team-name}
-    rm -rf ~/.claude/tasks/{team-name}
-    echo "Full cleanup complete"
+  ### 审查依据
+  - 引用的规则文档列表
+  - 审查方式（diff 全量阅读 / 规则交叉核查 / etc）

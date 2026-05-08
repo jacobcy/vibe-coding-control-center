@@ -17,9 +17,10 @@ if [[ -d "${PWD}/.vibe" && -d "${PWD}/bin" ]]; then
 fi
 
 # ---------- Aliases ----------
-# Source aliases from the global install; aliases.sh internally uses
-# config.sh to auto-detect VIBE_ROOT.
-if [[ -f "${HOME}/.vibe/config/aliases.sh" ]]; then
+# Source aliases from the global install; aliases.sh internally resolves VIBE_ROOT.
+if [[ -f "${HOME}/.vibe/config/shell/aliases.sh" ]]; then
+    source "${HOME}/.vibe/config/shell/aliases.sh"
+elif [[ -f "${HOME}/.vibe/config/aliases.sh" ]]; then
     source "${HOME}/.vibe/config/aliases.sh"
 fi
 

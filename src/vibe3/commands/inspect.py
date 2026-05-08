@@ -4,6 +4,7 @@ import json
 from typing import Annotated, Any, cast
 
 import typer
+import yaml
 
 from vibe3.analysis import command_analyzer, dag_service, structure_service
 from vibe3.analysis.command_analyzer_helpers import find_command_file
@@ -20,14 +21,12 @@ When to use inspect:
   - Analyzing one file structure (LOC, functions, imports)
   - Looking up where a symbol is used
   - Finding dead code
-  - Analyzing impact of a single change (PR / commit / branch)
+  - Analyzing impact of a single change (branch / uncommitted)
 
 Subcommands:
   files [<file>]             Structure of one file (default: all Python files)
   symbols <file>:<symbol>    Find symbol references
   base [<branch>]            Key impact vs base branch
-  pr <number>                Impact analysis of a GitHub PR
-  commit <sha>               Impact analysis of one commit
   uncommit                   Impact analysis of uncommitted changes
   dead-code [<root>]         Find unused functions
   commands [<cmd> <subcmd>]  Static analysis of CLI command structure
@@ -74,6 +73,7 @@ register_change(app)
 def files_(
     file: Annotated[str, typer.Argument(help="File to analyze")] = "",
     json_out: _JSON_OPT = False,
+    yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
     quiet: Annotated[
         bool, typer.Option("--quiet", help="Suppress next step suggestions")
     ] = False,
@@ -105,6 +105,12 @@ def files_(
 
         if json_out:
             typer.echo(json.dumps(result.model_dump(), indent=2))
+        elif yaml_out:
+            typer.echo(
+                yaml.dump(
+                    result.model_dump(), default_flow_style=False, allow_unicode=True
+                )
+            )
         else:
             typer.echo(f"=== File: {file} ===")
             typer.echo(f"  Language  : {result.language}")
@@ -130,6 +136,8 @@ def files_(
 
         if json_out:
             typer.echo(json.dumps(results, indent=2))
+        elif yaml_out:
+            typer.echo(yaml.dump(results, default_flow_style=False, allow_unicode=True))
         else:
             typer.echo("=== Python Files Summary ===")
             for r in results:
@@ -218,6 +226,7 @@ def dead_code(
         str, typer.Argument(help="Root directory to scan (default: src/vibe3)")
     ] = "src/vibe3",
     json_out: _JSON_OPT = False,
+    yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
     min_confidence: Annotated[
         str,
         typer.Option(
@@ -248,6 +257,7 @@ def dead_code(
         vibe3 inspect dead-code
         vibe3 inspect dead-code src/vibe3 --min-confidence=high
         vibe3 inspect dead-code --json
+        vibe3 inspect dead-code --yaml
     """
     if trace:
         enable_trace()
@@ -280,6 +290,12 @@ def dead_code(
 
         if json_out:
             typer.echo(report.model_dump_json(indent=2))
+        elif yaml_out:
+            typer.echo(
+                yaml.dump(
+                    report.model_dump(), default_flow_style=False, allow_unicode=True
+                )
+            )
         else:
             typer.echo("=== Dead Code Report ===")
             typer.echo(f"  Total symbols scanned: {report.total_symbols}")

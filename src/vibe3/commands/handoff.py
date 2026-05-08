@@ -2,16 +2,8 @@
 
 import typer
 
-from vibe3.commands.handoff_read import show, status
-from vibe3.commands.handoff_write import (
-    append,
-    audit,
-    indicate,
-    init,
-    plan,
-    report,
-    verdict,
-)
+from vibe3.commands.handoff_read import register_read_commands
+from vibe3.commands.handoff_write import register_write_commands
 
 app = typer.Typer(
     help="Agent handoff chain and events",
@@ -19,13 +11,5 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-# Register commands
-app.command()(show)
-app.command()(status)
-app.command()(init)
-app.command()(append)
-app.command()(plan)
-app.command()(report)
-app.command()(indicate)
-app.command()(audit)
-app.command()(verdict)
+register_read_commands(app)
+register_write_commands(app)

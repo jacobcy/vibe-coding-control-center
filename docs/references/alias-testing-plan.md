@@ -7,7 +7,7 @@
 ## 测试文件位置
 
 - 测试脚本: `tests/test-aliases.sh`
-- Alias 配置: `config/aliases.sh` 和 `config/aliases/*.sh`
+- Alias 配置: `config/shell/aliases.sh` (sources from `lib/alias/*.sh`)
 
 ## 使用方法
 
@@ -32,14 +32,15 @@ zsh tests/test-aliases.sh --quiet
 - 检查所有 alias 文件的 zsh 语法
 - 验证没有语法错误
 - 测试文件:
-  - `config/aliases.sh`
-  - `config/aliases/claude.sh`
-  - `config/aliases/opencode.sh`
-  - `config/aliases/openspec.sh`
-  - `config/aliases/vibe.sh`
-  - `config/aliases/git.sh`
-  - `config/aliases/tmux.sh`
-  - `config/aliases/worktree.sh`
+  - `config/shell/aliases.sh` (entry point)
+  - `lib/alias/loader.sh`
+  - `lib/alias/agent.sh`
+  - `lib/alias/git.sh`
+  - `lib/alias/openspec.sh`
+  - `lib/alias/tmux.sh`
+  - `lib/alias/vibe.sh`
+  - `lib/alias/vibe3.sh`
+  - `lib/alias/worktree.sh`
 
 ### 2. 加载测试 (Load Tests)
 - 验证 aliases.sh 能够成功加载
@@ -76,13 +77,13 @@ zsh tests/test-aliases.sh --quiet
 ## 预期输出示例
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║          Vibe Alias 测试套件 (Test Suite)                  ║
-╚════════════════════════════════════════════════════════════╝
++==============================================================+
+|          Vibe Alias 测试套件 (Test Suite)                    |
++==============================================================+
 
-╔════════════════════════════════════════════════════════════╗
-║              语法检查测试 (Syntax Tests)                     ║
-╚════════════════════════════════════════════════════════════╝
++==============================================================+
+|              语法检查测试 (Syntax Tests)                     |
++==============================================================+
 
 [TEST] 语法检查: aliases.sh
 [PASS] 语法检查: aliases.sh
@@ -90,9 +91,9 @@ zsh tests/test-aliases.sh --quiet
 [PASS] 语法检查: claude.sh
 ...
 
-╔════════════════════════════════════════════════════════════╗
-║                    测试总结 (Test Summary)                 ║
-╚════════════════════════════════════════════════════════════╝
++==============================================================+
+|                    测试总结 (Test Summary)                   |
++==============================================================+
 
   总测试数: 35
   通过: 35
@@ -109,7 +110,7 @@ zsh tests/test-aliases.sh --quiet
 - 检查是否有交互式命令阻塞
 
 ### 语法检查失败
-- 运行 `zsh -n config/aliases.sh` 查看具体错误
+- 运行 `zsh -n config/shell/aliases.sh` 查看具体错误
 - 检查是否使用了 zsh 不支持的语法
 
 ### 函数测试失败

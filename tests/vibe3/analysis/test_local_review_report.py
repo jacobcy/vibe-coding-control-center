@@ -127,7 +127,7 @@ class TestFindLatestPrepushReport:
 
     def test_find_latest_empty_directory(self, tmp_path: Path) -> None:
         """Return None when no reports exist."""
-        reports_dir = tmp_path / ".agent" / "reports"
+        reports_dir = tmp_path / ".agent" / "reports" / "review"
         reports_dir.mkdir(parents=True)
 
         with patch(
@@ -136,7 +136,7 @@ class TestFindLatestPrepushReport:
         ):
             # Patch the constructor to return our tmp path
             def side_effect(path_str: str) -> Path:
-                if path_str == ".agent/reports":
+                if path_str == ".agent/reports/review":
                     return reports_dir
                 return Path(path_str)
 
@@ -149,7 +149,7 @@ class TestFindLatestPrepushReport:
 
     def test_find_latest_single_report(self, tmp_path: Path) -> None:
         """Find and parse a single report file."""
-        reports_dir = tmp_path / ".agent" / "reports"
+        reports_dir = tmp_path / ".agent" / "reports" / "review"
         reports_dir.mkdir(parents=True)
 
         report_file = reports_dir / "pre-push-review-20260320-225241.md"
@@ -164,7 +164,7 @@ created_at: 2026-03-20T22:52:41
 """)
 
         def side_effect(path_str: str) -> Path:
-            if path_str == ".agent/reports":
+            if path_str == ".agent/reports/review":
                 return reports_dir
             return Path(path_str)
 
@@ -182,7 +182,7 @@ created_at: 2026-03-20T22:52:41
 
     def test_find_latest_multiple_reports(self, tmp_path: Path) -> None:
         """Find the most recent report among multiple files."""
-        reports_dir = tmp_path / ".agent" / "reports"
+        reports_dir = tmp_path / ".agent" / "reports" / "review"
         reports_dir.mkdir(parents=True)
 
         # Create two report files with different timestamps
@@ -200,7 +200,7 @@ created_at: 2026-03-20T22:52:41
         report2.touch()
 
         def side_effect(path_str: str) -> Path:
-            if path_str == ".agent/reports":
+            if path_str == ".agent/reports/review":
                 return reports_dir
             return Path(path_str)
 
@@ -216,7 +216,7 @@ created_at: 2026-03-20T22:52:41
 
     def test_find_latest_handles_parse_error(self, tmp_path: Path) -> None:
         """Return report with None fields if parsing fails."""
-        reports_dir = tmp_path / ".agent" / "reports"
+        reports_dir = tmp_path / ".agent" / "reports" / "review"
         reports_dir.mkdir(parents=True)
 
         report_file = reports_dir / "pre-push-review-20260320-225241.md"
@@ -224,7 +224,7 @@ created_at: 2026-03-20T22:52:41
         report_file.write_text("Some unstructured content")
 
         def side_effect(path_str: str) -> Path:
-            if path_str == ".agent/reports":
+            if path_str == ".agent/reports/review":
                 return reports_dir
             return Path(path_str)
 

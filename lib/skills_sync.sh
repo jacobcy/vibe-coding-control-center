@@ -58,7 +58,9 @@ _vibe_skills_claude_plugin_count() {
 # Read agents list from skills-expected.yaml (replaced registry.json in #204)
 _vibe_skills_expected_file() { echo "$VIBE_ROOT/skills/vibe-skills-manager/skills-expected.yaml"; }
 _vibe_skills_manifest_file() {
-    if [[ -f "$VIBE_ROOT/config/skills.json" ]]; then
+    if [[ -f "$VIBE_ROOT/config/v3/skills.json" ]]; then
+        echo "$VIBE_ROOT/config/v3/skills.json"
+    elif [[ -f "$VIBE_ROOT/config/skills.json" ]]; then
         echo "$VIBE_ROOT/config/skills.json"
     else
         echo "$HOME/.vibe/skills.json"

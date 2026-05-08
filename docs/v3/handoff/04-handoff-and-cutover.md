@@ -24,7 +24,7 @@ related_docs:
 
 本阶段固定以下口径：
 
-- `repo issue -> pr` 是唯一标准交付链
+- `GitHub issue -> pr` 是唯一标准交付链
 - `git` 与 GitHub 现场负责业务事实
 - SQLite handoff store 只负责 flow 责任链与最小索引
 - 共享目录下的 `current.md` 负责结构化 handoff 中间态，不负责主链事实
@@ -316,7 +316,7 @@ handoff command 不负责：
 
 ### 11.1 Concept Acceptance
 
-- [x] `repo issue -> pr` 主链和本地 handoff store 的职责边界写清
+- [x] `GitHub issue -> pr` 主链和本地 handoff store 的职责边界写清
 - [x] SQLite 只存责任链与引用、不存正文的约束写清
 - [x] 共享 `current.md` 的中间态角色写清
 - [x] `.agent/context/task.md` 的降级角色写清

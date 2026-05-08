@@ -200,7 +200,7 @@ cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
 现象：某个角色行为明显偏差（过度执行或过于保守）。
 
 ```bash
-cat config/settings.yaml
+cat config/v3/settings.yaml
 ```
 
 检查点：

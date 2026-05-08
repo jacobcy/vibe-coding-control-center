@@ -35,7 +35,9 @@ related_docs:
 
 ## 主链路
 
-`GitHub issue -> roadmap item -> vibe-new -> vibe-start -> spec execution -> PR -> review/integrate -> done`
+`GitHub issue -> vibe-new -> vibe-start -> spec execution -> PR -> review/integrate -> done`
+
+> Note: `roadmap item` 是历史兼容/规划参考语义（见 glossary.md §3.2）。当前治理直接管理 assignee issue，不经过 roadmap item 中间层转换。
 
 对应常用 skill：
 
@@ -45,9 +47,9 @@ related_docs:
    - 记忆句：它是“发 issue / 整理 issue”的入口，不是“拿 issue 开做”。
 
 2. `vibe-roadmap`
-   - 做什么：管理 roadmap item、版本窗口、triage、决定“下一个 roadmap 做什么”。
+   - 做什么：管理版本规划、triage、决定”下一个要推进什么”。
    - 不做什么：不创建 issue，不修 runtime。
-   - 记忆句：它是 roadmap 的大脑。
+   - 记忆句：它是规划的大脑。
 
 3. `vibe-new`
    - 做什么：旧 flow 到新 flow 的转换器；决定主 issue，判断是否带着未提交改动进入新 flow，还是清空现场后再进入。
@@ -80,12 +82,12 @@ related_docs:
 
 1. `vibe-task`
    - 做什么：task-centered audit；看 task registry、`roadmap <-> task` 映射、task 数据质量、跨 worktree task 总览。
-   - 重要纠正：它不是纯只读；在审计修复模式下，可以在用户确认后执行 `vibe task add/update/remove`。
+   - 重要纠正：它不是纯只读；在审计修复模式下，可以在用户确认后执行修复操作。
    - 不做什么：不负责 runtime `task <-> flow` 修复。
 
 2. `vibe-check`
    - 做什么：runtime / recovery audit，负责 `task <-> flow`、worktree、stale binding 的现场一致性审计与修复。
-   - 重要纠正：它不是 roadmap / task registry 的历史总审计，也不是“下一个做什么”的大脑。
+   - 重要纠正：它不是 roadmap / task registry 的历史总审计，也不是”下一个做什么”的大脑。
    - 不做什么：不负责 roadmap 排期，不负责 `roadmap <-> task` 语义修复。
 
 ## 一句话版本

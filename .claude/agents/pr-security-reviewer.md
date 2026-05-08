@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的红队测试和输出格式，以及项目特有工具使用要求。
   
 model: sonnet
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, SendMessage
 extends: security-reviewer  # 继承全局 security-reviewer 的基础能力
 # 安全限制：禁止修改文件和执行危险操作
 forbidden_commands:
@@ -215,6 +215,40 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 | 数据 | 泄露、篡改、删除 | handoff 数据篡改 |
 | 配置 | 硬编码、默认值 | API key 泄露 |
 | 日志 | 完整性、篡改 | 审计日志绕过 |
+
+## 工作协议（强制）
+
+### 1. 必须等待背景信息
+
+**在开始工作前**，必须先收到 team-lead 通过 SendMessage 发送的 Phase 1 背景报告。
+
+**等待机制**：
+- 你被 spawn 后进入等待状态
+- Team-lead 会发送包含 PR 信息和 Phase 1 背景的消息
+- 收到背景后才能开始安全评估
+
+**如果未收到背景**：
+- 不要自行开始工作
+- 使用 SendMessage 向 team-lead 请求背景
+
+### 2. 必须发送结果给 team-lead
+
+**工作完成后**，必须使用 SendMessage 发送完整报告给 team-lead。
+
+```yaml
+SendMessage(
+  to: "team-lead",
+  summary: "PR #<number> 安全审查报告完成",
+  message: |
+    ## PR #<number> 安全审查报告
+    
+    [完整报告内容]
+)
+```
+
+**禁止**：
+- ❌ 只打印到终端不发送
+- ❌ 发送不完整的报告
 
 ## 工作方式
 

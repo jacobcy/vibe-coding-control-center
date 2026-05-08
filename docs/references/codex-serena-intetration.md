@@ -1,4 +1,13 @@
 
+---
+title: Codex + Serena PR Review 集成架构
+status: historical-reference
+scope: external-tool-chain
+note: 本文档描述外部工具链 Codex + Serena 的 PR review 集成架构，非当前项目主流程。当前项目 PR review 实际方式通过 vibe3 CLI，详见 CLAUDE.md §Agent 工作流 和 docs/standards/v3/skill-standard.md。
+---
+
+# Codex + Serena PR Review 集成架构
+
 目标架构
 
 你要的完整版本是这条链：

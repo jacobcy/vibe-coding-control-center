@@ -1,5 +1,6 @@
 """GitClient 单元测试."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -90,6 +91,36 @@ class TestGetGitCommonDir:
         with patch.object(client, "_run", return_value=".git"):
             with pytest.raises(GitError, match="returned non-absolute path"):
                 client.get_git_common_dir()
+
+
+class TestListWorktrees:
+    """list_worktrees 测试."""
+
+    def test_parses_worktree_entries_with_cwd_override(self) -> None:
+        porcelain_output = """worktree /tmp/main
+branch refs/heads/main
+
+worktree /tmp/do-20260430-abc123
+branch refs/heads/task/issue-123
+"""
+        client = GitClient()
+
+        with patch("vibe3.clients.git_client.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=porcelain_output)
+
+            entries = client.list_worktrees(cwd=Path("/tmp/main"))
+
+        assert entries == [
+            ("/tmp/main", "refs/heads/main"),
+            ("/tmp/do-20260430-abc123", "refs/heads/task/issue-123"),
+        ]
+        mock_run.assert_called_once_with(
+            ["git", "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd="/tmp/main",
+        )
 
 
 class TestGetChangedFiles:

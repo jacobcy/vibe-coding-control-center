@@ -187,8 +187,11 @@ class TestGovernanceSyncRunner:
             # Should classify and record error
             mock_tracking.record_error.assert_called_once()
             call_args = mock_tracking.record_error.call_args
-            # First arg is error code, second is message
-            assert call_args[0][0] == "E_API_RATE_LIMIT"  # rate limit error code
+            # Check keyword arguments
+            assert call_args.kwargs["error_code"] == "E_API_RATE_LIMIT"
+            assert call_args.kwargs["tick_id"] == 5
+            assert call_args.kwargs["issue_number"] is None
+            assert call_args.kwargs["branch"] is None
 
         # Should also log governance event
         mock_append_event.assert_called()

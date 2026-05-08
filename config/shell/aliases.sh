@@ -1,10 +1,10 @@
 #!/usr/bin/env zsh
-# config/aliases.sh - Compatibility shim for Vibe 2.0
+# config/shell/aliases.sh - Compatibility shim for Vibe 2.0
 # DEPRECATED: Use source $(vibe alias --load) which points to lib/alias/loader.sh
 
 _v_shim_self="$(dirname "${(%):-%x:A}")"
-_v_root="$(cd "$_v_shim_self/.." && pwd)"
-_v_new_loader="$_v_shim_self/../lib/alias/loader.sh"
+_v_root="$(cd "$_v_shim_self/../.." && pwd)"
+_v_new_loader="$_v_root/lib/alias/loader.sh"
 _v_legacy_alias_dir="$_v_shim_self/aliases"
 _v_legacy_loaded=0
 

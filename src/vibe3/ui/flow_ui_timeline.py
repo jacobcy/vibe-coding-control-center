@@ -190,7 +190,7 @@ def _render_actors(state: FlowStatusResponse) -> None:
 
 
 def _render_reasons(state: FlowStatusResponse) -> None:
-    """Show blocked reason if present (failed_reason deprecated)."""
+    """Show blocked reason if present."""
     if state.blocked_reason:
         console.print()
         console.print(f"  [red bold]blocked_reason:[/] [red]{state.blocked_reason}[/]")
@@ -278,7 +278,7 @@ def _render_refs(
             if not refs_shown:
                 console.print("[bold]--- Refs ---[/]")
                 refs_shown = True
-            # Use explicit mapping; only plan_ref has a corresponding actor field
+            # Use explicit mapping; all refs except spec_ref have actor fields
             actor_field = REF_TO_ACTOR_FIELD.get(label)
             actor = getattr(state, actor_field, None) if actor_field else None
             actor_str = f"  [dim]{actor}[/]" if actor else ""

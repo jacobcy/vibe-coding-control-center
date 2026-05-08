@@ -214,6 +214,6 @@ skills/<name>/
 4. 是否把 OpenSpec `opsx-*` 归类到 OpenSpec 工具链而非 skills 依赖管理？
 5. 是否对 Claude 采用插件优先策略，并避免用 `npx skills` 代替插件生态？
 6. 若引入 `.claude/commands/`，是否保持其为适配层而非第二套业务逻辑？
-7. 是否避免在 skill / workflow 文案中重新定义 `repo issue`、`roadmap item`、`task`、`flow`、`pr` 的对象边界？
+7. 是否避免在 skill / workflow 文案中重新定义 `GitHub issue`、`roadmap item`、`task`、`flow`、`pr` 的对象边界？
 
 (End of file - total 196 lines)

@@ -12,3 +12,11 @@ def parse_issue_number(issue: str) -> int:
     if match:
         return int(match.group(1))
     raise ValueError(f"Invalid issue format: {issue}")
+
+
+def try_parse_issue_number(issue: str) -> int | None:
+    """Try to parse issue number, returning None on failure."""
+    try:
+        return parse_issue_number(issue)
+    except ValueError:
+        return None

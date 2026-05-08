@@ -24,6 +24,7 @@ from vibe3.commands import (
     pr,
     review,
     run,
+    scan,
     snapshot,
     status,
     task,
@@ -62,6 +63,7 @@ app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
+app.add_typer(scan.app, name="scan")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")

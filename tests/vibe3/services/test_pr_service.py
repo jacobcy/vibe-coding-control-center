@@ -233,3 +233,131 @@ def test_pr_service_close_open_pr_for_flow(pr_service: PRService) -> None:
         "feature-branch", state="open"
     )
     gh_instance.close_pr.assert_called_once_with(123, comment="Abandoning flow")
+
+
+def test_mark_ready_publishes_loc_comment(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
+    """Test that mark_ready publishes LOC comment."""
+    from vibe3.services.pr_loc_comment_service import PRLocCommentService
+
+    # Setup mocks
+    gh_instance = pr_service.github_client
+    gh_instance.check_auth.return_value = True
+    gh_instance.get_pr.return_value = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=True,  # Draft PR to trigger mark_ready
+    )
+    gh_instance.mark_ready.return_value = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,  # Now ready
+    )
+
+    # Add LOC comment service mock
+    loc_service_mock = MagicMock(spec=PRLocCommentService)
+    pr_service.loc_comment_service = loc_service_mock
+
+    # Call mark_ready
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        result = pr_service.mark_ready(123)
+
+    # Verify LOC comment was published
+    loc_service_mock.publish_loc_summary.assert_called_once_with(123)
+
+    # Verify PR was marked ready
+    gh_instance.mark_ready.assert_called_once_with(123)
+    assert result.draft is False
+
+
+def test_loc_comment_idempotent_update(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
+    """Test that LOC comment updates existing comment on re-run."""
+    from vibe3.services.pr_loc_comment_service import PRLocCommentService
+
+    # Setup mocks for already-ready PR (is_already_ready=True)
+    gh_instance = pr_service.github_client
+    gh_instance.check_auth.return_value = True
+    gh_instance.get_pr.return_value = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,  # Already ready
+    )
+
+    # Add LOC comment service mock
+    loc_service_mock = MagicMock(spec=PRLocCommentService)
+    pr_service.loc_comment_service = loc_service_mock
+
+    # Call mark_ready on already-ready PR
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        result = pr_service.mark_ready(123)
+
+    # Verify LOC comment was still published (idempotent update)
+    loc_service_mock.publish_loc_summary.assert_called_once_with(123)
+
+    # Verify PR remains ready
+    assert result.draft is False
+
+
+def test_mark_ready_handles_loc_comment_failure(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
+    """Test that LOC comment failure doesn't block mark_ready."""
+    from vibe3.services.pr_loc_comment_service import PRLocCommentService
+
+    # Setup mocks
+    gh_instance = pr_service.github_client
+    gh_instance.check_auth.return_value = True
+    gh_instance.get_pr.return_value = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=True,
+    )
+    gh_instance.mark_ready.return_value = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+
+    # Add LOC comment service mock that raises exception
+    loc_service_mock = MagicMock(spec=PRLocCommentService)
+    loc_service_mock.publish_loc_summary.side_effect = Exception("LOC error")
+    pr_service.loc_comment_service = loc_service_mock
+
+    # Call mark_ready - should not fail
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        result = pr_service.mark_ready(123)
+
+    # Verify LOC comment was attempted
+    loc_service_mock.publish_loc_summary.assert_called_once_with(123)
+
+    # Verify PR was still marked ready despite LOC error
+    gh_instance.mark_ready.assert_called_once_with(123)
+    assert result.draft is False

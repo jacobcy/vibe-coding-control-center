@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Check per-file LOC ceiling for test files
-# Reads limits from config/loc_limits.yaml without uv
+# Reads limits from config/v3/loc_limits.yaml without uv
 #
 # Limits:
 #   default: 300 lines (most test files should fit)
 #   max: 400 lines (special cases with justification)
 #
-# Test paths (defined in config/loc_limits.yaml:code_limits.test_paths):
+# Test paths (defined in config/v3/loc_limits.yaml:code_limits.test_paths):
 #   Python: tests/vibe3/
 #
 # Exit codes:

@@ -36,12 +36,12 @@ def display_actor(actor: str | None) -> tuple[str, bool]:
     - If actor is set and normalizes to a meaningful value → (normalized, False)
     - Else → (worktree git user.name, True)
 
-    Uses ``SignatureService.normalize_actor`` which maps legacy aliases and
+    Uses ``normalize_actor`` from utils.actor_utils which maps legacy aliases and
     filters placeholders, giving consistent output across PR body and UI.
     """
-    from vibe3.services.signature_service import SignatureService
+    from vibe3.utils.actor_utils import normalize_actor
 
-    normalized = SignatureService.normalize_actor(actor)
+    normalized = normalize_actor(actor)
     if normalized is not None:
         return normalized, False
 

@@ -35,7 +35,7 @@
 3. 本地启动检查
 - 启动：
 ```bash
-uv run python src/vibe3/cli.py serve start --async -v --port 8080
+uv run python src/vibe3/cli.py serve start -v --port 8080
 ```
 - 状态：
 ```bash
@@ -47,7 +47,7 @@ curl -sS http://127.0.0.1:8080/status
 ### 3.1 干跑（建议先做）
 
 ```bash
-uv run python src/vibe3/cli.py serve start --async -v --dry-run --port 8080
+uv run python src/vibe3/cli.py serve start -v --dry-run --port 8080
 ```
 
 创建并指派 issue 给 `vibe-manager-agent`，预期日志包含：

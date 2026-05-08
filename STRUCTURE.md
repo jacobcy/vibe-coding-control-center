@@ -269,8 +269,8 @@ vibe3 inspect commit <sha>                # 改动影响范围
 
 | 文件 | 职责 | 更新频率 |
 |------|------|---------|
-| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff` 命令访问，不直接编辑） | 每个动作后 |
-| `memory/` | **[TRACKED]** AI 上下文记忆目录（已迁移至 claude-memory MCP 工具） | 不再主动更新 |
+| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff status` 或 `vibe3 handoff show` 命令访问，不直接编辑） | 每个动作后 |
+| `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具） | 仅补充关键模式 |
 
 #### `.claude/rules/` - 编码规则
 

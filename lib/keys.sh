@@ -130,7 +130,7 @@ _keys_check() {
     echo "  2. 添加变量: KEY=VALUE (每行一个)"
     echo "  3. 保存后重新打开终端，或运行: ${CYAN}source $(_keys_file)${NC}"
     echo ""
-    echo "${BOLD}Agent 配置覆盖 (覆盖 config/models.json):${NC}"
+    echo "${BOLD}Agent 配置覆盖 (覆盖 config/v3/models.json):${NC}"
     echo "  VIBE_BACKEND_<ROLE>   如 VIBE_BACKEND_PLANNER=opencode"
     echo "  VIBE_MODEL_<ROLE>     如 VIBE_MODEL_PLANNER=deepseek/deepseek-v4-pro"
     echo "  VIBE_DEFAULT_BACKEND  全局默认 backend"

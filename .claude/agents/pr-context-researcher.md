@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的时效性检查和依赖关系分析。
 
 model: haiku
-tools: Read, Grep, Glob, WebFetch, Bash
+tools: Read, Grep, Glob, WebFetch, Bash, SendMessage
 extends: Explore  # 继承全局 Explore 的基础能力
 # Bash 仅用于只读 GitHub/context 命令，不执行写操作或本地状态修改
 ---
@@ -149,6 +149,27 @@ context_bundle:
 
 [关键问题和注意事项]
 ```
+
+## 工作协议（强制）
+
+### 必须发送结果给 team-lead
+
+**工作完成后**，必须使用 SendMessage 发送完整报告给 team-lead。
+
+```yaml
+SendMessage(
+  to: "team-lead",
+  summary: "PR #<number> 背景调研报告完成",
+  message: |
+    ## PR #<number> 背景报告
+    
+    [完整报告内容]
+)
+```
+
+**禁止**：
+- ❌ 只打印到终端不发送
+- ❌ 发送不完整的报告
 
 ## 工作方式
 

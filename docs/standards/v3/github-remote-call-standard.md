@@ -22,7 +22,7 @@ related_docs:
 
 本文档定义 Vibe 3.0 与 GitHub 远端交互时的最小调用标准。
 
-目标不是覆盖所有 GitHub API，而是锁定执行器最容易猜错的几件事：
+目标不是覆盖所有 GitHub API，而是锁定执行代理最容易猜错的几件事：
 
 - 什么时候用 `gh issue` / `gh pr`
 - 什么时候用 `gh api graphql`
@@ -37,7 +37,7 @@ Vibe 3.0 的远端调用固定遵循：
 - **优先 GitHub 一等命令**
 - **ProjectV2 和复杂字段更新才进入 GraphQL**
 
-禁止执行器直接自行发明：
+禁止执行代理直接自行发明：
 
 - 未记录在标准中的 GraphQL 对象写入路径
 - 随意 `curl` GitHub API 替代 `gh`
@@ -122,7 +122,7 @@ gh api graphql -f query='...'
 
 ### 4.1 Allowed GraphQL Reads
 
-允许执行器通过 GraphQL 读取：
+允许执行代理通过 GraphQL 读取：
 
 - ProjectV2 items
 - ProjectV2 fieldValues
@@ -131,14 +131,14 @@ gh api graphql -f query='...'
 
 ### 4.2 Allowed GraphQL Writes
 
-允许执行器通过 GraphQL 写入：
+允许执行代理通过 GraphQL 写入：
 
 - `updateProjectV2ItemFieldValue`
 - issue dependency 相关 mutation
 
 ### 4.3 Prohibited GraphQL Assumptions
 
-执行器不得假设：
+执行代理不得假设：
 
 - 所有 Project 字段都能通过 `updateProjectV2ItemFieldValue` 更新
 - Assignees / Labels / Milestone / Repository 也能按普通 field value 一样写
@@ -150,7 +150,7 @@ gh api graphql -f query='...'
 
 ## 5. Project Field Rules
 
-V3 当前只要求执行器明确区分两类字段：
+V3 当前只要求执行代理明确区分两类字段：
 
 ### 5.1 Official GitHub Fields
 

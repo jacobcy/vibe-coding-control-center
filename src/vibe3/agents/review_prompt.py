@@ -38,7 +38,7 @@ class ContextBuilderError(VibeError):
 def build_policy_section(policy_path: str) -> str:
     """Build policy section from file.
 
-    Source: config/settings.yaml (review.policy_file)
+    Source: config/v3/settings.yaml (review.policy_file)
 
     Args:
         policy_path: Path to review policy markdown file
@@ -61,7 +61,7 @@ def build_policy_section(policy_path: str) -> str:
 def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
     """Build tools guide section from file.
 
-    Source: config/settings.yaml (review.common_rules)
+    Source: config/v3/settings.yaml (review.common_rules)
 
     Args:
         tools_guide_path: Path to tools guide file (optional)
@@ -124,7 +124,8 @@ def build_ast_analysis_section(
 def build_review_task_section(task_text: str | None) -> str:
     """Build review task section.
 
-    Source: config/settings.yaml (review.review_task) or default
+    Source: config/prompts/prompts.yaml (review.review_task) via VibeConfig,
+    or default.
 
     Args:
         task_text: Task text from config (optional)
@@ -135,20 +136,28 @@ def build_review_task_section(task_text: str | None) -> str:
     if task_text:
         return f"## Review Task\n{task_text}"
 
-    # Default task guidance
+    # Default: findings-first task guidance
     return """## Review Task
 
+**Prioritize**: correctness → regression risk → API breaks → missing tests
+
+**Focus on**:
 - Run `git diff <base>...HEAD` to see file changes
 - Review only changed code, not the entire codebase
 - Use AST analysis to understand function-level impact
-- Prioritize: correctness, regression risk, API breaks
-- Focus on actionable, specific findings"""
+- Give findings first, then verdict with brief rationale
+
+**Skip**:
+- Generic architecture commentary unrelated to this diff
+- Praise/description paragraphs
+- Style suggestions unless they affect correctness"""
 
 
 def build_output_contract_section(output_format: str | None) -> str:
     """Build output contract section.
 
-    Source: config/settings.yaml (review.output_format) or default
+    Source: config/prompts/prompts.yaml (review.output_format) via VibeConfig,
+    or default.
 
     Args:
         output_format: Output format text from config (optional)
@@ -159,19 +168,29 @@ def build_output_contract_section(output_format: str | None) -> str:
     if output_format:
         return f"## Output format requirements\n{output_format}"
 
-    # Default output format
+    # Default: findings-first output format
     return """## Output format requirements
 
-Each finding should follow this format:
-path/to/file.py:42 [MAJOR] concise issue description
+**FINDINGS FIRST — No praise, no generic commentary.**
 
-The final line must be:
+The first line must be exactly:
 VERDICT: PASS | MAJOR | BLOCK
 
-Where:
-- PASS: No significant issues found
-- MAJOR: Issues found that should be addressed before merge
-- BLOCK: Critical issues that must be fixed before merge"""
+If findings exist, list them concisely:
+path/to/file.py:42 [BLOCK] <specific issue with code evidence>
+path/to/file.py:100 [MAJOR] <specific issue with code evidence>
+
+Then provide a brief rationale (1-2 sentences):
+- PASS: "Why no blocking/major issue was found for this diff"
+- MAJOR: "Summary of what should be addressed before merge"
+- BLOCK: "Summary of critical issues that must be fixed"
+
+The final line must repeat the same VERDICT.
+
+**DO NOT**:
+- Write lengthy summary before findings
+- Include "Strength" / "Positive" / "Praise" paragraphs
+- Give generic architecture commentary unrelated to the diff"""
 
 
 def _review_variant(mode: ReviewPromptMode, context_mode: PromptContextMode) -> str:
@@ -195,7 +214,7 @@ def _build_review_prompt_providers(
     request: ReviewRequest,
     config: VibeConfig,
 ) -> dict[str, PromptProvider]:
-    """Build providers used by config/prompt-recipes.yaml review sections."""
+    """Build providers used by config/prompts/prompt-recipes.yaml review sections."""
 
     def review_retry_task() -> str | None:
         return getattr(config.review, "retry_task", None)
@@ -232,7 +251,7 @@ def build_review_prompt_body(
 
     Args:
         request: Review request containing scope, symbols, and task.
-        config: VibeConfig instance (loads from settings.yaml if None).
+        config: VibeConfig instance (loads from default migrated config if None).
         mode: Prompt mode. ``retry`` revisits an existing review round.
         context_mode: ``resume`` means an existing session is available, so use
             the minimal retry prompt instead of re-sending policy/rules context.

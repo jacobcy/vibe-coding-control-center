@@ -143,7 +143,6 @@ class AssigneeDispatchConfig(BaseModel):
     timeout_seconds: int = Field(default=3600, ge=60)
     prompt_template: str = Field(default="orchestra.assignee_dispatch.manager")
     supervisor_file: str | None = Field(default="supervisor/manager.md")
-    include_supervisor_content: bool = Field(default=True)
 
     # NEW: Role-specific token configuration
     token_env: str | None = Field(
@@ -378,7 +377,7 @@ def build_manager_request(...) -> ExecutionRequest | None:
 
 ---
 
-### Phase 6: UI Enhancement (Optional)
+### UI Enhancement (Optional)
 
 **Objective**: Improve CLI output to distinguish human vs. bot actions.
 
@@ -457,9 +456,9 @@ def render_task_comments(
 - [x] Read from `config.bot_username` and `config.manager_usernames`
 - [x] Test comment filtering with bot's own comments
 
-### Phase 6: UI Polish (Optional)
+### UI Polish (Optional)
 - [ ] Implement `render_task_comments()` with bot filtering
-- [ ] Update `vibe task show` to use new renderer
+- [ ] Update `vibe3 task show` to use new renderer
 - [ ] Test with mixed human/bot comments
 
 ---

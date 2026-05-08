@@ -7,7 +7,7 @@
 #
 # Uses only the Python standard library so it can run before uv sync.
 #
-# Code paths (defined in config/loc_limits.yaml:code_limits.code_paths.v2_shell):
+# Code paths (defined in config/v3/loc_limits.yaml:code_limits.code_paths.v2_shell):
 #   - lib/
 #   - lib3/
 #   - bin/vibe
@@ -58,7 +58,7 @@ def count_loc(patterns: list[str]) -> int:
   return total
 
 
-config = parse_config("config/loc_limits.yaml")
+config = parse_config("config/v3/loc_limits.yaml")
 limit_total = int(config["code_limits.total_file_loc.v2_shell"])
 total_loc = count_loc(["lib/*.sh", "lib3/*.sh", "bin/vibe"])
 

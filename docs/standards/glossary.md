@@ -63,8 +63,8 @@ related_docs:
   - GitHub issue 不是 roadmap item
   - GitHub issue 不是 flow
 - 落点：
-  - 命令语义见 [command-standard.md](command-standard.md)
-  - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
+  - 命令语义见 [command-standard.md](v3/command-standard.md)
+  - task 关联字段见 [registry-json-standard.md](v3/registry-json-standard.md)
   - 标准规范见 [issue-standard.md](issue-standard.md)
 - 使用规则：
   - 所有 issue 都是 GitHub repository issue
@@ -184,7 +184,7 @@ related_docs:
   - `milestone` 不是 flow
 - 落点：
   - 规划语义见 [command-standard.md](command-standard.md)
-  - 文件边界见 [roadmap-json-standard.md](roadmap-json-standard.md)
+  - 文件边界见 [roadmap-json-standard.md](v3/roadmap-json-standard.md)
 - 使用规则：
   - 讨论版本、阶段、交付窗口时优先使用 `milestone`
   - 历史上的 `version_goal` 应视为兼容字段，而不是长期上位概念

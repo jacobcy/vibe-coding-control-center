@@ -24,7 +24,7 @@ class CoverageService:
 
         Args:
             thresholds: Custom coverage thresholds per layer.
-                        If None, reads from config/settings.yaml.
+                        If None, reads from config/v3/settings.yaml.
             project_root: Project root directory (defaults to cwd)
         """
         if thresholds is not None:
@@ -103,7 +103,7 @@ class CoverageService:
     def _run_pytest_cov(self) -> dict[str, Any]:
         """Run pytest with --cov --cov-json and parse output.
 
-        Output is saved to .agent/reports/<flow_slug>/coverage.json
+        Output is saved to .agent/reports/coverage/<branch>/coverage.json
 
         Returns:
             Parsed coverage data from coverage.json
@@ -117,7 +117,11 @@ class CoverageService:
         git = GitClient()
         current_branch = git.get_current_branch()
         reports_dir = (
-            self.project_root / ".agent" / "reports" / current_branch.replace("/", "-")
+            self.project_root
+            / ".agent"
+            / "reports"
+            / "coverage"
+            / current_branch.replace("/", "-")
         )
         reports_dir.mkdir(parents=True, exist_ok=True)
         cov_file = reports_dir / "coverage.json"

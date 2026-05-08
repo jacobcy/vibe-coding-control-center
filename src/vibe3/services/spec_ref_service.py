@@ -44,30 +44,9 @@ class SpecRefService:
         )
 
     def _try_parse_issue_number(self, spec_ref: str) -> int | None:
-        stripped = spec_ref.strip()
+        from vibe3.utils.issue_ref import try_parse_issue_number
 
-        if stripped.isdigit():
-            return int(stripped)
-
-        if stripped.startswith("#"):
-            remainder = stripped[1:]
-            digits = []
-            for ch in remainder:
-                if ch.isdigit():
-                    digits.append(ch)
-                else:
-                    break
-            if digits:
-                return int("".join(digits))
-
-        if "github.com" in stripped and "/issues/" in stripped:
-            parts = stripped.split("/issues/")
-            if len(parts) == 2:
-                num_part = parts[1].split("?")[0].split("#")[0]
-                if num_part.isdigit():
-                    return int(num_part)
-
-        return None
+        return try_parse_issue_number(spec_ref)
 
     def _resolve_issue_spec(self, spec_ref: str, issue_number: int) -> SpecRefInfo:
         issue_data = self._fetch_issue_data(issue_number)

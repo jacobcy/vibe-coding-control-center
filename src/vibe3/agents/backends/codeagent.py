@@ -267,21 +267,20 @@ class CodeagentBackend:
 
             if dry_run:
                 if dry_run_summary:
-                    print("=== Dry Run Summary ===")
+                    logger.debug("=== Dry Run Summary ===")
                     for key, value in dry_run_summary.items():
-                        print(f"{key}: {value}")
-                print("=== Command ===")
-                print(" ".join(command))
+                        logger.debug("{}: {}", key, value)
+                logger.debug("command: {}", " ".join(command))
                 if show_prompt and prompt_file_path:
-                    print(f"\n=== Prompt File: {prompt_file_path} ===")
-                    print(
+                    logger.debug("prompt_file: {}", prompt_file_path)
+                    logger.debug(
+                        "prompt_content:\n{}",
                         build_prompt_file_content(
                             prompt, include_global_notice=include_global_notice
-                        )
+                        ),
                     )
                 if task:
-                    print(f"\n=== Task ===\n{task}")
-                print("\n=== End ===")
+                    logger.debug("task:\n{}", task)
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
             wrapper_log_path: Path | None = None

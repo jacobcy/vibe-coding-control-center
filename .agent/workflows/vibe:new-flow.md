@@ -10,8 +10,8 @@ tags: [workflow, vibe, planning, orchestration]
 ## 定位
 
 - `vibe:new-flow` 是一个 `standalone orchestration workflow`。
-- 它不需要同名 skill；它只负责把用户带到“新建逻辑 flow”这一步。
-- 它不承担 `repo issue`、`roadmap item` 或 feature 定义职责。
+- 它不需要同名 skill；它只负责把用户带到”新建逻辑 flow”这一步。
+- 它不承担 `GitHub issue` 或 feature 定义职责。
 
 ## Steps
 

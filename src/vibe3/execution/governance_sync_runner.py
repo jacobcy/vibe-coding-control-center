@@ -95,14 +95,22 @@ def run_governance_sync(
 
     except Exception as exc:
         # Error tracking: classify and record for FailedGate threshold
-        from vibe3.exceptions.error_classification import classify_error
+        from vibe3.exceptions.error_classification import (
+            classify_error_hybrid,
+        )
         from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        error_output = f"{type(exc).__name__}: {exc}"
-        error_code = classify_error(error_output)
+        error_code = classify_error_hybrid(exc)
 
         error_tracking = ErrorTrackingService.get_instance()
-        error_tracking.record_error(error_code, str(exc))
+        # Record error with tick_id (governance has no specific issue/branch)
+        error_tracking.record_error(
+            error_code=error_code,
+            error_message=str(exc),
+            tick_id=tick_count,  # Governance runs in tick context
+            issue_number=None,  # Governance is global, not issue-specific
+            branch=None,
+        )
 
         logger.bind(domain="governance", tick=tick_count).error(
             f"Governance scan failed: {error_code} - {exc}"

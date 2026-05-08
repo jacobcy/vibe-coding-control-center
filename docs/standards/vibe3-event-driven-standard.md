@@ -547,7 +547,7 @@ LabelService().transition(
 
 - **[vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md)**: 定义执行层级与 worktree 语义，本文件补充事件语义。
 - **[vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)**: 定义 driver/tick/async child 架构，事件发布时机参考该文件。
-- **[vibe3-state-sync-standard.md](vibe3-state-sync-standard.md)**: 定义 flow 状态机，事件触发条件参考该文件。
+- **[v3/command-standard.md](v3/command-standard.md)**: 定义 flow 状态机，事件触发条件参考该文件。
 - **[agent-debugging-standard.md](agent-debugging-standard.md)**: 调试手册，事件日志规范以本文件为准。
 
 ### 11.2 术语真源
@@ -591,7 +591,7 @@ LabelService().transition(
 | 角色 | 处理对象 | 说明 |
 |------|---------|------|
 | governance scan | assignee issue pool | `supervisor/governance/assignee-pool.md` |
-| governance/roadmap | broader repo issue pool | 自动纳入适合自动化推进的 bug fix / small feature 到 assignee issue pool |
+| governance/roadmap | broader GitHub issue pool | 自动纳入适合自动化推进的 bug fix / small feature 到 assignee issue pool |
 | governance/cron | broader repo docs scope | 每轮最多派发 5 个过时文档到 supervisor issue |
 | supervisor/apply | supervisor issue | 显式立项的治理 issue，带 `supervisor` label |
 | manager | assignee issue | 已进入执行池的 issue，由 manager 主链推进 |

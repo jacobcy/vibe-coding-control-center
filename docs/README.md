@@ -10,7 +10,7 @@
 docs/
 ├── README.md                        # 本文件：文档总览
 ├── standards/                       # 标准和规范文档
-│   ├── DOC_ORGANIZATION.md         # 文档组织标准（必读）
+│   ├── doc-organization.md          # 文档组织标准（必读）
 │   ├── cognition-spec-dominion.md  # 宪法大纲：Vibe Guard 流程定义
 │   ├── ...                         # 其他现行标准
 │   └── v3/                          # V3 命令、数据、技能与 handoff 标准

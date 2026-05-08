@@ -30,6 +30,43 @@
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
 
+## 环境变量/外部 API 语义验证
+
+如果实现依赖环境变量或外部 API，plan 阶段必须：
+
+### 1. 显式写出语义假设
+
+- 环境变量名、预期格式、预期语义
+- API endpoint、参数格式、返回值格式
+
+### 2. 执行实际命令/调用验证语义
+
+- 不能只凭文档假设
+- 必须在 plan 中记录验证命令和输出结果
+- 如果无法在当前环境验证（如 CI 环境），必须标注为"未验证风险"
+
+### 3. 记录验证结果
+
+示例：
+```bash
+# 验证 TMUX 环境变量语义
+echo $TMUX
+# 输出: /private/tmp/tmux-501/default,4658,123
+# 结论: TMUX env var 是 socket path，不是 session name
+
+# 获取实际 session name
+tmux display-message -p '#{session_name}'
+# 输出: vibe3-executor-issue-42
+# 结论: 需要用 tmux display-message 获取 session name
+```
+
+### 如果跳过验证
+
+必须在 plan 的「Risks & Considerations」中标注：
+- 哪些环境变量/API 语义未验证
+- 未验证可能导致什么问题
+- 建议在什么阶段/环境补充验证
+
 ## 独立判断强制验证点
 
 规划完成后，必须停下来回答以下问题：
@@ -165,6 +202,34 @@
 - 配置改动：至少验证读取路径、默认值和调用链是否一致
 
 如果某项常规验证不适用，明确写出原因，不要沉默省略。
+
+### 测试范围策略
+
+Plan 验证步骤必须采用以下两种策略之一：
+
+**策略 A（默认）：全量测试**
+- 执行命令：`uv run pytest tests/`
+- 适用场景：CI 环境、改动范围较广、影响面不明确
+- 与 CLAUDE.md §14 协调：本地可交由 CI 执行全量测试，Plan 中应区分本地验证与 CI 验证
+
+**策略 B（定向）：明确列出所有相关测试目录**
+- 必须列出：
+  - 直接修改文件对应的测试目录
+  - 重导出（re-export）或间接引用这些符号的测试
+  - 集成测试目录（如 `tests/vibe3/integration/`）
+- 必须说明：为什么窄验证足够覆盖风险
+- 与 CLAUDE.md §14 协调：本地默认执行定向测试，避免反复全量运行
+
+**测试范围覆盖检查要求**：
+Planner 在指定定向测试范围时，必须检查：
+- 直接修改文件对应的测试目录
+- 重导出（re-export）或间接引用这些符号的测试
+- 集成测试目录（如 `tests/vibe3/integration/`）
+- 公开入口或关键路径的集成测试
+
+如果采用策略 B，Plan 中必须显式声明：
+- 测试范围列表（具体目录路径）
+- 选择定向测试的理由（为什么窄验证足够）
 
 ## Comment Contract（Plan 角色）
 

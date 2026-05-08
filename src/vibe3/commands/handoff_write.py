@@ -296,3 +296,14 @@ def verdict(
             console.print(f"  [dim]Reason: {reason}[/]")
         console.print(f"  [dim]Actor: {record.actor}[/]")
         console.print(f"  [dim]Role: {record.role}[/]")
+
+
+def register_write_commands(app: typer.Typer) -> None:
+    """Register write handoff commands."""
+    app.command()(init)
+    app.command()(append)
+    app.command()(plan)
+    app.command()(report)
+    app.command()(indicate)
+    app.command()(audit)
+    app.command()(verdict)

@@ -31,7 +31,7 @@ class TestPRShowLocalReview:
         mock_pr.comments = []
 
         # Create a local review report
-        reports_dir = tmp_path / ".agent" / "reports"
+        reports_dir = tmp_path / ".agent" / "reports" / "review"
         reports_dir.mkdir(parents=True)
 
         report_file = reports_dir / "pre-push-review-20260320-225241.md"
@@ -63,13 +63,13 @@ verdict: PASS
         mock_inspect_runner = MagicMock(return_value={})
 
         def side_effect_path(path_str: str) -> Path:
-            if path_str == ".agent/reports":
+            if path_str == ".agent/reports/review":
                 return reports_dir
             return Path(path_str)
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
@@ -123,7 +123,7 @@ verdict: PASS
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
@@ -165,7 +165,7 @@ verdict: PASS
         }
 
         # Create a local review report
-        reports_dir = tmp_path / ".agent" / "reports"
+        reports_dir = tmp_path / ".agent" / "reports" / "review"
         reports_dir.mkdir(parents=True)
 
         report_file = reports_dir / "pre-push-review-20260320-225241.md"
@@ -189,13 +189,13 @@ verdict: PASS
         mock_inspect_runner = MagicMock(return_value={})
 
         def side_effect_path(path_str: str) -> Path:
-            if path_str == ".agent/reports":
+            if path_str == ".agent/reports/review":
                 return reports_dir
             return Path(path_str)
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(
@@ -259,7 +259,7 @@ verdict: PASS
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query.run_inspect_json",
+                "vibe3.analysis.inspect_query_service.build_change_analysis",
                 side_effect=mock_inspect_runner,
             ):
                 with patch(

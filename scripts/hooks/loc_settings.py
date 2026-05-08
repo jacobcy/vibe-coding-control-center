@@ -22,6 +22,8 @@ class LocSettings:
     single_file_max: int
     total_v2_shell: int
     total_v3_python: int
+    warning_threshold_percent: int
+    last_reviewed: str
     code_paths_v2_shell: tuple[str, ...]
     code_paths_v3_python: tuple[str, ...]
     scripts_paths_v2_shell: tuple[str, ...]
@@ -98,7 +100,17 @@ def _parse_settings(path: Path) -> tuple[dict[str, str], dict[str, list[str]], d
     return scalars, string_lists, object_lists
 
 
-def load_loc_settings(config_path: str = "config/loc_limits.yaml") -> LocSettings:
+def load_loc_settings(config_path: str | None = None) -> LocSettings:
+    # Try new path first, then fallback to old path
+    if config_path is None:
+        new_path = Path("config/v3/loc_limits.yaml")
+        old_path = Path("config/loc_limits.yaml")
+        if new_path.exists():
+            config_path = str(new_path)
+        elif old_path.exists():
+            config_path = str(old_path)
+        else:
+            config_path = "config/v3/loc_limits.yaml"  # Default to new path
     scalars, string_lists, object_lists = _parse_settings(Path(config_path))
     exceptions = tuple(
         LocException(
@@ -119,6 +131,8 @@ def load_loc_settings(config_path: str = "config/loc_limits.yaml") -> LocSetting
         single_file_max=int(scalars.get("code_limits.single_file_loc.max", "400")),
         total_v2_shell=int(scalars.get("code_limits.total_file_loc.v2_shell", "4000")),
         total_v3_python=int(scalars.get("code_limits.total_file_loc.v3_python", "32000")),
+        warning_threshold_percent=int(scalars.get("code_limits.total_file_loc.warning_threshold_percent", "90")),
+        last_reviewed=scalars.get("code_limits.total_file_loc.last_reviewed", ""),
         code_paths_v2_shell=tuple(string_lists.get("code_limits.code_paths.v2_shell", [])),
         code_paths_v3_python=tuple(string_lists.get("code_limits.code_paths.v3_python", [])),
         scripts_paths_v2_shell=tuple(string_lists.get("code_limits.scripts_paths.v2_shell", [])),
@@ -134,6 +148,12 @@ def find_exception(exceptions: tuple[LocException, ...], relative_path: str) -> 
         if entry.path == relative_path:
             return entry
     return None
+
+
+def is_in_warning_zone(current_loc: int, limit: int, warning_threshold_percent: int) -> bool:
+    """Check if current LOC is in warning zone (between threshold and limit)."""
+    warning_threshold = limit * warning_threshold_percent / 100
+    return warning_threshold <= current_loc < limit
 
 
 def iter_files(

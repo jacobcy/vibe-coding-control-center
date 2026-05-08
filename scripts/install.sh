@@ -144,11 +144,16 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_D
 
 # 3. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
-for dir in bin lib lib3 config scripts alias; do
+for dir in bin lib lib3 config scripts alias src; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
     mkdir -p "$INSTALL_DIR/$dir"
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
     cp -R "$SOURCE_ROOT/$dir/." "$INSTALL_DIR/$dir/"
+done
+
+# Sync Python project files for uv run
+for file in pyproject.toml uv.lock; do
+    [[ -f "$SOURCE_ROOT/$file" ]] && cp "$SOURCE_ROOT/$file" "$INSTALL_DIR/"
 done
 log_success "Core modules synced"
 
@@ -160,8 +165,12 @@ if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
 fi
 
 # 4.5 Sync canonical skills manifest
-if [[ -f "$SOURCE_ROOT/config/skills.json" ]]; then
+if [[ -f "$SOURCE_ROOT/config/v3/skills.json" ]]; then
     log_info "Syncing canonical skills manifest..."
+    cp "$SOURCE_ROOT/config/v3/skills.json" "$INSTALL_DIR/skills.json"
+    chmod 644 "$INSTALL_DIR/skills.json"
+elif [[ -f "$SOURCE_ROOT/config/skills.json" ]]; then
+    log_info "Syncing legacy skills manifest..."
     cp "$SOURCE_ROOT/config/skills.json" "$INSTALL_DIR/skills.json"
     chmod 644 "$INSTALL_DIR/skills.json"
 fi
@@ -169,7 +178,7 @@ fi
 # 5. Bootstrap loader.sh
 LOADER_DST="$INSTALL_DIR/loader.sh"
 log_info "Installing loader at $LOADER_DST..."
-cp "$SOURCE_ROOT/config/loader.sh" "$LOADER_DST"
+cp "$SOURCE_ROOT/config/shell/loader.sh" "$LOADER_DST"
 chmod 755 "$LOADER_DST"
 log_success "Loader installed"
 

@@ -24,7 +24,7 @@ from vibe3.execution.role_contracts import MANAGER_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
-from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
+from vibe3.prompts.template_loader import _resolve_prompts_path
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
 from vibe3.services.issue_failure_service import fail_manager_issue
 
@@ -239,11 +239,12 @@ def build_manager_sync_request(
     variant_key = "retry.resume" if session_id else "first.bootstrap"
 
     # Load prompts.yaml for static sections
-    with open(DEFAULT_PROMPTS_PATH) as f:
+    prompts_path = _resolve_prompts_path()
+    with open(prompts_path) as f:
         prompts_data = yaml.safe_load(f)
     manager_sections = prompts_data.get("manager", {})
 
-    # Build providers for each section
+    # Build providers for static sections (no source override)
     providers: dict[str, PromptProvider] = {
         "manager.target": _make_section_provider(manager_sections, "manager.target"),
         "manager.quick_commands": _make_section_provider(
@@ -254,18 +255,34 @@ def build_manager_sync_request(
         ),
     }
 
-    # Add supervisor_content provider if configured
-    ad = config.assignee_dispatch
-    if ad.include_supervisor_content and ad.supervisor_file:
-        supervisor_path = Path(ad.supervisor_file)
+    # Load manifest and get recipe definition with section sources
+    manifest = PromptManifest.load_default()
+    recipe_def = manifest.recipe("manager.default")
 
-        def _read_supervisor() -> str:
-            return supervisor_path.read_text()
+    # Check if recipe has loaded_definition with section sources
+    if recipe_def.loaded_definition is not None:
+        variant_spec = recipe_def.loaded_definition.variants.get(variant_key)
+        if variant_spec is not None:
+            # For sections with source declarations, resolve directly
+            from vibe3.prompts.builtin_providers import resolve_source
+            from vibe3.prompts.provider_registry import ProviderRegistry
 
-        providers["manager.supervisor_content"] = _read_supervisor
+            registry = ProviderRegistry()
+            runtime_context: dict[str, Any] = {}
+
+            for section_spec in variant_spec.sections:
+                if section_spec.source is not None:
+                    # Section has explicit source - resolve it
+                    content = resolve_source(
+                        section_spec.source, runtime_context, registry
+                    )
+
+                    def _make_provider(c: str = content) -> str:
+                        return c
+
+                    providers[section_spec.key] = _make_provider
 
     # Render prompt using manifest
-    manifest = PromptManifest.load_default()
     prompt = manifest.render_sections(
         recipe_key="manager.default",
         variant_key=variant_key,

@@ -77,6 +77,15 @@ class GlobalDispatchCoordinator:
 
         self._promote_progressed_entries()
 
+        # Check if queue was emptied by _promote_progressed_entries
+        # (e.g., all issues became blocked/done)
+        if not self._frozen_queue:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: queue emptied by state changes",
+            )
+            return
+
         import subprocess
 
         try:
@@ -229,6 +238,10 @@ class GlobalDispatchCoordinator:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
         seen_issue_numbers: set[int] = set()
+        append_orchestra_event(
+            "dispatcher",
+            "GlobalDispatchCoordinator: starting queue collection",
+        )
         for state in (
             IssueState.REVIEW,
             IssueState.MERGE_READY,
@@ -254,10 +267,20 @@ class GlobalDispatchCoordinator:
                         )
                     )
             except Exception as exc:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: collect_ready_issues failed for "
+                    f"{state.value}: {exc}",
+                )
                 logger.bind(
                     domain="global_dispatch",
                     state=state.value,
                 ).error(f"collect_ready_issues failed for {state.value}: {exc}")
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: queue collection complete, "
+            f"total={len(queue)} issues",
+        )
         return queue
 
     def _promote_progressed_entries(self) -> None:
@@ -298,6 +321,25 @@ class GlobalDispatchCoordinator:
 
             current_state = issue.state.value
             if current_state == entry.waiting_state:
+                # State unchanged. Check whether the agent session that would
+                # advance it is still alive.  If no session exists the label can
+                # never change ─ promote the entry for re-dispatch so the queue
+                # can eventually drain and re-collect.
+                if self._registry is not None:
+                    active = self._registry.get_live_sessions_for_issue(
+                        issue_number=entry.issue_number,
+                        roles=["manager", "planner", "executor", "reviewer"],
+                    )
+                    if not active:
+                        entry.waiting_state = None
+                        promoted.append(entry)
+                        append_orchestra_event(
+                            "dispatcher",
+                            f"GlobalDispatchCoordinator: requeued "
+                            f"#{entry.issue_number} "
+                            f"(no active session, state={current_state})",
+                        )
+                        continue
                 retained.append(entry)
                 continue
 
@@ -325,6 +367,10 @@ class GlobalDispatchCoordinator:
         # Update frozen queue: promoted + retained (removed entries discarded)
         if promoted or retained:
             self._frozen_queue = promoted + retained
+        else:
+            # All entries removed (e.g., all issues became blocked)
+            # Clear frozen queue to trigger fresh collection on next tick
+            self._frozen_queue = None
 
     def _load_issue(self, issue_number: int) -> IssueInfo | None:
         """Load the current issue snapshot for an already-frozen issue."""

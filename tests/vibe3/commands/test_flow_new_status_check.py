@@ -14,7 +14,7 @@ runner = CliRunner()
 class TestFlowAddStatusCheck:
     """Tests for flow add status checking."""
 
-    @patch("vibe3.commands.flow.FlowService")
+    @patch("vibe3.commands.flow_manage.FlowService")
     def test_unregistered_branch_creates_flow(self, mock_service_class):
         """A branch without any flow record should create a new flow."""
         mock_service = MagicMock()
@@ -34,7 +34,7 @@ class TestFlowAddStatusCheck:
         )
 
     @pytest.mark.parametrize("flow_status", ["active", "done", "aborted", "stale"])
-    @patch("vibe3.commands.flow.FlowService")
+    @patch("vibe3.commands.flow_manage.FlowService")
     def test_existing_flow_confirms_idempotently(
         self, mock_service_class, flow_status: str
     ):

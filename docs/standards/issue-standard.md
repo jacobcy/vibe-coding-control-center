@@ -218,7 +218,7 @@ dependencies:
 ### ❌ 错误说法
 
 - "创建一个 task issue"
-- "task issue 和 repo issue 是两种类型"
+- "task issue 和 GitHub issue 是两种类型"
 - "vibe-task 标签是真源"
 
 ---

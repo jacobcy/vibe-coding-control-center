@@ -145,7 +145,7 @@ def _build_plan_prompt_providers(
     config: VibeConfig,
     context_mode: PromptContextMode,
 ) -> dict[str, PromptProvider]:
-    """Build providers used by config/prompt-recipes.yaml plan sections."""
+    """Build providers used by config/prompts/prompt-recipes.yaml plan sections."""
     from vibe3.agents.review_prompt import build_tools_guide_section
 
     plan_config = getattr(config, "plan", None)

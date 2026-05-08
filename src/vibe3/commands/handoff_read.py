@@ -211,3 +211,9 @@ def status(
         _render_handoff_events(
             handoff_events, worktree_root=worktree_root, branch=target_branch
         )
+
+
+def register_read_commands(app: typer.Typer) -> None:
+    """Register read-only handoff commands."""
+    app.command()(show)
+    app.command()(status)

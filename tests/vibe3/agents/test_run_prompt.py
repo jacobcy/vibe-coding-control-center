@@ -14,6 +14,7 @@ from vibe3.models.plan import PlanRequest, PlanScope
 FORBIDDEN_INTERNAL_TOKENS = (
     "common.md",
     "config/settings.yaml",
+    "config/v3/settings.yaml",
     ".agent/rules",
     "Follow policy at",
 )

@@ -16,6 +16,21 @@
 - 不把个人偏好包装成缺陷。
 - 不因风格差异给出高严重性结论。
 
+## Findings First Principle
+
+**核心原则**：先给 findings，再给 verdict。没有 finding 就不要编造。
+
+输出优先级：
+1. Blocking issue（必须修复）
+2. Non-blocking but noteworthy risk（应关注）
+3. No finding（明确说明为何无发现）
+
+**禁止**：
+- 输出冗长的 praise 或 description 段落
+- 与当前 diff 无关的泛化架构点评
+- 把风格偏好包装成高严重性结论
+- PASS 时生成冗长表扬而非简洁理由
+
 ## 审查前强制检查清单
 
 开始 review 前，**必须完成**以下检查：
@@ -173,7 +188,13 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 ### PASS
 
 - 未发现会影响正确性、回归、安全性或项目边界的明显问题
-- 即使有建议，也只是次要改进
+- **必须简洁说明为何没有发现 blocking / major issue**（1-2句话）
+- 即使有建议，也只是次要改进，用 notes 形式给出
+- 不要生成 praise 段落
+
+示例：
+✓ "PASS: 变更范围有限，仅新增辅助函数，未触及公开API或关键路径，测试覆盖充分。"
+✗ "PASS: 代码质量优秀，结构清晰，命名规范，注释完整..."（冗长表扬）
 
 ### MAJOR
 
@@ -199,6 +220,18 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 ## 输出要求
 
+**强制结构**：
+1. VERDICT 行（首行）
+2. Findings 列表（如有）
+3. PASS/MAJOR/BLOCK 理由说明（简洁）
+4. Notes（可选，仅限次要建议）
+
+**禁止**：
+- 先写 lengthy summary 再给 findings
+- 输出 “Strength” / “Positive” 段落
+- 与当前 diff 无关的泛化点评
+
+**基本要求**：
 - 先给 findings，再给 verdict。
 - 只写可操作问题。
 - 问题描述必须指出为什么这是问题，而不只是说”建议更好”。

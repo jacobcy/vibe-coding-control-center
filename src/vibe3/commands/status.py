@@ -31,6 +31,59 @@ JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
+def _extract_blocked_reason_summary(blocked_reason: str) -> str:
+    """Extract key information from blocked_reason for status display.
+
+    Filters out verbose runtime details (TMPDIR, Recent Errors, stdin mode).
+    Preserves short status messages and error codes for quick diagnosis.
+
+    Args:
+        blocked_reason: Full blocked_reason from flow state
+
+    Returns:
+        Concise summary suitable for single-line display
+    """
+    if not blocked_reason:
+        return ""
+
+    lines = blocked_reason.strip().split("\n")
+    if not lines:
+        return ""
+
+    # Get first meaningful line
+    first_line = lines[0].strip()
+
+    # For short reasons (state unchanged, required ref missing), return as-is
+    if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
+        return first_line
+
+    # Extract error code prefix and filter out TMPDIR/Recent Errors noise
+    # E.g., "E_EXEC_NO_OUTPUT:", "codeagent-wrapper failed (code 1):"
+    import re
+
+    # Remove TMPDIR and everything after it in first line
+    cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", first_line)[0].strip()
+
+    # Remove " | === Recent Errors === | Using stdin mode" suffix
+    cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
+
+    # Remove trailing pipe separators
+    cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+
+    # Truncate to 80 chars, prefer breaking after punctuation
+    if len(cleaned) <= 80:
+        return cleaned
+
+    # Try to break after colon or period (preserve error code prefix)
+    for sep in [":", "。"]:
+        pos = cleaned.rfind(sep, 0, 80)
+        if pos > 0:
+            return cleaned[: pos + 1]
+
+    # Fallback: hard truncate
+    return cleaned[:80]
+
+
 def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     """Only auto-task flows should participate in task-oriented Issue Progress."""
     flow = cast(FlowStatusResponse | None, item.get("flow"))
@@ -160,7 +213,7 @@ def status(
             )
         )
 
-        # 1.5 Dispatch blocking (FailedGate)
+        # 1.5 Dispatch status (FailedGate + Queue)
         if orch_snapshot.dispatch_blocked:
             console.print(
                 "Dispatch: [bold red]FROZEN[/] "
@@ -168,6 +221,8 @@ def status(
             )
             console.print(f"  [red]Issue:   #{orch_snapshot.blocked_issue_number}[/]")
             console.print(f"  [red]Reason:  {orch_snapshot.blocked_issue_reason}[/]")
+        elif not orch_snapshot.server_running:
+            console.print("Dispatch: [dim]inactive (server stopped)[/]")
         else:
             console.print("Dispatch: [green]active[/]")
 
@@ -364,19 +419,25 @@ def status(
                 blocked_by = cast(tuple[int, ...] | None, item.get("blocked_by"))
                 blocked_reason = cast(str | None, item.get("blocked_reason"))
 
-                if flow is None:
-                    flow_info = "[dim](no flow scene)[/]"
-                elif getattr(flow, "flow_status", "active") == "stale":
-                    flow_info = f"[dim]{flow.branch} (stale)[/]"
-                else:
-                    flow_info = f"[cyan]{flow.branch}[/]"
+                # Title: truncate only if needed, no forced ellipsis
+                display_title = title[:60] + ("..." if len(title) > 60 else "")
+                console.print(f"  #{number:4}  [red]BLOCKED[/]  {display_title}")
 
-                console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
+                # Flow info on separate line (consistent with other sections)
+                if flow:
+                    console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
+                else:
+                    console.print("         [dim]flow:[/] [dim](no flow scene)[/]")
+
+                # Blocked metadata
                 if blocked_by:
                     blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)
                     console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
+
+                # Blocked reason: extract key information from verbose error messages
                 if blocked_reason:
-                    console.print(f"         [yellow]reason:[/] {blocked_reason}")
+                    reason_summary = _extract_blocked_reason_summary(blocked_reason)
+                    console.print(f"         [yellow]reason:[/] {reason_summary}")
         else:
             console.print("  [dim](none)[/]")
 

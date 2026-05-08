@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from vibe3.commands.flow import update
+from vibe3.commands.flow_manage import update
 
 
 def test_update_clear_spec_ref_with_empty_string() -> None:
@@ -17,8 +17,10 @@ def test_update_clear_spec_ref_with_empty_string() -> None:
     mock_flow_service.ensure_flow_for_branch.return_value = mock_flow
     mock_flow_service.get_current_branch.return_value = "test/branch"
 
-    with patch("vibe3.commands.flow.FlowService", return_value=mock_flow_service):
-        with patch("vibe3.commands.flow.trace_scope"):
+    with patch(
+        "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
+    ):
+        with patch("vibe3.commands.flow_manage.trace_scope"):
             update(branch="test/branch", spec="")
 
     # Verify: spec_ref cleared with None
@@ -35,8 +37,10 @@ def test_update_with_issue_number_rejected() -> None:
     mock_flow_service.ensure_flow_for_branch.return_value = mock_flow
     mock_flow_service.get_current_branch.return_value = "test/branch"
 
-    with patch("vibe3.commands.flow.FlowService", return_value=mock_flow_service):
-        with patch("vibe3.commands.flow.trace_scope"):
+    with patch(
+        "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
+    ):
+        with patch("vibe3.commands.flow_manage.trace_scope"):
             with pytest.raises(typer.Exit) as exc_info:
                 update(branch="test/branch", spec="123")
 
@@ -51,8 +55,10 @@ def test_update_with_valid_file_path() -> None:
     mock_flow.branch = "test/branch"
     mock_flow_service.ensure_flow_for_branch.return_value = mock_flow
 
-    with patch("vibe3.commands.flow.FlowService", return_value=mock_flow_service):
-        with patch("vibe3.commands.flow.trace_scope"):
+    with patch(
+        "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
+    ):
+        with patch("vibe3.commands.flow_manage.trace_scope"):
             with patch.object(Path, "exists", return_value=True):
                 with patch.object(Path, "is_file", return_value=True):
                     with patch.object(
@@ -71,8 +77,10 @@ def test_update_with_invalid_file_path_raises_error() -> None:
     mock_flow.branch = "test/branch"
     mock_flow_service.ensure_flow_for_branch.return_value = mock_flow
 
-    with patch("vibe3.commands.flow.FlowService", return_value=mock_flow_service):
-        with patch("vibe3.commands.flow.trace_scope"):
+    with patch(
+        "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
+    ):
+        with patch("vibe3.commands.flow_manage.trace_scope"):
             with patch.object(Path, "exists", return_value=False):
                 with pytest.raises(typer.Exit) as exc_info:
                     update(branch="test/branch", spec="nonexistent.md")
@@ -88,8 +96,10 @@ def test_update_without_spec_does_not_modify() -> None:
     mock_flow.branch = "test/branch"
     mock_flow_service.ensure_flow_for_branch.return_value = mock_flow
 
-    with patch("vibe3.commands.flow.FlowService", return_value=mock_flow_service):
-        with patch("vibe3.commands.flow.trace_scope"):
+    with patch(
+        "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
+    ):
+        with patch("vibe3.commands.flow_manage.trace_scope"):
             update(branch="test/branch", spec=None)
 
     # Verify: bind_spec NOT called, update_flow_state NOT called for spec_ref

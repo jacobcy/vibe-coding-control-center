@@ -450,9 +450,18 @@ class TestGlobalDispatchCoordinator:
             re.sub(r"\x1b\[[0-9;]*m", "", message) for message in events
         ]
 
+        # New diagnostic logging adds "starting queue collection"
+        # and "queue collection complete"
         assert normalized_events[0] == (
-            "GlobalDispatchCoordinator: dispatch-intent #467 (planner)"
+            "GlobalDispatchCoordinator: starting queue collection"
         )
         assert normalized_events[1] == (
+            "GlobalDispatchCoordinator: queue collection complete, total=1 issues"
+        )
+        # Original logs now at index 2 and 3
+        assert normalized_events[2] == (
+            "GlobalDispatchCoordinator: dispatch-intent #467 (planner)"
+        )
+        assert normalized_events[3] == (
             "planner launch failed for #467: Failed to resolve permanent worktree"
         )
