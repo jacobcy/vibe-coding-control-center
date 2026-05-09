@@ -12,11 +12,13 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
-from vibe3.exceptions import SystemError
+from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.logging import append_orchestra_event
@@ -26,7 +28,6 @@ if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.orchestra.failed_gate import FailedGate
     from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
-    from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
 
 class OrchestrationFacade(ServiceBase):
@@ -47,9 +48,9 @@ class OrchestrationFacade(ServiceBase):
         self,
         tick_count: int = 0,
         config: OrchestraConfig | None = None,
-        dispatch_services: list[StateLabelDispatchService] | None = None,
-        capacity: CapacityService | None = None,
+        capacity: "CapacityService | None" = None,
         failed_gate: "FailedGate | None" = None,
+        store: "SQLiteClient | None" = None,
     ) -> None:
         """Initialize facade with tick counter.
 
@@ -57,11 +58,6 @@ class OrchestrationFacade(ServiceBase):
             tick_count: Initial tick count for governance scan tracking
             config: Runtime orchestra config. When omitted, falls back to
                 settings-based defaults for tests and direct construction.
-            dispatch_services: Optional list of issue-polling dispatch services
-                (StateLabelDispatchService instances). When provided, their
-                on_tick() methods are called concurrently from this facade's
-                on_tick(), replacing the need to register them separately in
-                the heartbeat server.
             capacity: Optional CapacityService for capacity-aware dispatch.
                 When provided, GlobalDispatchCoordinator is used for unified
                 dispatch with capacity checks before emitting intents.
@@ -69,30 +65,40 @@ class OrchestrationFacade(ServiceBase):
             failed_gate: Optional FailedGate retained for compatibility with
                 existing server assembly. Runtime dispatch is no longer frozen
                 here; gating belongs on the authoritative sync execution path.
+            store: Optional SQLiteClient for dependency injection. When omitted
+                with capacity provided, creates a new SQLiteClient instance.
         """
         self._tick_count = tick_count
         self._config = config or load_orchestra_config()
         self._created_at = time.monotonic()
         self._last_governance_started_at: float | None = None
-        self._dispatch_services = list(dispatch_services or [])
         self._capacity = capacity
         self._coordinator: GlobalDispatchCoordinator | None = None
         self._failed_gate = failed_gate
 
-        if self._dispatch_services and self._capacity is not None:
+        if self._capacity is not None:
             from vibe3.environment.session_registry import SessionRegistryService
             from vibe3.orchestra.global_dispatch_coordinator import (
                 GlobalDispatchCoordinator,
             )
 
-            store = self._capacity._store
-            backend = self._capacity._backend
-            registry = SessionRegistryService(store, backend)
+            actual_store = store or SQLiteClient()
+            github = GitHubClient()
+            flow_manager = FlowManager(self._config)
+            registry = SessionRegistryService(actual_store, self._capacity._backend)
             self._coordinator = GlobalDispatchCoordinator(
+                config=self._config,
                 capacity=self._capacity,
-                dispatch_services=self._dispatch_services,
+                github=github,
+                store=actual_store,
+                flow_manager=flow_manager,
                 registry=registry,
             )
+
+    def shutdown(self) -> None:
+        """Cleanup resources owned by the facade."""
+        if self._coordinator:
+            self._coordinator.shutdown()
 
     async def on_tick(self) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
@@ -139,18 +145,8 @@ class OrchestrationFacade(ServiceBase):
             # Continue to dispatch even if supervisor scan fails
 
         # Poll issue labels for all trigger states
-        if not self._dispatch_services:
-            append_orchestra_event(
-                "dispatcher",
-                "OrchestrationFacade: no dispatch services registered",
-            )
-            return
-
         if self._coordinator is None:
-            raise SystemError(
-                "OrchestrationFacade: GlobalDispatchCoordinator not initialized. "
-                "Both dispatch_services and capacity must be provided at init time."
-            )
+            return
 
         # Always reconcile session state to prevent stale capacity tracking.
         if self._capacity:
@@ -159,9 +155,8 @@ class OrchestrationFacade(ServiceBase):
                 # This ensures count_live_worker_sessions() returns accurate results.
                 from vibe3.environment.session_registry import SessionRegistryService
 
-                store = self._capacity._store
-                backend = self._capacity._backend
-                registry = SessionRegistryService(store, backend)
+                store = SQLiteClient()
+                registry = SessionRegistryService(store, self._capacity._backend)
                 # Mark worker sessions as done (not orphaned) when tmux exits
                 registry.mark_worker_sessions_done_when_tmux_gone()
                 # Then orphan any remaining dead sessions (failed launches)
@@ -236,7 +231,7 @@ class OrchestrationFacade(ServiceBase):
             to_state=to_state,
         ).info("Emitting IssueStateChanged event")
 
-        publish(event)  # type: ignore[no-untyped-call]
+        publish(event)
 
     def on_heartbeat_tick(self) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
@@ -280,7 +275,7 @@ class OrchestrationFacade(ServiceBase):
             domain="orchestration_facade",
             tick_count=self._tick_count,
         ).info("Emitting GovernanceScanStarted event")
-        publish(event)  # type: ignore[no-untyped-call]
+        publish(event)
 
     def on_governance_decision(
         self,
@@ -348,4 +343,4 @@ class OrchestrationFacade(ServiceBase):
                 issue_number=event.issue_number,
                 supervisor_file=event.supervisor_file,
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
-            publish(event)  # type: ignore[no-untyped-call]
+            publish(event)

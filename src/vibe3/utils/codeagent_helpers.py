@@ -131,19 +131,76 @@ def prepare_prompt_file(prompt: str, include_global_notice: bool = True) -> Path
 
 
 def sanitize_task_shell_meta(task: str) -> str:
-    """Replace shell glob meta characters with safe equivalents."""
+    """Replace shell meta characters with safe equivalents.
+
+    Covers both glob characters and special characters that trigger stdin mode
+    in codeagent-wrapper (newline, backslash, quotes, backtick, dollar).
+    """
     replacements = {
+        # Shell glob characters
         "*": "×",
         "?": "？",
         "[": "【",
         "]": "】",
         "{": "｛",
         "}": "｝",
+        # Shell special characters (trigger stdin mode)
+        "\\": "＼",  # Fullwidth backslash
+        '"': "＂",  # Fullwidth double quote
+        "'": "＇",  # Fullwidth single quote
+        "`": "｀",  # Fullwidth backtick
+        "$": "＄",  # Fullwidth dollar sign
+        "\n": " ",  # Newline -> space
     }
     result = task
     for meta, safe in replacements.items():
         result = result.replace(meta, safe)
     return result
+
+
+def sanitize_prompt_for_display(text: str) -> str:
+    """Mask sensitive patterns in prompt text before debug logging.
+
+    Applies regex substitutions for common secret formats (API keys, tokens,
+    access keys) while preserving prefixes to maintain debugging utility.
+    """
+    # OpenAI/API keys: sk-proj-..., sk-...
+    # Match sk-proj- or sk- as the prefix, followed by at least 20 chars
+    text = re.sub(
+        r"(sk-proj-|sk-)[A-Za-z0-9\-_]{20,}",
+        r"\1***REDACTED***",
+        text,
+    )
+
+    # AWS access keys: AKIA...
+    text = re.sub(
+        r"(AKIA)[A-Z0-9]{16}",
+        r"\1***REDACTED***",
+        text,
+    )
+
+    # GitHub tokens: ghp_..., gho_..., ghu_..., ghs_..., ghr_...
+    text = re.sub(
+        r"(gh[pousr]_)[A-Za-z0-9]{36,}",
+        r"\1***REDACTED***",
+        text,
+    )
+
+    # Generic key/value pairs: api_key: xxx, secret_key=xxx
+    text = re.sub(
+        r"(?i)(api_key|apikey|secret_key|access_token|auth_token|private_key)\s*[:=]\s*\S+",
+        r"\1***REDACTED***",
+        text,
+    )
+
+    # Bearer tokens: Bearer eyJ...
+    text = re.sub(
+        r"(Bearer\s+)[A-Za-z0-9\-_\.]{20,}",
+        r"\1***REDACTED***",
+        text,
+    )
+
+    return text
 
 
 def stream_reader(

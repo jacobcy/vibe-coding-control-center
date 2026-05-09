@@ -162,6 +162,17 @@ def _get_branch_files(
     return [f for f in output.splitlines() if f.strip()]
 
 
+def _numstat_via_merge_base(
+    run: Callable[[list[str]], str],
+    get_merge_base: Callable[[str, str], str],
+    head: str,
+    base: str,
+) -> str:
+    """Get numstat via merge-base resolution."""
+    merge_base = get_merge_base(head, base)
+    return run(["diff", "--numstat", f"{merge_base}...{head}"])
+
+
 def has_uncommitted_changes(run: Callable[[list[str]], str]) -> bool:
     """Check if working directory is dirty.
 
@@ -197,10 +208,15 @@ def get_numstat(
 
     Raises:
         GitError: git command execution failed
-        ValueError: missing required dependencies (e.g., github_client for PR source)
+        SystemError: missing required callables
+            (e.g., get_merge_base for branch/PR sources)
     """
     log = logger.bind(domain="git", action="get_numstat", source_type=source.type)
     log.info("Getting numstat")
+
+    # Note: isinstance guards protect against direct dataclass construction
+    # bypassing the Pydantic discriminated union discriminator. Sister
+    # functions get_changed_files() and get_diff() use the same pattern.
 
     if source.type == ChangeSourceType.UNCOMMITTED:
         output = run(["diff", "--numstat", "HEAD"])
@@ -216,9 +232,10 @@ def get_numstat(
                 f"Type mismatch: expected BranchSource, got {type(source).__name__}"
             )
         if not get_merge_base:
-            raise ValueError("get_merge_base callable required for BranchSource")
-        merge_base = get_merge_base(source.branch, source.base)
-        output = run(["diff", "--numstat", f"{merge_base}...{source.branch}"])
+            raise SystemError("get_merge_base callable required for BranchSource")
+        output = _numstat_via_merge_base(
+            run, get_merge_base, source.branch, source.base
+        )
     elif source.type == ChangeSourceType.PR:
         if not isinstance(source, PRSource):
             raise SystemError(
@@ -230,15 +247,16 @@ def get_numstat(
                 "PR source requires GitHubClient injection",
             )
         if not get_merge_base:
-            raise ValueError("get_merge_base callable required for PRSource")
+            raise SystemError("get_merge_base callable required for PRSource")
         pr_info = github_client.get_pr(source.pr_number)
         if not pr_info:
             raise GitError(
                 "get_numstat",
                 f"PR #{source.pr_number} not found",
             )
-        merge_base = get_merge_base(pr_info.head_branch, pr_info.base_branch)
-        output = run(["diff", "--numstat", f"{merge_base}...{pr_info.head_branch}"])
+        output = _numstat_via_merge_base(
+            run, get_merge_base, pr_info.head_branch, pr_info.base_branch
+        )
     else:
         raise GitError("get_numstat", f"Unknown source type: {source.type}")
 

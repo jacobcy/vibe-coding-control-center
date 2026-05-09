@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.clients.git_status_ops import get_numstat
-from vibe3.exceptions import GitError
+from vibe3.clients.git_status_ops import _numstat_via_merge_base, get_numstat
+from vibe3.exceptions import GitError, SystemError
 from vibe3.models.change_source import (
     BranchSource,
     CommitSource,
@@ -54,7 +54,7 @@ class TestGetNumstat:
         run = MagicMock()
         source = BranchSource(branch="feature", base="main")
 
-        with pytest.raises(ValueError, match="get_merge_base callable required"):
+        with pytest.raises(SystemError, match="get_merge_base callable required"):
             get_numstat(run, source)
 
     def test_pr_source_uses_github_client(self) -> None:
@@ -92,7 +92,7 @@ class TestGetNumstat:
         github_client = MagicMock()
         source = PRSource(pr_number=42)
 
-        with pytest.raises(ValueError, match="get_merge_base callable required"):
+        with pytest.raises(SystemError, match="get_merge_base callable required"):
             get_numstat(run, source, github_client=github_client)
 
     def test_pr_source_raises_when_pr_not_found(self) -> None:
@@ -107,3 +107,27 @@ class TestGetNumstat:
             get_numstat(
                 run, source, github_client=github_client, get_merge_base=get_merge_base
             )
+
+
+class TestNumstatViaMergeBase:
+    """Test _numstat_via_merge_base helper function."""
+
+    def test_calls_merge_base_with_head_and_base(self) -> None:
+        """Test that get_merge_base is called with (head, base) arguments."""
+        run = MagicMock(return_value="5\t3\tsrc/file.py")
+        get_merge_base = MagicMock(return_value="merge123")
+
+        result = _numstat_via_merge_base(run, get_merge_base, "feature", "main")
+
+        get_merge_base.assert_called_once_with("feature", "main")
+        assert result == "5\t3\tsrc/file.py"
+
+    def test_calls_run_with_correct_diff_args(self) -> None:
+        """Test that run is called with correct diff --numstat arguments."""
+        run = MagicMock(return_value="10\t2\tsrc/other.py")
+        get_merge_base = MagicMock(return_value="base456")
+
+        result = _numstat_via_merge_base(run, get_merge_base, "branch", "main")
+
+        run.assert_called_once_with(["diff", "--numstat", "base456...branch"])
+        assert result == "10\t2\tsrc/other.py"

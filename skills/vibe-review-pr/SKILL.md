@@ -22,6 +22,8 @@ description: |
 
 任一缺失 → 立即停止，按文件范围回退到单 agent 审查。
 
+> **tmux 机制说明**：`TMUX` 已设置是前置条件，因为 `Agent(team_name=...)` 会由 Claude Code 运行时**自动**在当前 tmux session 中创建新 pane 来运行 teammate。team-lead **不需要**手动执行 tmux 命令管理 pane——pane 的创建、复用、销毁全部由运行时处理。team-lead 只通过 `SendMessage` 和接收 teammate-message 与 teammates 通信。
+
 ## Must Read
 
 启动前读取：
@@ -109,6 +111,25 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 `TaskList` 可随时用于确认进度，避免重复创建。
 
+### Step 6.6: Task Lifecycle（跨 PR 管理）
+
+> **踩坑记录**：跨 PR 审查时，旧 PR 的 task 会累积在 task list 中，造成视觉混乱和状态不一致。
+
+**每个 PR 开始审查前**：
+
+1. 检查 `TaskList`，如有上一轮 PR 的未完成 task，标记为 `completed`（附带说明：上一 PR 遗留）
+2. 如有上一轮 PR 已完成但未标记的 task，标记为 `completed`
+3. 为当前 PR 创建 Phase 1 task（按 Step 6.5）
+
+**每个 Phase 执行时**：
+
+- 开始 Phase → `TaskUpdate(status="in_progress")`
+- 完成 Phase → `TaskUpdate(status="completed")`
+
+**会话结束时**（Step 10）：
+
+- 所有 task 由 TeamDelete 自动清理，无需手动删除
+
 ### Step 7: PR 分类（多维判断，禁止简化）
 
 > **常见错误**：看到"文档改动"就归类 `simple`。这是错的。
@@ -133,43 +154,13 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 ## Phase Contracts
 
-Phase 契约：
-
-- 1 背景调研：必须先于 Phase 2 完成；产出 `phase_1_output` 并回传 team-lead。易错点是只打印到终端、未保存为变量、未通过 SendMessage 回传。
-- 2 专项审查：多 agent 在同一响应内并行 spawn；spawn 后立即 SendMessage，把 `phase_1_output` 广播给每个；对 standard/refactor/large PR，先提取 PR diff 文件。易错点是与 Phase 1 并行启动、忘发背景导致盲审、architect-reviewer 无 Bash 而未提前提取 diff。
-- 2.5 Codex验证（可选）：触发条件是安全PR、大型PR（>500行）、冲突仲裁；可跳过条件是三方已一致且证据充分，且须在 Phase 3 中明确注明跳过理由。易错点是与 Phase 2 并行执行、未收集完整 Phase 2 报告就调用。
-- 3 综合判断：检查 `required - received` 缺失；冲突必须仲裁；缺失只能标“审查不完整”；如有 Phase 2.5 报告可作为补充材料。易错点是替缺失 agent 脑补或用错误 teammate-message 内容继续。
-- 4 写回：模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue；CRITICAL 阻塞 ≥ 2 个或涉及架构重设计时应建议 REJECT 而非 auto-fix。易错点是把范围外技术债塞进当前 PR comment，或对复杂架构问题错误使用 auto-fix。
-
-### Phase 2 Prep: 提取 PR Diff（standard/refactor/large PR 必做）
-
-> **重要**：`architect-reviewer` 工具集为 `[Read, Grep, Glob, WebSearch]`，**无 Bash**。它无法执行 `gh pr diff` 或 `git show`。若不提前提取文件，architect-reviewer 将请求 team-lead 补发，造成延迟。
-
-在 Phase 2 spawn 之前，**team-lead** 必须执行：
-
-```bash
-# 1. 创建 temp 目录
-mkdir -p temp/pr{pr_number}
-
-# 2. 提取完整 diff
-gh pr diff {pr_number} > temp/pr{pr_number}/full.diff
-
-# 3. 提取各个 PR 修改文件（使用 PR 分支名称）
-git show {pr_branch}:{file_path} > temp/pr{pr_number}/{basename}
-# 例：git show task/issue-283:src/vibe3/clients/github_project_client.py \
-#       > temp/pr738/src_vibe3_clients_github_project_client.py
-```
-
-在 Phase 1 → Phase 2 广播中，额外附加文件路径说明：
-
-```
-## 可读文件路径（team-lead 已提取）
-- temp/pr{pr_number}/full.diff
-- temp/pr{pr_number}/{basename1}  ({LOC} LOC, NEW/MODIFIED)
-- ...
-
-main 分支对照：直接 Read 工具读 src/vibe3/... 路径（当前 cwd 是 main 分支）。
-```
+| Phase | 强制要求 | 易错点 |
+|-------|---------|-------|
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**（issue #742 真实踩坑）；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
+| 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**执行时机**：Phase 2完成后收集所有报告；通过 `codex:rescue` skill 调用；第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选；第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用；把”可选触发”误写成”只有不完整才触发” |
+| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标”审查不完整”；如有 Phase 2.5 报告作为补充材料 | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
+| 4 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
 > **没有 Phase 5**。完成 Phase 4 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
 
@@ -254,7 +245,8 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 ### Phase 流程
 
 - Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
-- Phase 2 spawn 后必须 SendMessage 发 `phase_1_output`，禁止盲审
+- fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；不要求额外 SendMessage 才开始
+- 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
 - 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
 
 ### 状态操作

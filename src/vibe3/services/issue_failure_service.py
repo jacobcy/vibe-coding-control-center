@@ -6,6 +6,8 @@ executor or manager runs fail or make no progress.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
@@ -178,6 +180,63 @@ _ROLE_MAP = {
 }
 
 
+def mark_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    role: str,
+    actor: str | None = None,
+    repo: str | None = None,
+    is_noop: bool = False,
+    action: Literal["fail", "block"] = "block",
+) -> None:
+    """Unified issue state marking interface.
+
+    Args:
+        action: "fail" for failure events, "block" for block events.
+            Determines comment style and deduplication strategy.
+    """
+    # Normalize role names
+    role = _ROLE_MAP.get(role, role)
+    actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
+
+    # Record event for observability
+    _ensure_flow_state_for_issue(issue_number, action, reason, actor)
+
+    # Build appropriate comment based on action and is_noop
+    if action == "fail":
+        comment = _build_failure_comment(role, reason)
+        dedupe_latest_comment = True
+        dedupe_reason = None
+        skip_if_terminal = False
+    else:  # action == "block"
+        if is_noop:
+            ref_names = {"plan": "plan_ref", "run": "report_ref", "review": "audit_ref"}
+            ref_name = ref_names.get(role)
+            if ref_name:
+                comment = _build_missing_ref_comment(role, ref_name, reason)
+            else:
+                comment = f"[{role}] 无法推进,已切换为 state/blocked。\n\n原因:{reason}"
+        else:
+            comment = f"[{role}] 已切换为 state/blocked。\n\n原因:{reason}"
+
+        dedupe_latest_comment = is_noop
+        dedupe_reason = reason if not is_noop else None
+        skip_if_terminal = True
+
+    _transition_issue_state(
+        issue_number=issue_number,
+        to_state=IssueState.BLOCKED,
+        actor=actor,
+        force=True,
+        repo=repo,
+        comment=comment,
+        dedupe_latest_comment=dedupe_latest_comment,
+        dedupe_reason=dedupe_reason,
+        skip_if_terminal=skip_if_terminal,
+    )
+
+
 def fail_issue(
     *,
     issue_number: int,
@@ -194,22 +253,12 @@ def fail_issue(
     IssueFailed event is still recorded for observability.
     blocked_reason is recorded in flow state via _ensure_flow_state_for_issue().
     """
-    # Normalize role names
-    role = _ROLE_MAP.get(role, role)
-    actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
-
-    # Record IssueFailed event for observability (but use blocked state)
-    # This also records blocked_reason to flow state
-    _ensure_flow_state_for_issue(issue_number, "fail", reason, actor)
-
-    # Transition to BLOCKED state (changed from FAILED to BLOCKED)
-    _transition_issue_state(
+    mark_issue(
         issue_number=issue_number,
-        to_state=IssueState.BLOCKED,
+        reason=reason,
+        role=role,
         actor=actor,
-        force=True,
-        comment=_build_failure_comment(role, reason),
-        dedupe_latest_comment=True,
+        action="fail",
     )
 
 
@@ -223,31 +272,14 @@ def block_issue(
     is_noop: bool = False,
 ) -> None:
     """Generic block issue handler."""
-    role = _ROLE_MAP.get(role, role)
-    actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
-
-    _ensure_flow_state_for_issue(issue_number, "block", reason, actor)
-
-    if is_noop:
-        ref_names = {"plan": "plan_ref", "run": "report_ref", "review": "audit_ref"}
-        ref_name = ref_names.get(role)
-        if ref_name:
-            comment = _build_missing_ref_comment(role, ref_name, reason)
-        else:
-            comment = f"[{role}] 无法推进,已切换为 state/blocked。\n\n原因:{reason}"
-    else:
-        comment = f"[{role}] 已切换为 state/blocked。\n\n原因:{reason}"
-
-    _transition_issue_state(
+    mark_issue(
         issue_number=issue_number,
-        to_state=IssueState.BLOCKED,
+        reason=reason,
+        role=role,
         actor=actor,
-        force=True,
         repo=repo,
-        dedupe_reason=reason if not is_noop else None,
-        dedupe_latest_comment=is_noop,
-        comment=comment,
-        skip_if_terminal=True,
+        is_noop=is_noop,
+        action="block",
     )
 
 

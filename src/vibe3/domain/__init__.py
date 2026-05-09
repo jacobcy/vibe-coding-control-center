@@ -8,6 +8,8 @@ This module provides domain events for all execution layers:
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
 
+from typing import TYPE_CHECKING, Callable
+
 from vibe3.domain.events import (
     # Base
     DomainEvent,
@@ -27,6 +29,9 @@ from vibe3.domain.events import (
     SupervisorPromptRendered,
 )
 
+if TYPE_CHECKING:
+    from vibe3.domain.publisher import EventPublisher
+
 
 def register_event_handlers() -> None:
     """Register domain event handlers lazily to avoid import cycles."""
@@ -37,21 +42,21 @@ def register_event_handlers() -> None:
     _register_event_handlers()
 
 
-def get_publisher():  # type: ignore[no-untyped-def]
+def get_publisher() -> "EventPublisher":
     """Return the global domain event publisher lazily."""
     from vibe3.domain.publisher import get_publisher as _get_publisher
 
     return _get_publisher()
 
 
-def publish(event):  # type: ignore[no-untyped-def]
+def publish(event: DomainEvent) -> None:
     """Publish a domain event lazily."""
     from vibe3.domain.publisher import publish as _publish
 
     return _publish(event)
 
 
-def subscribe(event_type, handler):  # type: ignore[no-untyped-def]
+def subscribe(event_type: str, handler: "Callable[[DomainEvent], None]") -> None:
     """Subscribe a handler lazily."""
     from vibe3.domain.publisher import subscribe as _subscribe
 

@@ -237,7 +237,6 @@ class TestOrchestrationFacade:
         mock_append_event: MagicMock,
     ) -> None:
         """Failed gate should freeze dispatch-intent emission, not heartbeat itself."""
-        dispatch_service = MagicMock()
         capacity = MagicMock()
         gate = MagicMock()
         gate.check.return_value = GateResult(
@@ -247,7 +246,6 @@ class TestOrchestrationFacade:
         )
 
         facade = OrchestrationFacade(
-            dispatch_services=[dispatch_service],
             capacity=capacity,
             failed_gate=gate,
         )
