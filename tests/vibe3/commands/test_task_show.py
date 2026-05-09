@@ -281,3 +281,74 @@ def test_task_show_full_flag(
     assert result_full.exit_code == 0
     for i in range(10):
         assert f"Line {i}" in result_full.output
+
+
+@patch("vibe3.commands.task.render_task_comments")
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_renders_multiple_tasks(
+    mock_task_service_cls,
+    mock_render_task_comments,
+) -> None:
+    """task show should display multiple task issues with primary label."""
+    task_service = MagicMock()
+    task_service.resolve_branch.return_value = "task/issue-123"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-123",
+        local_task=FlowStatusResponse(
+            branch="task/issue-123",
+            flow_slug="multi-task",
+            flow_status="active",
+            task_issue_number=123,
+        ),
+        task_issue_numbers=[123, 456, 789],
+        issue_title="Primary task title",
+        issue_state="OPEN",
+    )
+    task_service.fetch_issue_with_comments.return_value = None
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show"])
+
+    assert result.exit_code == 0
+    output = result.output
+    # Should show "Task Issue(s):" header for multiple tasks
+    assert "Task Issue(s):" in output
+    # Should show primary task with label and title
+    assert "#123  (primary)  Primary task title" in output
+    # Should show additional tasks
+    assert "#456" in output
+    assert "#789" in output
+
+
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_json_includes_task_issue_numbers(
+    mock_task_service_cls,
+) -> None:
+    """task show --json should include task_issue_numbers array."""
+    task_service = MagicMock()
+    task_service.resolve_branch.return_value = "task/issue-123"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-123",
+        local_task=FlowStatusResponse(
+            branch="task/issue-123",
+            flow_slug="multi-task-json",
+            flow_status="active",
+            task_issue_number=123,
+        ),
+        task_issue_numbers=[123, 456],
+        issue_title="Multi-task JSON test",
+    )
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "--json"])
+
+    assert result.exit_code == 0
+    # Parse JSON output after deprecation warning
+    output_lines = result.output.split("\n", 1)
+    if output_lines[0].startswith("Warning:"):
+        json_output = output_lines[1]
+    else:
+        json_output = result.output
+    payload = json.loads(json_output)
+    # Should include task_issue_numbers array
+    assert payload["task_issue_numbers"] == [123, 456]

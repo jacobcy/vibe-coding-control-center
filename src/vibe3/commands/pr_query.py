@@ -42,6 +42,30 @@ from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_local_review_summary, render_pr_details
 
 
+def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
+    """Resolve task issue numbers from flow SQLite store.
+
+    Args:
+        pr_svc: PRService instance with SQLite client
+        branch: Branch name to query
+
+    Returns:
+        List of task issue numbers (empty if none found)
+    """
+    try:
+        issue_links = pr_svc.store.get_issue_links(branch)
+        return [
+            link["issue_number"] for link in issue_links if link["issue_role"] == "task"
+        ]
+    except Exception:
+        logger.bind(
+            domain="pr",
+            action="resolve_task_from_flow",
+            branch=branch,
+        ).warning("Failed to resolve task from flow")
+        return []
+
+
 @dataclass(frozen=True)
 class PrQueryTarget:
     """Resolved PR query target from explicit args or current flow."""
@@ -348,6 +372,17 @@ def register_query_commands(app: typer.Typer) -> None:
             else:
                 # Human-readable output
                 render_pr_details(pr)
+
+                # Show bound tasks from flow truth
+                # Use PR head_branch if no branch was resolved
+                effective_branch = branch or target.current_branch or pr.head_branch
+                if effective_branch:
+                    bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
+                    if bound_tasks:
+                        console = Console()
+                        console.print("\n[bold]### Bound Task(s)[/]")
+                        for task_num in bound_tasks:
+                            console.print(f"  - #{task_num}")
 
                 # Show change analysis
                 if analysis_summary:

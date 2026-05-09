@@ -158,23 +158,49 @@ def render_task_show(
     console.print("[bold]Current Task[/]")
     console.print(f"Branch: {task.branch}")
     console.print(f"Flow:   {task.flow_slug} ({task.flow_status})")
-    if task.task_issue_number:
-        title_suffix = f"  {task_result.issue_title}" if task_result.issue_title else ""
-        console.print(f"Task:   #{task.task_issue_number}{title_suffix}")
-    elif task_result.issue_title:
-        console.print(f"Task:   {task_result.issue_title}")
+
+    # Display task issues (primary + additional)
+    if task_result.task_issue_numbers and len(task_result.task_issue_numbers) > 1:
+        # Multiple task issues: show as list
+        console.print("\n[bold]Task Issue(s):[/]")
+        for idx, issue_num in enumerate(task_result.task_issue_numbers):
+            if idx == 0:
+                label = "primary"
+                title_suffix = (
+                    f"  {task_result.issue_title}" if task_result.issue_title else ""
+                )
+                console.print(f"  #{issue_num}  ({label}){title_suffix}")
+            else:
+                console.print(f"  #{issue_num}")
+    else:
+        # Single or no task_issue_numbers: use existing format
+        if task.task_issue_number:
+            title_suffix = (
+                f"  {task_result.issue_title}" if task_result.issue_title else ""
+            )
+            console.print(f"Task:   #{task.task_issue_number}{title_suffix}")
+        elif task_result.issue_title:
+            console.print(f"Task:   {task_result.issue_title}")
+
     if task_result.issue_state:
         console.print(f"Issue:  {str(task_result.issue_state).lower()}")
-    if task_result.related_issue_numbers:
-        console.print(
-            "Related Issue(s): "
-            + "  ".join(f"#{number}" for number in task_result.related_issue_numbers)
-        )
-    if task_result.dependency_issue_numbers:
-        console.print(
-            "Dependencies: "
-            + "  ".join(f"#{number}" for number in task_result.dependency_issue_numbers)
-        )
+
+    # Group linked issues under a sub-header
+    has_linked = (
+        task_result.related_issue_numbers or task_result.dependency_issue_numbers
+    )
+    if has_linked:
+        console.print("\n[bold]Linked Issues[/]")
+        if task_result.related_issue_numbers:
+            related = "  ".join(
+                f"#{number}" for number in task_result.related_issue_numbers
+            )
+            console.print(f"Related Issue(s): {related}")
+        if task_result.dependency_issue_numbers:
+            deps = "  ".join(
+                f"#{number}" for number in task_result.dependency_issue_numbers
+            )
+            console.print(f"Dependencies: {deps}")
     if task.spec_ref:
         console.print(f"Spec Ref: {task.spec_ref}")
     if task.latest_verdict:
