@@ -40,42 +40,42 @@ description: |
 环境检查 → TeamCreate（一次） → PR #A → continue → PR #B → ... → end → TeamDelete（一次）
 ```
 
-| 规则 | 原因 | 易犯错误 |
-|------|------|---------|
-| 一个会话一个 Team | TeamCreate / TeamDelete 是高代价操作；teammates 状态不应跨 PR 重置 | 每审完一个 PR 就 TeamDelete，下一个又重建 |
-| 一个 Team 多个 PR | spawn agent 比 SendMessage 慢 10-100 倍且占资源 | 每个 PR 都重新 spawn `code-analyst` |
-| 切换 PR 用 SendMessage | agent 已就绪，只需告诉它"换审 PR #B" | 关闭旧 agent，spawn 新 agent |
-| TeamDelete 仅在用户 end | 用户没说结束就保留状态 | 看到"询问是否继续"以为是 TeamDelete 触发点 |
+要点：
+
+- 一个会话一个 Team：TeamCreate / TeamDelete 是高代价操作；teammates 状态不应跨 PR 重置。易犯错是每审完一个 PR 就 TeamDelete，下一个又重建。
+- 一个 Team 多个 PR：spawn agent 比 SendMessage 慢 10-100 倍且占资源。易犯错是每个 PR 都重新 spawn `code-analyst`。
+- 切换 PR 用 SendMessage：agent 已就绪，只需告诉它“换审 PR #B”。易犯错是关闭旧 agent 再 spawn 新 agent。
+- TeamDelete 默认仅在用户 end：用户没说结束就保留状态，恢复流程另行处理。易犯错是看到“询问是否继续”就以为要 TeamDelete。
 
 Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-编号命名，会强化错误心智模型）。
 
 ## Execution Flow
 
-| Step | 动作 | 关键约束 |
-|------|------|---------|
-| 1 | 环境检查 | 缺工具 → 立即回退，禁止模拟 |
-| 2 | 选执行模式 | `auto-fix / comment-only / auto-decide / ask-each` |
-| 3 | PR 选择/排序 | 优先 `state/merge-ready`、改动小、`base==main` |
-| 4 | 检查已有审查 | 有人类 / agent 评论时询问是否重审 |
-| 5 | 加载 template | 读 `.claude/team-templates/pr-review-team.yaml` |
-| 6 | 创建或复用 Team | 已存在且健康 → 复用；不存在 → TeamCreate；状态异常 → 停止由人类处理 |
-| 6.5 | **创建 Backlog Tasks** | **TeamCreate 完成后立即创建**（见下方 Backlog Setup）|
-| 7 | 判断 PR 类型 | 多维判断（见下） |
-| 8 | 执行审查 | Phase 1 → 2 → 3 → 4，**严格串行** |
-| 9 | 询问继续 | continue → 回 Step 3，**复用** Team；end → Step 10 |
-| 10 | TeamDelete | 仅当 Step 9 选 end；**先向所有 teammates 发 `shutdown_request`**，再 TeamDelete |
+执行顺序：
 
-### Step 6.5: Backlog Setup（TeamCreate 完成后立即执行）
+1. 环境检查：缺工具 → 立即回退，禁止模拟。
+2. 选执行模式：`auto-fix / comment-only / auto-decide / ask-each`。
+3. PR 选择/排序：优先 `state/merge-ready`、改动小、`base==main`。
+4. 检查已有审查：有人类 / agent 评论时询问是否重审。
+5. 加载 template：读 `.claude/team-templates/pr-review-team.yaml`。
+6. 创建或复用 Team：已存在且健康 → 复用；不存在 → TeamCreate；状态异常 → 停止由人类处理。
+7. 创建 Backlog Tasks：TeamCreate 完成后立即创建（见下方 Backlog Setup）。
+8. 判断 PR 类型：多维判断（见下）。
+9. 执行审查：Phase 1 → 2 → 3 → 4，严格串行。
+10. 询问继续：continue → 回 Step 3，复用 Team；end → Step 10。
+11. TeamDelete：仅当 Step 9 选 end；先向所有 teammates 发 `shutdown_request`，再 TeamDelete；恢复流程可例外。
+
+### Step 6.5: Backlog Setup（TeamCreate 后先建 Phase 1，后续按 PR 类型补建）
 
 > **踩坑记录**：TeamCreate 之前创建的 TaskCreate 不会关联到 team 的 task list，`TaskList` 返回空。必须先 TeamCreate 再 TaskCreate。
 
 **强制顺序**：
 
 ```
-TeamCreate → TaskCreate(Phase 1) → TaskCreate(Phase 2) → ... → TaskUpdate(owner="team-lead")
+TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 ```
 
-为每个审查 phase 创建一个 task，并用 `TaskUpdate(owner="team-lead")` 设置归属：
+先为 Phase 1 创建 task，并用 `TaskUpdate(owner="team-lead")` 设置归属；Step 7 判定为 `standard` / `refactor` / `security` 后，再补建 Phase 2 / 2.5 / 3 / 4 的 task：
 
 ```yaml
 - tool: TaskCreate
@@ -122,24 +122,24 @@ TeamCreate → TaskCreate(Phase 1) → TaskCreate(Phase 2) → ... → TaskUpdat
 
 任一不满足 → 不是 simple。
 
-| 类型 | 触发 | 处理 |
-|------|------|------|
-| `simple` | 上述 4 项**全**满足 | 仅 Phase 1（team-lead 调用 `vibe-review-docs` 或 `vibe-review-code`） |
-| `security` | 涉及认证 / 授权 / 数据 / 凭据 / 输入验证 | Phase 1+2，**必须**含 `security-reviewer` |
-| `refactor` | ≥ 5 文件 **或** 大规模重构 | Phase 1+2 |
-| `standard` | 不属于上述 | Phase 1+2 |
+分类规则：
+
+- `simple`：上述 4 项**全**满足。处理方式是仅 Phase 1，由 team-lead 调用 `vibe-review-docs` 或 `vibe-review-code`。
+- `security`：涉及认证 / 授权 / 数据 / 凭据 / 输入验证。处理方式是 Phase 1+2，且**必须**含 `security-reviewer`。
+- `refactor`：≥ 5 文件或大规模重构。处理方式是 Phase 1+2。
+- `standard`：不属于上述。处理方式是 Phase 1+2。
 
 **反例**（issue #742 真实踩坑）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 + 文档 → 错误归类 `simple` → 实际应按 `standard` 处理。**只要包含代码改动或多文件，就不是 simple。**
 
 ## Phase Contracts
 
-| Phase | 强制要求 | 易错点 |
-|-------|---------|-------|
-| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；spawn 后**立即** SendMessage 把 `phase_1_output` 广播给每个；**对 standard/refactor/large PR，先提取 PR diff 文件**（见 Phase 2 Prep） | **与 Phase 1 并行启动**（issue #742 真实踩坑）；忘发背景导致盲审；architect-reviewer 无 Bash 而未提前提取 diff |
-| 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**可跳过条件**：三方已一致且证据充分（须在 Phase 3 中明确注明跳过理由）；通过 `codex:rescue` skill 调用 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用 |
-| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标"审查不完整"；如有 Phase 2.5 报告作为补充材料 | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
-| 4 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue；**CRITICAL 阻塞 ≥ 2 个或涉及架构重设计时应建议 REJECT 而非 auto-fix** | 把范围外技术债塞进当前 PR comment；对复杂架构问题错误使用 auto-fix |
+Phase 契约：
+
+- 1 背景调研：必须先于 Phase 2 完成；产出 `phase_1_output` 并回传 team-lead。易错点是只打印到终端、未保存为变量、未通过 SendMessage 回传。
+- 2 专项审查：多 agent 在同一响应内并行 spawn；spawn 后立即 SendMessage，把 `phase_1_output` 广播给每个；对 standard/refactor/large PR，先提取 PR diff 文件。易错点是与 Phase 1 并行启动、忘发背景导致盲审、architect-reviewer 无 Bash 而未提前提取 diff。
+- 2.5 Codex验证（可选）：触发条件是安全PR、大型PR（>500行）、冲突仲裁；可跳过条件是三方已一致且证据充分，且须在 Phase 3 中明确注明跳过理由。易错点是与 Phase 2 并行执行、未收集完整 Phase 2 报告就调用。
+- 3 综合判断：检查 `required - received` 缺失；冲突必须仲裁；缺失只能标“审查不完整”；如有 Phase 2.5 报告可作为补充材料。易错点是替缺失 agent 脑补或用错误 teammate-message 内容继续。
+- 4 写回：模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue；CRITICAL 阻塞 ≥ 2 个或涉及架构重设计时应建议 REJECT 而非 auto-fix。易错点是把范围外技术债塞进当前 PR comment，或对复杂架构问题错误使用 auto-fix。
 
 ### Phase 2 Prep: 提取 PR Diff（standard/refactor/large PR 必做）
 
@@ -224,7 +224,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 ### 7. 测试评估看性质而非数量
 
 - ❌ "9 个测试 → 测试覆盖 A (95)"
-- ✅ "9 个 MagicMock 单元测试，覆盖 4 种 ChangeSource + 4 种错误分支，但缺乏与真实 GitClient._run 的集成契约测试"
+- ✅ "9 个 MagicMock 单元测试，覆盖 4 种 ChangeSource + 4 种错误分支，但缺乏与真实 GitClient.\_run 的集成契约测试"
 
 必须区分：单元（mock） / 集成（真实依赖）、happy path / 错误分支。
 
@@ -247,7 +247,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - 切换 PR 用 SendMessage，禁止重新 spawn agent
 - **TeamDelete 合法场景**：
   - ✅ 任务完成时（Step 10）
-  - ✅ 状态不一致时先尝试清理（Step 6）
+  - ✅ 状态不一致时，按 Recovery 先尝试清理
 - **清理优先级**：TeamDelete → rm -rf fallback → 退出重建会话
 - 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
 
@@ -262,7 +262,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - 不手工编辑 `~/.claude/projects/.../*.jsonl`
 - 不手工 `rm -rf ~/.claude/teams/`（TeamDelete 失败时的 fallback 例外）
 - 不手工 `tmux kill-pane`
-- **会话结束（Step 10）必须先发 shutdown_request，再 TeamDelete**：
+- **会话结束（Step 10）通常先发 shutdown_request，再 TeamDelete；恢复流程可例外**：
 
   ```python
   # Step 10 标准关闭流程
@@ -300,14 +300,14 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 ## File Map
 
-| 文件 | 职责 |
-|------|------|
-| `SKILL.md` | 生命周期、phase 契约、质量标准、硬边界 |
-| `references/execution-reference.md` | 消息样例与等待策略 |
-| `references/recovery-playbook.md` | 故障恢复路径 |
-| `.claude/team-templates/pr-review-team.yaml` | 团队配置真源 |
-| `.claude/agents/pr-*.md` | teammate 项目特定职责 |
-| `docs/references/team-guide.md` | Team 功能通用背景 |
+文件清单：
+
+- `SKILL.md`：生命周期、phase 契约、质量标准、硬边界。
+- `references/execution-reference.md`：消息样例与等待策略。
+- `references/recovery-playbook.md`：故障恢复路径。
+- `.claude/team-templates/pr-review-team.yaml`：团队配置真源。
+- `.claude/agents/pr-*.md`：teammate 项目特定职责。
+- `docs/references/team-guide.md`：Team 功能通用背景。
 
 ## Usage
 
