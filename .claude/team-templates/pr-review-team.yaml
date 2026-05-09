@@ -7,7 +7,7 @@
 # 3. 使用 Agent tool spawn teammate:
 #    Agent(team_name="pr-review-team", name="<agent-name>",
 #          subagent_type="<subagent_type>", model="<model>", prompt="<prompt>")
-# 4. 使用 SendMessage 在 teammates 间传递 context bundle
+# 4. fresh spawn 背景优先写入 prompt；复用 teammates 或补充上下文时再用 SendMessage
 # 5. Phase 4 由 team-lead 执行（当前 session），不需要 spawn
 
 name: pr-review-team
@@ -274,10 +274,10 @@ workflow:
       - step: save_phase_1_output
         action: |
           【关键步骤】将背景报告内容保存为 phase_1_output 变量
-          这是 Phase 2 SendMessage 的必要输入
+          这是 Phase 2 fresh spawn prompt / reuse SendMessage 的共同输入
           如果不保存，Phase 2 将无法获取背景信息
       - step: prepare_phase_2_context
-        action: 将背景报告通过 SendMessage 传给 Phase 2 agents
+        action: 保存背景，供 fresh spawn prompt 或复用 teammate 的 SendMessage 使用
 
   phase_2:
     name: 专项审查
@@ -285,16 +285,15 @@ workflow:
     parallel: true
     requires_phase_1_output: true
     message_passing: SendMessage
-    # 【关键】必须通过 SendMessage 将 Phase 1 背景传递给 Phase 2 agents
-    # 否则 Phase 2 将处于"盲审"状态，两阶段设计失去意义
+    # 【关键】fresh spawn 直接在 prompt 中携带 Phase 1 背景
+    # SendMessage 仅用于复用 teammate 或补发额外上下文，避免盲审
     # 执行指令
     execution:
       - step: spawn_code_analyst
         tool: Agent
         params:
           # 注意：parallel spawn 需要在单次响应中发起多个 Agent 调用
-          # 【修复】在 spawn prompt 中嵌入完整背景，避免 agent idle
-          # 实际执行发现：spawn 后 SendMessage 可能延迟，导致 agent 立即 idle
+          # 【修复】fresh spawn 时在 prompt 中直接内嵌背景，避免等待额外消息
           team_name: pr-review-team
           name: code-analyst
           subagent_type: pr-code-analyst
@@ -345,8 +344,8 @@ workflow:
             请基于以上背景评估安全性。
           run_in_background: true
 
-      # 【说明】不再需要 SendMessage，背景已在 spawn prompt 中传递
-      # 如果需要补充额外信息，可使用 SendMessage，但非必需
+      # 【说明】fresh spawn 的背景已在 prompt 中传递
+      # 如果需要补充额外信息或复用已有 teammate，可再使用 SendMessage
       - step: wait_for_phase_2_results
         action: |
           等待所有 Phase 2 agents 返回结果。
@@ -384,21 +383,23 @@ workflow:
         action: |
           判断是否触发Codex验证（两阶段判断）：
 
-          **第一阶段：PR 类型判断**
+          **第一阶段：PR 风险判断**
           满足以下任一条件：
           1. PR类型为 `security`
-          2. 改动行数 > 500 或影响关键架构
-
+          2. 改动行数 > 500 或影响关键架构（inspect base风险高）
+          3. Phase 3 出现需要第三方裁决的冲突
           **第二阶段：Phase 2 完整性判断**
           required_agents = [code-analyst, architect-reviewer, security-reviewer]
           检查是否有 agent 超时/未返回结果
 
           **最终触发条件**：
-          - 第一阶段 AND 第二阶段 都满足 → 执行 Phase 2.5
-          - 仅第一阶段满足 → 跳过 Phase 2.5，直接进入 Phase 3
-          - 仅第二阶段满足 → 跳过 Phase 2.5（非 security PR 不强制 Codex）
+          - 第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选
+          - 第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制
+          - 第一阶段不满足 → 跳过 Phase 2.5，直接进入 Phase 3
 
-          **注意**：SKILL.md 中的升级规则（"Phase 2 报告不完整且 security PR"）即此两阶段判断。
+          **注意**：
+          - "可选"保留给 security / large / conflict_arbitration 的独立复核场景
+          - "升级为强制"只适用于第一阶段已命中的高风险 PR
 
       - step: collect_phase_2_reports
         action: |
@@ -443,7 +444,7 @@ workflow:
           验证所有 Phase 2 agents 已返回报告：
 
           required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
-          received_agents = [从 idle notifications 获取]
+          received_agents = [从 task-notification(status=completed) 获取]
 
           missing = set(required_agents) - set(received_agents)
           if missing:
@@ -452,7 +453,7 @@ workflow:
             # 重要：不要假设缺失的 agent 同意其他结论
 
       - step: collect_all_reports
-        action: 从 idle notifications 获取各 agent 报告
+        action: 从 task-notification（status=completed）收集各 agent 报告
       - step: detect_conflicts
         action: 对比各报告，找出差异点
       - step: arbitrate

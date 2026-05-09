@@ -154,13 +154,13 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 ## Phase Contracts
 
-Phase 契约：
-
-- 1 背景调研：必须先于 Phase 2 完成；产出 `phase_1_output` 并回传 team-lead。**team-lead 等待期间只允许执行 context_bundle 中定义的 shell 基础命令（gh pr view、CI 状态等）并将结果传给 context-researcher，禁止自行做深度代码分析（读 diff、读源码、分析架构）——这是 context-researcher 的专属职责。** 易错点是只打印到终端、未保存为变量、未通过 SendMessage 回传；以及 team-lead 在等待期间"顺手"自己做分析，导致 Phase 1 产出变成 team-lead 的个人研究而非 context-researcher 的独立调研。
-- 2 专项审查：多 agent 在同一响应内并行 spawn；spawn 后立即 SendMessage，把 `phase_1_output` 广播给每个。易错点是与 Phase 1 并行启动、忘发背景导致盲审。
-- 2.5 Codex验证（可选）：触发条件是安全PR、大型PR（>500行）、冲突仲裁。**⚠️ 升级规则：若 Phase 2 报告不完整（有 agent 超时/限流/未回报），且 PR 满足触发条件（large_pr / security），Phase 2.5 从「可选」升级为「强制」——用 Codex 独立复查补偿缺失报告，不能直接跳到 Phase 3。** 可跳过条件（仅当 Phase 2 三方报告**全部到齐**时）：三方结论一致且证据充分，须在 Phase 3 明确注明跳过理由。易错点是与 Phase 2 并行执行、Phase 2 不完整却以"跳过"理由绕过 Codex。
-- 3 综合判断：检查 `required - received` 缺失；冲突必须仲裁；缺失只能标“审查不完整”；如有 Phase 2.5 报告可作为补充材料。易错点是替缺失 agent 脑补或用错误 teammate-message 内容继续。
-- 4 写回：模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue；CRITICAL 阻塞 ≥ 2 个或涉及架构重设计时应建议 REJECT 而非 auto-fix。易错点是把范围外技术债塞进当前 PR comment，或对复杂架构问题错误使用 auto-fix。
+| Phase | 强制要求 | 易错点 |
+|-------|---------|-------|
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**（issue #742 真实踩坑）；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
+| 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**执行时机**：Phase 2完成后收集所有报告；通过 `codex:rescue` skill 调用；第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选；第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用；把”可选触发”误写成”只有不完整才触发” |
+| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标”审查不完整”；如有 Phase 2.5 报告作为补充材料 | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
+| 4 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
 > **没有 Phase 5**。完成 Phase 4 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
 
@@ -245,7 +245,8 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 ### Phase 流程
 
 - Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
-- Phase 2 spawn 后必须 SendMessage 发 `phase_1_output`，禁止盲审
+- fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；不要求额外 SendMessage 才开始
+- 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
 - 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
 
 ### 状态操作

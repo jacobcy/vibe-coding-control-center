@@ -81,6 +81,8 @@ main 分支对照：直接 Read src/vibe3/... 路径即可。
 
 仅适用 `refactor / security / standard`。**Phase 1 必须先完成**，禁止并行启动。
 
+fresh spawn 的 Phase 2 agent 直接从初始 prompt 读取 `phase_1_output` 并开始审查。
+
 同一响应内并行 spawn：
 
 ```yaml
@@ -90,7 +92,13 @@ main 分支对照：直接 Read src/vibe3/... 路径即可。
     name: code-analyst
     subagent_type: pr-code-analyst
     model: haiku
-    prompt: "分析 PR #{pr_number} 的代码质量。等待背景信息后开始。"
+    prompt: |
+      分析 PR #{pr_number} 的代码质量。
+
+      ## PR #{pr_number} 背景报告
+      {phase_1_output}
+
+      请基于以上背景开始审查。
     run_in_background: true
 
 - tool: Agent
@@ -99,7 +107,13 @@ main 分支对照：直接 Read src/vibe3/... 路径即可。
     name: architect-reviewer
     subagent_type: pr-architect-reviewer
     model: sonnet
-    prompt: "评估 PR #{pr_number} 的架构影响。等待背景信息后开始。"
+    prompt: |
+      评估 PR #{pr_number} 的架构影响。
+
+      ## PR #{pr_number} 背景报告
+      {phase_1_output}
+
+      你可以使用 Bash 工具补充读取 diff / git show / git log 数据。
     run_in_background: true
 
 - tool: Agent
@@ -108,23 +122,30 @@ main 分支对照：直接 Read src/vibe3/... 路径即可。
     name: security-reviewer
     subagent_type: pr-security-reviewer
     model: sonnet
-    prompt: "评估 PR #{pr_number} 的安全性。等待背景信息后开始。"
+    prompt: |
+      评估 PR #{pr_number} 的安全性。
+
+      ## PR #{pr_number} 背景报告
+      {phase_1_output}
     run_in_background: true
 ```
 
-立即广播背景：
+fresh spawn 不需要额外 SendMessage。只有两类场景继续使用 SendMessage：
+
+- 复用上一轮已经存在的 teammate
+- Phase 2 过程中需要补发额外上下文
 
 ```yaml
 - tool: SendMessage
   params:
-    to: "code-analyst"  # 对每个 Phase 2 agent 都执行
+    to: "code-analyst"
     message: |
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
-      请基于以上背景开始审查。
+      ## 切换到 PR #{next_pr_number}
+      {phase_1_output_of_next_pr}
+      请基于以上背景分析新的 PR。
 ```
 
-等待策略：等所有 Phase 2 agents idle；默认 5 分钟超时；超时只能标"部分审查未完成"。
+等待策略：idle 只表示空闲/等待态，最终结果以 `task-notification(status=completed)` 为准；默认 5 分钟超时；超时只能标"部分审查未完成"。
 
 ### 多 PR 复用模式（第二个及之后的 PR）
 

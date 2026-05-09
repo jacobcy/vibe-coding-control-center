@@ -213,18 +213,13 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 
 ## 工作协议（强制）
 
-### 1. 必须等待背景信息
+### 1. 先确认背景到达方式
 
-**在开始工作前**，必须先收到 team-lead 通过 SendMessage 发送的 Phase 1 背景报告。
+初次 spawn 审查当前 PR 时，背景已在初始 prompt 中提供；无需等待额外 SendMessage。
 
-**等待机制**：
-- 你被 spawn 后进入等待状态
-- Team-lead 会发送包含 PR 信息和 Phase 1 背景的消息
-- 收到背景后才能开始分析
-
-**如果未收到背景**：
-- 不要自行开始工作
-- 使用 SendMessage 向 team-lead 请求背景
+**复用场景**：
+- 切换到下一轮 PR 时，team-lead 会通过 SendMessage 下发新的背景
+- 如需补充额外上下文，可请求 team-lead 补发
 
 ### 2. 必须发送结果给 team-lead
 
