@@ -5,6 +5,12 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
+from vibe3.models.review_runner import AgentOptions
+from vibe3.prompts.assembler import PromptAssembler
+from vibe3.prompts.models import PromptRecipe, PromptVariableSource, VariableSourceKind
+
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
@@ -249,6 +255,80 @@ def create_mcp_server(
                 indent=2,
             )
 
+    @mcp.tool()
+    def orchestra_ask(question: str) -> str:
+        """Ask a question about project knowledge and get an answer from a sub-agent.
+
+        Spawns a project explorer agent to answer questions about code structure,
+        documentation, conventions, and other static project knowledge.
+
+        Args:
+            question: Question about the project
+                (e.g., "What is the structure of src/vibe3/?")
+
+        Returns:
+            Answer from the project explorer agent, or error message if execution fails
+        """
+        try:
+            # Resolve repo root for working directory context
+            repo_root = resolve_orchestra_repo_root()
+
+            # Read supervisor file
+            supervisor_path = repo_root / "supervisor" / "project-explorer.md"
+            if not supervisor_path.exists():
+                return json.dumps(
+                    {"error": f"Supervisor file not found: {supervisor_path}"},
+                    indent=2,
+                )
+            supervisor_content = supervisor_path.read_text(encoding="utf-8")
+
+            # Build prompt recipe
+            recipe = PromptRecipe(
+                template_key="orchestra.explorer",
+                variables={
+                    "supervisor_content": PromptVariableSource(
+                        kind=VariableSourceKind.LITERAL,
+                        value=supervisor_content,
+                    ),
+                    "question": PromptVariableSource(
+                        kind=VariableSourceKind.LITERAL,
+                        value=question,
+                    ),
+                },
+            )
+
+            # Render prompt
+            assembler = PromptAssembler()
+            render_result = assembler.render(recipe, runtime_context={})
+            prompt = render_result.rendered_text
+
+            # Configure agent options with 180s timeout
+            options = AgentOptions(
+                agent="vibe-reviewer",
+                timeout_seconds=180,
+            )
+
+            # Execute via CodeagentBackend
+            backend = CodeagentBackend()
+            result = backend.run(
+                prompt=prompt,
+                options=options,
+                cwd=repo_root,
+                role="explorer",
+            )
+
+            # Return stdout as answer
+            return result.stdout or ""
+
+        except Exception as exc:
+            logger.bind(domain="orchestra").error(
+                f"Failed to execute orchestra_ask: {exc}"
+            )
+            return json.dumps(
+                {"error": f"Failed to answer question: {exc}"},
+                indent=2,
+            )
+
     log = logger.bind(domain="orchestra")
-    log.info("MCP server created with 3 resources and 3 tools")
+    log.info("MCP server created with 3 resources and 4 tools")
     return mcp

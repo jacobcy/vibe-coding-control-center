@@ -114,6 +114,19 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 你当前处于 supervisor/apply 场景。只围绕 Supervisor 材料处理 handoff 或治理 issue。
 不要进入 governance 巡检模式，也不要进入 run / plan / review 执行模式。
 """},
+        "explorer": """# Project Explorer
+
+{supervisor_content}
+
+## Question
+
+{question}
+
+## Instructions
+
+Answer the question above by reading relevant project files.
+Be concise and factual. If uncertain, say so.
+""",
     },
 }
 
