@@ -351,6 +351,8 @@ run:
     If no explicit verification requirements in plan, write: "No explicit Verification requirements in plan."
 
     ## Verification
+    - [ ] All changes committed (git status clean)
+    - [ ] Commit message follows standards
     - [ ] All tests pass
     - [ ] No type errors
     - [ ] No lint errors
