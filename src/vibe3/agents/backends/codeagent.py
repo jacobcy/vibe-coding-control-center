@@ -29,6 +29,7 @@ from vibe3.utils.codeagent_helpers import (
     build_prompt_file_content,
     diagnose_backend_error,
     prepare_prompt_file,
+    sanitize_prompt_for_display,
     sanitize_task_shell_meta,
     stream_reader,
     summarize_backend_output,
@@ -273,11 +274,12 @@ class CodeagentBackend:
                 logger.debug("command: {}", " ".join(command))
                 if show_prompt and prompt_file_path:
                     logger.debug("prompt_file: {}", prompt_file_path)
+                    prompt_content = build_prompt_file_content(
+                        prompt, include_global_notice=include_global_notice
+                    )
                     logger.debug(
                         "prompt_content:\n{}",
-                        build_prompt_file_content(
-                            prompt, include_global_notice=include_global_notice
-                        ),
+                        sanitize_prompt_for_display(prompt_content),
                     )
                 if task:
                     logger.debug("task:\n{}", task)
