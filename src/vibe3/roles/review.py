@@ -43,6 +43,44 @@ from vibe3.roles.review_helpers import (
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
 
+
+def validate_review_prerequisites(
+    flow_service: FlowService,
+    branch: str,
+) -> tuple[Any, int]:
+    """Validate flow exists and has linked issue.
+
+    Args:
+        flow_service: FlowService instance for flow operations
+        branch: Target branch name
+
+    Returns:
+        Tuple of (flow status, issue number)
+
+    Raises:
+        UserError: If no flow exists or no linked issue
+    """
+    from vibe3.exceptions import UserError
+
+    flow = flow_service.get_flow_status(branch)
+
+    if not flow:
+        raise UserError(
+            f"No flow for branch '{branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first."
+        )
+
+    issue_number = flow.task_issue_number
+
+    if not issue_number:
+        raise UserError(
+            f"No issue linked to flow '{branch}'.\n"
+            "Run 'vibe3 flow bind <issue>' first."
+        )
+
+    return flow, issue_number
+
+
 REVIEWER_ROLE = TriggerableRoleDefinition(
     name="reviewer",
     registry_role="reviewer",
