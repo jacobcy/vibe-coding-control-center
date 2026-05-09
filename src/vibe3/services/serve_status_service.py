@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -194,9 +195,6 @@ class ServeStatusService:
                     # Format time as HH:MM:SS (convert UTC to local timezone)
                     time_str = err.get("created_at", "")
                     if time_str and len(time_str) >= 19:
-                        # Convert UTC to local timezone (Asia/Shanghai, UTC+8)
-                        from datetime import datetime, timedelta, timezone
-
                         try:
                             # Parse UTC time from database
                             utc_time = datetime.strptime(
@@ -204,9 +202,8 @@ class ServeStatusService:
                             )
                             utc_time = utc_time.replace(tzinfo=timezone.utc)
 
-                            # Convert to local timezone (UTC+8)
-                            local_tz = timezone(timedelta(hours=8))
-                            local_time = utc_time.astimezone(local_tz)
+                            # Convert to system local timezone
+                            local_time = utc_time.astimezone()
 
                             # Extract HH:MM:SS
                             time_display = local_time.strftime("%H:%M:%S")
