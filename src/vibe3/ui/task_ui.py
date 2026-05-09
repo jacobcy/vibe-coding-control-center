@@ -13,6 +13,10 @@ from vibe3.utils.path_helpers import ref_to_handoff_cmd
 if TYPE_CHECKING:
     from vibe3.services.task_service import TaskShowResult
 
+# Display limits for task show output
+MAX_SUMMARY_LINES = 3  # Maximum summary lines shown in non-full mode
+MAX_COMMENTS_DISPLAY = 3  # Maximum recent comments to display
+
 
 def build_task_show_payload(task_result: "TaskShowResult") -> dict[str, object]:
     """Build a single JSON payload for task show."""
@@ -233,8 +237,8 @@ def render_task_show(
                 for line in summary_lines:
                     console.print(f"  {line}")
             else:
-                # Show only first 3 lines for readability
-                summary_lines = summary_lines[:3]
+                # Show only first N lines for readability
+                summary_lines = summary_lines[:MAX_SUMMARY_LINES]
                 console.print("Summary:")
                 for line in summary_lines:
                     console.print(f"  {line}")
@@ -252,12 +256,14 @@ def render_task_show(
         console.print(f"URL:     {pr.url}")
 
 
-def render_task_comments(issue: dict[str, object], max_comments: int = 3) -> None:
+def render_task_comments(
+    issue: dict[str, object], max_comments: int = MAX_COMMENTS_DISPLAY
+) -> None:
     """Render last N comments with human/agent labels.
 
     Args:
         issue: Issue dict with comments
-        max_comments: Maximum number of recent comments to show (default 3)
+        max_comments: Maximum number of recent comments to show
     """
     comments = issue.get("comments") or []
     if not isinstance(comments, list):
