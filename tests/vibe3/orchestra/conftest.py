@@ -11,20 +11,27 @@ from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.global_dispatch_coordinator import (
     GlobalDispatchCoordinator,
 )
+from vibe3.orchestra.queue_ordering import resolve_priority
 
 
 @pytest.fixture
 def make_issue() -> callable:
-    """Factory for creating mock issue objects."""
+    """Factory for creating mock issue objects.
 
-    def _make_issue(number: int, priority: int = 5) -> MagicMock:
-        issue = MagicMock()
-        issue.number = number
-        issue.labels = [f"priority/{priority}"]
-        issue.milestone = None
-        issue.assignees = ["manager-bot"]
-        issue.priority = priority
-        return issue
+    NOTE: This fixture returns IssueInfo objects (not MagicMock) to avoid
+    type comparison errors in sorting operations like sort_ready_issues().
+    MagicMock objects don't support <= comparisons with int values.
+    """
+
+    def _make_issue(number: int, priority: int = 5) -> IssueInfo:
+        return IssueInfo(
+            number=number,
+            title=f"Issue {number}",
+            state=IssueState.READY,
+            labels=[f"priority/{priority}", "state/ready"],
+            milestone=None,
+            assignees=["manager-bot"],
+        )
 
     return _make_issue
 
@@ -114,6 +121,7 @@ def make_coordinator() -> callable:
 
             async def mock_poll(state: IssueState) -> list[IssueInfo]:
                 if state == target_state:
+                    # ready_issues are now IssueInfo objects, not MagicMock
                     issues_info = [
                         IssueInfo(
                             number=issue.number,
@@ -121,7 +129,7 @@ def make_coordinator() -> callable:
                             state=target_state,
                             labels=[
                                 target_state.to_label(),
-                                f"priority/{issue.priority}",
+                                f"priority/{resolve_priority(issue.labels)}",
                             ],
                             assignees=["manager-bot"],
                         )
