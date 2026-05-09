@@ -108,11 +108,25 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 - tool: TaskCreate
   params:
     subject: "Phase 1: Context research"
-    description: "spawn context-researcher, collect PR background"
+    description: "spawn context-researcher, collect PR background and save to metadata"
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-1-task-id>"
+    status: "in_progress"
+    owner: "team-lead"
+
+# Phase 2 必须等待 Phase 1 完成并通过 task dependency 强制传递背景
 - tool: TaskCreate
   params:
     subject: "Phase 2: Parallel review"
-    description: "spawn code-analyst + architect-reviewer + security-reviewer"
+    description: "spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background"
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-2-task-id>"
+    addBlockedBy: ["<phase-1-task-id>"]  # 强制依赖 Phase 1
+    metadata:
+      requires_phase_1_output: true  # 标记需要背景信息
+
 - tool: TaskCreate
   params:
     subject: "Phase 2.5: Codex verification"
@@ -125,13 +139,32 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
   params:
     subject: "Phase 4: Write back"
     description: "ask-each mode; post PR comment; create follow-up issues"
+```
 
-# 每个 task 创建后立即标注 owner 和 in_progress：
+**关键步骤（Phase 1 完成后必须执行）**：
+
+```yaml
+# Phase 1 完成时，必须将背景报告保存到 task metadata
 - tool: TaskUpdate
   params:
     taskId: "<phase-1-task-id>"
-    status: "in_progress"
-    owner: "team-lead"
+    status: "completed"
+    metadata:
+      phase_1_output: |
+        ## PR #<number> 背景报告
+
+        [完整的 context-researcher 报告内容，包括所有章节]
+```
+
+**Phase 2 启动前检查**：
+
+```yaml
+# Phase 2 开始前，必须从 Phase 1 task 获取背景信息
+- tool: TaskGet
+  params:
+    taskId: "<phase-1-task-id>"
+  # 从 metadata.phase_1_output 提取完整背景报告
+  # 然后嵌入 Phase 2 agents 的 prompt 中
 ```
 
 `TaskList` 可随时用于确认进度，避免重复创建。

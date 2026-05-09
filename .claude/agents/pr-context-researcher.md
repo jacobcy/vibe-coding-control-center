@@ -8,7 +8,7 @@ description: |
   注意：此 agent 是对全局 Explore 的项目特定扩展，
   增加了 PR 特定的时效性检查和依赖关系分析。
 
-model: haiku
+model: sonnet  # 使用 sonnet 避免 haiku thinking budget 限制问题
 tools: Read, Grep, Glob, WebFetch, Bash, SendMessage
 extends: Explore  # 继承全局 Explore 的基础能力
 # Bash 仅用于只读 GitHub/context 命令，不执行写操作或本地状态修改
