@@ -62,6 +62,7 @@ class FlowState(BaseModel):
     report_ref: str | None = None
     audit_ref: str | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation
+    pr_ready_marked_at: str | None = None  # Timestamp when PR was marked ready
     planner_actor: str | None = None
     executor_actor: str | None = None
     reviewer_actor: str | None = None
@@ -232,6 +233,7 @@ class FlowStatusResponse(BaseModel):
     pr_number: int | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation
     pr_ready_for_review: bool = False
+    pr_ready_marked_at: str | None = None  # Timestamp when PR was marked ready
     spec_ref: str | None = None
     plan_ref: str | None = None
     report_ref: str | None = None
@@ -321,6 +323,7 @@ class FlowStatusResponse(BaseModel):
                 if pr_ready is not None
                 else bool(data.get("pr_ready_for_review"))
             ),
+            pr_ready_marked_at=data.get("pr_ready_marked_at"),
             spec_ref=data.get("spec_ref"),
             plan_ref=data.get("plan_ref"),
             report_ref=data.get("report_ref"),

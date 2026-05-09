@@ -21,6 +21,7 @@ class SQLiteFlowStateRepo:
         "audit_ref",
         "indicate_ref",
         "pr_ref",  # PR URL as proof of PR creation
+        "pr_ready_marked_at",  # Timestamp when PR was marked ready
         "planner_actor",
         "executor_actor",
         "reviewer_actor",

@@ -361,3 +361,43 @@ def test_mark_ready_handles_loc_comment_failure(
     # Verify PR was still marked ready despite LOC error
     gh_instance.mark_ready.assert_called_once_with(123)
     assert result.draft is False
+
+
+def test_mark_ready_writes_pr_ready_marked_at(
+    pr_service: PRService, no_conflict_git: MagicMock
+) -> None:
+    """Test mark_ready writes pr_ready_marked_at timestamp."""
+    gh_instance = pr_service.github_client
+    mock_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=True,
+    )
+
+    gh_instance.check_auth.return_value = True
+    gh_instance.get_pr.return_value = mock_pr
+    gh_instance.mark_ready.return_value = mock_pr.model_copy(update={"draft": False})
+    mock_store = MagicMock()
+    mock_store.get_issue_links.return_value = []
+
+    with patch.object(pr_service, "git_client", no_conflict_git):
+        with patch.object(pr_service, "store", mock_store):
+            pr = pr_service.mark_ready(123)
+
+            assert pr.number == 123
+            # Verify update_flow_state was called with pr_ready_marked_at
+            calls = mock_store.update_flow_state.call_args_list
+            # Find the call that includes pr_ready_marked_at
+            found_marker = False
+            for call in calls:
+                kwargs = call.kwargs
+                if "pr_ready_marked_at" in kwargs:
+                    found_marker = True
+                    assert kwargs["pr_ready_marked_at"] is not None
+                    break
+            assert found_marker, "pr_ready_marked_at should be written to flow state"

@@ -209,7 +209,15 @@ class PRService:
         is_already_ready: bool = False,
     ) -> None:
         """Finalize PR ready state: sync, briefing, and AI reviews."""
+        from datetime import datetime
+
         self._sync_pr_flow_state(pr_for_sync, actor=actor)
+
+        # Mark flow as waiting for review
+        self.store.update_flow_state(
+            pr_for_sync.head_branch,
+            pr_ready_marked_at=datetime.now().isoformat(),
+        )
 
         try:
             self.briefing_service.publish_briefing(

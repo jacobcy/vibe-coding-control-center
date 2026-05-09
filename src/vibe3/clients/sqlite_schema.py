@@ -38,7 +38,8 @@ _CREATE_FLOW_STATE = """
         reviewer_status TEXT,
         execution_pid INTEGER,
         execution_started_at TEXT,
-        execution_completed_at TEXT
+        execution_completed_at TEXT,
+        pr_ready_marked_at TEXT
     )
 """
 
@@ -262,6 +263,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN indicate_ref TEXT")
         logger.bind(external="sqlite", operation="migration").info(
             "Added indicate_ref column to flow_state"
+        )
+
+    # Migration: add pr_ready_marked_at column for waiting-review state tracking
+    if "pr_ready_marked_at" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN pr_ready_marked_at TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added pr_ready_marked_at column to flow_state"
         )
 
     # Migration: migrate existing blocked_by data to new fields

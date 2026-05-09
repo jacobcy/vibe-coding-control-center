@@ -68,7 +68,15 @@ class FlowManager:
             ).warning(f"Flow branch '{branch}' missing in git — rejecting as stale")
             return False
 
-        return str(flow.get("flow_status") or "active") not in {
+        # A flow is "reusable" if not terminal AND not waiting for PR review
+        flow_status = str(flow.get("flow_status") or "active")
+        pr_ready_marked_at = flow.get("pr_ready_marked_at")
+
+        # If waiting for review, don't reuse - create new flow for different issue
+        if pr_ready_marked_at is not None and flow_status == "active":
+            return False
+
+        return flow_status not in {
             "done",
             "aborted",
             "stale",

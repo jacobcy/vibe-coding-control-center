@@ -1,8 +1,11 @@
 """Flow service implementation."""
 
+from typing import Any
+
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.config.settings import VibeConfig
+from vibe3.models.flow import FlowState
 from vibe3.services.flow_block_mixin import FlowLifecycleMixin
 from vibe3.services.flow_transition import FlowTransitionMixin
 from vibe3.utils.git_path_client import GitPathProtocol
@@ -49,3 +52,24 @@ class FlowService(FlowLifecycleMixin, FlowTransitionMixin):
             Current branch name
         """
         return self.git_client.get_current_branch()
+
+    def is_flow_waiting_review(self, flow_state: FlowState | dict[str, Any]) -> bool:
+        """Check if flow is waiting for PR review.
+
+        A flow is "waiting review" if:
+        - pr_ready_marked_at is set (PR was marked ready)
+        - flow_status is 'active' (not done/stale/aborted)
+
+        Args:
+            flow_state: Flow state dict or FlowState model
+
+        Returns:
+            True if flow is waiting for review
+        """
+        if isinstance(flow_state, FlowState):
+            marked_at = flow_state.pr_ready_marked_at
+            status = flow_state.flow_status
+        else:
+            marked_at = flow_state.get("pr_ready_marked_at")
+            status = flow_state.get("flow_status", "active")
+        return marked_at is not None and status == "active"

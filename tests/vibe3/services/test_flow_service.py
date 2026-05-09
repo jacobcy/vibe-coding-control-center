@@ -136,3 +136,57 @@ class TestFlowServiceAbort:
         assert mock_store.add_event.called
         event_call = mock_store.add_event.call_args
         assert event_call[0][1] == "flow_reactivated"
+
+
+class TestFlowServiceWaitingReview:
+    """Tests for is_flow_waiting_review helper."""
+
+    def test_waiting_review_detects_marked_flow(self, mock_store, mock_git):
+        """Test is_flow_waiting_review returns True for flow with marker."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        flow_dict = {
+            "branch": "task/issue-123",
+            "flow_status": "active",
+            "pr_ready_marked_at": "2026-05-02T10:00:00",
+        }
+
+        assert service.is_flow_waiting_review(flow_dict) is True
+
+    def test_waiting_review_false_without_marker(self, mock_store, mock_git):
+        """Test is_flow_waiting_review returns False without marker."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        flow_dict = {
+            "branch": "task/issue-123",
+            "flow_status": "active",
+        }
+
+        assert service.is_flow_waiting_review(flow_dict) is False
+
+    def test_waiting_review_false_for_non_active_status(self, mock_store, mock_git):
+        """Test is_flow_waiting_review returns False for non-active flow."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        flow_dict = {
+            "branch": "task/issue-123",
+            "flow_status": "done",
+            "pr_ready_marked_at": "2026-05-02T10:00:00",
+        }
+
+        assert service.is_flow_waiting_review(flow_dict) is False
+
+    def test_waiting_review_works_with_flow_state_model(self, mock_store, mock_git):
+        """Test is_flow_waiting_review works with FlowState model instance."""
+        from vibe3.models.flow import FlowState
+
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        flow_state = FlowState(
+            branch="task/issue-123",
+            flow_slug="issue-123",
+            flow_status="active",
+            pr_ready_marked_at="2026-05-02T10:00:00",
+        )
+
+        assert service.is_flow_waiting_review(flow_state) is True
