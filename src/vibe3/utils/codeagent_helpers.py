@@ -49,7 +49,9 @@ def strip_ansi(text: str) -> str:
 
 def summarize_backend_output(stderr: str, stdout: str) -> str:
     """Build a short, readable summary from backend stdout/stderr."""
-    raw_output = stderr or stdout
+    # Merge both streams to capture all error information
+    # stderr contains wrapper metadata, stdout contains actual errors
+    raw_output = f"{stderr}\n{stdout}" if stderr and stdout else stderr or stdout
     if not raw_output.strip():
         return "(no output)"
 
