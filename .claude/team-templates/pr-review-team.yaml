@@ -293,13 +293,19 @@ workflow:
         tool: Agent
         params:
           # 注意：parallel spawn 需要在单次响应中发起多个 Agent 调用
-          # 【重要】prompt 中不要写 {phase_1_output} 占位符
-          # 实际背景通过 SendMessage 发送，而非在 spawn prompt 中
+          # 【修复】在 spawn prompt 中嵌入完整背景，避免 agent idle
+          # 实际执行发现：spawn 后 SendMessage 可能延迟，导致 agent 立即 idle
           team_name: pr-review-team
           name: code-analyst
           subagent_type: pr-code-analyst
           model: haiku
-          prompt: "分析 PR #{pr_number} 的代码质量。等待接收背景信息后开始分析。"
+          prompt: |
+            分析 PR #{pr_number} 的代码质量。
+
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+
+            请基于以上背景分析代码质量。
           run_in_background: true
       - step: spawn_architect_reviewer
         tool: Agent
@@ -308,7 +314,13 @@ workflow:
           name: architect-reviewer
           subagent_type: pr-architect-reviewer
           model: sonnet
-          prompt: "评估 PR #{pr_number} 的架构影响。等待接收背景信息后开始评估。"
+          prompt: |
+            评估 PR #{pr_number} 的架构影响。
+
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+
+            请基于以上背景评估架构影响。
           run_in_background: true
       - step: spawn_security_reviewer
         tool: Agent
@@ -317,35 +329,17 @@ workflow:
           name: security-reviewer
           subagent_type: pr-security-reviewer
           model: sonnet
-          prompt: "评估 PR #{pr_number} 的安全性。等待接收背景信息后开始评估。"
+          prompt: |
+            评估 PR #{pr_number} 的安全性。
+
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+
+            请基于以上背景评估安全性。
           run_in_background: true
 
-      # 【关键步骤】使用 SendMessage 发送 Phase 1 背景给各 agent
-      # 这是规定动作，不可跳过！如果不发送，Phase 2 agents 无法获得背景信息
-      - step: send_context_to_phase_2
-        tool: SendMessage
-        params:
-          to: code-analyst
-          message: |
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-            请基于以上背景分析代码质量。
-      - step: send_context_to_phase_2
-        tool: SendMessage
-        params:
-          to: architect-reviewer
-          message: |
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-            请基于以上背景评估架构影响。
-      - step: send_context_to_phase_2
-        tool: SendMessage
-        params:
-          to: security-reviewer
-          message: |
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-            请基于以上背景评估安全性。
+      # 【说明】不再需要 SendMessage，背景已在 spawn prompt 中传递
+      # 如果需要补充额外信息，可使用 SendMessage，但非必需
       - step: wait_for_phase_2_results
         action: |
           等待所有 Phase 2 agents 返回结果。
@@ -355,7 +349,15 @@ workflow:
           - architect-reviewer
           - security-reviewer
 
-          超时：5 分钟
+          **等待策略**：
+          1. 收到 idle 通知 → 不操作，继续等待（idle 是正常状态，不代表完成）
+          2. 收到 task-notification（status=completed）→ 读取结果
+          3. 超时（5 分钟）→ 标注"审查不完整"，进入 Phase 3
+
+          **重要**：
+          - idle 通知是 agent 的正常状态（等待输入），不代表"未开始"或"失败"
+          - 实际审查结果通过 task-notification 返回
+          - 不要在收到 idle 后立即 SendMessage 提示 agent 执行任务
 
           如果超时仍有 agent 未返回：
           - 记录 WARNING
@@ -373,12 +375,23 @@ workflow:
     execution:
       - step: check_trigger_conditions
         action: |
-          判断是否触发Codex验证：
-          1. PR类型为 `security`
-          2. 改动行数 > 500 或影响关键架构（inspect base风险高）
+          判断是否触发Codex验证（两阶段判断）：
 
-          满足任一条件 → 执行Phase 2.5
-          不满足 → 跳过，直接进入Phase 3
+          **第一阶段：PR 类型判断**
+          满足以下任一条件：
+          1. PR类型为 `security`
+          2. 改动行数 > 500 或影响关键架构
+
+          **第二阶段：Phase 2 完整性判断**
+          required_agents = [code-analyst, architect-reviewer, security-reviewer]
+          检查是否有 agent 超时/未返回结果
+
+          **最终触发条件**：
+          - 第一阶段 AND 第二阶段 都满足 → 执行 Phase 2.5
+          - 仅第一阶段满足 → 跳过 Phase 2.5，直接进入 Phase 3
+          - 仅第二阶段满足 → 跳过 Phase 2.5（非 security PR 不强制 Codex）
+
+          **注意**：SKILL.md 中的升级规则（"Phase 2 报告不完整且 security PR"）即此两阶段判断。
 
       - step: collect_phase_2_reports
         action: |
