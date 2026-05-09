@@ -10,19 +10,29 @@ Queue rule:
 
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_labels import GhIssueLabelPort
+from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
+from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.queue_ordering import sort_ready_issues
+from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
+    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+    from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
 @dataclass
@@ -39,30 +49,221 @@ class GlobalDispatchCoordinator:
 
     def __init__(
         self,
+        config: OrchestraConfig,
         capacity: CapacityService,
-        dispatch_services: list[StateLabelDispatchService],
+        github: GitHubClient,
+        store: "SQLiteClient",
+        flow_manager: FlowManager,
         registry: "SessionRegistryService | None" = None,
+        executor: ThreadPoolExecutor | None = None,
     ) -> None:
+        self._config = config
         self._capacity = capacity
-        self._dispatch_services = dispatch_services
+        self._github = github
+        self._store = store
+        self._flow_manager = flow_manager
         self._registry = registry
+        self._executor = executor or ThreadPoolExecutor(
+            max_workers=config.max_concurrent_flows
+        )
+        self._owns_executor = executor is None
         self._frozen_queue: list[QueueEntry] | None = None
-        self._github = (
-            dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
+        self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
+        # Get supervisor_label from config
+        self._supervisor_label = config.supervisor_handoff.issue_label
+
+    def shutdown(self) -> None:
+        """Shutdown the executor if we own it."""
+        if self._owns_executor and self._executor:
+            self._executor.shutdown(wait=True)
+
+    def _find_role_for_state(
+        self, state: IssueState
+    ) -> TriggerableRoleDefinition | None:
+        """Find the role definition for a state label."""
+        for role in LABEL_DISPATCH_ROLES:
+            if role.trigger_state == state:
+                return role
+        return None
+
+    async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
+        """Poll GitHub for issues with a specific state label.
+
+        Args:
+            state: Issue state to poll for
+
+        Returns:
+            List of ready issues for this state
+        """
+        raw_issues = await asyncio.get_running_loop().run_in_executor(
+            self._executor,
+            lambda: self._github.list_issues(
+                limit=100,
+                state="open",
+                assignee=None,
+                repo=self._config.repo,
+                label=state.to_label(),
+            ),
         )
-        self._repo = dispatch_services[0].config.repo if dispatch_services else None
-        # Union manager_usernames from all services
-        self._manager_usernames = tuple(
-            username
-            for service in dispatch_services
-            for username in service.config.manager_usernames
+
+        ready = self._select_ready_issues(raw_issues, state)
+
+        append_orchestra_event(
+            "dispatcher",
+            f"poll_issues_by_state({state.value}): {len(ready)} ready issues",
         )
-        # Get supervisor_label from first service (should be same for all)
-        self._supervisor_label = (
-            dispatch_services[0].config.supervisor_handoff.issue_label
-            if dispatch_services
-            else "supervisor"
-        )
+        return ready
+
+    def _emit_dispatch_intent(
+        self, role: "TriggerableRoleDefinition", issue: IssueInfo
+    ) -> None:
+        """Emit dispatch intent for an issue.
+
+        Args:
+            role: Role definition for this dispatch
+            issue: Issue to dispatch
+        """
+        from vibe3.domain import publish
+        from vibe3.roles.registry import build_label_dispatch_event
+
+        # Pre-dispatch cleanup: remove conflicting state/* labels
+        # This ensures a single state label before dispatch.
+        old_state_labels = [
+            lb
+            for lb in issue.labels
+            if lb.startswith("state/") and lb != role.trigger_state.to_label()
+        ]
+        if old_state_labels:
+            try:
+                label_port = GhIssueLabelPort(repo=self._config.repo)
+                for old_lb in old_state_labels:
+                    label_port.remove_issue_label(issue.number, old_lb)
+            except Exception as exc:
+                logger.bind(domain="orchestra").warning(
+                    f"Failed to clean old state labels for #{issue.number}: {exc}"
+                )
+
+        branch, _ = self._flow_context(issue.number)
+        publish(build_label_dispatch_event(role, issue, branch=branch))
+
+    def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
+        """Get flow context (branch and state) for an issue.
+
+        Args:
+            issue_number: Issue number to look up
+
+        Returns:
+            Tuple of (branch, flow_state)
+        """
+        flow = self._flow_manager.get_flow_for_issue(issue_number)
+        branch = str(flow.get("branch") or "").strip() if flow else ""
+        if not branch:
+            return "", None
+        return branch, self._store.get_flow_state(branch)
+
+    def _select_ready_issues(
+        self, raw_issues: list[dict[str, object]], trigger_state: IssueState
+    ) -> list[IssueInfo]:
+        """Select ready issues by filtering through qualify gate and other checks.
+
+        Args:
+            raw_issues: Raw issue payloads from GitHub
+            trigger_state: The trigger state being collected
+
+        Returns:
+            Filtered and sorted ready issues
+        """
+        selected: list[IssueInfo] = []
+        role = self._find_role_for_state(trigger_state)
+        if role is None:
+            return selected
+
+        for item in raw_issues:
+            labels = self._normalize_labels(item.get("labels"))
+
+            # Untracked state: ignore issues with no state labels
+            if not any(lbl.startswith("state/") for lbl in labels):
+                continue
+
+            # Skip blocked issues (FAILED unified to BLOCKED)
+            if IssueState.BLOCKED.to_label() in labels:
+                continue
+
+            issue = IssueInfo.from_github_payload(item)
+            if issue is None:
+                continue
+
+            # BLOCKED_ROLE: collect all candidates without qualify gate.
+            # Gate runs at intent time in GlobalDispatchCoordinator.
+            if role.trigger_name == "blocked":
+                selected.append(issue)
+                continue
+
+            branch, flow_state = self._flow_context(issue.number)
+
+            # Qualify Gate — returns target state or None if blocked
+            target = self._qualify_gate.run_qualify_gate(
+                issue, branch, flow_state, labels, trigger_state
+            )
+            if target is None or target != trigger_state:
+                continue
+
+            # Role-specific branch existence requirements
+            if role.trigger_name != "manager":
+                if not branch or not self._is_auto_task_branch(branch):
+                    continue
+                if not self._flow_manager.git.branch_exists(branch):
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"skip #{issue.number}: branch '{branch}' not found in git",
+                    )
+                    continue
+
+            # Verify assignee/supervisor filters
+            # Always require manager assignee for all dispatch stages
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=self._config.manager_usernames,
+                require_manager_assignee=True,
+            ):
+                continue
+
+            selected.append(issue)
+
+        return sort_ready_issues(selected)
+
+    @staticmethod
+    def _normalize_labels(raw_labels: object) -> list[str]:
+        """Normalize raw labels from GitHub API.
+
+        Args:
+            raw_labels: Raw labels object from GitHub
+
+        Returns:
+            List of label names
+        """
+        labels: list[str] = []
+        if not isinstance(raw_labels, list):
+            return labels
+        for item in raw_labels:
+            if isinstance(item, dict):
+                name = item.get("name")
+                if isinstance(name, str) and name:
+                    labels.append(name)
+        return labels
+
+    @staticmethod
+    def _is_auto_task_branch(branch: str) -> bool:
+        """Check if branch is an auto-task branch.
+
+        Args:
+            branch: Branch name to check
+
+        Returns:
+            True if branch starts with 'task/issue-'
+        """
+        return branch.startswith("task/issue-")
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
@@ -86,24 +287,8 @@ class GlobalDispatchCoordinator:
             )
             return
 
-        import subprocess
-
-        try:
-            result = subprocess.run(
-                ["tmux", "list-sessions"],
-                capture_output=True,
-                text=True,
-                timeout=1,
-            )
-            vibe3_count = len(
-                [line for line in result.stdout.splitlines() if "vibe3-" in line]
-            )
-            live_worker_count = max(0, vibe3_count - 1)
-            max_capacity = self._capacity.config.max_concurrent_flows
-            available_slots = max(0, max_capacity - live_worker_count)
-        except Exception:
-            status = self._capacity.get_capacity_status("manager")
-            available_slots = status["remaining"]
+        status = self._capacity.get_capacity_status("manager")
+        available_slots = status["remaining"]
 
         if available_slots <= 0:
             append_orchestra_event(
@@ -132,7 +317,7 @@ class GlobalDispatchCoordinator:
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
-                manager_usernames=self._manager_usernames,
+                manager_usernames=self._config.manager_usernames,
                 require_manager_assignee=True,
             ):
                 append_orchestra_event(
@@ -173,23 +358,19 @@ class GlobalDispatchCoordinator:
 
             # For BLOCKED issues: run qualify gate at intent time (lazy evaluation)
             if issue.state == IssueState.BLOCKED:
-                blocked_service = self._find_service_for_state(IssueState.BLOCKED)
-                if blocked_service is None:
-                    self._frozen_queue.pop(index)
-                    continue
-                target_state = blocked_service.qualify_blocked_issue(issue)
+                target_state = self._qualify_gate.qualify_blocked_issue(issue)
                 if target_state is None:
                     # Still blocked — remove from frozen queue, re-collected next tick
                     self._frozen_queue.pop(index)
                     continue
-                service = self._find_service_for_state(target_state)
-                if service is None:
+                role = self._find_role_for_state(target_state)
+                if role is None:
                     self._frozen_queue.pop(index)
                     continue
                 entry.collected_state = target_state.value
             else:
-                service = self._find_service_for_state(issue.state)
-                if service is None:
+                role = self._find_role_for_state(issue.state)
+                if role is None:
                     self._frozen_queue.pop(index)
                     continue
 
@@ -199,9 +380,9 @@ class GlobalDispatchCoordinator:
                 append_orchestra_event(
                     "dispatcher",
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
-                    f"#{issue.number} ({service.role_def.registry_role})",
+                    f"#{issue.number} ({role.registry_role})",
                 )
-                service._emit_dispatch_intent(issue)
+                self._emit_dispatch_intent(role, issue)
                 # For BLOCKED issues, waiting_state must track the TARGET state
                 # (qualify gate already changed GitHub labels to target_state).
                 # Using issue.state.value ("blocked") cause _promote_progressed_entries
@@ -211,16 +392,16 @@ class GlobalDispatchCoordinator:
 
                 logger.bind(
                     domain="global_dispatch",
-                    role=service.role_def.registry_role,
+                    role=role.registry_role,
                     issue=issue.number,
                 ).info(
                     f"Emitted dispatch intent for #{issue.number} "
-                    f"({service.role_def.registry_role})"
+                    f"({role.registry_role})"
                 )
             except Exception as exc:
                 logger.bind(
                     domain="global_dispatch",
-                    role=service.role_def.registry_role,
+                    role=role.registry_role,
                     issue=issue.number,
                 ).error(f"Dispatch failed for #{issue.number}: {exc}")
             index += 1
@@ -251,11 +432,8 @@ class GlobalDispatchCoordinator:
             IssueState.BLOCKED,  # Qualify gate runs at intent time
             IssueState.READY,
         ):
-            service = self._find_service_for_state(state)
-            if service is None:
-                continue
             try:
-                issues = await service.collect_ready_issues()
+                issues = await self._poll_issues_by_state(state)
                 for issue in issues:
                     if issue.number in seen_issue_numbers:
                         continue
@@ -275,7 +453,7 @@ class GlobalDispatchCoordinator:
                 logger.bind(
                     domain="global_dispatch",
                     state=state.value,
-                ).error(f"collect_ready_issues failed for {state.value}: {exc}")
+                ).error(f"poll_issues_by_state failed for {state.value}: {exc}")
         append_orchestra_event(
             "dispatcher",
             f"GlobalDispatchCoordinator: queue collection complete, "
@@ -308,7 +486,7 @@ class GlobalDispatchCoordinator:
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
-                manager_usernames=self._manager_usernames,
+                manager_usernames=self._config.manager_usernames,
                 require_manager_assignee=True,
             ):
                 removed.append(entry)
@@ -374,10 +552,8 @@ class GlobalDispatchCoordinator:
 
     def _load_issue(self, issue_number: int) -> IssueInfo | None:
         """Load the current issue snapshot for an already-frozen issue."""
-        if self._github is None:
-            return None
         try:
-            payload = self._github.view_issue(issue_number, repo=self._repo)
+            payload = self._github.view_issue(issue_number, repo=self._config.repo)
         except Exception as exc:
             logger.bind(domain="global_dispatch", issue=issue_number).error(
                 f"view_issue failed for #{issue_number}: {exc}"
@@ -386,13 +562,3 @@ class GlobalDispatchCoordinator:
         if not isinstance(payload, dict):
             return None
         return IssueInfo.from_github_payload(payload)
-
-    def _find_service_for_state(
-        self,
-        state: IssueState,
-    ) -> StateLabelDispatchService | None:
-        """Find the dispatch service responsible for a state label."""
-        for service in self._dispatch_services:
-            if service.role_def.trigger_state == state:
-                return service
-        return None
