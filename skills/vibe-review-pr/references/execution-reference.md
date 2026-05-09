@@ -62,7 +62,7 @@ fresh spawn 的 Phase 2 agent 直接从初始 prompt 读取 `phase_1_output` 并
     team_name: pr-review-team
     name: code-analyst
     subagent_type: pr-code-analyst
-    model: haiku
+    model: sonnet
     prompt: |
       分析 PR #{pr_number} 的代码质量。
 
@@ -77,7 +77,7 @@ fresh spawn 的 Phase 2 agent 直接从初始 prompt 读取 `phase_1_output` 并
     team_name: pr-review-team
     name: architect-reviewer
     subagent_type: pr-architect-reviewer
-    model: sonnet
+    model: opus
     prompt: |
       评估 PR #{pr_number} 的架构影响。
 
