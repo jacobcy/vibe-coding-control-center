@@ -45,6 +45,29 @@ class ServeStatusService:
         self._display_failed_gate()
         self._display_error_tracking()
 
+    @staticmethod
+    def _clean_error_message(error_message: str, max_length: int = 60) -> str:
+        """Clean error message by removing TMPDIR and other noise.
+
+        Args:
+            error_message: Raw error message from error_log
+            max_length: Maximum length to truncate (default 60)
+
+        Returns:
+            Cleaned and truncated error message
+        """
+        # Remove CLAUDE_CODE_TMPDIR and everything after it
+        cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", error_message)[0].strip()
+
+        # Remove " | === Recent Errors ===" suffix
+        cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
+
+        # Remove trailing pipe separators
+        cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+
+        # Truncate to max_length
+        return cleaned[:max_length] if len(cleaned) > max_length else cleaned
+
     def _display_daemon_status(
         self,
         pid: int | None,
@@ -185,7 +208,7 @@ class ServeStatusService:
                         issue_display,
                         err["error_code"],
                         time_display,
-                        err["error_message"][:60],  # Truncate long messages
+                        self._clean_error_message(err["error_message"]),
                     )
 
                 self.console.print(table)
