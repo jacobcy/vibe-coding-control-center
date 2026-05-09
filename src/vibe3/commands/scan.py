@@ -57,10 +57,10 @@ def _run_governance_scan(tick_count: int | None = None) -> None:
         failed_gate=failed_gate,
     )
 
-    # Trigger governance scan
+    # Trigger governance scan (force=True to skip interval gating for manual trigger)
     # on_heartbeat_tick publishes GovernanceScanStarted event
     # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick()
+    facade.on_heartbeat_tick(force=True)
 
     logger.bind(domain="orchestra").info("Governance scan completed")
 
@@ -206,8 +206,8 @@ async def _run_combined_scan_async(tick_count: int | None = None) -> None:
         failed_gate=failed_gate,
     )
 
-    # Run governance scan first
-    facade.on_heartbeat_tick()
+    # Run governance scan first (force=True to skip interval gating for manual trigger)
+    facade.on_heartbeat_tick(force=True)
     logger.bind(domain="orchestra").info("Governance scan completed")
 
     # Then run supervisor scan
