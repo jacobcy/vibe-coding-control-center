@@ -131,14 +131,26 @@ def prepare_prompt_file(prompt: str, include_global_notice: bool = True) -> Path
 
 
 def sanitize_task_shell_meta(task: str) -> str:
-    """Replace shell glob meta characters with safe equivalents."""
+    """Replace shell meta characters with safe equivalents.
+
+    Covers both glob characters and special characters that trigger stdin mode
+    in codeagent-wrapper (newline, backslash, quotes, backtick, dollar).
+    """
     replacements = {
+        # Shell glob characters
         "*": "×",
         "?": "？",
         "[": "【",
         "]": "】",
         "{": "｛",
         "}": "｝",
+        # Shell special characters (trigger stdin mode)
+        "\\": "＼",  # Fullwidth backslash
+        '"': "＂",  # Fullwidth double quote
+        "'": "＇",  # Fullwidth single quote
+        "`": "｀",  # Fullwidth backtick
+        "$": "＄",  # Fullwidth dollar sign
+        "\n": " ",  # Newline -> space
     }
     result = task
     for meta, safe in replacements.items():
