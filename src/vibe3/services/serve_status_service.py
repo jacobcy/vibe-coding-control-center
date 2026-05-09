@@ -185,23 +185,43 @@ class ServeStatusService:
             if recent_errors:
                 table = Table(title="\n  Recent Errors (last 10)", show_lines=True)
                 table.add_column("Tick", style="cyan", width=6)
-                table.add_column("Issue", style="yellow", width=6)
+                table.add_column("Issue", style="yellow", width=10)
                 table.add_column("Code", style="magenta")
                 table.add_column("Time", style="dim", width=19)
                 table.add_column("Message", style="white")
 
                 for err in recent_errors:
-                    # Format time as HH:MM:SS (remove date part)
+                    # Format time as HH:MM:SS (convert UTC to local timezone)
                     time_str = err.get("created_at", "")
                     if time_str and len(time_str) >= 19:
-                        # Extract HH:MM:SS from "2026-05-06 09:13:19"
-                        time_display = time_str[11:19]
+                        # Convert UTC to local timezone (Asia/Shanghai, UTC+8)
+                        from datetime import datetime, timedelta, timezone
+
+                        try:
+                            # Parse UTC time from database
+                            utc_time = datetime.strptime(
+                                time_str[:19], "%Y-%m-%d %H:%M:%S"
+                            )
+                            utc_time = utc_time.replace(tzinfo=timezone.utc)
+
+                            # Convert to local timezone (UTC+8)
+                            local_tz = timezone(timedelta(hours=8))
+                            local_time = utc_time.astimezone(local_tz)
+
+                            # Extract HH:MM:SS
+                            time_display = local_time.strftime("%H:%M:%S")
+                        except (ValueError, TypeError):
+                            # Fallback: just extract time part
+                            time_display = time_str[11:19]
                     else:
                         time_display = time_str
 
-                    # Format issue number
+                    # Format issue number (NULL for governance errors)
                     issue_num = err.get("issue_number")
-                    issue_display = f"#{issue_num}" if issue_num else "-"
+                    if issue_num is None:
+                        issue_display = "governance"
+                    else:
+                        issue_display = f"#{issue_num}"
 
                     table.add_row(
                         str(err["tick_id"]),
