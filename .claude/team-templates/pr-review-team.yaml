@@ -266,7 +266,7 @@ workflow:
           team_name: pr-review-team
           name: context-researcher
           subagent_type: pr-context-researcher
-          model: haiku
+          model: sonnet  # 使用 sonnet 避免 haiku extended thinking 限制
           prompt: "收集 PR #{pr_number} 的背景信息..."
         wait_for_result: true  # 必须等待 Phase 1 完成
       - step: receive_context_report
@@ -297,7 +297,7 @@ workflow:
           team_name: pr-review-team
           name: code-analyst
           subagent_type: pr-code-analyst
-          model: haiku
+          model: sonnet  # 代码分析需要强模型，与 agent 定义一致
           prompt: |
             分析 PR #{pr_number} 的代码质量。
 
