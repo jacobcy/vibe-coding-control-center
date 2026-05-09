@@ -57,12 +57,14 @@ def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
         return [
             link["issue_number"] for link in issue_links if link["issue_role"] == "task"
         ]
-    except Exception:
+    except Exception as e:
         logger.bind(
             domain="pr",
             action="resolve_task_from_flow",
             branch=branch,
-        ).warning("Failed to resolve task from flow")
+            error_type=type(e).__name__,
+            error_msg=str(e),
+        ).warning(f"Failed to resolve bound tasks from flow: {e}")
         return []
 
 
