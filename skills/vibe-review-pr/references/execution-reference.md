@@ -48,35 +48,6 @@ TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
 
 接收报告优先级：team inbox → teammate-message → 必要时 SendMessage 补发。
 
-## Phase 2 Prep: Diff 文件提取（standard/refactor/large PR 必做）
-
-> architect-reviewer 工具集为 [Read, Grep, Glob, WebSearch]，无 Bash。必须由 team-lead 提前提取。
-
-```bash
-# spawn Phase 2 agents 之前执行
-mkdir -p temp/pr{pr_number}
-gh pr diff {pr_number} > temp/pr{pr_number}/full.diff
-
-# 提取每个改动文件（从 PR 分支）
-PR_BRANCH=$(gh pr view {pr_number} --json headRefName -q .headRefName)
-for f in src/vibe3/clients/github_project_client.py \
-          src/vibe3/services/project_status_sync_service.py; do  # 按实际 diff 列表
-  out="temp/pr{pr_number}/$(echo "$f" | tr '/' '_')"
-  git show "$PR_BRANCH:$f" > "$out"
-done
-```
-
-在 Phase 2 广播消息中附加：
-
-```markdown
-## 可读文件（team-lead 已提取到 temp/pr{pr_number}/）
-- full.diff
-- src_vibe3_clients_github_project_client.py  (345 LOC, NEW)
-- ...
-
-main 分支对照：直接 Read src/vibe3/... 路径即可。
-```
-
 ## Phase 2: 专项审查
 
 仅适用 `refactor / security / standard`。**Phase 1 必须先完成**，禁止并行启动。
