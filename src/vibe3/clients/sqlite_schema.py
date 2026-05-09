@@ -145,6 +145,17 @@ _CREATE_FAILED_GATE_STATE = """
     )
 """
 
+_CREATE_ORCHESTRA_QUEUE = """
+    CREATE TABLE IF NOT EXISTS orchestra_queue (
+        issue_number INTEGER PRIMARY KEY,
+        collected_state TEXT NOT NULL,
+        waiting_state TEXT,
+        enqueued_at TEXT NOT NULL,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+    )
+"""
+
 
 _CLEAN_STALE_VERDICT_LINES_SQL = """
     UPDATE flow_events
@@ -297,12 +308,19 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for index_sql in _CREATE_ERROR_LOG_INDEXES:
         cursor.execute(index_sql)
     cursor.execute(_CREATE_FAILED_GATE_STATE)
+    cursor.execute(_CREATE_ORCHESTRA_QUEUE)
 
     # Create indexes for runtime_session table
     for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
         stmt = stmt.strip()
         if stmt:
             cursor.execute(stmt)
+
+    # Create index for orchestra_queue retry_count queries
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_orchestra_queue_retry_count "
+        "ON orchestra_queue(retry_count)"
+    )
 
     # Migration: add refs column to flow_events if missing
     event_columns = {

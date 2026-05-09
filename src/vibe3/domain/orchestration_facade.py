@@ -92,6 +92,7 @@ class OrchestrationFacade(ServiceBase):
                 capacity=self._capacity,
                 dispatch_services=self._dispatch_services,
                 registry=registry,
+                store=store,
             )
 
     async def on_tick(self) -> None:

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import re
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.global_dispatch_coordinator import (
+    MAX_RETRY_COUNT,
     GlobalDispatchCoordinator,
     QueueEntry,
 )
@@ -66,7 +67,6 @@ def make_service(role: str, ready_issues: list) -> MagicMock:
     service.config.repo = "owner/repo"
     service._github = MagicMock()
     return service
-    return service
 
 
 def make_capacity(remaining: int = 1) -> MagicMock:
@@ -99,6 +99,14 @@ def install_issue_loader(
 
 
 class TestGlobalDispatchCoordinator:
+    @pytest.fixture(autouse=True)
+    def mock_subprocess_run(self):
+        """Mock subprocess.run to avoid tmux dependency in tests."""
+        with patch("subprocess.run") as mock_run:
+            # Make subprocess.run raise an exception to use capacity.get_capacity_status
+            mock_run.side_effect = Exception("tmux not available in tests")
+            yield mock_run
+
     @pytest.mark.asyncio
     async def test_dispatch_all_when_capacity_available(self) -> None:
         issues = [make_issue(1), make_issue(2)]
@@ -465,3 +473,175 @@ class TestGlobalDispatchCoordinator:
         assert normalized_events[3] == (
             "planner launch failed for #467: Failed to resolve permanent worktree"
         )
+
+    @pytest.mark.asyncio
+    async def test_queue_persisted_after_dispatch_intent(self) -> None:
+        """Verify SQLite contains entry after coordinate() emits dispatch intent."""
+        issue = make_issue(100)
+        service = make_service("planner", [issue])
+        capacity = make_capacity(remaining=1)
+
+        # Create mock store
+        store = MagicMock()
+        store.load_queue_entries.return_value = []
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service], store=store)
+        install_issue_loader(coordinator, {100: IssueState.CLAIMED})
+
+        await coordinator.coordinate()
+
+        # Verify persistence was called to save the entry
+        store.save_queue_entry.assert_called()
+        call_args = store.save_queue_entry.call_args
+        assert call_args[1]["issue_number"] == 100
+        assert call_args[1]["collected_state"] == "claimed"
+
+    @pytest.mark.asyncio
+    async def test_queue_loaded_on_coordinator_init(self) -> None:
+        """Verify entries restored from SQLite on coordinator initialization."""
+        # Setup mock store with persisted data
+        store = MagicMock()
+        store.load_queue_entries.return_value = [
+            {
+                "issue_number": 200,
+                "collected_state": "in-progress",
+                "waiting_state": None,
+                "retry_count": 2,
+            },
+            {
+                "issue_number": 201,
+                "collected_state": "review",
+                "waiting_state": "review",
+                "retry_count": 1,
+            },
+        ]
+
+        service = make_service("planner", [])
+        capacity = make_capacity(remaining=1)
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service], store=store)
+
+        # Verify queue was loaded from persistence
+        assert coordinator._frozen_queue is not None
+        assert len(coordinator._frozen_queue) == 2
+        assert coordinator._frozen_queue[0].issue_number == 200
+        assert coordinator._frozen_queue[0].retry_count == 2
+        assert coordinator._frozen_queue[1].issue_number == 201
+        assert coordinator._frozen_queue[1].waiting_state == "review"
+
+    @pytest.mark.asyncio
+    async def test_entry_removed_after_state_done(self) -> None:
+        """Verify SQLite cleanup on terminal state."""
+        issue = make_issue(300)
+        service = make_service("manager", [issue])
+        capacity = make_capacity(remaining=1)
+
+        store = MagicMock()
+        # Simulate a persisted entry being loaded
+        store.load_queue_entries.return_value = [
+            {
+                "issue_number": 300,
+                "collected_state": "ready",
+                "waiting_state": None,
+                "retry_count": 0,
+            }
+        ]
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service], store=store)
+        states = {300: IssueState.READY}
+        install_issue_loader(coordinator, states)
+
+        # First coordinate - dispatch intent emitted
+        await coordinator.coordinate()
+
+        # Now issue is done
+        states[300] = IssueState.DONE
+        await coordinator.coordinate()
+
+        # Verify entry was removed from persistence
+        store.remove_queue_entry.assert_called_with(300)
+
+    @pytest.mark.asyncio
+    async def test_retry_threshold_removes_entry(self) -> None:
+        """Verify auto-removal after exceeding MAX_RETRY_COUNT."""
+        service = make_service("planner", [])
+        capacity = make_capacity(remaining=1)
+
+        store = MagicMock()
+        # Return entry with retry_count exceeding threshold
+        store.load_queue_entries.return_value = [
+            {
+                "issue_number": 400,
+                "collected_state": "claimed",
+                "waiting_state": "claimed",
+                "retry_count": MAX_RETRY_COUNT + 1,
+            }
+        ]
+        store.get_queue_entries_over_retry_limit.return_value = [400]
+
+        coordinator = GlobalDispatchCoordinator(capacity, [service], store=store)
+        install_issue_loader(coordinator, {400: IssueState.CLAIMED})
+
+        await coordinator.coordinate()
+
+        # Verify entry was removed from both memory and persistence
+        assert coordinator._frozen_queue is not None
+        assert 400 not in [e.issue_number for e in coordinator._frozen_queue]
+        store.remove_queue_entry.assert_called_with(400)
+
+    @pytest.mark.asyncio
+    async def test_server_restart_preserves_queue(self) -> None:
+        """Integration test: queue survives simulated restart."""
+        issue = make_issue(500)
+        manager_service = make_service("manager", [issue])
+        planner_service = make_service("planner", [])
+        capacity = make_capacity(remaining=1)
+
+        # First run: collect and dispatch
+        store = MagicMock()
+        store.load_queue_entries.return_value = []
+
+        coordinator1 = GlobalDispatchCoordinator(
+            capacity, [manager_service, planner_service], store=store
+        )
+        install_issue_loader(coordinator1, {500: IssueState.READY})
+
+        await coordinator1.coordinate()
+        assert manager_service._emit_dispatch_intent.call_count == 1
+
+        # Verify entry was persisted with waiting_state
+        save_call = store.save_queue_entry.call_args
+        assert save_call[1]["issue_number"] == 500
+        assert save_call[1]["waiting_state"] == "ready"
+
+        # Simulate restart: load persisted state
+        store.load_queue_entries.return_value = [
+            {
+                "issue_number": 500,
+                "collected_state": "ready",
+                "waiting_state": "ready",
+                "retry_count": 1,
+            }
+        ]
+
+        coordinator2 = GlobalDispatchCoordinator(
+            capacity, [manager_service, planner_service], store=store
+        )
+        install_issue_loader(coordinator2, {500: IssueState.CLAIMED})  # State changed
+
+        # Verify queue was restored on restart
+        assert coordinator2._frozen_queue is not None
+        assert len(coordinator2._frozen_queue) == 1
+        assert coordinator2._frozen_queue[0].issue_number == 500
+        assert coordinator2._frozen_queue[0].retry_count == 1
+
+        # State changed from ready to claimed - should be promoted to front
+        await coordinator2.coordinate()
+        # Entry should be promoted and dispatched via planner service
+        assert len(coordinator2._frozen_queue) == 1
+        assert (
+            coordinator2._frozen_queue[0].waiting_state == "claimed"
+        )  # Set after dispatch
+        assert coordinator2._frozen_queue[0].retry_count == 0  # Reset on promotion
+        # Should dispatch via planner service (for CLAIMED state)
+        assert planner_service._emit_dispatch_intent.call_count == 1
