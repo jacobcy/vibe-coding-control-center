@@ -13,7 +13,7 @@ from pathlib import Path
 class TestWorkingDirectoryIndependence:
     """Verify tests don't depend on specific working directory."""
 
-    def test_repo_root_detection_works_from_subdirectory(self, tmp_path: Path) -> None:
+    def test_repo_root_detection_works_from_subdirectory(self) -> None:
         """Verify repo root detection works from any subdirectory."""
         import os
 
@@ -40,7 +40,7 @@ class TestWorkingDirectoryIndependence:
             # Restore original working directory
             os.chdir(original_cwd)
 
-    def test_config_loading_independent_of_cwd(self, tmp_path: Path) -> None:
+    def test_config_loading_independent_of_cwd(self) -> None:
         """Verify config loading works from any working directory."""
         import os
 
