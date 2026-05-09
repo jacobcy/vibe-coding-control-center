@@ -231,7 +231,7 @@ class OrchestrationFacade(ServiceBase):
             to_state=to_state,
         ).info("Emitting IssueStateChanged event")
 
-        publish(event)  # type: ignore[no-untyped-call]
+        publish(event)
 
     def on_heartbeat_tick(self) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
@@ -275,7 +275,7 @@ class OrchestrationFacade(ServiceBase):
             domain="orchestration_facade",
             tick_count=self._tick_count,
         ).info("Emitting GovernanceScanStarted event")
-        publish(event)  # type: ignore[no-untyped-call]
+        publish(event)
 
     def on_governance_decision(
         self,
@@ -343,4 +343,4 @@ class OrchestrationFacade(ServiceBase):
                 issue_number=event.issue_number,
                 supervisor_file=event.supervisor_file,
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
-            publish(event)  # type: ignore[no-untyped-call]
+            publish(event)
