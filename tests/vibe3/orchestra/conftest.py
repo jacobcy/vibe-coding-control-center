@@ -15,16 +15,22 @@ from vibe3.orchestra.global_dispatch_coordinator import (
 
 @pytest.fixture
 def make_issue() -> callable:
-    """Factory for creating mock issue objects."""
+    """Factory for creating IssueInfo objects.
 
-    def _make_issue(number: int, priority: int = 5) -> MagicMock:
-        issue = MagicMock()
-        issue.number = number
-        issue.labels = [f"priority/{priority}"]
-        issue.milestone = None
-        issue.assignees = ["manager-bot"]
-        issue.priority = priority
-        return issue
+    NOTE: This fixture returns IssueInfo objects (not MagicMock) to avoid
+    type comparison errors in sorting operations like sort_ready_issues().
+    MagicMock objects don't support <= comparisons with int values.
+    """
+
+    def _make_issue(number: int, priority: int = 5) -> IssueInfo:
+        return IssueInfo(
+            number=number,
+            title=f"Issue {number}",
+            state=IssueState.READY,
+            labels=[f"priority/{priority}", IssueState.READY.to_label()],
+            milestone=None,
+            assignees=["manager-bot"],
+        )
 
     return _make_issue
 
@@ -57,7 +63,7 @@ def make_coordinator() -> callable:
 
     def _make_coordinator(
         role: str = "manager",
-        ready_issues: list | None = None,
+        ready_issues: list[IssueInfo] | None = None,
         config: OrchestraConfig | None = None,
         capacity: MagicMock | None = None,
         with_branches: bool = False,
@@ -114,20 +120,25 @@ def make_coordinator() -> callable:
 
             async def mock_poll(state: IssueState) -> list[IssueInfo]:
                 if state == target_state:
-                    issues_info = [
+                    return [
                         IssueInfo(
                             number=issue.number,
-                            title=f"Issue {issue.number}",
+                            title=issue.title,
                             state=target_state,
                             labels=[
+                                *[
+                                    lb
+                                    for lb in issue.labels
+                                    if not lb.startswith("state/")
+                                ],
                                 target_state.to_label(),
-                                f"priority/{issue.priority}",
                             ],
-                            assignees=["manager-bot"],
+                            milestone=issue.milestone,
+                            url=issue.url,
+                            assignees=issue.assignees or ["manager-bot"],
                         )
                         for issue in ready_issues
                     ]
-                    return issues_info
                 return []
 
             coordinator._poll_issues_by_state = mock_poll
