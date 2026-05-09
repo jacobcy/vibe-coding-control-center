@@ -34,6 +34,31 @@ description: |
 
 需要消息样例或恢复路径时再读 `references/execution-reference.md` / `references/recovery-playbook.md`。
 
+## Common Pitfalls（已知陷阱，issue #787）
+
+### Deferred Tools 加载（自动处理，但需了解）
+
+**问题**：SendMessage 是 deferred tool，调用前必须先加载 schema，否则报 InputValidationError。
+
+**解决方案**：所有 teammate agent 定义已配置自动加载：
+- 每个 agent 在开始工作前自动调用 `ToolSearch(query="select:SendMessage")`
+- Team-lead **无需**在 prompt 中手动提示
+
+**诊断**（如 agent 未发送报告）：
+```bash
+tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
+```
+
+详见：`.claude/agents/pr-*.md` 的 "Deferred Tools 初始化" 章节。
+
+### 其他常见陷阱
+
+详见 `references/debug-guide.md`：
+- Pane 可见性说明（非 bug）
+- Agent 执行过程查看方法
+- Model 参数核查
+- PR 编号路由诊断
+
 ## Session Lifecycle（强制理解，issue #742 反复踩坑）
 
 > **核心误解**：把 Team 当成"PR-级"对象。事实上 Team 是"会话级"对象。
