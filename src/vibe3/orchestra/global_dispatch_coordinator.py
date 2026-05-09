@@ -18,6 +18,7 @@ from loguru import logger
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.queue_persistence import QueuePersistence
 from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class GlobalDispatchCoordinator:
         self._capacity = capacity
         self._dispatch_services = dispatch_services
         self._registry = registry
-        self._store = store
+        self._persistence = QueuePersistence(store)
         self._github = (
             dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
         )
@@ -71,57 +72,12 @@ class GlobalDispatchCoordinator:
         )
 
         # Load persisted queue on initialization
-        self._frozen_queue: list[QueueEntry] | None = None
-        if self._store is not None:
-            try:
-                persisted = self._store.load_queue_entries()
-                if persisted:
-                    self._frozen_queue = [
-                        QueueEntry(
-                            issue_number=entry["issue_number"],
-                            collected_state=entry["collected_state"],
-                            waiting_state=entry["waiting_state"],
-                            retry_count=entry["retry_count"],
-                        )
-                        for entry in persisted
-                    ]
-                    logger.bind(domain="global_dispatch").info(
-                        f"Loaded {len(self._frozen_queue)} queue entries "
-                        "from persistence"
-                    )
-            except Exception as exc:
-                logger.bind(domain="global_dispatch").error(
-                    f"Failed to load persisted queue: {exc}"
-                )
+        self._frozen_queue: list[QueueEntry] | None = (
+            self._persistence.load_persisted_queue()
+        )
 
-    async def coordinate(self) -> None:
-        """Run one heartbeat tick against the frozen queue."""
-        if self._frozen_queue is None or len(self._frozen_queue) == 0:
-            self._frozen_queue = await self._collect_frozen_queue()
-            if not self._frozen_queue:
-                append_orchestra_event(
-                    "dispatcher",
-                    "GlobalDispatchCoordinator: no candidates",
-                )
-                return
-            # Persist newly collected queue entries
-            self._persist_queue_entries()
-
-        self._promote_progressed_entries()
-
-        # Check and remove entries exceeding retry threshold
-        if self._store is not None:
-            self._check_retry_threshold()
-
-        # Check if queue was emptied by _promote_progressed_entries
-        # (e.g., all issues became blocked/done)
-        if not self._frozen_queue:
-            append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: queue emptied by state changes",
-            )
-            return
-
+    def _get_available_capacity(self) -> int:
+        """Check current capacity and return available slots."""
         import subprocess
 
         try:
@@ -136,17 +92,18 @@ class GlobalDispatchCoordinator:
             )
             live_worker_count = max(0, vibe3_count - 1)
             max_capacity = self._capacity.config.max_concurrent_flows
-            available_slots = max(0, max_capacity - live_worker_count)
+            return max(0, max_capacity - live_worker_count)
         except Exception:
             status = self._capacity.get_capacity_status("manager")
-            available_slots = status["remaining"]
+            return status["remaining"]
 
-        if available_slots <= 0:
-            append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: capacity full",
-            )
-            return
+    def _dispatch_ready_issues(self, available_slots: int) -> int:
+        """Dispatch ready issues from the queue.
+
+        Returns the number of issues dispatched.
+        """
+        if self._frozen_queue is None:
+            return 0
 
         dispatched_count = 0
         index = 0
@@ -157,13 +114,13 @@ class GlobalDispatchCoordinator:
                     f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
                     f"skipped remaining (capacity full)",
                 )
-                return
+                return dispatched_count
 
             entry = self._frozen_queue[index]
             issue = self._load_issue(entry.issue_number)
             if issue is None or issue.state is None:
                 self._frozen_queue.pop(index)
-                self._remove_persisted_entry(entry.issue_number)
+                self._persistence.remove_persisted_entry(entry.issue_number)
                 continue
 
             if should_skip_from_queue(
@@ -178,12 +135,12 @@ class GlobalDispatchCoordinator:
                     "from queue (supervisor or assignee check failed)",
                 )
                 self._frozen_queue.pop(index)
-                self._remove_persisted_entry(entry.issue_number)
+                self._persistence.remove_persisted_entry(entry.issue_number)
                 continue
 
             if issue.state == IssueState.DONE:
                 self._frozen_queue.pop(index)
-                self._remove_persisted_entry(entry.issue_number)
+                self._persistence.remove_persisted_entry(entry.issue_number)
                 continue
 
             # Update collected_state to current state for tracking
@@ -249,7 +206,7 @@ class GlobalDispatchCoordinator:
                 dispatched_count += 1
 
                 # Persist updated waiting_state
-                self._update_persisted_entry(entry)
+                self._persistence.update_persisted_entry(entry)
 
                 logger.bind(
                     domain="global_dispatch",
@@ -266,6 +223,53 @@ class GlobalDispatchCoordinator:
                     issue=issue.number,
                 ).error(f"Dispatch failed for #{issue.number}: {exc}")
             index += 1
+
+        return dispatched_count
+
+    async def coordinate(self) -> None:
+        """Run one heartbeat tick against the frozen queue."""
+        if self._frozen_queue is None or len(self._frozen_queue) == 0:
+            self._frozen_queue = await self._collect_frozen_queue()
+            if not self._frozen_queue:
+                append_orchestra_event(
+                    "dispatcher",
+                    "GlobalDispatchCoordinator: no candidates",
+                )
+                return
+            # Persist newly collected queue entries
+            self._persistence.persist_queue_entries(self._frozen_queue)
+
+        self._promote_progressed_entries()
+
+        # Check and remove entries exceeding retry threshold
+        removed_entries = self._persistence.check_retry_threshold(
+            self._frozen_queue or []
+        )
+        if removed_entries and self._frozen_queue:
+            removed_numbers = {e.issue_number for e in removed_entries}
+            self._frozen_queue = [
+                e for e in self._frozen_queue if e.issue_number not in removed_numbers
+            ]
+
+        # Check if queue was emptied by _promote_progressed_entries
+        # (e.g., all issues became blocked/done)
+        if not self._frozen_queue:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: queue emptied by state changes",
+            )
+            return
+
+        available_slots = self._get_available_capacity()
+
+        if available_slots <= 0:
+            append_orchestra_event(
+                "dispatcher",
+                "GlobalDispatchCoordinator: capacity full",
+            )
+            return
+
+        dispatched_count = self._dispatch_ready_issues(available_slots)
 
         if dispatched_count > 0:
             green = "\033[32m"
@@ -339,6 +343,18 @@ class GlobalDispatchCoordinator:
         retained: list[QueueEntry] = []
         removed: list[QueueEntry] = []
         for entry in self._frozen_queue:
+            should_remove, reason = self._should_remove_entry(entry)
+
+            if should_remove:
+                if reason != "issue_not_found":
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
+                        f"from queue ({reason}, requires human intervention)",
+                    )
+                removed.append(entry)
+                continue
+
             if entry.waiting_state is None:
                 retained.append(entry)
                 continue
@@ -347,25 +363,11 @@ class GlobalDispatchCoordinator:
             if issue is None or issue.state is None:
                 continue
 
-            if should_skip_from_queue(
-                issue,
-                supervisor_label=self._supervisor_label,
-                manager_usernames=self._manager_usernames,
-                require_manager_assignee=True,
-            ):
-                removed.append(entry)
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
-                    "from queue (supervisor or assignee check failed)",
-                )
-                continue
-
             current_state = issue.state.value
             if current_state == entry.waiting_state:
                 # Issue returned to same state - increment retry count
                 entry.retry_count += 1
-                self._update_persisted_entry(entry)
+                self._persistence.update_persisted_entry(entry)
 
                 # State unchanged. Check whether the agent session that would
                 # advance it is still alive.  If no session exists the label can
@@ -389,23 +391,12 @@ class GlobalDispatchCoordinator:
                 retained.append(entry)
                 continue
 
-            # Blocked state requires human intervention - remove from queue
-            if current_state == "blocked":
-                removed.append(entry)
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
-                    f"from queue (state changed to {current_state}, "
-                    f"requires human intervention)",
-                )
-                continue
-
             # Progress detected (state changed to non-terminal) - promote to front
             entry.waiting_state = None
             entry.collected_state = current_state  # Sync with current state
             entry.retry_count = 0  # Reset retry count on successful state transition
             promoted.append(entry)
-            self._update_persisted_entry(entry)
+            self._persistence.update_persisted_entry(entry)
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: requeued #{entry.issue_number} "
@@ -422,7 +413,7 @@ class GlobalDispatchCoordinator:
 
         # Remove deleted entries from persistence
         for entry in removed:
-            self._remove_persisted_entry(entry.issue_number)
+            self._persistence.remove_persisted_entry(entry.issue_number)
 
     def _load_issue(self, issue_number: int) -> IssueInfo | None:
         """Load the current issue snapshot for an already-frozen issue."""
@@ -449,73 +440,28 @@ class GlobalDispatchCoordinator:
                 return service
         return None
 
-    def _persist_queue_entries(self) -> None:
-        """Persist all queue entries to SQLite."""
-        if self._store is None or not self._frozen_queue:
-            return
-        try:
-            for entry in self._frozen_queue:
-                self._store.save_queue_entry(
-                    issue_number=entry.issue_number,
-                    collected_state=entry.collected_state or "",
-                    waiting_state=entry.waiting_state,
-                    retry_count=entry.retry_count,
-                )
-        except Exception as exc:
-            logger.bind(domain="global_dispatch").error(
-                f"Failed to persist queue entries: {exc}"
-            )
+    def _should_remove_entry(self, entry: QueueEntry) -> tuple[bool, str]:
+        """Check if entry should be removed from queue.
 
-    def _update_persisted_entry(self, entry: QueueEntry) -> None:
-        """Update a single queue entry in SQLite."""
-        if self._store is None:
-            return
-        try:
-            self._store.save_queue_entry(
-                issue_number=entry.issue_number,
-                collected_state=entry.collected_state or "",
-                waiting_state=entry.waiting_state,
-                retry_count=entry.retry_count,
-            )
-        except Exception as exc:
-            logger.bind(domain="global_dispatch", issue=entry.issue_number).error(
-                f"Failed to update persisted entry: {exc}"
-            )
+        Returns (should_remove, reason) tuple.
+        """
+        if entry.waiting_state is None:
+            return False, ""
 
-    def _remove_persisted_entry(self, issue_number: int) -> None:
-        """Remove a queue entry from SQLite."""
-        if self._store is None:
-            return
-        try:
-            self._store.remove_queue_entry(issue_number)
-        except Exception as exc:
-            logger.bind(domain="global_dispatch", issue=issue_number).error(
-                f"Failed to remove persisted entry: {exc}"
-            )
+        issue = self._load_issue(entry.issue_number)
+        if issue is None or issue.state is None:
+            return True, "issue_not_found"
 
-    def _check_retry_threshold(self) -> None:
-        """Remove entries exceeding MAX_RETRY_COUNT."""
-        if self._store is None or not self._frozen_queue:
-            return
-        try:
-            exceeders = self._store.get_queue_entries_over_retry_limit(MAX_RETRY_COUNT)
-            for issue_number in exceeders:
-                # Remove from in-memory queue
-                self._frozen_queue = [
-                    e for e in self._frozen_queue if e.issue_number != issue_number
-                ]
-                # Remove from persistence
-                self._store.remove_queue_entry(issue_number)
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: removed #{issue_number} "
-                    f"from queue (retry_count > {MAX_RETRY_COUNT})",
-                )
-                logger.bind(domain="global_dispatch", issue=issue_number).warning(
-                    f"Removed issue #{issue_number} from queue "
-                    f"(retry threshold exceeded)"
-                )
-        except Exception as exc:
-            logger.bind(domain="global_dispatch").error(
-                f"Failed to check retry threshold: {exc}"
-            )
+        if should_skip_from_queue(
+            issue,
+            supervisor_label=self._supervisor_label,
+            manager_usernames=self._manager_usernames,
+            require_manager_assignee=True,
+        ):
+            return True, "supervisor_or_assignee_check_failed"
+
+        current_state = issue.state.value
+        if current_state == "blocked":
+            return True, f"state_changed_to_{current_state}"
+
+        return False, ""

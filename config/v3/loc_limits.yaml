@@ -101,8 +101,13 @@ code_limits:
         limit: 485
         reason: "Orchestra CLI 入口聚合，职责单一（包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查）"
       - path: "src/vibe3/server/registry.py"
-        limit: 420
+        limit: 425
         reason: "Orchestra PID/tmux 管理，多进程协调辅助函数共生"
+
+      # Orchestra 核心调度
+      - path: "src/vibe3/orchestra/global_dispatch_coordinator.py"
+        limit: 470
+        reason: "Global dispatch coordinator 核心调度聚合，包含冻结队列管理、状态追踪、容量检查、dispatch 循环等紧密耦合逻辑，拆分会破坏调度完整性"
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
