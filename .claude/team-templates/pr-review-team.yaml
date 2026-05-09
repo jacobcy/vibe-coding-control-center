@@ -191,7 +191,7 @@ agents:
     model: opus
     description: 架构审查专家，评估 PR 对项目架构的影响
     spawn_config:
-      tools: [Read, Grep, Glob, WebSearch]
+      tools: [Read, Grep, Glob, WebSearch, Bash]
       run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [结论, 置信度, 关键发现]
@@ -319,6 +319,13 @@ workflow:
 
             ## PR #{pr_number} 背景报告
             {phase_1_output}
+
+            ## 获取 diff 指引
+            你可以使用 Bash 工具获取所需的 diff 数据：
+            - 完整 diff: `gh pr diff {pr_number}`
+            - 特定文件: `git show {pr_branch}:{file_path}`
+            - 提交历史: `git log --oneline {base_branch}..{pr_branch}`
+            - 改动统计: `git diff --stat {base_branch}...{pr_branch}`
 
             请基于以上背景评估架构影响。
           run_in_background: true

@@ -111,6 +111,25 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 `TaskList` 可随时用于确认进度，避免重复创建。
 
+### Step 6.6: Task Lifecycle（跨 PR 管理）
+
+> **踩坑记录**：跨 PR 审查时，旧 PR 的 task 会累积在 task list 中，造成视觉混乱和状态不一致。
+
+**每个 PR 开始审查前**：
+
+1. 检查 `TaskList`，如有上一轮 PR 的未完成 task，标记为 `completed`（附带说明：上一 PR 遗留）
+2. 如有上一轮 PR 已完成但未标记的 task，标记为 `completed`
+3. 为当前 PR 创建 Phase 1 task（按 Step 6.5）
+
+**每个 Phase 执行时**：
+
+- 开始 Phase → `TaskUpdate(status="in_progress")`
+- 完成 Phase → `TaskUpdate(status="completed")`
+
+**会话结束时**（Step 10）：
+
+- 所有 task 由 TeamDelete 自动清理，无需手动删除
+
 ### Step 7: PR 分类（多维判断，禁止简化）
 
 > **常见错误**：看到"文档改动"就归类 `simple`。这是错的。
@@ -138,40 +157,10 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 Phase 契约：
 
 - 1 背景调研：必须先于 Phase 2 完成；产出 `phase_1_output` 并回传 team-lead。**team-lead 等待期间只允许执行 context_bundle 中定义的 shell 基础命令（gh pr view、CI 状态等）并将结果传给 context-researcher，禁止自行做深度代码分析（读 diff、读源码、分析架构）——这是 context-researcher 的专属职责。** 易错点是只打印到终端、未保存为变量、未通过 SendMessage 回传；以及 team-lead 在等待期间"顺手"自己做分析，导致 Phase 1 产出变成 team-lead 的个人研究而非 context-researcher 的独立调研。
-- 2 专项审查：多 agent 在同一响应内并行 spawn；spawn 后立即 SendMessage，把 `phase_1_output` 广播给每个；对 standard/refactor/large PR，先提取 PR diff 文件。易错点是与 Phase 1 并行启动、忘发背景导致盲审、architect-reviewer 无 Bash 而未提前提取 diff。
+- 2 专项审查：多 agent 在同一响应内并行 spawn；spawn 后立即 SendMessage，把 `phase_1_output` 广播给每个。易错点是与 Phase 1 并行启动、忘发背景导致盲审。
 - 2.5 Codex验证（可选）：触发条件是安全PR、大型PR（>500行）、冲突仲裁。**⚠️ 升级规则：若 Phase 2 报告不完整（有 agent 超时/限流/未回报），且 PR 满足触发条件（large_pr / security），Phase 2.5 从「可选」升级为「强制」——用 Codex 独立复查补偿缺失报告，不能直接跳到 Phase 3。** 可跳过条件（仅当 Phase 2 三方报告**全部到齐**时）：三方结论一致且证据充分，须在 Phase 3 明确注明跳过理由。易错点是与 Phase 2 并行执行、Phase 2 不完整却以"跳过"理由绕过 Codex。
 - 3 综合判断：检查 `required - received` 缺失；冲突必须仲裁；缺失只能标“审查不完整”；如有 Phase 2.5 报告可作为补充材料。易错点是替缺失 agent 脑补或用错误 teammate-message 内容继续。
 - 4 写回：模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue；CRITICAL 阻塞 ≥ 2 个或涉及架构重设计时应建议 REJECT 而非 auto-fix。易错点是把范围外技术债塞进当前 PR comment，或对复杂架构问题错误使用 auto-fix。
-
-### Phase 2 Prep: 提取 PR Diff（standard/refactor/large PR 必做）
-
-> **重要**：`architect-reviewer` 工具集为 `[Read, Grep, Glob, WebSearch]`，**无 Bash**。它无法执行 `gh pr diff` 或 `git show`。若不提前提取文件，architect-reviewer 将请求 team-lead 补发，造成延迟。
-
-在 Phase 2 spawn 之前，**team-lead** 必须执行：
-
-```bash
-# 1. 创建 temp 目录
-mkdir -p temp/pr{pr_number}
-
-# 2. 提取完整 diff
-gh pr diff {pr_number} > temp/pr{pr_number}/full.diff
-
-# 3. 提取各个 PR 修改文件（使用 PR 分支名称）
-git show {pr_branch}:{file_path} > temp/pr{pr_number}/{basename}
-# 例：git show task/issue-283:src/vibe3/clients/github_project_client.py \
-#       > temp/pr738/src_vibe3_clients_github_project_client.py
-```
-
-在 Phase 1 → Phase 2 广播中，额外附加文件路径说明：
-
-```
-## 可读文件路径（team-lead 已提取）
-- temp/pr{pr_number}/full.diff
-- temp/pr{pr_number}/{basename1}  ({LOC} LOC, NEW/MODIFIED)
-- ...
-
-main 分支对照：直接 Read 工具读 src/vibe3/... 路径（当前 cwd 是 main 分支）。
-```
 
 > **没有 Phase 5**。完成 Phase 4 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
 
