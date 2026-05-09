@@ -89,7 +89,7 @@ main 分支对照：直接 Read src/vibe3/... 路径即可。
     team_name: pr-review-team
     name: code-analyst
     subagent_type: pr-code-analyst
-    model: haiku
+    model: sonnet
     prompt: "分析 PR #{pr_number} 的代码质量。等待背景信息后开始。"
     run_in_background: true
 
@@ -98,7 +98,7 @@ main 分支对照：直接 Read src/vibe3/... 路径即可。
     team_name: pr-review-team
     name: architect-reviewer
     subagent_type: pr-architect-reviewer
-    model: sonnet
+    model: opus
     prompt: "评估 PR #{pr_number} 的架构影响。等待背景信息后开始。"
     run_in_background: true
 

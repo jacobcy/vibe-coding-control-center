@@ -62,8 +62,8 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 7. 创建 Backlog Tasks：TeamCreate 完成后立即创建（见下方 Backlog Setup）。
 8. 判断 PR 类型：多维判断（见下）。
 9. 执行审查：Phase 1 → 2 → 3 → 4，严格串行。
-10. 询问继续：continue → 回 Step 3，复用 Team；end → Step 10。
-11. TeamDelete：仅当 Step 9 选 end；先向所有 teammates 发 `shutdown_request`，再 TeamDelete；恢复流程可例外。
+10. 询问继续：continue → 回 Step 3，复用 Team；end → Step 11。
+11. TeamDelete：仅当 Step 10 选 end；先向所有 teammates 发 `shutdown_request`，再 TeamDelete；恢复流程可例外。
 
 ### Step 6.5: Backlog Setup（TeamCreate 后先建 Phase 1，后续按 PR 类型补建）
 
@@ -298,6 +298,8 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - 背景报告未送达
 - teammate-message PR 编号路由错误（Claude Code 已知 bug #40166 / #39651）
 
+执行过程看不到 / model 不对 / PR 编号错位 → `references/debug-guide.md`。
+
 ## File Map
 
 文件清单：
@@ -305,6 +307,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - `SKILL.md`：生命周期、phase 契约、质量标准、硬边界。
 - `references/execution-reference.md`：消息样例与等待策略。
 - `references/recovery-playbook.md`：故障恢复路径。
+- `references/debug-guide.md`：pane 可见性说明、agent 执行过程查看方法、model 参数核查、PR 编号路由诊断。
 - `.claude/team-templates/pr-review-team.yaml`：团队配置真源。
 - `.claude/agents/pr-*.md`：teammate 项目特定职责。
 - `docs/references/team-guide.md`：Team 功能通用背景。
