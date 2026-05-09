@@ -67,6 +67,7 @@ def summarize_backend_output(stderr: str, stdout: str) -> str:
         "Command:",
         "PID:",
         "Log:",
+        "CLAUDE_CODE_TMPDIR:",
         "Traceback (most recent call last):",
     )
     detail_markers = (
