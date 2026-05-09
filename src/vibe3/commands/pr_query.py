@@ -96,7 +96,14 @@ def _resolve_pr_target(
     try:
         pr = pr_svc.github_client.get_pr(None, current_branch)
         resolved_pr = pr.number if pr else None
-    except Exception:
+    except Exception as e:
+        logger.bind(
+            domain="pr",
+            action="resolve_pr_target",
+            branch=current_branch,
+            error_type=type(e).__name__,
+            error_msg=str(e),
+        ).debug(f"Failed to resolve PR from current branch: {e}")
         resolved_pr = None
 
     return PrQueryTarget(
