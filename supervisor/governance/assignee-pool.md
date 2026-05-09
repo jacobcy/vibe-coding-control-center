@@ -171,6 +171,22 @@ issue 是否可纳入？
   - 若 pool 为空：写 `[governance suggest]` 说明不确定性，放行给 manager
   - 若 pool 非空：保守等待
 
+**可自动恢复的 blocked issue**
+- #123: state/blocked (blocked_reason: state unchanged)
+  - 调用 `gh issue view 123 --json body` → blocked_reason = "state unchanged"
+  - 调用 `vibe3 flow show --branch task/issue-123` → plan_ref = "docs/plans/xxx.md"
+  - authoritative ref 存在，说明 agent 已完成工作但漏改 state
+  - 调用 `vibe3 task resume 123 --label auto -y`
+  - 写 `[governance auto-recover]` comment 说明已恢复
+  - **结论**：自动恢复成功
+
+**不可自动恢复的 blocked issue**
+- #456: state/blocked (blocked_reason: external dependency)
+  - 调用 `gh issue view 456 --json body` → blocked_reason = "external dependency"
+  - blocked_reason 不是 "state unchanged"，说明需要真实的人类介入
+  - 写 `[governance suggest]` comment 建议人类检查外部依赖状态
+  - **结论**：不自动恢复，建议人类处理
+
 ## What It Produces
 
 - running issues summary
@@ -214,7 +230,21 @@ Steps:
    - 已有有效 flow / live dispatch 的 issue，从候选中排除
    - 被硬规则阻塞的 issue，从候选中排除
 3. 对 ready candidates 按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 排序
-4. 检查是否存在可自动补偿的 `state unchanged` blocked issues
+4. **Blocked Issues 抽查恢复**：
+   - 随机抽取 1-2 个处于 `state/blocked` 的 issues 进行检查
+   - 对选中的 blocked issue：
+     a. 调用 `gh issue view <number> --json body` 获取 issue body
+     b. 从 body 中提取 `blocked_reason` 字段
+     c. 如果 `blocked_reason == "state unchanged"`：
+        - 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
+        - 检查 `plan_ref`、`report_ref` 或 `audit_ref` 是否存在
+        - 如果存在任意一个 authoritative ref：
+          - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
+          - 写 `[governance auto-recover]` comment 说明恢复原因和依据
+        - 如果没有任何 authoritative ref：
+          - 写 `[governance suggest]` comment 建议人类处理
+     d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
+        - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
 5. 输出治理结论
 
 Decision sketch:
@@ -229,12 +259,30 @@ Decision sketch:
   - 已在 `state/blocked` 但依赖已解除的 issue：写 `[governance suggest]` 评论建议人类 resume
   - 已过时的 issue：写 `[governance suggest]` 评论建议关闭
 - **自动补偿（唯一允许的执行动作）**：
-  - 当前必须是 `state/blocked`
-  - `blocked_reason` 必须精确匹配 `state unchanged`
-  - 必须先读取 `flow show`
-  - 只有当 authoritative `plan_ref`、`report_ref` 或 `audit_ref` 已存在时，才允许把 state 恢复到 `state/handoff`
-  - governance 不读取或解释 verdict；只做漏改 state 的最小纠偏
-  - 没有 authoritative ref、同时存在多种不一致信号、或无法唯一判断时，一律不自动恢复，只写建议评论
+
+  **抽查策略**：
+  - 每次随机抽取 1-2 个 `state/blocked` issues 进行检查
+  - 不需要检查所有 blocked issues（governance 每小时运行，会逐步覆盖）
+
+  **前置检查**：
+  1. 对选中的 blocked issue 调用 `gh issue view <number> --json body` 获取 blocked_reason
+  2. 仅当 `blocked_reason == "state unchanged"` 时继续检查
+
+  **Ref 检查**：
+  1. 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
+  2. 检查是否存在 `plan_ref`、`report_ref` 或 `audit_ref`
+  3. 如果存在任意一个，执行自动恢复；否则写建议评论
+
+  **恢复动作**：
+  - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
+  - 写 `[governance auto-recover]` comment 说明恢复原因和依据
+  - **注意**：只做最小 state 纠偏，不推进后续阶段
+
+  **禁止场景**（不自动恢复）：
+  - blocked_reason 不是 "state unchanged"（如外部依赖、手动阻塞、测试失败等）
+  - 没有任何 authoritative ref（说明 agent 确实未完成工作）
+  - 存在多种不一致信号（无法唯一判断）
+  - 以上场景一律写 `[governance suggest]` 评论建议人类处理
 - **label 调整（仅非 state labels）**：
   - milestone 调整
   - roadmap 调整
@@ -327,7 +375,6 @@ Exit:
 - 当前 label 为 `state/blocked`
 - `blocked_reason == "state unchanged"`
 - `flow show` 中已存在 authoritative `plan_ref`、`report_ref` 或 `audit_ref`
-- 目标状态可唯一确定为 `state/handoff`
 
 执行格式：
 
@@ -335,15 +382,13 @@ Exit:
 [governance auto-recover] 已自动恢复 state
 
 恢复原因：检测到 blocked 原因是 state unchanged，但 authoritative ref 已存在，判定为 agent 漏改 state。
-恢复动作：state/blocked -> state/handoff
+恢复命令：vibe3 task resume <number> --label auto -y
 依据：<plan_ref 或 report_ref 或 audit_ref>
 说明：本动作只做最小一致性修正，不代表后续阶段已完成。
 ```
 
 禁止：
 
-- 不得恢复到 `state/claimed`
-- 不得恢复到 `state/in-progress`
 - 不得基于 verdict 决定恢复与否
 - 不得在没有 authoritative ref 时自动恢复
 - 不得连续推进多个状态
