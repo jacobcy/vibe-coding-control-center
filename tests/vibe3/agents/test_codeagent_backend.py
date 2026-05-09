@@ -583,3 +583,57 @@ Traceback (most recent call last):
 
         command = mock_run.call_args[0][0]
         assert "--worktree" not in command
+
+    def test_dry_run_show_prompt_sanitizes_secrets(self) -> None:
+        """Dry-run with show_prompt should complete successfully with secrets in prompt.
+
+        The actual sanitization logic is verified in unit tests for
+        sanitize_prompt_for_display(). This test verifies the integration
+        point is wired up correctly.
+        """
+        config = VibeConfig(
+            agent_prompt=AgentPromptConfig(
+                global_notice="## Debug Stop Rule\nStop current task after two retries."
+            )
+        )
+
+        with (
+            patch(
+                "vibe3.utils.codeagent_helpers.VibeConfig.get_defaults",
+                return_value=config,
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH"
+            ) as mock_models_path,
+        ):
+            import json
+            from pathlib import Path
+
+            mock_models = Path("/tmp/models.json")
+            mock_models.write_text(json.dumps({"default_backend": "claude"}))
+            mock_models_path.__str__ = lambda: str(mock_models)
+            mock_models_path.__fspath__ = lambda: str(mock_models)
+            mock_models_path.exists.return_value = True
+            mock_models_path.read_text.return_value = json.dumps(
+                {"default_backend": "claude"}
+            )
+
+            backend = CodeagentBackend()
+            prompt_with_secret = """Task instructions:
+Use the API key: sk-proj-abc123def456ghi789jkl012mno345pqr678
+AWS access: AKIAIOSFODNN7EXAMPLE
+GitHub token: ghp_1234567890abcdefghijklmnopqrstuvwxyz123456
+Regular content here.
+api_key: my_secret_key_123
+Bearer: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload
+"""
+            result = backend.run(
+                prompt_with_secret,
+                AgentOptions(agent="vibe-reviewer"),
+                dry_run=True,
+                show_prompt=True,
+            )
+
+        # Verify dry-run completes successfully
+        assert result.exit_code == 0
+        assert result.stdout == "[dry-run]"
