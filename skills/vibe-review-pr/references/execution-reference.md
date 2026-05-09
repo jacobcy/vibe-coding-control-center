@@ -4,6 +4,27 @@
 
 > 审查会话只有 4 个 phase：背景调研 → 专项审查 → 综合判断 → 写回。完成 Phase 4 控制权回 Step 9。**没有 Phase 5**，不要操作 teammates 的 idle / pane / inbox。
 
+## Step 6: TeamCreate + Backlog Setup
+
+> **顺序铁律**：先 TeamCreate，后 TaskCreate。反序创建的 task 不关联 team，TaskList 永远返回空。
+
+```python
+# 1. 创建 Team
+TeamCreate(team_name="pr-review-team", description="PR review for PR #{pr_number}")
+
+# 2. TeamCreate 成功后立即创建 phase 追踪 tasks
+t1 = TaskCreate(subject="Phase 1: Context research",    description="...")
+t2 = TaskCreate(subject="Phase 2: Parallel review",     description="...")
+t3 = TaskCreate(subject="Phase 2.5: Codex verification", description="(optional) >500 LOC trigger")
+t4 = TaskCreate(subject="Phase 3: Synthesis",           description="...")
+t5 = TaskCreate(subject="Phase 4: Write back",          description="...")
+
+# 3. 立即将 Phase 1 标记为 in_progress 并归属 team-lead
+TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
+
+# TaskList 可随时验证 5 个 task 都可见
+```
+
 ## Phase 1: 背景调研
 
 产出 `phase_1_output` 并回传 team-lead。
@@ -26,6 +47,35 @@
 ```
 
 接收报告优先级：team inbox → teammate-message → 必要时 SendMessage 补发。
+
+## Phase 2 Prep: Diff 文件提取（standard/refactor/large PR 必做）
+
+> architect-reviewer 工具集为 [Read, Grep, Glob, WebSearch]，无 Bash。必须由 team-lead 提前提取。
+
+```bash
+# spawn Phase 2 agents 之前执行
+mkdir -p temp/pr{pr_number}
+gh pr diff {pr_number} > temp/pr{pr_number}/full.diff
+
+# 提取每个改动文件（从 PR 分支）
+PR_BRANCH=$(gh pr view {pr_number} --json headRefName -q .headRefName)
+for f in src/vibe3/clients/github_project_client.py \
+          src/vibe3/services/project_status_sync_service.py; do  # 按实际 diff 列表
+  out="temp/pr{pr_number}/$(echo "$f" | tr '/' '_')"
+  git show "$PR_BRANCH:$f" > "$out"
+done
+```
+
+在 Phase 2 广播消息中附加：
+
+```markdown
+## 可读文件（team-lead 已提取到 temp/pr{pr_number}/）
+- full.diff
+- src_vibe3_clients_github_project_client.py  (345 LOC, NEW)
+- ...
+
+main 分支对照：直接 Read src/vibe3/... 路径即可。
+```
 
 ## Phase 2: 专项审查
 
@@ -140,6 +190,21 @@ cat ~/.claude/projects/.../<sessionId>.jsonl | grep -A 5 "PR #"
 **comment 禁含**：百分制 / 字母评分 / 内部 phase 标题作叙事结构 / 与本 PR 无关的项目级指标。
 
 范围外的真实技术债转 follow-up issue，不塞 comment。
+
+## Step 10: 会话结束（TeamDelete 前必发 shutdown_request）
+
+```python
+# 1. 向所有活跃 teammates 广播 shutdown_request
+for agent in ["code-analyst", "architect-reviewer", "security-reviewer", "context-researcher"]:
+    SendMessage(to=agent, message={"type": "shutdown_request"})
+
+# 2. 等待 idle 通知（通常 < 5s），然后执行 TeamDelete
+TeamDelete()
+
+# 3. 若 TeamDelete 返回 "no team found"（agents 已自行退出）
+#    fallback 手动清理：
+#    rm -rf ~/.claude/teams/pr-review-team ~/.claude/tasks/pr-review-team
+```
 
 ## AskUserQuestion 样例
 
