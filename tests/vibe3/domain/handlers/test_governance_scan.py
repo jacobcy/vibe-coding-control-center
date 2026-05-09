@@ -51,6 +51,8 @@ class TestGovernanceScanHandler:
             in mock_append_governance_event.call_args.args[0]
         )
 
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -63,6 +65,8 @@ class TestGovernanceScanHandler:
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.governance_scan import (
             handle_governance_scan_started,
@@ -70,6 +74,11 @@ class TestGovernanceScanHandler:
 
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
+
+        # Mock registry to return no live governance sessions
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -95,6 +104,8 @@ class TestGovernanceScanHandler:
         assert "governance" in call_args.cmd
         assert "5" in call_args.cmd  # tick_count
 
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.orchestra.logging.append_governance_event")
@@ -105,6 +116,8 @@ class TestGovernanceScanHandler:
         mock_append_governance_event: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.governance_scan import (
             handle_governance_scan_started,
@@ -112,6 +125,11 @@ class TestGovernanceScanHandler:
 
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
+
+        # Mock registry to return no live governance sessions
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
 
         mock_status = MagicMock()
         mock_status.snapshot.return_value = MagicMock(circuit_breaker_state="open")
@@ -122,6 +140,8 @@ class TestGovernanceScanHandler:
         mock_append_governance_event.assert_called_once()
         assert "circuit breaker OPEN" in mock_append_governance_event.call_args.args[0]
 
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -134,6 +154,8 @@ class TestGovernanceScanHandler:
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.governance_scan import (
             handle_governance_scan_started,
@@ -141,6 +163,11 @@ class TestGovernanceScanHandler:
 
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
+
+        # Mock registry to return no live governance sessions
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
@@ -157,6 +184,8 @@ class TestGovernanceScanHandler:
         mock_coordinator.dispatch_execution.assert_called_once()
         mock_append_governance_event.assert_called()
 
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.services.orchestra_status_service.OrchestraStatusService")
     @patch("vibe3.execution.flow_dispatch.FlowManager")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -169,6 +198,8 @@ class TestGovernanceScanHandler:
         mock_coordinator_cls: MagicMock,
         mock_flow_cls: MagicMock,
         mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.governance_scan import (
             handle_governance_scan_started,
@@ -176,6 +207,11 @@ class TestGovernanceScanHandler:
 
         mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
         mock_from_settings.return_value = mock_config
+
+        # Mock registry to return no live governance sessions
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
 
         mock_coordinator = MagicMock()
         mock_coordinator.dispatch_execution.side_effect = RuntimeError(

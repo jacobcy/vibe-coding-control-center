@@ -6,7 +6,6 @@ Extracted from orchestra/serve_utils.py.
 import os
 import shlex
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -23,8 +22,6 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.webhook_utils import make_webhook_router
@@ -79,12 +76,7 @@ def _build_server_with_launch_cwd(
     failed_gate = FailedGate(store=shared_store)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
-    # Shutdown cleanup: mark all sessions stopped when the server exits.
-    # Same clean-slate semantics as startup -- session lifecycle is owned by
-    # the server. Agents may still be running in tmux; they are not killed.
-    heartbeat.set_shutdown_callback(shared_registry.clear_all_sessions)
 
-    shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
     shared_flow_manager = FlowManager(config, registry=shared_registry)
     shared_circuit_breaker = None
 
@@ -123,37 +115,25 @@ def _build_server_with_launch_cwd(
             WorktreeCleanupService(config, repo_path=launch_cwd or Path.cwd())
         )
 
-    # Build dispatch services for all trigger states.
-    # These are NOT registered directly with the heartbeat — instead they are
-    # passed to OrchestrationFacade and called concurrently from its on_tick(),
-    # reducing heartbeat services from 6 to 1 (the facade itself).
-    dispatch_services = []
-    if config.state_label_dispatch.enabled:
-        for role_service in LABEL_DISPATCH_ROLES:
-            dispatch_services.append(
-                StateLabelDispatchService(
-                    config,
-                    github=shared_github,
-                    executor=shared_executor,
-                    flow_manager=shared_flow_manager,
-                    registry=shared_registry,
-                    capacity=shared_capacity,
-                    role_def=role_service,
-                )
-            )
-
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
+    # GlobalDispatchCoordinator is created internally by the facade.
     facade = OrchestrationFacade(
         config=config,
-        dispatch_services=dispatch_services,
         capacity=shared_capacity,
         failed_gate=failed_gate,
+        store=shared_store,
     )
     heartbeat.register(facade)
 
-    # GovernanceService and SupervisorHandoffService are deleted.
+    # Combined shutdown callback for all services
+    def shutdown_all() -> None:
+        """Cleanup all services on shutdown."""
+        shared_registry.clear_all_sessions()
+        facade.shutdown()
+
+    heartbeat.set_shutdown_callback(shutdown_all)
     # Governance and supervisor dispatch are now handled inline by
     # OrchestrationFacade via roles/governance.py and roles/supervisor.py
     # through ExecutionCoordinator — no per-role service or handler needed.

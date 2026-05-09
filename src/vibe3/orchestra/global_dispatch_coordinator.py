@@ -10,19 +10,36 @@ Queue rule:
 
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
+from vibe3.domain import publish
+from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
+from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.dispatch_queue_helpers import (
+    clean_old_state_labels,
+    find_role_for_state,
+    get_flow_context,
+    load_issue,
+    promote_progressed_entries,
+    select_ready_issues,
+)
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.utils.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
+    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+    from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
 @dataclass
@@ -39,30 +56,82 @@ class GlobalDispatchCoordinator:
 
     def __init__(
         self,
+        config: OrchestraConfig,
         capacity: CapacityService,
-        dispatch_services: list[StateLabelDispatchService],
+        github: GitHubClient,
+        store: "SQLiteClient",
+        flow_manager: FlowManager,
         registry: "SessionRegistryService | None" = None,
+        executor: ThreadPoolExecutor | None = None,
     ) -> None:
+        self._config = config
         self._capacity = capacity
-        self._dispatch_services = dispatch_services
+        self._github = github
+        self._store = store
+        self._flow_manager = flow_manager
         self._registry = registry
+        self._executor = executor or ThreadPoolExecutor(
+            max_workers=config.max_concurrent_flows
+        )
+        self._owns_executor = executor is None
         self._frozen_queue: list[QueueEntry] | None = None
-        self._github = (
-            dispatch_services[0]._github if dispatch_services else None  # noqa: SLF001
+        self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
+        self._supervisor_label = config.supervisor_handoff.issue_label
+
+    def shutdown(self) -> None:
+        """Shutdown the executor if we own it."""
+        if self._owns_executor and self._executor:
+            self._executor.shutdown(wait=True)
+
+    async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
+        """Poll GitHub for issues with a specific state label."""
+        raw_issues = await asyncio.get_running_loop().run_in_executor(
+            self._executor,
+            lambda: self._github.list_issues(
+                limit=100,
+                state="open",
+                assignee=None,
+                repo=self._config.repo,
+                label=state.to_label(),
+            ),
         )
-        self._repo = dispatch_services[0].config.repo if dispatch_services else None
-        # Union manager_usernames from all services
-        self._manager_usernames = tuple(
-            username
-            for service in dispatch_services
-            for username in service.config.manager_usernames
+
+        ready = select_ready_issues(
+            raw_issues,
+            state,
+            self._config,
+            self._github,
+            self._store,
+            self._flow_manager,
+            self._qualify_gate,
+            self._supervisor_label,
         )
-        # Get supervisor_label from first service (should be same for all)
-        self._supervisor_label = (
-            dispatch_services[0].config.supervisor_handoff.issue_label
-            if dispatch_services
-            else "supervisor"
+
+        append_orchestra_event(
+            "dispatcher",
+            f"poll_issues_by_state({state.value}): {len(ready)} ready issues",
         )
+        return ready
+
+    def _emit_dispatch_intent(
+        self, role: "TriggerableRoleDefinition", issue: IssueInfo
+    ) -> None:
+        """Emit dispatch intent for an issue."""
+        # Pre-dispatch cleanup: remove conflicting state/* labels
+        clean_old_state_labels(issue, role, self._config)
+
+        branch, _ = self._flow_context(issue.number)
+        publish(build_label_dispatch_event(role, issue, branch=branch))
+
+    def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
+        """Get flow context for an issue (backward compatibility)."""
+        return get_flow_context(
+            issue_number, self._config, self._github, self._store, self._flow_manager
+        )
+
+    def _load_issue(self, issue_number: int) -> IssueInfo | None:
+        """Load issue snapshot (backward compatibility)."""
+        return load_issue(issue_number, self._config, self._github)
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
@@ -77,8 +146,6 @@ class GlobalDispatchCoordinator:
 
         self._promote_progressed_entries()
 
-        # Check if queue was emptied by _promote_progressed_entries
-        # (e.g., all issues became blocked/done)
         if not self._frozen_queue:
             append_orchestra_event(
                 "dispatcher",
@@ -86,24 +153,8 @@ class GlobalDispatchCoordinator:
             )
             return
 
-        import subprocess
-
-        try:
-            result = subprocess.run(
-                ["tmux", "list-sessions"],
-                capture_output=True,
-                text=True,
-                timeout=1,
-            )
-            vibe3_count = len(
-                [line for line in result.stdout.splitlines() if "vibe3-" in line]
-            )
-            live_worker_count = max(0, vibe3_count - 1)
-            max_capacity = self._capacity.config.max_concurrent_flows
-            available_slots = max(0, max_capacity - live_worker_count)
-        except Exception:
-            status = self._capacity.get_capacity_status("manager")
-            available_slots = status["remaining"]
+        status = self._capacity.get_capacity_status("manager")
+        available_slots = status["remaining"]
 
         if available_slots <= 0:
             append_orchestra_event(
@@ -132,7 +183,7 @@ class GlobalDispatchCoordinator:
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
-                manager_usernames=self._manager_usernames,
+                manager_usernames=self._config.manager_usernames,
                 require_manager_assignee=True,
             ):
                 append_orchestra_event(
@@ -147,16 +198,13 @@ class GlobalDispatchCoordinator:
                 self._frozen_queue.pop(index)
                 continue
 
-            # Update collected_state to current state for tracking
-            # No longer "avoid" state changes - assignee check is sufficient
             entry.collected_state = issue.state.value
 
             if entry.waiting_state is not None:
                 index += 1
                 continue
 
-            # Per-issue active session gate:
-            # Prevent dispatch if ANY worker role session is still live for this issue.
+            # Per-issue active session gate
             if self._registry is not None:
                 active = self._registry.get_live_sessions_for_issue(
                     issue_number=entry.issue_number,
@@ -171,25 +219,20 @@ class GlobalDispatchCoordinator:
                     index += 1
                     continue
 
-            # For BLOCKED issues: run qualify gate at intent time (lazy evaluation)
+            # For BLOCKED issues: run qualify gate at intent time
             if issue.state == IssueState.BLOCKED:
-                blocked_service = self._find_service_for_state(IssueState.BLOCKED)
-                if blocked_service is None:
-                    self._frozen_queue.pop(index)
-                    continue
-                target_state = blocked_service.qualify_blocked_issue(issue)
+                target_state = self._qualify_gate.qualify_blocked_issue(issue)
                 if target_state is None:
-                    # Still blocked — remove from frozen queue, re-collected next tick
                     self._frozen_queue.pop(index)
                     continue
-                service = self._find_service_for_state(target_state)
-                if service is None:
+                role = find_role_for_state(target_state)
+                if role is None:
                     self._frozen_queue.pop(index)
                     continue
                 entry.collected_state = target_state.value
             else:
-                service = self._find_service_for_state(issue.state)
-                if service is None:
+                role = find_role_for_state(issue.state)
+                if role is None:
                     self._frozen_queue.pop(index)
                     continue
 
@@ -199,28 +242,24 @@ class GlobalDispatchCoordinator:
                 append_orchestra_event(
                     "dispatcher",
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
-                    f"#{issue.number} ({service.role_def.registry_role})",
+                    f"#{issue.number} ({role.registry_role})",
                 )
-                service._emit_dispatch_intent(issue)
-                # For BLOCKED issues, waiting_state must track the TARGET state
-                # (qualify gate already changed GitHub labels to target_state).
-                # Using issue.state.value ("blocked") cause _promote_progressed_entries
-                # to detect a false state change and re-dispatch on the next tick.
+                self._emit_dispatch_intent(role, issue)
                 entry.waiting_state = entry.collected_state
                 dispatched_count += 1
 
                 logger.bind(
                     domain="global_dispatch",
-                    role=service.role_def.registry_role,
+                    role=role.registry_role,
                     issue=issue.number,
                 ).info(
                     f"Emitted dispatch intent for #{issue.number} "
-                    f"({service.role_def.registry_role})"
+                    f"({role.registry_role})"
                 )
             except Exception as exc:
                 logger.bind(
                     domain="global_dispatch",
-                    role=service.role_def.registry_role,
+                    role=role.registry_role,
                     issue=issue.number,
                 ).error(f"Dispatch failed for #{issue.number}: {exc}")
             index += 1
@@ -248,14 +287,11 @@ class GlobalDispatchCoordinator:
             IssueState.IN_PROGRESS,
             IssueState.CLAIMED,
             IssueState.HANDOFF,
-            IssueState.BLOCKED,  # Qualify gate runs at intent time
+            IssueState.BLOCKED,
             IssueState.READY,
         ):
-            service = self._find_service_for_state(state)
-            if service is None:
-                continue
             try:
-                issues = await service.collect_ready_issues()
+                issues = await self._poll_issues_by_state(state)
                 for issue in issues:
                     if issue.number in seen_issue_numbers:
                         continue
@@ -275,7 +311,7 @@ class GlobalDispatchCoordinator:
                 logger.bind(
                     domain="global_dispatch",
                     state=state.value,
-                ).error(f"collect_ready_issues failed for {state.value}: {exc}")
+                ).error(f"poll_issues_by_state failed for {state.value}: {exc}")
         append_orchestra_event(
             "dispatcher",
             f"GlobalDispatchCoordinator: queue collection complete, "
@@ -284,115 +320,51 @@ class GlobalDispatchCoordinator:
         return queue
 
     def _promote_progressed_entries(self) -> None:
-        """Move progressed issues to the front; remove blocked/failed from queue.
-
-        Blocked and failed states require human intervention and should not be
-        automatically retried by the dispatcher. Remove them from the frozen queue
-        to avoid wasting dispatch slots.
-        """
+        """Move progressed issues to the front; remove blocked/failed from queue."""
         if not self._frozen_queue:
             return
 
-        promoted: list[QueueEntry] = []
-        retained: list[QueueEntry] = []
-        removed: list[QueueEntry] = []
-        for entry in self._frozen_queue:
-            if entry.waiting_state is None:
-                retained.append(entry)
-                continue
+        # Convert QueueEntry to dict for helper function
+        queue_dicts = [
+            {
+                "issue_number": e.issue_number,
+                "collected_state": e.collected_state,
+                "waiting_state": e.waiting_state,
+            }
+            for e in self._frozen_queue
+        ]
 
-            issue = self._load_issue(entry.issue_number)
-            if issue is None or issue.state is None:
-                continue
+        promoted, retained, removed = promote_progressed_entries(
+            queue_dicts,
+            self._config,
+            self._github,
+            self._registry,
+            self._supervisor_label,
+            load_issue_func=self._load_issue,
+        )
 
-            if should_skip_from_queue(
-                issue,
-                supervisor_label=self._supervisor_label,
-                manager_usernames=self._manager_usernames,
-                require_manager_assignee=True,
-            ):
-                removed.append(entry)
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
-                    "from queue (supervisor or assignee check failed)",
-                )
-                continue
-
-            current_state = issue.state.value
-            if current_state == entry.waiting_state:
-                # State unchanged. Check whether the agent session that would
-                # advance it is still alive.  If no session exists the label can
-                # never change ─ promote the entry for re-dispatch so the queue
-                # can eventually drain and re-collect.
-                if self._registry is not None:
-                    active = self._registry.get_live_sessions_for_issue(
-                        issue_number=entry.issue_number,
-                        roles=["manager", "planner", "executor", "reviewer"],
-                    )
-                    if not active:
-                        entry.waiting_state = None
-                        promoted.append(entry)
-                        append_orchestra_event(
-                            "dispatcher",
-                            f"GlobalDispatchCoordinator: requeued "
-                            f"#{entry.issue_number} "
-                            f"(no active session, state={current_state})",
-                        )
-                        continue
-                retained.append(entry)
-                continue
-
-            # Blocked state requires human intervention - remove from queue
-            if current_state == "blocked":
-                removed.append(entry)
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
-                    f"from queue (state changed to {current_state}, "
-                    f"requires human intervention)",
-                )
-                continue
-
-            # Progress detected (state changed to non-terminal) - promote to front
-            entry.waiting_state = None
-            entry.collected_state = current_state  # Sync with current state
-            promoted.append(entry)
-            append_orchestra_event(
-                "dispatcher",
-                f"GlobalDispatchCoordinator: requeued #{entry.issue_number} "
-                f"to front after state change to {current_state}",
+        # Convert back to QueueEntry
+        promoted_entries = [
+            QueueEntry(
+                issue_number=e["issue_number"],
+                collected_state=e.get("collected_state"),
+                waiting_state=e.get("waiting_state"),
             )
+            for e in promoted
+        ]
 
-        # Update frozen queue: promoted + retained (removed entries discarded)
-        if promoted or retained:
-            self._frozen_queue = promoted + retained
+        retained_entries = [
+            QueueEntry(
+                issue_number=e["issue_number"],
+                collected_state=e.get("collected_state"),
+                waiting_state=e.get("waiting_state"),
+            )
+            for e in retained
+        ]
+
+        # Update frozen queue
+        if promoted_entries or retained_entries:
+            self._frozen_queue = promoted_entries + retained_entries
         else:
-            # All entries removed (e.g., all issues became blocked)
-            # Clear frozen queue to trigger fresh collection on next tick
+            # All entries removed - trigger fresh collection
             self._frozen_queue = None
-
-    def _load_issue(self, issue_number: int) -> IssueInfo | None:
-        """Load the current issue snapshot for an already-frozen issue."""
-        if self._github is None:
-            return None
-        try:
-            payload = self._github.view_issue(issue_number, repo=self._repo)
-        except Exception as exc:
-            logger.bind(domain="global_dispatch", issue=issue_number).error(
-                f"view_issue failed for #{issue_number}: {exc}"
-            )
-            return None
-        if not isinstance(payload, dict):
-            return None
-        return IssueInfo.from_github_payload(payload)
-
-    def _find_service_for_state(
-        self,
-        state: IssueState,
-    ) -> StateLabelDispatchService | None:
-        """Find the dispatch service responsible for a state label."""
-        for service in self._dispatch_services:
-            if service.role_def.trigger_state == state:
-                return service
-        return None

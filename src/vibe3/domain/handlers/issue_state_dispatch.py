@@ -52,7 +52,7 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
                 actor="agent:manager",
             )
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         config = load_orchestra_config()
 
         target_state = (

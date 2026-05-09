@@ -53,7 +53,6 @@ def _run_governance_scan(tick_count: int | None = None) -> None:
     facade = OrchestrationFacade(
         tick_count=tick_count if tick_count is not None else 0,
         config=config,
-        dispatch_services=None,  # Not needed for governance scan
         capacity=shared_capacity,
         failed_gate=failed_gate,
     )
@@ -100,7 +99,6 @@ async def _run_supervisor_scan_async() -> None:
     facade = OrchestrationFacade(
         tick_count=0,
         config=config,
-        dispatch_services=None,
         capacity=shared_capacity,
         failed_gate=failed_gate,
     )
@@ -204,7 +202,6 @@ async def _run_combined_scan_async(tick_count: int | None = None) -> None:
     facade = OrchestrationFacade(
         tick_count=tick_count if tick_count is not None else 0,
         config=config,
-        dispatch_services=None,
         capacity=shared_capacity,
         failed_gate=failed_gate,
     )
