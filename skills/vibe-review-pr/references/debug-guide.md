@@ -54,19 +54,18 @@ cat ~/.claude/teams/pr-review-team/inboxes/architect-reviewer.json 2>/dev/null
 ls -lht ~/.claude/projects/*/*/tool-results/*.txt 2>/dev/null | head -20
 ```
 
-## SendMessage 是 Deferred Tool
+## Deferred Tools 自动加载
 
-teammate 在发送消息前必须先加载工具 schema，否则调用会报 InputValidationError：
+所有 teammate agents 已在定义文件中配置自动加载 deferred tools schema：
 
-```python
-# 正确做法：先 ToolSearch 再 SendMessage
-ToolSearch(query="select:SendMessage")
-SendMessage(to="team-lead", message="...", summary="...")
-```
+- **自动执行**：每个 agent 在开始工作前会自动调用 `ToolSearch(query="select:SendMessage")`
+- **无需手动干预**：team-lead 无需在 prompt 中提示，agent 会自行处理
+- **已配置 agents**：pr-context-researcher, pr-code-analyst, pr-architect-reviewer, pr-security-reviewer
 
-如果 teammate 迟迟没有发送报告，可能是卡在 ToolSearch 步骤。检查方法：
+如果 teammate 迟迟没有发送报告，检查方法：
 ```bash
-tmux capture-pane -t <pane-id> -p | grep -E "ToolSearch|SendMessage|deferred"
+# 检查 agent 是否成功加载 SendMessage
+tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
 ```
 
 ## Model 参数核查

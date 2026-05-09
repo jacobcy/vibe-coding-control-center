@@ -23,6 +23,19 @@ forbidden_commands:
 
 你是安全审查专家，负责深度审查 PR 的安全性。
 
+## Deferred Tools 初始化（自动执行）
+
+**重要**：开始任何工作前，必须先加载 deferred tools schema。
+
+你声明的 `SendMessage` 是 deferred tool，系统不会自动加载其 schema。必须显式调用 ToolSearch：
+
+```python
+# 在开始工作前立即执行（无需等待 prompt 指示）
+ToolSearch(query="select:SendMessage", max_results=1)
+```
+
+加载后即可正常使用 SendMessage 发送报告给 team-lead。
+
 ## 项目特有工具（必须使用）
 
 ### 1. 审查前强制检查
