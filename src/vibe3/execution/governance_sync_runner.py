@@ -24,6 +24,7 @@ from vibe3.services.orchestra_status_service import OrchestraStatusService
 def run_governance_sync(
     *,
     tick_count: int,
+    material_override: str | None = None,
     dry_run: bool = False,
     show_prompt: bool = False,
     session_id: str | None = None,
@@ -36,6 +37,7 @@ def run_governance_sync(
 
     Args:
         tick_count: Tick number for governance material rotation
+        material_override: Optional governance role to override material rotation
         dry_run: If True, print command without executing
         show_prompt: If True, print prompt content in dry-run mode
         session_id: Optional session ID for resume
@@ -55,12 +57,16 @@ def run_governance_sync(
         tick_count=tick_count,
     )
     render_result = render_governance_prompt(
-        config, snapshot_context, tick_count=tick_count
+        config,
+        snapshot_context,
+        tick_count=tick_count,
+        material_override=material_override,
     )
     prompt_content = render_result.rendered_text
 
     if dry_run:
-        echo(f"-> Governance dry-run: tick={tick_count}")
+        material_info = f" material={material_override}" if material_override else ""
+        echo(f"-> Governance dry-run: tick={tick_count}{material_info}")
         if show_prompt:
             echo("--- Prompt ---")
             echo(
@@ -70,7 +76,8 @@ def run_governance_sync(
             )
         return
 
-    echo(f"-> Executing governance tick={tick_count}...")
+    material_info = f" material={material_override}" if material_override else ""
+    echo(f"-> Executing governance tick={tick_count}{material_info}...")
 
     try:
         result = CodeagentBackend().run(
