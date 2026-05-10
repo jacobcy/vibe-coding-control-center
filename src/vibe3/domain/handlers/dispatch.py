@@ -19,7 +19,7 @@ from vibe3.domain.events import (
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
 )
-from vibe3.domain.events.flow_lifecycle import DomainEvent
+from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -116,6 +116,7 @@ def _dispatch_role_intent(
     ).warning(f"{role.capitalize()} dispatch not launched: {result.reason}")
 
 
+@register_handler("PlannerDispatchIntent")
 def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
     """Handle PlannerDispatchIntent event via role request builder."""
     store = SQLiteClient()
@@ -147,6 +148,7 @@ def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
         raise
 
 
+@register_handler("ExecutorDispatchIntent")
 def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     """Handle ExecutorDispatchIntent event via role request builder.
 
@@ -195,6 +197,7 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
         raise
 
 
+@register_handler("ReviewerDispatchIntent")
 def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
     """Handle ReviewerDispatchIntent event via role request builder.
 
@@ -235,26 +238,3 @@ def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
         ).exception(f"Reviewer dispatch failed: {exc}")
         # Propagate exception to event system for proper handling
         raise
-
-
-def register_dispatch_handlers() -> None:
-    """Register all dispatch-intent event handlers."""
-    from typing import cast
-
-    from vibe3.domain.publisher import subscribe
-
-    # Subscribe to new event names
-    subscribe(
-        "PlannerDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_planner_dispatch_intent),
-    )
-    subscribe(
-        "ExecutorDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_executor_dispatch_intent),
-    )
-    subscribe(
-        "ReviewerDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_reviewer_dispatch_intent),
-    )
-
-    logger.bind(domain="events").info("Dispatch-intent event handlers registered")
