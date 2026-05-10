@@ -68,8 +68,8 @@ code_limits:
         limit: 550
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，6个渲染section紧密耦合，blocked_reason智能提取逻辑增加可读性，CLI 入口函数难以拆分"
       - path: "src/vibe3/commands/scan.py"
-        limit: 650
-        reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，material 列表、描述提取、issue context 快照等紧密耦合 helper 函数，CLI 入口聚合难以拆分"
+        limit: 470
+        reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，已下沉 UI 和业务逻辑到 ui/ 和 services/ 层"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 420
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 成成、trace 输出等紧密耦合逻辑"
