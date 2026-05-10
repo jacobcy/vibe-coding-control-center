@@ -33,8 +33,21 @@ class TestWorkingDirectoryIndependence:
                 # Change to subdirectory within the repo
                 os.chdir(str(subdir))
 
+                # Debug: print current directory after chdir
+                import sys
+
+                print(
+                    f"DEBUG: After chdir to subdir, cwd = {os.getcwd()}",
+                    file=sys.stderr,
+                )
+
                 # Should work from any directory within the repo
                 worktree_root_from_subdir = get_worktree_root()
+                print(f"DEBUG: worktree_root = {worktree_root}", file=sys.stderr)
+                print(
+                    f"DEBUG: worktree_root_from_subdir = {worktree_root_from_subdir}",
+                    file=sys.stderr,
+                )
                 assert worktree_root_from_subdir == worktree_root
         finally:
             # Restore original working directory
