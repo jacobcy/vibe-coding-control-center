@@ -3,9 +3,9 @@ from vibe3.models.flow import FlowEvent
 
 
 def test_render_handoff_events_sanitizes_absolute_ref_in_detail(capsys) -> None:
-    worktree_root = "/Users/jacobcy/src/vibe-center/main/.worktrees/task/issue-417"
+    worktree_root = "/workspace/vibe-center/.worktrees/task/issue-417"
     abs_ref = (
-        "/Users/jacobcy/src/vibe-center/main/.worktrees/task/issue-417/"
+        "/workspace/vibe-center/.worktrees/task/issue-417/"
         "docs/reports/task-issue-417-audit-auto-2026-04-21T01:41:01Z.md"
     )
     event = FlowEvent(

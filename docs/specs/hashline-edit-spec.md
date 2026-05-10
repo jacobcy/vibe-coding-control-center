@@ -223,7 +223,7 @@ suggested ref: 3#77bc91af
 
 CLI 注册点：
 
-- 在 [`src/vibe3/cli.py`](/Users/jacobcy/src/vibe-center/main/.worktrees/wt-claude-v3/src/vibe3/cli.py:48) 增加 `app.add_typer(hash.app, name="hash")`
+ - 在 `src/vibe3/cli.py` 增加 `app.add_typer(hash.app, name="hash")`
 
 测试建议：
 
