@@ -166,7 +166,10 @@ def _extract_material_description(material_name: str) -> str:
     from pathlib import Path
 
     # Normalize to full path if needed
-    if not material_name.startswith("supervisor/governance/"):
+    if (
+        not material_name.startswith("supervisor/governance/")
+        and not Path(material_name).is_absolute()
+    ):
         material_name = f"supervisor/governance/{material_name}"
 
     # Ensure .md suffix
@@ -187,7 +190,8 @@ def _extract_material_description(material_name: str) -> str:
                     # Stop at first non-empty, non-title line
                     if line and not line.startswith("#"):
                         break
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Failed to extract description from {material_name}: {e}")
         pass
 
     # Fallback to filename

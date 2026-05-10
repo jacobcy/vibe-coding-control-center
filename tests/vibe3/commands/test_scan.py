@@ -338,7 +338,7 @@ def test_extract_material_description_handles_no_title():
 
     try:
         description = _extract_material_description(temp_path)
-        # Should fall back to filename
-        assert temp_path in description or True
+        # Should fall back to filename when no title
+        assert description == temp_path
     finally:
         Path(temp_path).unlink()
