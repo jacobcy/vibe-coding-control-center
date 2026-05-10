@@ -373,8 +373,8 @@ class CheckService(CheckRemote):
             except ValueError:
                 return False
 
-        from vibe3.execution.flow_dispatch import FlowManager
         from vibe3.models.orchestration import IssueInfo
+        from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 
         issue = IssueInfo(
             number=issue_number,
@@ -382,13 +382,13 @@ class CheckService(CheckRemote):
             state=IssueState.READY,
             labels=[IssueState.READY.to_label()],
         )
-        manager = FlowManager(
+        orchestrator = FlowOrchestratorService(
             load_orchestra_config(),
             store=self.store,
             git=self.git_client,
             github=self.github_client,
         )
-        manager.create_flow_for_issue(issue)
+        orchestrator.create_flow_for_issue(issue)
         return True
 
     def _mark_flow_status(
