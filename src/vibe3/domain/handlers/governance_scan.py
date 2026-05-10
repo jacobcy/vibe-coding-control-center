@@ -6,17 +6,17 @@ captures API errors in the sync chain.
 """
 
 import os
-from typing import Callable, cast
 
 from loguru import logger
 
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.domain.events.flow_lifecycle import DomainEvent
 from vibe3.domain.events.governance import GovernanceScanStarted
+from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 
 
+@register_handler("GovernanceScanStarted")
 def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     """Dispatch governance scan via CLI self-invocation."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -136,14 +136,3 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
             f"governance dispatch skipped: tick={event.tick_count} "
             f"reason={result.reason}",
         )
-
-
-def register_governance_scan_handlers() -> None:
-    """Register governance scan event handlers."""
-    from vibe3.domain.publisher import subscribe
-
-    subscribe(
-        "GovernanceScanStarted",
-        cast(Callable[[DomainEvent], None], handle_governance_scan_started),
-    )
-    logger.bind(domain="events").info("Governance scan event handlers registered")
