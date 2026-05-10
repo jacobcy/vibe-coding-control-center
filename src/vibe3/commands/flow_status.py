@@ -28,12 +28,13 @@ if TYPE_CHECKING:
     pass
 
 
+from vibe3.commands.command_options import (
+    AllOption,
+    JsonOption,
+    TraceOption,
+)
+
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
-AllOption = Annotated[
-    bool, typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）")
-]
-JsonOption = Annotated[bool, typer.Option("--json")]
-TraceOption = Annotated[bool, typer.Option("--trace")]
 
 
 def _render_snapshot_format(projection: Any, flow_status: Any, format: str) -> None:

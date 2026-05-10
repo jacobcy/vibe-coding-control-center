@@ -6,6 +6,10 @@ from typing import Annotated, List, Literal
 import typer
 from loguru import logger
 
+from vibe3.commands.command_options import (
+    JsonOption,
+    TraceOption,
+)
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -39,10 +43,6 @@ SpecOption = Annotated[
         help="Spec file path or issue reference. Use empty string '' to clear spec_ref",
     ),
 ]
-TraceOption = Annotated[
-    bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-]
-JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 ActorOption = Annotated[
     str | None,
     typer.Option(
