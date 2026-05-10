@@ -61,7 +61,9 @@ class TestGovernanceScan:
         """Test governance scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0
-        assert "DRY RUN: Would run governance scan" in result.output
+        # Should now show material information and prompt preview
+        output_lower = result.output.lower()
+        assert "material:" in output_lower or "governance scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
@@ -364,3 +366,29 @@ def test_governance_list_mutually_exclusive_with_role():
     # Should error with clear message
     assert result.exit_code != 0
     assert "cannot be used together" in result.output.lower()
+
+
+class TestGovernanceDryRunPromptDisplay:
+    """Tests for governance --dry-run prompt display."""
+
+    @patch("vibe3.commands.scan._run_governance_scan")
+    def test_governance_dry_run_shows_material_info(self, mock_run):
+        """Test that --dry-run shows which material would be used."""
+        result = runner.invoke(
+            app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
+        )
+
+        assert result.exit_code == 0
+        # Should show material information
+        assert "assignee-pool" in result.output.lower() or "Material:" in result.output
+
+    def test_governance_dry_run_shows_prompt_preview(self):
+        """Test that --dry-run displays rendered prompt."""
+        result = runner.invoke(
+            app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
+        )
+
+        assert result.exit_code == 0
+        # Should show prompt preview section
+        output_lower = result.output.lower()
+        assert "prompt" in output_lower or "governance prompt" in output_lower
