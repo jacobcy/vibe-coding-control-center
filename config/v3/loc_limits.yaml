@@ -180,9 +180,6 @@ code_limits:
       - path: "tests/vibe3/services/test_task_resume_operations.py"
         limit: 410
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
-      - path: "tests/vibe3/commands/test_scan.py"
-        limit: 460
-        reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个子命令的 help/dry-run/execution 测试，包含 FailedGate 阻塞集成测试和 dry-run prompt 显示测试，9 个测试类 25 个测试方法紧密耦合，拆分收益低；当前 453 行轻微超限（+3 行）"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数
