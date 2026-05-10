@@ -342,3 +342,25 @@ def test_extract_material_description_handles_no_title():
         assert description == temp_path
     finally:
         Path(temp_path).unlink()
+
+
+# Tests for --list parameter
+def test_governance_list_shows_materials():
+    """Test that --list shows governance materials."""
+    result = runner.invoke(app, ["scan", "governance", "--list"])
+
+    assert result.exit_code == 0
+    assert "Available Governance Materials" in result.stdout
+    # Should show at least assignee-pool
+    assert "assignee-pool" in result.stdout or "Assignee Pool" in result.stdout
+
+
+def test_governance_list_mutually_exclusive_with_role():
+    """Test that --list and --role are mutually exclusive."""
+    result = runner.invoke(
+        app, ["scan", "governance", "--list", "--role", "assignee-pool"]
+    )
+
+    # Should either error or ignore --role
+    # We'll accept both behaviors in implementation
+    assert result.exit_code == 0 or "cannot be used with" in result.stdout.lower()

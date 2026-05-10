@@ -253,6 +253,10 @@ def governance(
             help="Override governance role (run without --role to see available)",
         ),
     ] = None,
+    list_materials: Annotated[
+        bool,
+        typer.Option("--list", help="List available governance materials"),
+    ] = False,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Show what would be done without executing"),
@@ -271,6 +275,11 @@ def governance(
 
     if dry_run:
         typer.echo("DRY RUN: Would run governance scan")
+        return
+
+    # Handle --list option
+    if list_materials:
+        _list_governance_materials()
         return
 
     # Get available materials for help text
