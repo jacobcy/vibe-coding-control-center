@@ -29,6 +29,11 @@
 - **建议** → 输出治理结论和最小 label 调整建议
 - **不做** → 不恢复一般 blocked issue、不执行任何代码变更
 
+**闭环要求**：
+- 不要把“已有历史 assignee / 历史上进过 pool”当成充分结论；必须以当前 task / flow / ready queue 现场为准
+- 如果 ready queue 很浅，而 broader intake 最近持续没有新增 issue，需在结论中明确指出是“入口收缩”还是“池内真实无候选”
+- 不要输出只有静态归档价值、但对下一步 dispatch 没帮助的 `already in assignee pool` 列表
+
 **Intake 原则**：
 - **实质判断优先**：不只看标签类型，要实质检查 issue 范围和代码缺口
 - **灵活处理**：范围过大可拆分，明确范围可处理重构，确定不适用可关闭
@@ -125,6 +130,13 @@ Forbidden:
   - 放行给 manager 判断是否值得执行
 - 若 assignee pool 非空，保守等待
 
+**队列偏浅时的保守边界**：
+- 如果当前 ready queue 只剩少量候选，或 blocked / in-progress 已经占住大部分池子，不要机械地把所有灰区 issue 都归入“保守等待”
+- 此时应优先输出：
+  - 哪些 ready issue 仍值得启动
+  - 哪些 blocked issue 只是状态/依赖信息不完整
+  - 当前池子为什么变浅，缺口来自依赖、状态漏改，还是 intake 入口收缩
+
 ### Intake 决策流程
 
 ```
@@ -176,8 +188,8 @@ issue 是否可纳入？
   - 调用 `gh issue view 123 --json body` → blocked_reason = "state unchanged"
   - 调用 `vibe3 flow show --branch task/issue-123` → plan_ref = "docs/plans/xxx.md"
   - authoritative ref 存在，说明 agent 已完成工作但漏改 state
-  - 调用 `vibe3 task resume 123 --label auto -y`
-  - 写 `[governance auto-recover]` comment 说明已恢复
+  - 执行允许范围内的最小 state 补偿：`state/blocked` → `state/handoff`
+  - 写 `[governance auto-recover]` comment 说明恢复依据
   - **结论**：自动恢复成功
 
 **不可自动恢复的 blocked issue**
@@ -239,13 +251,17 @@ Steps:
         - 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
         - 检查 `plan_ref`、`report_ref` 或 `audit_ref` 是否存在
         - 如果存在任意一个 authoritative ref：
-          - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
+          - 执行允许范围内的最小 state 补偿：`state/blocked` → `state/handoff`
           - 写 `[governance auto-recover]` comment 说明恢复原因和依据
         - 如果没有任何 authoritative ref：
           - 写 `[governance suggest]` comment 建议人类处理
      d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
         - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
 5. 输出治理结论
+
+输出时额外检查：
+- 如果你写出“already in assignee pool”，必须同时回答这些 issue 当前是否仍有 assignee、state、ready queue 资格
+- 如果当前 ready queue 少于稳定运行所需的候选量，必须明确指出缺口来源，而不是仅罗列历史已纳入对象
 
 Decision sketch:
 
@@ -268,15 +284,15 @@ Decision sketch:
   1. 对选中的 blocked issue 调用 `gh issue view <number> --json body` 获取 blocked_reason
   2. 仅当 `blocked_reason == "state unchanged"` 时继续检查
 
-  **Ref 检查**：
-  1. 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
-  2. 检查是否存在 `plan_ref`、`report_ref` 或 `audit_ref`
-  3. 如果存在任意一个，执行自动恢复；否则写建议评论
+	  **Ref 检查**：
+	  1. 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
+	  2. 检查是否存在 `plan_ref`、`report_ref` 或 `audit_ref`
+	  3. 如果存在任意一个，执行自动恢复；否则写建议评论
 
-  **恢复动作**：
-  - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
-  - 写 `[governance auto-recover]` comment 说明恢复原因和依据
-  - **注意**：只做最小 state 纠偏，不推进后续阶段
+	  **恢复动作**：
+	  - 执行允许范围内的最小 state 补偿：`state/blocked` → `state/handoff`
+	  - 写 `[governance auto-recover]` comment 说明恢复原因和依据
+	  - **注意**：只做最小 state 纠偏，不推进后续阶段
 
   **禁止场景**（不自动恢复）：
   - blocked_reason 不是 "state unchanged"（如外部依赖、手动阻塞、测试失败等）
@@ -382,7 +398,7 @@ Exit:
 [governance auto-recover] 已自动恢复 state
 
 恢复原因：检测到 blocked 原因是 state unchanged，但 authoritative ref 已存在，判定为 agent 漏改 state。
-恢复命令：vibe3 task resume <number> --label auto -y
+恢复动作：`state/blocked` → `state/handoff`
 依据：<plan_ref 或 report_ref 或 audit_ref>
 说明：本动作只做最小一致性修正，不代表后续阶段已完成。
 ```
