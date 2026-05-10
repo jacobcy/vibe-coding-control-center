@@ -20,8 +20,6 @@ class GovernanceScanStarted(DomainEvent):
     """
 
     tick_count: int
-    is_manual: bool = False
-    material_override: str | None = None
     actor: str = "system:governance"
     timestamp: str | None = None
 

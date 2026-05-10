@@ -3,7 +3,6 @@
 from vibe3.services.scan_service import (
     extract_material_description,
     fetch_supervisor_candidates,
-    render_governance_prompt_preview,
 )
 
 
@@ -54,41 +53,47 @@ class TestFetchSupervisorCandidates:
             },
         ]
 
-        candidates = fetch_supervisor_candidates(mock_github, "owner/repo")
+        total_scanned, candidates = fetch_supervisor_candidates(
+            mock_github, "owner/repo"
+        )
 
+        # Should return total scanned count
+        assert total_scanned == 2
         # Should only return issue with both labels
         assert len(candidates) == 1
         assert candidates[0]["number"] == 123
 
     def test_returns_empty_list_on_error(self):
-        """Test returns empty list on GitHub error."""
+        """Test returns empty tuple on GitHub error."""
         from unittest.mock import MagicMock
 
         mock_github = MagicMock()
         mock_github.list_issues.side_effect = Exception("API Error")
 
-        candidates = fetch_supervisor_candidates(mock_github, "owner/repo")
+        total_scanned, candidates = fetch_supervisor_candidates(
+            mock_github, "owner/repo"
+        )
+        assert total_scanned == 0
         assert candidates == []
 
+    def test_queries_100_issues_not_50(self):
+        """Test that fetch_supervisor_candidates queries 100 issues (Issue #803).
 
-class TestRenderGovernancePromptPreview:
-    """Tests for governance prompt rendering."""
+        Previously queried only 50 issues, causing dry-run to miss candidates.
+        """
+        from unittest.mock import MagicMock
 
-    def test_returns_rendered_text(self):
-        """Test that rendered text is returned."""
-        from unittest.mock import MagicMock, patch
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []
 
-        mock_config = MagicMock()
+        total_scanned, candidates = fetch_supervisor_candidates(
+            mock_github, "owner/repo"
+        )
 
-        with patch("vibe3.roles.governance.render_governance_prompt") as mock_render:
-            mock_result = MagicMock()
-            mock_result.rendered_text = "# Test Prompt"
-            mock_render.return_value = mock_result
-
-            result = render_governance_prompt_preview(
-                config=mock_config,
-                tick_count=0,
-                material_override="test-material",
-            )
-
-            assert result == "# Test Prompt"
+        # Verify limit parameter is 100 (not 50)
+        mock_github.list_issues.assert_called_once()
+        call_args = mock_github.list_issues.call_args
+        assert call_args.kwargs.get("limit") == 100
+        # Empty results
+        assert total_scanned == 0
+        assert candidates == []

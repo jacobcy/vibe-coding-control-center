@@ -39,7 +39,59 @@ def extract_material_description(material_path: str) -> str:
     return material_path
 
 
-def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[dict]:
+def dispatch_governance_execution(material_override: str | None = None) -> None:
+    """Execute governance scan (execution-only entry point).
+
+    Entry point for internal governance command, calling execution layer directly.
+
+    Args:
+        material_override: Optional governance role to override material rotation
+    """
+    from vibe3.execution.governance_sync_runner import run_governance_sync
+
+    run_governance_sync(
+        tick_count=0,  # Manual scan uses tick=0 for default material selection
+        material_override=material_override,
+        dry_run=False,  # Execution-only, no dry-run
+        show_prompt=False,
+        session_id=None,
+    )
+
+
+def dispatch_supervisor_execution(issue_number: int, no_async: bool = False) -> None:
+    """Execute supervisor apply for a single issue (execution-only entry point).
+
+    Entry point for internal apply command, calling execution layer directly.
+
+    Args:
+        issue_number: Issue to apply supervisor handoff
+        no_async: Run synchronously instead of async tmux session
+    """
+    from vibe3.execution.issue_role_sync_runner import (
+        run_issue_role_async,
+        run_issue_role_sync,
+    )
+    from vibe3.roles.supervisor import SUPERVISOR_CLI_SYNC_SPEC
+
+    if no_async:
+        run_issue_role_sync(
+            issue_number=issue_number,
+            dry_run=False,
+            fresh_session=True,
+            show_prompt=False,
+            spec=SUPERVISOR_CLI_SYNC_SPEC,
+        )
+    else:
+        run_issue_role_async(
+            issue_number=issue_number,
+            dry_run=False,
+            spec=SUPERVISOR_CLI_SYNC_SPEC,
+        )
+
+
+def fetch_supervisor_candidates(
+    github_client: Any, repo: str | None
+) -> tuple[int, list[dict]]:
     """Fetch supervisor candidate issues from GitHub.
 
     Filters for issues with both 'supervisor' and 'state/handoff' labels.
@@ -49,12 +101,15 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
         repo: Repository in "owner/repo" format
 
     Returns:
-        List of candidate issues (number, title, labels)
+        Tuple of (total_issues_scanned, matching_candidates)
+        - total_issues_scanned: Total number of open issues queried
+        - matching_candidates: List of candidate issues (number, title, labels)
     """
     from vibe3.utils.label_utils import normalize_labels
 
     try:
-        raw_issues = github_client.list_issues(limit=50, state="open", repo=repo)
+        raw_issues = github_client.list_issues(limit=100, state="open", repo=repo)
+        total_scanned = len(raw_issues)
 
         # Filter for supervisor + state/handoff labels
         matching = []
@@ -69,40 +124,67 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
                     }
                 )
 
-        return matching
+        return total_scanned, matching
 
     except Exception as e:
         logger.error(f"Failed to fetch supervisor candidates: {e}")
+        return 0, []
+
+
+def get_available_governance_materials() -> list[str]:
+    """Fetch available governance materials from catalog.
+
+    Returns list of short material names (without path/suffix).
+
+    Returns:
+        List of material short names (e.g., ["assignee-pool", "roadmap-intake"])
+    """
+    try:
+        from vibe3.roles.governance import load_governance_material_catalog
+
+        catalog = load_governance_material_catalog()
+        materials = []
+        for material in catalog:
+            # Extract short name:
+            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
+            name = material.name
+            if name.startswith("supervisor/governance/"):
+                short_name = name.split("/")[-1]
+                short_name = (
+                    short_name[:-3] if short_name.endswith(".md") else short_name
+                )
+                materials.append(short_name)
+        return sorted(set(materials))
+    except Exception:
+        # Fallback if catalog cannot be loaded
         return []
 
 
-def render_governance_prompt_preview(
-    config: Any, tick_count: int, material_override: str | None
-) -> str:
-    """Render governance prompt for preview.
+def list_governance_materials(console: Any) -> None:
+    """List available governance materials with descriptions.
+
+    Loads catalog, extracts descriptions, and displays via UI layer.
 
     Args:
-        config: Orchestra config
-        tick_count: Tick count for material rotation
-        material_override: Optional material override
-
-    Returns:
-        Rendered prompt text
+        console: Rich Console instance for display
     """
-    from vibe3.roles.governance import (
-        build_governance_dry_run_context,
-        render_governance_prompt,
-    )
+    import typer
 
-    # Build minimal snapshot context for dry-run
-    snapshot_context = build_governance_dry_run_context()
+    from vibe3.roles.governance import load_governance_material_catalog
+    from vibe3.ui.scan_display import display_material_list
 
-    # Render prompt
-    render_result = render_governance_prompt(
-        config,
-        snapshot_context,
-        tick_count=tick_count,
-        material_override=material_override,
-    )
+    # Load catalog
+    try:
+        catalog = load_governance_material_catalog()
+    except Exception as exc:
+        console.print(f"[red]Error loading material catalog: {exc}[/red]")
+        raise typer.Exit(1)
 
-    return render_result.rendered_text
+    # Build materials list with descriptions
+    materials = []
+    for material in catalog:
+        description = extract_material_description(material.name)
+        materials.append({"name": material.name, "description": description})
+
+    # Display via UI layer
+    display_material_list(console, materials)

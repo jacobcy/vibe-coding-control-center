@@ -1,7 +1,7 @@
 """Tests for scan CLI command."""
 
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -61,9 +61,10 @@ class TestGovernanceScan:
         """Test governance scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0
-        # Should now show material information and prompt preview
+        # New format: "-> Governance dry-run: tick=0"
+        # Uses real-time snapshot via run_governance_sync(dry_run=True)
         output_lower = result.output.lower()
-        assert "material:" in output_lower or "governance scan dry-run" in output_lower
+        assert "governance dry-run" in output_lower or "--- prompt ---" in output_lower
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
@@ -72,6 +73,29 @@ class TestGovernanceScan:
         assert result.exit_code == 0
         assert "Governance scan completed" in result.output
         mock_run.assert_called_once_with(material_override=None)
+
+    def test_governance_scan_does_not_call_on_heartbeat_tick(self):
+        """Test manual governance scan calls service layer directly.
+
+        Manual scan should call dispatch_governance_execution (service layer),
+        not through OrchestrationFacade heartbeat path or internal command layer.
+        """
+        # Mock the service layer function that should be called
+        with patch(
+            "vibe3.services.scan_service.dispatch_governance_execution"
+        ) as mock_service_run:
+            # Mock facade to ensure it's not created
+            with patch(
+                "vibe3.domain.orchestration_facade.OrchestrationFacade"
+            ) as mock_facade:
+                runner.invoke(app, ["scan", "governance"])
+
+                # After refactor, facade should not be instantiated
+                mock_facade.assert_not_called()
+
+                # Service layer function should be called directly
+                assert mock_service_run.called
+                mock_service_run.assert_called_once_with(material_override=None)
 
 
 class TestSupervisorScan:
@@ -86,14 +110,16 @@ class TestSupervisorScan:
         assert "supervisor" in output_lower
         assert "dry-run" in output_lower or "dry run" in output_lower
 
-    @patch("vibe3.commands.scan._run_supervisor_scan_async")
+    @patch("vibe3.commands.scan._run_supervisor_scan")
     def test_supervisor_execution(self, mock_run):
         """Test supervisor scan execution."""
-        # Mock async function needs to return a coroutine
-        mock_run.return_value = None
+        # Mock return value (total_scanned, matched_count)
+        mock_run.return_value = (10, 2)
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
-        assert "Supervisor scan completed" in result.output
+        # Should show scan statistics, not "completed" message
+        assert "Scanned 10 open issues" in result.output
+        assert "found 2" in result.output
 
 
 class TestCombinedScan:
@@ -105,7 +131,8 @@ class TestCombinedScan:
         assert result.exit_code == 0
         # Should show both governance and supervisor dry-run output
         output_lower = result.output.lower()
-        assert "governance scan dry-run" in output_lower
+        # New format: "Governance dry-run" and "Supervisor scan dry-run"
+        assert "governance dry-run" in output_lower
         assert "supervisor scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_combined_scan_async")
@@ -121,233 +148,167 @@ class TestScanIntegration:
     """Integration tests for scan command with services."""
 
     def test_governance_scan_registers_handlers(self):
-        """Test that governance scan registers event handlers."""
-        with (
-            patch("vibe3.domain.handlers.register_event_handlers") as mock_handlers,
-            patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
-        ):
+        """Test that governance scan calls service layer directly.
 
-            # Mock FailedGate to return open gate
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = False
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
-
-            mock_facade_instance = MagicMock()
-            mock_facade.return_value = mock_facade_instance
-
+        After refactor: manual governance scan no longer registers handlers
+        or uses facade. It calls service layer (dispatch_governance_execution) directly.
+        """
+        with patch(
+            "vibe3.services.scan_service.dispatch_governance_execution"
+        ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan()
 
-            # Verify handlers were registered before facade methods called
-            mock_handlers.assert_called_once()
-            mock_facade.assert_called_once()
-            mock_facade_instance.on_heartbeat_tick.assert_called_once()
+            # Verify service layer was called (new architecture)
+            mock_service.assert_called_once_with(material_override=None)
 
-    @pytest.mark.asyncio
-    async def test_supervisor_scan_registers_handlers(self):
-        """Test that supervisor scan registers event handlers."""
+    def test_supervisor_scan_registers_handlers(self):
+        """Test that supervisor scan calls service layer directly.
+
+        After refactor: manual supervisor scan no longer registers handlers
+        or uses facade. It calls service layer (dispatch_supervisor_execution) directly.
+        """
         with (
-            patch("vibe3.domain.handlers.register_event_handlers") as mock_handlers,
             patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
+                "vibe3.services.scan_service.fetch_supervisor_candidates"
+            ) as mock_fetch,
+            patch(
+                "vibe3.services.scan_service.dispatch_supervisor_execution"
+            ) as mock_apply,
         ):
+            # Mock candidate list (total_scanned, candidates)
+            mock_fetch.return_value = (
+                1,
+                [
+                    {
+                        "number": 123,
+                        "title": "Issue A",
+                        "labels": ["supervisor", "state/handoff"],
+                    },
+                ],
+            )
 
-            # Mock FailedGate to return open gate
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = False
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
+            from vibe3.commands.scan import _run_supervisor_scan
 
-            mock_facade_instance = MagicMock()
+            _run_supervisor_scan()
 
-            # Make on_supervisor_scan an async mock
-            async def async_mock():
-                return (10, 2)
-
-            mock_facade_instance.on_supervisor_scan = async_mock
-            mock_facade.return_value = mock_facade_instance
-
-            from vibe3.commands.scan import _run_supervisor_scan_async
-
-            await _run_supervisor_scan_async()
-
-            # Verify handlers were registered
-            mock_handlers.assert_called_once()
-            mock_facade.assert_called_once()
+            # Verify candidates fetched
+            mock_fetch.assert_called_once()
+            # Verify service layer apply called
+            mock_apply.assert_called_once()
 
 
 class TestFailedGateBlocking:
     """Tests for FailedGate blocking in scan commands."""
 
     def test_governance_scan_blocked_by_failed_gate(self):
-        """Test that governance scan respects FailedGate."""
-        with (
-            patch("vibe3.domain.handlers.register_event_handlers"),
-            patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
-        ):
+        """Test that manual governance scan ignores FailedGate.
 
-            # Mock FailedGate to return blocked state
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = True
-            mock_gate_result.reason = "API error threshold: 2 recent errors"
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
-
-            mock_facade_instance = MagicMock()
-            mock_facade.return_value = mock_facade_instance
-
+        After refactor: manual governance scan calls service layer directly,
+        bypassing FailedGate (which is only for heartbeat automatic chain).
+        FailedGate is only checked in automatic heartbeat polling, not manual scans.
+        """
+        with patch(
+            "vibe3.services.scan_service.dispatch_governance_execution"
+        ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan()
 
-            # Verify FailedGate was checked
-            mock_gate_instance.check.assert_called_once()
+            # Manual scan always calls service layer, ignoring FailedGate
+            mock_service.assert_called_once_with(material_override=None)
 
-            # Verify facade was NOT called (blocked by gate)
-            mock_facade_instance.on_heartbeat_tick.assert_not_called()
+    def test_supervisor_scan_blocked_by_failed_gate(self):
+        """Test manual supervisor scan ignores FailedGate.
 
-    @pytest.mark.asyncio
-    async def test_supervisor_scan_blocked_by_failed_gate(self):
-        """Test that supervisor scan respects FailedGate."""
-        with (
-            patch("vibe3.domain.handlers.register_event_handlers"),
-            patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
-        ):
+        After refactor: manual supervisor scan calls internal dispatch directly,
+        bypassing FailedGate (which is only for heartbeat automatic chain).
+        FailedGate is only checked in automatic heartbeat polling, not manual scans.
+        """
+        with patch(
+            "vibe3.services.scan_service.fetch_supervisor_candidates"
+        ) as mock_fetch:
+            # Mock empty candidate list (total_scanned, candidates)
+            mock_fetch.return_value = (0, [])
 
-            # Mock FailedGate to return blocked state
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = True
-            mock_gate_result.reason = "Model configuration errors: E_MODEL_INVALID"
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
+            from vibe3.commands.scan import _run_supervisor_scan
 
-            mock_facade_instance = MagicMock()
-            mock_facade_instance.on_supervisor_scan = MagicMock(return_value=None)
-            mock_facade.return_value = mock_facade_instance
+            _run_supervisor_scan()
 
-            from vibe3.commands.scan import _run_supervisor_scan_async
-
-            await _run_supervisor_scan_async()
-
-            # Verify FailedGate was checked
-            mock_gate_instance.check.assert_called_once()
-
-            # Verify facade was NOT called (blocked by gate)
-            mock_facade_instance.on_supervisor_scan.assert_not_called()
+            # Manual scan always fetches candidates, ignoring FailedGate
+            mock_fetch.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_combined_scan_blocked_by_failed_gate(self):
-        """Test that combined scan respects FailedGate."""
+        """Test combined scan bypasses FailedGate for both governance and supervisor.
+
+        After refactor: manual scans bypass FailedGate entirely.
+        FailedGate is only checked in automatic heartbeat polling.
+        Both governance and supervisor use service layer directly.
+        """
         with (
-            patch("vibe3.domain.handlers.register_event_handlers"),
             patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
+                "vibe3.services.scan_service.dispatch_governance_execution"
+            ) as mock_governance,
+            patch(
+                "vibe3.services.scan_service.fetch_supervisor_candidates"
+            ) as mock_fetch,
+            patch("vibe3.services.scan_service.dispatch_supervisor_execution"),
         ):
-
-            # Mock FailedGate to return blocked state
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = True
-            mock_gate_result.reason = "System in failed state"
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
-
-            mock_facade_instance = MagicMock()
-            mock_facade_instance.on_supervisor_scan = MagicMock(return_value=None)
-            mock_facade.return_value = mock_facade_instance
+            # Mock supervisor candidates (total_scanned, candidates)
+            mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_combined_scan_async
 
             await _run_combined_scan_async()
 
-            # Verify FailedGate was checked
-            mock_gate_instance.check.assert_called_once()
+            # Governance always runs (bypasses FailedGate)
+            mock_governance.assert_called_once()
 
-            # Verify neither facade method was called (blocked by gate)
-            mock_facade_instance.on_heartbeat_tick.assert_not_called()
-            mock_facade_instance.on_supervisor_scan.assert_not_called()
+            # Supervisor also runs (bypasses FailedGate)
+            mock_fetch.assert_called_once()
 
 
 # Tests for material description extraction
-def test_extract_material_description_from_assignee_pool():
-    """Test extracting description from assignee-pool.md."""
-    from vibe3.commands.scan import _extract_material_description
+def test_supervisor_scan_fetches_candidates_and_calls_service_apply() -> None:
+    """Test manual supervisor scan calls service layer directly.
 
-    description = _extract_material_description(
-        "supervisor/governance/assignee-pool.md"
-    )
-    assert description == "Assignee Pool 治理材料"
+    After refactor: manual supervisor scan should fetch candidates,
+    filter them, and call dispatch_supervisor_execution for each one,
+    not through internal command layer.
+    """
+    with (
+        patch("vibe3.services.scan_service.fetch_supervisor_candidates") as mock_fetch,
+        patch(
+            "vibe3.services.scan_service.dispatch_supervisor_execution"
+        ) as mock_apply,
+    ):
+        # Mock candidate list (total_scanned, candidates)
+        mock_fetch.return_value = (
+            2,
+            [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+                {
+                    "number": 456,
+                    "title": "Issue B",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ],
+        )
 
+        result = runner.invoke(app, ["scan", "supervisor"])
 
-def test_extract_material_description_from_roadmap_intake():
-    """Test extracting description from roadmap-intake.md."""
-    from vibe3.commands.scan import _extract_material_description
+        assert result.exit_code == 0
+        # Should fetch candidates
+        mock_fetch.assert_called_once()
 
-    description = _extract_material_description(
-        "supervisor/governance/roadmap-intake.md"
-    )
-    assert description == "Roadmap Intake 治理材料"
-
-
-def test_extract_material_description_handles_missing_file():
-    """Test handling missing file gracefully."""
-    from vibe3.commands.scan import _extract_material_description
-
-    description = _extract_material_description("supervisor/governance/nonexistent.md")
-    assert description == "supervisor/governance/nonexistent.md"
-
-
-def test_extract_material_description_handles_no_title():
-    """Test handling file without title."""
-    import tempfile
-    from pathlib import Path
-
-    from vibe3.commands.scan import _extract_material_description
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-        f.write("Some content without title\n")
-        temp_path = f.name
-
-    try:
-        description = _extract_material_description(temp_path)
-        # Should fall back to filename when no title
-        assert description == temp_path
-    finally:
-        Path(temp_path).unlink()
+        # Should call service layer apply for each candidate
+        assert mock_apply.call_count == 2
 
 
 # Tests for --list parameter

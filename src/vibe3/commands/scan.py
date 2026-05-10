@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.observability import setup_logging
 
@@ -15,158 +16,82 @@ app = typer.Typer(
 )
 
 
-def _run_governance_scan(material_override: str | None = None) -> None:
-    """Execute governance scan once.
+def _execute_governance_internal(material_override: str | None = None) -> None:
+    """Execute governance scan via service layer (no facade).
 
-    Creates minimal services and publishes GovernanceScanStarted event.
-    Event handlers handle the actual execution via CLI self-invocation.
+    Direct path for manual governance scan, calling execution layer
+    without going through OrchestrationFacade heartbeat chain
+    or internal command layer.
 
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.services.scan_service import dispatch_governance_execution
 
-    # Register event handlers before publishing events
-    register_event_handlers()
+    dispatch_governance_execution(material_override=material_override)
 
-    # Load config
-    config = load_orchestra_config()
 
-    # Initialize services (following _build_server_with_launch_cwd pattern)
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
+def _run_governance_scan(material_override: str | None = None) -> None:
+    """Execute governance scan once via internal dispatch.
 
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
+    Calls internal_governance_dispatch directly without facade heartbeat chain.
 
-    # Create facade with minimal services for governance scan
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
-    )
-
-    # Trigger governance scan (force=True to skip interval gating for manual trigger)
-    # on_heartbeat_tick publishes GovernanceScanStarted event
-    # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick(force=True, material_override=material_override)
-
+    Args:
+        material_override: Optional governance role to override material rotation
+    """
+    _execute_governance_internal(material_override=material_override)
     logger.bind(domain="orchestra").info("Governance scan completed")
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
-    """Execute governance scan in dry-run mode, displaying prompt without execution.
+    """Execute governance scan in dry-run mode via run_governance_sync.
+
+    Uses real-time snapshot (not synthetic context) to preview governance prompt.
+    This fixes Issue #803 Problem 1: dry-run must match production execution path.
 
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from rich.console import Console
+    from vibe3.execution.governance_sync_runner import run_governance_sync
 
-    from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.roles.governance import build_governance_recipe
-    from vibe3.services.scan_service import render_governance_prompt_preview
-    from vibe3.ui.scan_display import display_governance_dry_run
-
-    console = Console()
-    config = load_orchestra_config()
-    tick_count = 0  # Dry-run uses tick 0 for consistency
-
-    try:
-        # Build recipe to get material name
-        recipe = build_governance_recipe(config, tick_count, material_override)
-        current_material = recipe.variables.get("supervisor_name")
-        if current_material is None:
-            console.print("[red]Error: supervisor_name variable not found[/red]")
-            raise typer.Exit(1)
-
-        # Extract material name (guaranteed to be str at this point)
-        if hasattr(current_material, "value") and current_material.value:
-            material_name = str(current_material.value)
-        else:
-            material_name = str(current_material)
-
-        # Render prompt
-        prompt_content = render_governance_prompt_preview(
-            config, tick_count, material_override
-        )
-
-        # Display via UI layer
-        display_governance_dry_run(console, material_name, prompt_content)
-
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
-
-
-async def _run_supervisor_scan_async() -> None:
-    """Execute supervisor scan once (async implementation)."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-
-    # Register event handlers before publishing events
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
+    # Call internal governance runner with dry_run=True
+    # This uses real snapshot instead of synthetic dry-run context
+    run_governance_sync(
+        tick_count=0,  # Manual scan always uses tick=0
+        material_override=material_override,
+        dry_run=True,
+        show_prompt=True,
+        session_id=None,
     )
 
-    # Trigger supervisor scan
-    # on_supervisor_scan publishes SupervisorIssueIdentified events
-    total_scanned, matched_count = await facade.on_supervisor_scan()
 
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
+def _run_supervisor_scan() -> tuple[int, int]:
+    """Execute supervisor scan once via execution layer (no facade).
 
-    logger.bind(domain="orchestra").info("Supervisor scan completed")
+    Fetches supervisor candidates and calls execution layer directly
+    without going through OrchestrationFacade or internal command layer.
+
+    Returns:
+        Tuple of (total_issues_scanned, matched_issues_found)
+    """
+    from vibe3.services.scan_service import (
+        dispatch_supervisor_execution,
+        fetch_supervisor_candidates,
+    )
+
+    config = load_orchestra_config()
+    github = GitHubClient()
+
+    # Fetch candidates
+    total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
+    matched_count = len(candidates)
+
+    # Dispatch each candidate via execution layer
+    for candidate in candidates:
+        issue_number = candidate["number"]
+        dispatch_supervisor_execution(issue_number=issue_number, no_async=False)
+
+    return total_scanned, matched_count
 
 
 def _run_supervisor_scan_dry_run() -> None:
@@ -187,99 +112,15 @@ def _run_supervisor_scan_dry_run() -> None:
     # Fetch candidates via service layer
     try:
         github = GitHubClient()
-        candidates = fetch_supervisor_candidates(github, config.repo)
+        total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     except Exception as e:
         # On error, display empty list
         console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
+        total_scanned = 0
         candidates = []
 
     # Display via UI layer
-    display_supervisor_dry_run(console, candidates)
-
-
-def _get_available_governance_materials() -> list[str]:
-    """Fetch available governance materials from catalog.
-
-    Returns list of short material names (without path/suffix).
-    """
-    try:
-        from vibe3.roles.governance import load_governance_material_catalog
-
-        catalog = load_governance_material_catalog()
-        materials = []
-        for material in catalog:
-            # Extract short name:
-            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
-            name = material.name
-            if name.startswith("supervisor/governance/"):
-                short_name = name.split("/")[-1]
-                short_name = (
-                    short_name[:-3] if short_name.endswith(".md") else short_name
-                )
-                materials.append(short_name)
-        return sorted(set(materials))
-    except Exception:
-        # Fallback if catalog cannot be loaded
-        return []
-
-
-def _extract_material_description(material_name: str) -> str:
-    """Extract description from material file (DEPRECATED - use scan_service).
-
-    This function delegates to scan_service.extract_material_description.
-
-    Args:
-        material_name: Material file path or name
-
-    Returns:
-        Material description or filename as fallback
-    """
-    from pathlib import Path
-
-    from vibe3.services.scan_service import extract_material_description
-
-    # Normalize to full path if needed (only for relative governance paths)
-    if (
-        not material_name.startswith("supervisor/governance/")
-        and not Path(material_name).is_absolute()
-    ):
-        material_name = f"supervisor/governance/{material_name}"
-
-    # Ensure .md suffix
-    if not material_name.endswith(".md"):
-        material_name = f"{material_name}.md"
-
-    return extract_material_description(material_name)
-
-
-def _list_governance_materials() -> None:
-    """List available governance materials with descriptions.
-
-    Delegates to service and UI layers for business logic and display.
-    """
-    from rich.console import Console
-
-    from vibe3.roles.governance import load_governance_material_catalog
-    from vibe3.services.scan_service import extract_material_description
-    from vibe3.ui.scan_display import display_material_list
-
-    console = Console()
-
-    # Load catalog
-    try:
-        catalog = load_governance_material_catalog()
-    except Exception as exc:
-        console.print(f"[red]Error loading material catalog: {exc}[/red]")
-        raise typer.Exit(1)
-
-    # Build materials list with descriptions
-    materials = []
-    for material in catalog:
-        description = extract_material_description(material.name)
-        materials.append({"name": material.name, "description": description})
-
-    # Display via UI layer
-    display_material_list(console, materials)
+    display_supervisor_dry_run(console, total_scanned, candidates)
 
 
 @app.command()
@@ -312,6 +153,13 @@ def governance(
     Scans all open issues and triggers governance dispatch for issues
     matching governance rules. Runs once and exits.
     """
+    from rich.console import Console
+
+    from vibe3.services.scan_service import (
+        get_available_governance_materials,
+        list_governance_materials,
+    )
+
     setup_logging(verbose=verbose)
 
     # Check mutual exclusivity first
@@ -321,7 +169,8 @@ def governance(
 
     # Handle --list option (highest priority)
     if list_materials:
-        _list_governance_materials()
+        console = Console()
+        list_governance_materials(console)
         return
 
     if dry_run:
@@ -330,7 +179,7 @@ def governance(
         return
 
     # Get available materials for help text
-    available_materials = _get_available_governance_materials()
+    available_materials = get_available_governance_materials()
 
     if role is None:
         # No role specified - show guidance
@@ -370,54 +219,36 @@ def supervisor(
         _run_supervisor_scan_dry_run()
         return
 
-    asyncio.run(_run_supervisor_scan_async())
-    typer.echo("Supervisor scan completed")
+    # Manual supervisor scan: direct dispatch without facade
+    total_scanned, matched_count = _run_supervisor_scan()
+
+    # Display scan results
+    if matched_count == 0:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels"
+        )
+    else:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found {matched_count} issue(s) requiring supervisor attention"
+        )
+
+    logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
 async def _run_combined_scan_async() -> None:
-    """Execute both governance and supervisor scans in sequence."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
+    """Execute both governance and supervisor scans in sequence.
 
-    # Register event handlers before publishing events
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
-    )
-
-    # Run governance scan first (force=True to skip interval gating for manual trigger)
-    facade.on_heartbeat_tick(force=True)
+    Governance scan uses internal dispatch directly (no facade).
+    Supervisor scan uses internal apply dispatch directly (no facade).
+    """
+    # Governance: call internal dispatch directly (no facade, no FailedGate)
+    _execute_governance_internal(material_override=None)
     logger.bind(domain="orchestra").info("Governance scan completed")
 
-    # Then run supervisor scan
-    total_scanned, matched_count = await facade.on_supervisor_scan()
+    # Supervisor: call internal dispatch directly (no facade)
+    total_scanned, matched_count = _run_supervisor_scan()
 
     # Display scan results
     if matched_count == 0:
