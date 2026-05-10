@@ -67,6 +67,7 @@ for file_path in [files[key] for key in sorted(files)]:
             print(f"   → Action: This file will block CI. Options:")
             print(f"     1. Refactor to under {config.ci_block_threshold} lines")
             print(f"     2. Request exception in config/loc_limits.yaml")
+        print()  # Separate files
         errors += 1
     elif exception is None and lines > config.warning_threshold:
         print(f"⚠️  WARNING: {rel_path} has {lines} lines")
@@ -74,6 +75,7 @@ for file_path in [files[key] for key in sorted(files)]:
         print(f"   CI block threshold: {config.ci_block_threshold} lines (CI: enforced)")
         print()
         print(f"   → Tip: Consider refactoring to under {config.warning_threshold} lines")
+        print()  # Separate files
         warnings += 1
 
 print()
