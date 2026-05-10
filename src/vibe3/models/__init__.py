@@ -15,6 +15,7 @@ from vibe3.models.snapshot import (
     StructureMetrics,
     StructureSnapshot,
 )
+from vibe3.models.tick import TickPhase, TickPlan, TickRequest, TickSource
 from vibe3.models.trace import ExecutionStep, TraceOutput
 
 __all__: list[str] = [
@@ -33,5 +34,9 @@ __all__: list[str] = [
     "StructureDiff",
     "StructureMetrics",
     "StructureSnapshot",
+    "TickPhase",
+    "TickPlan",
+    "TickRequest",
+    "TickSource",
     "TraceOutput",
 ]
