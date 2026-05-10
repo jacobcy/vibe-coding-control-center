@@ -233,29 +233,40 @@ class OrchestrationFacade(ServiceBase):
 
         publish(event)
 
-    def on_heartbeat_tick(self, force: bool = False) -> None:
+    def on_heartbeat_tick(
+        self, force: bool = False, material_override: str | None = None
+    ) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
 
         由 runtime heartbeat 定期调用，发布 governance 链路的 periodic scan 事件。
         包含 interval_ticks gating，避免每次 tick 都触发。
 
         Args:
-            force: 当 True 时跳过 interval gating，用于手动触发 (vibe3 scan governance)
+            force: 当 True 时跳过 interval gating，用于手动触发
+                (vibe3 scan governance)
+            material_override: 当提供时，覆盖 material rotation，
+                指定执行的 governance 角色
 
         执行装配由 governance_scan handler 负责，facade 只做 observation。
         """
-        self._tick_count += 1
+        # For manual triggers (force=True), use tick_count=0 for consistent t0 suffix
+        # For automatic triggers, increment tick counter
+        if force:
+            tick_count = 0
+        else:
+            self._tick_count += 1
+            tick_count = self._tick_count
 
         # Skip interval gating when force=True (manual trigger)
         if not force:
             interval = self._config.governance.interval_ticks
-            if self._tick_count % interval != 0:
+            if tick_count % interval != 0:
                 logger.bind(
                     domain="orchestration_facade",
-                    tick_count=self._tick_count,
+                    tick_count=tick_count,
                     interval=interval,
                 ).debug(
-                    f"Skipping governance scan (tick {self._tick_count} "
+                    f"Skipping governance scan (tick {tick_count} "
                     f"not divisible by {interval})"
                 )
                 return
@@ -267,7 +278,7 @@ class OrchestrationFacade(ServiceBase):
             if elapsed < min_interval_seconds:
                 logger.bind(
                     domain="orchestration_facade",
-                    tick_count=self._tick_count,
+                    tick_count=tick_count,
                     interval=interval,
                     min_interval_seconds=min_interval_seconds,
                     elapsed_seconds=round(elapsed, 2),
@@ -277,11 +288,16 @@ class OrchestrationFacade(ServiceBase):
         # Update timestamp when actually emitting event
         self._last_governance_started_at = time.monotonic()
 
-        event = GovernanceScanStarted(tick_count=self._tick_count)
+        event = GovernanceScanStarted(
+            tick_count=tick_count,
+            is_manual=force,
+            material_override=material_override,
+        )
         logger.bind(
             domain="orchestration_facade",
-            tick_count=self._tick_count,
+            tick_count=tick_count,
             force=force,
+            material_override=material_override,
         ).info("Emitting GovernanceScanStarted event")
         publish(event)
 

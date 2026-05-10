@@ -15,11 +15,14 @@ app = typer.Typer(
 )
 
 
-def _run_governance_scan() -> None:
+def _run_governance_scan(material_override: str | None = None) -> None:
     """Execute governance scan once.
 
     Creates minimal services and publishes GovernanceScanStarted event.
     Event handlers handle the actual execution via CLI self-invocation.
+
+    Args:
+        material_override: Optional governance role to override material rotation
     """
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -60,7 +63,7 @@ def _run_governance_scan() -> None:
     # Trigger governance scan (force=True to skip interval gating for manual trigger)
     # on_heartbeat_tick publishes GovernanceScanStarted event
     # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick(force=True)
+    facade.on_heartbeat_tick(force=True, material_override=material_override)
 
     logger.bind(domain="orchestra").info("Governance scan completed")
 
@@ -124,6 +127,15 @@ async def _run_supervisor_scan_async() -> None:
 
 @app.command()
 def governance(
+    role: Annotated[
+        str | None,
+        typer.Option(
+            "--role",
+            "-r",
+            help="Override governance role: assignee-pool, roadmap-intake, "
+            "or cron-supervisor",
+        ),
+    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Show what would be done without executing"),
@@ -144,7 +156,7 @@ def governance(
         typer.echo("DRY RUN: Would run governance scan")
         return
 
-    _run_governance_scan()
+    _run_governance_scan(material_override=role)
     typer.echo("Governance scan completed")
 
 
