@@ -233,47 +233,55 @@ class OrchestrationFacade(ServiceBase):
 
         publish(event)
 
-    def on_heartbeat_tick(self) -> None:
+    def on_heartbeat_tick(self, force: bool = False) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
 
         由 runtime heartbeat 定期调用，发布 governance 链路的 periodic scan 事件。
         包含 interval_ticks gating，避免每次 tick 都触发。
+
+        Args:
+            force: 当 True 时跳过 interval gating，用于手动触发 (vibe3 scan governance)
+
         执行装配由 governance_scan handler 负责，facade 只做 observation。
         """
         self._tick_count += 1
 
-        interval = self._config.governance.interval_ticks
-        if self._tick_count % interval != 0:
-            logger.bind(
-                domain="orchestration_facade",
-                tick_count=self._tick_count,
-                interval=interval,
-            ).debug(
-                f"Skipping governance scan (tick {self._tick_count} "
-                f"not divisible by {interval})"
-            )
-            return
+        # Skip interval gating when force=True (manual trigger)
+        if not force:
+            interval = self._config.governance.interval_ticks
+            if self._tick_count % interval != 0:
+                logger.bind(
+                    domain="orchestration_facade",
+                    tick_count=self._tick_count,
+                    interval=interval,
+                ).debug(
+                    f"Skipping governance scan (tick {self._tick_count} "
+                    f"not divisible by {interval})"
+                )
+                return
 
-        min_interval_seconds = self._config.polling_interval * interval
-        now = time.monotonic()
-        last_started_at = self._last_governance_started_at or self._created_at
-        elapsed = now - last_started_at
-        if elapsed < min_interval_seconds:
-            logger.bind(
-                domain="orchestration_facade",
-                tick_count=self._tick_count,
-                interval=interval,
-                min_interval_seconds=min_interval_seconds,
-                elapsed_seconds=round(elapsed, 2),
-            ).debug("Skipping governance scan (min interval not reached)")
-            return
+            min_interval_seconds = self._config.polling_interval * interval
+            now = time.monotonic()
+            last_started_at = self._last_governance_started_at or self._created_at
+            elapsed = now - last_started_at
+            if elapsed < min_interval_seconds:
+                logger.bind(
+                    domain="orchestration_facade",
+                    tick_count=self._tick_count,
+                    interval=interval,
+                    min_interval_seconds=min_interval_seconds,
+                    elapsed_seconds=round(elapsed, 2),
+                ).debug("Skipping governance scan (min interval not reached)")
+                return
 
-        self._last_governance_started_at = now
+        # Update timestamp when actually emitting event
+        self._last_governance_started_at = time.monotonic()
 
         event = GovernanceScanStarted(tick_count=self._tick_count)
         logger.bind(
             domain="orchestration_facade",
             tick_count=self._tick_count,
+            force=force,
         ).info("Emitting GovernanceScanStarted event")
         publish(event)
 
@@ -304,13 +312,16 @@ class OrchestrationFacade(ServiceBase):
 
         GitHubClient().add_comment(issue_info.number, comment_body)
 
-    async def on_supervisor_scan(self) -> None:
+    async def on_supervisor_scan(self) -> tuple[int, int]:
         """扫描 supervisor candidates 并发布 SupervisorIssueIdentified 事件.
 
         查找带有 supervisor + state/handoff labels 的 issues，
         发布 SupervisorIssueIdentified 事件。
         包含 interval_ticks gating，避免每 tick 都触发（与 governance 同频）。
         执行装配由 supervisor_scan handler 负责，facade 只做 observation。
+
+        Returns:
+            Tuple of (total_issues_scanned, matched_issues_found)
         """
         interval = self._config.supervisor_handoff.interval_ticks
         if self._tick_count % interval != 0:
@@ -322,7 +333,7 @@ class OrchestrationFacade(ServiceBase):
                 f"Skipping supervisor scan (tick {self._tick_count} "
                 f"not divisible by {interval})"
             )
-            return
+            return (0, 0)
 
         from vibe3.clients.github_client import GitHubClient
         from vibe3.roles.supervisor import iter_supervisor_identified_events
@@ -337,10 +348,16 @@ class OrchestrationFacade(ServiceBase):
             repo=config.repo,
         )
 
-        for event in iter_supervisor_identified_events(config, raw_issues):
+        total_scanned = len(raw_issues)
+        events = list(iter_supervisor_identified_events(config, raw_issues))
+        matched_count = len(events)
+
+        for event in events:
             logger.bind(
                 domain="orchestration_facade",
                 issue_number=event.issue_number,
                 supervisor_file=event.supervisor_file,
             ).info("Supervisor candidate found, publishing SupervisorIssueIdentified")
             publish(event)
+
+        return (total_scanned, matched_count)

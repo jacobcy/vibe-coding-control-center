@@ -15,11 +15,11 @@ app = typer.Typer(
 )
 
 
-def _run_governance_scan(tick_count: int | None = None) -> None:
+def _run_governance_scan() -> None:
     """Execute governance scan once.
 
-    Args:
-        tick_count: Override tick count (bypasses interval gating)
+    Creates minimal services and publishes GovernanceScanStarted event.
+    Event handlers handle the actual execution via CLI self-invocation.
     """
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -51,16 +51,16 @@ def _run_governance_scan(tick_count: int | None = None) -> None:
 
     # Create facade with minimal services for governance scan
     facade = OrchestrationFacade(
-        tick_count=tick_count if tick_count is not None else 0,
+        tick_count=0,
         config=config,
         capacity=shared_capacity,
         failed_gate=failed_gate,
     )
 
-    # Trigger governance scan
+    # Trigger governance scan (force=True to skip interval gating for manual trigger)
     # on_heartbeat_tick publishes GovernanceScanStarted event
     # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick()
+    facade.on_heartbeat_tick(force=True)
 
     logger.bind(domain="orchestra").info("Governance scan completed")
 
@@ -105,17 +105,25 @@ async def _run_supervisor_scan_async() -> None:
 
     # Trigger supervisor scan
     # on_supervisor_scan publishes SupervisorIssueIdentified events
-    await facade.on_supervisor_scan()
+    total_scanned, matched_count = await facade.on_supervisor_scan()
+
+    # Display scan results
+    if matched_count == 0:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels"
+        )
+    else:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found {matched_count} issue(s) requiring supervisor attention"
+        )
 
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
 @app.command()
 def governance(
-    tick: Annotated[
-        int | None,
-        typer.Option("--tick", "-t", help="Override tick count for governance scan"),
-    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Show what would be done without executing"),
@@ -134,11 +142,9 @@ def governance(
 
     if dry_run:
         typer.echo("DRY RUN: Would run governance scan")
-        if tick is not None:
-            typer.echo(f"  - Using tick count: {tick}")
         return
 
-    _run_governance_scan(tick_count=tick)
+    _run_governance_scan()
     typer.echo("Governance scan completed")
 
 
@@ -168,7 +174,7 @@ def supervisor(
     typer.echo("Supervisor scan completed")
 
 
-async def _run_combined_scan_async(tick_count: int | None = None) -> None:
+async def _run_combined_scan_async() -> None:
     """Execute both governance and supervisor scans in sequence."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -200,27 +206,36 @@ async def _run_combined_scan_async(tick_count: int | None = None) -> None:
 
     # Create facade
     facade = OrchestrationFacade(
-        tick_count=tick_count if tick_count is not None else 0,
+        tick_count=0,
         config=config,
         capacity=shared_capacity,
         failed_gate=failed_gate,
     )
 
-    # Run governance scan first
-    facade.on_heartbeat_tick()
+    # Run governance scan first (force=True to skip interval gating for manual trigger)
+    facade.on_heartbeat_tick(force=True)
     logger.bind(domain="orchestra").info("Governance scan completed")
 
     # Then run supervisor scan
-    await facade.on_supervisor_scan()
+    total_scanned, matched_count = await facade.on_supervisor_scan()
+
+    # Display scan results
+    if matched_count == 0:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels"
+        )
+    else:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found {matched_count} issue(s) requiring supervisor attention"
+        )
+
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
 @app.command()
 def all(
-    tick: Annotated[
-        int | None,
-        typer.Option("--tick", "-t", help="Override tick count for governance scan"),
-    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Show what would be done without executing"),
@@ -238,9 +253,7 @@ def all(
 
     if dry_run:
         typer.echo("DRY RUN: Would run both governance and supervisor scans")
-        if tick is not None:
-            typer.echo(f"  - Using tick count: {tick}")
         return
 
-    asyncio.run(_run_combined_scan_async(tick_count=tick))
+    asyncio.run(_run_combined_scan_async())
     typer.echo("Combined scan completed")

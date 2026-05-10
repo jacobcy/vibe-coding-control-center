@@ -35,7 +35,6 @@ class TestScanCommand:
         assert result.exit_code == 0
         output = _strip_ansi(result.output)
         assert "Run governance scan once" in output
-        assert "--tick" in output
         assert "--dry-run" in output
 
     def test_scan_supervisor_help(self):
@@ -52,7 +51,6 @@ class TestScanCommand:
         assert result.exit_code == 0
         output = _strip_ansi(result.output)
         assert "Run both governance and supervisor scans once" in output
-        assert "--tick" in output
         assert "--dry-run" in output
 
 
@@ -65,28 +63,13 @@ class TestGovernanceScan:
         assert result.exit_code == 0
         assert "DRY RUN: Would run governance scan" in result.output
 
-    def test_governance_dry_run_with_tick(self):
-        """Test governance scan dry-run with custom tick count."""
-        result = runner.invoke(app, ["scan", "governance", "--dry-run", "--tick", "42"])
-        assert result.exit_code == 0
-        assert "DRY RUN: Would run governance scan" in result.output
-        assert "Using tick count: 42" in result.output
-
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
         """Test governance scan execution."""
         result = runner.invoke(app, ["scan", "governance"])
         assert result.exit_code == 0
         assert "Governance scan completed" in result.output
-        mock_run.assert_called_once_with(tick_count=None)
-
-    @patch("vibe3.commands.scan._run_governance_scan")
-    def test_governance_execution_with_tick(self, mock_run):
-        """Test governance scan execution with custom tick."""
-        result = runner.invoke(app, ["scan", "governance", "--tick", "100"])
-        assert result.exit_code == 0
-        assert "Governance scan completed" in result.output
-        mock_run.assert_called_once_with(tick_count=100)
+        mock_run.assert_called_once_with()
 
 
 class TestSupervisorScan:
@@ -119,28 +102,11 @@ class TestCombinedScan:
             "DRY RUN: Would run both governance and supervisor scans" in result.output
         )
 
-    def test_all_dry_run_with_tick(self):
-        """Test combined scan dry-run with custom tick count."""
-        result = runner.invoke(app, ["scan", "all", "--dry-run", "--tick", "50"])
-        assert result.exit_code == 0
-        assert (
-            "DRY RUN: Would run both governance and supervisor scans" in result.output
-        )
-        assert "Using tick count: 50" in result.output
-
     @patch("vibe3.commands.scan._run_combined_scan_async")
     def test_all_execution(self, mock_run):
         """Test combined scan execution."""
         mock_run.return_value = None
         result = runner.invoke(app, ["scan", "all"])
-        assert result.exit_code == 0
-        assert "Combined scan completed" in result.output
-
-    @patch("vibe3.commands.scan._run_combined_scan_async")
-    def test_all_execution_with_tick(self, mock_run):
-        """Test combined scan execution with custom tick."""
-        mock_run.return_value = None
-        result = runner.invoke(app, ["scan", "all", "--tick", "75"])
         assert result.exit_code == 0
         assert "Combined scan completed" in result.output
 
@@ -173,7 +139,7 @@ class TestScanIntegration:
 
             from vibe3.commands.scan import _run_governance_scan
 
-            _run_governance_scan(tick_count=10)
+            _run_governance_scan()
 
             # Verify handlers were registered before facade methods called
             mock_handlers.assert_called_once()
@@ -205,7 +171,7 @@ class TestScanIntegration:
 
             # Make on_supervisor_scan an async mock
             async def async_mock():
-                pass
+                return (10, 2)
 
             mock_facade_instance.on_supervisor_scan = async_mock
             mock_facade.return_value = mock_facade_instance
@@ -248,7 +214,7 @@ class TestFailedGateBlocking:
 
             from vibe3.commands.scan import _run_governance_scan
 
-            _run_governance_scan(tick_count=10)
+            _run_governance_scan()
 
             # Verify FailedGate was checked
             mock_gate_instance.check.assert_called_once()
@@ -320,7 +286,7 @@ class TestFailedGateBlocking:
 
             from vibe3.commands.scan import _run_combined_scan_async
 
-            await _run_combined_scan_async(tick_count=20)
+            await _run_combined_scan_async()
 
             # Verify FailedGate was checked
             mock_gate_instance.check.assert_called_once()

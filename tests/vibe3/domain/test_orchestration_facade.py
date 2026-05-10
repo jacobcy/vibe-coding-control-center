@@ -71,7 +71,8 @@ class TestOrchestrationFacade:
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
         )
-        mock_monotonic.side_effect = [0.0, 1.0, 2.0]
+        # Need 5 values: 2 for first call, 2 for second call, 1 for extra safety
+        mock_monotonic.side_effect = [0.0, 1.0, 2.0, 3.0, 4.0]
         facade = OrchestrationFacade(tick_count=0)
 
         facade.on_heartbeat_tick()
@@ -101,7 +102,8 @@ class TestOrchestrationFacade:
             polling_interval=900,
             governance=MagicMock(interval_ticks=1),
         )
-        mock_monotonic.side_effect = [0.0, 60.0, 901.0]
+        # Need 3 values: 1 for first call (skip), 2 for second call (publish)
+        mock_monotonic.side_effect = [0.0, 60.0, 901.0, 901.0]
 
         facade = OrchestrationFacade(tick_count=0)
 
@@ -121,7 +123,7 @@ class TestOrchestrationFacade:
         mock_monotonic: MagicMock,
         mock_publish: MagicMock,
     ) -> None:
-        mock_monotonic.side_effect = [0.0, 60.0]
+        mock_monotonic.side_effect = [0.0, 60.0, 60.0]
         config = OrchestraConfig(
             polling_interval=60,
             governance=GovernanceConfig(interval_ticks=1),
@@ -170,7 +172,7 @@ class TestOrchestrationFacade:
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
         )
-        mock_monotonic.side_effect = [0.0, 1.0]
+        mock_monotonic.side_effect = [0.0, 1.0, 1.0]
         facade = OrchestrationFacade()
 
         facade.on_issue_state_changed(sample_issue_info, from_state="ready")
