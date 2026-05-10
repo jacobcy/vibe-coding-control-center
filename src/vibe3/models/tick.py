@@ -28,7 +28,9 @@ class TickRequest(BaseModel):
         tick_id: Tick number (0 for manual, 1..N for heartbeat)
         phases: Which phases to execute (governance/supervisor)
         governance_material: Optional explicit material override
-        supervisor_issue_numbers: Optional explicit issue list
+        supervisor_issue_numbers: Optional explicit issue list.
+            Named with 'numbers' suffix to distinguish from the resolved
+            'issues' list in TickPlan, which may be scanned from GitHub.
         dry_run: Preview mode without actual execution
     """
 
@@ -54,7 +56,9 @@ class TickPlan(BaseModel):
         governance_enabled: Whether governance phase will execute
         governance_material: Resolved material (auto or explicit)
         supervisor_enabled: Whether supervisor phase will execute
-        supervisor_issues: Resolved issue list (scanned or explicit)
+        supervisor_issues: Resolved issue list (scanned or explicit).
+            Named with 'issues' suffix to indicate this is the final
+            resolved list, distinct from the request's 'issue_numbers'.
         dry_run: Preview mode
     """
 
