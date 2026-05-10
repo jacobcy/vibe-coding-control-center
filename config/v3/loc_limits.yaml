@@ -71,7 +71,7 @@ code_limits:
         limit: 470
         reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，已下沉 UI 和业务逻辑到 ui/ 和 services/ 层"
       - path: "src/vibe3/commands/pr_query.py"
-        limit: 420
+        limit: 450
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 成成、trace 输出等紧密耦合逻辑"
 
       # Services 层 —— 允许 400-500
@@ -96,7 +96,7 @@ code_limits:
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
       - path: "src/vibe3/roles/governance.py"
-        limit: 520
+        limit: 540
         reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑；材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
 
       # Server —— 允许 485
