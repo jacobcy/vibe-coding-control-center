@@ -56,7 +56,7 @@ class TestDisplaySupervisorDryRun:
         console = Console()
 
         with patch.object(console, "print") as mock_print:
-            display_supervisor_dry_run(console=console, candidates=[])
+            display_supervisor_dry_run(console=console, total_scanned=10, candidates=[])
 
             # Check that process steps are mentioned
             printed_text = " ".join(str(call) for call in mock_print.call_args_list)
@@ -78,7 +78,9 @@ class TestDisplaySupervisorDryRun:
         ]
 
         with patch.object(console, "print") as mock_print:
-            display_supervisor_dry_run(console=console, candidates=candidates)
+            display_supervisor_dry_run(
+                console=console, total_scanned=15, candidates=candidates
+            )
 
             # Should print table with issue info
             assert mock_print.call_count > 0

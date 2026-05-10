@@ -83,7 +83,7 @@ def _run_supervisor_scan() -> tuple[int, int]:
     github = GitHubClient()
 
     # Fetch candidates
-    candidates = fetch_supervisor_candidates(github, config.repo)
+    total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     matched_count = len(candidates)
 
     # Dispatch each candidate via internal apply
@@ -91,7 +91,7 @@ def _run_supervisor_scan() -> tuple[int, int]:
         issue_number = candidate["number"]
         internal_apply_dispatch(issue=issue_number, dry_run=False, no_async=False)
 
-    return matched_count, matched_count
+    return total_scanned, matched_count
 
 
 def _run_supervisor_scan_dry_run() -> None:
@@ -112,14 +112,15 @@ def _run_supervisor_scan_dry_run() -> None:
     # Fetch candidates via service layer
     try:
         github = GitHubClient()
-        candidates = fetch_supervisor_candidates(github, config.repo)
+        total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     except Exception as e:
         # On error, display empty list
         console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
+        total_scanned = 0
         candidates = []
 
     # Display via UI layer
-    display_supervisor_dry_run(console, candidates)
+    display_supervisor_dry_run(console, total_scanned, candidates)
 
 
 @app.command()

@@ -187,14 +187,17 @@ class TestScanIntegration:
             ) as mock_fetch,
             patch("vibe3.commands.internal.internal_apply_dispatch") as mock_apply,
         ):
-            # Mock candidate list
-            mock_fetch.return_value = [
-                {
-                    "number": 123,
-                    "title": "Issue A",
-                    "labels": ["supervisor", "state/handoff"],
-                },
-            ]
+            # Mock candidate list (total_scanned, candidates)
+            mock_fetch.return_value = (
+                1,
+                [
+                    {
+                        "number": 123,
+                        "title": "Issue A",
+                        "labels": ["supervisor", "state/handoff"],
+                    },
+                ],
+            )
 
             from vibe3.commands.scan import _run_supervisor_scan
 
@@ -236,8 +239,8 @@ class TestFailedGateBlocking:
         with patch(
             "vibe3.services.scan_service.fetch_supervisor_candidates"
         ) as mock_fetch:
-            # Mock empty candidate list
-            mock_fetch.return_value = []
+            # Mock empty candidate list (total_scanned, candidates)
+            mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_supervisor_scan
 
@@ -263,8 +266,8 @@ class TestFailedGateBlocking:
             ) as mock_fetch,
             patch("vibe3.commands.internal.internal_apply_dispatch"),
         ):
-            # Mock supervisor candidates
-            mock_fetch.return_value = []
+            # Mock supervisor candidates (total_scanned, candidates)
+            mock_fetch.return_value = (0, [])
 
             from vibe3.commands.scan import _run_combined_scan_async
 
@@ -289,19 +292,22 @@ def test_supervisor_scan_fetches_candidates_and_calls_internal_apply() -> None:
         patch("vibe3.services.scan_service.fetch_supervisor_candidates") as mock_fetch,
         patch("vibe3.commands.internal.internal_apply_dispatch") as mock_apply,
     ):
-        # Mock candidate list
-        mock_fetch.return_value = [
-            {
-                "number": 123,
-                "title": "Issue A",
-                "labels": ["supervisor", "state/handoff"],
-            },
-            {
-                "number": 456,
-                "title": "Issue B",
-                "labels": ["supervisor", "state/handoff"],
-            },
-        ]
+        # Mock candidate list (total_scanned, candidates)
+        mock_fetch.return_value = (
+            2,
+            [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+                {
+                    "number": 456,
+                    "title": "Issue B",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ],
+        )
 
         result = runner.invoke(app, ["scan", "supervisor"])
 

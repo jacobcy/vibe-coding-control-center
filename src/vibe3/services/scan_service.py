@@ -39,7 +39,9 @@ def extract_material_description(material_path: str) -> str:
     return material_path
 
 
-def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[dict]:
+def fetch_supervisor_candidates(
+    github_client: Any, repo: str | None
+) -> tuple[int, list[dict]]:
     """Fetch supervisor candidate issues from GitHub.
 
     Filters for issues with both 'supervisor' and 'state/handoff' labels.
@@ -49,12 +51,15 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
         repo: Repository in "owner/repo" format
 
     Returns:
-        List of candidate issues (number, title, labels)
+        Tuple of (total_issues_scanned, matching_candidates)
+        - total_issues_scanned: Total number of open issues queried
+        - matching_candidates: List of candidate issues (number, title, labels)
     """
     from vibe3.utils.label_utils import normalize_labels
 
     try:
         raw_issues = github_client.list_issues(limit=100, state="open", repo=repo)
+        total_scanned = len(raw_issues)
 
         # Filter for supervisor + state/handoff labels
         matching = []
@@ -69,11 +74,11 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
                     }
                 )
 
-        return matching
+        return total_scanned, matching
 
     except Exception as e:
         logger.error(f"Failed to fetch supervisor candidates: {e}")
-        return []
+        return 0, []
 
 
 def get_available_governance_materials() -> list[str]:

@@ -40,11 +40,14 @@ def display_governance_dry_run(
     console.print("[dim]Mode: dry-run (no execution)[/dim]\n")
 
 
-def display_supervisor_dry_run(console: Console, candidates: list[dict]) -> None:
+def display_supervisor_dry_run(
+    console: Console, total_scanned: int, candidates: list[dict]
+) -> None:
     """Display supervisor scan dry-run output.
 
     Args:
         console: Rich Console instance
+        total_scanned: Total number of open issues scanned
         candidates: List of candidate issues (number, title, labels)
     """
     console.print("\n[bold]Supervisor Scan Dry-Run[/bold]")
@@ -52,8 +55,8 @@ def display_supervisor_dry_run(console: Console, candidates: list[dict]) -> None
 
     # Scan process simulation
     console.print("[bold]Scan Process:[/bold]")
-    console.print("1. Query open issues with 'supervisor' label")
-    console.print("2. Filter by additional 'state/handoff' label")
+    console.print(f"1. Queried {total_scanned} open issues")
+    console.print("2. Filtered by 'supervisor' + 'state/handoff' labels")
     console.print("3. For each matching issue:")
     console.print("   - Build supervisor handoff prompt")
     console.print("   - Would dispatch supervisor-apply agent\n")
@@ -85,18 +88,13 @@ def display_supervisor_dry_run(console: Console, candidates: list[dict]) -> None
         )
     else:
         console.print(
-            "[yellow]No issues found with supervisor + "
-            "state/handoff labels[/yellow]\n"
-        )
-        console.print(
-            "[dim]In real mode, would report: 'Scanned X open issues, "
-            "found 0 issues requiring supervisor attention'[/dim]"
+            f"[yellow]Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels[/yellow]\n"
         )
 
     console.print("\n[bold]Summary:[/bold]")
-    console.print(
-        "[dim]• Scan target: Open issues with supervisor + state/handoff labels[/dim]"
-    )
+    console.print(f"[dim]• Total issues scanned: {total_scanned}[/dim]")
+    console.print(f"[dim]• Matching candidates: {len(candidates)}[/dim]")
     console.print(
         "[dim]• Action: Would build and dispatch supervisor-apply prompts[/dim]"
     )

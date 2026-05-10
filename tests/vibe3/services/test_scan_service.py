@@ -53,20 +53,27 @@ class TestFetchSupervisorCandidates:
             },
         ]
 
-        candidates = fetch_supervisor_candidates(mock_github, "owner/repo")
+        total_scanned, candidates = fetch_supervisor_candidates(
+            mock_github, "owner/repo"
+        )
 
+        # Should return total scanned count
+        assert total_scanned == 2
         # Should only return issue with both labels
         assert len(candidates) == 1
         assert candidates[0]["number"] == 123
 
     def test_returns_empty_list_on_error(self):
-        """Test returns empty list on GitHub error."""
+        """Test returns empty tuple on GitHub error."""
         from unittest.mock import MagicMock
 
         mock_github = MagicMock()
         mock_github.list_issues.side_effect = Exception("API Error")
 
-        candidates = fetch_supervisor_candidates(mock_github, "owner/repo")
+        total_scanned, candidates = fetch_supervisor_candidates(
+            mock_github, "owner/repo"
+        )
+        assert total_scanned == 0
         assert candidates == []
 
     def test_queries_100_issues_not_50(self):
@@ -79,9 +86,14 @@ class TestFetchSupervisorCandidates:
         mock_github = MagicMock()
         mock_github.list_issues.return_value = []
 
-        fetch_supervisor_candidates(mock_github, "owner/repo")
+        total_scanned, candidates = fetch_supervisor_candidates(
+            mock_github, "owner/repo"
+        )
 
         # Verify limit parameter is 100 (not 50)
         mock_github.list_issues.assert_called_once()
         call_args = mock_github.list_issues.call_args
         assert call_args.kwargs.get("limit") == 100
+        # Empty results
+        assert total_scanned == 0
+        assert candidates == []
