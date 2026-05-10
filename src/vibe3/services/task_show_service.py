@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
@@ -56,6 +56,7 @@ class TaskShowResult:
 
     branch: str
     local_task: FlowStatusResponse | None = None
+    task_issue_numbers: list[int] = field(default_factory=list)
     related_issue_numbers: list[int] | None = None
     dependency_issue_numbers: list[int] | None = None
     issue_title: str | None = None
@@ -72,6 +73,7 @@ class TaskShowResult:
             "local_task": (
                 self.local_task.model_dump() if self.local_task is not None else None
             ),
+            "task_issue_numbers": self.task_issue_numbers,
             "related_issue_numbers": self.related_issue_numbers or [],
             "dependency_issue_numbers": self.dependency_issue_numbers or [],
             "issue_title": self.issue_title,
@@ -288,6 +290,9 @@ class TaskShowService:
         local_task = self.flow_service.get_flow_status(target_branch)
 
         issue_links = self.store.get_issue_links(target_branch)
+        task_issue_numbers = [
+            link["issue_number"] for link in issue_links if link["issue_role"] == "task"
+        ]
         related_issue_numbers = [
             link["issue_number"]
             for link in issue_links
@@ -341,6 +346,7 @@ class TaskShowService:
         return TaskShowResult(
             branch=target_branch,
             local_task=local_task,
+            task_issue_numbers=task_issue_numbers,
             related_issue_numbers=related_issue_numbers,
             dependency_issue_numbers=dependency_issue_numbers,
             issue_title=issue_title,
