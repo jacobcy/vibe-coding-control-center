@@ -1,5 +1,6 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -142,6 +143,14 @@ class GitClient:
             f"current os.getcwd()={Path.cwd()}",
             file=sys.stderr,
         )
+
+        # Remove GIT_DIR and GIT_PREFIX to ensure git uses
+        # normal repository discovery. These variables are set
+        # by git hooks and can break git rev-parse --show-toplevel
+        env = dict(os.environ)
+        env.pop("GIT_DIR", None)
+        env.pop("GIT_PREFIX", None)
+
         try:
             result = subprocess.run(
                 cmd,
@@ -149,6 +158,7 @@ class GitClient:
                 text=True,
                 check=True,
                 cwd=str(effective_cwd) if effective_cwd else None,
+                env=env,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
