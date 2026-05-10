@@ -2,14 +2,13 @@
 
 from unittest.mock import patch
 
+from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 
 def test_flow_orchestrator_service_initialization():
     """FlowOrchestratorService should initialize with config."""
-    from vibe3.config.orchestra_settings import load_orchestra_config
-
     config = load_orchestra_config()
     service = FlowOrchestratorService(config)
 
@@ -18,8 +17,6 @@ def test_flow_orchestrator_service_initialization():
 
 def test_flow_orchestrator_can_snapshot():
     """FlowOrchestratorService should provide snapshot capability."""
-    from vibe3.config.orchestra_settings import load_orchestra_config
-
     config = load_orchestra_config()
     service = FlowOrchestratorService(config)
 
@@ -39,5 +36,18 @@ def test_flow_orchestrator_can_snapshot():
         snapshot = service.snapshot()
 
         assert snapshot is not None
-        assert hasattr(snapshot, "server_running")
         assert snapshot.server_running is True
+
+
+def test_flow_orchestrator_snapshot_returns_none_when_unreachable() -> None:
+    """FlowOrchestratorService.snapshot() returns None when server unreachable."""
+    config = load_orchestra_config()
+    service = FlowOrchestratorService(config)
+
+    with patch(
+        "vibe3.services.flow_orchestrator_service.OrchestraStatusService.fetch_live_snapshot",
+        return_value=None,
+    ):
+        snapshot = service.snapshot()
+
+        assert snapshot is None
