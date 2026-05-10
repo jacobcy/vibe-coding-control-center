@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import Enum
 
 from vibe3.models.orchestration import IssueState
+from vibe3.utils.label_utils import has_manager_assignee
 
 
 class TaskStatusBucket(str, Enum):
@@ -16,20 +17,16 @@ class TaskStatusBucket(str, Enum):
     OTHER = "other"
 
 
-def has_manager_assignee(assignee: str | None) -> bool:
-    """Whether the issue has a usable primary manager assignee."""
-    return bool(assignee and assignee.strip())
-
-
 def classify_task_status(
     state: IssueState | None,
     assignee: str | None,
+    manager_usernames: list[str] | tuple[str, ...],
 ) -> TaskStatusBucket:
     """Classify a task into the shared status buckets.
 
     Semantics:
-    - assignee is the intake signal
-    - state/ready is the queue signal
+    - manager assignee is the intake/queue signal
+    - state/ready with non-manager assignee is an anomaly
     - state/ready without assignee is an anomaly / historical debt
     - blocked has dedicated section in status dashboard
     - non-ready states stay in intake view even if assignee is missing, because
@@ -37,7 +34,10 @@ def classify_task_status(
       violation
     """
     if state == IssueState.READY:
-        if not has_manager_assignee(assignee):
+        if not has_manager_assignee(
+            [assignee] if assignee else [],
+            manager_usernames,
+        ):
             return TaskStatusBucket.READY_ANOMALY
         return TaskStatusBucket.READY_QUEUE
 
