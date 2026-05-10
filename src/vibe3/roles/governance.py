@@ -300,7 +300,7 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
 
 
 def build_governance_recipe(
-    config: OrchestraConfig, tick_count: int = 0
+    config: OrchestraConfig, tick_count: int = 0, material_override: str | None = None
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
     recipe_def = _load_governance_recipe_definition()
@@ -309,8 +309,35 @@ def build_governance_recipe(
     catalog = recipe_def.loaded_definition.material_catalog
     if not catalog:
         raise ValueError("governance.scan recipe requires material_catalog")
-    current = catalog[tick_count % len(catalog)]
-    current_material = current.name
+
+    # Override material if specified, otherwise use tick-based rotation
+    if material_override:
+        # Find the matching material in catalog
+        matching_materials = [
+            m for m in catalog if Path(m.name).name == material_override
+        ]
+        if not matching_materials:
+            # Try with .md suffix
+            matching_materials = [
+                m
+                for m in catalog
+                if m.name == f"supervisor/governance/{material_override}"
+            ]
+        if not matching_materials:
+            # Try exact path match
+            matching_materials = [m for m in catalog if m.name == material_override]
+        if not matching_materials:
+            raise ValueError(
+                f"Material '{material_override}' not found in catalog. "
+                f"Available: {[m.name for m in catalog]}"
+            )
+        current = matching_materials[0]
+        current_material = current.name
+    else:
+        # Normal tick-based rotation
+        current = catalog[tick_count % len(catalog)]
+        current_material = current.name
+
     supervisor_content_source = current.source
 
     variables: dict[str, PromptVariableSource] = {
@@ -340,10 +367,13 @@ def render_governance_prompt(
     snapshot_context: dict[str, Any],
     prompts_path: Path | None = None,
     tick_count: int = 0,
+    material_override: str | None = None,
 ) -> PromptRenderResult:
     """Render governance plan from snapshot context via PromptAssembler."""
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
-    recipe = build_governance_recipe(config, tick_count=tick_count)
+    recipe = build_governance_recipe(
+        config, tick_count=tick_count, material_override=material_override
+    )
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
     return assembler.render(recipe, runtime_context=snapshot_context)

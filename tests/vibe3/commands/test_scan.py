@@ -69,7 +69,7 @@ class TestGovernanceScan:
         result = runner.invoke(app, ["scan", "governance"])
         assert result.exit_code == 0
         assert "Governance scan completed" in result.output
-        mock_run.assert_called_once_with()
+        mock_run.assert_called_once_with(material_override=None)
 
 
 class TestSupervisorScan:
