@@ -194,6 +194,33 @@ class TestBuildSnapshotContext:
         # Verify context is built correctly
         assert "suggested_issue_details" in ctx
 
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_material_override_uses_matching_scope(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        config = _make_config()
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 301,
+                "title": "fix: intake candidate",
+                "body": "clear scope",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            }
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(
+            snapshot,
+            config=config,
+            tick_count=0,
+            material_override="roadmap-intake",
+        )
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert "#301" in ctx["suggested_issue_details"]
+
 
 class TestBuildGovernanceRecipe:
     """Tests for build_governance_recipe."""
