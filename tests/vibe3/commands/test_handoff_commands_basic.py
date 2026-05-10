@@ -313,9 +313,9 @@ class TestHandoffBasicCommands:
         result = runner.invoke(app, ["handoff", "status", "--json"])
 
         assert result.exit_code == 0
-        assert "deprecated" in result.output.lower()
+        assert "deprecated" in result.stderr.lower()
         import json
 
         # Output should still be valid JSON
-        output = json.loads(result.output.split("Warning:", 1)[1].split("\n", 1)[1])
+        output = json.loads(result.stdout)
         assert "state" in output
