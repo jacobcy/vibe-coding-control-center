@@ -73,6 +73,41 @@ class TestGovernanceScan:
         assert "Governance scan completed" in result.output
         mock_run.assert_called_once_with(material_override=None)
 
+    def test_governance_scan_does_not_call_on_heartbeat_tick(self):
+        """Test manual governance scan does not call facade.on_heartbeat_tick.
+
+        Manual scan should call internal_governance_dispatch directly,
+        not through OrchestrationFacade heartbeat path.
+        """
+        # Mock the internal dispatch function that should be called
+        with patch(
+            "vibe3.commands.internal.internal_governance_dispatch"
+        ) as mock_internal_dispatch:
+            # Mock facade to ensure it's not created
+            # OrchestrationFacade is imported inside _run_governance_scan
+            with patch(
+                "vibe3.domain.orchestration_facade.OrchestrationFacade"
+            ) as mock_facade:
+                runner.invoke(app, ["scan", "governance"])
+
+                # After refactor, facade should not be instantiated
+                mock_facade.assert_not_called()
+
+                # And internal dispatch should be called instead
+                # (This will pass once we refactor _run_governance_scan)
+                # For now, we expect this to fail as implementation
+                # still uses facade
+                if mock_internal_dispatch.called:
+                    # Success: new implementation calls internal dispatch
+                    pass
+                else:
+                    # Failure: old implementation still uses facade
+                    # We'll fix this in Step 3
+                    raise AssertionError(
+                        "Implementation still uses facade, "
+                        "should call internal dispatch"
+                    )
+
 
 class TestSupervisorScan:
     """Tests for scan supervisor subcommand."""
@@ -121,36 +156,20 @@ class TestScanIntegration:
     """Integration tests for scan command with services."""
 
     def test_governance_scan_registers_handlers(self):
-        """Test that governance scan registers event handlers."""
-        with (
-            patch("vibe3.domain.handlers.register_event_handlers") as mock_handlers,
-            patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
-        ):
+        """Test that governance scan calls internal dispatch directly.
 
-            # Mock FailedGate to return open gate
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = False
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
-
-            mock_facade_instance = MagicMock()
-            mock_facade.return_value = mock_facade_instance
-
+        After refactor: manual governance scan no longer registers handlers
+        or uses facade. It calls internal_governance_dispatch directly.
+        """
+        with patch(
+            "vibe3.commands.internal.internal_governance_dispatch"
+        ) as mock_internal:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan()
 
-            # Verify handlers were registered before facade methods called
-            mock_handlers.assert_called_once()
-            mock_facade.assert_called_once()
-            mock_facade_instance.on_heartbeat_tick.assert_called_once()
+            # Verify internal dispatch was called (new architecture)
+            mock_internal.assert_called_once_with(tick=0, material=None)
 
     @pytest.mark.asyncio
     async def test_supervisor_scan_registers_handlers(self):
@@ -195,38 +214,21 @@ class TestFailedGateBlocking:
     """Tests for FailedGate blocking in scan commands."""
 
     def test_governance_scan_blocked_by_failed_gate(self):
-        """Test that governance scan respects FailedGate."""
-        with (
-            patch("vibe3.domain.handlers.register_event_handlers"),
-            patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
-        ):
+        """Test that manual governance scan ignores FailedGate.
 
-            # Mock FailedGate to return blocked state
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = True
-            mock_gate_result.reason = "API error threshold: 2 recent errors"
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
-
-            mock_facade_instance = MagicMock()
-            mock_facade.return_value = mock_facade_instance
-
+        After refactor: manual governance scan calls internal dispatch directly,
+        bypassing FailedGate (which is only for heartbeat automatic chain).
+        FailedGate is only checked in automatic heartbeat polling, not manual scans.
+        """
+        with patch(
+            "vibe3.commands.internal.internal_governance_dispatch"
+        ) as mock_internal:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan()
 
-            # Verify FailedGate was checked
-            mock_gate_instance.check.assert_called_once()
-
-            # Verify facade was NOT called (blocked by gate)
-            mock_facade_instance.on_heartbeat_tick.assert_not_called()
+            # Manual scan always calls internal dispatch, ignoring FailedGate
+            mock_internal.assert_called_once_with(tick=0, material=None)
 
     @pytest.mark.asyncio
     async def test_supervisor_scan_blocked_by_failed_gate(self):
@@ -266,9 +268,17 @@ class TestFailedGateBlocking:
 
     @pytest.mark.asyncio
     async def test_combined_scan_blocked_by_failed_gate(self):
-        """Test that combined scan respects FailedGate."""
+        """Test combined scan governance bypasses FailedGate.
+
+        Governance bypasses FailedGate (internal dispatch),
+        but supervisor scan still checks FailedGate (until Task 4).
+        When FailedGate blocks, supervisor scan returns early
+        without creating facade.
+        """
         with (
-            patch("vibe3.domain.handlers.register_event_handlers"),
+            patch(
+                "vibe3.commands.internal.internal_governance_dispatch"
+            ) as mock_governance,
             patch(
                 "vibe3.domain.orchestration_facade.OrchestrationFacade"
             ) as mock_facade,
@@ -286,20 +296,18 @@ class TestFailedGateBlocking:
             mock_gate_instance.check.return_value = mock_gate_result
             mock_failed_gate.return_value = mock_gate_instance
 
-            mock_facade_instance = MagicMock()
-            mock_facade_instance.on_supervisor_scan = MagicMock(return_value=None)
-            mock_facade.return_value = mock_facade_instance
-
             from vibe3.commands.scan import _run_combined_scan_async
 
             await _run_combined_scan_async()
 
-            # Verify FailedGate was checked
-            mock_gate_instance.check.assert_called_once()
+            # Governance always runs (bypasses FailedGate)
+            mock_governance.assert_called_once()
 
-            # Verify neither facade method was called (blocked by gate)
-            mock_facade_instance.on_heartbeat_tick.assert_not_called()
-            mock_facade_instance.on_supervisor_scan.assert_not_called()
+            # Supervisor blocked by FailedGate, facade not created
+            mock_facade.assert_not_called()
+
+            # FailedGate checked for supervisor
+            mock_gate_instance.check.assert_called()
 
 
 # Tests for material description extraction

@@ -15,56 +15,32 @@ app = typer.Typer(
 )
 
 
-def _run_governance_scan(material_override: str | None = None) -> None:
-    """Execute governance scan once.
+def _execute_governance_internal(material_override: str | None = None) -> None:
+    """Execute governance scan via internal dispatch (no facade).
 
-    Creates minimal services and publishes GovernanceScanStarted event.
-    Event handlers handle the actual execution via CLI self-invocation.
+    Direct path for manual governance scan, calling internal_governance_dispatch
+    without going through OrchestrationFacade heartbeat chain.
 
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.commands.internal import internal_governance_dispatch
 
-    # Register event handlers before publishing events
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services (following _build_server_with_launch_cwd pattern)
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade with minimal services for governance scan
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
+    internal_governance_dispatch(
+        tick=0,
+        material=material_override,
     )
 
-    # Trigger governance scan (force=True to skip interval gating for manual trigger)
-    # on_heartbeat_tick publishes GovernanceScanStarted event
-    # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick(force=True, material_override=material_override)
 
+def _run_governance_scan(material_override: str | None = None) -> None:
+    """Execute governance scan once via internal dispatch.
+
+    Calls internal_governance_dispatch directly without facade heartbeat chain.
+
+    Args:
+        material_override: Optional governance role to override material rotation
+    """
+    _execute_governance_internal(material_override=material_override)
     logger.bind(domain="orchestra").info("Governance scan completed")
 
 
@@ -375,7 +351,16 @@ def supervisor(
 
 
 async def _run_combined_scan_async() -> None:
-    """Execute both governance and supervisor scans in sequence."""
+    """Execute both governance and supervisor scans in sequence.
+
+    Governance scan uses internal dispatch directly (no facade).
+    Supervisor scan temporarily still uses facade (will be refactored in Task 4).
+    """
+    # Governance: call internal dispatch directly (no facade, no FailedGate)
+    _execute_governance_internal(material_override=None)
+    logger.bind(domain="orchestra").info("Governance scan completed")
+
+    # Supervisor: still uses facade for now (Task 4 will refactor this)
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.domain.handlers import register_event_handlers
@@ -383,28 +368,28 @@ async def _run_combined_scan_async() -> None:
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.orchestra.failed_gate import FailedGate
 
-    # Register event handlers before publishing events
+    # Register event handlers for supervisor scan
     register_event_handlers()
 
     # Load config
     config = load_orchestra_config()
 
-    # Initialize services
+    # Initialize services for supervisor
     shared_store = SQLiteClient()
     shared_backend = CodeagentBackend()
     failed_gate = FailedGate(store=shared_store)
     shared_capacity = CapacityService(config, shared_store, shared_backend)
 
-    # Check FailedGate before dispatching
+    # Check FailedGate before supervisor scan
     gate_result = failed_gate.check()
     if gate_result.blocked:
         logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
+            f"Supervisor scan blocked by failed gate: {gate_result.reason}"
         )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
+        typer.echo(f"Supervisor scan blocked by failed gate: {gate_result.reason}")
         return
 
-    # Create facade
+    # Create facade for supervisor scan only
     facade = OrchestrationFacade(
         tick_count=0,
         config=config,
@@ -412,11 +397,7 @@ async def _run_combined_scan_async() -> None:
         failed_gate=failed_gate,
     )
 
-    # Run governance scan first (force=True to skip interval gating for manual trigger)
-    facade.on_heartbeat_tick(force=True)
-    logger.bind(domain="orchestra").info("Governance scan completed")
-
-    # Then run supervisor scan
+    # Run supervisor scan
     total_scanned, matched_count = await facade.on_supervisor_scan()
 
     # Display scan results
