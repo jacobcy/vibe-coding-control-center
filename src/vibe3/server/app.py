@@ -3,6 +3,7 @@
 import asyncio
 import os
 import signal
+import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -139,14 +140,14 @@ def start(
         typer.Option(
             "-v", "--verbose", count=True, help="Increase verbosity (or use global -v)"
         ),
-    ] = 0,
+    ] = 1,
 ) -> None:
     """Start Orchestra server (webhook receiver + heartbeat polling).
 
     Defaults from config/v3/settings.yaml; repo defaults to current repository.
     """
     # Inherit global verbose if not specified locally
-    if verbose == 0 and "verbose" in ctx.meta:
+    if verbose == 1 and "verbose" in ctx.meta:
         verbose = ctx.meta["verbose"]
 
     setup_logging(verbose=verbose)
@@ -409,3 +410,35 @@ def resume(
     console.print(f"  - Cleared by: {cleared_by}")
     console.print(f"  - Clear reason: {reason}")
     console.print("\nOrchestra will resume on next tick")
+
+
+@app.command()
+def logs(
+    follow: Annotated[
+        bool,
+        typer.Option("-f", "--follow", help="Follow log output (tail -f)"),
+    ] = False,
+    lines: Annotated[
+        int,
+        typer.Option("-n", "--lines", help="Number of lines to show (default: 50)"),
+    ] = 50,
+) -> None:
+    """Show Orchestra server logs.
+
+    Displays recent log entries from the orchestra events log.
+    Use -f to follow log output in real-time.
+    """
+    log_path = orchestra_events_log_path()
+
+    if not log_path.exists():
+        typer.echo(f"No log file found at {log_path}")
+        typer.echo("Server may not have been started yet.")
+        raise typer.Exit(1)
+
+    try:
+        if follow:
+            subprocess.run(["tail", "-f", str(log_path)])
+        else:
+            subprocess.run(["tail", f"-n{lines}", str(log_path)])
+    except KeyboardInterrupt:
+        pass

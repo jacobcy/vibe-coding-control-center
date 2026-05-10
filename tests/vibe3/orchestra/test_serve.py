@@ -294,3 +294,41 @@ def test_stop_kills_tmux_session_when_pid_file_missing(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "stopped orchestra server tmux session" in result.stdout.lower()
+
+
+def test_logs_shows_error_when_no_log_file(monkeypatch, tmp_path) -> None:
+    """Test that serve logs reports error when log file doesn't exist."""
+    monkeypatch.setattr(
+        "vibe3.server.app.orchestra_events_log_path",
+        lambda: tmp_path / "nonexistent.log",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["serve", "logs"])
+
+    assert result.exit_code == 1
+    assert "No log file found" in result.stdout
+
+
+def test_logs_shows_log_content(monkeypatch, tmp_path) -> None:
+    """Test that serve logs displays log file content."""
+    log_path = tmp_path / "events.log"
+    log_path.write_text("[2024-01-01T00:00:00] [test] Test log entry\n")
+
+    monkeypatch.setattr(
+        "vibe3.server.app.orchestra_events_log_path",
+        lambda: log_path,
+    )
+
+    # Mock subprocess.run to avoid actually calling tail
+    mock_run = patch("vibe3.server.app.subprocess.run").start()
+    mock_run.return_value = None
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["serve", "logs"])
+
+    # Check that subprocess.run was called with correct arguments
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(["tail", "-n50", str(log_path)])
+
+    patch.stopall()
