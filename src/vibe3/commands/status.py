@@ -5,6 +5,11 @@ from typing import Annotated, cast
 
 import typer
 
+from vibe3.commands.command_options import (
+    AllOption,
+    JsonOption,
+    TraceOption,
+)
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
@@ -23,12 +28,6 @@ from vibe3.services.task_status_classifier import (
     classify_task_status,
 )
 from vibe3.ui.console import console
-
-AllOption = Annotated[
-    bool, typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）")
-]
-JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
-TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
 def _extract_blocked_reason_summary(blocked_reason: str) -> str:
