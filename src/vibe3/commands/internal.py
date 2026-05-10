@@ -61,26 +61,9 @@ def internal_apply_dispatch(
     ] = False,
 ) -> None:
     """L2: Dispatch the Supervisor/Apply agent for a governance issue."""
-    from vibe3.execution.issue_role_sync_runner import (
-        run_issue_role_async,
-        run_issue_role_sync,
-    )
-    from vibe3.roles.supervisor import SUPERVISOR_CLI_SYNC_SPEC
+    from vibe3.services.scan_service import run_manual_supervisor_apply
 
-    if no_async:
-        run_issue_role_sync(
-            issue_number=issue,
-            dry_run=dry_run,
-            fresh_session=True,
-            show_prompt=False,
-            spec=SUPERVISOR_CLI_SYNC_SPEC,
-        )
-    else:
-        run_issue_role_async(
-            issue_number=issue,
-            dry_run=dry_run,
-            spec=SUPERVISOR_CLI_SYNC_SPEC,
-        )
+    run_manual_supervisor_apply(issue_number=issue, dry_run=dry_run, no_async=no_async)
 
 
 @app.command("governance")
@@ -108,14 +91,6 @@ def internal_governance_dispatch(
     dry_run/show_prompt removed - those belong to scan layer (user preview),
     not internal execution layer.
     """
-    from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.services.scan_service import run_manual_governance_scan
 
-    # Governance always runs sync in CLI self-invocation context
-    # (async wrapper already launched by governance_scan handler)
-    run_governance_sync(
-        tick_count=tick,
-        material_override=material,
-        dry_run=False,
-        show_prompt=False,
-        session_id=None,
-    )
+    run_manual_governance_scan(material_override=material)

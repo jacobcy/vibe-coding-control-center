@@ -17,20 +17,18 @@ app = typer.Typer(
 
 
 def _execute_governance_internal(material_override: str | None = None) -> None:
-    """Execute governance scan via internal dispatch (no facade).
+    """Execute governance scan via service layer (no facade).
 
-    Direct path for manual governance scan, calling internal_governance_dispatch
-    without going through OrchestrationFacade heartbeat chain.
+    Direct path for manual governance scan, calling execution layer
+    without going through OrchestrationFacade heartbeat chain
+    or internal command layer.
 
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from vibe3.commands.internal import internal_governance_dispatch
+    from vibe3.services.scan_service import run_manual_governance_scan
 
-    internal_governance_dispatch(
-        tick=0,
-        material=material_override,
-    )
+    run_manual_governance_scan(material_override=material_override)
 
 
 def _run_governance_scan(material_override: str | None = None) -> None:
@@ -68,16 +66,18 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
 
 
 def _run_supervisor_scan() -> tuple[int, int]:
-    """Execute supervisor scan once via internal apply (no facade).
+    """Execute supervisor scan once via execution layer (no facade).
 
-    Fetches supervisor candidates and calls internal_apply_dispatch directly
-    without going through OrchestrationFacade event chain.
+    Fetches supervisor candidates and calls execution layer directly
+    without going through OrchestrationFacade or internal command layer.
 
     Returns:
         Tuple of (total_issues_scanned, matched_issues_found)
     """
-    from vibe3.commands.internal import internal_apply_dispatch
-    from vibe3.services.scan_service import fetch_supervisor_candidates
+    from vibe3.services.scan_service import (
+        fetch_supervisor_candidates,
+        run_manual_supervisor_apply,
+    )
 
     config = load_orchestra_config()
     github = GitHubClient()
@@ -86,10 +86,12 @@ def _run_supervisor_scan() -> tuple[int, int]:
     total_scanned, candidates = fetch_supervisor_candidates(github, config.repo)
     matched_count = len(candidates)
 
-    # Dispatch each candidate via internal apply
+    # Dispatch each candidate via execution layer
     for candidate in candidates:
         issue_number = candidate["number"]
-        internal_apply_dispatch(issue=issue_number, dry_run=False, no_async=False)
+        run_manual_supervisor_apply(
+            issue_number=issue_number, dry_run=False, no_async=False
+        )
 
     return total_scanned, matched_count
 

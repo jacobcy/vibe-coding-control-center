@@ -75,17 +75,16 @@ class TestGovernanceScan:
         mock_run.assert_called_once_with(material_override=None)
 
     def test_governance_scan_does_not_call_on_heartbeat_tick(self):
-        """Test manual governance scan does not call facade.on_heartbeat_tick.
+        """Test manual governance scan calls service layer directly.
 
-        Manual scan should call internal_governance_dispatch directly,
-        not through OrchestrationFacade heartbeat path.
+        Manual scan should call run_manual_governance_scan (service layer),
+        not through OrchestrationFacade heartbeat path or internal command layer.
         """
-        # Mock the internal dispatch function that should be called
+        # Mock the service layer function that should be called
         with patch(
-            "vibe3.commands.internal.internal_governance_dispatch"
-        ) as mock_internal_dispatch:
+            "vibe3.services.scan_service.run_manual_governance_scan"
+        ) as mock_service_run:
             # Mock facade to ensure it's not created
-            # OrchestrationFacade is imported inside _run_governance_scan
             with patch(
                 "vibe3.domain.orchestration_facade.OrchestrationFacade"
             ) as mock_facade:
@@ -94,20 +93,9 @@ class TestGovernanceScan:
                 # After refactor, facade should not be instantiated
                 mock_facade.assert_not_called()
 
-                # And internal dispatch should be called instead
-                # (This will pass once we refactor _run_governance_scan)
-                # For now, we expect this to fail as implementation
-                # still uses facade
-                if mock_internal_dispatch.called:
-                    # Success: new implementation calls internal dispatch
-                    pass
-                else:
-                    # Failure: old implementation still uses facade
-                    # We'll fix this in Step 3
-                    raise AssertionError(
-                        "Implementation still uses facade, "
-                        "should call internal dispatch"
-                    )
+                # Service layer function should be called directly
+                assert mock_service_run.called
+                mock_service_run.assert_called_once_with(material_override=None)
 
 
 class TestSupervisorScan:
@@ -160,32 +148,34 @@ class TestScanIntegration:
     """Integration tests for scan command with services."""
 
     def test_governance_scan_registers_handlers(self):
-        """Test that governance scan calls internal dispatch directly.
+        """Test that governance scan calls service layer directly.
 
         After refactor: manual governance scan no longer registers handlers
-        or uses facade. It calls internal_governance_dispatch directly.
+        or uses facade. It calls service layer (run_manual_governance_scan) directly.
         """
         with patch(
-            "vibe3.commands.internal.internal_governance_dispatch"
-        ) as mock_internal:
+            "vibe3.services.scan_service.run_manual_governance_scan"
+        ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan()
 
-            # Verify internal dispatch was called (new architecture)
-            mock_internal.assert_called_once_with(tick=0, material=None)
+            # Verify service layer was called (new architecture)
+            mock_service.assert_called_once_with(material_override=None)
 
     def test_supervisor_scan_registers_handlers(self):
-        """Test that supervisor scan calls internal dispatch directly.
+        """Test that supervisor scan calls service layer directly.
 
         After refactor: manual supervisor scan no longer registers handlers
-        or uses facade. It calls internal_apply_dispatch directly.
+        or uses facade. It calls service layer (run_manual_supervisor_apply) directly.
         """
         with (
             patch(
                 "vibe3.services.scan_service.fetch_supervisor_candidates"
             ) as mock_fetch,
-            patch("vibe3.commands.internal.internal_apply_dispatch") as mock_apply,
+            patch(
+                "vibe3.services.scan_service.run_manual_supervisor_apply"
+            ) as mock_apply,
         ):
             # Mock candidate list (total_scanned, candidates)
             mock_fetch.return_value = (
@@ -205,7 +195,7 @@ class TestScanIntegration:
 
             # Verify candidates fetched
             mock_fetch.assert_called_once()
-            # Verify internal dispatch called
+            # Verify service layer apply called
             mock_apply.assert_called_once()
 
 
@@ -215,19 +205,19 @@ class TestFailedGateBlocking:
     def test_governance_scan_blocked_by_failed_gate(self):
         """Test that manual governance scan ignores FailedGate.
 
-        After refactor: manual governance scan calls internal dispatch directly,
+        After refactor: manual governance scan calls service layer directly,
         bypassing FailedGate (which is only for heartbeat automatic chain).
         FailedGate is only checked in automatic heartbeat polling, not manual scans.
         """
         with patch(
-            "vibe3.commands.internal.internal_governance_dispatch"
-        ) as mock_internal:
+            "vibe3.services.scan_service.run_manual_governance_scan"
+        ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan()
 
-            # Manual scan always calls internal dispatch, ignoring FailedGate
-            mock_internal.assert_called_once_with(tick=0, material=None)
+            # Manual scan always calls service layer, ignoring FailedGate
+            mock_service.assert_called_once_with(material_override=None)
 
     def test_supervisor_scan_blocked_by_failed_gate(self):
         """Test manual supervisor scan ignores FailedGate.
@@ -255,16 +245,16 @@ class TestFailedGateBlocking:
 
         After refactor: manual scans bypass FailedGate entirely.
         FailedGate is only checked in automatic heartbeat polling.
-        Both governance and supervisor use internal dispatch directly.
+        Both governance and supervisor use service layer directly.
         """
         with (
             patch(
-                "vibe3.commands.internal.internal_governance_dispatch"
+                "vibe3.services.scan_service.run_manual_governance_scan"
             ) as mock_governance,
             patch(
                 "vibe3.services.scan_service.fetch_supervisor_candidates"
             ) as mock_fetch,
-            patch("vibe3.commands.internal.internal_apply_dispatch"),
+            patch("vibe3.services.scan_service.run_manual_supervisor_apply"),
         ):
             # Mock supervisor candidates (total_scanned, candidates)
             mock_fetch.return_value = (0, [])
@@ -281,16 +271,16 @@ class TestFailedGateBlocking:
 
 
 # Tests for material description extraction
-def test_supervisor_scan_fetches_candidates_and_calls_internal_apply() -> None:
-    """Test manual supervisor scan calls internal apply directly.
+def test_supervisor_scan_fetches_candidates_and_calls_service_apply() -> None:
+    """Test manual supervisor scan calls service layer directly.
 
     After refactor: manual supervisor scan should fetch candidates,
-    filter them, and call internal_apply_dispatch for each one,
-    not through facade event chain.
+    filter them, and call run_manual_supervisor_apply for each one,
+    not through internal command layer.
     """
     with (
         patch("vibe3.services.scan_service.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.commands.internal.internal_apply_dispatch") as mock_apply,
+        patch("vibe3.services.scan_service.run_manual_supervisor_apply") as mock_apply,
     ):
         # Mock candidate list (total_scanned, candidates)
         mock_fetch.return_value = (
@@ -315,7 +305,7 @@ def test_supervisor_scan_fetches_candidates_and_calls_internal_apply() -> None:
         # Should fetch candidates
         mock_fetch.assert_called_once()
 
-        # Should call internal_apply_dispatch for each candidate
+        # Should call service layer apply for each candidate
         assert mock_apply.call_count == 2
 
 
