@@ -90,22 +90,12 @@ def render_governance_prompt_preview(
         Rendered prompt text
     """
     from vibe3.roles.governance import (
-        _build_issue_context,
+        build_governance_dry_run_context,
         render_governance_prompt,
     )
 
-    # Build minimal snapshot context
-    snapshot_context = _build_issue_context(
-        active_entries=(),
-        server_running=False,
-        active_flows=0,
-        active_worktrees=0,
-        queued_issues=(),
-        circuit_breaker_state="closed",
-        circuit_breaker_failures=0,
-        issue_scope_name="dry-run mode",
-        scope_note="Dry-run mode: using minimal context for prompt preview",
-    )
+    # Build minimal snapshot context for dry-run
+    snapshot_context = build_governance_dry_run_context()
 
     # Render prompt
     render_result = render_governance_prompt(
