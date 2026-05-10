@@ -103,9 +103,10 @@ class TestCombinedScan:
         """Test combined scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "all", "--dry-run"])
         assert result.exit_code == 0
-        assert (
-            "DRY RUN: Would run both governance and supervisor scans" in result.output
-        )
+        # Should show both governance and supervisor dry-run output
+        output_lower = result.output.lower()
+        assert "governance scan dry-run" in output_lower
+        assert "supervisor scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_combined_scan_async")
     def test_all_execution(self, mock_run):
