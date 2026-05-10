@@ -609,7 +609,8 @@ def all(
     setup_logging(verbose=verbose)
 
     if dry_run:
-        typer.echo("DRY RUN: Would run both governance and supervisor scans")
+        _run_governance_scan_dry_run()
+        _run_supervisor_scan_dry_run()
         return
 
     asyncio.run(_run_combined_scan_async())
