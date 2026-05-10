@@ -311,64 +311,6 @@ def test_supervisor_scan_fetches_candidates_and_calls_internal_apply() -> None:
 
         # Should call internal_apply_dispatch for each candidate
         assert mock_apply.call_count == 2
-    """Test internal_governance_dispatch signature only has execution params.
-
-    After refactor: internal governance should only accept tick/material,
-    not dry_run/show_prompt (those belong to scan layer).
-    """
-    from inspect import signature
-
-    from vibe3.commands.internal import internal_governance_dispatch
-
-    params = signature(internal_governance_dispatch).parameters
-    assert "tick" in params
-    assert "material" in params
-    assert "dry_run" not in params
-    assert "show_prompt" not in params
-    """Test extracting description from assignee-pool.md."""
-    from vibe3.commands.scan import _extract_material_description
-
-    description = _extract_material_description(
-        "supervisor/governance/assignee-pool.md"
-    )
-    assert description == "Assignee Pool 治理材料"
-
-
-def test_extract_material_description_from_roadmap_intake():
-    """Test extracting description from roadmap-intake.md."""
-    from vibe3.commands.scan import _extract_material_description
-
-    description = _extract_material_description(
-        "supervisor/governance/roadmap-intake.md"
-    )
-    assert description == "Roadmap Intake 治理材料"
-
-
-def test_extract_material_description_handles_missing_file():
-    """Test handling missing file gracefully."""
-    from vibe3.commands.scan import _extract_material_description
-
-    description = _extract_material_description("supervisor/governance/nonexistent.md")
-    assert description == "supervisor/governance/nonexistent.md"
-
-
-def test_extract_material_description_handles_no_title():
-    """Test handling file without title."""
-    import tempfile
-    from pathlib import Path
-
-    from vibe3.commands.scan import _extract_material_description
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-        f.write("Some content without title\n")
-        temp_path = f.name
-
-    try:
-        description = _extract_material_description(temp_path)
-        # Should fall back to filename when no title
-        assert description == temp_path
-    finally:
-        Path(temp_path).unlink()
 
 
 # Tests for --list parameter

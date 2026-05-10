@@ -148,35 +148,6 @@ def _get_available_governance_materials() -> list[str]:
         return []
 
 
-def _extract_material_description(material_name: str) -> str:
-    """Extract description from material file (DEPRECATED - use scan_service).
-
-    This function delegates to scan_service.extract_material_description.
-
-    Args:
-        material_name: Material file path or name
-
-    Returns:
-        Material description or filename as fallback
-    """
-    from pathlib import Path
-
-    from vibe3.services.scan_service import extract_material_description
-
-    # Normalize to full path if needed (only for relative governance paths)
-    if (
-        not material_name.startswith("supervisor/governance/")
-        and not Path(material_name).is_absolute()
-    ):
-        material_name = f"supervisor/governance/{material_name}"
-
-    # Ensure .md suffix
-    if not material_name.endswith(".md"):
-        material_name = f"{material_name}.md"
-
-    return extract_material_description(material_name)
-
-
 def _list_governance_materials() -> None:
     """List available governance materials with descriptions.
 
