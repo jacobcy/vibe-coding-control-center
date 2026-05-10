@@ -74,6 +74,28 @@ _GOVERNANCE_RUNTIME_VARS = (
 )
 
 
+def build_governance_dry_run_context() -> dict[str, Any]:
+    """Build minimal governance context for dry-run mode.
+
+    Returns empty/minimal context suitable for prompt preview
+    without accessing live data.
+
+    Returns:
+        Minimal governance context dict
+    """
+    return _build_issue_context(
+        active_entries=(),
+        server_running=False,
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+        circuit_breaker_state="closed",
+        circuit_breaker_failures=0,
+        issue_scope_name="dry-run mode",
+        scope_note="Dry-run mode: using minimal context for prompt preview",
+    )
+
+
 def _build_issue_context(
     active_entries: tuple[Any, ...],
     *,
