@@ -224,6 +224,105 @@ async def _run_supervisor_scan_async() -> None:
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
+def _run_supervisor_scan_dry_run() -> None:
+    """Execute supervisor scan in dry-run mode, displaying scan plan.
+
+    Shows scan process without actual execution.
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.utils.label_utils import normalize_labels
+
+    console = Console()
+    config = load_orchestra_config()
+
+    console.print("\n[bold]Supervisor Scan Dry-Run[/bold]")
+    console.print("[cyan]Mode:[/cyan] dry-run (no execution)\n")
+
+    # Simulate the scan process
+    console.print("[bold]Scan Process:[/bold]")
+    console.print("1. Query open issues with 'supervisor' label")
+    console.print("2. Filter by additional 'state/handoff' label")
+    console.print("3. For each matching issue:")
+    console.print("   - Build supervisor handoff prompt")
+    console.print("   - Would dispatch supervisor-apply agent\n")
+
+    # Try to fetch actual issues (if possible)
+    try:
+        github = GitHubClient()
+        raw_issues = github.list_issues(
+            limit=50,
+            state="open",
+            assignee=None,
+            repo=config.repo,
+        )
+
+        # Filter for supervisor + state/handoff labels
+        matching_issues = []
+        for item in raw_issues:
+            labels = normalize_labels(item.get("labels"))
+            if "supervisor" in labels and "state/handoff" in labels:
+                matching_issues.append(
+                    {
+                        "number": item.get("number"),
+                        "title": item.get("title", "")[:60],  # Truncate long titles
+                        "labels": labels,
+                    }
+                )
+
+        # Display results
+        if matching_issues:
+            console.print(
+                f"[bold]Found {len(matching_issues)} supervisor candidate(s):[/bold]\n"
+            )
+
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("Issue", style="yellow")
+            table.add_column("Title", style="white")
+            table.add_column("Labels", style="green")
+
+            for issue in matching_issues[:10]:  # Show first 10
+                labels_str = ", ".join(
+                    sorted(issue["labels"])[:5]
+                )  # Show first 5 labels
+                table.add_row(f"#{issue['number']}", issue["title"], labels_str)
+
+            console.print(table)
+
+            if len(matching_issues) > 10:
+                console.print(f"\n[dim]... and {len(matching_issues) - 10} more[/dim]")
+
+            console.print(
+                "\n[dim]In real mode, would dispatch supervisor-apply agent "
+                "for each issue[/dim]"
+            )
+        else:
+            console.print(
+                "[yellow]No issues found with supervisor + "
+                "state/handoff labels[/yellow]\n"
+            )
+            console.print(
+                "[dim]In real mode, would report: 'Scanned X open issues, "
+                "found 0 issues requiring supervisor attention'[/dim]"
+            )
+
+    except Exception as e:
+        console.print(f"[yellow]Could not query GitHub (dry-run limited): {e}[/yellow]")
+        console.print("[dim]In real mode, would query live issue data[/dim]")
+
+    console.print("\n[bold]Summary:[/bold]")
+    console.print(
+        "[dim]• Scan target: Open issues with supervisor + state/handoff labels[/dim]"
+    )
+    console.print(
+        "[dim]• Action: Would build and dispatch supervisor-apply prompts[/dim]"
+    )
+    console.print("[dim]• Mode: dry-run (no execution)[/dim]\n")
+
+
 def _get_available_governance_materials() -> list[str]:
     """Fetch available governance materials from catalog.
 
@@ -425,7 +524,7 @@ def supervisor(
     setup_logging(verbose=verbose)
 
     if dry_run:
-        typer.echo("DRY RUN: Would run supervisor scan")
+        _run_supervisor_scan_dry_run()
         return
 
     asyncio.run(_run_supervisor_scan_async())
