@@ -245,6 +245,12 @@ def _list_governance_materials() -> None:
 
 @app.command()
 def governance(
+    list_materials: Annotated[
+        bool,
+        typer.Option(
+            "--list", help="List available governance materials (exclusive with --role)"
+        ),
+    ] = False,
     role: Annotated[
         str | None,
         typer.Option(
@@ -253,10 +259,6 @@ def governance(
             help="Override governance role (run without --role to see available)",
         ),
     ] = None,
-    list_materials: Annotated[
-        bool,
-        typer.Option("--list", help="List available governance materials"),
-    ] = False,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Show what would be done without executing"),
@@ -276,6 +278,11 @@ def governance(
     if dry_run:
         typer.echo("DRY RUN: Would run governance scan")
         return
+
+    # Check mutual exclusivity
+    if list_materials and role is not None:
+        typer.echo("Error: --list and --role cannot be used together", err=True)
+        raise typer.Exit(1)
 
     # Handle --list option
     if list_materials:
