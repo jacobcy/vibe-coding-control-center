@@ -17,7 +17,6 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
-from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
@@ -101,11 +100,11 @@ class OrchestrationFacade(ServiceBase):
             self._coordinator.shutdown()
 
     async def on_tick(self) -> None:
-        """Heartbeat polling -> publish governance + supervisor events.
+        """Heartbeat polling -> execute governance + supervisor.
 
         Called by runtime heartbeat periodically:
-        1. Publishes GovernanceScanStarted (if interval gating passes)
-        2. Publishes SupervisorIssueIdentified for matching issues
+        1. Executes governance via unified tick architecture (if interval gating passes)
+        2. Scans and publishes SupervisorIssueIdentified for matching issues
         3. Reconciles in-flight markers (always, even when frozen)
         4. Polls issue labels and dispatches (only when not frozen)
         """
@@ -236,10 +235,11 @@ class OrchestrationFacade(ServiceBase):
     def on_heartbeat_tick(
         self, force: bool = False, material_override: str | None = None
     ) -> None:
-        """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
+        """Heartbeat polling -> Execute governance via unified tick architecture.
 
-        由 runtime heartbeat 定期调用，发布 governance 链路的 periodic scan 事件。
-        包含 interval_ticks gating，避免每次 tick 都触发。
+        由 runtime heartbeat 定期调用，通过 TickPlanner → TickDispatcher
+        链路执行 governance。包含 interval_ticks gating，
+        避免每次 tick 都触发。
 
         Args:
             force: 当 True 时跳过 interval gating，用于手动触发
@@ -247,8 +247,12 @@ class OrchestrationFacade(ServiceBase):
             material_override: 当提供时，覆盖 material rotation，
                 指定执行的 governance 角色
 
-        执行装配由 governance_scan handler 负责，facade 只做 observation。
+        执行通过 TickDispatcher 调用 internal 命令完成，不发布事件。
         """
+        from vibe3.models.tick import TickPhase, TickRequest, TickSource
+        from vibe3.services.tick_dispatcher import TickDispatcher
+        from vibe3.services.tick_planner import TickPlanner
+
         # For manual triggers (force=True), use tick_count=0 for consistent t0 suffix
         # For automatic triggers, increment tick counter
         if force:
@@ -285,21 +289,43 @@ class OrchestrationFacade(ServiceBase):
                 ).debug("Skipping governance scan (min interval not reached)")
                 return
 
-        # Update timestamp when actually emitting event
+        # Check failed gate before execution (heartbeat path)
+        if self._failed_gate is not None:
+            gate_result = self._failed_gate.check()
+            if gate_result.blocked:
+                reason_part = (
+                    f" reason={gate_result.reason}" if gate_result.reason else ""
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"governance blocked by failed gate:{reason_part}",
+                )
+                logger.bind(
+                    domain="orchestration_facade",
+                    reason=gate_result.reason,
+                    blocked_ticks=gate_result.blocked_ticks,
+                ).warning("Governance blocked by failed gate")
+                self._failed_gate.increment_blocked_ticks()
+                return
+
+        # Update timestamp when actually executing
         self._last_governance_started_at = time.monotonic()
 
-        event = GovernanceScanStarted(
-            tick_count=tick_count,
-            is_manual=force,
-            material_override=material_override,
+        # Build tick request
+        request = TickRequest(
+            source=TickSource.HEARTBEAT if not force else TickSource.MANUAL_SCAN,
+            tick_id=tick_count,
+            phases=[TickPhase.GOVERNANCE],
+            governance_material=material_override,
         )
-        logger.bind(
-            domain="orchestration_facade",
-            tick_count=tick_count,
-            force=force,
-            material_override=material_override,
-        ).info("Emitting GovernanceScanStarted event")
-        publish(event)
+
+        # Plan execution
+        planner = TickPlanner(self._config)
+        plan = planner.plan(request, tick_count=tick_count)
+
+        # Dispatch execution (sync method)
+        dispatcher = TickDispatcher(self._config)
+        dispatcher.dispatch(plan)
 
     def on_governance_decision(
         self,

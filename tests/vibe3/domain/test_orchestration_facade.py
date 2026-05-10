@@ -7,7 +7,6 @@ import pytest
 from vibe3.domain.events import (
     IssueStateChanged,
 )
-from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
@@ -57,71 +56,107 @@ class TestOrchestrationFacade:
         assert event.from_state == "ready"
         assert event.to_state == "claimed"
 
-    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.services.tick_dispatcher.TickDispatcher")
+    @patch("vibe3.services.tick_planner.TickPlanner")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
     @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
-    def test_on_heartbeat_tick_publishes_governance_scan_started(
+    def test_on_heartbeat_tick_dispatches_governance_via_tick_architecture(
         self,
         mock_load_config: MagicMock,
         mock_monotonic: MagicMock,
-        mock_publish: MagicMock,
+        mock_tick_planner_cls: MagicMock,
+        mock_tick_dispatcher_cls: MagicMock,
     ) -> None:
-        """Test that on_heartbeat_tick publishes GovernanceScanStarted."""
-        mock_load_config.return_value = MagicMock(
+        """Test that on_heartbeat_tick uses TickPlanner -> TickDispatcher chain."""
+        mock_config = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
         )
-        # Need 5 values: 2 for first call, 2 for second call, 1 for extra safety
-        mock_monotonic.side_effect = [0.0, 1.0, 2.0, 3.0, 4.0]
+        mock_load_config.return_value = mock_config
+        # Need enough values for multiple calls
+        mock_monotonic.side_effect = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+        # Setup planner mock
+        mock_planner = MagicMock()
+        mock_plan = MagicMock()
+        mock_planner.plan.return_value = mock_plan
+        mock_tick_planner_cls.return_value = mock_planner
+
+        # Setup dispatcher mock
+        mock_dispatcher = MagicMock()
+        mock_tick_dispatcher_cls.return_value = mock_dispatcher
+
         facade = OrchestrationFacade(tick_count=0)
 
         facade.on_heartbeat_tick()
 
-        assert mock_publish.call_count == 1
-        event = mock_publish.call_args.args[0]
-        assert isinstance(event, GovernanceScanStarted)
-        assert event.tick_count == 1
+        # Verify TickPlanner.plan was called with tick_count=1
+        assert mock_planner.plan.call_count == 1
+        request_arg = mock_planner.plan.call_args.args[0]
+        assert request_arg.tick_id == 1
+        assert mock_planner.plan.call_args.kwargs["tick_count"] == 1
 
-        mock_publish.reset_mock()
+        # Verify TickDispatcher.dispatch was called
+        assert mock_dispatcher.dispatch.call_count == 1
+
+        mock_planner.reset_mock()
+        mock_dispatcher.reset_mock()
         facade.on_heartbeat_tick()
-        assert mock_publish.call_count == 1
-        event2 = mock_publish.call_args.args[0]
-        assert isinstance(event2, GovernanceScanStarted)
-        assert event2.tick_count == 2
 
-    @patch("vibe3.domain.orchestration_facade.publish")
+        # Verify second call with tick_count=2
+        assert mock_planner.plan.call_count == 1
+        request_arg2 = mock_planner.plan.call_args.args[0]
+        assert request_arg2.tick_id == 2
+        assert mock_planner.plan.call_args.kwargs["tick_count"] == 2
+        assert mock_dispatcher.dispatch.call_count == 1
+
+    @patch("vibe3.services.tick_dispatcher.TickDispatcher")
+    @patch("vibe3.services.tick_planner.TickPlanner")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
     @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
     def test_on_heartbeat_tick_respects_absolute_governance_interval(
         self,
         mock_load_config: MagicMock,
         mock_monotonic: MagicMock,
-        mock_publish: MagicMock,
+        mock_tick_planner_cls: MagicMock,
+        mock_tick_dispatcher_cls: MagicMock,
     ) -> None:
         mock_load_config.return_value = MagicMock(
             polling_interval=900,
             governance=MagicMock(interval_ticks=1),
         )
-        # Need 3 values: 1 for first call (skip), 2 for second call (publish)
+        # Need 3 values: 1 for first call (skip), 2 for second call (execute)
         mock_monotonic.side_effect = [0.0, 60.0, 901.0, 901.0]
+
+        # Setup mocks
+        mock_planner = MagicMock()
+        mock_plan = MagicMock()
+        mock_planner.plan.return_value = mock_plan
+        mock_tick_planner_cls.return_value = mock_planner
+
+        mock_dispatcher = MagicMock()
+        mock_tick_dispatcher_cls.return_value = mock_dispatcher
 
         facade = OrchestrationFacade(tick_count=0)
 
         facade.on_heartbeat_tick()
-        mock_publish.assert_not_called()
+        # Should skip due to min interval check
+        mock_planner.plan.assert_not_called()
+        mock_dispatcher.dispatch.assert_not_called()
 
         facade.on_heartbeat_tick()
-        assert mock_publish.call_count == 1
-        event = mock_publish.call_args.args[0]
-        assert isinstance(event, GovernanceScanStarted)
-        assert event.tick_count == 2
+        # Should execute after interval passes
+        assert mock_planner.plan.call_count == 1
+        assert mock_dispatcher.dispatch.call_count == 1
 
-    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.services.tick_dispatcher.TickDispatcher")
+    @patch("vibe3.services.tick_planner.TickPlanner")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
     def test_on_heartbeat_tick_uses_injected_runtime_config(
         self,
         mock_monotonic: MagicMock,
-        mock_publish: MagicMock,
+        mock_tick_planner_cls: MagicMock,
+        mock_tick_dispatcher_cls: MagicMock,
     ) -> None:
         mock_monotonic.side_effect = [0.0, 60.0, 60.0]
         config = OrchestraConfig(
@@ -129,14 +164,22 @@ class TestOrchestrationFacade:
             governance=GovernanceConfig(interval_ticks=1),
         )
 
+        # Setup mocks
+        mock_planner = MagicMock()
+        mock_plan = MagicMock()
+        mock_planner.plan.return_value = mock_plan
+        mock_tick_planner_cls.return_value = mock_planner
+
+        mock_dispatcher = MagicMock()
+        mock_tick_dispatcher_cls.return_value = mock_dispatcher
+
         facade = OrchestrationFacade(tick_count=0, config=config)
 
         facade.on_heartbeat_tick()
 
-        assert mock_publish.call_count == 1
-        event = mock_publish.call_args.args[0]
-        assert isinstance(event, GovernanceScanStarted)
-        assert event.tick_count == 1
+        # Verify TickPlanner was called with injected config
+        assert mock_planner.plan.call_count == 1
+        assert mock_dispatcher.dispatch.call_count == 1
 
     @patch("vibe3.clients.github_client.GitHubClient.add_comment")
     def test_on_governance_decision_posts_comment(
@@ -157,33 +200,49 @@ class TestOrchestrationFacade:
         assert call_args.args[0] == 42
         assert "Manual review required" in call_args.args[1]
 
+    @patch("vibe3.services.tick_dispatcher.TickDispatcher")
+    @patch("vibe3.services.tick_planner.TickPlanner")
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
     @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
-    def test_facade_publishes_only_events_not_dispatch(
+    def test_facade_publishes_events_and_dispatches_governance(
         self,
         mock_load_config: MagicMock,
         mock_monotonic: MagicMock,
         mock_publish: MagicMock,
+        mock_tick_planner_cls: MagicMock,
+        mock_tick_dispatcher_cls: MagicMock,
         sample_issue_info: IssueInfo,
     ) -> None:
-        """Test facade only publishes domain events, never does execution assembly."""
+        """Test facade publishes IssueStateChanged events and dispatches governance."""
         mock_load_config.return_value = MagicMock(
             polling_interval=1,
             governance=MagicMock(interval_ticks=1),
         )
         mock_monotonic.side_effect = [0.0, 1.0, 1.0]
+
+        # Setup mocks for tick architecture
+        mock_planner = MagicMock()
+        mock_plan = MagicMock()
+        mock_planner.plan.return_value = mock_plan
+        mock_tick_planner_cls.return_value = mock_planner
+
+        mock_dispatcher = MagicMock()
+        mock_tick_dispatcher_cls.return_value = mock_dispatcher
+
         facade = OrchestrationFacade()
 
         facade.on_issue_state_changed(sample_issue_info, from_state="ready")
         facade.on_heartbeat_tick()
 
-        # Both calls produce exactly one publish each.
-        assert mock_publish.call_count == 2
-        events = [call.args[0] for call in mock_publish.call_args_list]
-        event_types = {type(e).__name__ for e in events}
-        assert "IssueStateChanged" in event_types
-        assert "GovernanceScanStarted" in event_types
+        # IssueStateChanged is published (observation layer)
+        assert mock_publish.call_count == 1
+        event = mock_publish.call_args.args[0]
+        assert isinstance(event, IssueStateChanged)
+
+        # Governance is dispatched via TickDispatcher (execution layer)
+        assert mock_planner.plan.call_count == 1
+        assert mock_dispatcher.dispatch.call_count == 1
 
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
