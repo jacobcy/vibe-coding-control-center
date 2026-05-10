@@ -14,13 +14,13 @@ from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+from vibe3.execution.store_context import get_store
 
 
 @register_handler("GovernanceScanStarted")
 def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     """Dispatch governance scan via CLI self-invocation."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.flow_dispatch import FlowManager
@@ -33,37 +33,40 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     from vibe3.services.orchestra_status_service import OrchestraStatusService
 
     config = load_orchestra_config()
-    store = SQLiteClient()
-    backend = CodeagentBackend()
-    registry = SessionRegistryService(store, backend)
-    registry.mark_governance_sessions_done_when_tmux_gone()
-    live_governance = registry.list_live_governance_sessions()
-    if len(live_governance) >= config.governance_max_concurrent:
-        session_names = ", ".join(
-            str(session.get("tmux_session") or session.get("session_name") or "?")
-            for session in live_governance[:3]
-        )
-        skip_result = ExecutionLaunchResult(
-            launched=False,
-            skipped=True,
-            reason=(
-                "governance already running"
-                if not session_names
-                else f"governance already running ({session_names})"
-            ),
-            reason_code="governance_already_running",
-        )
-        append_governance_event(
-            f"governance dispatch skipped: tick={event.tick_count} "
-            f"reason={skip_result.reason}"
-        )
-        logger.bind(
-            domain="governance_handler",
-            tick=event.tick_count,
-            live_governance=len(live_governance),
-            governance_max=config.governance_max_concurrent,
-        ).info("Skipping governance scan because another governance session is live")
-        return
+
+    with get_store() as store:
+        backend = CodeagentBackend()
+        registry = SessionRegistryService(store, backend)
+        registry.mark_governance_sessions_done_when_tmux_gone()
+        live_governance = registry.list_live_governance_sessions()
+        if len(live_governance) >= config.governance_max_concurrent:
+            session_names = ", ".join(
+                str(session.get("tmux_session") or session.get("session_name") or "?")
+                for session in live_governance[:3]
+            )
+            skip_result = ExecutionLaunchResult(
+                launched=False,
+                skipped=True,
+                reason=(
+                    "governance already running"
+                    if not session_names
+                    else f"governance already running ({session_names})"
+                ),
+                reason_code="governance_already_running",
+            )
+            append_governance_event(
+                f"governance dispatch skipped: tick={event.tick_count} "
+                f"reason={skip_result.reason}"
+            )
+            logger.bind(
+                domain="governance_handler",
+                tick=event.tick_count,
+                live_governance=len(live_governance),
+                governance_max=config.governance_max_concurrent,
+            ).info(
+                "Skipping governance scan because another governance session is live"
+            )
+            return
 
     flow_manager = FlowManager(config)
     status_service = OrchestraStatusService(config, orchestrator=flow_manager)
@@ -115,16 +118,18 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
         worktree_requirement=GOVERNANCE_GATE_CONFIG,
     )
 
-    coordinator = ExecutionCoordinator(config, store, backend)
+    with get_store() as store:
+        backend = CodeagentBackend()
+        coordinator = ExecutionCoordinator(config, store, backend)
 
-    try:
-        result = coordinator.dispatch_execution(request)
-    except Exception as exc:
-        logger.bind(
-            domain="governance_handler",
-            tick=event.tick_count,
-        ).exception(f"Governance scan dispatch failed: {exc}")
-        return
+        try:
+            result = coordinator.dispatch_execution(request)
+        except Exception as exc:
+            logger.bind(
+                domain="governance_handler",
+                tick=event.tick_count,
+            ).exception(f"Governance scan dispatch failed: {exc}")
+            return
 
     if result and result.launched:
         append_governance_event(
