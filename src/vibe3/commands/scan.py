@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.observability import setup_logging
 
@@ -88,61 +89,31 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
         raise typer.Exit(1)
 
 
-async def _run_supervisor_scan_async() -> None:
-    """Execute supervisor scan once (async implementation)."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
+def _run_supervisor_scan() -> tuple[int, int]:
+    """Execute supervisor scan once via internal apply (no facade).
 
-    # Register event handlers before publishing events
-    register_event_handlers()
+    Fetches supervisor candidates and calls internal_apply_dispatch directly
+    without going through OrchestrationFacade event chain.
 
-    # Load config
+    Returns:
+        Tuple of (total_issues_scanned, matched_issues_found)
+    """
+    from vibe3.commands.internal import internal_apply_dispatch
+    from vibe3.services.scan_service import fetch_supervisor_candidates
+
     config = load_orchestra_config()
+    github = GitHubClient()
 
-    # Initialize services
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
+    # Fetch candidates
+    candidates = fetch_supervisor_candidates(github, config.repo)
+    matched_count = len(candidates)
 
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
+    # Dispatch each candidate via internal apply
+    for candidate in candidates:
+        issue_number = candidate["number"]
+        internal_apply_dispatch(issue=issue_number, dry_run=False, no_async=False)
 
-    # Create facade
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
-    )
-
-    # Trigger supervisor scan
-    # on_supervisor_scan publishes SupervisorIssueIdentified events
-    total_scanned, matched_count = await facade.on_supervisor_scan()
-
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
-
-    logger.bind(domain="orchestra").info("Supervisor scan completed")
+    return matched_count, matched_count
 
 
 def _run_supervisor_scan_dry_run() -> None:
@@ -346,59 +317,36 @@ def supervisor(
         _run_supervisor_scan_dry_run()
         return
 
-    asyncio.run(_run_supervisor_scan_async())
-    typer.echo("Supervisor scan completed")
+    # Manual supervisor scan: direct dispatch without facade
+    total_scanned, matched_count = _run_supervisor_scan()
+
+    # Display scan results
+    if matched_count == 0:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels"
+        )
+    else:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found {matched_count} issue(s) requiring supervisor attention"
+        )
+
+    logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
 async def _run_combined_scan_async() -> None:
     """Execute both governance and supervisor scans in sequence.
 
     Governance scan uses internal dispatch directly (no facade).
-    Supervisor scan temporarily still uses facade (will be refactored in Task 4).
+    Supervisor scan uses internal apply dispatch directly (no facade).
     """
     # Governance: call internal dispatch directly (no facade, no FailedGate)
     _execute_governance_internal(material_override=None)
     logger.bind(domain="orchestra").info("Governance scan completed")
 
-    # Supervisor: still uses facade for now (Task 4 will refactor this)
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-
-    # Register event handlers for supervisor scan
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services for supervisor
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before supervisor scan
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Supervisor scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Supervisor scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade for supervisor scan only
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
-    )
-
-    # Run supervisor scan
-    total_scanned, matched_count = await facade.on_supervisor_scan()
+    # Supervisor: call internal dispatch directly (no facade)
+    total_scanned, matched_count = _run_supervisor_scan()
 
     # Display scan results
     if matched_count == 0:

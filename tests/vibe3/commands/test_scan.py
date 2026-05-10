@@ -1,7 +1,7 @@
 """Tests for scan CLI command."""
 
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -121,14 +121,16 @@ class TestSupervisorScan:
         assert "supervisor" in output_lower
         assert "dry-run" in output_lower or "dry run" in output_lower
 
-    @patch("vibe3.commands.scan._run_supervisor_scan_async")
+    @patch("vibe3.commands.scan._run_supervisor_scan")
     def test_supervisor_execution(self, mock_run):
         """Test supervisor scan execution."""
-        # Mock async function needs to return a coroutine
-        mock_run.return_value = None
+        # Mock return value (total_scanned, matched_count)
+        mock_run.return_value = (10, 2)
         result = runner.invoke(app, ["scan", "supervisor"])
         assert result.exit_code == 0
-        assert "Supervisor scan completed" in result.output
+        # Should show scan statistics, not "completed" message
+        assert "Scanned 10 open issues" in result.output
+        assert "found 2" in result.output
 
 
 class TestCombinedScan:
@@ -171,43 +173,35 @@ class TestScanIntegration:
             # Verify internal dispatch was called (new architecture)
             mock_internal.assert_called_once_with(tick=0, material=None)
 
-    @pytest.mark.asyncio
-    async def test_supervisor_scan_registers_handlers(self):
-        """Test that supervisor scan registers event handlers."""
+    def test_supervisor_scan_registers_handlers(self):
+        """Test that supervisor scan calls internal dispatch directly.
+
+        After refactor: manual supervisor scan no longer registers handlers
+        or uses facade. It calls internal_apply_dispatch directly.
+        """
         with (
-            patch("vibe3.domain.handlers.register_event_handlers") as mock_handlers,
             patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
+                "vibe3.services.scan_service.fetch_supervisor_candidates"
+            ) as mock_fetch,
+            patch("vibe3.commands.internal.internal_apply_dispatch") as mock_apply,
         ):
+            # Mock candidate list
+            mock_fetch.return_value = [
+                {
+                    "number": 123,
+                    "title": "Issue A",
+                    "labels": ["supervisor", "state/handoff"],
+                },
+            ]
 
-            # Mock FailedGate to return open gate
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = False
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
+            from vibe3.commands.scan import _run_supervisor_scan
 
-            mock_facade_instance = MagicMock()
+            _run_supervisor_scan()
 
-            # Make on_supervisor_scan an async mock
-            async def async_mock():
-                return (10, 2)
-
-            mock_facade_instance.on_supervisor_scan = async_mock
-            mock_facade.return_value = mock_facade_instance
-
-            from vibe3.commands.scan import _run_supervisor_scan_async
-
-            await _run_supervisor_scan_async()
-
-            # Verify handlers were registered
-            mock_handlers.assert_called_once()
-            mock_facade.assert_called_once()
+            # Verify candidates fetched
+            mock_fetch.assert_called_once()
+            # Verify internal dispatch called
+            mock_apply.assert_called_once()
 
 
 class TestFailedGateBlocking:
@@ -230,71 +224,45 @@ class TestFailedGateBlocking:
             # Manual scan always calls internal dispatch, ignoring FailedGate
             mock_internal.assert_called_once_with(tick=0, material=None)
 
-    @pytest.mark.asyncio
-    async def test_supervisor_scan_blocked_by_failed_gate(self):
-        """Test that supervisor scan respects FailedGate."""
-        with (
-            patch("vibe3.domain.handlers.register_event_handlers"),
-            patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
-        ):
+    def test_supervisor_scan_blocked_by_failed_gate(self):
+        """Test manual supervisor scan ignores FailedGate.
 
-            # Mock FailedGate to return blocked state
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = True
-            mock_gate_result.reason = "Model configuration errors: E_MODEL_INVALID"
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
+        After refactor: manual supervisor scan calls internal dispatch directly,
+        bypassing FailedGate (which is only for heartbeat automatic chain).
+        FailedGate is only checked in automatic heartbeat polling, not manual scans.
+        """
+        with patch(
+            "vibe3.services.scan_service.fetch_supervisor_candidates"
+        ) as mock_fetch:
+            # Mock empty candidate list
+            mock_fetch.return_value = []
 
-            mock_facade_instance = MagicMock()
-            mock_facade_instance.on_supervisor_scan = MagicMock(return_value=None)
-            mock_facade.return_value = mock_facade_instance
+            from vibe3.commands.scan import _run_supervisor_scan
 
-            from vibe3.commands.scan import _run_supervisor_scan_async
+            _run_supervisor_scan()
 
-            await _run_supervisor_scan_async()
-
-            # Verify FailedGate was checked
-            mock_gate_instance.check.assert_called_once()
-
-            # Verify facade was NOT called (blocked by gate)
-            mock_facade_instance.on_supervisor_scan.assert_not_called()
+            # Manual scan always fetches candidates, ignoring FailedGate
+            mock_fetch.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_combined_scan_blocked_by_failed_gate(self):
-        """Test combined scan governance bypasses FailedGate.
+        """Test combined scan bypasses FailedGate for both governance and supervisor.
 
-        Governance bypasses FailedGate (internal dispatch),
-        but supervisor scan still checks FailedGate (until Task 4).
-        When FailedGate blocks, supervisor scan returns early
-        without creating facade.
+        After refactor: manual scans bypass FailedGate entirely.
+        FailedGate is only checked in automatic heartbeat polling.
+        Both governance and supervisor use internal dispatch directly.
         """
         with (
             patch(
                 "vibe3.commands.internal.internal_governance_dispatch"
             ) as mock_governance,
             patch(
-                "vibe3.domain.orchestration_facade.OrchestrationFacade"
-            ) as mock_facade,
-            patch("vibe3.clients.sqlite_client.SQLiteClient"),
-            patch("vibe3.orchestra.failed_gate.FailedGate") as mock_failed_gate,
-            patch("vibe3.execution.capacity_service.CapacityService"),
-            patch("vibe3.config.orchestra_settings.load_orchestra_config"),
+                "vibe3.services.scan_service.fetch_supervisor_candidates"
+            ) as mock_fetch,
+            patch("vibe3.commands.internal.internal_apply_dispatch"),
         ):
-
-            # Mock FailedGate to return blocked state
-            mock_gate_instance = MagicMock()
-            mock_gate_result = MagicMock()
-            mock_gate_result.blocked = True
-            mock_gate_result.reason = "System in failed state"
-            mock_gate_instance.check.return_value = mock_gate_result
-            mock_failed_gate.return_value = mock_gate_instance
+            # Mock supervisor candidates
+            mock_fetch.return_value = []
 
             from vibe3.commands.scan import _run_combined_scan_async
 
@@ -303,15 +271,44 @@ class TestFailedGateBlocking:
             # Governance always runs (bypasses FailedGate)
             mock_governance.assert_called_once()
 
-            # Supervisor blocked by FailedGate, facade not created
-            mock_facade.assert_not_called()
-
-            # FailedGate checked for supervisor
-            mock_gate_instance.check.assert_called()
+            # Supervisor also runs (bypasses FailedGate)
+            mock_fetch.assert_called_once()
 
 
 # Tests for material description extraction
-def test_internal_governance_signature_is_execution_only() -> None:
+def test_supervisor_scan_fetches_candidates_and_calls_internal_apply() -> None:
+    """Test manual supervisor scan calls internal apply directly.
+
+    After refactor: manual supervisor scan should fetch candidates,
+    filter them, and call internal_apply_dispatch for each one,
+    not through facade event chain.
+    """
+    with (
+        patch("vibe3.services.scan_service.fetch_supervisor_candidates") as mock_fetch,
+        patch("vibe3.commands.internal.internal_apply_dispatch") as mock_apply,
+    ):
+        # Mock candidate list
+        mock_fetch.return_value = [
+            {
+                "number": 123,
+                "title": "Issue A",
+                "labels": ["supervisor", "state/handoff"],
+            },
+            {
+                "number": 456,
+                "title": "Issue B",
+                "labels": ["supervisor", "state/handoff"],
+            },
+        ]
+
+        result = runner.invoke(app, ["scan", "supervisor"])
+
+        assert result.exit_code == 0
+        # Should fetch candidates
+        mock_fetch.assert_called_once()
+
+        # Should call internal_apply_dispatch for each candidate
+        assert mock_apply.call_count == 2
     """Test internal_governance_dispatch signature only has execution params.
 
     After refactor: internal governance should only accept tick/material,
