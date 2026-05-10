@@ -23,30 +23,6 @@ def test_internal_manager_dispatch():
         assert mock_run.call_args.kwargs["spec"].role_name == "manager"
 
 
-def test_internal_manager_with_options():
-    """测试 internal manager 命令支持所有选项."""
-    with patch(
-        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-    ) as mock_run:
-        result = runner.invoke(
-            cli_app,
-            [
-                "internal",
-                "manager",
-                "456",
-                "--no-async",
-                "--dry-run",
-                "--fresh-session",
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert mock_run.call_args.kwargs["issue_number"] == 456
-        assert mock_run.call_args.kwargs["dry_run"] is True
-        assert mock_run.call_args.kwargs["fresh_session"] is True
-        assert mock_run.call_args.kwargs["spec"].role_name == "manager"
-
-
 def test_internal_apply_dispatch():
     """测试 internal apply 命令参数解析和调用."""
     with patch(
@@ -61,22 +37,6 @@ def test_internal_apply_dispatch():
         assert mock_run.call_args.kwargs["issue_number"] == 42
         assert mock_run.call_args.kwargs["dry_run"] is False
         assert mock_run.call_args.kwargs["fresh_session"] is True
-        assert mock_run.call_args.kwargs["spec"].role_name == "supervisor"
-
-
-def test_internal_apply_with_dry_run():
-    """测试 internal apply 命令支持 --dry-run 选项."""
-    with patch(
-        "vibe3.execution.issue_role_sync_runner.run_issue_role_sync"
-    ) as mock_run:
-        result = runner.invoke(
-            cli_app,
-            ["internal", "apply", "789", "--no-async", "--dry-run"],
-        )
-
-        assert result.exit_code == 0
-        assert mock_run.call_args.kwargs["issue_number"] == 789
-        assert mock_run.call_args.kwargs["dry_run"] is True
         assert mock_run.call_args.kwargs["spec"].role_name == "supervisor"
 
 

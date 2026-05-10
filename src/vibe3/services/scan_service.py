@@ -39,10 +39,10 @@ def extract_material_description(material_path: str) -> str:
     return material_path
 
 
-def run_manual_governance_scan(material_override: str | None = None) -> None:
-    """Execute manual governance scan (no heartbeat facade).
+def dispatch_governance_execution(material_override: str | None = None) -> None:
+    """Execute governance scan (execution-only entry point).
 
-    Entry point for scan governance command, calling execution layer directly.
+    Entry point for internal governance command, calling execution layer directly.
 
     Args:
         material_override: Optional governance role to override material rotation
@@ -52,22 +52,19 @@ def run_manual_governance_scan(material_override: str | None = None) -> None:
     run_governance_sync(
         tick_count=0,  # Manual scan uses tick=0 for default material selection
         material_override=material_override,
-        dry_run=False,  # Manual scan is execution (dry-run handled by scan layer)
+        dry_run=False,  # Execution-only, no dry-run
         show_prompt=False,
         session_id=None,
     )
 
 
-def run_manual_supervisor_apply(
-    issue_number: int, dry_run: bool = False, no_async: bool = False
-) -> None:
-    """Execute manual supervisor apply for a single issue.
+def dispatch_supervisor_execution(issue_number: int, no_async: bool = False) -> None:
+    """Execute supervisor apply for a single issue (execution-only entry point).
 
-    Entry point for scan supervisor command, calling execution layer directly.
+    Entry point for internal apply command, calling execution layer directly.
 
     Args:
         issue_number: Issue to apply supervisor handoff
-        dry_run: Preview mode (no execution)
         no_async: Run synchronously instead of async tmux session
     """
     from vibe3.execution.issue_role_sync_runner import (
@@ -79,7 +76,7 @@ def run_manual_supervisor_apply(
     if no_async:
         run_issue_role_sync(
             issue_number=issue_number,
-            dry_run=dry_run,
+            dry_run=False,
             fresh_session=True,
             show_prompt=False,
             spec=SUPERVISOR_CLI_SYNC_SPEC,
@@ -87,7 +84,7 @@ def run_manual_supervisor_apply(
     else:
         run_issue_role_async(
             issue_number=issue_number,
-            dry_run=dry_run,
+            dry_run=False,
             spec=SUPERVISOR_CLI_SYNC_SPEC,
         )
 

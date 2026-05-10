@@ -77,12 +77,12 @@ class TestGovernanceScan:
     def test_governance_scan_does_not_call_on_heartbeat_tick(self):
         """Test manual governance scan calls service layer directly.
 
-        Manual scan should call run_manual_governance_scan (service layer),
+        Manual scan should call dispatch_governance_execution (service layer),
         not through OrchestrationFacade heartbeat path or internal command layer.
         """
         # Mock the service layer function that should be called
         with patch(
-            "vibe3.services.scan_service.run_manual_governance_scan"
+            "vibe3.services.scan_service.dispatch_governance_execution"
         ) as mock_service_run:
             # Mock facade to ensure it's not created
             with patch(
@@ -151,10 +151,10 @@ class TestScanIntegration:
         """Test that governance scan calls service layer directly.
 
         After refactor: manual governance scan no longer registers handlers
-        or uses facade. It calls service layer (run_manual_governance_scan) directly.
+        or uses facade. It calls service layer (dispatch_governance_execution) directly.
         """
         with patch(
-            "vibe3.services.scan_service.run_manual_governance_scan"
+            "vibe3.services.scan_service.dispatch_governance_execution"
         ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
@@ -167,14 +167,14 @@ class TestScanIntegration:
         """Test that supervisor scan calls service layer directly.
 
         After refactor: manual supervisor scan no longer registers handlers
-        or uses facade. It calls service layer (run_manual_supervisor_apply) directly.
+        or uses facade. It calls service layer (dispatch_supervisor_execution) directly.
         """
         with (
             patch(
                 "vibe3.services.scan_service.fetch_supervisor_candidates"
             ) as mock_fetch,
             patch(
-                "vibe3.services.scan_service.run_manual_supervisor_apply"
+                "vibe3.services.scan_service.dispatch_supervisor_execution"
             ) as mock_apply,
         ):
             # Mock candidate list (total_scanned, candidates)
@@ -210,7 +210,7 @@ class TestFailedGateBlocking:
         FailedGate is only checked in automatic heartbeat polling, not manual scans.
         """
         with patch(
-            "vibe3.services.scan_service.run_manual_governance_scan"
+            "vibe3.services.scan_service.dispatch_governance_execution"
         ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
@@ -249,12 +249,12 @@ class TestFailedGateBlocking:
         """
         with (
             patch(
-                "vibe3.services.scan_service.run_manual_governance_scan"
+                "vibe3.services.scan_service.dispatch_governance_execution"
             ) as mock_governance,
             patch(
                 "vibe3.services.scan_service.fetch_supervisor_candidates"
             ) as mock_fetch,
-            patch("vibe3.services.scan_service.run_manual_supervisor_apply"),
+            patch("vibe3.services.scan_service.dispatch_supervisor_execution"),
         ):
             # Mock supervisor candidates (total_scanned, candidates)
             mock_fetch.return_value = (0, [])
@@ -275,12 +275,14 @@ def test_supervisor_scan_fetches_candidates_and_calls_service_apply() -> None:
     """Test manual supervisor scan calls service layer directly.
 
     After refactor: manual supervisor scan should fetch candidates,
-    filter them, and call run_manual_supervisor_apply for each one,
+    filter them, and call dispatch_supervisor_execution for each one,
     not through internal command layer.
     """
     with (
         patch("vibe3.services.scan_service.fetch_supervisor_candidates") as mock_fetch,
-        patch("vibe3.services.scan_service.run_manual_supervisor_apply") as mock_apply,
+        patch(
+            "vibe3.services.scan_service.dispatch_supervisor_execution"
+        ) as mock_apply,
     ):
         # Mock candidate list (total_scanned, candidates)
         mock_fetch.return_value = (
