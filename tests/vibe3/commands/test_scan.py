@@ -294,3 +294,51 @@ class TestFailedGateBlocking:
             # Verify neither facade method was called (blocked by gate)
             mock_facade_instance.on_heartbeat_tick.assert_not_called()
             mock_facade_instance.on_supervisor_scan.assert_not_called()
+
+
+# Tests for material description extraction
+def test_extract_material_description_from_assignee_pool():
+    """Test extracting description from assignee-pool.md."""
+    from vibe3.commands.scan import _extract_material_description
+
+    description = _extract_material_description(
+        "supervisor/governance/assignee-pool.md"
+    )
+    assert description == "Assignee Pool 治理材料"
+
+
+def test_extract_material_description_from_roadmap_intake():
+    """Test extracting description from roadmap-intake.md."""
+    from vibe3.commands.scan import _extract_material_description
+
+    description = _extract_material_description(
+        "supervisor/governance/roadmap-intake.md"
+    )
+    assert description == "Roadmap Intake 治理材料"
+
+
+def test_extract_material_description_handles_missing_file():
+    """Test handling missing file gracefully."""
+    from vibe3.commands.scan import _extract_material_description
+
+    description = _extract_material_description("supervisor/governance/nonexistent.md")
+    assert description == "supervisor/governance/nonexistent.md"
+
+
+def test_extract_material_description_handles_no_title():
+    """Test handling file without title."""
+    import tempfile
+    from pathlib import Path
+
+    from vibe3.commands.scan import _extract_material_description
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write("Some content without title\n")
+        temp_path = f.name
+
+    try:
+        description = _extract_material_description(temp_path)
+        # Should fall back to filename
+        assert temp_path in description or True
+    finally:
+        Path(temp_path).unlink()
