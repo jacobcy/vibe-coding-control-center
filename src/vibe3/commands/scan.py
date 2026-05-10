@@ -275,18 +275,18 @@ def governance(
     """
     setup_logging(verbose=verbose)
 
-    if dry_run:
-        typer.echo("DRY RUN: Would run governance scan")
-        return
-
-    # Check mutual exclusivity
+    # Check mutual exclusivity first
     if list_materials and role is not None:
         typer.echo("Error: --list and --role cannot be used together", err=True)
         raise typer.Exit(1)
 
-    # Handle --list option
+    # Handle --list option (highest priority)
     if list_materials:
         _list_governance_materials()
+        return
+
+    if dry_run:
+        typer.echo("DRY RUN: Would run governance scan")
         return
 
     # Get available materials for help text
