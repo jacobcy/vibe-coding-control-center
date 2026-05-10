@@ -417,3 +417,17 @@ class TestSupervisorDryRunPromptDisplay:
 
         assert result.exit_code == 0
         mock_run.assert_called_once()
+
+
+class TestCombinedScanDryRun:
+    """Tests for scan all --dry-run functionality."""
+
+    @patch("vibe3.commands.scan._run_governance_scan_dry_run")
+    @patch("vibe3.commands.scan._run_supervisor_scan_dry_run")
+    def test_all_dry_run_calls_both_handlers(self, mock_supervisor, mock_governance):
+        """Test that 'scan all --dry-run' calls both dry-run handlers."""
+        result = runner.invoke(app, ["scan", "all", "--dry-run"])
+
+        assert result.exit_code == 0
+        mock_governance.assert_called_once()
+        mock_supervisor.assert_called_once()
