@@ -41,6 +41,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
         repo="openai/vibe-center",
         port=1234,
         supervisor_handoff=SimpleNamespace(issue_label="supervisor"),
+        manager_usernames=["manager-bot"],
     )
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,
@@ -89,9 +90,9 @@ def test_task_status_splits_assignee_ready_and_anomaly(
         },
         {
             "number": 303,
-            "title": "Ready without assignee",
+            "title": "Ready with human assignee",
             "state": IssueState.READY,
-            "assignee": None,
+            "assignee": "jacobcy",
             "flow": _make_flow(303),
             "queued": False,
             "failed_reason": None,
@@ -112,8 +113,8 @@ def test_task_status_splits_assignee_ready_and_anomaly(
     assert output.index("Assignee Intake:") < output.index("Ready Queue:")
     assert output.index("Ready Queue:") < output.index("Ready Exceptions:")
     assert "manager-bot" in output
-    assert "Ready without assignee" in output
-    assert "historical debt" in output
+    assert "Ready with human assignee" in output
+    assert "non-manager assignee" in output
 
 
 @patch("vibe3.commands.status.load_orchestra_config")
@@ -132,6 +133,7 @@ def test_task_status_shows_flows_with_prs(
         repo="openai/vibe-center",
         port=1234,
         supervisor_handoff=SimpleNamespace(issue_label="supervisor"),
+        manager_usernames=["manager-bot"],
     )
     mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
         timestamp=1234567890.0,

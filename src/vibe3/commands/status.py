@@ -279,6 +279,7 @@ def status(
             bucket = classify_task_status(
                 state,
                 cast(str | None, item.get("assignee")),
+                config.manager_usernames,
             )
             bucketed_items[bucket].append(item)
 
@@ -349,14 +350,21 @@ def status(
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
+                    assignee = cast(str | None, item.get("assignee"))
 
                     display_title = title[:48] + "..." if len(title) > 48 else title
                     console.print(f"  #{number:4}  [red]READY     [/]  {display_title}")
-                    _render_task_item_details(flow, config)
-                    console.print(
-                        "             [yellow]missing assignee:[/] "
-                        "ready queue historical debt"
-                    )
+                    _render_task_item_details(flow, config, assignee=assignee)
+                    if assignee:
+                        console.print(
+                            "             [yellow]non-manager assignee:[/] "
+                            "requires assignee-pool or roadmap intake repair"
+                        )
+                    else:
+                        console.print(
+                            "             [yellow]missing assignee:[/] "
+                            "ready queue historical debt"
+                        )
             else:
                 console.print("  [dim](none)[/]")
         else:
