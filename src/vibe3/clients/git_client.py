@@ -132,17 +132,8 @@ class GitClient:
         Raises:
             GitError: git 命令执行失败
         """
-        import sys
-
         cmd = ["git", *args]
         effective_cwd = Path(cwd) if cwd else self._cwd
-        print(
-            f"DEBUG GitClient._run: cmd={cmd}, "
-            f"self._cwd={self._cwd}, "
-            f"effective_cwd={effective_cwd}, "
-            f"current os.getcwd()={Path.cwd()}",
-            file=sys.stderr,
-        )
 
         # Remove GIT_DIR and GIT_PREFIX to ensure git uses
         # normal repository discovery. These variables are set

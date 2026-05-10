@@ -23,12 +23,6 @@ class TestWorkingDirectoryIndependence:
         original_cwd = os.getcwd()
 
         try:
-            # Debug: print git environment variables
-            import sys
-
-            git_env_vars = {k: v for k, v in os.environ.items() if k.startswith("GIT_")}
-            print(f"DEBUG: Git environment variables: {git_env_vars}", file=sys.stderr)
-
             # Get the repo root first (while we're in a valid git directory)
             worktree_root = get_worktree_root()
             root_path = Path(worktree_root)
@@ -39,28 +33,8 @@ class TestWorkingDirectoryIndependence:
                 # Change to subdirectory within the repo
                 os.chdir(str(subdir))
 
-                # Debug: print current directory after chdir
-                print(
-                    f"DEBUG: After chdir to subdir, cwd = {os.getcwd()}",
-                    file=sys.stderr,
-                )
-
-                # Debug: print git environment variables after chdir
-                git_env_vars2 = {
-                    k: v for k, v in os.environ.items() if k.startswith("GIT_")
-                }
-                print(
-                    f"DEBUG: Git environment variables after chdir: {git_env_vars2}",
-                    file=sys.stderr,
-                )
-
                 # Should work from any directory within the repo
                 worktree_root_from_subdir = get_worktree_root()
-                print(f"DEBUG: worktree_root = {worktree_root}", file=sys.stderr)
-                print(
-                    f"DEBUG: worktree_root_from_subdir = {worktree_root_from_subdir}",
-                    file=sys.stderr,
-                )
                 assert worktree_root_from_subdir == worktree_root
         finally:
             # Restore original working directory

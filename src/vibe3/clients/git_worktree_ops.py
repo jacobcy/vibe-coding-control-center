@@ -78,13 +78,7 @@ def get_git_common_dir(run: Callable[[list[str]], str]) -> str:
 
 def get_worktree_root(run: Callable[[list[str]], str]) -> str:
     """Get the top-level path of the current worktree."""
-    import sys
-
-    print(
-        "DEBUG git_worktree_ops: Running git rev-parse --show-toplevel", file=sys.stderr
-    )
     worktree_root = run(["rev-parse", "--show-toplevel"])
-    print(f"DEBUG git_worktree_ops: Result = {worktree_root}", file=sys.stderr)
     logger.bind(
         domain="git",
         action="get_worktree_root",
