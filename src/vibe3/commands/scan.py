@@ -360,7 +360,7 @@ def governance(
     ] = None,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show what would be done without executing"),
+        typer.Option("--dry-run", help="Build and display prompt without executing"),
     ] = False,
     verbose: Annotated[
         int,
