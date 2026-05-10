@@ -361,6 +361,6 @@ def test_governance_list_mutually_exclusive_with_role():
         app, ["scan", "governance", "--list", "--role", "assignee-pool"]
     )
 
-    # Should either error or ignore --role
-    # We'll accept both behaviors in implementation
-    assert result.exit_code == 0 or "cannot be used with" in result.stdout.lower()
+    # Should error with clear message
+    assert result.exit_code != 0
+    assert "cannot be used together" in result.output.lower()
