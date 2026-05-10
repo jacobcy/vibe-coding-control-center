@@ -74,35 +74,3 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
     except Exception as e:
         logger.error(f"Failed to fetch supervisor candidates: {e}")
         return []
-
-
-def render_governance_prompt_preview(
-    config: Any, tick_count: int, material_override: str | None
-) -> str:
-    """Render governance prompt for preview.
-
-    Args:
-        config: Orchestra config
-        tick_count: Tick count for material rotation
-        material_override: Optional material override
-
-    Returns:
-        Rendered prompt text
-    """
-    from vibe3.roles.governance import (
-        build_governance_dry_run_context,
-        render_governance_prompt,
-    )
-
-    # Build minimal snapshot context for dry-run
-    snapshot_context = build_governance_dry_run_context()
-
-    # Render prompt
-    render_result = render_governance_prompt(
-        config,
-        snapshot_context,
-        tick_count=tick_count,
-        material_override=material_override,
-    )
-
-    return render_result.rendered_text

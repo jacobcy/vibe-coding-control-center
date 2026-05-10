@@ -3,7 +3,6 @@
 from vibe3.services.scan_service import (
     extract_material_description,
     fetch_supervisor_candidates,
-    render_governance_prompt_preview,
 )
 
 
@@ -86,26 +85,3 @@ class TestFetchSupervisorCandidates:
         mock_github.list_issues.assert_called_once()
         call_args = mock_github.list_issues.call_args
         assert call_args.kwargs.get("limit") == 100
-
-
-class TestRenderGovernancePromptPreview:
-    """Tests for governance prompt rendering."""
-
-    def test_returns_rendered_text(self):
-        """Test that rendered text is returned."""
-        from unittest.mock import MagicMock, patch
-
-        mock_config = MagicMock()
-
-        with patch("vibe3.roles.governance.render_governance_prompt") as mock_render:
-            mock_result = MagicMock()
-            mock_result.rendered_text = "# Test Prompt"
-            mock_render.return_value = mock_result
-
-            result = render_governance_prompt_preview(
-                config=mock_config,
-                tick_count=0,
-                material_override="test-material",
-            )
-
-            assert result == "# Test Prompt"
