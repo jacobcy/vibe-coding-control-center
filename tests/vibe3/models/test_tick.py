@@ -10,7 +10,7 @@ from vibe3.prompts.models import (
 )
 
 
-def test_tick_request_manual_defaults():
+def test_tick_request_manual_defaults() -> None:
     """Manual tick should default to tick_id=0 and both phases enabled."""
     req = TickRequest(source=TickSource.MANUAL_SCAN)
     assert req.tick_id == 0
@@ -20,7 +20,7 @@ def test_tick_request_manual_defaults():
     assert req.supervisor_issue_numbers == []
 
 
-def test_tick_request_with_governance_material():
+def test_tick_request_with_governance_material() -> None:
     """Should accept explicit governance material."""
     req = TickRequest(
         source=TickSource.MANUAL_SCAN,
@@ -31,7 +31,7 @@ def test_tick_request_with_governance_material():
     assert TickPhase.SUPERVISOR not in req.phases
 
 
-def test_tick_request_with_supervisor_issues():
+def test_tick_request_with_supervisor_issues() -> None:
     """Should accept explicit supervisor issue numbers."""
     req = TickRequest(
         source=TickSource.MANUAL_SCAN,
@@ -41,7 +41,7 @@ def test_tick_request_with_supervisor_issues():
     assert req.supervisor_issue_numbers == [743, 812]
 
 
-def test_tick_plan_from_request():
+def test_tick_plan_from_request() -> None:
     """TickPlan should be derived from TickRequest with explicit material."""
     req = TickRequest(
         source=TickSource.MANUAL_SCAN,
@@ -54,7 +54,7 @@ def test_tick_plan_from_request():
     assert plan.supervisor_issues == [743]
 
 
-def test_tick_plan_auto_select_governance_material():
+def test_tick_plan_auto_select_governance_material() -> None:
     """TickPlan should auto-select governance material via rotation."""
     # Create mock config
     config = MagicMock()
@@ -124,7 +124,7 @@ def test_tick_plan_auto_select_governance_material():
         governance_module._load_governance_material_catalog = original_load
 
 
-def test_tick_plan_empty_phases():
+def test_tick_plan_empty_phases() -> None:
     """TickPlan with empty phases should create a no-op tick."""
     req = TickRequest(
         source=TickSource.MANUAL_SCAN,
