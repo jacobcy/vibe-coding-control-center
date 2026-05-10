@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -44,6 +45,29 @@ class ServeStatusService:
         self._display_recent_activity()
         self._display_failed_gate()
         self._display_error_tracking()
+
+    @staticmethod
+    def _clean_error_message(error_message: str, max_length: int = 60) -> str:
+        """Clean error message by removing TMPDIR and other noise.
+
+        Args:
+            error_message: Raw error message from error_log
+            max_length: Maximum length to truncate (default 60)
+
+        Returns:
+            Cleaned and truncated error message
+        """
+        # Remove CLAUDE_CODE_TMPDIR and everything after it
+        cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", error_message)[0].strip()
+
+        # Remove " | === Recent Errors ===" suffix
+        cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
+
+        # Remove trailing pipe separators
+        cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+
+        # Truncate to max_length
+        return cleaned[:max_length] if len(cleaned) > max_length else cleaned
 
     def _display_daemon_status(
         self,
@@ -162,30 +186,46 @@ class ServeStatusService:
             if recent_errors:
                 table = Table(title="\n  Recent Errors (last 10)", show_lines=True)
                 table.add_column("Tick", style="cyan", width=6)
-                table.add_column("Issue", style="yellow", width=6)
+                table.add_column("Issue", style="yellow", width=10)
                 table.add_column("Code", style="magenta")
                 table.add_column("Time", style="dim", width=19)
                 table.add_column("Message", style="white")
 
                 for err in recent_errors:
-                    # Format time as HH:MM:SS (remove date part)
+                    # Format time as HH:MM:SS (convert UTC to local timezone)
                     time_str = err.get("created_at", "")
                     if time_str and len(time_str) >= 19:
-                        # Extract HH:MM:SS from "2026-05-06 09:13:19"
-                        time_display = time_str[11:19]
+                        try:
+                            # Parse UTC time from database
+                            utc_time = datetime.strptime(
+                                time_str[:19], "%Y-%m-%d %H:%M:%S"
+                            )
+                            utc_time = utc_time.replace(tzinfo=timezone.utc)
+
+                            # Convert to system local timezone
+                            local_time = utc_time.astimezone()
+
+                            # Extract HH:MM:SS
+                            time_display = local_time.strftime("%H:%M:%S")
+                        except (ValueError, TypeError):
+                            # Fallback: just extract time part
+                            time_display = time_str[11:19]
                     else:
                         time_display = time_str
 
-                    # Format issue number
+                    # Format issue number (NULL for governance errors)
                     issue_num = err.get("issue_number")
-                    issue_display = f"#{issue_num}" if issue_num else "-"
+                    if issue_num is None:
+                        issue_display = "governance"
+                    else:
+                        issue_display = f"#{issue_num}"
 
                     table.add_row(
                         str(err["tick_id"]),
                         issue_display,
                         err["error_code"],
                         time_display,
-                        err["error_message"][:60],  # Truncate long messages
+                        self._clean_error_message(err["error_message"]),
                     )
 
                 self.console.print(table)

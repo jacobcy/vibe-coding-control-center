@@ -127,6 +127,8 @@ def classify_error(error_output: str) -> str:
         "service unavailable" in output_lower
         or "serveroverloaded" in output_lower
         or "server overloaded" in output_lower
+        or "server is overloaded" in output_lower
+        or "decode server is overloaded" in output_lower
         or "503" in output_lower
     ):
         return E_API_UNAVAILABLE
