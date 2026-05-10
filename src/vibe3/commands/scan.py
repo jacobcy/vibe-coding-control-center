@@ -509,7 +509,9 @@ def governance(
 def supervisor(
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show what would be done without executing"),
+        typer.Option(
+            "--dry-run", help="Show scan plan and candidates without executing"
+        ),
     ] = False,
     verbose: Annotated[
         int,
@@ -595,7 +597,9 @@ async def _run_combined_scan_async() -> None:
 def all(
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show what would be done without executing"),
+        typer.Option(
+            "--dry-run", help="Show governance and supervisor plans without executing"
+        ),
     ] = False,
     verbose: Annotated[
         int,
