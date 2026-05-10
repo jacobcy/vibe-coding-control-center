@@ -7,7 +7,7 @@ from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 
-def test_flow_orchestrator_service_initialization():
+def test_flow_orchestrator_service_initialization() -> None:
     """FlowOrchestratorService should initialize with config."""
     config = load_orchestra_config()
     service = FlowOrchestratorService(config)
@@ -15,7 +15,7 @@ def test_flow_orchestrator_service_initialization():
     assert service.config == config
 
 
-def test_flow_orchestrator_can_snapshot():
+def test_flow_orchestrator_can_snapshot() -> None:
     """FlowOrchestratorService should provide snapshot capability."""
     config = load_orchestra_config()
     service = FlowOrchestratorService(config)
