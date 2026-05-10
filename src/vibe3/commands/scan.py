@@ -151,6 +151,94 @@ def _get_available_governance_materials() -> list[str]:
         return []
 
 
+def _extract_material_description(material_name: str) -> str:
+    """Extract description from material file.
+
+    Reads the first markdown header (# Title) as description.
+    Falls back to filename if no title found.
+
+    Args:
+        material_name: Material file path or name
+
+    Returns:
+        Material description or filename as fallback
+    """
+    from pathlib import Path
+
+    # Normalize to full path if needed
+    if not material_name.startswith("supervisor/governance/"):
+        material_name = f"supervisor/governance/{material_name}"
+
+    # Ensure .md suffix
+    if not material_name.endswith(".md"):
+        material_name = f"{material_name}.md"
+
+    material_path = Path(material_name)
+
+    # Try to read title from file
+    try:
+        if material_path.exists():
+            with open(material_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("# "):
+                        # Extract title without '# ' prefix
+                        return line[2:].strip()
+                    # Stop at first non-empty, non-title line
+                    if line and not line.startswith("#"):
+                        break
+    except Exception:
+        pass
+
+    # Fallback to filename
+    return material_name
+
+
+def _list_governance_materials() -> None:
+    """List available governance materials with descriptions.
+
+    Displays a formatted table with material names and descriptions.
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from vibe3.roles.governance import load_governance_material_catalog
+
+    console = Console()
+
+    # Load catalog
+    try:
+        catalog = load_governance_material_catalog()
+    except Exception as exc:
+        console.print(f"[red]Error loading material catalog: {exc}[/red]")
+        raise typer.Exit(1)
+
+    if not catalog:
+        console.print("[yellow]No governance materials found[/yellow]")
+        return
+
+    # Build table
+    table = Table(title="Available Governance Materials")
+    table.add_column("Material", style="cyan", no_wrap=True)
+    table.add_column("Description", style="white")
+
+    for material in catalog:
+        # Extract short name
+        name = material.name
+        if name.startswith("supervisor/governance/"):
+            short_name = name.split("/")[-1]
+            short_name = short_name[:-3] if short_name.endswith(".md") else short_name
+        else:
+            short_name = name
+
+        # Extract description
+        description = _extract_material_description(material.name)
+
+        table.add_row(short_name, description)
+
+    console.print(table)
+
+
 @app.command()
 def governance(
     role: Annotated[
