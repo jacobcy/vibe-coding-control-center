@@ -60,13 +60,16 @@ code_limits:
           - 查询一致性（所有方法都需过滤 deleted_at）
           - 事务原子性保证
 
-      # Commands 层 —— 允许 440-480
+      # Commands 层 —— 允许 440-650
       - path: "src/vibe3/commands/task.py"
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/status.py"
         limit: 550
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，6个渲染section紧密耦合，blocked_reason智能提取逻辑增加可读性，CLI 入口函数难以拆分"
+      - path: "src/vibe3/commands/scan.py"
+        limit: 650
+        reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，material 列表、描述提取、issue context 快照等紧密耦合 helper 函数，CLI 入口聚合难以拆分"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 450
         reason: "PR query 命令聚合，包含 PR 详情展示、inspect 集成、trace 输出、bound task 展示等紧密耦合逻辑"
