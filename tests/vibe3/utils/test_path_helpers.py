@@ -14,9 +14,9 @@ from vibe3.utils.path_helpers import (
 
 
 def test_sanitize_event_detail_paths_rewrites_absolute_refs() -> None:
-    worktree_root = "/Users/jacobcy/src/vibe-center/main/.worktrees/task/issue-417"
+    worktree_root = "/workspace/vibe-center/.worktrees/task/issue-417"
     abs_ref = (
-        "/Users/jacobcy/src/vibe-center/main/.worktrees/task/issue-417/"
+        "/workspace/vibe-center/.worktrees/task/issue-417/"
         "docs/reports/task-issue-417-audit-auto-2026-04-21T01:41:01Z.md"
     )
 
