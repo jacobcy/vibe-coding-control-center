@@ -470,3 +470,22 @@ def _write_dry_run_plan(
     ) as handle:
         handle.write(plan_content)
         return Path(handle.name)
+
+
+def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
+    """Load the governance material catalog from prompt manifest.
+
+    Returns:
+        Tuple of PromptMaterialSpec objects for governance materials.
+    """
+    recipe_def = _load_governance_recipe_definition()
+    if not recipe_def.loaded_definition:
+        raise ValueError("governance.scan recipe not properly loaded")
+    catalog = recipe_def.loaded_definition.material_catalog
+    if not catalog:
+        raise ValueError("governance.scan recipe requires material_catalog")
+    return catalog
+
+
+# Backward compatibility alias
+_load_governance_material_catalog = load_governance_material_catalog
