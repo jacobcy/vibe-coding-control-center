@@ -311,7 +311,21 @@ class TestFailedGateBlocking:
 
 
 # Tests for material description extraction
-def test_extract_material_description_from_assignee_pool():
+def test_internal_governance_signature_is_execution_only() -> None:
+    """Test internal_governance_dispatch signature only has execution params.
+
+    After refactor: internal governance should only accept tick/material,
+    not dry_run/show_prompt (those belong to scan layer).
+    """
+    from inspect import signature
+
+    from vibe3.commands.internal import internal_governance_dispatch
+
+    params = signature(internal_governance_dispatch).parameters
+    assert "tick" in params
+    assert "material" in params
+    assert "dry_run" not in params
+    assert "show_prompt" not in params
     """Test extracting description from assignee-pool.md."""
     from vibe3.commands.scan import _extract_material_description
 

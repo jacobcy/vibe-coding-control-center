@@ -96,16 +96,17 @@ def internal_governance_dispatch(
             help="Override material rotation with specific governance role",
         ),
     ] = None,
-    dry_run: bool = False,
-    show_prompt: bool = False,
 ) -> None:
-    """L3: Dispatch the Governance scan agent.
+    """L3: Dispatch the Governance scan agent (execution-only).
 
     Governance scan uses tick count to rotate through supervisor materials.
     Unlike manager/apply, governance has no issue_number - it scans the whole system.
 
     Note: This command is only called via CLI self-invocation (internal governance)
     from the tmux wrapper launched by governance_scan handler. It always runs sync.
+
+    dry_run/show_prompt removed - those belong to scan layer (user preview),
+    not internal execution layer.
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
 
@@ -114,7 +115,7 @@ def internal_governance_dispatch(
     run_governance_sync(
         tick_count=tick,
         material_override=material,
-        dry_run=dry_run,
-        show_prompt=show_prompt,
+        dry_run=False,
+        show_prompt=False,
         session_id=None,
     )
