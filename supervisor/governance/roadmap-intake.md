@@ -16,6 +16,11 @@
 配置中的 manager assignee，就不要把它当成已 intake 的任务。
 这里不是讨论场，不做大范围架构探索，也不承接需要大量人类对齐的工作。
 
+**闭环目标**：
+- broader repo issue pool 中只要存在边界明确、依赖就绪、可由 manager 继续收敛的 issue，就应尽量纳入 assignee issue pool
+- 不要把“尚有若干实现选项”误判成“必须人类拍板”
+- 只有当 issue 的目标本身不明确，或会改变架构/产品方向时，才用 `needs human decision` 跳过
+
 ## 职责
 
 - 扫描 broader repo issue pool，识别哪些 open issues 适合纳入 assignee issue pool
@@ -31,6 +36,7 @@
 **Level 1: 基础条件**
 - 问题边界明确、验收口径清楚、无需额外产品讨论
 - 改动范围可控、依赖关系简单
+- 允许存在若干实现选项；只要目标清楚、边界稳定、可由 manager 在执行中收敛，就不算人类阻塞
 
 **Level 2: 架构一致性**（新增）
 - 依赖的模块/函数仍存在
@@ -76,9 +82,14 @@
 - 依赖未就绪 → 建议等依赖完成后重新提出
 
 **跳过（保守等待）**：
-- 需要人类拍板方案
-- 需要架构讨论
+- issue 的目标/验收口径本身不明确，无法确定做完算什么
+- 需要先决定架构方向、产品策略或跨团队边界
 - 不确定是否过时
+
+**不要误判为 `needs human decision` 的情况**：
+- 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么
+- manager 可以先读代码再决定采用哪种小范围实现
+- 描述里列了若干候选方案，但这些方案不会改变系统边界，只影响落地细节
 
 ### 与 Assignee Pool 的职责边界
 
@@ -112,6 +123,7 @@ Assignee Pool（第二道）：
 - **关闭优于等待**：明确过时的 issue 应关闭，不要留在 pool 中悬而不决
 - **调整优于拒绝**：有问题的 issue 建议调整内容，而不是保守等待
 - **保守兜底**：不确定时等待，避免误纳入或误关闭
+- **纳入优于空转**：如果当前 ready queue 很浅，且候选 issue 满足三级审查，不要因为“可能有别的实现写法”而空转
 
 ## Permission Contract
 
@@ -149,14 +161,21 @@ Forbidden:
 ## Execution Pattern
 
 1. 先看 broader repo issue pool 中当前 open issues
-2. 过滤掉 discussion / refactor / big feature / 需人类先定方案的 issue
-3. 识别 bug fix 和方案明确的 small feature
+2. 先过滤掉 discussion、明确的大 feature、以及真正需要人类先定方向的 issue
+3. 重点识别以下可纳入对象：
+   - bug fix
+   - 方案明确的 small feature
+   - **边界明确的 refactor / cleanup**
 4. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
 5. 对可纳入对象执行最小动作：
    - 派为 assignee issue，并明确指派给一个配置中的 manager assignee
    - 如有必要补最小 routing labels
 6. 对不适合纳入的对象记录简短原因
-7. 输出结论后停止
+7. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
+   - 是因为候选确实都不满足三级审查
+   - 还是因为当前材料把“实现选择”误当成了“人类拍板”
+   - 若 ready queue 偏浅，优先重新检查是否存在被误判可纳入的 bounded refactor / bugfix
+8. 输出结论后停止
 
 ## Comment Contract
 
