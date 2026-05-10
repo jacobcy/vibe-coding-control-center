@@ -242,22 +242,28 @@ class OrchestrationFacade(ServiceBase):
         包含 interval_ticks gating，避免每次 tick 都触发。
 
         Args:
-            force: 当 True 时跳过 interval gating，用于手动触发
-                (vibe3 scan governance)
+            force: DEPRECATED - 不再用于手动触发。
+                Manual governance scan 现在直接调用 internal_governance_dispatch，
+                不经过 facade heartbeat 链路。
+                此参数保留仅为向后兼容，实际不应再使用。
             material_override: 当提供时，覆盖 material rotation，
                 指定执行的 governance 角色
 
+        注意：手动 scan 命令不再使用此方法。
+        Manual governance/supervisor scans 直接调用 internal dispatch，
+        只有自动 heartbeat polling 才使用此 facade 方法。
         执行装配由 governance_scan handler 负责，facade 只做 observation。
         """
         # For manual triggers (force=True), use tick_count=0 for consistent t0 suffix
-        # For automatic triggers, increment tick counter
+        # NOTE: force=True is DEPRECATED - manual scans no longer use this path
         if force:
             tick_count = 0
         else:
             self._tick_count += 1
             tick_count = self._tick_count
 
-        # Skip interval gating when force=True (manual trigger)
+        # Skip interval gating when force=True
+        # (backward compat, not used by manual scans)
         if not force:
             interval = self._config.governance.interval_ticks
             if tick_count % interval != 0:
