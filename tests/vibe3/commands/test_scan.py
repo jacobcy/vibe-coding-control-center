@@ -61,7 +61,9 @@ class TestGovernanceScan:
         """Test governance scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0
-        assert "DRY RUN: Would run governance scan" in result.output
+        # Should now show material information and prompt preview
+        output_lower = result.output.lower()
+        assert "material:" in output_lower or "governance scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
@@ -69,7 +71,7 @@ class TestGovernanceScan:
         result = runner.invoke(app, ["scan", "governance"])
         assert result.exit_code == 0
         assert "Governance scan completed" in result.output
-        mock_run.assert_called_once_with()
+        mock_run.assert_called_once_with(material_override=None)
 
 
 class TestSupervisorScan:
@@ -79,7 +81,10 @@ class TestSupervisorScan:
         """Test supervisor scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
         assert result.exit_code == 0
-        assert "DRY RUN: Would run supervisor scan" in result.output
+        # Should show scan information
+        output_lower = result.output.lower()
+        assert "supervisor" in output_lower
+        assert "dry-run" in output_lower or "dry run" in output_lower
 
     @patch("vibe3.commands.scan._run_supervisor_scan_async")
     def test_supervisor_execution(self, mock_run):
@@ -98,9 +103,10 @@ class TestCombinedScan:
         """Test combined scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "all", "--dry-run"])
         assert result.exit_code == 0
-        assert (
-            "DRY RUN: Would run both governance and supervisor scans" in result.output
-        )
+        # Should show both governance and supervisor dry-run output
+        output_lower = result.output.lower()
+        assert "governance scan dry-run" in output_lower
+        assert "supervisor scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_combined_scan_async")
     def test_all_execution(self, mock_run):
@@ -294,3 +300,135 @@ class TestFailedGateBlocking:
             # Verify neither facade method was called (blocked by gate)
             mock_facade_instance.on_heartbeat_tick.assert_not_called()
             mock_facade_instance.on_supervisor_scan.assert_not_called()
+
+
+# Tests for material description extraction
+def test_extract_material_description_from_assignee_pool():
+    """Test extracting description from assignee-pool.md."""
+    from vibe3.commands.scan import _extract_material_description
+
+    description = _extract_material_description(
+        "supervisor/governance/assignee-pool.md"
+    )
+    assert description == "Assignee Pool 治理材料"
+
+
+def test_extract_material_description_from_roadmap_intake():
+    """Test extracting description from roadmap-intake.md."""
+    from vibe3.commands.scan import _extract_material_description
+
+    description = _extract_material_description(
+        "supervisor/governance/roadmap-intake.md"
+    )
+    assert description == "Roadmap Intake 治理材料"
+
+
+def test_extract_material_description_handles_missing_file():
+    """Test handling missing file gracefully."""
+    from vibe3.commands.scan import _extract_material_description
+
+    description = _extract_material_description("supervisor/governance/nonexistent.md")
+    assert description == "supervisor/governance/nonexistent.md"
+
+
+def test_extract_material_description_handles_no_title():
+    """Test handling file without title."""
+    import tempfile
+    from pathlib import Path
+
+    from vibe3.commands.scan import _extract_material_description
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write("Some content without title\n")
+        temp_path = f.name
+
+    try:
+        description = _extract_material_description(temp_path)
+        # Should fall back to filename when no title
+        assert description == temp_path
+    finally:
+        Path(temp_path).unlink()
+
+
+# Tests for --list parameter
+def test_governance_list_shows_materials():
+    """Test that --list shows governance materials."""
+    result = runner.invoke(app, ["scan", "governance", "--list"])
+
+    assert result.exit_code == 0
+    assert "Available Governance Materials" in result.stdout
+    # Should show at least assignee-pool
+    assert "assignee-pool" in result.stdout or "Assignee Pool" in result.stdout
+
+
+def test_governance_list_mutually_exclusive_with_role():
+    """Test that --list and --role are mutually exclusive."""
+    result = runner.invoke(
+        app, ["scan", "governance", "--list", "--role", "assignee-pool"]
+    )
+
+    # Should error with clear message
+    assert result.exit_code != 0
+    assert "cannot be used together" in result.output.lower()
+
+
+class TestGovernanceDryRunPromptDisplay:
+    """Tests for governance --dry-run prompt display."""
+
+    @patch("vibe3.commands.scan._run_governance_scan")
+    def test_governance_dry_run_shows_material_info(self, mock_run):
+        """Test that --dry-run shows which material would be used."""
+        result = runner.invoke(
+            app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
+        )
+
+        assert result.exit_code == 0
+        # Should show material information
+        assert "assignee-pool" in result.output.lower() or "Material:" in result.output
+
+    def test_governance_dry_run_shows_prompt_preview(self):
+        """Test that --dry-run displays rendered prompt."""
+        result = runner.invoke(
+            app, ["scan", "governance", "--role", "assignee-pool", "--dry-run"]
+        )
+
+        assert result.exit_code == 0
+        # Should show prompt preview section
+        output_lower = result.output.lower()
+        assert "prompt" in output_lower or "governance prompt" in output_lower
+
+
+class TestSupervisorDryRunPromptDisplay:
+    """Tests for supervisor --dry-run prompt display."""
+
+    def test_supervisor_dry_run_shows_scan_info(self):
+        """Test that --dry-run shows scan information."""
+        result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
+
+        assert result.exit_code == 0
+        # Should show scan information
+        output_lower = result.output.lower()
+        assert "supervisor" in output_lower
+        assert "dry-run" in output_lower or "dry run" in output_lower
+
+    @patch("vibe3.commands.scan._run_supervisor_scan_dry_run")
+    def test_supervisor_dry_run_calls_handler(self, mock_run):
+        """Test that --dry-run calls the dry-run handler."""
+        result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
+
+        assert result.exit_code == 0
+        mock_run.assert_called_once()
+
+
+class TestCombinedScanDryRun:
+    """Tests for scan all --dry-run functionality."""
+
+    @patch("vibe3.commands.scan._run_governance_scan_dry_run")
+    @patch("vibe3.commands.scan._run_supervisor_scan_dry_run")
+    def test_all_dry_run_calls_both_handlers(self, mock_supervisor, mock_governance):
+        """Test that 'scan all --dry-run' calls both dry-run handlers."""
+        result = runner.invoke(app, ["scan", "all", "--dry-run"])
+
+        assert result.exit_code == 0
+        mock_governance.assert_called_once()
+        mock_supervisor.assert_called_once()

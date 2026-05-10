@@ -15,11 +15,14 @@ app = typer.Typer(
 )
 
 
-def _run_governance_scan() -> None:
+def _run_governance_scan(material_override: str | None = None) -> None:
     """Execute governance scan once.
 
     Creates minimal services and publishes GovernanceScanStarted event.
     Event handlers handle the actual execution via CLI self-invocation.
+
+    Args:
+        material_override: Optional governance role to override material rotation
     """
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -60,9 +63,53 @@ def _run_governance_scan() -> None:
     # Trigger governance scan (force=True to skip interval gating for manual trigger)
     # on_heartbeat_tick publishes GovernanceScanStarted event
     # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick(force=True)
+    facade.on_heartbeat_tick(force=True, material_override=material_override)
 
     logger.bind(domain="orchestra").info("Governance scan completed")
+
+
+def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
+    """Execute governance scan in dry-run mode, displaying prompt without execution.
+
+    Args:
+        material_override: Optional governance role to override material rotation
+    """
+    from rich.console import Console
+
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.roles.governance import build_governance_recipe
+    from vibe3.services.scan_service import render_governance_prompt_preview
+    from vibe3.ui.scan_display import display_governance_dry_run
+
+    console = Console()
+    config = load_orchestra_config()
+    tick_count = 0  # Dry-run uses tick 0 for consistency
+
+    try:
+        # Build recipe to get material name
+        recipe = build_governance_recipe(config, tick_count, material_override)
+        current_material = recipe.variables.get("supervisor_name")
+        if current_material is None:
+            console.print("[red]Error: supervisor_name variable not found[/red]")
+            raise typer.Exit(1)
+
+        # Extract material name (guaranteed to be str at this point)
+        if hasattr(current_material, "value") and current_material.value:
+            material_name = str(current_material.value)
+        else:
+            material_name = str(current_material)
+
+        # Render prompt
+        prompt_content = render_governance_prompt_preview(
+            config, tick_count, material_override
+        )
+
+        # Display via UI layer
+        display_governance_dry_run(console, material_name, prompt_content)
+
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
 
 
 async def _run_supervisor_scan_async() -> None:
@@ -122,11 +169,138 @@ async def _run_supervisor_scan_async() -> None:
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
+def _run_supervisor_scan_dry_run() -> None:
+    """Execute supervisor scan in dry-run mode, displaying scan plan.
+
+    Shows scan process without actual execution.
+    """
+    from rich.console import Console
+
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.services.scan_service import fetch_supervisor_candidates
+    from vibe3.ui.scan_display import display_supervisor_dry_run
+
+    console = Console()
+    config = load_orchestra_config()
+
+    # Fetch candidates via service layer
+    try:
+        github = GitHubClient()
+        candidates = fetch_supervisor_candidates(github, config.repo)
+    except Exception as e:
+        # On error, display empty list
+        console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
+        candidates = []
+
+    # Display via UI layer
+    display_supervisor_dry_run(console, candidates)
+
+
+def _get_available_governance_materials() -> list[str]:
+    """Fetch available governance materials from catalog.
+
+    Returns list of short material names (without path/suffix).
+    """
+    try:
+        from vibe3.roles.governance import load_governance_material_catalog
+
+        catalog = load_governance_material_catalog()
+        materials = []
+        for material in catalog:
+            # Extract short name:
+            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
+            name = material.name
+            if name.startswith("supervisor/governance/"):
+                short_name = name.split("/")[-1]
+                short_name = (
+                    short_name[:-3] if short_name.endswith(".md") else short_name
+                )
+                materials.append(short_name)
+        return sorted(set(materials))
+    except Exception:
+        # Fallback if catalog cannot be loaded
+        return []
+
+
+def _extract_material_description(material_name: str) -> str:
+    """Extract description from material file (DEPRECATED - use scan_service).
+
+    This function delegates to scan_service.extract_material_description.
+
+    Args:
+        material_name: Material file path or name
+
+    Returns:
+        Material description or filename as fallback
+    """
+    from pathlib import Path
+
+    from vibe3.services.scan_service import extract_material_description
+
+    # Normalize to full path if needed (only for relative governance paths)
+    if (
+        not material_name.startswith("supervisor/governance/")
+        and not Path(material_name).is_absolute()
+    ):
+        material_name = f"supervisor/governance/{material_name}"
+
+    # Ensure .md suffix
+    if not material_name.endswith(".md"):
+        material_name = f"{material_name}.md"
+
+    return extract_material_description(material_name)
+
+
+def _list_governance_materials() -> None:
+    """List available governance materials with descriptions.
+
+    Delegates to service and UI layers for business logic and display.
+    """
+    from rich.console import Console
+
+    from vibe3.roles.governance import load_governance_material_catalog
+    from vibe3.services.scan_service import extract_material_description
+    from vibe3.ui.scan_display import display_material_list
+
+    console = Console()
+
+    # Load catalog
+    try:
+        catalog = load_governance_material_catalog()
+    except Exception as exc:
+        console.print(f"[red]Error loading material catalog: {exc}[/red]")
+        raise typer.Exit(1)
+
+    # Build materials list with descriptions
+    materials = []
+    for material in catalog:
+        description = extract_material_description(material.name)
+        materials.append({"name": material.name, "description": description})
+
+    # Display via UI layer
+    display_material_list(console, materials)
+
+
 @app.command()
 def governance(
+    list_materials: Annotated[
+        bool,
+        typer.Option(
+            "--list", help="List available governance materials (exclusive with --role)"
+        ),
+    ] = False,
+    role: Annotated[
+        str | None,
+        typer.Option(
+            "--role",
+            "-r",
+            help="Override governance role (run without --role to see available)",
+        ),
+    ] = None,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show what would be done without executing"),
+        typer.Option("--dry-run", help="Build and display prompt without executing"),
     ] = False,
     verbose: Annotated[
         int,
@@ -140,11 +314,35 @@ def governance(
     """
     setup_logging(verbose=verbose)
 
-    if dry_run:
-        typer.echo("DRY RUN: Would run governance scan")
+    # Check mutual exclusivity first
+    if list_materials and role is not None:
+        typer.echo("Error: --list and --role cannot be used together", err=True)
+        raise typer.Exit(1)
+
+    # Handle --list option (highest priority)
+    if list_materials:
+        _list_governance_materials()
         return
 
-    _run_governance_scan()
+    if dry_run:
+        # In dry-run mode, build and display the prompt without executing
+        _run_governance_scan_dry_run(material_override=role)
+        return
+
+    # Get available materials for help text
+    available_materials = _get_available_governance_materials()
+
+    if role is None:
+        # No role specified - show guidance
+        typer.echo(
+            "No --role specified. Using automatic material rotation (tick-based)."
+        )
+        if available_materials:
+            typer.echo(f"Available roles: {', '.join(available_materials)}")
+            typer.echo("Use --role <role-name> to specify a particular role.")
+        typer.echo("")  # Blank line for readability
+
+    _run_governance_scan(material_override=role)
     typer.echo("Governance scan completed")
 
 
@@ -152,7 +350,9 @@ def governance(
 def supervisor(
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show what would be done without executing"),
+        typer.Option(
+            "--dry-run", help="Show scan plan and candidates without executing"
+        ),
     ] = False,
     verbose: Annotated[
         int,
@@ -167,7 +367,7 @@ def supervisor(
     setup_logging(verbose=verbose)
 
     if dry_run:
-        typer.echo("DRY RUN: Would run supervisor scan")
+        _run_supervisor_scan_dry_run()
         return
 
     asyncio.run(_run_supervisor_scan_async())
@@ -238,7 +438,9 @@ async def _run_combined_scan_async() -> None:
 def all(
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show what would be done without executing"),
+        typer.Option(
+            "--dry-run", help="Show governance and supervisor plans without executing"
+        ),
     ] = False,
     verbose: Annotated[
         int,
@@ -252,7 +454,8 @@ def all(
     setup_logging(verbose=verbose)
 
     if dry_run:
-        typer.echo("DRY RUN: Would run both governance and supervisor scans")
+        _run_governance_scan_dry_run()
+        _run_supervisor_scan_dry_run()
         return
 
     asyncio.run(_run_combined_scan_async())

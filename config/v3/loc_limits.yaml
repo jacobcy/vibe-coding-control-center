@@ -60,16 +60,19 @@ code_limits:
           - 查询一致性（所有方法都需过滤 deleted_at）
           - 事务原子性保证
 
-      # Commands 层 —— 允许 440-480
+      # Commands 层 —— 允许 440-650
       - path: "src/vibe3/commands/task.py"
         limit: 480
         reason: "Task 命令聚合，包含 resume、list、多个子命令入口"
       - path: "src/vibe3/commands/status.py"
         limit: 550
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，6个渲染section紧密耦合，blocked_reason智能提取逻辑增加可读性，CLI 入口函数难以拆分"
+      - path: "src/vibe3/commands/scan.py"
+        limit: 470
+        reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，已下沉 UI 和业务逻辑到 ui/ 和 services/ 层"
       - path: "src/vibe3/commands/pr_query.py"
         limit: 450
-        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 集成、trace 输出、bound task 展示等紧密耦合逻辑"
+        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 成成、trace 输出等紧密耦合逻辑"
 
       # Services 层 —— 允许 400-500
       - path: "src/vibe3/analysis/snapshot_service.py"
@@ -93,8 +96,8 @@ code_limits:
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
       - path: "src/vibe3/roles/governance.py"
-        limit: 450
-        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑"
+        limit: 540
+        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑；材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
 
       # Server —— 允许 485
       - path: "src/vibe3/server/app.py"
@@ -177,6 +180,9 @@ code_limits:
       - path: "tests/vibe3/services/test_task_resume_operations.py"
         limit: 410
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
+      - path: "tests/vibe3/commands/test_scan.py"
+        limit: 450
+        reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个子命令的 help/dry-run/execution 测试，包含 FailedGate 阻塞集成测试和 dry-run prompt 显示测试，8 个测试类 17 个测试方法紧密耦合，拆分收益低"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数

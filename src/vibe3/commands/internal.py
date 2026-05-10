@@ -88,6 +88,14 @@ def internal_governance_dispatch(
     tick: Annotated[
         int, typer.Argument(help="Tick count for governance material rotation")
     ],
+    material: Annotated[
+        str | None,
+        typer.Option(
+            "--material",
+            "-m",
+            help="Override material rotation with specific governance role",
+        ),
+    ] = None,
     dry_run: bool = False,
     show_prompt: bool = False,
 ) -> None:
@@ -105,6 +113,7 @@ def internal_governance_dispatch(
     # (async wrapper already launched by governance_scan handler)
     run_governance_sync(
         tick_count=tick,
+        material_override=material,
         dry_run=dry_run,
         show_prompt=show_prompt,
         session_id=None,

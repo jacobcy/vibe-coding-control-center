@@ -74,6 +74,28 @@ _GOVERNANCE_RUNTIME_VARS = (
 )
 
 
+def build_governance_dry_run_context() -> dict[str, Any]:
+    """Build minimal governance context for dry-run mode.
+
+    Returns empty/minimal context suitable for prompt preview
+    without accessing live data.
+
+    Returns:
+        Minimal governance context dict
+    """
+    return _build_issue_context(
+        active_entries=(),
+        server_running=False,
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+        circuit_breaker_state="closed",
+        circuit_breaker_failures=0,
+        issue_scope_name="dry-run mode",
+        scope_note="Dry-run mode: using minimal context for prompt preview",
+    )
+
+
 def _build_issue_context(
     active_entries: tuple[Any, ...],
     *,
@@ -142,7 +164,12 @@ def _load_governance_recipe_definition() -> PromptRecipeDefinition:
     return PromptManifest.load_default().recipe("governance.scan")
 
 
-def _load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
+def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
+    """Load the governance material catalog from prompt manifest.
+
+    Returns:
+        Tuple of PromptMaterialSpec objects for governance materials.
+    """
     recipe_def = _load_governance_recipe_definition()
     if not recipe_def.loaded_definition:
         raise ValueError("governance.scan recipe not properly loaded")
@@ -150,6 +177,10 @@ def _load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
     if not catalog:
         raise ValueError("governance.scan recipe requires material_catalog")
     return catalog
+
+
+# Backward compatibility alias
+_load_governance_material_catalog = load_governance_material_catalog
 
 
 def _is_doc_candidate(title: str, body: str, labels: list[str]) -> bool:
@@ -299,8 +330,50 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
     return registry
 
 
+def _normalize_material_name(material_name: str) -> str:
+    """Normalize material name to canonical form for comparison.
+
+    Converts various input formats to canonical form:
+    - "roadmap-intake" → "roadmap-intake"
+    - "roadmap-intake.md" → "roadmap-intake"
+    - "supervisor/governance/roadmap-intake" → "roadmap-intake"
+    - "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
+    """
+    path = Path(material_name)
+    # Get the filename without directory
+    stem = path.stem if path.suffix == ".md" else path.name
+    # If stem still has .md suffix, remove it
+    if stem.endswith(".md"):
+        stem = stem[:-3]
+    return stem
+
+
+def _find_material_in_catalog(
+    catalog: tuple[PromptMaterialSpec, ...], material_override: str
+) -> PromptMaterialSpec | None:
+    """Find material in catalog using flexible matching.
+
+    Attempts multiple matching strategies:
+    1. Exact name match (for advanced users who provide full path)
+    2. Normalized match (handles partial names, missing suffixes, etc.)
+    """
+    # Strategy 1: Exact match
+    for material in catalog:
+        if material.name == material_override:
+            return material
+
+    # Strategy 2: Normalized match
+    normalized_target = _normalize_material_name(material_override)
+    for material in catalog:
+        normalized_catalog_name = _normalize_material_name(material.name)
+        if normalized_catalog_name == normalized_target:
+            return material
+
+    return None
+
+
 def build_governance_recipe(
-    config: OrchestraConfig, tick_count: int = 0
+    config: OrchestraConfig, tick_count: int = 0, material_override: str | None = None
 ) -> PromptRecipe:
     """Build the PromptRecipe for governance dispatch."""
     recipe_def = _load_governance_recipe_definition()
@@ -309,8 +382,26 @@ def build_governance_recipe(
     catalog = recipe_def.loaded_definition.material_catalog
     if not catalog:
         raise ValueError("governance.scan recipe requires material_catalog")
-    current = catalog[tick_count % len(catalog)]
-    current_material = current.name
+
+    # Override material if specified, otherwise use tick-based rotation
+    if material_override:
+        # Find the matching material in catalog using flexible matching
+        current = _find_material_in_catalog(catalog, material_override)
+        if not current:
+            # Generate helpful error with available materials
+            available = sorted(set(_normalize_material_name(m.name) for m in catalog))
+            raise ValueError(
+                f"Material '{material_override}' not found in catalog.\n"
+                f"Available materials: {', '.join(available)}\n"
+                f"You can specify materials by short name (e.g., 'roadmap-intake') "
+                f"or full path (e.g., 'supervisor/governance/roadmap-intake.md')"
+            )
+        current_material = current.name
+    else:
+        # Normal tick-based rotation
+        current = catalog[tick_count % len(catalog)]
+        current_material = current.name
+
     supervisor_content_source = current.source
 
     variables: dict[str, PromptVariableSource] = {
@@ -340,10 +431,13 @@ def render_governance_prompt(
     snapshot_context: dict[str, Any],
     prompts_path: Path | None = None,
     tick_count: int = 0,
+    material_override: str | None = None,
 ) -> PromptRenderResult:
     """Render governance plan from snapshot context via PromptAssembler."""
     prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
-    recipe = build_governance_recipe(config, tick_count=tick_count)
+    recipe = build_governance_recipe(
+        config, tick_count=tick_count, material_override=material_override
+    )
     registry = _build_runtime_registry(snapshot_context)
     assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
     return assembler.render(recipe, runtime_context=snapshot_context)
