@@ -122,62 +122,6 @@ def _run_supervisor_scan_dry_run() -> None:
     display_supervisor_dry_run(console, candidates)
 
 
-def _get_available_governance_materials() -> list[str]:
-    """Fetch available governance materials from catalog.
-
-    Returns list of short material names (without path/suffix).
-    """
-    try:
-        from vibe3.roles.governance import load_governance_material_catalog
-
-        catalog = load_governance_material_catalog()
-        materials = []
-        for material in catalog:
-            # Extract short name:
-            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
-            name = material.name
-            if name.startswith("supervisor/governance/"):
-                short_name = name.split("/")[-1]
-                short_name = (
-                    short_name[:-3] if short_name.endswith(".md") else short_name
-                )
-                materials.append(short_name)
-        return sorted(set(materials))
-    except Exception:
-        # Fallback if catalog cannot be loaded
-        return []
-
-
-def _list_governance_materials() -> None:
-    """List available governance materials with descriptions.
-
-    Delegates to service and UI layers for business logic and display.
-    """
-    from rich.console import Console
-
-    from vibe3.roles.governance import load_governance_material_catalog
-    from vibe3.services.scan_service import extract_material_description
-    from vibe3.ui.scan_display import display_material_list
-
-    console = Console()
-
-    # Load catalog
-    try:
-        catalog = load_governance_material_catalog()
-    except Exception as exc:
-        console.print(f"[red]Error loading material catalog: {exc}[/red]")
-        raise typer.Exit(1)
-
-    # Build materials list with descriptions
-    materials = []
-    for material in catalog:
-        description = extract_material_description(material.name)
-        materials.append({"name": material.name, "description": description})
-
-    # Display via UI layer
-    display_material_list(console, materials)
-
-
 @app.command()
 def governance(
     list_materials: Annotated[
@@ -208,6 +152,13 @@ def governance(
     Scans all open issues and triggers governance dispatch for issues
     matching governance rules. Runs once and exits.
     """
+    from rich.console import Console
+
+    from vibe3.services.scan_service import (
+        get_available_governance_materials,
+        list_governance_materials,
+    )
+
     setup_logging(verbose=verbose)
 
     # Check mutual exclusivity first
@@ -217,7 +168,8 @@ def governance(
 
     # Handle --list option (highest priority)
     if list_materials:
-        _list_governance_materials()
+        console = Console()
+        list_governance_materials(console)
         return
 
     if dry_run:
@@ -226,7 +178,7 @@ def governance(
         return
 
     # Get available materials for help text
-    available_materials = _get_available_governance_materials()
+    available_materials = get_available_governance_materials()
 
     if role is None:
         # No role specified - show guidance

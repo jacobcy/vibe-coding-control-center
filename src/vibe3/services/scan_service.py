@@ -74,3 +74,62 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
     except Exception as e:
         logger.error(f"Failed to fetch supervisor candidates: {e}")
         return []
+
+
+def get_available_governance_materials() -> list[str]:
+    """Fetch available governance materials from catalog.
+
+    Returns list of short material names (without path/suffix).
+
+    Returns:
+        List of material short names (e.g., ["assignee-pool", "roadmap-intake"])
+    """
+    try:
+        from vibe3.roles.governance import load_governance_material_catalog
+
+        catalog = load_governance_material_catalog()
+        materials = []
+        for material in catalog:
+            # Extract short name:
+            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
+            name = material.name
+            if name.startswith("supervisor/governance/"):
+                short_name = name.split("/")[-1]
+                short_name = (
+                    short_name[:-3] if short_name.endswith(".md") else short_name
+                )
+                materials.append(short_name)
+        return sorted(set(materials))
+    except Exception:
+        # Fallback if catalog cannot be loaded
+        return []
+
+
+def list_governance_materials(console: Any) -> None:
+    """List available governance materials with descriptions.
+
+    Loads catalog, extracts descriptions, and displays via UI layer.
+
+    Args:
+        console: Rich Console instance for display
+    """
+    import typer
+
+    from vibe3.roles.governance import load_governance_material_catalog
+    from vibe3.ui.scan_display import display_material_list
+
+    # Load catalog
+    try:
+        catalog = load_governance_material_catalog()
+    except Exception as exc:
+        console.print(f"[red]Error loading material catalog: {exc}[/red]")
+        raise typer.Exit(1)
+
+    # Build materials list with descriptions
+    materials = []
+    for material in catalog:
+        description = extract_material_description(material.name)
+        materials.append({"name": material.name, "description": description})
+
+    # Display via UI layer
+    display_material_list(console, materials)
