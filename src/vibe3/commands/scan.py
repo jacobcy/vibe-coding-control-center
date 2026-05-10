@@ -125,6 +125,32 @@ async def _run_supervisor_scan_async() -> None:
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
+def _get_available_governance_materials() -> list[str]:
+    """Fetch available governance materials from catalog.
+
+    Returns list of short material names (without path/suffix).
+    """
+    try:
+        from vibe3.roles.governance import load_governance_material_catalog
+
+        catalog = load_governance_material_catalog()
+        materials = []
+        for material in catalog:
+            # Extract short name:
+            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
+            name = material.name
+            if name.startswith("supervisor/governance/"):
+                short_name = name.split("/")[-1]
+                short_name = (
+                    short_name[:-3] if short_name.endswith(".md") else short_name
+                )
+                materials.append(short_name)
+        return sorted(set(materials))
+    except Exception:
+        # Fallback if catalog cannot be loaded
+        return []
+
+
 @app.command()
 def governance(
     role: Annotated[
@@ -132,8 +158,7 @@ def governance(
         typer.Option(
             "--role",
             "-r",
-            help="Override governance role: assignee-pool, roadmap-intake, "
-            "or cron-supervisor",
+            help="Override governance role (run without --role to see available)",
         ),
     ] = None,
     dry_run: Annotated[
@@ -155,6 +180,19 @@ def governance(
     if dry_run:
         typer.echo("DRY RUN: Would run governance scan")
         return
+
+    # Get available materials for help text
+    available_materials = _get_available_governance_materials()
+
+    if role is None:
+        # No role specified - show guidance
+        typer.echo(
+            "No --role specified. Using automatic material rotation (tick-based)."
+        )
+        if available_materials:
+            typer.echo(f"Available roles: {', '.join(available_materials)}")
+            typer.echo("Use --role <role-name> to specify a particular role.")
+        typer.echo("")  # Blank line for readability
 
     _run_governance_scan(material_override=role)
     typer.echo("Governance scan completed")

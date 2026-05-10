@@ -142,7 +142,12 @@ def _load_governance_recipe_definition() -> PromptRecipeDefinition:
     return PromptManifest.load_default().recipe("governance.scan")
 
 
-def _load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
+def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
+    """Load the governance material catalog from prompt manifest.
+
+    Returns:
+        Tuple of PromptMaterialSpec objects for governance materials.
+    """
     recipe_def = _load_governance_recipe_definition()
     if not recipe_def.loaded_definition:
         raise ValueError("governance.scan recipe not properly loaded")
@@ -150,6 +155,10 @@ def _load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
     if not catalog:
         raise ValueError("governance.scan recipe requires material_catalog")
     return catalog
+
+
+# Backward compatibility alias
+_load_governance_material_catalog = load_governance_material_catalog
 
 
 def _is_doc_candidate(title: str, body: str, labels: list[str]) -> bool:
@@ -299,6 +308,48 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
     return registry
 
 
+def _normalize_material_name(material_name: str) -> str:
+    """Normalize material name to canonical form for comparison.
+
+    Converts various input formats to canonical form:
+    - "roadmap-intake" → "roadmap-intake"
+    - "roadmap-intake.md" → "roadmap-intake"
+    - "supervisor/governance/roadmap-intake" → "roadmap-intake"
+    - "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
+    """
+    path = Path(material_name)
+    # Get the filename without directory
+    stem = path.stem if path.suffix == ".md" else path.name
+    # If stem still has .md suffix, remove it
+    if stem.endswith(".md"):
+        stem = stem[:-3]
+    return stem
+
+
+def _find_material_in_catalog(
+    catalog: tuple[PromptMaterialSpec, ...], material_override: str
+) -> PromptMaterialSpec | None:
+    """Find material in catalog using flexible matching.
+
+    Attempts multiple matching strategies:
+    1. Exact name match (for advanced users who provide full path)
+    2. Normalized match (handles partial names, missing suffixes, etc.)
+    """
+    # Strategy 1: Exact match
+    for material in catalog:
+        if material.name == material_override:
+            return material
+
+    # Strategy 2: Normalized match
+    normalized_target = _normalize_material_name(material_override)
+    for material in catalog:
+        normalized_catalog_name = _normalize_material_name(material.name)
+        if normalized_catalog_name == normalized_target:
+            return material
+
+    return None
+
+
 def build_governance_recipe(
     config: OrchestraConfig, tick_count: int = 0, material_override: str | None = None
 ) -> PromptRecipe:
@@ -312,26 +363,17 @@ def build_governance_recipe(
 
     # Override material if specified, otherwise use tick-based rotation
     if material_override:
-        # Find the matching material in catalog
-        matching_materials = [
-            m for m in catalog if Path(m.name).name == material_override
-        ]
-        if not matching_materials:
-            # Try with .md suffix
-            matching_materials = [
-                m
-                for m in catalog
-                if m.name == f"supervisor/governance/{material_override}"
-            ]
-        if not matching_materials:
-            # Try exact path match
-            matching_materials = [m for m in catalog if m.name == material_override]
-        if not matching_materials:
+        # Find the matching material in catalog using flexible matching
+        current = _find_material_in_catalog(catalog, material_override)
+        if not current:
+            # Generate helpful error with available materials
+            available = sorted(set(_normalize_material_name(m.name) for m in catalog))
             raise ValueError(
-                f"Material '{material_override}' not found in catalog. "
-                f"Available: {[m.name for m in catalog]}"
+                f"Material '{material_override}' not found in catalog.\n"
+                f"Available materials: {', '.join(available)}\n"
+                f"You can specify materials by short name (e.g., 'roadmap-intake') "
+                f"or full path (e.g., 'supervisor/governance/roadmap-intake.md')"
             )
-        current = matching_materials[0]
         current_material = current.name
     else:
         # Normal tick-based rotation
