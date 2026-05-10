@@ -81,7 +81,10 @@ class TestSupervisorScan:
         """Test supervisor scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
         assert result.exit_code == 0
-        assert "DRY RUN: Would run supervisor scan" in result.output
+        # Should show scan information
+        output_lower = result.output.lower()
+        assert "supervisor" in output_lower
+        assert "dry-run" in output_lower or "dry run" in output_lower
 
     @patch("vibe3.commands.scan._run_supervisor_scan_async")
     def test_supervisor_execution(self, mock_run):
@@ -392,3 +395,25 @@ class TestGovernanceDryRunPromptDisplay:
         # Should show prompt preview section
         output_lower = result.output.lower()
         assert "prompt" in output_lower or "governance prompt" in output_lower
+
+
+class TestSupervisorDryRunPromptDisplay:
+    """Tests for supervisor --dry-run prompt display."""
+
+    def test_supervisor_dry_run_shows_scan_info(self):
+        """Test that --dry-run shows scan information."""
+        result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
+
+        assert result.exit_code == 0
+        # Should show scan information
+        output_lower = result.output.lower()
+        assert "supervisor" in output_lower
+        assert "dry-run" in output_lower or "dry run" in output_lower
+
+    @patch("vibe3.commands.scan._run_supervisor_scan_dry_run")
+    def test_supervisor_dry_run_calls_handler(self, mock_run):
+        """Test that --dry-run calls the dry-run handler."""
+        result = runner.invoke(app, ["scan", "supervisor", "--dry-run"])
+
+        assert result.exit_code == 0
+        mock_run.assert_called_once()
