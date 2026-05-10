@@ -55,6 +55,7 @@ def run_governance_sync(
         snapshot,
         config=config,
         tick_count=tick_count,
+        material_override=material_override,
     )
     render_result = render_governance_prompt(
         config,
