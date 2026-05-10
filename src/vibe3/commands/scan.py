@@ -1,301 +1,165 @@
-"""Scan command: standalone governance/supervisor scans without HeartbeatServer."""
+"""Scan command: manual tick 0 entry point for governance/supervisor scans."""
 
-import asyncio
 from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.models.tick import TickPhase, TickRequest, TickSource
 from vibe3.observability import setup_logging
+from vibe3.services.tick_dispatcher import TickDispatcher
+from vibe3.services.tick_planner import TickPlanner
 
 app = typer.Typer(
-    help="Run governance and supervisor scans without starting the server",
-    no_args_is_help=True,
+    help="Run governance and supervisor scans (manual tick 0)",
+    no_args_is_help=False,  # Changed: allow no-args to run both phases
 )
 
 
-def _run_governance_scan(material_override: str | None = None) -> None:
-    """Execute governance scan once.
-
-    Creates minimal services and publishes GovernanceScanStarted event.
-    Event handlers handle the actual execution via CLI self-invocation.
-
-    Args:
-        material_override: Optional governance role to override material rotation
-    """
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-
-    # Register event handlers before publishing events
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services (following _build_server_with_launch_cwd pattern)
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade with minimal services for governance scan
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
-    )
-
-    # Trigger governance scan (force=True to skip interval gating for manual trigger)
-    # on_heartbeat_tick publishes GovernanceScanStarted event
-    # which triggers handle_governance_scan_started
-    facade.on_heartbeat_tick(force=True, material_override=material_override)
-
-    logger.bind(domain="orchestra").info("Governance scan completed")
-
-
-def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
-    """Execute governance scan in dry-run mode, displaying prompt without execution.
-
-    Args:
-        material_override: Optional governance role to override material rotation
-    """
-    from rich.console import Console
-
-    from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.roles.governance import build_governance_recipe
-    from vibe3.services.scan_service import render_governance_prompt_preview
-    from vibe3.ui.scan_display import display_governance_dry_run
-
-    console = Console()
-    config = load_orchestra_config()
-    tick_count = 0  # Dry-run uses tick 0 for consistency
-
-    try:
-        # Build recipe to get material name
-        recipe = build_governance_recipe(config, tick_count, material_override)
-        current_material = recipe.variables.get("supervisor_name")
-        if current_material is None:
-            console.print("[red]Error: supervisor_name variable not found[/red]")
-            raise typer.Exit(1)
-
-        # Extract material name (guaranteed to be str at this point)
-        if hasattr(current_material, "value") and current_material.value:
-            material_name = str(current_material.value)
-        else:
-            material_name = str(current_material)
-
-        # Render prompt
-        prompt_content = render_governance_prompt_preview(
-            config, tick_count, material_override
-        )
-
-        # Display via UI layer
-        display_governance_dry_run(console, material_name, prompt_content)
-
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
-
-
-async def _run_supervisor_scan_async() -> None:
-    """Execute supervisor scan once (async implementation)."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-
-    # Register event handlers before publishing events
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
-    )
-
-    # Trigger supervisor scan
-    # on_supervisor_scan publishes SupervisorIssueIdentified events
-    total_scanned, matched_count = await facade.on_supervisor_scan()
-
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
-
-    logger.bind(domain="orchestra").info("Supervisor scan completed")
-
-
-def _run_supervisor_scan_dry_run() -> None:
-    """Execute supervisor scan in dry-run mode, displaying scan plan.
-
-    Shows scan process without actual execution.
-    """
-    from rich.console import Console
-
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.services.scan_service import fetch_supervisor_candidates
-    from vibe3.ui.scan_display import display_supervisor_dry_run
-
-    console = Console()
-    config = load_orchestra_config()
-
-    # Fetch candidates via service layer
-    try:
-        github = GitHubClient()
-        candidates = fetch_supervisor_candidates(github, config.repo)
-    except Exception as e:
-        # On error, display empty list
-        console.print(f"[yellow]Could not query GitHub: {e}[/yellow]")
-        candidates = []
-
-    # Display via UI layer
-    display_supervisor_dry_run(console, candidates)
-
-
-def _get_available_governance_materials() -> list[str]:
-    """Fetch available governance materials from catalog.
-
-    Returns list of short material names (without path/suffix).
-    """
-    try:
-        from vibe3.roles.governance import load_governance_material_catalog
-
-        catalog = load_governance_material_catalog()
-        materials = []
-        for material in catalog:
-            # Extract short name:
-            # "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
-            name = material.name
-            if name.startswith("supervisor/governance/"):
-                short_name = name.split("/")[-1]
-                short_name = (
-                    short_name[:-3] if short_name.endswith(".md") else short_name
-                )
-                materials.append(short_name)
-        return sorted(set(materials))
-    except Exception:
-        # Fallback if catalog cannot be loaded
-        return []
-
-
-def _extract_material_description(material_name: str) -> str:
-    """Extract description from material file (DEPRECATED - use scan_service).
-
-    This function delegates to scan_service.extract_material_description.
-
-    Args:
-        material_name: Material file path or name
-
-    Returns:
-        Material description or filename as fallback
-    """
-    from pathlib import Path
-
-    from vibe3.services.scan_service import extract_material_description
-
-    # Normalize to full path if needed (only for relative governance paths)
-    if (
-        not material_name.startswith("supervisor/governance/")
-        and not Path(material_name).is_absolute()
-    ):
-        material_name = f"supervisor/governance/{material_name}"
-
-    # Ensure .md suffix
-    if not material_name.endswith(".md"):
-        material_name = f"{material_name}.md"
-
-    return extract_material_description(material_name)
-
-
-def _list_governance_materials() -> None:
-    """List available governance materials with descriptions.
-
-    Delegates to service and UI layers for business logic and display.
-    """
-    from rich.console import Console
-
-    from vibe3.roles.governance import load_governance_material_catalog
-    from vibe3.services.scan_service import extract_material_description
-    from vibe3.ui.scan_display import display_material_list
-
-    console = Console()
-
-    # Load catalog
-    try:
-        catalog = load_governance_material_catalog()
-    except Exception as exc:
-        console.print(f"[red]Error loading material catalog: {exc}[/red]")
-        raise typer.Exit(1)
-
-    # Build materials list with descriptions
-    materials = []
-    for material in catalog:
-        description = extract_material_description(material.name)
-        materials.append({"name": material.name, "description": description})
-
-    # Display via UI layer
-    display_material_list(console, materials)
-
-
-@app.command()
-def governance(
-    list_materials: Annotated[
+@app.callback(invoke_without_command=True)
+def scan(
+    ctx: typer.Context,
+    governance: Annotated[
         bool,
         typer.Option(
-            "--list", help="List available governance materials (exclusive with --role)"
+            "--governance",
+            "-g",
+            help="Run governance phase (auto-select material "
+            "unless --governance-material specified)",
         ),
     ] = False,
+    governance_material: Annotated[
+        str | None,
+        typer.Option(
+            "--governance-material",
+            "-gm",
+            help="Governance material name (e.g., roadmap-intake). "
+            "Requires --governance.",
+        ),
+    ] = None,
+    supervisor: Annotated[
+        bool,
+        typer.Option(
+            "--supervisor",
+            "-s",
+            help="Run supervisor phase (scan candidates "
+            "unless --supervisor-issue specified)",
+        ),
+    ] = False,
+    supervisor_issue: Annotated[
+        int | None,
+        typer.Option(
+            "--supervisor-issue",
+            "-si",
+            help="Supervisor issue number. Requires --supervisor.",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview execution plan without running"),
+    ] = False,
+    verbose: Annotated[
+        int,
+        typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
+    ] = 0,
+) -> None:
+    """Run governance and/or supervisor scans (manual tick 0).
+
+    This is the unified scan entry point using TickPlanner → TickDispatcher.
+
+    Default behavior (no flags): execute both governance and supervisor phases.
+
+    Examples:
+        vibe3 scan  # Full manual tick 0
+        vibe3 scan --governance  # Governance only, auto-select material
+        vibe3 scan --governance --governance-material roadmap-intake
+        vibe3 scan --supervisor  # Supervisor scan candidates
+        vibe3 scan --supervisor --supervisor-issue 743
+        vibe3 scan -g -gm roadmap-intake -s -si 743 --dry-run
+    """
+    setup_logging(verbose=verbose)
+
+    # If user invokes a subcommand, let Typer handle it
+    if ctx.resilient_parsing:
+        return
+
+    # Validate mutual dependencies
+    if governance_material and not governance:
+        typer.echo(
+            "Error: --governance-material requires --governance",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if supervisor_issue and not supervisor:
+        typer.echo(
+            "Error: --supervisor-issue requires --supervisor",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Determine which phases to run
+    phases: list[TickPhase] = []
+
+    # If no main flags specified, run both phases (default behavior)
+    if not governance and not supervisor:
+        phases = [TickPhase.GOVERNANCE, TickPhase.SUPERVISOR]
+        logger.bind(domain="scan").info(
+            "No flags specified, running both phases (default)"
+        )
+    else:
+        # Add phases based on flags
+        if governance:
+            phases.append(TickPhase.GOVERNANCE)
+
+        if supervisor:
+            phases.append(TickPhase.SUPERVISOR)
+
+    # Build TickRequest
+    governance_material_value: str | None = None
+    if governance:
+        governance_material_value = (
+            governance_material  # None = auto-select, explicit = use value
+        )
+
+    supervisor_issue_numbers: list[int] = []
+    if supervisor:
+        if supervisor_issue:
+            supervisor_issue_numbers = [supervisor_issue]
+        # Empty list means "scan candidates" (dispatcher will handle)
+
+    request = TickRequest(
+        source=TickSource.MANUAL_SCAN,
+        tick_id=0,
+        phases=phases,
+        governance_material=governance_material_value,
+        supervisor_issue_numbers=supervisor_issue_numbers,
+        dry_run=dry_run,
+    )
+
+    # Load config and create planner
+    config = load_orchestra_config()
+    planner = TickPlanner(config)
+
+    # Create execution plan
+    plan = planner.plan(request, tick_count=0)
+
+    # Dispatch execution
+    dispatcher = TickDispatcher(config)
+    dispatcher.dispatch(plan)
+
+
+# Keep old subcommands for backward compatibility during transition
+# Mark as deprecated in help text
+@app.command(deprecated=True)
+def governance(
     role: Annotated[
         str | None,
         typer.Option(
             "--role",
             "-r",
-            help="Override governance role (run without --role to see available)",
+            help="Override governance role",
         ),
     ] = None,
     dry_run: Annotated[
@@ -307,156 +171,98 @@ def governance(
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
     ] = 0,
 ) -> None:
-    """Run governance scan once.
+    """[DEPRECATED] Use 'vibe3 scan --governance' instead."""
+    typer.echo(
+        "Warning: 'scan governance' is deprecated. Use 'scan --governance' instead.",
+        err=True,
+    )
 
-    Scans all open issues and triggers governance dispatch for issues
-    matching governance rules. Runs once and exits.
-    """
-    setup_logging(verbose=verbose)
+    # Map old parameters to new unified command
+    phases = [TickPhase.GOVERNANCE]
+    request = TickRequest(
+        source=TickSource.MANUAL_SCAN,
+        tick_id=0,
+        phases=phases,
+        governance_material=role,
+        supervisor_issue_numbers=[],
+        dry_run=dry_run,
+    )
 
-    # Check mutual exclusivity first
-    if list_materials and role is not None:
-        typer.echo("Error: --list and --role cannot be used together", err=True)
-        raise typer.Exit(1)
+    config = load_orchestra_config()
+    planner = TickPlanner(config)
+    plan = planner.plan(request, tick_count=0)
 
-    # Handle --list option (highest priority)
-    if list_materials:
-        _list_governance_materials()
-        return
-
-    if dry_run:
-        # In dry-run mode, build and display the prompt without executing
-        _run_governance_scan_dry_run(material_override=role)
-        return
-
-    # Get available materials for help text
-    available_materials = _get_available_governance_materials()
-
-    if role is None:
-        # No role specified - show guidance
-        typer.echo(
-            "No --role specified. Using automatic material rotation (tick-based)."
-        )
-        if available_materials:
-            typer.echo(f"Available roles: {', '.join(available_materials)}")
-            typer.echo("Use --role <role-name> to specify a particular role.")
-        typer.echo("")  # Blank line for readability
-
-    _run_governance_scan(material_override=role)
-    typer.echo("Governance scan completed")
+    dispatcher = TickDispatcher(config)
+    dispatcher.dispatch(plan)
 
 
-@app.command()
+@app.command(deprecated=True)
 def supervisor(
     dry_run: Annotated[
         bool,
-        typer.Option(
-            "--dry-run", help="Show scan plan and candidates without executing"
-        ),
+        typer.Option("--dry-run", help="Show scan plan without executing"),
     ] = False,
     verbose: Annotated[
         int,
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
     ] = 0,
 ) -> None:
-    """Run supervisor scan once.
-
-    Scans for issues with supervisor + state/handoff labels and triggers
-    supervisor handoff dispatch. Runs once and exits.
-    """
-    setup_logging(verbose=verbose)
-
-    if dry_run:
-        _run_supervisor_scan_dry_run()
-        return
-
-    asyncio.run(_run_supervisor_scan_async())
-    typer.echo("Supervisor scan completed")
-
-
-async def _run_combined_scan_async() -> None:
-    """Execute both governance and supervisor scans in sequence."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.domain.handlers import register_event_handlers
-    from vibe3.domain.orchestration_facade import OrchestrationFacade
-    from vibe3.execution.capacity_service import CapacityService
-    from vibe3.orchestra.failed_gate import FailedGate
-
-    # Register event handlers before publishing events
-    register_event_handlers()
-
-    # Load config
-    config = load_orchestra_config()
-
-    # Initialize services
-    shared_store = SQLiteClient()
-    shared_backend = CodeagentBackend()
-    failed_gate = FailedGate(store=shared_store)
-    shared_capacity = CapacityService(config, shared_store, shared_backend)
-
-    # Check FailedGate before dispatching
-    gate_result = failed_gate.check()
-    if gate_result.blocked:
-        logger.bind(domain="orchestra").error(
-            f"Scan blocked by failed gate: {gate_result.reason}"
-        )
-        typer.echo(f"Scan blocked by failed gate: {gate_result.reason}")
-        return
-
-    # Create facade
-    facade = OrchestrationFacade(
-        tick_count=0,
-        config=config,
-        capacity=shared_capacity,
-        failed_gate=failed_gate,
+    """[DEPRECATED] Use 'vibe3 scan --supervisor' instead."""
+    typer.echo(
+        "Warning: 'scan supervisor' is deprecated. Use 'scan --supervisor' instead.",
+        err=True,
     )
 
-    # Run governance scan first (force=True to skip interval gating for manual trigger)
-    facade.on_heartbeat_tick(force=True)
-    logger.bind(domain="orchestra").info("Governance scan completed")
+    # Map to new unified command
+    phases = [TickPhase.SUPERVISOR]
+    request = TickRequest(
+        source=TickSource.MANUAL_SCAN,
+        tick_id=0,
+        phases=phases,
+        governance_material=None,
+        supervisor_issue_numbers=[],  # Empty = scan candidates
+        dry_run=dry_run,
+    )
 
-    # Then run supervisor scan
-    total_scanned, matched_count = await facade.on_supervisor_scan()
+    config = load_orchestra_config()
+    planner = TickPlanner(config)
+    plan = planner.plan(request, tick_count=0)
 
-    # Display scan results
-    if matched_count == 0:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found 0 issues with supervisor + state/handoff labels"
-        )
-    else:
-        typer.echo(
-            f"Scanned {total_scanned} open issues, "
-            f"found {matched_count} issue(s) requiring supervisor attention"
-        )
-
-    logger.bind(domain="orchestra").info("Supervisor scan completed")
+    dispatcher = TickDispatcher(config)
+    dispatcher.dispatch(plan)
 
 
-@app.command()
+@app.command(deprecated=True)
 def all(
     dry_run: Annotated[
         bool,
-        typer.Option(
-            "--dry-run", help="Show governance and supervisor plans without executing"
-        ),
+        typer.Option("--dry-run", help="Show plans without executing"),
     ] = False,
     verbose: Annotated[
         int,
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
     ] = 0,
 ) -> None:
-    """Run both governance and supervisor scans once.
+    """[DEPRECATED] Use 'vibe3 scan' (no flags) instead."""
+    typer.echo(
+        "Warning: 'scan all' is deprecated. Use 'scan' (no flags) instead.",
+        err=True,
+    )
 
-    Equivalent to running 'scan governance' and 'scan supervisor' in sequence.
-    """
-    setup_logging(verbose=verbose)
+    # Map to new unified command
+    phases = [TickPhase.GOVERNANCE, TickPhase.SUPERVISOR]
+    request = TickRequest(
+        source=TickSource.MANUAL_SCAN,
+        tick_id=0,
+        phases=phases,
+        governance_material=None,  # Auto-select
+        supervisor_issue_numbers=[],  # Scan candidates
+        dry_run=dry_run,
+    )
 
-    if dry_run:
-        _run_governance_scan_dry_run()
-        _run_supervisor_scan_dry_run()
-        return
+    config = load_orchestra_config()
+    planner = TickPlanner(config)
+    plan = planner.plan(request, tick_count=0)
 
-    asyncio.run(_run_combined_scan_async())
-    typer.echo("Combined scan completed")
+    dispatcher = TickDispatcher(config)
+    dispatcher.dispatch(plan)
