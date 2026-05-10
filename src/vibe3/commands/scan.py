@@ -46,47 +46,25 @@ def _run_governance_scan(material_override: str | None = None) -> None:
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
-    """Execute governance scan in dry-run mode, displaying prompt without execution.
+    """Execute governance scan in dry-run mode via run_governance_sync.
+
+    Uses real-time snapshot (not synthetic context) to preview governance prompt.
+    This fixes Issue #803 Problem 1: dry-run must match production execution path.
 
     Args:
         material_override: Optional governance role to override material rotation
     """
-    from rich.console import Console
+    from vibe3.execution.governance_sync_runner import run_governance_sync
 
-    from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.roles.governance import build_governance_recipe
-    from vibe3.services.scan_service import render_governance_prompt_preview
-    from vibe3.ui.scan_display import display_governance_dry_run
-
-    console = Console()
-    config = load_orchestra_config()
-    tick_count = 0  # Dry-run uses tick 0 for consistency
-
-    try:
-        # Build recipe to get material name
-        recipe = build_governance_recipe(config, tick_count, material_override)
-        current_material = recipe.variables.get("supervisor_name")
-        if current_material is None:
-            console.print("[red]Error: supervisor_name variable not found[/red]")
-            raise typer.Exit(1)
-
-        # Extract material name (guaranteed to be str at this point)
-        if hasattr(current_material, "value") and current_material.value:
-            material_name = str(current_material.value)
-        else:
-            material_name = str(current_material)
-
-        # Render prompt
-        prompt_content = render_governance_prompt_preview(
-            config, tick_count, material_override
-        )
-
-        # Display via UI layer
-        display_governance_dry_run(console, material_name, prompt_content)
-
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+    # Call internal governance runner with dry_run=True
+    # This uses real snapshot instead of synthetic dry-run context
+    run_governance_sync(
+        tick_count=0,  # Manual scan always uses tick=0
+        material_override=material_override,
+        dry_run=True,
+        show_prompt=True,
+        session_id=None,
+    )
 
 
 def _run_supervisor_scan() -> tuple[int, int]:

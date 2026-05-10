@@ -61,9 +61,10 @@ class TestGovernanceScan:
         """Test governance scan with --dry-run flag."""
         result = runner.invoke(app, ["scan", "governance", "--dry-run"])
         assert result.exit_code == 0
-        # Should now show material information and prompt preview
+        # New format: "-> Governance dry-run: tick=0"
+        # Uses real-time snapshot via run_governance_sync(dry_run=True)
         output_lower = result.output.lower()
-        assert "material:" in output_lower or "governance scan dry-run" in output_lower
+        assert "governance dry-run" in output_lower or "--- prompt ---" in output_lower
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
@@ -142,7 +143,8 @@ class TestCombinedScan:
         assert result.exit_code == 0
         # Should show both governance and supervisor dry-run output
         output_lower = result.output.lower()
-        assert "governance scan dry-run" in output_lower
+        # New format: "Governance dry-run" and "Supervisor scan dry-run"
+        assert "governance dry-run" in output_lower
         assert "supervisor scan dry-run" in output_lower
 
     @patch("vibe3.commands.scan._run_combined_scan_async")
