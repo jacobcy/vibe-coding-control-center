@@ -144,22 +144,8 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
     # Display prompt preview
     console.print("\n[bold]Prompt Preview:[/bold]")
 
-    # For long prompts, display in a panel with scrolling
-    if len(prompt_content) > 1000:
-        # Truncate for display, show first and last parts
-        lines = prompt_content.split("\n")
-        if len(lines) > 30:
-            preview = (
-                "\n".join(lines[:15])
-                + "\n\n... (truncated) ...\n\n"
-                + "\n".join(lines[-15:])
-            )
-        else:
-            preview = prompt_content
-    else:
-        preview = prompt_content
-
-    console.print(Panel(preview, title="Governance Prompt", border_style="blue"))
+    # Display the full prompt in a panel
+    console.print(Panel(prompt_content, title="Governance Prompt", border_style="blue"))
 
     # Display summary
     console.print(f"\n[dim]Prompt length: {len(prompt_content)} characters[/dim]")
