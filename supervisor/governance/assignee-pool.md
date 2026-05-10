@@ -56,7 +56,7 @@ Allowed:
      - 当前 issue 已在 `state/blocked`
      - `blocked_reason` 明确为 `state unchanged`
      - `flow show` 能确认 authoritative ref 已存在
-     - 仅允许把 state 恢复到 `state/handoff`
+     - 使用 `vibe3 task resume --label auto` 自动恢复到正确状态
      - 恢复后必须写 comment 说明是 governance 自动补偿
   2. **遗漏 state/ready 补齐**：
      - 当前 issue 有 manager assignee
@@ -188,8 +188,8 @@ issue 是否可纳入？
   - 调用 `gh issue view 123 --json body` → blocked_reason = "state unchanged"
   - 调用 `vibe3 flow show --branch task/issue-123` → plan_ref = "docs/plans/xxx.md"
   - authoritative ref 存在，说明 agent 已完成工作但漏改 state
-  - 执行允许范围内的最小 state 补偿：`state/blocked` → `state/handoff`
-  - 写 `[governance auto-recover]` comment 说明恢复依据
+  - 调用 `vibe3 task resume 123 --label auto -y`
+  - 写 `[governance auto-recover]` comment 说明已恢复
   - **结论**：自动恢复成功
 
 **不可自动恢复的 blocked issue**
@@ -209,7 +209,7 @@ issue 是否可纳入？
 - start / wait / defer recommendations with short reasons
 - `[governance suggest]` 格式的治理建议评论
 - 极窄的自动补偿动作：
-  - `state unchanged` 恢复（`state/blocked` → `state/handoff`）
+  - `state unchanged` 恢复（`vibe3 task resume --label auto`）
   - 遗漏 `state/ready` 补齐（有 assignee 但无 state label → `state/ready`）
 
 ## Hard Boundary
@@ -251,7 +251,7 @@ Steps:
         - 调用 `uv run python src/vibe3/cli.py flow show --branch <branch>` 获取 flow state
         - 检查 `plan_ref`、`report_ref` 或 `audit_ref` 是否存在
         - 如果存在任意一个 authoritative ref：
-          - 执行允许范围内的最小 state 补偿：`state/blocked` → `state/handoff`
+          - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
           - 写 `[governance auto-recover]` comment 说明恢复原因和依据
         - 如果没有任何 authoritative ref：
           - 写 `[governance suggest]` comment 建议人类处理
@@ -290,7 +290,7 @@ Decision sketch:
 	  3. 如果存在任意一个，执行自动恢复；否则写建议评论
 
 	  **恢复动作**：
-	  - 执行允许范围内的最小 state 补偿：`state/blocked` → `state/handoff`
+	  - 调用 `uv run python src/vibe3/cli.py task resume <number> --label auto -y`
 	  - 写 `[governance auto-recover]` comment 说明恢复原因和依据
 	  - **注意**：只做最小 state 纠偏，不推进后续阶段
 
@@ -398,7 +398,7 @@ Exit:
 [governance auto-recover] 已自动恢复 state
 
 恢复原因：检测到 blocked 原因是 state unchanged，但 authoritative ref 已存在，判定为 agent 漏改 state。
-恢复动作：`state/blocked` → `state/handoff`
+恢复命令：vibe3 task resume <number> --label auto -y
 依据：<plan_ref 或 report_ref 或 audit_ref>
 说明：本动作只做最小一致性修正，不代表后续阶段已完成。
 ```
