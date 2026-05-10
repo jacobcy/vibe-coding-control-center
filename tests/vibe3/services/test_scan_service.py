@@ -70,6 +70,23 @@ class TestFetchSupervisorCandidates:
         candidates = fetch_supervisor_candidates(mock_github, "owner/repo")
         assert candidates == []
 
+    def test_queries_100_issues_not_50(self):
+        """Test that fetch_supervisor_candidates queries 100 issues (Issue #803).
+
+        Previously queried only 50 issues, causing dry-run to miss candidates.
+        """
+        from unittest.mock import MagicMock
+
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []
+
+        fetch_supervisor_candidates(mock_github, "owner/repo")
+
+        # Verify limit parameter is 100 (not 50)
+        mock_github.list_issues.assert_called_once()
+        call_args = mock_github.list_issues.call_args
+        assert call_args.kwargs.get("limit") == 100
+
 
 class TestRenderGovernancePromptPreview:
     """Tests for governance prompt rendering."""

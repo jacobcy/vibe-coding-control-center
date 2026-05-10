@@ -54,7 +54,7 @@ def fetch_supervisor_candidates(github_client: Any, repo: str | None) -> list[di
     from vibe3.utils.label_utils import normalize_labels
 
     try:
-        raw_issues = github_client.list_issues(limit=50, state="open", repo=repo)
+        raw_issues = github_client.list_issues(limit=100, state="open", repo=repo)
 
         # Filter for supervisor + state/handoff labels
         matching = []
