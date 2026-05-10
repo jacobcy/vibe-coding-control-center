@@ -171,7 +171,7 @@ class TestScanIntegration:
 
             # Make on_supervisor_scan an async mock
             async def async_mock():
-                pass
+                return (10, 2)
 
             mock_facade_instance.on_supervisor_scan = async_mock
             mock_facade.return_value = mock_facade_instance
