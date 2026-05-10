@@ -68,6 +68,105 @@ def _run_governance_scan(material_override: str | None = None) -> None:
     logger.bind(domain="orchestra").info("Governance scan completed")
 
 
+def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
+    """Execute governance scan in dry-run mode, displaying prompt without execution.
+
+    Args:
+        material_override: Optional governance role to override material rotation
+    """
+    from rich.console import Console
+    from rich.panel import Panel
+
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.roles.governance import (
+        build_governance_recipe,
+        render_governance_prompt,
+    )
+
+    console = Console()
+
+    # Load config
+    config = load_orchestra_config()
+
+    # Determine material (use override or tick-based rotation)
+    tick_count = 0  # In dry-run, always use tick 0 for consistency
+
+    try:
+        recipe = build_governance_recipe(config, tick_count, material_override)
+        current_material = recipe.variables.get("supervisor_name")
+        if current_material is None:
+            console.print(
+                "[red]Error: supervisor_name variable not found in recipe[/red]"
+            )
+            raise typer.Exit(1)
+        if hasattr(current_material, "value"):
+            material_name = current_material.value
+        else:
+            material_name = str(current_material)
+    except ValueError as e:
+        # Material not found
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    # Display material information
+    console.print("\n[bold]Governance Scan Dry-Run[/bold]")
+    console.print(f"[cyan]Material:[/cyan] {material_name}")
+
+    # Build minimal snapshot context for prompt rendering
+    # In dry-run, we use minimal/empty context since we're not accessing live data
+    from vibe3.roles.governance import _build_issue_context
+
+    snapshot_context = _build_issue_context(
+        active_entries=(),
+        server_running=False,
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+        circuit_breaker_state="closed",
+        circuit_breaker_failures=0,
+        issue_scope_name="dry-run mode",
+        scope_note="Dry-run mode: using minimal context for prompt preview",
+    )
+
+    # Render the prompt
+    try:
+        render_result = render_governance_prompt(
+            config,
+            snapshot_context,
+            tick_count=tick_count,
+            material_override=material_override,
+        )
+        prompt_content = render_result.rendered_text
+    except Exception as e:
+        console.print(f"[red]Error rendering prompt: {e}[/red]")
+        raise typer.Exit(1)
+
+    # Display prompt preview
+    console.print("\n[bold]Prompt Preview:[/bold]")
+
+    # For long prompts, display in a panel with scrolling
+    if len(prompt_content) > 1000:
+        # Truncate for display, show first and last parts
+        lines = prompt_content.split("\n")
+        if len(lines) > 30:
+            preview = (
+                "\n".join(lines[:15])
+                + "\n\n... (truncated) ...\n\n"
+                + "\n".join(lines[-15:])
+            )
+        else:
+            preview = prompt_content
+    else:
+        preview = prompt_content
+
+    console.print(Panel(preview, title="Governance Prompt", border_style="blue"))
+
+    # Display summary
+    console.print(f"\n[dim]Prompt length: {len(prompt_content)} characters[/dim]")
+    console.print(f"[dim]Material: {material_name}[/dim]")
+    console.print("[dim]Mode: dry-run (no execution)[/dim]\n")
+
+
 async def _run_supervisor_scan_async() -> None:
     """Execute supervisor scan once (async implementation)."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -286,7 +385,8 @@ def governance(
         return
 
     if dry_run:
-        typer.echo("DRY RUN: Would run governance scan")
+        # In dry-run mode, build and display the prompt without executing
+        _run_governance_scan_dry_run(material_override=role)
         return
 
     # Get available materials for help text
