@@ -105,7 +105,19 @@ async def _run_supervisor_scan_async() -> None:
 
     # Trigger supervisor scan
     # on_supervisor_scan publishes SupervisorIssueIdentified events
-    await facade.on_supervisor_scan()
+    total_scanned, matched_count = await facade.on_supervisor_scan()
+
+    # Display scan results
+    if matched_count == 0:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels"
+        )
+    else:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found {matched_count} issue(s) requiring supervisor attention"
+        )
 
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
@@ -205,7 +217,20 @@ async def _run_combined_scan_async() -> None:
     logger.bind(domain="orchestra").info("Governance scan completed")
 
     # Then run supervisor scan
-    await facade.on_supervisor_scan()
+    total_scanned, matched_count = await facade.on_supervisor_scan()
+
+    # Display scan results
+    if matched_count == 0:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found 0 issues with supervisor + state/handoff labels"
+        )
+    else:
+        typer.echo(
+            f"Scanned {total_scanned} open issues, "
+            f"found {matched_count} issue(s) requiring supervisor attention"
+        )
+
     logger.bind(domain="orchestra").info("Supervisor scan completed")
 
 
