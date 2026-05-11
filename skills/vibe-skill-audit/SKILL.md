@@ -45,6 +45,8 @@ Forbidden:
 - **Shell 边界**：涉及共享状态或外部系统时必须通过真实 `vibe3` 命令
 - **命令对齐**：skill 中提到的所有 `vibe3` 命令必须与当前 CLI 实现一致
 - **漂移修正优先**：发现不一致时默认直接更新 skill 文案
+- **Gate 优先于提示**：凡是多阶段流程、subagent 协作、handoff、审批、验证等关键行为，优先固化到 backlog task、metadata、状态检查或结果裁决 gate；不得只靠 prompt 里的“必须/禁止”维持约束
+- **减少解释空间**：skill 文案、执行模板、reference 样例之间不得出现可被 agent 合理化绕开的语句；一旦发现“先干活后解释”空间，默认视为 Blocking 并立即修正
 
 ## Truth Sources
 
@@ -69,6 +71,7 @@ Forbidden:
 6. 不允许在 skill 中重新定义术语或边界语义
 7. 如果需要停止，就 `exit()`
 8. skill 审计完成后必须明确说明哪些检查已执行
+9. 涉及 subagent / workflow 的 skill，必须检查是否存在可判定的 gate，而不是只有 prompt 约束
 
 ## `exit()` 语义
 
@@ -187,10 +190,11 @@ Steps:
 
 1. 读取目标 skill 文案
 2. 执行 `check_command_alignment()`、`check_standard_citation()`、`check_shell_boundary()` 验证
-3. 对发现的问题：命令漂移→立即修正改用新命令或标注 `Capability Gap`；引用缺失→立即补充；边界违规→立即修正；真源不清晰→保留 `Drift Warning` 并说明问题
-4. 验证更新后的 skill 结构
-5. 修正涉及命令或边界时更新相关测试
-6. `exit()`
+3. 如目标 skill 含 subagent / workflow / backlog task：额外检查关键约束是否已固化为 backlog task、metadata、状态检查、结果过滤等 gate；若只有 prompt 约束、缺少 gate、或存在可被误读的执行顺序，视为 Blocking
+4. 对发现的问题：命令漂移→立即修正改用新命令或标注 `Capability Gap`；引用缺失→立即补充；边界违规→立即修正；真源不清晰→保留 `Drift Warning` 并说明问题；prompt-only workflow → 补 gate、补测试、删歧义描述
+5. 验证更新后的 skill 结构
+6. 修正涉及命令、边界或 gate 时更新相关测试
+7. `exit()`
 
 Hard rule: 发现漂移默认直接修正文案；真源不清晰时才允许保留 `Drift Warning`
 
@@ -247,7 +251,7 @@ Steps:
    - 检查动作词语义是否符合 action-verbs.md（例如 `done` 是否超出边界）
    - 检查是否使用了未定义术语（例如 "Skill Governor"）
 
-**虚构参数和执行流程检查**：
+**虚构参数、执行流程与 gate 检查**：
 
 9. **虚构参数检查**（严重违规项）：
    - 检查硬编码用户名路径（如 `/Users/username/`）
@@ -258,20 +262,24 @@ Steps:
     - Stable Reads 是否列出标准工具（ls, cat, python3, bash, git, uv）
     - 伪代码步骤是否清晰可执行，无含糊表述
     - Inputs / Steps / Exit 结构是否完整
+    - 若 skill 涉及 subagent / workflow / backlog task：检查是否把关键行为固化为 backlog task、metadata、状态检查、结果过滤等 gate
+    - 检查是否存在“写了必须先验证/先握手，但执行模板先开始工作”的顺序漏洞
+    - 检查 reference 样例、执行模板、agent 文案之间是否互相打架，给 agent 留下“我以为 prompt 已经正式放行”的解释空间
 
 **分类发现并立即修正**：
 
 11. **分类发现**：
-    - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数（必须立即修正）
+    - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、prompt-only gate、执行顺序自相矛盾、可被 agent 合理化绕开的描述（必须立即修正）
     - `Missing Reference`: 缺失标准引用、缺失必读文档部分（必须立即补充）
     - `Skill Structure Violation`: 缺失 Overview/When to Use/Execution Flow/Guardrails（必须补充）
     - `Capability Gap`: skill 需要的命令不存在（必须标注）
     - `Drift Warning`: 真源本身不清晰或需深入审查（说明原因，不强行修正）
 
 12. **立即修正 Blocking、Missing Reference、Skill Structure Violation**：
-    - Blocking 发现：立即修正 skill 文案（虚构参数、术语、对象模型重定义等）
+    - Blocking 发现：立即修正 skill 文案（虚构参数、术语、对象模型重定义、prompt-only workflow、顺序漏洞等）
     - Missing Reference 发现：立即补充标准引用，补充必读文档部分
     - Skill Structure Violation 发现：立即补充 Overview/When to Use/Execution Flow/Guardrails
+    - prompt-only workflow：优先把关键行为固化到 backlog task / metadata / 状态 gate / 结果裁决 gate，并删除会暗示“可先执行后解释”的描述
     - Drift Warning：明确说明真源问题，不强行修正
     - 标注修正内容和位置
 
@@ -350,6 +358,7 @@ Hard rule:
 - Missing Reference 发现必须立即补充，不得跳过
 - 虚构参数（硬编码用户名/路径）是严重违规项，评分不得高于 3/5
 - **文件超过 400 行且存在冗余内容时必须清理**，评分不得高于 3/5
+- **涉及 subagent / workflow 的 skill，如关键约束只存在于 prompt 而未落到 gate，必须判为 Blocking 并立即修正**
 - 审计完成后必须提供质量评分表和预估效果表（含文件体积对比）
 - 必须验证修正和清理结果，确认无残留问题和冗余表述
 
@@ -360,7 +369,7 @@ Hard rule:
 1. **已执行检查清单**（✅ 标记）：前置规范阅读（skill-audit 读 skill-standard/glossary/action-verbs）、被审核 skill 必读文档检查（不超过 3 个、业务相关、不包含 glossary/action-verbs）、对象模型边界检查、术语检查、动作词检查、SKILL.md 结构检查、命令对齐、标准引用、Shell 边界、虚构参数检查、工具推荐、执行流程检查、冗余清理
 
 2. **发现分类**：
-   - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、必读文档超过 3 个、必读文档包含 glossary/action-verbs（必须修正）
+   - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、必读文档超过 3 个、必读文档包含 glossary/action-verbs、prompt-only gate、执行顺序自相矛盾、reference/template/agent 文案互相冲突（必须修正）
    - `Missing Reference`: 缺失标准引用、缺失必读文档部分、必读文档缺失业务相关标准（必须补充）
    - `Skill Structure Violation`: 缺失 Overview/When to Use/Execution Flow/Guardrails（必须补充）
    - `Capability Gap`: skill 需要的命令不存在（必须标注）
@@ -387,5 +396,7 @@ Hard rule:
 - 不得保留过时命令或旧职责描述作为主路径
 - 不得在 skill 中发明绕过 Shell 命令的 workaround
 - 不得只报漂移警告而不修正文案（真源清晰时）
+- **不得把关键流程约束只写在 prompt 里**：涉及握手、验证、审批、subagent 协作时，必须尽量固化到 backlog task、metadata、状态检查或结果裁决 gate
+- **不得保留给 agent 自行解释的缝**：如果 skill 同时出现“先验证/先握手”和“直接开始工作/无需等待”的描述，必须立即删除歧义并补 gate
 - **不得保留冗余表述**：重复职责列表、重复规则说明、过度详细的表格、与 Forbidden 重复的 Restrictions
 - **不得跳过前置强制步骤**：必须先读真源规范，再检查被审核 skill 的必读文档部分（不超过 3 个、业务相关）
