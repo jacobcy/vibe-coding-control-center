@@ -143,7 +143,15 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 - tool: TaskCreate
   params:
     subject: "Phase 1: Context research"
-    description: "spawn context-researcher, collect PR background and save to metadata"
+    description: |
+      spawn context-researcher, collect PR background and save to metadata
+
+      【强制握手协议】：
+      1. team-lead 先执行 ToolSearch(query="select:SendMessage") 确认自身可用
+      2. spawn context-researcher 后，立即发送握手：
+         SendMessage(to="context-researcher", message="请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'已就绪'")
+      3. 收到"已就绪"后，才能分配调研任务
+      4. 未握手成功前，不得给该 agent 分配任何工作
 - tool: TaskUpdate
   params:
     taskId: "<phase-1-task-id>"
@@ -154,7 +162,15 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 - tool: TaskCreate
   params:
     subject: "Phase 2: Parallel review"
-    description: "spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background"
+    description: |
+      spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background
+
+      【强制握手协议】（逐个进行，非批量）：
+      1. 依次 spawn 每个 agent，每 spawn 一个立即握手：
+         SendMessage(to="<agent-name>", message="请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'已就绪'")
+      2. 收到该 agent "已就绪"后，才能分配审查任务
+      3. 每个 agent 必须单独握手确认
+      4. 握手时 prompt 中内嵌 phase_1_output（从 task #1 metadata 获取）
 - tool: TaskUpdate
   params:
     taskId: "<phase-2-task-id>"
@@ -165,15 +181,21 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 - tool: TaskCreate
   params:
     subject: "Phase 2.5: Codex verification"
-    description: "(optional) bundle Phase 2 reports, call codex:rescue"
+    description: "(optional) bundle Phase 2 reports, call codex:rescue。此阶段不涉及 agent 握手。"
 - tool: TaskCreate
   params:
     subject: "Phase 3: Synthesis"
-    description: "verify all reports, arbitrate conflicts, final decision"
+    description: |
+      verify all reports, arbitrate conflicts, final decision
+
+      【检查项】：
+      1. 检查 Phase 2 各 agent 是否握手成功并返回报告
+      2. 如有 agent 未握手成功/未返回，标注"审查不完整"
+      3. 禁止替缺失 agent 脑补结论
 - tool: TaskCreate
   params:
     subject: "Phase 4: Write back"
-    description: "ask-each mode; post PR comment; create follow-up issues"
+    description: "ask-each mode; post PR comment; create follow-up issues。此阶段不涉及 agent 握手。仅限 gh pr comment 和 gh issue create。"
 ```
 
 **关键步骤（Phase 1 完成后必须执行）**：
