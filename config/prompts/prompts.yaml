@@ -565,11 +565,11 @@ plan:
     - Read current task context: `uv run python src/vibe3/cli.py task show`
     - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
     - Read handoff artifact: `uv run python src/vibe3/cli.py handoff show @key`
-    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show --branch <branch-name>`
+    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show @current --branch <branch-name>`
 
     ## Read Manager Instructions
     **IMPORTANT**: Manager may have appended specific instructions in handoff.
-    Run `uv run python src/vibe3/cli.py handoff show --branch <current-branch>` to read manager's instructions.
+    Run `uv run python src/vibe3/cli.py handoff show @current --branch <current-branch>` to read manager's instructions.
     Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
 
     ## Read Authoritative Refs via CLI
@@ -670,11 +670,11 @@ review:
     - Read current task context: `uv run python src/vibe3/cli.py task show`
     - Read handoff status: `uv run python src/vibe3/cli.py handoff status`
     - Read handoff artifact: `uv run python src/vibe3/cli.py handoff show @key`
-    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show --branch <branch-name>`
+    - Read handoff for current branch: `uv run python src/vibe3/cli.py handoff show @current --branch <branch-name>`
 
     ## Read Manager Instructions
     **IMPORTANT**: Manager may have appended specific instructions in handoff.
-    Run `uv run python src/vibe3/cli.py handoff show --branch <current-branch>` to read manager's instructions.
+    Run `uv run python src/vibe3/cli.py handoff show @current --branch <current-branch>` to read manager's instructions.
     Look for section "给下一阶段 agent 的指令" and follow those instructions exactly.
 
     ## Read Authoritative Refs via CLI
