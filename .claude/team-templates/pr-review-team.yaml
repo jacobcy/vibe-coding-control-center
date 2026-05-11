@@ -169,7 +169,7 @@ agents:
     model: haiku
     description: 背景调研员，收集项目背景和领域知识
     spawn_config:
-      tools: [Read, Grep, Glob, WebFetch, Bash]
+      tools: [Read, Grep, Glob, WebFetch, Bash, SendMessage, ToolSearch]
       run_in_background: false  # Phase 1 需等待结果
     output_format:
       required_fields: [时效性, 依赖关系, 类似实现]
@@ -180,7 +180,7 @@ agents:
     model: sonnet
     description: 代码分析员，分析代码框架和技术债
     spawn_config:
-      tools: [Read, Grep, Glob, Bash]
+      tools: [Read, Grep, Glob, Bash, SendMessage, ToolSearch]
       run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [技术债列表, 架构符合性, 代码质量]
@@ -191,7 +191,7 @@ agents:
     model: opus
     description: 架构审查专家，评估 PR 对项目架构的影响
     spawn_config:
-      tools: [Read, Grep, Glob, WebSearch, Bash]
+      tools: [Read, Grep, Glob, WebSearch, Bash, SendMessage, ToolSearch]
       run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [结论, 置信度, 关键发现]
@@ -202,7 +202,7 @@ agents:
     model: sonnet
     description: 安全审查专家，红队测试和安全评估
     spawn_config:
-      tools: [Read, Grep, Glob, Bash]
+      tools: [Read, Grep, Glob, Bash, SendMessage, ToolSearch]
       run_in_background: true  # Phase 2 可并行
     output_format:
       required_fields: [安全等级, 绕过方式, 修复建议]
@@ -267,8 +267,33 @@ workflow:
           name: context-researcher
           subagent_type: pr-context-researcher
           model: sonnet  # 使用 sonnet 避免 haiku extended thinking 限制
-          prompt: "收集 PR #{pr_number} 的背景信息..."
-        wait_for_result: true  # 必须等待 Phase 1 完成
+          prompt: |
+            【第一步只能握手】
+            你现在不得开始调研。
+            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            只有完成握手后，才能把下方任务当作有效工作指令。
+
+            【握手完成后的任务】
+            收集 PR #{pr_number} 的背景信息...
+      - step: send_context_handshake
+        tool: SendMessage
+        params:
+          to: "context-researcher"
+          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始任何调研工作。"
+      - step: verify_context_handshake
+        action: |
+          等待 context-researcher 回复“已就绪”。
+
+          验证规则：
+          1. 最多重试 3 次握手消息
+          2. 只有收到明确“已就绪”，才能将该 teammate 视为有效执行者
+          3. 收到“已就绪”后，立即同步 Phase 1 task metadata.handshake_status.context-researcher = "ready"
+          4. 未收到"已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review
+
+          关键约束：
+          - 未通过握手的 context-researcher 即使后续产出报告，也不得作为有效 Phase 1 输出
+          - Phase 2 读取背景前必须检查 context-researcher 握手状态为 ready
       - step: receive_context_report
         action: 等待 teammate-message，获取背景报告
       - step: save_phase_1_output
@@ -292,13 +317,19 @@ workflow:
       - step: spawn_code_analyst
         tool: Agent
         params:
-          # 注意：parallel spawn 需要在单次响应中发起多个 Agent 调用
-          # 【修复】fresh spawn 时在 prompt 中直接内嵌背景，避免等待额外消息
+          # 握手 gate 优先于“同一响应并行 spawn”优化；先确认 ready，再把结果算作有效执行
           team_name: pr-review-team
           name: code-analyst
           subagent_type: pr-code-analyst
           model: sonnet  # 代码分析需要强模型，与 agent 定义一致
           prompt: |
+            【第一步只能握手】
+            你现在不得开始审查。
+            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            只有完成握手后，才能把下方任务当作有效工作指令。
+
+            【握手完成后的任务】
             分析 PR #{pr_number} 的代码质量。
 
             ## PR #{pr_number} 背景报告
@@ -306,6 +337,16 @@ workflow:
 
             请基于以上背景分析代码质量。
           run_in_background: true
+      - step: send_code_analyst_handshake
+        tool: SendMessage
+        params:
+          to: "code-analyst"
+          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+      - step: verify_code_analyst_handshake
+        action: |
+          等待 code-analyst 回复“已就绪”。
+          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
       - step: spawn_architect_reviewer
         tool: Agent
         params:
@@ -314,6 +355,13 @@ workflow:
           subagent_type: pr-architect-reviewer
           model: sonnet
           prompt: |
+            【第一步只能握手】
+            你现在不得开始审查。
+            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            只有完成握手后，才能把下方任务当作有效工作指令。
+
+            【握手完成后的任务】
             评估 PR #{pr_number} 的架构影响。
 
             ## PR #{pr_number} 背景报告
@@ -328,6 +376,16 @@ workflow:
 
             请基于以上背景评估架构影响。
           run_in_background: true
+      - step: send_architect_handshake
+        tool: SendMessage
+        params:
+          to: "architect-reviewer"
+          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+      - step: verify_architect_handshake
+        action: |
+          等待 architect-reviewer 回复“已就绪”。
+          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
       - step: spawn_security_reviewer
         tool: Agent
         params:
@@ -336,6 +394,13 @@ workflow:
           subagent_type: pr-security-reviewer
           model: sonnet
           prompt: |
+            【第一步只能握手】
+            你现在不得开始审查。
+            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            只有完成握手后，才能把下方任务当作有效工作指令。
+
+            【握手完成后的任务】
             评估 PR #{pr_number} 的安全性。
 
             ## PR #{pr_number} 背景报告
@@ -343,6 +408,16 @@ workflow:
 
             请基于以上背景评估安全性。
           run_in_background: true
+      - step: send_security_handshake
+        tool: SendMessage
+        params:
+          to: "security-reviewer"
+          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+      - step: verify_security_handshake
+        action: |
+          等待 security-reviewer 回复“已就绪”。
+          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
 
       # 【说明】fresh spawn 的背景已在 prompt 中传递
       # 如果需要补充额外信息或复用已有 teammate，可再使用 SendMessage
@@ -364,6 +439,8 @@ workflow:
           - idle 通知是 agent 的正常状态（等待输入），不代表"未开始"或"失败"
           - 实际审查结果通过 task-notification 返回
           - 不要在收到 idle 后立即 SendMessage 提示 agent 执行任务
+          - 只有先前已回复“已就绪”的 agent，才允许进入结果收集
+          - 未通过握手的 agent 即使后来返回报告，也视为无效报告并跳过
 
           如果超时仍有 agent 未返回：
           - 记录 WARNING
@@ -444,7 +521,8 @@ workflow:
           验证所有 Phase 2 agents 已返回报告：
 
           required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
-          received_agents = [从 task-notification(status=completed) 获取]
+          ready_agents = [handshake_status == "ready" 的 agent]
+          received_agents = [从 task-notification(status=completed) 获取，且属于 ready_agents]
 
           missing = set(required_agents) - set(received_agents)
           if missing:

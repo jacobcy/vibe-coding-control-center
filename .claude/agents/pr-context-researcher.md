@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的时效性检查和依赖关系分析。
 
 model: sonnet  # 使用 sonnet 避免 haiku thinking budget 限制问题
-tools: Read, Grep, Glob, WebFetch, Bash, SendMessage
+tools: Read, Grep, Glob, WebFetch, Bash, SendMessage, ToolSearch
 extends: Explore  # 继承全局 Explore 的基础能力
 # Bash 仅用于只读 GitHub/context 命令，不执行写操作或本地状态修改
 ---
@@ -27,7 +27,17 @@ extends: Explore  # 继承全局 Explore 的基础能力
 ToolSearch(query="select:SendMessage", max_results=1)
 ```
 
-加载后即可正常使用 SendMessage 发送报告给 team-lead。
+加载后必须先执行握手确认，再进入正常工作。
+
+### 握手确认（加载成功后的第一条消息）
+
+```python
+SendMessage(to="team-lead", message="已就绪")
+```
+
+- 发送“已就绪”前，禁止执行 Read / Grep / Glob / WebFetch / Bash
+- team-lead 未确认前，你的任何调研结果都可能被判定为无效并丢弃
+- 若无法完成握手，立即停止并等待，不得继续工作
 
 ## 项目特有工具（必须使用）
 
@@ -185,6 +195,9 @@ SendMessage(
 - ❌ 发送不完整的报告
 
 ## 工作方式
+
+初次 spawn 调研当前 PR 时，即使初始 prompt 已包含任务，也**必须先握手后调研**。
+初始 prompt 里的任务内容只是待激活指令；在你发送"已就绪"之前，不得开始读取资料或输出背景结论。
 
 1. 接收 PR 编号
 2. 读取 team-lead 传入的 context bundle 和 PR 信息

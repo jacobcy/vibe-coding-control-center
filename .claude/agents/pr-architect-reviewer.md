@@ -9,7 +9,7 @@ description: |
   增加了 PR 特定的价值评估和时效性检查。
 
 model: opus
-tools: Read, Grep, Glob, WebSearch, Bash, SendMessage
+tools: Read, Grep, Glob, WebSearch, Bash, SendMessage, ToolSearch
 extends: architect  # 继承全局 architect 的基础能力
 ---
 
@@ -26,7 +26,17 @@ extends: architect  # 继承全局 architect 的基础能力
 ToolSearch(query="select:SendMessage", max_results=1)
 ```
 
-加载后即可正常使用 SendMessage 发送报告给 team-lead。
+加载后必须先执行握手确认，再进入正常工作。
+
+### 握手确认（加载成功后的第一条消息）
+
+```python
+SendMessage(to="team-lead", message="已就绪")
+```
+
+- 发送“已就绪”前，禁止执行 Read / Grep / Glob / WebSearch / Bash
+- team-lead 未确认前，你的任何审查结果都可能被判定为无效并丢弃
+- 若无法完成握手，立即停止并等待，不得继续工作
 
 ## 项目特有工具（必须使用）
 
@@ -289,7 +299,8 @@ Tier 3 (Policies) <-> Tier 2 (Skills) <-> Tier 1 (Shell)
 
 ### 1. 先确认背景到达方式
 
-初次 spawn 审查当前 PR 时，背景已在初始 prompt 中提供；无需等待额外 SendMessage。
+初次 spawn 审查当前 PR 时，背景已在初始 prompt 中提供；无需等待额外 SendMessage 传背景。
+但这**不构成免握手许可**：你仍必须先 ToolSearch，再发送"已就绪"，然后才能开始审查。
 
 **复用场景**：
 - 切换到下一轮 PR 时，team-lead 会通过 SendMessage 下发新的背景

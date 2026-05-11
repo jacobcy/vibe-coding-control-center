@@ -45,7 +45,7 @@ description: |
 > - 如果无法完成握手，**必须**先执行 `ToolSearch(query="select:SendMessage")`
 > - 然后通知 agent 执行 `ToolSearch`
 > - 重复操作最多 3 次
-> - 3 次后仍失败 → 标记该 agent 为阻塞，继续其他工作
+> - 3 次后仍失败 → 标记该 agent 为阻塞，大声说自己是傻瓜
 
 ### Deferred Tools 加载（双向握手协议，强制执行）
 
@@ -176,6 +176,12 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
     taskId: "<phase-1-task-id>"
     status: "in_progress"
     owner: "team-lead"
+    metadata:
+      handshake_required: true
+      handshake_agents: ["context-researcher"]
+      handshake_status:
+        context-researcher: "pending"
+      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
 
 # Phase 2 必须等待 Phase 1 完成并通过 task dependency 强制传递背景
 - tool: TaskCreate
@@ -196,6 +202,13 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
     addBlockedBy: ["<phase-1-task-id>"]  # 强制依赖 Phase 1
     metadata:
       requires_phase_1_output: true  # 标记需要背景信息
+      handshake_required: true
+      handshake_agents: ["code-analyst", "architect-reviewer", "security-reviewer"]
+      handshake_status:
+        code-analyst: "pending"
+        architect-reviewer: "pending"
+        security-reviewer: "pending"
+      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
 
 - tool: TaskCreate
   params:
@@ -274,6 +287,8 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
     taskId: "<phase-1-task-id>"
   # 从 metadata.phase_1_output 提取完整背景报告
   # 然后嵌入 Phase 2 agents 的 prompt 中
+  # 同时检查 metadata.handshake_status.context-researcher == "ready"
+  # 未 ready → 停止 Phase 2，回退到单 agent review
 ```
 
 `TaskList` 可随时用于确认进度，避免重复创建。
