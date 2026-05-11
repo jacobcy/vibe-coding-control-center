@@ -146,6 +146,15 @@ _CREATE_FAILED_GATE_STATE = """
     )
 """
 
+_CREATE_ORCHESTRA_QUEUE = """
+    CREATE TABLE IF NOT EXISTS orchestra_queue (
+        issue_number INTEGER PRIMARY KEY,
+        collected_state TEXT,
+        waiting_state TEXT,
+        updated_at TEXT NOT NULL
+    )
+"""
+
 
 _CLEAN_STALE_VERDICT_LINES_SQL = """
     UPDATE flow_events
@@ -305,6 +314,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for index_sql in _CREATE_ERROR_LOG_INDEXES:
         cursor.execute(index_sql)
     cursor.execute(_CREATE_FAILED_GATE_STATE)
+    cursor.execute(_CREATE_ORCHESTRA_QUEUE)
 
     # Create indexes for runtime_session table
     for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
