@@ -338,7 +338,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 |-------|---------|-------|
 | 0 双向握手 | 每 spawn 一个 agent 立即握手；收到该 agent “已就绪”后才分配工作；team-lead 自身先 ToolSearch | 一次 spawn 全部再一起握手；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到“已就绪”后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
 | 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
 | 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
 | 5 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
@@ -427,7 +427,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 - **Phase 0 必须在任何 Phase 之前完成**：收齐所有 agent 的"已就绪"后才能启动 Phase 1
 - Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
-- fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；不要求额外 SendMessage 才开始
+- fresh spawn 的初始 prompt 只允许握手；收到“已就绪”后，再通过第二条 SendMessage 下发 `phase_1_output` 和正式任务
 - 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
 - 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
 

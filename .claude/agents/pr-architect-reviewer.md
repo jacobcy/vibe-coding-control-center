@@ -299,8 +299,8 @@ Tier 3 (Policies) <-> Tier 2 (Skills) <-> Tier 1 (Shell)
 
 ### 1. 先确认背景到达方式
 
-初次 spawn 审查当前 PR 时，背景已在初始 prompt 中提供；无需等待额外 SendMessage 传背景。
-但这**不构成免握手许可**：你仍必须先 ToolSearch，再发送"已就绪"，然后才能开始审查。
+初次 spawn 审查当前 PR 时，初始 prompt 只用于握手，不包含正式审查任务。
+你必须先 ToolSearch，再发送"已就绪"，然后等待 team-lead 通过 SendMessage 下发首轮正式任务和背景。
 
 **复用场景**：
 - 切换到下一轮 PR 时，team-lead 会通过 SendMessage 下发新的背景

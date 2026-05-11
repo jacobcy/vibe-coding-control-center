@@ -53,3 +53,21 @@ EOF
     "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
   [ "$status" -eq 0 ]
 }
+
+@test "vibe-skill-audit treats handshake-stage work mixing as blocking" {
+  run grep -F "spawn 初始 prompt 必须只包含当前阶段允许动作" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "若在 handshake 阶段混入任何正式工作（如 gh pr view/diff、读取 diff、开始审查、开始调研），视为 Blocking" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "不得在 handshake 阶段混入正式工作" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "把正式工作拆到握手成功后的第二条消息、第二个 task 或后续 phase" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+}

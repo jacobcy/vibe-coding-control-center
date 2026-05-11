@@ -267,20 +267,7 @@ workflow:
             你现在不得开始调研。
             先执行 ToolSearch(query="select:SendMessage", max_results=1)，
             然后立刻 SendMessage(to="team-lead", message="已就绪")。
-            只有完成握手后，才能把下方任务当作有效工作指令。
-
-            【握手完成后的任务】
-            审查 PR #{pr_number}，请自主完成背景调研。
-            1. 使用 gh pr view {pr_number} 获取 PR 基本信息（标题、描述、改动文件、标签）
-            2. 使用 gh pr diff {pr_number} 获取完整 diff，分析改动范围
-            3. 使用 git log 获取 PR 分支的提交历史（从 base 分叉点开始）
-            4. 检查关联 issue 的评论和上下文
-            5. 分析 handoff 状态（如适用）
-            6. 输出结构化背景报告：PR 概述、改动范围、关联 issue、领域知识、风险评估
-
-            ## 重要
-            - team-lead 不会预先提供上下文，首轮调研由你自主完成
-            - 完成后通过 SendMessage 将报告发送给 team-lead
+            在收到 team-lead 后续正式任务前，不得开始任何调研。
       - step: send_context_handshake
         tool: SendMessage
         params:
@@ -299,6 +286,23 @@ workflow:
           关键约束：
           - 未通过握手的 context-researcher 即使后续产出报告，也不得作为有效 Phase 1 输出
           - Phase 2 读取背景前必须检查 context-researcher 握手状态为 ready
+      - step: send_context_task
+        tool: SendMessage
+        params:
+          to: "context-researcher"
+          message: |
+            【正式调研任务】
+            审查 PR #{pr_number}，请自主完成背景调研。
+            1. 使用 gh pr view {pr_number} 获取 PR 基本信息（标题、描述、改动文件、标签）
+            2. 使用 gh pr diff {pr_number} 获取完整 diff，分析改动范围
+            3. 使用 git log 获取 PR 分支的提交历史（从 base 分叉点开始）
+            4. 检查关联 issue 的评论和上下文
+            5. 分析 handoff 状态（如适用）
+            6. 输出结构化背景报告：PR 概述、改动范围、关联 issue、领域知识、风险评估
+
+            ## 重要
+            - 这是握手成功后的正式工作指令
+            - 完成后通过 SendMessage 将报告发送给 team-lead
       - step: receive_context_report
         action: 等待 teammate-message，获取背景报告
       - step: save_phase_1_output
@@ -332,15 +336,7 @@ workflow:
             你现在不得开始审查。
             先执行 ToolSearch(query="select:SendMessage", max_results=1)，
             然后立刻 SendMessage(to="team-lead", message="已就绪")。
-            只有完成握手后，才能把下方任务当作有效工作指令。
-
-            【握手完成后的任务】
-            分析 PR #{pr_number} 的代码质量。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            请基于以上背景分析代码质量。
+            在收到 team-lead 后续正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_code_analyst_handshake
         tool: SendMessage
@@ -352,6 +348,18 @@ workflow:
           等待 code-analyst 回复“已就绪”。
           未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
           收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
+      - step: send_code_analyst_task
+        tool: SendMessage
+        params:
+          to: "code-analyst"
+          message: |
+            【正式审查任务】
+            分析 PR #{pr_number} 的代码质量。
+
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+
+            请基于以上背景分析代码质量。
       - step: spawn_architect_reviewer
         tool: Agent
         params:
@@ -364,9 +372,24 @@ workflow:
             你现在不得开始审查。
             先执行 ToolSearch(query="select:SendMessage", max_results=1)，
             然后立刻 SendMessage(to="team-lead", message="已就绪")。
-            只有完成握手后，才能把下方任务当作有效工作指令。
-
-            【握手完成后的任务】
+            在收到 team-lead 后续正式任务前，不得开始任何审查。
+          run_in_background: true
+      - step: send_architect_handshake
+        tool: SendMessage
+        params:
+          to: "architect-reviewer"
+          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+      - step: verify_architect_handshake
+        action: |
+          等待 architect-reviewer 回复“已就绪”。
+          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
+      - step: send_architect_task
+        tool: SendMessage
+        params:
+          to: "architect-reviewer"
+          message: |
+            【正式审查任务】
             评估 PR #{pr_number} 的架构影响。
 
             ## PR #{pr_number} 背景报告
@@ -380,17 +403,6 @@ workflow:
             - 改动统计: `git diff --stat {base_branch}...{pr_branch}`
 
             请基于以上背景评估架构影响。
-          run_in_background: true
-      - step: send_architect_handshake
-        tool: SendMessage
-        params:
-          to: "architect-reviewer"
-          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
-      - step: verify_architect_handshake
-        action: |
-          等待 architect-reviewer 回复“已就绪”。
-          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
       - step: spawn_security_reviewer
         tool: Agent
         params:
@@ -403,15 +415,7 @@ workflow:
             你现在不得开始审查。
             先执行 ToolSearch(query="select:SendMessage", max_results=1)，
             然后立刻 SendMessage(to="team-lead", message="已就绪")。
-            只有完成握手后，才能把下方任务当作有效工作指令。
-
-            【握手完成后的任务】
-            评估 PR #{pr_number} 的安全性。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            请基于以上背景评估安全性。
+            在收到 team-lead 后续正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_security_handshake
         tool: SendMessage
@@ -423,6 +427,18 @@ workflow:
           等待 security-reviewer 回复“已就绪”。
           未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
           收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
+      - step: send_security_task
+        tool: SendMessage
+        params:
+          to: "security-reviewer"
+          message: |
+            【正式审查任务】
+            评估 PR #{pr_number} 的安全性。
+
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
+
+            请基于以上背景评估安全性。
 
       # 【说明】fresh spawn 的背景已在 prompt 中传递
       # 如果需要补充额外信息或复用已有 teammate，可再使用 SendMessage

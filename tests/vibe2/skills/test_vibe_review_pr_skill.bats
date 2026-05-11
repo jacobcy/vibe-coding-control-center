@@ -4,26 +4,26 @@ setup() {
   export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
 }
 
-@test "vibe-review-pr fresh Phase 2 flow uses spawn prompt context instead of mandatory follow-up SendMessage" {
+@test "vibe-review-pr fresh Phase 2 flow activates work after handshake with follow-up SendMessage" {
   run grep -F "fresh spawn 时在 prompt 中直接内嵌 \`phase_1_output\`；不要求额外 SendMessage 才开始" \
     "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
 
-  run grep -F "fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 \`phase_1_output\` 作为任务上下文，" \
+  run grep -F "fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。" \
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
   [ "$status" -eq 0 ]
 
-  run grep -F "但这**不构成免握手许可**：你仍必须先 ToolSearch，再发送\"已就绪\"，然后才能开始审查。" \
+  run grep -F "初始 prompt 只用于握手，不包含正式审查任务。" \
     "$REPO_ROOT/.claude/agents/pr-code-analyst.md" \
     "$REPO_ROOT/.claude/agents/pr-architect-reviewer.md" \
     "$REPO_ROOT/.claude/agents/pr-security-reviewer.md"
   [ "$status" -eq 0 ]
 
-  run grep -F "必须先收到 team-lead 通过 SendMessage 发送的 Phase 1 背景报告。" \
+  run grep -F "等待 team-lead 通过 SendMessage 下发首轮正式任务和背景。" \
     "$REPO_ROOT/.claude/agents/pr-code-analyst.md" \
     "$REPO_ROOT/.claude/agents/pr-architect-reviewer.md" \
     "$REPO_ROOT/.claude/agents/pr-security-reviewer.md"
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 0 ]
 }
 
 @test "vibe-review-pr architect reviewer documentation matches Bash-enabled diff retrieval" {
@@ -151,5 +151,31 @@ setup() {
 
   run grep -F "  wait: true" \
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
+  [ "$status" -ne 0 ]
+}
+
+@test "vibe-review-pr activates work only after handshake succeeds" {
+  run grep -F 'step: send_context_task' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'step: send_code_analyst_task' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'step: send_architect_task' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'step: send_security_task' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F '握手成功后，才通过第二条 SendMessage 下发正式调研任务。' \
+    "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'team-lead 不会预先提供上下文，首轮调研由你自主完成' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
   [ "$status" -ne 0 ]
 }

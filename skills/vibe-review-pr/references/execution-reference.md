@@ -41,15 +41,7 @@ TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
       你现在不得开始调研。
       先执行 ToolSearch(query="select:SendMessage", max_results=1)，
       然后立刻 SendMessage(to="team-lead", message="已就绪")。
-      只有完成握手后，才能把下方任务当作有效工作指令。
-
-      【握手完成后的任务】
-      收集 PR #{pr_number} 的背景：
-      1. 阅读 CLAUDE.md, AGENTS.md, docs/standards/glossary.md
-      2. 读取相关 issue 的 body 与 comments（task/issue-* 分支）
-      3. 分析依赖关系与时效性
-
-      完成后通过 SendMessage 发送结构化报告给 team-lead。
+      在收到 team-lead 后续正式任务前，不得开始任何调研。
 
 - tool: SendMessage
   params:
@@ -57,18 +49,31 @@ TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
     message: |
       请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
       完成后仅回复“已就绪”；未完成握手前不得开始任何调研工作。
+
+- tool: SendMessage
+  params:
+    to: "context-researcher"
+    message: |
+      【正式调研任务】
+      收集 PR #{pr_number} 的背景：
+      1. 阅读 CLAUDE.md, AGENTS.md, docs/standards/glossary.md
+      2. 读取相关 issue 的 body 与 comments（task/issue-* 分支）
+      3. 分析依赖关系与时效性
+
+      完成后通过 SendMessage 发送结构化报告给 team-lead。
 ```
 
 接收报告优先级：team inbox → teammate-message → 必要时 SendMessage 补发。
 fresh spawn 只有在收到"已就绪"后，team-lead 才能把该 teammate 视为有效执行者。
 未收到 ready 的 context-researcher，即使后续发来报告，也不得作为有效 Phase 1 输出。
+握手成功后，才通过第二条 SendMessage 下发正式调研任务。
 
 ## Phase 2: 专项审查
 
 仅适用 `refactor / security / standard`。**Phase 1 必须先完成**，禁止并行启动。
 
-fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为任务上下文，
-但**必须先完成握手并发送"已就绪"**，才能开始真正审查。
+fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
+它们必须先完成握手并发送"已就绪"，之后再由 team-lead 通过第二条 SendMessage 下发背景和正式任务。
 
 同一响应内并行 spawn：
 
@@ -84,15 +89,7 @@ fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为
       你现在不得开始审查。
       先执行 ToolSearch(query="select:SendMessage", max_results=1)，
       然后立刻 SendMessage(to="team-lead", message="已就绪")。
-      只有完成握手后，才能把下方任务当作有效工作指令。
-
-      【握手完成后的任务】
-      分析 PR #{pr_number} 的代码质量。
-
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
-
-      请基于以上背景开始审查。
+      在收到 team-lead 后续正式任务前，不得开始任何审查。
     run_in_background: true
 
 - tool: SendMessage
@@ -101,6 +98,18 @@ fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为
     message: |
       请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
       完成后仅回复“已就绪”；未收到握手确认前，不得开始审查。
+
+- tool: SendMessage
+  params:
+    to: "code-analyst"
+    message: |
+      【正式审查任务】
+      分析 PR #{pr_number} 的代码质量。
+
+      ## PR #{pr_number} 背景报告
+      {phase_1_output}
+
+      请基于以上背景开始审查。
 
 - tool: Agent
   params:
@@ -113,15 +122,7 @@ fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为
       你现在不得开始审查。
       先执行 ToolSearch(query="select:SendMessage", max_results=1)，
       然后立刻 SendMessage(to="team-lead", message="已就绪")。
-      只有完成握手后，才能把下方任务当作有效工作指令。
-
-      【握手完成后的任务】
-      评估 PR #{pr_number} 的架构影响。
-
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
-
-      你可以使用 Bash 工具补充读取 diff / git show / git log 数据。
+      在收到 team-lead 后续正式任务前，不得开始任何审查。
     run_in_background: true
 
 - tool: SendMessage
@@ -130,6 +131,18 @@ fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为
     message: |
       请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
       完成后仅回复“已就绪”；未收到握手确认前，不得开始审查。
+
+- tool: SendMessage
+  params:
+    to: "architect-reviewer"
+    message: |
+      【正式审查任务】
+      评估 PR #{pr_number} 的架构影响。
+
+      ## PR #{pr_number} 背景报告
+      {phase_1_output}
+
+      你可以使用 Bash 工具补充读取 diff / git show / git log 数据。
 
 - tool: Agent
   params:
@@ -142,13 +155,7 @@ fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为
       你现在不得开始审查。
       先执行 ToolSearch(query="select:SendMessage", max_results=1)，
       然后立刻 SendMessage(to="team-lead", message="已就绪")。
-      只有完成握手后，才能把下方任务当作有效工作指令。
-
-      【握手完成后的任务】
-      评估 PR #{pr_number} 的安全性。
-
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
+      在收到 team-lead 后续正式任务前，不得开始任何审查。
     run_in_background: true
 
 - tool: SendMessage
@@ -157,9 +164,19 @@ fresh spawn 的 Phase 2 agent 会从初始 prompt 读取 `phase_1_output` 作为
     message: |
       请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
       完成后仅回复“已就绪”；未收到握手确认前，不得开始审查。
+
+- tool: SendMessage
+  params:
+    to: "security-reviewer"
+    message: |
+      【正式审查任务】
+      评估 PR #{pr_number} 的安全性。
+
+      ## PR #{pr_number} 背景报告
+      {phase_1_output}
 ```
 
-除强制握手外，fresh spawn 不需要额外 SendMessage 传背景。只有两类场景继续使用 SendMessage：
+除强制握手和正式任务激活外，fresh spawn 不需要额外 SendMessage 传背景。只有两类场景继续使用 SendMessage：
 
 - 复用上一轮已经存在的 teammate
 - Phase 2 过程中需要补发额外上下文
