@@ -214,7 +214,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
-| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
 | 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**（issue #742 真实踩坑）；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
 | 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**执行时机**：Phase 2完成后收集所有报告；通过 `codex:rescue` skill 调用；第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选；第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用；把”可选触发”误写成”只有不完整才触发” |
 | 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标”审查不完整”；如有 Phase 2.5 报告作为补充材料 | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
@@ -306,6 +306,14 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；不要求额外 SendMessage 才开始
 - 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
 - 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
+
+### Lead 职责边界（强制，issue #823）
+
+- team-lead 职责：spawn agent、管理 task 生命周期、Phase 3 综合判断、Phase 4 写回（仅限 `gh pr comment` 和 `gh issue create`）
+- **禁止 team-lead 自行收集上下文**（gh pr view、git diff、git log 等），这是 context-researcher 的工作
+- **禁止 team-lead 执行其他 shell 命令**：gh pr diff、git show、git commit、git push 等调研或修改操作
+- Phase 1 只需：spawn context-researcher（带自包含 prompt）→ 等待报告 → 保存到 task metadata
+- 唯一的 context 传递是：从 Phase 1 报告**转发**到 Phase 2 fresh spawn prompt，不做预收集
 
 ### 状态操作
 

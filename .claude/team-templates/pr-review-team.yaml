@@ -123,27 +123,22 @@ preflight_checks:
       - 复用：SendMessage 唤醒现有 teammates
       - 不复用：停止当前轮次，由人类决定是否退出并重建会话
 
-# Team-lead 负责收集 shell 上下文，并把结果传给 teammates
-context_bundle:
-  executor: team-lead
-  commands:
-    pr_info: "gh pr view <number> --json headRefName,title,body,comments"
-    pr_branch: "gh pr view <number> --json headRefName -q .headRefName"
-    handoff_status: "uv run python src/vibe3/cli.py handoff status <pr-branch> 2>/dev/null || echo 'handoff not available'"
-    issue_comments: |
-      PR_BRANCH="<pr-branch>"
-      if echo "$PR_BRANCH" | grep -qE '^(task|dev)/issue-[0-9]+'; then
-        ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
-        gh issue view "$ISSUE_NUM" --comments
-      else
-        echo "issue comments unavailable for non-flow branch: $PR_BRANCH"
-      fi
-    pr_comments: "gh pr view <number> --comments"
-  provided_to:
-    - context-researcher
-    - architect-reviewer
-    - code-analyst
-    - security-reviewer
+# Team-lead 职责边界（强制）
+# - ✅ spawn agent、组织团队、管理 task 生命周期
+# - ✅ 接收 Phase 1 背景报告、嵌入 Phase 2 fresh spawn prompt
+# - ✅ Phase 3 综合判断（收集报告、冲突仲裁、最终决策）
+# - ✅ Phase 4 写回：仅限 gh pr comment 和 gh issue create（禁止其他 gh/git 命令）
+# - ❌ 不得自行收集上下文（gh pr view / git diff 等）——这是 context-researcher 的工作
+# - ❌ 不得在 spawn context-researcher 之前做任何背景调查
+# - ❌ 不得越权替缺失 agent 脑补审查结论
+# - ❌ 不得执行 gh pr diff / git log / git show 等调研命令
+# - ❌ 不得执行 git commit / git push 等修改操作
+
+# Context 传递链路（单向）
+#
+#   context-researcher ──(phase_1_output)──▶ team-lead ──(嵌入 prompt)──▶ Phase 2 agents
+#
+# team-lead 只做"转发"，不做"预收集"。context-researcher 用自己工具完成全部背景调研。
 
 # 复用策略
 reuse_policy:
@@ -267,7 +262,20 @@ workflow:
           name: context-researcher
           subagent_type: pr-context-researcher
           model: sonnet  # 使用 sonnet 避免 haiku extended thinking 限制
-          prompt: "收集 PR #{pr_number} 的背景信息..."
+          prompt: |
+            审查 PR #{pr_number}，请自行完成背景调研。
+
+            ## 你的任务
+            1. 使用 gh pr view {pr_number} 获取 PR 基本信息（标题、描述、改动文件、标签）
+            2. 使用 gh pr diff {pr_number} 获取完整 diff，分析改动范围
+            3. 使用 git log 获取 PR 分支的提交历史（从 base 分叉点开始）
+            4. 检查关联 issue 的评论和上下文
+            5. 分析 handoff 状态（如适用）
+            6. 输出结构化背景报告：PR 概述、改动范围、关联 issue、领域知识、风险评估
+
+            ## 重要
+            - team-lead 不会预先提供上下文——所有调研由你自主完成
+            - 完成后通过 SendMessage 将报告发送给 team-lead
         wait_for_result: true  # 必须等待 Phase 1 完成
       - step: receive_context_report
         action: 等待 teammate-message，获取背景报告
