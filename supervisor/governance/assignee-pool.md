@@ -51,24 +51,28 @@ Allowed:
 - `handoff`: read（读取交接上下文）
 - `scene`: read（读取现场信息）
 - `comment.write`: 写治理建议评论（格式为 `[governance suggest]`）
-- `state/labels.write`: 仅限两个极窄补偿动作：
-  1. **漏改 blocked 恢复**：
-     - 当前 issue 已在 `state/blocked`
+- `state/labels.write`: 两项动作，性质不同：
+
+  1. **入池评估与标签补齐**（本职工作）：
+     触发条件：当前 issue 有 manager assignee，且缺少任何 `state/*` label
+     - 必须先评估优先级：检查 issue 内容，确定合适的 `priority/[0-9]` 或 legacy priority
+     - 检查并补齐 `roadmap/*` 标签（如缺失）
+     - 检查并补齐 `priority/*` 标签（如缺失）
+     - 最后才设置 `state/ready`
+     - **禁止**在 priority 评估完成前设置 `state/ready`
+     - 设置后必须写 `[governance suggest]` comment 说明评估依据
+     - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest]` 建议而非直接拒绝
+
+  2. **漏改 blocked 恢复**（唯一补偿动作）：
+     触发条件：当前 issue 已在 `state/blocked`
      - `blocked_reason` 明确为 `state unchanged`
      - `flow show` 能确认 authoritative ref 已存在
      - 使用 `vibe3 task resume --label auto` 自动恢复到正确状态
-     - 恢复后必须写 comment 说明是 governance 自动补偿
-  2. **遗漏 state/ready 补齐**：
-     - 当前 issue 有 manager assignee
-     - 缺少任何 `state/*` label
-     - 没有活跃的 flow scene（`has_flow=False`）
-     - 仅允许设置为 `state/ready`
-     - 设置后必须写 comment 说明原因
-     - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest]` 建议而非直接拒绝
+     - 恢复后必须写 `[governance auto-recover]` comment 说明是 governance 自动补偿
 
 Forbidden:
 
-- `state/labels.write`: 除上面的两个补偿动作外，其他任何 `state/*` label 的修改都禁止（包括设置 `state/claimed`、`state/in-progress`、`state/blocked`、`state/done`）
+- `state/labels.write`: 除上面两项动作外，其他任何 `state/*` label 的修改都禁止（包括设置 `state/claimed`、`state/in-progress`、`state/blocked`、`state/done`）
 - `issue.resume`: 恢复 blocked 或 failed issue（这是人类专属动作，通过 `vibe3 task resume`）
 - `issue.close`: 关闭 issue（只建议关闭，由 Manager 执行）
 - `code.write`: 任何形式的代码修改
@@ -82,7 +86,7 @@ Forbidden:
 
 - 如果某个动作没有被明确允许，视为 forbidden
 - 治理建议以 `[governance suggest]` 署名写入 issue comment
-- 上述单一补偿动作之外，state/labels 的修改只能由 manager 或人类执行
+- 上述两项动作之外，state/labels 的修改只能由 manager 或人类执行
 
 ## What It Reads
 
@@ -208,9 +212,8 @@ issue 是否可纳入？
 - 最小 non-state label 调整建议（仅 `milestone`、`roadmap/*`、`priority/[0-9]`）
 - start / wait / defer recommendations with short reasons
 - `[governance suggest]` 格式的治理建议评论
-- 极窄的自动补偿动作：
-  - `state unchanged` 恢复（`vibe3 task resume --label auto`）
-  - 遗漏 `state/ready` 补齐（有 assignee 但无 state label → `state/ready`）
+- 入池评估与标签补齐：有 assignee 但无 state label → 评 priority → 补 roadmap/priority → 设 `state/ready`
+- 漏改恢复补偿：`state unchanged` 恢复（`vibe3 task resume --label auto`）
 
 ## Hard Boundary
 
@@ -225,9 +228,9 @@ issue 是否可纳入？
 - 不负责写代码
 - **不负责一般性的 `state/*` label 修改**
 - **不负责一般性的 blocked/failed resume**
-- **只允许修正两种明确的漏改 state 场景**：
-  1. `state unchanged` 且 authoritative ref 已存在
-  2. 有 manager assignee 但缺少 state label 且无活跃 flow
+- **允许两项 state 动作**：
+  1. **入池评估与标签补齐**：有 manager assignee 但缺少 state label → 先评 priority/roadmap，再设 `state/ready`
+  2. **漏改 blocked 恢复**：`state/blocked` + `blocked_reason == "state unchanged"` + authoritative ref 已存在 → 自动恢复
 
 ## Execution Pattern
 
@@ -242,7 +245,17 @@ Steps:
    - 已有有效 flow / live dispatch 的 issue，从候选中排除
    - 被硬规则阻塞的 issue，从候选中排除
 3. 对 ready candidates 按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 排序
-4. **Blocked Issues 抽查恢复**：
+4. **入池评估与标签补齐**：
+   - 扫描 assignee issue pool 中有 manager assignee 但缺少 `state/*` label 的 issue
+   - 对每个候选 issue：
+     a. 检查是否已有活跃 flow（`has_flow=True`）→ 跳过（说明已在执行中）
+     b. 评估优先级：阅读 issue 内容，确定合适的 `priority/[0-9]` 或 legacy priority
+     c. 检查并补齐 `roadmap/*` 标签（如缺失）
+     d. 检查并补齐 `priority/*` 标签（如缺失）
+     e. 设置 `state/ready`
+     f. 写 `[governance suggest]` comment 说明评估依据
+   - **禁止**在 priority 评估完成前设置 `state/ready`
+5. **Blocked Issues 抽查恢复**：
    - 随机抽取 1-2 个处于 `state/blocked` 的 issues 进行检查
    - 对选中的 blocked issue：
      a. 调用 `gh issue view <number> --json body` 获取 issue body
@@ -257,7 +270,7 @@ Steps:
           - 写 `[governance suggest]` comment 建议人类处理
      d. 如果是其他 blocked_reason（如外部依赖、手动阻塞等）：
         - 不执行自动恢复，只写 `[governance suggest]` comment 建议人类处理
-5. 输出治理结论
+6. 输出治理结论
 
 输出时额外检查：
 - 如果你写出“already in assignee pool”，必须同时回答这些 issue 当前是否仍有 assignee、state、ready queue 资格
@@ -274,7 +287,12 @@ Decision sketch:
   - 已在 `state/ready` 但有未解除依赖的 issue：标记为 concern，建议 manager 检查
   - 已在 `state/blocked` 但依赖已解除的 issue：写 `[governance suggest]` 评论建议人类 resume
   - 已过时的 issue：写 `[governance suggest]` 评论建议关闭
-- **自动补偿（唯一允许的执行动作）**：
+- **入池评估与标签补齐（本职工作）**：
+  - 每次 scan 检查所有有 manager assignee 但缺少 `state/*` label 的 issue
+  - 先评 priority → 补 roadmap → 补 priority → 最后设 `state/ready`
+  - **禁止**跳过 priority 评估直接设 `state/ready`
+
+- **漏改 blocked 恢复（唯一补偿动作）**：
 
   **抽查策略**：
   - 每次随机抽取 1-2 个 `state/blocked` issues 进行检查
@@ -303,13 +321,13 @@ Decision sketch:
   - milestone 调整
   - roadmap 调整
   - priority 调整
-  - **不得调整 `state/*` labels，除非命中上面的唯一自动补偿动作**
+  - **不得调整 `state/*` labels，除非命中上面两项动作**
 
 Exit:
 
 - 输出治理结论后停止
 - 不要进入执行分配、实现方案、代码修改或单 flow 管理
-- 自动补偿最多执行一步，不做链式推进
+- 自动补偿最多执行一步，不做链式推进；入池评估需完整评估所有符合条件的 issue
 
 ## Queue Guidance
 
@@ -344,6 +362,7 @@ Exit:
 - **类型匹配规则**：
   - `[governance suggest] 建议关闭此 Issue` → 检查是否已有"建议关闭"
   - `[governance suggest] 建议恢复此 Issue` → 检查是否已有"建议恢复"
+  - `[governance suggest] 入池评估` → 检查是否已有"入池评估"
   - `[governance suggest] 关注` → 检查是否已有"关注"且关注原因相同
   - `[governance auto-recover]` → 检查是否已有相同恢复动作
 - **跳过时的输出**：在 governance 输出中记录"已建议（跳过重复评论）"，说明原因
@@ -383,6 +402,22 @@ Exit:
 ```
 
 注意：只建议恢复，由人类执行 `vibe3 task resume`。
+
+### `suggest_pool_entry()`
+
+当 issue 有 manager assignee 但缺少 state label，governance 完成入池评估与标签补齐后：
+
+```
+[governance suggest] 入池评估
+
+评估依据：<priority 选择的理由>
+已执行动作：
+- 设置 roadmap: <roadmap/*>
+- 设置 priority: <priority/[0-9]>
+- 设置 state/ready
+```
+
+注意：这个是 governance 本职工作，不是补偿。governance 已完成标签设置，无需人类干预。
 
 ### `auto_recover_state_unchanged()`
 
