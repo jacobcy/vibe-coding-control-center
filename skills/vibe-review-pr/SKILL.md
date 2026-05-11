@@ -36,6 +36,17 @@ description: |
 
 ## Common Pitfalls（已知陷阱，issue #787）
 
+> **⚠️ 最高优先级提醒：握手失败排查**
+> 
+> 如果握手无法完成，**最常见的原因**是 team-lead 自己没有执行 `ToolSearch`。
+> 
+> **强制规则**：
+> - **不得以任何理由假设自己已经 deferred tools**
+> - 如果无法完成握手，**必须**先执行 `ToolSearch(query="select:SendMessage")`
+> - 然后通知 agent 执行 `ToolSearch`
+> - 重复操作最多 3 次
+> - 3 次后仍失败 → 标记该 agent 为阻塞，继续其他工作
+
 ### Deferred Tools 加载（双向握手协议，强制执行）
 
 **核心问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。
