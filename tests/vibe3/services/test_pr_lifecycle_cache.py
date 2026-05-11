@@ -9,7 +9,7 @@ from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 
 
-def test_create_draft_pr_updates_cache_title() -> None:
+def test_create_pr_updates_cache_title() -> None:
     """PR creation should cache PR number and title."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
@@ -52,7 +52,7 @@ def test_create_draft_pr_updates_cache_title() -> None:
             mock_git_class.return_value = mock_git
 
             service = PRService(store=store)
-            result = service.create_draft_pr(
+            result = service.create_pr(
                 title="Fix orchestra async startup recursion",
                 body="Body",
                 base_branch="main",
@@ -178,7 +178,7 @@ def test_pr_create_appends_handoff_update() -> None:
             mock_git_class.return_value = mock_git
 
             service = PRService(store=store)
-            service.create_draft_pr(
+            service.create_pr(
                 title="Fix recursion",
                 body="Body",
                 base_branch="main",

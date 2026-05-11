@@ -213,7 +213,7 @@ def register_create_command(app: typer.Typer) -> None:
             # - Human mode: None
             actor = "ai-assistant" if ai else None
 
-            pr = pr_service.create_draft_pr(
+            pr = pr_service.create_pr(
                 title=pr_title,
                 body=pr_body,
                 base_branch=resolved_base,
