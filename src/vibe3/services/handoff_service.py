@@ -41,6 +41,7 @@ class HandoffService:
         "plan": "planner_actor",
         "run": "executor_actor",
         "review": "reviewer_actor",
+        "indicate": "manager_actor",
     }
     # Legacy kind aliases → canonical kind
     _LEGACY_KIND_ALIASES: dict[str, str] = {
