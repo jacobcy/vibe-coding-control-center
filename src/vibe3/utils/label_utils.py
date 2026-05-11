@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
+from vibe3.clients.github_labels import GhIssueLabelPort
+from vibe3.models.orchestra_config import OrchestraConfig
+
 if TYPE_CHECKING:
     from vibe3.models.orchestration import IssueInfo
+    from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
 def normalize_labels(raw_labels: object) -> list[str]:
@@ -83,3 +89,31 @@ def should_skip_from_queue(
         return True
 
     return False
+
+
+def clean_old_state_labels(
+    issue: "IssueInfo",
+    role: "TriggerableRoleDefinition",
+    config: OrchestraConfig,
+) -> None:
+    """Remove conflicting state/* labels before dispatch.
+
+    Args:
+        issue: Issue to clean labels for
+        role: Role definition for this dispatch
+        config: Orchestra configuration
+    """
+    old_state_labels = [
+        lb
+        for lb in issue.labels
+        if lb.startswith("state/") and lb != role.trigger_state.to_label()
+    ]
+    if old_state_labels:
+        try:
+            label_port = GhIssueLabelPort(repo=config.repo)
+            for old_lb in old_state_labels:
+                label_port.remove_issue_label(issue.number, old_lb)
+        except Exception as exc:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to clean old state labels for #{issue.number}: {exc}"
+            )

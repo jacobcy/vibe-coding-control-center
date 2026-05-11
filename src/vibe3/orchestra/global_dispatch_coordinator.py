@@ -24,17 +24,18 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.dispatch_queue_helpers import (
-    clean_old_state_labels,
+from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
     load_issue,
+)
+from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.queue_operations import (
     promote_progressed_entries,
     select_ready_issues,
 )
-from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.roles.registry import build_label_dispatch_event
-from vibe3.utils.label_utils import should_skip_from_queue
+from vibe3.utils.label_utils import clean_old_state_labels, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
