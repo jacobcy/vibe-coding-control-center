@@ -83,7 +83,7 @@ def register_create_command(app: typer.Typer) -> None:
             typer.Option(
                 "--yes",
                 "-y",
-                help="Confirm you are human and want to create a draft PR",
+                help="Confirm you are human and want to create a pull request",
             ),
         ] = False,
         trace: Annotated[
@@ -96,7 +96,7 @@ def register_create_command(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
     ) -> None:
-        """Create draft PR.
+        """Create a pull request.
 
         Human entrance: use --yes to confirm.
         Agent entrance: use --agent to bypass human confirmation (requires -t and -b).
