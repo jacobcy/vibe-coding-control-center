@@ -32,11 +32,12 @@ ToolSearch(query="select:SendMessage", max_results=1)
 
 ### 握手结果处理
 
-**成功**：确认 `SendMessage` 可用 → 发送“【agent_ready】已就绪”并进入正常审查流程
+**成功**：确认 `SendMessage` 可用 → 发送”【agent_ready】已进入握手流程”
+  发送后等待 team-lead 的 `【handshake_completed】` + 正式任务，收到后握手才算完成
 **失败**：立即停止一切操作，原地等待
 - **禁止**执行任何后续工作（Read/Grep/Bash/审查报告）
 - **禁止**尝试发送报告（此时 SendMessage 不可用）
-- team-lead 通过超时检测发现你未回复，会重新发送握手或处理
+- team-lead 通过 POLLING 重发 `lead_ready` 来唤醒你
 
 ## Deferred Tools 说明
 
@@ -45,10 +46,10 @@ ToolSearch(query="select:SendMessage", max_results=1)
 ### 握手确认（加载成功后的第一条消息）
 
 ```python
-SendMessage(to="team-lead", message="【agent_ready】已就绪")
+SendMessage(to="team-lead", message="【agent_ready】已进入握手流程")
 ```
 
-- 发送“【agent_ready】已就绪”前，禁止执行 Read / Grep / Glob / WebSearch / Bash
+- 发送”【agent_ready】已进入握手流程”前，禁止执行 Read / Grep / Glob / WebSearch / Bash
 - team-lead 未确认前，你的任何审查结果都可能被判定为无效并丢弃
 - 若无法完成握手，立即停止并等待，不得继续工作
 
@@ -302,7 +303,7 @@ Tier 3 (Policies) <-> Tier 2 (Skills) <-> Tier 1 (Shell)
 ### 1. 先确认背景到达方式
 
 初次 spawn 审查当前 PR 时，初始 prompt 只用于握手，不包含正式审查任务。
-你必须先等待 `【lead_ready】`，再 ToolSearch，再发送"【agent_ready】已就绪"，然后等待 team-lead 通过 SendMessage 下发首轮正式任务和背景。
+你必须先等待 `【lead_ready】`，再 ToolSearch，再发送"【agent_ready】已进入握手流程"，然后等待 team-lead 通过 SendMessage 下发 `【handshake_completed】` + 正式任务和背景。
 
 **复用场景**：
 - 切换到下一轮 PR 时，team-lead 会通过 SendMessage 下发新的背景
