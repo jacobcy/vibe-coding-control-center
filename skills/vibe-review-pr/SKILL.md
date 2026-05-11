@@ -36,20 +36,63 @@ description: |
 
 ## Common Pitfalls（已知陷阱，issue #787）
 
-### Deferred Tools 加载（自动处理，但需了解）
+### Deferred Tools 加载（双向握手协议，强制执行）
 
-**问题**：SendMessage 是 deferred tool，调用前必须先加载 schema，否则报 InputValidationError。
+**核心问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。
 
-**解决方案**：所有 teammate agent 定义已配置自动加载：
-- 每个 agent 在开始工作前自动调用 `ToolSearch(query="select:SendMessage")`
-- Team-lead **无需**在 prompt 中手动提示
+**死锁陷阱**：如果 agent 不执行 `ToolSearch`，就没有 `SendMessage` 能力，**根本无法汇报被阻塞**——之前"失败时报告给 team-lead"的设计是自相矛盾的。
+
+**正确方案：Phase 0 双向握手（强制执行，不可跳过）**
+
+```
+Phase 0: 双向握手协议（spawn 每个 agent 后立即握手，先于该 agent 的任何工作）
+
+Step 1 - team-lead 自身握手（整个 Phase 0 的第一步，仅一次，强制执行）：
+  【强制】team-lead 必须执行：
+    ToolSearch(query="select:SendMessage", max_results=1)
+  
+  【关键说明】：
+  - 即使会话开始时 UserPromptSubmit hook 自动触发了其他 ToolSearch，
+    team-lead 也必须重新执行此步骤作为 Phase 0 的正式握手
+  - 会话开始时的 ToolSearch 是响应 hook，不是 Phase 0 的正式握手
+  - Deferred tools 机制：声明在 agent 定义中 ≠ schema 已加载
+  - 必须显式执行 ToolSearch 才能加载 SendMessage schema
+  
+  失败 → 立即停止，禁止 spawn 任何 agent
+
+Step 2 - team-lead 每 spawn 一个 agent，立即对该 agent 发送握手消息：
+  SendMessage(to="<agent-name>", message="请执行 ToolSearch 并回复"已就绪"")
+
+Step 3 - agent 响应：
+  agent 执行 ToolSearch(query="select:SendMessage", max_results=1)
+  成功 → SendMessage(to="team-lead", message="已就绪")
+  失败 → agent 无法发送消息，team-lead 超时检测
+
+Step 4 - team-lead 确认该 agent：
+  收到"已就绪" → 该 agent 可参与后续工作
+  超时未收到 → 再次发送握手消息通知 agent
+  多次超时 → 标记该 agent 为阻塞，后续 Phase 标注"审查不完整"
+```
+
+**关键理解**：握手按阶段分别进行，不是"先 spawn 全部再一起握手"。
+
+- **Phase 1 阶段**：spawn context-researcher → 与 context-researcher 握手 → 等待调研报告
+- **Phase 2 阶段**：spawn code-analyst + architect + security → 分别与 3 个 agent 握手 → 并行审查
+
+team-lead 在 spawn 一个 agent 后，必须立即与其握手确认，才能继续该阶段的工作。
+不等到该 agent 握手成功，不得给该 agent 分配任何工作。
+
+**强制规则**：
+- **team-lead**：spawn agent 后必须立即握手，收到"已就绪"前不得给该 agent 分配工作
+- **teammate**：收到握手消息后，**唯一合法操作**是执行 ToolSearch 并回复
+- **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何其他操作**
 
 **诊断**（如 agent 未发送报告）：
 ```bash
 tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
 ```
 
-详见：`.claude/agents/pr-*.md` 的 "Deferred Tools 初始化" 章节。
+详见：`.claude/agents/pr-*.md` 的 "握手协议" 章节。
 
 ### 其他常见陷阱
 
