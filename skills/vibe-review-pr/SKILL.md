@@ -145,13 +145,21 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 ```
 
-先为 Phase 1 创建 task，并用 `TaskUpdate(owner="team-lead")` 设置归属；Step 7 判定为 `standard` / `refactor` / `security` 后，再补建 Phase 2 / 2.5 / 3 / 4 的 task：
+先为 Phase 1 创建 task，并用 `TaskUpdate(owner="team-lead")` 设置归属；Step 7 判定为 `standard` / `refactor` / `security` 后，再补建 Phase 2 / 3 / 4 / 5 的 task：
 
 ```yaml
 - tool: TaskCreate
   params:
     subject: "Phase 1: Context research"
-    description: "spawn context-researcher, collect PR background and save to metadata"
+    description: |
+      spawn context-researcher, collect PR background and save to metadata
+      
+      【强制握手协议】：
+      1. team-lead 先执行 ToolSearch(query="select:SendMessage") 确认自身可用
+      2. spawn context-researcher 后，立即发送握手：
+         SendMessage(to="context-researcher", message="请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'已就绪'")
+      3. 收到"已就绪"后，才能分配调研任务
+      4. 未握手成功前，不得给该 agent 分配任何工作
 - tool: TaskUpdate
   params:
     taskId: "<phase-1-task-id>"
@@ -162,7 +170,15 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 - tool: TaskCreate
   params:
     subject: "Phase 2: Parallel review"
-    description: "spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background"
+    description: |
+      spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background
+      
+      【强制握手协议】（逐个进行，非批量）：
+      1. 依次 spawn 每个 agent，每 spawn 一个立即握手：
+         SendMessage(to="<agent-name>", message="请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'已就绪'")
+      2. 收到该 agent "已就绪"后，才能分配审查任务
+      3. 每个 agent 必须单独握手确认
+      4. 握手时 prompt 中内嵌 phase_1_output（从 task #1 metadata 获取）
 - tool: TaskUpdate
   params:
     taskId: "<phase-2-task-id>"
