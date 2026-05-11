@@ -213,7 +213,7 @@ agents:
     model: sonnet
     description: 代码修复执行者，根据审核意见修复代码并提交
     spawn_config:
-      tools: [Read, Edit, Write, Bash, Grep, Glob]
+      tools: [Read, Edit, Write, Bash, Grep, Glob, SendMessage, ToolSearch]
       run_in_background: false  # Phase 4 需等待修复完成
     output_format:
       required_fields: [修复列表, 提交记录, 验证结果]
@@ -645,7 +645,7 @@ workflow:
         params:
           command: gh pr comment {pr_number} --body "{review_report}"
 
-      # Step 4b: auto-fix 路径
+      # Step 4b: auto-fix 路径（需要完整握手协议）
       - step: spawn_fix_executor
         condition: mode == "auto_fix"
         tool: Agent
@@ -655,6 +655,37 @@ workflow:
           subagent_type: pr-fix-executor
           model: sonnet
           prompt: |
+            【第一步只能握手】
+            你现在不得开始修复，也不得抢先自报 ready。
+            等待 team-lead 发送 `【lead_ready】`。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
+            在收到 team-lead 后续正式任务前，不得开始任何修复工作。
+        wait_for_result: false
+
+      - step: send_fix_handshake
+        condition: mode == "auto_fix"
+        tool: SendMessage
+        params:
+          to: "fix-executor"
+          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复\"【agent_ready】已就绪\"。未完成握手前不得开始任何修复工作。"
+
+      - step: wait_fix_ready
+        condition: mode == "auto_fix"
+        action: |
+          等待 fix-executor 回复"【agent_ready】已就绪"。
+          超时未收到（30秒）→ 第1次重试：再次发送 lead_ready
+          超时未收到（再30秒）→ 第2次重试：再次发送 lead_ready
+          超时未收到（再30秒）→ 第3次重试：再次发送 lead_ready
+          3次重试失败 → 标记 fix-executor 为失联，创建 follow-up issue
+
+      - step: send_fix_task
+        condition: mode == "auto_fix"
+        tool: SendMessage
+        params:
+          to: "fix-executor"
+          message: |
+            【正式修复任务】
             根据 PR #{pr_number} 的审核意见修复代码：
 
             审核报告：{review_report}
