@@ -45,13 +45,13 @@ description: |
 **正确方案：Phase 0 双向握手**
 
 ```
-Phase 0: 双向握手协议（必须最先执行，先于任何 Phase）
+Phase 0: 双向握手协议（spawn 每个 agent 后立即握手，先于该 agent 的任何工作）
 
-Step 1 - team-lead 自身握手：
+Step 1 - team-lead 自身握手（整个 Phase 0 的第一步，仅一次）：
   team-lead 先执行 ToolSearch(query="select:SendMessage", max_results=1)
   失败 → 立即停止，禁止 spawn 任何 agent
 
-Step 2 - team-lead spawn agent 后发送握手消息：
+Step 2 - team-lead 每 spawn 一个 agent，立即对该 agent 发送握手消息：
   SendMessage(to="<agent-name>", message="请执行 ToolSearch 并回复"已就绪"")
 
 Step 3 - agent 响应：
@@ -59,14 +59,22 @@ Step 3 - agent 响应：
   成功 → SendMessage(to="team-lead", message="已就绪")
   失败 → agent 无法发送消息，team-lead 超时检测
 
-Step 4 - team-lead 确认：
+Step 4 - team-lead 确认该 agent：
   收到"已就绪" → 该 agent 可参与后续工作
   超时未收到 → 再次发送握手消息通知 agent
   多次超时 → 标记该 agent 为阻塞，后续 Phase 标注"审查不完整"
 ```
 
+**关键理解**：握手按阶段分别进行，不是"先 spawn 全部再一起握手"。
+
+- **Phase 1 阶段**：spawn context-researcher → 与 context-researcher 握手 → 等待调研报告
+- **Phase 2 阶段**：spawn code-analyst + architect + security → 分别与 3 个 agent 握手 → 并行审查
+
+team-lead 在 spawn 一个 agent 后，必须立即与其握手确认，才能继续该阶段的工作。
+不等到该 agent 握手成功，不得给该 agent 分配任何工作。
+
 **强制规则**：
-- **team-lead**：收到所有 agent 的"已就绪"之前，**不得启动任何 Phase**
+- **team-lead**：spawn agent 后必须立即握手，收到"已就绪"前不得给该 agent 分配工作
 - **teammate**：收到握手消息后，**唯一合法操作**是执行 ToolSearch 并回复
 - **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何其他操作**
 
@@ -241,7 +249,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
-| 0 双向握手 | team-lead 先 ToolSearch；spawn 每个 agent 后发握手消息；等待"已就绪"回复；未收到则标记阻塞 | 跳过自身 ToolSearch；spawn 后不发握手；未收齐"已就绪"就启动 Phase 1 |
+| 0 双向握手 | 每 spawn 一个 agent 立即握手；收到该 agent "已就绪"后才分配工作；team-lead 自身先 ToolSearch | 一次 spawn 全部再一起握手；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
 | 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**（issue #742 真实踩坑）；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
 | 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**执行时机**：Phase 2完成后收集所有报告；通过 `codex:rescue` skill 调用；第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选；第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用；把”可选触发”误写成”只有不完整才触发” |
@@ -344,18 +352,23 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - Phase 1 只需：spawn context-researcher（带自包含 prompt）→ 等待报告 → 保存到 task metadata
 - 唯一的 context 传递是：从 Phase 1 报告**转发**到 Phase 2 fresh spawn prompt，不做预收集
 
-### 握手协议（强制，Phase 0）
+### 握手协议（强制，按阶段分别执行）
+
+**握手不是一次性集合操作，而是"spawn 谁 → 跟谁握手"的逐个确认过程。**
+
+**Phase 1**：spawn context-researcher → 握手 → 等"已就绪" → 分配调研任务
+**Phase 2**：spawn code-analyst + architect + security → 分别与每个握手 → 都"已就绪" → 并行分配任务
 
 **team-lead 必须**：
-1. spawn 任何 agent 前，自身先执行 `ToolSearch(query="select:SendMessage")`
-2. spawn agent 后，立即发送握手消息："请执行 ToolSearch 并回复"已就绪""
-3. 等待每个 agent 的"已就绪"回复，**收齐前不得启动 Phase 1**
+1. 整个 Phase 0 的第一步：自身先执行 `ToolSearch(query="select:SendMessage")`
+2. 每 spawn 一个 agent，立即发送握手消息："请执行 ToolSearch 并回复"已就绪""
+3. 收到该 agent 的"已就绪"回复后，才能给该 agent 分配工作
 4. 超时未收到 → 再次发送握手通知；多次超时 → 标记该 agent 为阻塞
 
 **team-lead 禁止**：
-- 自身未 ToolSearch 就 spawn agent
+- 自身未 ToolSearch 就 spawn 任何 agent
 - spawn 后不发握手消息，假设 agent 会自动执行
-- 未收齐"已就绪"就开始 Phase 1 工作
+- 未收到"已就绪"就给该 agent 分配工作
 - 替未响应的 agent 脑补结论
 
 ### 状态操作
