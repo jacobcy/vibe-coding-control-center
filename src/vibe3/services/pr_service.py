@@ -112,7 +112,7 @@ class PRService:
             body=enhanced_body,
             head_branch=head_branch,
             base_branch=base_branch,
-            draft=True,
+            draft=False,
             metadata=metadata,
         )
 
