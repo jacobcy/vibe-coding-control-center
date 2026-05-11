@@ -57,20 +57,29 @@ class FlowOrchestratorService:
     # FlowReader protocol implementation
 
     def get_flow_for_issue(self, issue_number: int) -> dict[str, Any] | None:
-        """Return the active flow record for the given issue, or None."""
-        flows = self.store.get_flows_by_issue(issue_number, role="task")
-        # Return the first active flow
-        for flow in flows:
-            if str(flow.get("flow_status") or "") == "active":
-                return flow
-        return None
+        """Return the active flow record for the given issue, or None.
+
+        Delegates to IssueFlowService.find_active_flow for deterministic selection:
+        1. Active canonical flow (task/issue-N)
+        2. Active non-canonical flow
+        3. First available flow (fallback)
+        """
+        return self.issue_flow_service.find_active_flow(issue_number)
 
     def get_pr_for_issue(self, issue_number: int) -> int | None:
-        """Return the PR number associated with the issue's flow, or None."""
+        """Return the PR number associated with the issue's flow, or None.
+
+        First checks the stored flow record, then falls back to GitHub API
+        if the store hasn't been updated yet.
+        """
         flow = self.get_flow_for_issue(issue_number)
         if flow and flow.get("pr_number"):
             return int(flow["pr_number"])
-        return None
+        # Fallback to GitHub API (important for newly created PRs)
+        try:
+            return self.github.get_pr_for_issue(issue_number)
+        except Exception:
+            return None
 
     def get_active_flow_count(self) -> int:
         """Return the number of currently active flows."""
@@ -99,8 +108,11 @@ class FlowOrchestratorService:
         slug = f"issue-{issue.number}"
         branch = self.issue_flow_service.canonical_branch_name(issue.number)
 
-        # Check for existing flows
+        # Check for existing flows via issue link
         existing_flows = self.store.get_flows_by_issue(issue.number, role="task")
+
+        # Also check canonical branch directly (handles corrupted/missing issue links)
+        canonical_flow = self.store.get_flow_state(branch)
 
         # Reuse existing flow if applicable
         for existing in existing_flows:
@@ -109,14 +121,14 @@ class FlowOrchestratorService:
                 log.info(f"Flow already exists for issue #{issue.number}")
                 return existing
 
-        # Check existing canonical flow
+        # Check canonical flow (from issue link or direct branch check)
         existing_canonical = next(
             (
                 flow
                 for flow in existing_flows
                 if str(flow.get("branch") or "").strip() == branch
             ),
-            None,
+            canonical_flow,  # Fallback to direct branch check
         )
 
         if existing_canonical:

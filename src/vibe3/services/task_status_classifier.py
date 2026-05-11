@@ -34,8 +34,12 @@ def classify_task_status(
       violation
     """
     if state == IssueState.READY:
+        # Missing assignee is always an anomaly, regardless of manager_usernames
+        if not assignee or not assignee.strip():
+            return TaskStatusBucket.READY_ANOMALY
+        # Non-manager assignee is also an anomaly
         if not has_manager_assignee(
-            [assignee] if assignee else [],
+            [assignee],
             manager_usernames,
         ):
             return TaskStatusBucket.READY_ANOMALY
