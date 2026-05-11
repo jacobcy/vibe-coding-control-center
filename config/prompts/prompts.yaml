@@ -363,6 +363,16 @@ run:
   # and move issue state forward.
   run_task: |
     The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
+
+    ### MANDATORY COMMIT STEP — you MUST do this before writing the report:
+    1. Check for uncommitted changes: `git status --short`
+    2. If there are changes:
+       a. Review and stage all relevant changes with `git add <files>`
+       b. Create a commit: `git commit -m "<meaningful message>"`
+       c. Verify the commit: `git log -1 --oneline`
+    3. If there are NO changes, you may skip this step — but ONLY after verifying with `git status --short`
+    4. If `git commit` fails (e.g., pre-commit hook failure), fix the issue and re-commit — do NOT proceed to report
+
     You must write a canonical execution report under `docs/reports/` in the current worktree.
     After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
     Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.

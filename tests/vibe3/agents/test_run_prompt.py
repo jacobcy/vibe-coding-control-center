@@ -110,3 +110,18 @@ def test_build_run_task_section_can_carry_report_ref_guidance() -> None:
 
     assert "docs/reports/" in result
     assert "handoff report" in result
+
+
+def test_build_run_prompt_body_includes_commit_before_report(tmp_path: Path) -> None:
+    """Exit contract must require commit before writing the report."""
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    assert "MANDATORY COMMIT STEP" in context
+    assert "git status --short" in context
+    assert "git commit" in context
+    assert "git log -1 --oneline" in context
+    assert "do NOT proceed to report" in context
