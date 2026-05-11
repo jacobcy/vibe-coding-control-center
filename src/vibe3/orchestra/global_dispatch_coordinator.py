@@ -114,11 +114,40 @@ class GlobalDispatchCoordinator:
         )
         return ready
 
+    def _emit_dispatch_intent(
+        self, role: "TriggerableRoleDefinition", issue: IssueInfo
+    ) -> None:
+        """Emit dispatch intent for an issue."""
+        # Pre-dispatch cleanup: remove conflicting state/* labels
+        clean_old_state_labels(issue, role, self._config)
+
+        branch, _ = self._flow_context(issue.number)
+        publish(build_label_dispatch_event(role, issue, branch=branch))
+
+    def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
+        """Get flow context for an issue (backward compatibility)."""
+        return get_flow_context(
+            issue_number, self._config, self._github, self._store, self._flow_manager
+        )
+
+    def _load_issue(self, issue_number: int) -> IssueInfo | None:
+        """Load issue snapshot (backward compatibility)."""
+        return load_issue(issue_number, self._config, self._github)
+
     def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
         """Check issue health before dispatch.
 
+        Health checks:
+        1. Issue must not be closed on GitHub
+        2. If issue has a PR, PR must not be merged
+
         Returns:
-            True if issue is healthy to dispatch, False if should be skipped.
+            True if issue is healthy and can be dispatched
+            False if issue should be skipped
+
+        Side effects:
+            - Closes issues with merged PRs
+            - Logs health check results
         """
         # Check 1: Issue closed on GitHub
         payload = self._github.view_issue(issue.number, repo=self._config.repo)
@@ -152,26 +181,6 @@ class GlobalDispatchCoordinator:
                     return False
 
         return True
-
-    def _emit_dispatch_intent(
-        self, role: "TriggerableRoleDefinition", issue: IssueInfo
-    ) -> None:
-        """Emit dispatch intent for an issue."""
-        # Pre-dispatch cleanup: remove conflicting state/* labels
-        clean_old_state_labels(issue, role, self._config)
-
-        branch, _ = self._flow_context(issue.number)
-        publish(build_label_dispatch_event(role, issue, branch=branch))
-
-    def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
-        """Get flow context for an issue (backward compatibility)."""
-        return get_flow_context(
-            issue_number, self._config, self._github, self._store, self._flow_manager
-        )
-
-    def _load_issue(self, issue_number: int) -> IssueInfo | None:
-        """Load issue snapshot (backward compatibility)."""
-        return load_issue(issue_number, self._config, self._github)
 
     async def coordinate(self) -> None:
         """Run one heartbeat tick against the frozen queue."""
