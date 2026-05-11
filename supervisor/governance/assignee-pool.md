@@ -62,6 +62,7 @@ Allowed:
      - 当前 issue 有 manager assignee
      - 缺少任何 `state/*` label
      - 没有活跃的 flow scene（`has_flow=False`）
+     - **已有优先级 label**（`priority/[0-9]` 或 legacy priority）
      - 仅允许设置为 `state/ready`
      - 设置后必须写 comment 说明原因
      - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest]` 建议而非直接拒绝
