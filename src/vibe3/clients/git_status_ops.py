@@ -1,5 +1,6 @@
 """Git status operations - diff and status helpers."""
 
+import re
 from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
@@ -170,6 +171,8 @@ def _numstat_via_merge_base(
 ) -> str:
     """Get numstat via merge-base resolution."""
     merge_base = get_merge_base(head, base)
+    if not re.match(r"^[a-f0-9]{40}$", merge_base):
+        raise SystemError(f"get_merge_base returned invalid SHA format: '{merge_base}'")
     return run(["diff", "--numstat", f"{merge_base}...{head}"])
 
 
