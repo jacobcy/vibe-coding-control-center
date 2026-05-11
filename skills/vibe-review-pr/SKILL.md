@@ -37,66 +37,88 @@ description: |
 ## Common Pitfalls（已知陷阱，issue #787）
 
 > **⚠️ 最高优先级提醒：握手失败排查**
-> 
-> 如果握手无法完成，**最常见的原因**是 team-lead 自己没有执行 `ToolSearch`。
-> 
+>
+> 如果握手无法完成，**最常见的原因**是 team-lead 发送 `lead_ready` 后 idle 了。
+>
 > **强制规则**：
-> - **不得以任何理由假设自己已经 deferred tools**
-> - 如果无法完成握手，**必须**先执行 `ToolSearch(query="select:SendMessage")`
-> - 然后通知 agent 执行 `ToolSearch`
-> - 重复操作最多 3 次
-> - 3 次后仍失败 → 标记该 agent 为阻塞，大声说自己是傻瓜
+> - **不得以任何理由在发送 lead_ready 后进入 idle**——必须进入 POLLING
+> - agent 大概率不执行 ToolSearch，lead 需要通过轮询重发 lead_ready 督促
+> - `agent_ready` 能到达 lead = agent ToolSearch 成功的唯一铁证
+> - 收到 `agent_ready` 后，发送 `handshake_completed` + 正式任务（合并一条消息）
+> - 重复重试最多 3 次（每 30 秒一次）
+> - 3 次后仍失败 → 标记该 agent 为阻塞，停止所有操作
 
-### Deferred Tools 加载（有序双向握手协议，issue #787，强制执行）
+### Deferred Tools 加载（四步握手协议 + POLLING 死锁防护，issue #787，强制执行）
 
 **核心问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。
 
-**死锁陷阱**：如果 agent 不执行 `ToolSearch`，就没有 `SendMessage` 能力，**根本无法汇报被阻塞**——之前"失败时报告给 team-lead"的设计是自相矛盾的。
+**死锁陷阱**：agent 大概率不执行 `ToolSearch`（经验事实），没有 `SendMessage` 能力就无法回复。lead 如果 idle 等待 → 双方永久卡死。
 
-**正确方案：Phase 0 有序双向握手（强制执行，不可跳过）**
+**正确方案：四步握手协议 + POLLING 死锁防护（强制执行，不可跳过）**
 
 ```
-Phase 0: 有序双向握手协议（lead_ready → agent_ready → send_task）
+Phase 0: 四步握手协议（lead_ready → POLLING → agent_ready → completed+任务）
 
 Step 1 - team-lead 自身握手（整个 Phase 0 的第一步，仅一次，强制执行）：
   【强制】team-lead 必须执行：
-    ToolSearch(query="select:SendMessage", max_results=1)
-  
+    ToolSearch(query=”select:SendMessage”, max_results=1)
+
   【关键说明】：
   - 即使会话开始时 UserPromptSubmit hook 自动触发了其他 ToolSearch，
     team-lead 也必须重新执行此步骤作为 Phase 0 的正式握手
-  - 会话开始时的 ToolSearch 是响应 hook，不是 Phase 0 的正式握手
   - Deferred tools 机制：声明在 agent 定义中 ≠ schema 已加载
   - 必须显式执行 ToolSearch 才能加载 SendMessage schema
-  
+
   失败 → 立即停止，禁止 spawn 任何 agent
 
-Step 2 - team-lead 每 spawn 一个 agent，立即发送 lead_ready：
-  SendMessage(to="<agent-name>", message="【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch，并在成功后回复【agent_ready】已就绪。")
+Step 2 - team-lead 每 spawn 一个 agent，立即发送 lead_ready，进入 POLLING：
+  SendMessage(to=”<agent-name>”, message=”【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】。”)
+
+  【强制】发送后立即进入 POLLING 状态：
+  - 禁止 idle，每 30 秒检查一次 agent 状态
+  - agent idle 但未收到 agent_ready → agent 还没执行 ToolSearch → 重发 lead_ready（督促 agent）
+  - agent active → 继续等待，不消耗 retry
+  - 收到 agent_ready → 立即退出 POLLING，进入 Step 3
+  - 最多重试 3 次（90 秒），仍失败 → 标记 agent 为 blocked，停止所有操作
+
+  **retry 只消耗在 “agent idle 但未收到 agent_ready” 的场景**；agent active 时不消耗。
 
 Step 3 - agent 在收到 lead_ready 后响应：
-  agent 执行 ToolSearch(query="select:SendMessage", max_results=1)
-  成功 → SendMessage(to="team-lead", message="【agent_ready】已就绪")
-  失败 → agent 无法发送消息，team-lead 超时检测
+  agent 执行 ToolSearch(query=”select:SendMessage”, max_results=1)
+  成功 → SendMessage(to=”team-lead”, message=”【agent_ready】已进入握手流程”)
+  失败 → agent 无法发送消息，沉默；等待 lead 的 POLLING 重发唤醒
 
-Step 4 - team-lead 确认该 agent：
-  收到"【agent_ready】已就绪" → 该 agent 可参与后续工作，下一步必须发送正式任务
-  超时未收到 → 再次发送 lead_ready 握手消息通知 agent
-  多次超时 → 标记该 agent 为阻塞，后续 Phase 标注"审查不完整"
+Step 4 - team-lead 收到 agent_ready 后，发送 completed + 正式任务：
+  收到”【agent_ready】已进入握手流程” → agent_ready 能到达本身就是 agent ToolSearch 成功的铁证
+  → 握手已经完成，只是 agent 不知道
+  → 发送 handshake_completed + 正式任务（合并为一条消息）
+  → lead 可以进入 idle，等待 agent 执行完任务报告
+
+  SendMessage(to=”<agent-name>”, message=”【handshake_completed】握手完成。
+
+【正式任务】
+{任务内容}”)
+
+  超时未收到 agent_ready → POLLING 重试（Step 2）
+  3 次重试失败 → 标记该 agent 为阻塞，后续 Phase 标注”审查不完整”
 ```
 
-**关键理解**：这是**有方向、有时序**的握手，不是双方同时各说一次“已就绪”。
+**核心原则**：
 
-- **Phase 1 阶段**：spawn context-researcher → lead 发送 `lead_ready` → agent 回复 `agent_ready` → 分配调研任务
-- **Phase 2 阶段**：spawn code-analyst + architect + security → lead 分别发送 `lead_ready` → 各 agent 分别回复 `agent_ready` → 并行分配任务
-
-team-lead 在 spawn 一个 agent 后，必须先发 `lead_ready`，等该 agent 返回 `agent_ready`，才能继续该阶段的工作。
-不等到该 agent 的 `agent_ready`，不得给该 agent 分配任何工作。
+- **`agent_ready` 能到达 lead = agent ToolSearch 成功的唯一可靠证明**
+  - agent 若没完成 ToolSearch 就没有 SendMessage，消息到达本身就是证据
+  - 不需要在消息内容里声明”我已完成”
+- **lead 状态**：
+  - 发送 `lead_ready` 后 → **POLLING**（禁止 idle，必须轮询督促 agent）
+  - 收到 `agent_ready`，发送 completed+任务后 → **可以 idle**（等 agent 执行完任务唤醒）
+- **handshake_completed 合并正式任务**：握手已完成，不必分两次消息
 
 **强制规则**：
-- **team-lead**：spawn agent 后必须立即发送 `lead_ready`；收到 `agent_ready` 前不得给该 agent 分配工作
+- **team-lead**：spawn agent 后必须立即发送 `lead_ready` 并进入 POLLING；收到 `agent_ready` 前禁止 idle
 - **teammate**：收到 `lead_ready` 消息后，**唯一合法操作**是执行 ToolSearch 并回复 `agent_ready`
 - **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何其他操作**
+- **POLLING**：lead 必须每 30 秒检查 agent 状态；idle → 重发 lead_ready；3 次失败后停止
+- **handshake_completed**：必须与正式任务合并为一条 SendMessage，不浪费额外消息
 
 **诊断**（如 agent 未发送报告）：
 ```bash
@@ -140,7 +162,7 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 4. 创建或复用 Team：已存在且健康 → 复用；不存在 → TeamCreate；状态异常 → 停止由人类处理。
 5. 创建 Backlog Tasks：TeamCreate 完成后**先只创建 Phase 1 task**（见下方 Backlog Setup）。
 6. **Phase 0 Step 1：team-lead 自身握手**：执行 `ToolSearch(query="select:SendMessage")`，确认 lead 自己可发送消息。
-7. **Phase 1 背景调研**：spawn `context-researcher` → 立即握手 → 收到"已就绪"后再通过第二条 `SendMessage` 下发正式调研任务 → 等待并保存 `phase_1_output`。
+7. **Phase 1 背景调研**：spawn `context-researcher` → 立即发送 `lead_ready` 并进入 POLLING → 收到 `agent_ready` 后发送 `handshake_completed` + 正式调研任务 → 等待并保存 `phase_1_output`。
 8. 基于 `phase_1_output` 判断 PR 类型、已有审查状态与后续路径；**显式指定 PR 编号时，这些事实来自 Phase 1 报告，而不是 team-lead 自己的 `gh pr view/diff`**。
 9. 按 PR 类型补建后续 Backlog Tasks：`simple` 只保留 Phase 1；其他类型再创建/更新 Phase 2 / 3 / 4 / 5 task。
 10. 执行审查：Phase 2 → 3 → 4 → 5，严格串行。
@@ -162,33 +184,38 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
 ```yaml
 - tool: TaskCreate
   params:
-    subject: "Phase 1: Context research"
+    subject: “Phase 1: Context research”
     description: |
       spawn context-researcher, collect PR background and save to metadata
-      【强制握手协议】：
-      1. team-lead 先执行 ToolSearch(query="select:SendMessage") 确认自身可用
-      2. spawn context-researcher 后，立即发送 `【lead_ready】`：
-         SendMessage(to="context-researcher", message="【lead_ready】team-lead 已完成握手，请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'【agent_ready】已就绪'")
-      3. 收到"【agent_ready】已就绪"后，才能分配调研任务
-      4. 未握手成功前，不得给该 agent 分配任何工作
-      5. 显式指定 PR 编号时，team-lead 不得为“确认 PR 是否存在/状态/基本信息”执行 `gh pr view`；首次接触 PR 的主体必须是 context-researcher
+      【强制握手协议 + POLLING】：
+      1. team-lead 先执行 ToolSearch(query=”select:SendMessage”) 确认自身可用
+      2. spawn context-researcher 后，立即发送 `【lead_ready】`，进入 POLLING：
+         SendMessage(to=”context-researcher”, message=”【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】”)
+      3. POLLING：每 30 秒检查 agent 状态；idle → 重发 lead_ready；active → 继续等待
+      4. 收到”【agent_ready】已进入握手流程”后，发送 handshake_completed + 正式任务：
+         SendMessage(to=”context-researcher”, message=”【handshake_completed】握手完成。\n\n【正式调研任务】\n...”)
+      5. 发送 completed+任务后 lead 可进入 idle，等待 agent 执行完任务报告
+      6. 3 次 POLLING 重试失败 → 标记 agent 为阻塞
+      7. 显式指定 PR 编号时，team-lead 不得为”确认 PR 是否存在/状态/基本信息”执行 `gh pr view`；首次接触 PR 的主体必须是 context-researcher
 - tool: TaskUpdate
   params:
-    taskId: "<phase-1-task-id>"
-    status: "in_progress"
-    owner: "team-lead"
+    taskId: “<phase-1-task-id>”
+    status: “in_progress”
+    owner: “team-lead”
     metadata:
-      handshake_protocol: "ordered_v1"
+      handshake_protocol: “four_step_v2”
       handshake_required: true
-      lead_handshake_status: "ready"
+      lead_handshake_status: “ready”
+      polling_interval: 30
+      max_retries: 3
       lead_ready_sent: false
       task_activation_allowed: false
-      expected_next_action: "send_context_lead_ready"
-      activation_state: "awaiting_lead_ready"
-      handshake_agents: ["context-researcher"]
+      expected_next_action: “send_lead_ready_and_start_polling”
+      activation_state: “awaiting_lead_ready”
+      handshake_agents: [“context-researcher”]
       handshake_status:
-        context-researcher: "pending"
-      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
+        context-researcher: “pending”
+      on_handshake_failure: “retry_via_polling_max_3_times_then_block”
 
 # Phase 2 必须等待 Phase 1 完成并通过 task dependency 强制传递背景
 - tool: TaskCreate
@@ -196,22 +223,25 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
     subject: "Phase 2: Parallel review"
     description: |
       spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background
-      【强制握手协议】（逐个进行，非批量）：
-      1. 依次 spawn 每个 agent，每 spawn 一个立即握手：
-         SendMessage(to="<agent-name>", message="【lead_ready】team-lead 已完成握手，请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'【agent_ready】已就绪'")
-      2. 收到该 agent "【agent_ready】已就绪"后，才能分配审查任务
-      3. 每个 agent 必须单独握手确认
-      4. 握手阶段不得内嵌 `phase_1_output` 或任何正式审查任务；收到"已就绪"后，再通过第二条 SendMessage 发送 phase_1_output（从 task #1 metadata 获取）
+      【强制握手协议 + POLLING】（逐个进行，非批量）：
+      1. 依次 spawn 每个 agent，每 spawn 一个立即发送 lead_ready 并进入 POLLING
+      2. POLLING：每 30 秒检查 agent 状态；idle → 重发 lead_ready；active → 等待
+      3. 收到该 agent "【agent_ready】已进入握手流程"后，发送 handshake_completed + 正式审查任务（含 phase_1_output）
+      4. 发送 completed+任务后，对该 agent 的 POLLING 结束，lead 可继续处理下一个 agent
+      5. 每个 agent 必须单独握手确认；3 次 POLLING 失败 → 跳过该 agent
+      6. 握手阶段不得内嵌 `phase_1_output` 或任何正式审查任务；收到"已进入握手流程"后，再通过第二条 SendMessage 发送 completed + phase_1_output（从 task #1 metadata 获取）
 - tool: TaskUpdate
   params:
     taskId: "<phase-2-task-id>"
     addBlockedBy: ["<phase-1-task-id>"]  # 强制依赖 Phase 1
     metadata:
-      handshake_protocol: "ordered_v1"
+      handshake_protocol: "four_step_v2"
       requires_phase_1_output: true  # 标记需要背景信息
       handshake_required: true
+      polling_interval: 30
+      max_retries: 3
       task_activation_allowed: false
-      expected_next_action: "send_code_analyst_lead_ready"
+      expected_next_action: "send_code_analyst_lead_ready_and_start_polling"
       activation_state: "awaiting_first_lead_ready"
       handshake_agents: ["code-analyst", "architect-reviewer", "security-reviewer"]
       lead_ready_sent:
@@ -222,7 +252,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
         code-analyst: "pending"
         architect-reviewer: "pending"
         security-reviewer: "pending"
-      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
+      on_handshake_failure: "retry_via_polling_max_3_times_then_skip_unready_agent"
 
 - tool: TaskCreate
   params:
@@ -351,9 +381,9 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
 
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
-| 0 有序双向握手 | team-lead 自身先 ToolSearch；每个 agent 在所属 phase 内逐个 spawn；lead 先发 `lead_ready`，agent 再回 `agent_ready`；收到该 agent `agent_ready` 后才分配工作 | 双方同时各说一次“已就绪”；一次 spawn 全部再一起握手；要求所有 phase 的 agent 先集体 ready；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
+| 0 四步握手+POLLING | team-lead 自身先 ToolSearch；每个 agent 逐个 spawn；lead 发 `lead_ready` 后进入 POLLING（30s 轮询，禁止 idle）；收到 `agent_ready` = agent ToolSearch 成功；发送 `handshake_completed` + 正式任务（合并一条）；3 次 POLLING 重试失败 → 标记 blocked | lead 发送 lead_ready 后 idle 导致死锁；把 completed 和任务分开发送浪费消息；在收到 agent_ready 前就假设 agent 已 ToolSearch |
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到“已就绪”后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到 `agent_ready` 后再通过第二条 SendMessage 下发 `handshake_completed` + phase_1_output 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
 | 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
 | 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
 | 5 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
@@ -440,10 +470,10 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 ### Phase 流程
 
-- **Phase 0 Step 1 必须先于任何 subagent 执行**：team-lead 自身先完成 ToolSearch；随后每个 agent 在其所属 phase 内按 `lead_ready -> agent_ready` 单独握手，未收到 `agent_ready` 前不得给该 agent 分配工作
+- **Phase 0 Step 1 必须先于任何 subagent 执行**：team-lead 自身先完成 ToolSearch；随后每个 agent 在其所属 phase 内按 `lead_ready → POLLING → agent_ready → handshake_completed+task` 四步握手，lead 发送 lead_ready 后禁止 idle，必须进入 POLLING；未收到 `agent_ready` 前不得给该 agent 分配工作
 - Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
-- fresh spawn 的初始 prompt 只允许握手；收到 `agent_ready` 后，再通过第二条 SendMessage 下发 `phase_1_output` 和正式任务
-- fresh spawn 的 agent 一旦回复“【agent_ready】已就绪”，team-lead 的**下一条有效动作**必须是对应的正式任务激活（如 `send_context_task` / `send_code_analyst_task`）；不得插入“保持空闲 / 等待新 PR / 稍后再分配”之类待命消息
+- fresh spawn 的初始 prompt 只允许握手；收到 `agent_ready` 后，handshake_completed + 正式任务合并为一条 SendMessage 下发（不再单独发 handshake_completed）
+- fresh spawn 的 agent 一旦回复”【agent_ready】已进入握手流程”，team-lead 的**下一条有效动作**必须是对应的正式任务激活（handshake_completed + 任务合并，如 `send_context_task` / `send_code_analyst_task`）；不得插入”保持空闲 / 等待新 PR / 稍后再分配”之类待命消息
 - backlog metadata 必须同时记录 `expected_next_action` 与 `task_activation_allowed`；若元数据仍处于 `awaiting_lead_ready` / `awaiting_agent_ready`，则任何正式任务下发都视为协议违规
 - 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
 - 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
@@ -462,20 +492,20 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 **握手不是一次性集合操作，而是"spawn 谁 → 跟谁握手"的逐个确认过程。**
 
-**Phase 1**：spawn context-researcher → 握手 → 等"已就绪" → 分配调研任务
-**Phase 2**：spawn code-analyst + architect + security → 分别与每个握手 → 都"已就绪" → 并行分配任务
+**Phase 1**：spawn context-researcher → lead_ready → POLLING → 等"已进入握手流程" → handshake_completed + 正式调研任务
+**Phase 2**：spawn code-analyst + architect + security → 分别 lead_ready + POLLING → 都"已进入握手流程" → handshake_completed + 正式审查任务
 
 **team-lead 必须**：
 1. 整个 Phase 0 的第一步：自身先执行 `ToolSearch(query="select:SendMessage")`
 2. 每 spawn 一个 agent，立即发送 `【lead_ready】` 握手消息
-3. 收到该 agent 的 `【agent_ready】已就绪` 回复后，必须立即发送该 phase 的正式任务；fresh spawn 不得先进入 idle / 待命态
-4. 超时未收到 → 再次发送 `lead_ready` 通知；多次超时 → 标记该 agent 为阻塞
+3. 收到该 agent 的 `【agent_ready】已进入握手流程` 回复后，必须立即发送 `【handshake_completed】` + 正式任务（合并为一条消息）；fresh spawn 不得先进入 idle / 待命态
+4. 超时未收到 → 进入 POLLING：每 30s 检查，agent idle 则重发 `lead_ready`，最多 3 次 → 标记该 agent 为阻塞
 
 **team-lead 禁止**：
 - 自身未 ToolSearch 就 spawn 任何 agent
 - spawn 后不发 `lead_ready`，假设 agent 会自动执行
 - 未收到 `agent_ready` 就给该 agent 分配工作
-- 对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR / 等待以后再分配"
+- 对 fresh spawn 且刚回复"【agent_ready】已进入握手流程"的 agent 发送"保持空闲 / 等待新 PR / 等待以后再分配"
 - 替未响应的 agent 脑补结论
 
 ### 状态操作

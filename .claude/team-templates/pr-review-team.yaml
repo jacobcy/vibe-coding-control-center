@@ -270,34 +270,37 @@ workflow:
             你现在不得开始调研，也不得抢先自报 ready。
             等待 team-lead 发送 `【lead_ready】`。
             收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何调研。
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已进入握手流程")。
+            在收到 team-lead 后续 `【handshake_completed】` + 正式任务前，不得开始任何调研。
       - step: send_context_handshake
         tool: SendMessage
         params:
-          to: "context-researcher"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始任何调研工作。"
+          to: “context-researcher”
+          message: “【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】已进入握手流程。未完成握手前不得开始任何调研工作。”
       - step: verify_context_handshake
         action: |
-          等待 context-researcher 回复“【agent_ready】已就绪”。
+          【POLLING 模式】发送 lead_ready 后，禁止 idle，每 30 秒检查 agent 状态。
 
           验证规则：
-          1. 最多重试 3 次握手消息
-          2. 只有收到明确“【agent_ready】已就绪”，才能将该 teammate 视为有效执行者
-          3. 收到“【agent_ready】已就绪”后，立即同步 Phase 1 task metadata.handshake_status.context-researcher = "ready"
-          4. 未收到"【agent_ready】已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review
+          1. 每 30 秒检查一次：收到 agent_ready → 握手成功；agent idle 但未收到 agent_ready → 重发 lead_ready
+          2. 最多重试 3 次（90 秒），均未收到 → 标记 context-researcher blocked
+          3. 收到”【agent_ready】已进入握手流程” → agent_ready 能到达 = agent ToolSearch 成功
+          4. 收到后立即同步 Phase 1 task metadata.handshake_status.context-researcher = “ready”
+          5. agent active 期间继续等待，不消耗 retry 次数
 
           关键约束：
           - 未通过握手的 context-researcher 即使后续产出报告，也不得作为有效 Phase 1 输出
           - Phase 2 读取背景前必须检查 context-researcher 握手状态为 ready
-          - 一旦收到“已就绪”，下一步必须进入 send_context_task；不得发送 idle/待命类消息
-          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`
-          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_context_task, activation_state=awaiting_task_dispatch`
+          - 一旦收到 agent_ready，下一步必须进入 send_context_task（handshake_completed + 任务合并发送）
+          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent=true, expected_next_action=polling_verify_agent_ready, activation_state=polling`
+          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_completed_and_task, activation_state=ready_to_send`
       - step: send_context_task
         tool: SendMessage
         params:
           to: "context-researcher"
           message: |
+            【handshake_completed】握手完成。
+
             【正式调研任务】
             审查 PR #{pr_number}，请自主完成背景调研。
             1. 使用 gh pr view {pr_number} 获取 PR 基本信息（标题、描述、改动文件、标签）
@@ -308,7 +311,7 @@ workflow:
             6. 输出结构化背景报告：PR 概述、改动范围、关联 issue、领域知识、风险评估
 
             ## 重要
-            - 这是握手成功后的正式工作指令
+            - 握手已完成，这是正式工作指令
             - 完成后通过 SendMessage 将报告发送给 team-lead
       - step: receive_context_report
         action: 等待 teammate-message，获取背景报告
@@ -327,13 +330,13 @@ workflow:
     requires_phase_1_output: true
     message_passing: SendMessage
     # 【关键】fresh spawn 初始 prompt 只允许握手
-    # Phase 1 背景必须在收到“已就绪”后，通过第二条 SendMessage 下发
+    # Phase 1 背景必须在收到”已进入握手流程”后，通过第二条 SendMessage 下发（handshake_completed + 任务合并）
     # 执行指令
     execution:
       - step: spawn_code_analyst
         tool: Agent
         params:
-          # 握手 gate 优先于“同一响应并行 spawn”优化；先确认 ready，再把结果算作有效执行
+          # 握手 gate 优先于”同一响应并行 spawn”优化；先确认 ready，再把结果算作有效执行
           team_name: pr-review-team
           name: code-analyst
           subagent_type: pr-code-analyst
@@ -342,28 +345,38 @@ workflow:
             【第一步只能握手】
             你现在不得开始审查，也不得抢先自报 ready。
             等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何审查。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query=”select:SendMessage”, max_results=1)，
+            然后立刻 SendMessage(to=”team-lead”, message=”【agent_ready】已进入握手流程”)。
+            在收到 team-lead 后续 `【handshake_completed】` + 正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_code_analyst_handshake
         tool: SendMessage
         params:
-          to: "code-analyst"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
+          to: “code-analyst”
+          message: “【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】已进入握手流程。未完成握手前不得开始任何审查工作。”
       - step: verify_code_analyst_handshake
         action: |
-          等待 code-analyst 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
-          下一步必须进入 send_code_analyst_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.code-analyst=true` 后，`expected_next_action=verify_code_analyst_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+          【POLLING 模式】发送 lead_ready 后，禁止 idle，每 30 秒检查 agent 状态。
+
+          验证规则：
+          1. 每 30 秒检查一次：收到 agent_ready → 握手成功；agent idle 但未收到 agent_ready → 重发 lead_ready
+          2. 最多重试 3 次（90 秒），均未收到 → 标记 code-analyst blocked
+          3. 收到”【agent_ready】已进入握手流程” → agent_ready 能到达 = agent ToolSearch 成功
+          4. 收到后立即同步 Phase 2 task metadata.handshake_status.code-analyst = “ready”
+          5. agent active 期间继续等待，不消耗 retry 次数
+
+          关键约束：
+          - 未通过握手的 code-analyst 即使后续产出报告，也不得作为有效 Phase 2 输出
+          - 一旦收到 agent_ready，下一步必须进入 send_code_analyst_task（handshake_completed + 任务合并发送）
+          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent.code-analyst=true, expected_next_action=polling_verify_agent_ready`
+          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed.code-analyst=true, expected_next_action=send_completed_and_task`
       - step: send_code_analyst_task
         tool: SendMessage
         params:
-          to: "code-analyst"
+          to: “code-analyst”
           message: |
+            【handshake_completed】握手完成。
+
             【正式审查任务】
             分析 PR #{pr_number} 的代码质量。
 
@@ -382,28 +395,38 @@ workflow:
             【第一步只能握手】
             你现在不得开始审查，也不得抢先自报 ready。
             等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何审查。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query=”select:SendMessage”, max_results=1)，
+            然后立刻 SendMessage(to=”team-lead”, message=”【agent_ready】已进入握手流程”)。
+            在收到 team-lead 后续 `【handshake_completed】` + 正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_architect_handshake
         tool: SendMessage
         params:
-          to: "architect-reviewer"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
+          to: “architect-reviewer”
+          message: “【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】已进入握手流程。未完成握手前不得开始任何审查工作。”
       - step: verify_architect_handshake
         action: |
-          等待 architect-reviewer 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
-          下一步必须进入 send_architect_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 后，`expected_next_action=verify_architect_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+          【POLLING 模式】发送 lead_ready 后，禁止 idle，每 30 秒检查 agent 状态。
+
+          验证规则：
+          1. 每 30 秒检查一次：收到 agent_ready → 握手成功；agent idle 但未收到 agent_ready → 重发 lead_ready
+          2. 最多重试 3 次（90 秒），均未收到 → 标记 architect-reviewer blocked
+          3. 收到”【agent_ready】已进入握手流程” → agent_ready 能到达 = agent ToolSearch 成功
+          4. 收到后立即同步 Phase 2 task metadata.handshake_status.architect-reviewer = “ready”
+          5. agent active 期间继续等待，不消耗 retry 次数
+
+          关键约束：
+          - 未通过握手的 architect-reviewer 即使后续产出报告，也不得作为有效 Phase 2 输出
+          - 一旦收到 agent_ready，下一步必须进入 send_architect_task（handshake_completed + 任务合并发送）
+          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent.architect-reviewer=true, expected_next_action=polling_verify_agent_ready`
+          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed.architect-reviewer=true, expected_next_action=send_completed_and_task`
       - step: send_architect_task
         tool: SendMessage
         params:
-          to: "architect-reviewer"
+          to: “architect-reviewer”
           message: |
+            【handshake_completed】握手完成。
+
             【正式审查任务】
             评估 PR #{pr_number} 的架构影响。
 
@@ -429,28 +452,38 @@ workflow:
             【第一步只能握手】
             你现在不得开始审查，也不得抢先自报 ready。
             等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何审查。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query=”select:SendMessage”, max_results=1)，
+            然后立刻 SendMessage(to=”team-lead”, message=”【agent_ready】已进入握手流程”)。
+            在收到 team-lead 后续 `【handshake_completed】` + 正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_security_handshake
         tool: SendMessage
         params:
-          to: "security-reviewer"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
+          to: “security-reviewer”
+          message: “【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】已进入握手流程。未完成握手前不得开始任何审查工作。”
       - step: verify_security_handshake
         action: |
-          等待 security-reviewer 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
-          下一步必须进入 send_security_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.security-reviewer=true` 后，`expected_next_action=verify_security_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+          【POLLING 模式】发送 lead_ready 后，禁止 idle，每 30 秒检查 agent 状态。
+
+          验证规则：
+          1. 每 30 秒检查一次：收到 agent_ready → 握手成功；agent idle 但未收到 agent_ready → 重发 lead_ready
+          2. 最多重试 3 次（90 秒），均未收到 → 标记 security-reviewer blocked
+          3. 收到”【agent_ready】已进入握手流程” → agent_ready 能到达 = agent ToolSearch 成功
+          4. 收到后立即同步 Phase 2 task metadata.handshake_status.security-reviewer = “ready”
+          5. agent active 期间继续等待，不消耗 retry 次数
+
+          关键约束：
+          - 未通过握手的 security-reviewer 即使后续产出报告，也不得作为有效 Phase 2 输出
+          - 一旦收到 agent_ready，下一步必须进入 send_security_task（handshake_completed + 任务合并发送）
+          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent.security-reviewer=true, expected_next_action=polling_verify_agent_ready`
+          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed.security-reviewer=true, expected_next_action=send_completed_and_task`
       - step: send_security_task
         tool: SendMessage
         params:
-          to: "security-reviewer"
+          to: “security-reviewer”
           message: |
+            【handshake_completed】握手完成。
+
             【正式审查任务】
             评估 PR #{pr_number} 的安全性。
 
@@ -479,7 +512,7 @@ workflow:
           - idle 通知是 agent 的正常状态（等待输入），不代表"未开始"或"失败"
           - 实际审查结果通过 task-notification 返回
           - 不要在收到 idle 后立即 SendMessage 提示 agent 执行任务
-          - 只有先前已回复“已就绪”的 agent，才允许进入结果收集
+          - 只有先前已回复”【agent_ready】已进入握手流程”并通过握手的 agent，才允许进入结果收集
           - 未通过握手的 agent 即使后来返回报告，也视为无效报告并跳过
 
           如果超时仍有 agent 未返回：
@@ -659,8 +692,8 @@ workflow:
             你现在不得开始修复，也不得抢先自报 ready。
             等待 team-lead 发送 `【lead_ready】`。
             收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何修复工作。
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已进入握手流程")。
+            在收到 team-lead 后续 `【handshake_completed】` + 正式任务前，不得开始任何修复工作。
         wait_for_result: false
 
       - step: send_fix_handshake
@@ -668,16 +701,19 @@ workflow:
         tool: SendMessage
         params:
           to: "fix-executor"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复\"【agent_ready】已就绪\"。未完成握手前不得开始任何修复工作。"
+          message: "【lead_ready】握手开始。请执行 ToolSearch(query='select:SendMessage', max_results=1)，完成后回复【agent_ready】已进入握手流程。未完成握手前不得开始任何修复工作。"
 
       - step: wait_fix_ready
         condition: mode == "auto_fix"
         action: |
-          等待 fix-executor 回复"【agent_ready】已就绪"。
-          超时未收到（30秒）→ 第1次重试：再次发送 lead_ready
-          超时未收到（再30秒）→ 第2次重试：再次发送 lead_ready
-          超时未收到（再30秒）→ 第3次重试：再次发送 lead_ready
-          3次重试失败 → 标记 fix-executor 为失联，创建 follow-up issue
+          【POLLING 模式】发送 lead_ready 后，禁止 idle，每 30 秒检查 agent 状态。
+
+          验证规则：
+          1. 每 30 秒检查一次：收到 agent_ready → 握手成功；agent idle 但未收到 agent_ready → 重发 lead_ready
+          2. 最多重试 3 次（90 秒），均未收到 → 标记 fix-executor blocked，创建 follow-up issue
+          3. 收到"【agent_ready】已进入握手流程" → agent_ready 能到达 = agent ToolSearch 成功
+          4. agent active 期间继续等待，不消耗 retry 次数
+          5. 一旦收到 agent_ready，下一步必须进入 send_fix_task（handshake_completed + 任务合并发送）
 
       - step: send_fix_task
         condition: mode == "auto_fix"
@@ -685,6 +721,8 @@ workflow:
         params:
           to: "fix-executor"
           message: |
+            【handshake_completed】握手完成。
+
             【正式修复任务】
             根据 PR #{pr_number} 的审核意见修复代码：
 
