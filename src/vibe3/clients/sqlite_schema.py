@@ -25,6 +25,7 @@ _CREATE_FLOW_STATE = """
         planner_actor TEXT,
         executor_actor TEXT,
         reviewer_actor TEXT,
+        manager_actor TEXT,
         latest_actor TEXT,
         initiated_by TEXT,
         blocked_by TEXT,

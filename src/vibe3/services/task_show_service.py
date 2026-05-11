@@ -14,7 +14,6 @@ from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_service import HandoffService
 from vibe3.utils.comment_utils import is_human_comment
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.utils.path_helpers import resolve_ref_path
@@ -205,41 +204,55 @@ class TaskShowService:
     def _select_latest_ref(
         self, branch: str, flow: FlowStatusResponse
     ) -> TaskRefSummary | None:
+        """Select the latest ref from previous round based on state transitions.
+
+        Uses state machine logic to determine which role worked in the
+        previous round:
+        - reviewer_status == done → show audit_ref (most recent completed work)
+        - executor_status == done → show report_ref
+        - planner_status == done → show plan_ref
+        - Otherwise, fallback to most recent ref by mtime
+
+        Args:
+            branch: Branch name
+            flow: Flow status response
+
+        Returns:
+            TaskRefSummary for the previous round's work, or None if not found
+        """
         worktree_root = flow.worktree_root
+
+        # State transition mapping: execution_status → ref_kind
+        # Check in reverse order (reviewer → executor → planner) to show
+        # the most recent completed work
+        status_to_ref = {
+            "reviewer_status": ("audit_ref", "audit"),
+            "executor_status": ("report_ref", "report"),
+            "planner_status": ("plan_ref", "plan"),
+        }
+
+        # Check state transitions in reverse order: reviewer → executor → planner
+        for status_field, (ref_field, kind) in status_to_ref.items():
+            status_value = getattr(flow, status_field, None)
+            if status_value == "done":
+                # This role completed in previous round
+                ref_value = getattr(flow, ref_field, None)
+                if ref_value:
+                    summary = self._build_ref_summary(kind, ref_value, worktree_root)
+                    if summary:
+                        return summary
+
+        # Fallback: most recent ref by modification time
         current_refs = {
             "plan": flow.plan_ref,
             "report": flow.report_ref,
             "audit": flow.audit_ref,
         }
-        handoff_service = HandoffService(
-            store=self.store,
-            git_client=self.flow_service.git_client,
-        )
-        events = sorted(
-            handoff_service.get_handoff_events(branch),
-            key=lambda event: event.created_at,
-            reverse=True,
-        )
-        event_to_kind = {
-            "handoff_plan": "plan",
-            "handoff_report": "report",
-            "handoff_run": "report",
-            "handoff_audit": "audit",
-        }
-        for event in events:
-            kind = event_to_kind.get(event.event_type)
-            if not kind:
-                continue
-            refs = event.refs if isinstance(event.refs, dict) else {}
-            event_ref = str(refs.get("ref") or "")
-            if not event_ref or current_refs.get(kind) != event_ref:
-                continue
-            summary = self._build_ref_summary(kind, event_ref, worktree_root)
-            if summary is not None:
-                return summary
 
         fallback_candidates: list[tuple[float, TaskRefSummary]] = []
         for kind, ref_value in current_refs.items():
+            if not ref_value:
+                continue
             summary = self._build_ref_summary(kind, ref_value, worktree_root)
             if summary is None:
                 continue
@@ -250,6 +263,7 @@ class TaskShowService:
 
         if not fallback_candidates:
             return None
+
         fallback_candidates.sort(key=lambda item: item[0], reverse=True)
         return fallback_candidates[0][1]
 

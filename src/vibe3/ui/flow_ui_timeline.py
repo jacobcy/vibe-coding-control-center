@@ -103,6 +103,7 @@ REF_TO_ACTOR_FIELD: dict[str, str] = {
     "plan_ref": "planner_actor",
     "report_ref": "executor_actor",
     "audit_ref": "reviewer_actor",
+    "indicate_ref": "manager_actor",
 }
 
 
@@ -288,7 +289,7 @@ def _render_refs(
     refs_shown = False
     titles = issue_titles or {}
 
-    for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:
+    for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref", "indicate_ref"]:
         val = getattr(state, label, None)
         if val:
             if not refs_shown:

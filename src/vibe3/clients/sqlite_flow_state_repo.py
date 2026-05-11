@@ -24,6 +24,7 @@ class SQLiteFlowStateRepo:
         "planner_actor",
         "executor_actor",
         "reviewer_actor",
+        "manager_actor",
         "latest_actor",
         "initiated_by",
         "blocked_by",  # Legacy field (deprecated, kept for backward compatibility)

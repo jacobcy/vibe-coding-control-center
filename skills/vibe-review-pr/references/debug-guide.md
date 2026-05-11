@@ -61,6 +61,7 @@ ls -lht ~/.claude/projects/*/*/tool-results/*.txt 2>/dev/null | head -20
 - **自动执行**：每个 agent 在开始工作前会自动调用 `ToolSearch(query="select:SendMessage")`
 - **无需手动干预**：team-lead 无需在 prompt 中提示，agent 会自行处理
 - **已配置 agents**：pr-context-researcher, pr-code-analyst, pr-architect-reviewer, pr-security-reviewer
+- **前提条件**：agent 定义的 `tools:` 和 team template 的 `spawn_config.tools` 都必须包含 `ToolSearch` 与 `SendMessage`；任一侧缺失都会导致握手卡死
 
 如果 teammate 迟迟没有发送报告，检查方法：
 ```bash

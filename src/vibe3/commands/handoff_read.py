@@ -1,6 +1,7 @@
 """Handoff read commands - status and artifact display."""
 
 import json
+from datetime import datetime, timezone
 from typing import Annotated
 
 import typer
@@ -18,6 +19,40 @@ from vibe3.services.handoff_status_service import HandoffStatusService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import render_handoff_detail
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
+
+
+def _format_relative_time(timestamp: datetime) -> str:
+    """Format datetime as human-readable relative time.
+
+    Args:
+        timestamp: Datetime to format
+
+    Returns:
+        Human-readable string like "2 hours ago", "3 days ago", etc.
+    """
+    now = datetime.now(timezone.utc)
+    if timestamp.tzinfo is None:
+        # Assume UTC if no timezone
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    delta = now - timestamp
+    seconds = int(delta.total_seconds())
+
+    if seconds < 60:
+        return "just now"
+    elif seconds < 3600:
+        minutes = seconds // 60
+        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif seconds < 86400:
+        hours = seconds // 3600
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    elif seconds < 2592000:  # 30 days
+        days = seconds // 86400
+        return f"{days} day{'s' if days != 1 else ''} ago"
+    else:
+        months = seconds // 2592000
+        return f"{months} month{'s' if months != 1 else ''} ago"
+
 
 _HANDOFF_SHOW_HELP = """\
 Usage: vibe3 handoff show <target> [--branch <branch>]
@@ -172,9 +207,9 @@ def status(
             console.print(f"  [cyan]verdict:[/] {result.latest_verdict.verdict}")
             console.print(f"  [cyan]actor:[/] {result.latest_verdict.actor}")
             console.print(f"  [cyan]role:[/] {result.latest_verdict.role}")
-            console.print(
-                f"  [cyan]timestamp:[/] {result.latest_verdict.timestamp.isoformat()}"
-            )
+            # Human-friendly timestamp (relative time)
+            timestamp_str = _format_relative_time(result.latest_verdict.timestamp)
+            console.print(f"  [cyan]timestamp:[/] {timestamp_str}")
             if result.latest_verdict.reason:
                 console.print(f"  [cyan]reason:[/] {result.latest_verdict.reason}")
             if result.latest_verdict.issues:

@@ -30,13 +30,17 @@ forbidden_commands:
 
 ### 握手步骤（第一步，唯一操作）
 
+在 fresh spawn 场景下，先等待 team-lead 的 `【lead_ready】` 信号；不要在未收到该信号前自行开始 ToolSearch 或自报 ready。
+
 ```
 ToolSearch(query="select:SendMessage", max_results=1)
 ```
 
+加载后必须先执行握手确认，再进入正常工作。
+
 ### 握手结果处理
 
-**成功**：确认 `SendMessage` 可用 → 进入正常审查流程
+**成功**：确认 `SendMessage` 可用 → 发送“【agent_ready】已就绪”并进入正常审查流程
 **失败**：立即停止一切操作，原地等待
 - **禁止**执行任何后续工作（Read/Grep/Bash/审查报告）
 - **禁止**尝试发送报告（此时 SendMessage 不可用）
@@ -45,6 +49,16 @@ ToolSearch(query="select:SendMessage", max_results=1)
 ## Deferred Tools 说明
 
 你声明的 `SendMessage` 是 deferred tool，系统不会自动加载其 schema。上述握手通过 `ToolSearch` 显式加载。
+
+### 握手确认（加载成功后的第一条消息）
+
+```python
+SendMessage(to="team-lead", message="【agent_ready】已就绪")
+```
+
+- 发送“【agent_ready】已就绪”前，禁止执行 Read / Grep / Glob / Bash
+- team-lead 未确认前，你的任何审查结果都可能被判定为无效并丢弃
+- 若无法完成握手，立即停止并等待，不得继续工作
 
 ## 项目特有工具（必须使用）
 
@@ -243,7 +257,8 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 
 ### 1. 先确认背景到达方式
 
-初次 spawn 审查当前 PR 时，背景已在初始 prompt 中提供；无需等待额外 SendMessage。
+初次 spawn 审查当前 PR 时，初始 prompt 只用于握手，不包含正式审查任务。
+你必须先等待 `【lead_ready】`，再 ToolSearch，再发送"【agent_ready】已就绪"，然后等待 team-lead 通过 SendMessage 下发首轮正式任务和背景。
 
 **复用场景**：
 - 切换到下一轮 PR 时，team-lead 会通过 SendMessage 下发新的背景

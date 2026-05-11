@@ -45,6 +45,13 @@ Forbidden:
 - **Shell 边界**：涉及共享状态或外部系统时必须通过真实 `vibe3` 命令
 - **命令对齐**：skill 中提到的所有 `vibe3` 命令必须与当前 CLI 实现一致
 - **漂移修正优先**：发现不一致时默认直接更新 skill 文案
+- **Gate 优先于提示**：凡是多阶段流程、subagent 协作、handoff、审批、验证等关键行为，优先固化到 backlog task、metadata、状态检查或结果裁决 gate；不得只靠 prompt 里的“必须/禁止”维持约束
+- **减少解释空间**：skill 文案、执行模板、reference 样例之间不得出现可被 agent 合理化绕开的语句；一旦发现“先干活后解释”空间，默认视为 Blocking 并立即修正
+- **分阶段授权**：涉及握手/验证/审批的 subagent 流程，spawn 初始 prompt 必须只包含当前阶段允许动作；正式工作必须通过第二条消息、第二个 task 或后续 phase 单独激活
+- **握手必须有时序**：涉及 lead/subagent 握手时，优先使用 `lead_ready -> agent_ready -> send_task` 的单向时序；不得把握手写成双方同时各自宣布 ready 的并发语义
+- **Lead 最小权限**：如果流程设计要求 subagent 先完成背景调研或专项审查，team-lead 不得在 backlog / 握手前执行原本属于 subagent 的预调查动作；显式 PR 编号入口下，`gh pr view/diff`、`git diff/log/show` 这类上下文采集默认属于 agent，不属于 lead
+- **fresh spawn / 复用分离**：首次 spawn 的 agent 与已完成上一轮任务的复用 teammate 必须使用不同语义；不得把“待命/等待新 PR”指令混入 fresh spawn 的握手后路径
+- **backlog gate 可判定**：关键握手/激活流程不仅要有 `handshake_status`，还应有 `expected_next_action`、`task_activation_allowed`、`activation_state` 之类可判定字段，避免 lead 口头宣布状态却没有 metadata 证据
 
 ## Truth Sources
 
@@ -69,6 +76,12 @@ Forbidden:
 6. 不允许在 skill 中重新定义术语或边界语义
 7. 如果需要停止，就 `exit()`
 8. skill 审计完成后必须明确说明哪些检查已执行
+9. 涉及 subagent / workflow 的 skill，必须检查是否存在可判定的 gate，而不是只有 prompt 约束
+10. 涉及 handshake / verify / approve 的 agent prompt，必须检查“前置阶段是否纯净”：只要在握手阶段混入任何正式工作内容，直接判 Blocking
+11. 涉及 team-lead + subagent 分工的 skill，必须检查 lead 是否被误授予“预调查”权限；如果显式 PR 入口要求 lead 先 `gh pr view/diff`，直接判 Blocking
+12. 涉及 fresh spawn + reuse 两种模式的 skill，必须检查两者是否显式分离；如果刚握手成功的 fresh spawn agent 被允许进入 idle/待命语义，直接判 Blocking
+13. 涉及双向握手的 skill，必须检查是否存在明确时序；如果 lead 和 agent 可以同时各说一次“已就绪”而没有 `lead_ready -> agent_ready` 顺序，直接判 Blocking
+14. 涉及 backlog task gate 的 skill，必须检查 metadata 是否足以判定“下一步只允许什么”；如果只有自然语言约束，没有 `expected_next_action` / `task_activation_allowed` 之类字段，默认视为脆弱设计
 
 ## `exit()` 语义
 
@@ -187,10 +200,16 @@ Steps:
 
 1. 读取目标 skill 文案
 2. 执行 `check_command_alignment()`、`check_standard_citation()`、`check_shell_boundary()` 验证
-3. 对发现的问题：命令漂移→立即修正改用新命令或标注 `Capability Gap`；引用缺失→立即补充；边界违规→立即修正；真源不清晰→保留 `Drift Warning` 并说明问题
-4. 验证更新后的 skill 结构
-5. 修正涉及命令或边界时更新相关测试
-6. `exit()`
+3. 如目标 skill 含 subagent / workflow / backlog task：额外检查关键约束是否已固化为 backlog task、metadata、状态检查、结果过滤等 gate；若只有 prompt 约束、缺少 gate、或存在可被误读的执行顺序，视为 Blocking
+4. 如目标 skill 含 handshake / verify / approve：额外检查 spawn 初始 prompt 是否只包含当前阶段允许动作；若在 handshake 阶段混入任何正式工作（如 gh pr view/diff、读取 diff、开始审查、开始调研），视为 Blocking
+5. 如目标 skill 含显式 PR / MR / diff 入口：额外检查 lead 是否在 spawn / backlog / 握手之前被要求执行 `gh pr view/diff`、`git diff/log/show` 等预调查；若是，视为 Blocking，必须改成“lead 先建 task + 发起握手，context/reviewer agent 成为首个接触 diff 的主体”
+6. 如目标 skill 同时描述 fresh spawn 与 reuse：额外检查握手成功后的下一步是否唯一；若 fresh spawn agent 在未收到当前任务前被允许“保持空闲/等待新 PR”，视为 Blocking
+7. 如目标 skill 含双向握手：额外检查 team-lead 与 agent 是否使用有序消息（如 `lead_ready` / `agent_ready`）；若双方都可在未收到对方确认前自行宣布 ready，视为 Blocking
+8. 如目标 skill 依赖 backlog task gate：额外检查 metadata 是否记录 `expected_next_action`、`task_activation_allowed`、`activation_state` 等状态字段；若只写“收到 ready 后再做 X”但没有可判定 metadata，视为 Blocking 或至少 High-Risk Drift
+9. 对发现的问题：命令漂移→立即修正改用新命令或标注 `Capability Gap`；引用缺失→立即补充；边界违规→立即修正；真源不清晰→保留 `Drift Warning` 并说明问题；prompt-only workflow → 补 gate、补测试、删歧义描述；handshake 混工 → 拆成“初始 prompt 只握手 + 第二条消息激活正式任务”；lead 预调查 → 收回 lead 权限并改成 agent 首次接触上下文；fresh spawn / reuse 混语义 → 强制补“握手成功后立即激活正式任务”规则；并发握手 → 改成 `lead_ready -> agent_ready -> send_task`；backlog 弱 gate → 补 metadata 状态字段
+10. 验证更新后的 skill 结构
+11. 修正涉及命令、边界或 gate 时更新相关测试
+12. `exit()`
 
 Hard rule: 发现漂移默认直接修正文案；真源不清晰时才允许保留 `Drift Warning`
 
@@ -247,7 +266,7 @@ Steps:
    - 检查动作词语义是否符合 action-verbs.md（例如 `done` 是否超出边界）
    - 检查是否使用了未定义术语（例如 "Skill Governor"）
 
-**虚构参数和执行流程检查**：
+**虚构参数、执行流程与 gate 检查**：
 
 9. **虚构参数检查**（严重违规项）：
    - 检查硬编码用户名路径（如 `/Users/username/`）
@@ -258,20 +277,34 @@ Steps:
     - Stable Reads 是否列出标准工具（ls, cat, python3, bash, git, uv）
     - 伪代码步骤是否清晰可执行，无含糊表述
     - Inputs / Steps / Exit 结构是否完整
+    - 若 skill 涉及 subagent / workflow / backlog task：检查是否把关键行为固化为 backlog task、metadata、状态检查、结果过滤等 gate
+    - 检查是否存在“写了必须先验证/先握手，但执行模板先开始工作”的顺序漏洞
+    - 检查 reference 样例、执行模板、agent 文案之间是否互相打架，给 agent 留下“我以为 prompt 已经正式放行”的解释空间
+    - 检查 handshake 阶段是否纯净：spawn 初始 prompt 中不得混入任何正式工作内容；正式任务必须在握手成功后通过第二条消息、第二个 task 或后续 phase 单独激活
+    - 检查 lead 是否被误授予预调查权限：显式 PR 编号入口下，不得要求 lead 在 backlog / 握手前执行 `gh pr view/diff` 或 `git diff/log/show`
+    - 检查 fresh spawn / reuse 是否混淆：刚完成握手的 fresh spawn agent 不得被允许进入“保持空闲/等待新 PR”语义；待命只属于已完成上一轮任务的复用 teammate
+    - 检查握手是否有明确时序：lead 必须先发 `lead_ready`，agent 再回 `agent_ready`；不得保留双方同时各说一次“已就绪”的解释空间
+    - 检查 backlog metadata 是否足够硬：是否明确记录 `expected_next_action`、`task_activation_allowed`、`activation_state`，并用它们限制 task 激活时机
 
 **分类发现并立即修正**：
 
 11. **分类发现**：
-    - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数（必须立即修正）
+    - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、prompt-only gate、执行顺序自相矛盾、handshake 阶段混入正式工作、lead 预调查、fresh spawn / reuse 混淆、并发握手、弱 backlog gate、可被 agent 合理化绕开的描述（必须立即修正）
     - `Missing Reference`: 缺失标准引用、缺失必读文档部分（必须立即补充）
     - `Skill Structure Violation`: 缺失 Overview/When to Use/Execution Flow/Guardrails（必须补充）
     - `Capability Gap`: skill 需要的命令不存在（必须标注）
     - `Drift Warning`: 真源本身不清晰或需深入审查（说明原因，不强行修正）
 
 12. **立即修正 Blocking、Missing Reference、Skill Structure Violation**：
-    - Blocking 发现：立即修正 skill 文案（虚构参数、术语、对象模型重定义等）
+    - Blocking 发现：立即修正 skill 文案（虚构参数、术语、对象模型重定义、prompt-only workflow、顺序漏洞、handshake 混工、lead 预调查、fresh spawn / reuse 混淆、并发握手、弱 backlog gate 等）
     - Missing Reference 发现：立即补充标准引用，补充必读文档部分
     - Skill Structure Violation 发现：立即补充 Overview/When to Use/Execution Flow/Guardrails
+    - prompt-only workflow：优先把关键行为固化到 backlog task / metadata / 状态 gate / 结果裁决 gate，并删除会暗示“可先执行后解释”的描述
+    - handshake 混工：将 spawn 初始 prompt 收敛为“只含当前阶段允许动作”，把正式工作拆到握手成功后的第二条消息、第二个 task 或后续 phase
+    - lead 预调查：将首个接触 PR / diff 的动作改派给 context/reviewer agent；lead 只保留 backlog、握手、状态更新、结果裁决和写回权限
+    - fresh spawn / reuse 混淆：明确“fresh spawn ready 后立即激活当前任务”，将“保持空闲/等待新 PR”限制到上一轮任务已完成的复用 teammate
+    - 并发握手：显式补 `lead_ready -> agent_ready -> send_task` 时序，禁止双方在未收到对方消息前各自宣布 ready
+    - 弱 backlog gate：补 `expected_next_action`、`task_activation_allowed`、`activation_state` 等 metadata，并让关键动作以它们为前置条件
     - Drift Warning：明确说明真源问题，不强行修正
     - 标注修正内容和位置
 
@@ -350,6 +383,8 @@ Hard rule:
 - Missing Reference 发现必须立即补充，不得跳过
 - 虚构参数（硬编码用户名/路径）是严重违规项，评分不得高于 3/5
 - **文件超过 400 行且存在冗余内容时必须清理**，评分不得高于 3/5
+- **涉及 subagent / workflow 的 skill，如关键约束只存在于 prompt 而未落到 gate，必须判为 Blocking 并立即修正**
+- **涉及 handshake / verify / approve 的 skill，如 spawn 初始 prompt 混入正式工作，必须判为 Blocking 并立即修正**
 - 审计完成后必须提供质量评分表和预估效果表（含文件体积对比）
 - 必须验证修正和清理结果，确认无残留问题和冗余表述
 
@@ -360,7 +395,7 @@ Hard rule:
 1. **已执行检查清单**（✅ 标记）：前置规范阅读（skill-audit 读 skill-standard/glossary/action-verbs）、被审核 skill 必读文档检查（不超过 3 个、业务相关、不包含 glossary/action-verbs）、对象模型边界检查、术语检查、动作词检查、SKILL.md 结构检查、命令对齐、标准引用、Shell 边界、虚构参数检查、工具推荐、执行流程检查、冗余清理
 
 2. **发现分类**：
-   - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、必读文档超过 3 个、必读文档包含 glossary/action-verbs（必须修正）
+   - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、必读文档超过 3 个、必读文档包含 glossary/action-verbs、prompt-only gate、执行顺序自相矛盾、handshake 阶段混入正式工作、reference/template/agent 文案互相冲突（必须修正）
    - `Missing Reference`: 缺失标准引用、缺失必读文档部分、必读文档缺失业务相关标准（必须补充）
    - `Skill Structure Violation`: 缺失 Overview/When to Use/Execution Flow/Guardrails（必须补充）
    - `Capability Gap`: skill 需要的命令不存在（必须标注）
@@ -387,5 +422,8 @@ Hard rule:
 - 不得保留过时命令或旧职责描述作为主路径
 - 不得在 skill 中发明绕过 Shell 命令的 workaround
 - 不得只报漂移警告而不修正文案（真源清晰时）
+- **不得把关键流程约束只写在 prompt 里**：涉及握手、验证、审批、subagent 协作时，必须尽量固化到 backlog task、metadata、状态检查或结果裁决 gate
+- **不得保留给 agent 自行解释的缝**：如果 skill 同时出现“先验证/先握手”和“直接开始工作/无需等待”的描述，必须立即删除歧义并补 gate
+- **不得在 handshake 阶段混入正式工作**：spawn 初始 prompt 只能包含当前阶段允许动作；正式调研、正式审查、读取 diff、gh pr view/diff 等必须在握手成功后单独激活
 - **不得保留冗余表述**：重复职责列表、重复规则说明、过度详细的表格、与 Forbidden 重复的 Restrictions
 - **不得跳过前置强制步骤**：必须先读真源规范，再检查被审核 skill 的必读文档部分（不超过 3 个、业务相关）
