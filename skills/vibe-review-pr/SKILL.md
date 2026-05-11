@@ -36,13 +36,14 @@ description: |
 
 ## Common Pitfalls（已知陷阱，issue #787）
 
-### Deferred Tools 加载（自动处理，但需了解）
+### Deferred Tools 加载（team-lead 和 teammates 强制，issue #787）
 
-**问题**：SendMessage 是 deferred tool，调用前必须先加载 schema，否则报 InputValidationError。
+**问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先加载，否则报 `InputValidationError`。
 
-**解决方案**：所有 teammate agent 定义已配置自动加载：
-- 每个 agent 在开始工作前自动调用 `ToolSearch(query="select:SendMessage")`
-- Team-lead **无需**在 prompt 中手动提示
+**强制规则**：
+- **teammate**：agent 定义中已包含初始化指令，但实际执行依赖 agent 是否调用 `ToolSearch`
+- **team-lead**：spawn teammate 后**不验证**其是否加载，但发现 teammate 未发送报告时需检查
+- **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何后续操作**
 
 **诊断**（如 agent 未发送报告）：
 ```bash
