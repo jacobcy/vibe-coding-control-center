@@ -146,6 +146,12 @@ class OrchestrationFacade(ServiceBase):
 
         # Poll issue labels for all trigger states
         if self._coordinator is None:
+            logger.bind(
+                domain="orchestration_facade",
+            ).warning(
+                "GlobalDispatchCoordinator not initialized, dispatch skipped "
+                "(capacity not provided)"
+            )
             return
 
         # Always reconcile session state to prevent stale capacity tracking.
