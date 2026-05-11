@@ -6,6 +6,10 @@ from vibe3.agents.models import ExecutionRole
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.role_policy import get_role_block_function
 
+# Loop prevention constants
+TRANSITION_LIMIT_SOFT = 10  # Standard flow limit
+TRANSITION_LIMIT_HARD = 20  # Hard limit with tolerance
+
 
 def extract_state_label(issue_payload: dict[str, object]) -> str | None:
     """Extract state/ label from GitHub issue payload."""
@@ -154,6 +158,64 @@ def apply_unified_noop_gate(
             actor=actor,
         )
         return
+
+    # --- NEW: State transition count check ---
+    # Increment transition count on successful state change
+    if flow_state is not None:
+        current_count = flow_state.get("transition_count", 0)
+        new_count = current_count + 1
+
+        # Check hard limit
+        if new_count >= TRANSITION_LIMIT_HARD:
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"No-op gate BLOCK: transition count exceeded hard limit "
+                f"({new_count} >= {TRANSITION_LIMIT_HARD})"
+            )
+            store.add_event(
+                branch,
+                EVENT_STATE_UNCHANGED,
+                actor,
+                detail=(
+                    f"Transition count exceeded hard limit: {new_count} >= "
+                    f"{TRANSITION_LIMIT_HARD}. Possible infinite loop."
+                ),
+                refs={
+                    "transition_count": str(new_count),
+                    "limit": str(TRANSITION_LIMIT_HARD),
+                    "issue": str(issue_number),
+                },
+            )
+            _block_fn(
+                issue_number=issue_number,
+                repo=repo,
+                reason=(
+                    f"transition count exceeded: {new_count} >= "
+                    f"{TRANSITION_LIMIT_HARD}"
+                ),
+                actor=actor,
+            )
+            return
+
+        # Log warning if approaching hard limit
+        if new_count >= TRANSITION_LIMIT_SOFT:
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"Transition count approaching hard limit: {new_count} "
+                f"(soft: {TRANSITION_LIMIT_SOFT}, hard: {TRANSITION_LIMIT_HARD})"
+            )
+
+        # Update transition count in flow_state (to be persisted by caller)
+        if flow_state is not None and isinstance(flow_state, dict):
+            flow_state["transition_count"] = new_count
 
     # --- NEW: required_ref check ---
     # Only check ref for worker roles (planner/executor/reviewer).

@@ -47,7 +47,7 @@ description: |
 > - 重复操作最多 3 次
 > - 3 次后仍失败 → 标记该 agent 为阻塞，大声说自己是傻瓜
 
-### Deferred Tools 加载（双向握手协议，强制执行）
+### Deferred Tools 加载（双向握手协议，issue #787，强制执行）
 
 **核心问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。
 
@@ -141,10 +141,11 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 5. 加载 template：读 `.claude/team-templates/pr-review-team.yaml`。
 6. 创建或复用 Team：已存在且健康 → 复用；不存在 → TeamCreate；状态异常 → 停止由人类处理。
 7. 创建 Backlog Tasks：TeamCreate 完成后立即创建（见下方 Backlog Setup）。
-8. 判断 PR 类型：多维判断（见下）。
-9. 执行审查：Phase 1 → 2 → 3 → 4，严格串行。
-10. 询问继续：continue → 回 Step 3，复用 Team；end → Step 11。
-11. TeamDelete：仅当 Step 10 选 end；先向所有 teammates 发 `shutdown_request`，再 TeamDelete；恢复流程可例外。
+8. **Phase 0 双向握手**：team-lead 自身 ToolSearch → spawn agent → 发送握手 → 等待"已就绪"（见下方 Phase 0 契约）
+9. 判断 PR 类型：多维判断（见下）。
+10. 执行审查：Phase 1 → 2 → 3 → 4 → 5，严格串行。
+11. 询问继续：continue → 回 Step 3，复用 Team；end → Step 12。
+12. TeamDelete：仅当 Step 10 选 end；先向所有 teammates 发 `shutdown_request`，再 TeamDelete；恢复流程可例外。
 
 ### Step 6.5: Backlog Setup（TeamCreate 后先建 Phase 1，后续按 PR 类型补建）
 
@@ -164,7 +165,6 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
     subject: "Phase 1: Context research"
     description: |
       spawn context-researcher, collect PR background and save to metadata
-      
       【强制握手协议】：
       1. team-lead 先执行 ToolSearch(query="select:SendMessage") 确认自身可用
       2. spawn context-researcher 后，立即发送握手：
@@ -189,7 +189,6 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
     subject: "Phase 2: Parallel review"
     description: |
       spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background
-      
       【强制握手协议】（逐个进行，非批量）：
       1. 依次 spawn 每个 agent，每 spawn 一个立即握手：
          SendMessage(to="<agent-name>", message="请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'已就绪'")
@@ -215,13 +214,11 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
     subject: "Phase 3: Codex decision"
     description: |
       （必选）校验 Phase 2 报告质量，决定是否启用 codex
-      
       【强制触发条件】满足任一项即启动 codex:rescue：
       - 安全 PR（涉及认证/授权/路径解析/输入验证）
       - 大型 PR（diff > 500 行）
       - 报告冲突（Phase 2 多份报告对同一问题结论矛盾）
       - 报告缺失（Phase 2 应有报告未送达）
-      
       【执行步骤】：
       1. 收集 Phase 2 全部报告，校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
       2. 失真报告标注"报告作废"，不作为 codex 输入
@@ -231,6 +228,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
       
       【关键约束】：
       - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告
+      - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告（文件列表、行数、安全声明、红队测试结果等），不得包含 git diff、代码片段、代码变更内容
       - 不得在 Phase 2 完成前启动（严格串行）
       - 不得用幻觉报告喂 codex（失效数据无法被 codex 验证）
       - 此阶段不涉及 agent 握手。
@@ -339,9 +337,9 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
 | 0 双向握手 | 每 spawn 一个 agent 立即握手；收到该 agent “已就绪”后才分配工作；team-lead 自身先 ToolSearch | 一次 spawn 全部再一起握手；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
-| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output` | **与 Phase 1 并行启动**；fresh spawn 仍要求额外 SendMessage 才开始 |
-| 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告** | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
+| 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
 | 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
 | 5 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
@@ -427,10 +425,38 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 ### Phase 流程
 
+- **Phase 0 必须在任何 Phase 之前完成**：收齐所有 agent 的"已就绪"后才能启动 Phase 1
 - Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
 - fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；不要求额外 SendMessage 才开始
 - 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
 - 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
+
+### Lead 职责边界（强制，issue #823）
+
+- team-lead 职责：spawn agent、管理 task 生命周期、Phase 3 决定是否启用 codex、Phase 4 综合判断、Phase 5 写回（仅限 `gh pr comment` 和 `gh issue create`）
+- **禁止 team-lead 自行收集上下文**（gh pr view、git diff、git log 等），这是 context-researcher 的工作
+- **禁止 team-lead 执行其他 shell 命令**：gh pr diff、git show、git commit、git push 等调研或修改操作
+- Phase 1 只需：spawn context-researcher（带自包含 prompt）→ 等待报告 → 保存到 task metadata
+- 唯一的 context 传递是：从 Phase 1 报告**转发**到 Phase 2 fresh spawn prompt，不做预收集
+
+### 握手协议（强制，按阶段分别执行）
+
+**握手不是一次性集合操作，而是"spawn 谁 → 跟谁握手"的逐个确认过程。**
+
+**Phase 1**：spawn context-researcher → 握手 → 等"已就绪" → 分配调研任务
+**Phase 2**：spawn code-analyst + architect + security → 分别与每个握手 → 都"已就绪" → 并行分配任务
+
+**team-lead 必须**：
+1. 整个 Phase 0 的第一步：自身先执行 `ToolSearch(query="select:SendMessage")`
+2. 每 spawn 一个 agent，立即发送握手消息："请执行 ToolSearch 并回复"已就绪""
+3. 收到该 agent 的"已就绪"回复后，才能给该 agent 分配工作
+4. 超时未收到 → 再次发送握手通知；多次超时 → 标记该 agent 为阻塞
+
+**team-lead 禁止**：
+- 自身未 ToolSearch 就 spawn 任何 agent
+- spawn 后不发握手消息，假设 agent 会自动执行
+- 未收到"已就绪"就给该 agent 分配工作
+- 替未响应的 agent 脑补结论
 
 ### 状态操作
 

@@ -39,6 +39,16 @@ _BACKEND_OPT = Annotated[
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
 
 # Output format options
+JsonOption = Annotated[
+    bool,
+    typer.Option("--json", help="Output in JSON format"),
+]
+
+AllOption = Annotated[
+    bool,
+    typer.Option("--all", help="Include all items (not just active)"),
+]
+
 FormatOption = Annotated[
     Literal["json", "yaml", "table"],
     typer.Option("--format", help="Output format: json, yaml, or table"),
@@ -52,6 +62,11 @@ VerboseOption = Annotated[
 ActorFilterOption = Annotated[
     str | None,
     typer.Option("--actor", help="Filter by actor pattern"),
+]
+
+TraceOption = Annotated[
+    bool,
+    typer.Option("--trace", help="Enable call tracing + DEBUG logs"),
 ]
 
 

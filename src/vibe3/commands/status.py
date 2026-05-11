@@ -5,6 +5,11 @@ from typing import Annotated, cast
 
 import typer
 
+from vibe3.commands.command_options import (
+    AllOption,
+    JsonOption,
+    TraceOption,
+)
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
@@ -23,12 +28,6 @@ from vibe3.services.task_status_classifier import (
     classify_task_status,
 )
 from vibe3.ui.console import console
-
-AllOption = Annotated[
-    bool, typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）")
-]
-JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
-TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
 def _extract_blocked_reason_summary(blocked_reason: str) -> str:
@@ -176,10 +175,10 @@ def status(
             # Fallback if server is not running
             from dataclasses import replace
 
-            from vibe3.execution.flow_dispatch import FlowManager
+            from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 
             orch_service = OrchestraStatusService(
-                config, orchestrator=FlowManager(config)
+                config, orchestrator=FlowOrchestratorService(config)
             )
             local_snap = orch_service.snapshot()
             orch_snapshot = replace(local_snap, server_running=False)
@@ -279,6 +278,7 @@ def status(
             bucket = classify_task_status(
                 state,
                 cast(str | None, item.get("assignee")),
+                config.manager_usernames,
             )
             bucketed_items[bucket].append(item)
 
@@ -349,14 +349,21 @@ def status(
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
+                    assignee = cast(str | None, item.get("assignee"))
 
                     display_title = title[:48] + "..." if len(title) > 48 else title
                     console.print(f"  #{number:4}  [red]READY     [/]  {display_title}")
-                    _render_task_item_details(flow, config)
-                    console.print(
-                        "             [yellow]missing assignee:[/] "
-                        "ready queue historical debt"
-                    )
+                    _render_task_item_details(flow, config, assignee=assignee)
+                    if assignee:
+                        console.print(
+                            "             [yellow]non-manager assignee:[/] "
+                            "requires assignee-pool or roadmap intake repair"
+                        )
+                    else:
+                        console.print(
+                            "             [yellow]missing assignee:[/] "
+                            "ready queue historical debt"
+                        )
             else:
                 console.print("  [dim](none)[/]")
         else:

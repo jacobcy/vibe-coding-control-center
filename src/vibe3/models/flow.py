@@ -94,6 +94,7 @@ class FlowState(BaseModel):
     deleted_at: str | None = (
         None  # Soft delete timestamp (None = active, ISO 8601 = deleted)
     )
+    transition_count: int = 0  # NEW: State transition count for loop prevention
 
     model_config = {"extra": "ignore"}
 
