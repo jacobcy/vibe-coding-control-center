@@ -229,11 +229,21 @@ def build_governance_snapshot_context(
     *,
     config: OrchestraConfig | None = None,
     tick_count: int = 0,
+    material_override: str | None = None,
     github: GitHubClient | None = None,
 ) -> dict[str, Any]:
     """Convert runtime observations into the governance prompt context dict."""
     config = config or load_orchestra_config()
-    current_material = _resolve_governance_material(config, tick_count)
+    if material_override:
+        catalog = load_governance_material_catalog()
+        selected = _find_material_in_catalog(catalog, material_override)
+        if not selected:
+            raise ValueError(
+                f"Material '{material_override}' not found in governance catalog"
+            )
+        current_material = selected.name
+    else:
+        current_material = _resolve_governance_material(config, tick_count)
     material_name = Path(current_material).name
 
     if material_name == "roadmap-intake.md":

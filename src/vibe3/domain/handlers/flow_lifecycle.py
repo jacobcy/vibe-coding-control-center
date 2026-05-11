@@ -15,10 +15,10 @@ from typing import Callable
 from loguru import logger
 
 from vibe3.domain.events.flow_lifecycle import (
-    DomainEvent,
     IssueFailed,
     IssueStateChanged,
 )
+from vibe3.domain.handler_registry import register_handler
 from vibe3.services.issue_failure_service import (
     fail_executor_issue,
     fail_manager_issue,
@@ -27,6 +27,7 @@ from vibe3.services.issue_failure_service import (
 )
 
 
+@register_handler("IssueStateChanged")
 def handle_issue_state_changed(event: IssueStateChanged) -> None:
     """Handle IssueStateChanged event.
 
@@ -49,6 +50,7 @@ _ROLE_FAIL_DISPATCH: dict[str, Callable[..., None]] = {
 }
 
 
+@register_handler("IssueFailed")
 def handle_issue_failed(event: IssueFailed) -> None:
     """Handle IssueFailed event.
 
@@ -70,18 +72,3 @@ def handle_issue_failed(event: IssueFailed) -> None:
         reason=event.reason,
         actor=event.actor,
     )
-
-
-def register_flow_lifecycle_handlers() -> None:
-    """Register all flow lifecycle event handlers."""
-    from typing import cast
-
-    from vibe3.domain.publisher import subscribe
-
-    subscribe(
-        "IssueStateChanged",
-        cast(Callable[[DomainEvent], None], handle_issue_state_changed),
-    )
-    subscribe("IssueFailed", cast(Callable[[DomainEvent], None], handle_issue_failed))
-
-    logger.bind(domain="events").info("Flow lifecycle event handlers registered")

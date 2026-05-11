@@ -1,18 +1,19 @@
 """Manager dispatch-intent handler."""
 
 import asyncio
-from typing import Callable
 
 from loguru import logger
 
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.domain.events import DomainEvent
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
+from vibe3.domain.handler_registry import register_handler
+from vibe3.execution.store_context import get_store
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 
 
+@register_handler("ManagerDispatchIntent")
 def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
     """Dispatch manager from an authoritative dispatch-intent event."""
     if event.actor == "human:resume":
@@ -96,58 +97,57 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
             return
 
         from vibe3.agents.backends.codeagent import CodeagentBackend
-        from vibe3.clients.sqlite_client import SQLiteClient
         from vibe3.environment.session_registry import SessionRegistryService
         from vibe3.execution.coordinator import ExecutionCoordinator
 
-        store = SQLiteClient()
-        backend = CodeagentBackend()
-        registry = SessionRegistryService(store=store, backend=backend)
-        coordinator = ExecutionCoordinator(config, store)
+        with get_store() as store:
+            backend = CodeagentBackend()
+            registry = SessionRegistryService(store=store, backend=backend)
+            coordinator = ExecutionCoordinator(config, store)
 
-        try:
-            request = await loop.run_in_executor(
-                None,
-                lambda: build_manager_request(
-                    config,
-                    issue_info,
-                    registry=registry,
-                ),
-            )
+            try:
+                request = await loop.run_in_executor(
+                    None,
+                    lambda: build_manager_request(
+                        config,
+                        issue_info,
+                        registry=registry,
+                    ),
+                )
 
-            if request is None:
-                _block_for_noop("Failed to prepare role execution request")
-                return
+                if request is None:
+                    _block_for_noop("Failed to prepare role execution request")
+                    return
 
-            result = await loop.run_in_executor(
-                None, lambda: coordinator.dispatch_execution(request)
-            )
+                result = await loop.run_in_executor(
+                    None, lambda: coordinator.dispatch_execution(request)
+                )
 
-            if result.launched:
+                if result.launched:
+                    logger.bind(
+                        domain="issue_state_dispatch_handler",
+                        role="manager",
+                        issue_number=event.issue_number,
+                    ).success("Role execution launched via ExecutionCoordinator")
+                elif result.skipped:
+                    logger.bind(
+                        domain="issue_state_dispatch_handler",
+                        role="manager",
+                        issue_number=event.issue_number,
+                    ).info(f"Role dispatch skipped: {result.reason}")
+                else:
+                    logger.bind(
+                        domain="issue_state_dispatch_handler",
+                        role="manager",
+                        issue_number=event.issue_number,
+                    ).warning(f"Role dispatch failed: {result.reason}")
+
+            except Exception as exc:
                 logger.bind(
                     domain="issue_state_dispatch_handler",
                     role="manager",
                     issue_number=event.issue_number,
-                ).success("Role execution launched via ExecutionCoordinator")
-            elif result.skipped:
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                ).info(f"Role dispatch skipped: {result.reason}")
-            else:
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                ).warning(f"Role dispatch failed: {result.reason}")
-
-        except Exception as exc:
-            logger.bind(
-                domain="issue_state_dispatch_handler",
-                role="manager",
-                issue_number=event.issue_number,
-            ).exception(f"Role dispatch failed: {exc}")
+                ).exception(f"Role dispatch failed: {exc}")
 
     try:
         loop = asyncio.get_running_loop()
@@ -157,18 +157,3 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
         )
     except RuntimeError:
         asyncio.run(_do_dispatch())
-
-
-def register_issue_state_dispatch_handlers() -> None:
-    """Register manager dispatch-intent handlers."""
-    from typing import cast
-
-    from vibe3.domain.publisher import subscribe
-
-    # Subscribe to new event name
-    subscribe(
-        "ManagerDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_manager_dispatch_intent),
-    )
-
-    logger.bind(domain="events").info("Issue-state role dispatch handlers registered")

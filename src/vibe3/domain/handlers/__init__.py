@@ -13,36 +13,40 @@ Handlers are organized by execution chain:
 OrchestrationFacade is a pure observation layer: it publishes events only.
 Execution assembly for governance and supervisor happens in these handlers.
 
+Handlers are automatically registered via @register_handler decorator
+at module import time.
+
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
 
-from vibe3.domain.handlers.dispatch import register_dispatch_handlers
-from vibe3.domain.handlers.flow_lifecycle import register_flow_lifecycle_handlers
-from vibe3.domain.handlers.governance_scan import register_governance_scan_handlers
-from vibe3.domain.handlers.issue_state_dispatch import (
-    register_issue_state_dispatch_handlers,
+# Import handler modules to trigger @register_handler decorator registration
+# Use `_` alias to suppress Ruff F401 (unused import) warnings
+from vibe3.domain.handlers import dispatch as _dispatch
+from vibe3.domain.handlers import flow_lifecycle as _flow_lifecycle
+from vibe3.domain.handlers import governance_scan as _governance_scan
+from vibe3.domain.handlers import issue_state_dispatch as _issue_state_dispatch
+from vibe3.domain.handlers import supervisor_scan as _supervisor_scan
+
+# Store modules in private tuple to prevent Ruff from flagging as unused
+# (intentionally not accessed - purpose is to keep module references alive)
+_HANDLER_MODULES = (
+    _dispatch,
+    _flow_lifecycle,
+    _governance_scan,
+    _issue_state_dispatch,
+    _supervisor_scan,
 )
-from vibe3.domain.handlers.supervisor_scan import register_supervisor_scan_handlers
 
 
 def register_event_handlers() -> None:
     """Register all event handlers with the global publisher.
 
-    This function should be called at application startup to ensure
-    all event handlers are properly registered.
+    Note: With @register_handler decorator, handlers are registered
+    at module import time. This function exists for backward compatibility
+    and to ensure all handler modules are imported.
 
-    Registration order:
-    1. L3 Flow Lifecycle handlers
-    2. L3 Issue-state role dispatch handlers
-    3. L3 Dispatch handlers (planner/executor/reviewer)
-    4. L1 Governance scan handler
-    5. L2 Supervisor scan handler
+    Registration happens automatically when modules are imported above.
     """
-    register_flow_lifecycle_handlers()
-    register_issue_state_dispatch_handlers()
-    register_dispatch_handlers()
-    register_governance_scan_handlers()
-    register_supervisor_scan_handlers()
 
 
 __all__ = [

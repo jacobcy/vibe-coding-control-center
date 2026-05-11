@@ -36,14 +36,14 @@ class TestPlannerDispatchHandler:
 
     @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_planner_dispatch_delegates_to_role_builder(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_sqlite_cls: MagicMock,
+        mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
@@ -57,6 +57,12 @@ class TestPlannerDispatchHandler:
             "title": "Test issue",
             "labels": [],
         }
+
+        # Mock get_store context manager
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = None
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
         # Mock request builder
         expected_request = _make_mock_request("planner", 42)
@@ -98,14 +104,14 @@ class TestExecutorDispatchHandler:
 
     @patch("vibe3.domain.handlers.dispatch.build_run_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_executor_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_sqlite_cls: MagicMock,
+        mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
@@ -122,7 +128,8 @@ class TestExecutorDispatchHandler:
         # Mock flow_state with plan_ref (normal implementation path)
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {"plan_ref": "plan.md"}
-        mock_sqlite_cls.return_value = mock_store
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
         expected_request = _make_mock_request("executor", 42)
         mock_build_request.return_value = expected_request
@@ -145,7 +152,7 @@ class TestExecutorDispatchHandler:
         )
 
         # Verify handler read flow_state
-        mock_store.get_flow_state.assert_called_once_with("task/issue-42")
+        mock_store.get_flow_state.assert_called_with("task/issue-42")
 
         # Verify request builder was called with plan_ref from flow_state
         # and commit_mode=False (trigger_state is in-progress, not merge-ready)
@@ -159,14 +166,14 @@ class TestExecutorDispatchHandler:
 
     @patch("vibe3.domain.handlers.dispatch.build_run_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_executor_dispatch_publish_path_from_merge_ready(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_sqlite_cls: MagicMock,
+        mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
@@ -185,7 +192,8 @@ class TestExecutorDispatchHandler:
         mock_store.get_flow_state.return_value = {
             "plan_ref": "plan.md",
         }
-        mock_sqlite_cls.return_value = mock_store
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
         expected_request = _make_mock_request("executor", 42)
         mock_build_request.return_value = expected_request
@@ -216,14 +224,14 @@ class TestReviewerDispatchHandler:
 
     @patch("vibe3.domain.handlers.dispatch.build_review_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_reviewer_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_sqlite_cls: MagicMock,
+        mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
@@ -240,7 +248,8 @@ class TestReviewerDispatchHandler:
         # Mock flow_state with report_ref
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {"report_ref": "report.md"}
-        mock_sqlite_cls.return_value = mock_store
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
         expected_request = _make_mock_request("reviewer", 42)
         mock_build_request.return_value = expected_request
@@ -263,7 +272,7 @@ class TestReviewerDispatchHandler:
         )
 
         # Verify handler read flow_state
-        mock_store.get_flow_state.assert_called_once_with("task/issue-42")
+        mock_store.get_flow_state.assert_called_with("task/issue-42")
 
         # Verify request builder was called with report_ref from flow_state
         mock_build_request.assert_called_once()
@@ -279,14 +288,14 @@ class TestDispatchNotLaunched:
 
     @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.dispatch.SQLiteClient")
+    @patch("vibe3.domain.handlers.dispatch.get_store")
     @patch("vibe3.domain.handlers.dispatch.GitHubClient")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_dispatch_not_launched_logs_warning(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_sqlite_cls: MagicMock,
+        mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
     ) -> None:
@@ -299,6 +308,12 @@ class TestDispatchNotLaunched:
             "title": "Test issue",
             "labels": [],
         }
+
+        # Mock get_store
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = None
+        mock_get_store.return_value.__enter__ = MagicMock(return_value=mock_store)
+        mock_get_store.return_value.__exit__ = MagicMock(return_value=None)
 
         mock_build_request.return_value = _make_mock_request("planner", 42)
 

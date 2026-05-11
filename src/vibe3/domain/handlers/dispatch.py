@@ -12,16 +12,16 @@ from typing import Callable
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import (
     ExecutorDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
 )
-from vibe3.domain.events.flow_lifecycle import DomainEvent
+from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.execution.store_context import get_store
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.plan import build_plan_request
@@ -65,62 +65,66 @@ def _dispatch_role_intent(
 ) -> None:
     """Dispatch a role intent through role request builder + ExecutionCoordinator."""
     config = load_orchestra_config()
-    store = SQLiteClient()
-    issue = _load_issue_info(config, issue_number)
 
-    logger.bind(
-        domain=handler_domain,
-        issue_number=issue_number,
-    ).debug(f"Building {role} request")
-
-    request = request_builder(config, issue, **builder_kwargs)
-
-    coordinator = ExecutionCoordinator(config, store)
-
-    # Record dispatch intent BEFORE execution (correct chronological order)
-    branch_arg = builder_kwargs.get("branch")
-    branch = str(branch_arg) if branch_arg else ""
-    if branch:
-        store.add_event(
-            branch,
-            f"{role}_dispatched",
-            actor,
-            detail=f"{role.capitalize()} dispatched",
-            refs={
-                "issue": str(issue_number),
-                "role": role,
-            },
-        )
-
-    result = coordinator.dispatch_execution(request)
-
-    if result.launched:
+    with get_store() as store:
+        issue = _load_issue_info(config, issue_number)
 
         logger.bind(
             domain=handler_domain,
             issue_number=issue_number,
-            tmux_session=result.tmux_session,
-        ).success(f"{role.capitalize()} dispatch completed")
-        return
+        ).debug(f"Building {role} request")
 
-    if result.skipped:
+        request = request_builder(config, issue, **builder_kwargs)
+
+        coordinator = ExecutionCoordinator(config, store)
+
+        # Record dispatch intent BEFORE execution (correct chronological order)
+        branch_arg = builder_kwargs.get("branch")
+        branch = str(branch_arg) if branch_arg else ""
+        if branch:
+            store.add_event(
+                branch,
+                f"{role}_dispatched",
+                actor,
+                detail=f"{role.capitalize()} dispatched",
+                refs={
+                    "issue": str(issue_number),
+                    "role": role,
+                },
+            )
+
+        result = coordinator.dispatch_execution(request)
+
+        if result.launched:
+
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                tmux_session=result.tmux_session,
+            ).success(f"{role.capitalize()} dispatch completed")
+            return
+
+        if result.skipped:
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+            ).info(f"{role.capitalize()} dispatch skipped: {result.reason}")
+            return
+
         logger.bind(
             domain=handler_domain,
             issue_number=issue_number,
-        ).info(f"{role.capitalize()} dispatch skipped: {result.reason}")
-        return
-
-    logger.bind(
-        domain=handler_domain,
-        issue_number=issue_number,
-    ).warning(f"{role.capitalize()} dispatch not launched: {result.reason}")
+        ).warning(f"{role.capitalize()} dispatch not launched: {result.reason}")
 
 
+@register_handler("PlannerDispatchIntent")
 def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
     """Handle PlannerDispatchIntent event via role request builder."""
-    store = SQLiteClient()
-    flow_state = store.get_flow_state(event.branch) if event.branch else None
-    has_plan = bool(flow_state and flow_state.get("plan_ref")) if flow_state else False
+    with get_store() as store:
+        flow_state = store.get_flow_state(event.branch) if event.branch else None
+        has_plan = (
+            bool(flow_state and flow_state.get("plan_ref")) if flow_state else False
+        )
 
     logger.bind(
         domain="planner_handler",
@@ -147,6 +151,7 @@ def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
         raise
 
 
+@register_handler("ExecutorDispatchIntent")
 def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     """Handle ExecutorDispatchIntent event via role request builder.
 
@@ -156,12 +161,13 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
     commit_mode is derived from trigger_state: when the executor is dispatched
     with state/merge-ready, it enters the publish path automatically.
     """
-    store = SQLiteClient()
-
-    # Read execution context from flow state
-    flow_state = store.get_flow_state(event.branch) if event.branch else None
-    plan_ref = str(v) if flow_state and (v := flow_state.get("plan_ref")) else None
-    audit_ref = str(v) if flow_state and (v := flow_state.get("audit_ref")) else None
+    with get_store() as store:
+        # Read execution context from flow state
+        flow_state = store.get_flow_state(event.branch) if event.branch else None
+        plan_ref = str(v) if flow_state and (v := flow_state.get("plan_ref")) else None
+        audit_ref = (
+            str(v) if flow_state and (v := flow_state.get("audit_ref")) else None
+        )
 
     # publish path is determined solely by trigger_state == merge-ready
     commit_mode = event.trigger_state == "merge-ready"
@@ -195,20 +201,22 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
         raise
 
 
+@register_handler("ReviewerDispatchIntent")
 def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
     """Handle ReviewerDispatchIntent event via role request builder.
 
     Enriches the neutral dispatch intent with report_ref and retry context
     read from flow state.
     """
-    store = SQLiteClient()
-
-    # Read execution context from flow state
-    flow_state = store.get_flow_state(event.branch) if event.branch else None
-    report_ref = str(v) if flow_state and (v := flow_state.get("report_ref")) else None
-    has_audit = (
-        bool(flow_state and flow_state.get("audit_ref")) if flow_state else False
-    )
+    with get_store() as store:
+        # Read execution context from flow state
+        flow_state = store.get_flow_state(event.branch) if event.branch else None
+        report_ref = (
+            str(v) if flow_state and (v := flow_state.get("report_ref")) else None
+        )
+        has_audit = (
+            bool(flow_state and flow_state.get("audit_ref")) if flow_state else False
+        )
 
     logger.bind(
         domain="reviewer_handler",
@@ -235,26 +243,3 @@ def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
         ).exception(f"Reviewer dispatch failed: {exc}")
         # Propagate exception to event system for proper handling
         raise
-
-
-def register_dispatch_handlers() -> None:
-    """Register all dispatch-intent event handlers."""
-    from typing import cast
-
-    from vibe3.domain.publisher import subscribe
-
-    # Subscribe to new event names
-    subscribe(
-        "PlannerDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_planner_dispatch_intent),
-    )
-    subscribe(
-        "ExecutorDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_executor_dispatch_intent),
-    )
-    subscribe(
-        "ReviewerDispatchIntent",
-        cast(Callable[[DomainEvent], None], handle_reviewer_dispatch_intent),
-    )
-
-    logger.bind(domain="events").info("Dispatch-intent event handlers registered")

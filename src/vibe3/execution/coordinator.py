@@ -97,7 +97,7 @@ class ExecutionCoordinator:
         worktree_manager = WorktreeManager(self.config, repo_path)
         ctx = worktree_manager.acquire_temporary_worktree(
             issue_number=issue_number,
-            base_branch="main",
+            base_branch=self.config.scene_base_ref,
         )
         return ctx.path
 
