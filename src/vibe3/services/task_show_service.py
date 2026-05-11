@@ -208,9 +208,9 @@ class TaskShowService:
 
         Uses state machine logic to determine which role worked in the
         previous round:
-        - planner_status == done → show plan_ref
+        - reviewer_status == done → show audit_ref (most recent completed work)
         - executor_status == done → show report_ref
-        - reviewer_status == done → show audit_ref
+        - planner_status == done → show plan_ref
         - Otherwise, fallback to most recent ref by mtime
 
         Args:
@@ -223,13 +223,15 @@ class TaskShowService:
         worktree_root = flow.worktree_root
 
         # State transition mapping: execution_status → ref_kind
+        # Check in reverse order (reviewer → executor → planner) to show
+        # the most recent completed work
         status_to_ref = {
-            "planner_status": ("plan_ref", "plan"),
-            "executor_status": ("report_ref", "report"),
             "reviewer_status": ("audit_ref", "audit"),
+            "executor_status": ("report_ref", "report"),
+            "planner_status": ("plan_ref", "plan"),
         }
 
-        # Check state transitions in order: planner → executor → reviewer
+        # Check state transitions in reverse order: reviewer → executor → planner
         for status_field, (ref_field, kind) in status_to_ref.items():
             status_value = getattr(flow, status_field, None)
             if status_value == "done":
