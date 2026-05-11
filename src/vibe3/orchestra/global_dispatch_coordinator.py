@@ -150,7 +150,13 @@ class GlobalDispatchCoordinator:
             - Logs health check results
         """
         # Check 1: Issue closed on GitHub
-        payload = self._github.view_issue(issue.number, repo=self._config.repo)
+        try:
+            payload = self._github.view_issue(issue.number, repo=self._config.repo)
+        except Exception as e:
+            logger.bind(domain="orchestra").error(
+                f"Health check failed for #{issue.number}: {e}"
+            )
+            return True  # Fail open: dispatch if we can't verify
         if isinstance(payload, dict) and payload.get("state") == "CLOSED":
             append_orchestra_event(
                 "dispatcher",
@@ -164,15 +170,27 @@ class GlobalDispatchCoordinator:
         if flow:
             pr_number = flow.get("pr_number")
             if pr_number:
-                pr = self._github.get_pr(pr_number=int(pr_number))
-                if pr is not None and pr.state == PRState.MERGED:
-                    self._github.close_issue_if_open(
-                        issue.number,
-                        closing_comment=(
-                            f"PR #{pr_number} 已合并，系统自动关闭此 issue。"
-                        ),
-                        repo=self._config.repo,
+                try:
+                    pr = self._github.get_pr(pr_number=int(pr_number))
+                except Exception as e:
+                    logger.bind(domain="orchestra").warning(
+                        f"Failed to check PR #{pr_number} "
+                        f"for issue #{issue.number}: {e}"
                     )
+                    return True  # Fail open
+                if pr is not None and pr.state == PRState.MERGED:
+                    try:
+                        self._github.close_issue_if_open(
+                            issue.number,
+                            closing_comment=(
+                                f"PR #{pr_number} 已合并，系统自动关闭此 issue。"
+                            ),
+                            repo=self._config.repo,
+                        )
+                    except Exception as e:
+                        logger.bind(domain="orchestra").error(
+                            f"Failed to close issue #{issue.number} after PR merge: {e}"
+                        )
                     append_orchestra_event(
                         "dispatcher",
                         f"GlobalDispatchCoordinator: skipped #{issue.number} "

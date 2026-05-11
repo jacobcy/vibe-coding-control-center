@@ -227,3 +227,46 @@ class TestPreDispatchHealthChecks:
         # Assert
         assert result is True, "Health check should pass for issue with open PR"
         github.close_issue.assert_not_called()
+
+    def test_health_check_handles_network_error(self) -> None:
+        """Health check should fail open on network errors."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        # Setup
+        config = MagicMock()
+        config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
+        config.repo = "owner/repo"  # Add repo to config
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+        )
+
+        issue = IssueInfo(
+            number=46,
+            title="Network error test",
+            state=IssueState.READY,
+            labels=["state/ready"],
+            github_state="OPEN",
+        )
+
+        # Mock network error
+        github.view_issue.side_effect = Exception("Network timeout")
+
+        # Execute
+        result = coordinator._health_check_before_dispatch(issue)
+
+        # Assert - should fail open
+        assert result is True, "Health check should fail open on network errors"
