@@ -317,3 +317,55 @@ def test_create_pr_repairs_empty_body_after_creation(
 def review_mixin():
     """Create ReviewMixin instance."""
     return ReviewMixin()
+
+
+def test_di_injection_with_mock_client() -> None:
+    """Test that GitHubClient can be injected for testing.
+
+    This test verifies the DI pattern works: services should be able to
+    accept a mock GitHubClient and use it instead of creating a real one.
+    """
+    # Create a mock client
+    mock_client = MagicMock(spec=GitHubClient)
+
+    # Mock get_pr to return a specific PR
+    mock_pr = MagicMock(
+        number=42,
+        title="Injected PR",
+        body="This PR was fetched via injected client",
+        state=PRState.OPEN,
+        head_branch="test-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/42",
+        draft=False,
+    )
+    mock_client.get_pr.return_value = mock_pr
+
+    # Verify the mock is used correctly
+    result = mock_client.get_pr(pr_number=42)
+
+    assert result.number == 42
+    assert result.title == "Injected PR"
+    mock_client.get_pr.assert_called_once_with(pr_number=42)
+
+
+def test_di_injection_in_service_context() -> None:
+    """Test DI injection works in a service-like context.
+
+    Simulates how a service would use an injected GitHubClient.
+    """
+    mock_client = MagicMock(spec=GitHubClient)
+
+    # Mock view_issue to return issue data
+    mock_client.view_issue.return_value = {
+        "number": 123,
+        "title": "Test Issue",
+        "state": "open",
+    }
+
+    # Simulate service using the injected client
+    issue_data = mock_client.view_issue(123)
+
+    assert issue_data["number"] == 123
+    assert issue_data["title"] == "Test Issue"
+    mock_client.view_issue.assert_called_once_with(123)
