@@ -100,7 +100,7 @@ class OrchestrationFacade(ServiceBase):
         if self._coordinator:
             self._coordinator.shutdown()
 
-    async def on_tick(self) -> None:
+    async def on_tick(self, tick_id: int = 0) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
 
         Called by runtime heartbeat periodically:
@@ -108,6 +108,9 @@ class OrchestrationFacade(ServiceBase):
         2. Publishes SupervisorIssueIdentified for matching issues
         3. Reconciles in-flight markers (always, even when frozen)
         4. Polls issue labels and dispatches (only when not frozen)
+
+        Args:
+            tick_id: Current tick number from HeartbeatServer (default: 0)
         """
 
         self.on_heartbeat_tick()
@@ -171,7 +174,7 @@ class OrchestrationFacade(ServiceBase):
                 )
                 # Continue to dispatch even if reconciliation fails
 
-        await self._coordinator.coordinate()
+        await self._coordinator.coordinate(tick_id)
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event.

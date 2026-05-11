@@ -38,6 +38,7 @@ class CodeagentCommand:
     fallback_prompt: str | None = None
     fallback_include_global_notice: bool = True
     dry_run_summary: dict[str, Any] | None = None
+    tick_id: int = 0  # Heartbeat tick number for error tracking
 
 
 @dataclass
@@ -78,6 +79,7 @@ def create_codeagent_command(
     fallback_prompt: str | None = None,
     fallback_include_global_notice: bool = True,
     dry_run_summary: dict[str, Any] | None = None,
+    tick_id: int = 0,
 ) -> CodeagentCommand:
     """Factory function to create CodeagentCommand.
 
@@ -106,6 +108,7 @@ def create_codeagent_command(
         fallback_include_global_notice: Whether fallback prompt should prepend
             the global notice
         dry_run_summary: Optional structured summary for dry-run output
+        tick_id: Heartbeat tick number for error tracking
 
     Returns:
         CodeagentCommand instance
@@ -140,4 +143,5 @@ def create_codeagent_command(
         fallback_prompt=fallback_prompt,
         fallback_include_global_notice=fallback_include_global_notice,
         dry_run_summary=dry_run_summary,
+        tick_id=tick_id,
     )

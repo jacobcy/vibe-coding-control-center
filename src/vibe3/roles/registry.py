@@ -46,6 +46,7 @@ def build_label_dispatch_event(
     issue: IssueInfo,
     *,
     branch: str,
+    tick_id: int = 0,
 ) -> (
     ManagerDispatchIntent
     | PlannerDispatchIntent
@@ -57,6 +58,12 @@ def build_label_dispatch_event(
     Dispatch layer emits neutral intents only -- no execution-specific
     context (refs, commit_mode) is read here.  The handler layer enriches
     the request before calling the role builder.
+
+    Args:
+        role: Triggerable role definition
+        issue: Issue info from GitHub
+        branch: Target branch
+        tick_id: Heartbeat tick number for error tracking (default: 0)
     """
     trigger = role.trigger_name
     if trigger == "blocked":
@@ -68,23 +75,27 @@ def build_label_dispatch_event(
             branch=branch,
             trigger_state=role.trigger_state.value,
             issue_title=issue.title if issue.title else None,
+            tick_id=tick_id,
         )
     if trigger == "plan":
         return PlannerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.CLAIMED.value,
+            tick_id=tick_id,
         )
     if trigger == "run":
         return ExecutorDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=role.trigger_state.value,
+            tick_id=tick_id,
         )
     if trigger == "review":
         return ReviewerDispatchIntent(
             issue_number=issue.number,
             branch=branch,
             trigger_state=IssueState.REVIEW.value,
+            tick_id=tick_id,
         )
     raise ValueError(f"Unsupported label dispatch trigger: {trigger}")
