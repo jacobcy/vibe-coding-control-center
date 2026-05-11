@@ -17,6 +17,7 @@ class TestPreDispatchHealthChecks:
         # Setup
         config = MagicMock()
         config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
+        config.repo = "owner/repo"  # Add repo to config
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -54,7 +55,7 @@ class TestPreDispatchHealthChecks:
 
         # Assert
         assert result is False, "Health check should return False for closed issue"
-        github.view_issue.assert_called_once_with(42)
+        github.view_issue.assert_called_once_with(42, repo="owner/repo")
 
     def test_health_check_passes_for_open_issue(self) -> None:
         """Health check should return True for open issues without merged PR."""
@@ -65,6 +66,7 @@ class TestPreDispatchHealthChecks:
         # Setup
         config = MagicMock()
         config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
+        config.repo = "owner/repo"  # Add repo to config
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -108,6 +110,7 @@ class TestPreDispatchHealthChecks:
         # Setup
         config = MagicMock()
         config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
+        config.repo = "owner/repo"  # Add repo to config
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -157,7 +160,11 @@ class TestPreDispatchHealthChecks:
 
         # Assert
         assert result is False, "Health check should fail for issue with merged PR"
-        github.close_issue.assert_called_once_with(44)
+        github.close_issue_if_open.assert_called_once_with(
+            44,
+            closing_comment="PR #123 已合并，系统自动关闭此 issue。",
+            repo="owner/repo",
+        )
 
     def test_health_check_passes_for_open_pr(self) -> None:
         """Health check should pass for issue with open PR."""
@@ -169,6 +176,7 @@ class TestPreDispatchHealthChecks:
         # Setup
         config = MagicMock()
         config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
+        config.repo = "owner/repo"  # Add repo to config
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()

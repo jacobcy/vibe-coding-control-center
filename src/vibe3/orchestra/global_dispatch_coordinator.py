@@ -24,6 +24,7 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.pr import PRState
 from vibe3.orchestra.dispatch_queue_helpers import (
     clean_old_state_labels,
     find_role_for_state,
@@ -112,6 +113,45 @@ class GlobalDispatchCoordinator:
             f"poll_issues_by_state({state.value}): {len(ready)} ready issues",
         )
         return ready
+
+    def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
+        """Check issue health before dispatch.
+
+        Returns:
+            True if issue is healthy to dispatch, False if should be skipped.
+        """
+        # Check 1: Issue closed on GitHub
+        payload = self._github.view_issue(issue.number, repo=self._config.repo)
+        if isinstance(payload, dict) and payload.get("state") == "CLOSED":
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                f"(issue is closed on GitHub)",
+            )
+            return False
+
+        # Check 2: PR merged (auto-close issue)
+        flow = self._flow_manager.get_flow_for_issue(issue.number)
+        if flow:
+            pr_number = flow.get("pr_number")
+            if pr_number:
+                pr = self._github.get_pr(pr_number=int(pr_number))
+                if pr is not None and pr.state == PRState.MERGED:
+                    self._github.close_issue_if_open(
+                        issue.number,
+                        closing_comment=(
+                            f"PR #{pr_number} 已合并，系统自动关闭此 issue。"
+                        ),
+                        repo=self._config.repo,
+                    )
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                        f"(PR #{pr_number} merged, issue auto-closed)",
+                    )
+                    return False
+
+        return True
 
     def _emit_dispatch_intent(
         self, role: "TriggerableRoleDefinition", issue: IssueInfo
@@ -235,6 +275,11 @@ class GlobalDispatchCoordinator:
                 if role is None:
                     self._frozen_queue.pop(index)
                     continue
+
+            # Pre-dispatch health check: verify issue not closed + PR not merged
+            if not self._health_check_before_dispatch(issue):
+                self._frozen_queue.pop(index)
+                continue
 
             try:
                 green = "\033[32m"
