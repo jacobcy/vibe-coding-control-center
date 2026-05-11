@@ -250,12 +250,14 @@ def check_ref_exists(
 
 def _resolve_shared_artifact(
     target: str,
-    git_client: GitPathProtocol,
+    branch: str | None = None,
+    git_client: GitPathProtocol | None = None,
 ) -> Path:
     """Resolve @prefix shared artifact path.
 
     Args:
-        target: Target string with @ prefix (e.g., "@task-xxx/run.md")
+        target: Target string with @ prefix (e.g., "@current", "@task-xxx/run.md")
+        branch: Optional branch for per-branch artifact resolution (e.g., @current)
         git_client: Git client for path resolution
 
     Returns:
@@ -264,7 +266,38 @@ def _resolve_shared_artifact(
     Raises:
         FileNotFoundError: If git common dir unavailable or artifact not found
     """
+    git_client = _get_git_client(git_client)
     key = target[1:]  # Strip @ prefix
+
+    # Special handling for @current (per-branch artifact)
+    if key == "current":
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        if not branch:
+            # Try to get current branch if not specified
+            try:
+                branch = git_client.get_current_branch()
+            except Exception:
+                raise FileNotFoundError(
+                    f"Cannot resolve @current without branch specification: {target}"
+                )
+
+        # Resolve @current to per-branch current.md
+        git_common = get_git_common_dir(git_client)
+        if not git_common:
+            raise FileNotFoundError(
+                f"Cannot resolve shared artifact without git common dir: {target}"
+            )
+
+        handoff_dir = get_branch_handoff_dir(git_common, branch)
+        current_md = handoff_dir / "current.md"
+        if not current_md.exists():
+            raise FileNotFoundError(
+                f"current.md not found for branch '{branch}': {target}"
+            )
+        return current_md
+
+    # Standard shared artifact (not @current)
     git_common = get_git_common_dir(git_client)
     if not git_common:
         raise FileNotFoundError(
@@ -334,7 +367,8 @@ def resolve_handoff_target(
 
     1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
        The ``@`` is stripped and the remainder is joined to the handoff dir.
-       ``branch`` is ignored for shared artifacts.
+       Special case: ``@current`` with ``--branch`` resolves to per-branch current.md.
+       ``branch`` is ignored for other shared artifacts.
 
     2. ``relative/path`` → canonical worktree ref.
        Resolved against the target branch's worktree root (or current worktree
@@ -349,14 +383,14 @@ def resolve_handoff_target(
 
     # Namespace 1: @ prefix → shared handoff store
     if target.startswith("@"):
-        return _resolve_shared_artifact(target, git_client)
+        return _resolve_shared_artifact(target, branch, git_client)
 
     # Namespace 1.5: vibe3/handoff/ prefix → shared handoff store (no @ needed)
     # This handles refs stored by record_passive_artifact that don't have @ prefix
     if target.startswith(_SHARED_HANDOFF_PREFIX):
         # Convert vibe3/handoff/task-xxx/run.md → @task-xxx/run.md
         return _resolve_shared_artifact(
-            "@" + target[len(_SHARED_HANDOFF_PREFIX) :], git_client
+            "@" + target[len(_SHARED_HANDOFF_PREFIX) :], branch, git_client
         )
 
     target_path = Path(target)
