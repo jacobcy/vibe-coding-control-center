@@ -303,10 +303,16 @@ class GlobalDispatchCoordinator:
                     self._frozen_queue.pop(index)
                     continue
 
-            # Pre-dispatch health check: verify issue not closed + PR not merged
+            # === NEW: Pre-dispatch health check ===
             if not self._health_check_before_dispatch(issue):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    "(health check failed)",
+                )
                 self._frozen_queue.pop(index)
                 continue
+            # === END health check ===
 
             try:
                 green = "\033[32m"
