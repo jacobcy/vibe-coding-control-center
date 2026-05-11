@@ -71,3 +71,71 @@ EOF
     "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
   [ "$status" -eq 0 ]
 }
+
+@test "vibe-skill-audit treats lead pre-investigation as blocking" {
+  run grep -F "Lead 最小权限" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "如果显式 PR 入口要求 lead 先 \`gh pr view/diff\`，直接判 Blocking" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "不得要求 lead 在 backlog / 握手前执行 \`gh pr view/diff\` 或 \`git diff/log/show\`" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "lead 预调查：将首个接触 PR / diff 的动作改派给 context/reviewer agent" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "vibe-skill-audit treats fresh-spawn idle fallback as blocking" {
+  run grep -F "fresh spawn / 复用分离" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "如果刚握手成功的 fresh spawn agent 被允许进入 idle/待命语义，直接判 Blocking" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "若 fresh spawn agent 在未收到当前任务前被允许“保持空闲/等待新 PR”，视为 Blocking" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "fresh spawn / reuse 混淆：明确“fresh spawn ready 后立即激活当前任务”" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "vibe-skill-audit treats concurrent ready-ready handshake as blocking" {
+  run grep -F "握手必须有时序" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '如果 lead 和 agent 可以同时各说一次“已就绪”而没有 `lead_ready -> agent_ready` 顺序，直接判 Blocking' \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '并发握手：显式补 `lead_ready -> agent_ready -> send_task` 时序' \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "vibe-skill-audit requires hard backlog metadata gates" {
+  run grep -F "backlog gate 可判定" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '如果只有自然语言约束，没有 `expected_next_action` / `task_activation_allowed` 之类字段，默认视为脆弱设计' \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "若只写“收到 ready 后再做 X”但没有可判定 metadata，视为 Blocking 或至少 High-Risk Drift" \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '弱 backlog gate：补 `expected_next_action`、`task_activation_allowed`、`activation_state` 等 metadata' \
+    "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"
+  [ "$status" -eq 0 ]
+}

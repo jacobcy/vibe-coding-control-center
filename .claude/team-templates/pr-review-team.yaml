@@ -125,11 +125,13 @@ preflight_checks:
 
 # Team-lead 职责边界（强制）
 # - ✅ spawn agent、组织团队、管理 task 生命周期
-# - ✅ 接收 Phase 1 背景报告、嵌入 Phase 2 fresh spawn prompt
+# - ✅ 接收 Phase 1 背景报告，并在握手成功后通过第二条 SendMessage 转发给 Phase 2 agents
 # - ✅ Phase 3 综合判断（收集报告、冲突仲裁、最终决策）
 # - ✅ Phase 4 写回：仅限 gh pr comment 和 gh issue create（禁止其他 gh/git 命令）
 # - ❌ 不得自行收集上下文（gh pr view / git diff 等）——这是 context-researcher 的工作
+# - ❌ 显式 PR 编号入口下，不得为了“确认 PR 状态/标题/标签/改动范围”执行 gh pr view
 # - ❌ 不得在 spawn context-researcher 之前做任何背景调查
+# - ❌ fresh spawn 的 agent 握手成功后，不得先让它"保持空闲/等待新 PR"；必须立即激活当前 phase 的正式任务
 # - ❌ 不得越权替缺失 agent 脑补审查结论
 # - ❌ 不得执行 gh pr diff / git log / git show 等调研命令
 # - ❌ 不得执行 git commit / git push 等修改操作
@@ -139,6 +141,7 @@ preflight_checks:
 #   context-researcher ──(phase_1_output)──▶ team-lead ──(嵌入 prompt)──▶ Phase 2 agents
 #
 # team-lead 只做"转发"，不做"预收集"。context-researcher 用自己工具完成全部背景调研。
+# 显式 PR 编号模式下，lead 的首个有效动作是 backlog + 握手；不是 gh pr view/diff。
 
 # 复用策略
 reuse_policy:
@@ -264,28 +267,32 @@ workflow:
           model: sonnet  # 使用 sonnet 避免 haiku extended thinking 限制
           prompt: |
             【第一步只能握手】
-            你现在不得开始调研。
-            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            你现在不得开始调研，也不得抢先自报 ready。
+            等待 team-lead 发送 `【lead_ready】`。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
             在收到 team-lead 后续正式任务前，不得开始任何调研。
       - step: send_context_handshake
         tool: SendMessage
         params:
           to: "context-researcher"
-          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始任何调研工作。"
+          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始任何调研工作。"
       - step: verify_context_handshake
         action: |
-          等待 context-researcher 回复“已就绪”。
+          等待 context-researcher 回复“【agent_ready】已就绪”。
 
           验证规则：
           1. 最多重试 3 次握手消息
-          2. 只有收到明确“已就绪”，才能将该 teammate 视为有效执行者
-          3. 收到“已就绪”后，立即同步 Phase 1 task metadata.handshake_status.context-researcher = "ready"
-          4. 未收到"已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review
+          2. 只有收到明确“【agent_ready】已就绪”，才能将该 teammate 视为有效执行者
+          3. 收到“【agent_ready】已就绪”后，立即同步 Phase 1 task metadata.handshake_status.context-researcher = "ready"
+          4. 未收到"【agent_ready】已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review
 
           关键约束：
           - 未通过握手的 context-researcher 即使后续产出报告，也不得作为有效 Phase 1 输出
           - Phase 2 读取背景前必须检查 context-researcher 握手状态为 ready
+          - 一旦收到“已就绪”，下一步必须进入 send_context_task；不得发送 idle/待命类消息
+          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`
+          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_context_task, activation_state=awaiting_task_dispatch`
       - step: send_context_task
         tool: SendMessage
         params:
@@ -319,8 +326,8 @@ workflow:
     parallel: true
     requires_phase_1_output: true
     message_passing: SendMessage
-    # 【关键】fresh spawn 直接在 prompt 中携带 Phase 1 背景
-    # SendMessage 仅用于复用 teammate 或补发额外上下文，避免盲审
+    # 【关键】fresh spawn 初始 prompt 只允许握手
+    # Phase 1 背景必须在收到“已就绪”后，通过第二条 SendMessage 下发
     # 执行指令
     execution:
       - step: spawn_code_analyst
@@ -333,21 +340,25 @@ workflow:
           model: sonnet  # 代码分析需要强模型，与 agent 定义一致
           prompt: |
             【第一步只能握手】
-            你现在不得开始审查。
-            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            你现在不得开始审查，也不得抢先自报 ready。
+            等待 team-lead 发送 `【lead_ready】`。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
             在收到 team-lead 后续正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_code_analyst_handshake
         tool: SendMessage
         params:
           to: "code-analyst"
-          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_code_analyst_handshake
         action: |
-          等待 code-analyst 回复“已就绪”。
-          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
+          等待 code-analyst 回复“【agent_ready】已就绪”。
+          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
+          下一步必须进入 send_code_analyst_task；不得先发送 idle/待命类消息
+          backlog gate：写入 `lead_ready_sent.code-analyst=true` 后，`expected_next_action=verify_code_analyst_handshake`
+          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
       - step: send_code_analyst_task
         tool: SendMessage
         params:
@@ -369,21 +380,25 @@ workflow:
           model: sonnet
           prompt: |
             【第一步只能握手】
-            你现在不得开始审查。
-            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            你现在不得开始审查，也不得抢先自报 ready。
+            等待 team-lead 发送 `【lead_ready】`。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
             在收到 team-lead 后续正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_architect_handshake
         tool: SendMessage
         params:
           to: "architect-reviewer"
-          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_architect_handshake
         action: |
-          等待 architect-reviewer 回复“已就绪”。
-          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
+          等待 architect-reviewer 回复“【agent_ready】已就绪”。
+          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
+          下一步必须进入 send_architect_task；不得先发送 idle/待命类消息
+          backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 后，`expected_next_action=verify_architect_handshake`
+          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
       - step: send_architect_task
         tool: SendMessage
         params:
@@ -412,21 +427,25 @@ workflow:
           model: sonnet
           prompt: |
             【第一步只能握手】
-            你现在不得开始审查。
-            先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="已就绪")。
+            你现在不得开始审查，也不得抢先自报 ready。
+            等待 team-lead 发送 `【lead_ready】`。
+            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
             在收到 team-lead 后续正式任务前，不得开始任何审查。
           run_in_background: true
       - step: send_security_handshake
         tool: SendMessage
         params:
           to: "security-reviewer"
-          message: "请先执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“已就绪”。未完成握手前不得开始审查。"
+          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_security_handshake
         action: |
-          等待 security-reviewer 回复“已就绪”。
-          未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
+          等待 security-reviewer 回复“【agent_ready】已就绪”。
+          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
+          下一步必须进入 send_security_task；不得先发送 idle/待命类消息
+          backlog gate：写入 `lead_ready_sent.security-reviewer=true` 后，`expected_next_action=verify_security_handshake`
+          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
       - step: send_security_task
         tool: SendMessage
         params:

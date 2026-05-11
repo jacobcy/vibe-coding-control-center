@@ -7,22 +7,35 @@
 ## Step 6: TeamCreate + Backlog Setup
 
 > **顺序铁律**：先 TeamCreate，后 TaskCreate。反序创建的 task 不关联 team，TaskList 永远返回空。
+> **显式 PR 编号入口铁律**：`/vibe-review-pr 821` 这类入口下，team-lead 在 Step 6 不得执行 `gh pr view` / `gh pr diff` / `git diff`。PR 基本信息和 diff 首次接触者必须是 Phase 1 的 `context-researcher`。
 
 ```python
 # 1. 创建 Team
 TeamCreate(team_name="pr-review-team", description="PR review for PR #{pr_number}")
 
-# 2. TeamCreate 成功后立即创建 phase 追踪 tasks
-t1 = TaskCreate(subject="Phase 1: Context research",    description="...")
-t2 = TaskCreate(subject="Phase 2: Parallel review",     description="...")
-t3 = TaskCreate(subject="Phase 2.5: Codex verification", description="(optional) >500 LOC trigger")
-t4 = TaskCreate(subject="Phase 3: Synthesis",           description="...")
-t5 = TaskCreate(subject="Phase 4: Write back",          description="...")
+# 2. TeamCreate 成功后先只创建 Phase 1 task
+t1 = TaskCreate(subject="Phase 1: Context research", description="...")
 
 # 3. 立即将 Phase 1 标记为 in_progress 并归属 team-lead
-TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
+TaskUpdate(
+  taskId=t1.id,
+  status="in_progress",
+  owner="team-lead",
+  metadata={
+    "handshake_protocol": "ordered_v1",
+    "lead_handshake_status": "ready",
+    "lead_ready_sent": False,
+    "task_activation_allowed": False,
+    "expected_next_action": "send_context_lead_ready",
+    "activation_state": "awaiting_lead_ready",
+  },
+)
 
-# TaskList 可随时验证 5 个 task 都可见
+# 4. team-lead 先完成自身握手，再进入 Phase 1
+ToolSearch(query="select:SendMessage", max_results=1)
+
+# 5. spawn context-researcher 后，先发送 lead_ready；收到 agent_ready 后再发送正式任务
+# 6. 等待 context-researcher 报告后，再决定是否补建 Phase 2/3/4/5 tasks
 ```
 
 ## Phase 1: 背景调研
@@ -38,17 +51,19 @@ TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
     model: haiku
     prompt: |
       【第一步只能握手】
-      你现在不得开始调研。
-      先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="已就绪")。
+      你现在不得开始调研，也不得抢先自报 ready。
+      等待 team-lead 发送 `【lead_ready】`。
+      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
       在收到 team-lead 后续正式任务前，不得开始任何调研。
 
 - tool: SendMessage
   params:
     to: "context-researcher"
     message: |
-      请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“已就绪”；未完成握手前不得开始任何调研工作。
+      【lead_ready】team-lead 已完成握手。
+      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
+      完成后仅回复“【agent_ready】已就绪”；未完成握手前不得开始任何调研工作。
 
 - tool: SendMessage
   params:
@@ -64,16 +79,19 @@ TaskUpdate(taskId=t1.id, status="in_progress", owner="team-lead")
 ```
 
 接收报告优先级：team inbox → teammate-message → 必要时 SendMessage 补发。
-fresh spawn 只有在收到"已就绪"后，team-lead 才能把该 teammate 视为有效执行者。
+fresh spawn 只有在收到"【agent_ready】已就绪"后，team-lead 才能把该 teammate 视为有效执行者。
 未收到 ready 的 context-researcher，即使后续发来报告，也不得作为有效 Phase 1 输出。
 握手成功后，才通过第二条 SendMessage 下发正式调研任务。
+对 fresh spawn 的 context-researcher，收到"【agent_ready】已就绪"后的下一条 team-lead 消息必须是正式调研任务；不得先发送"保持空闲""等待新 PR"之类待命指令。
+backlog metadata 应同步推进：发送 `lead_ready` 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`；收到 `agent_ready` 后写入 `task_activation_allowed=true, expected_next_action=send_context_task`。
+显式 PR 编号入口下，PR 状态、标题、标签、改动范围也必须来自该 Phase 1 报告，而不是 team-lead 自己的预调查。
 
 ## Phase 2: 专项审查
 
 仅适用 `refactor / security / standard`。**Phase 1 必须先完成**，禁止并行启动。
 
 fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
-它们必须先完成握手并发送"已就绪"，之后再由 team-lead 通过第二条 SendMessage 下发背景和正式任务。
+它们必须先收到 team-lead 的 `lead_ready`，再回复 `agent_ready`，之后再由 team-lead 通过第二条 SendMessage 下发背景和正式任务。
 
 同一响应内并行 spawn：
 
@@ -86,9 +104,10 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
     model: sonnet
     prompt: |
       【第一步只能握手】
-      你现在不得开始审查。
-      先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="已就绪")。
+      你现在不得开始审查，也不得抢先自报 ready。
+      等待 team-lead 发送 `【lead_ready】`。
+      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
       在收到 team-lead 后续正式任务前，不得开始任何审查。
     run_in_background: true
 
@@ -96,8 +115,9 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
   params:
     to: "code-analyst"
     message: |
-      请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“已就绪”；未收到握手确认前，不得开始审查。
+      【lead_ready】team-lead 已完成握手。
+      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
+      完成后仅回复“【agent_ready】已就绪”；未收到握手确认前，不得开始审查。
 
 - tool: SendMessage
   params:
@@ -119,9 +139,10 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
     model: opus
     prompt: |
       【第一步只能握手】
-      你现在不得开始审查。
-      先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="已就绪")。
+      你现在不得开始审查，也不得抢先自报 ready。
+      等待 team-lead 发送 `【lead_ready】`。
+      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
       在收到 team-lead 后续正式任务前，不得开始任何审查。
     run_in_background: true
 
@@ -129,8 +150,9 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
   params:
     to: "architect-reviewer"
     message: |
-      请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“已就绪”；未收到握手确认前，不得开始审查。
+      【lead_ready】team-lead 已完成握手。
+      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
+      完成后仅回复“【agent_ready】已就绪”；未收到握手确认前，不得开始审查。
 
 - tool: SendMessage
   params:
@@ -152,9 +174,10 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
     model: sonnet
     prompt: |
       【第一步只能握手】
-      你现在不得开始审查。
-      先执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="已就绪")。
+      你现在不得开始审查，也不得抢先自报 ready。
+      等待 team-lead 发送 `【lead_ready】`。
+      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
+      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
       在收到 team-lead 后续正式任务前，不得开始任何审查。
     run_in_background: true
 
@@ -162,8 +185,9 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
   params:
     to: "security-reviewer"
     message: |
-      请先执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“已就绪”；未收到握手确认前，不得开始审查。
+      【lead_ready】team-lead 已完成握手。
+      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
+      完成后仅回复“【agent_ready】已就绪”；未收到握手确认前，不得开始审查。
 
 - tool: SendMessage
   params:
@@ -210,6 +234,9 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
       {phase_1_output_of_next_pr}
       请基于以上背景分析新的 PR。
 ```
+
+注意：这里的“已有 agent”只指**上一轮任务已经完成并进入复用态**的 teammate。
+fresh spawn 且刚完成握手的 agent 不属于“已有空闲 teammate”；它的下一步必须是当前 PR 的正式任务，而不是待命。
 
 ## Phase 3: 综合判断
 

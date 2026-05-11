@@ -116,15 +116,15 @@ setup() {
     "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
   [ "$status" -eq 0 ]
 
-  run grep -F '未收到"已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review' \
+  run grep -F '未收到"【agent_ready】已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review' \
     "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
   [ "$status" -eq 0 ]
 
-  run grep -F '未收到"已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整' \
+  run grep -F '未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整' \
     "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
   [ "$status" -eq 0 ]
 
-  run grep -F 'fresh spawn 只有在收到"已就绪"后，team-lead 才能把该 teammate 视为有效执行者。' \
+  run grep -F 'fresh spawn 只有在收到"【agent_ready】已就绪"后，team-lead 才能把该 teammate 视为有效执行者。' \
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
   [ "$status" -eq 0 ]
 }
@@ -135,12 +135,12 @@ setup() {
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
   [ "$status" -eq 0 ]
 
-  run grep -F "你现在不得开始审查。" \
+  run grep -F "你现在不得开始审查，也不得抢先自报 ready。" \
     "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml" \
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
   [ "$status" -eq 0 ]
 
-  run grep -F "你现在不得开始调研。" \
+  run grep -F "你现在不得开始调研，也不得抢先自报 ready。" \
     "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml" \
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
   [ "$status" -eq 0 ]
@@ -151,6 +151,14 @@ setup() {
 
   run grep -F "  wait: true" \
     "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
+  [ "$status" -ne 0 ]
+
+  run grep -F '收齐所有 agent 的"已就绪"后才能启动 Phase 1' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -ne 0 ]
+
+  run grep -F '握手时 prompt 中内嵌 phase_1_output' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
   [ "$status" -ne 0 ]
 }
 
@@ -178,4 +186,94 @@ setup() {
   run grep -F 'team-lead 不会预先提供上下文，首轮调研由你自主完成' \
     "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
   [ "$status" -ne 0 ]
+}
+
+@test "vibe-review-pr explicit PR mode forbids lead pre-investigation" {
+  run grep -F '环境检查：只检查 tmux / Agent Teams / TeamCreate / TaskCreate / ToolSearch / SendMessage 可用性；**禁止在这一步执行 `gh pr view` / `gh pr diff` / `git diff`**。' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '显式指定 PR 编号时，这些事实来自 Phase 1 报告，而不是 team-lead 自己的 `gh pr view/diff`' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '显式 PR 编号入口禁止 lead 预调查' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '显式 PR 编号入口下，不得为了“确认 PR 状态/标题/标签/改动范围”执行 gh pr view' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F '显式 PR 编号入口铁律' \
+    "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "vibe-review-pr fresh spawn cannot fall into idle after handshake" {
+  run grep -F 'fresh spawn 的 agent 一旦回复“【agent_ready】已就绪”，team-lead 的**下一条有效动作**必须是对应的正式任务激活' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR / 等待以后再分配"' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '对 fresh spawn 的 context-researcher，收到"【agent_ready】已就绪"后的下一条 team-lead 消息必须是正式调研任务' \
+    "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '下一步必须进入 send_context_task；不得发送 idle/待命类消息' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F '如果你是 fresh spawn，"等待正式调研任务"指的就是**等待当前 PR 的正式调研任务**，不是保持空闲等待以后某个 PR。' \
+    "$REPO_ROOT/.claude/agents/pr-context-researcher.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "vibe-review-pr uses ordered lead-ready agent-ready handshake" {
+  run grep -F 'Phase 0: 有序双向握手协议（lead_ready → agent_ready → send_task）' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F '【lead_ready】team-lead 已完成握手' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md" \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F '【agent_ready】已就绪' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md" \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -F '先等待 `【lead_ready】`' \
+    "$REPO_ROOT/.claude/agents/pr-context-researcher.md" \
+    "$REPO_ROOT/.claude/agents/pr-code-analyst.md" \
+    "$REPO_ROOT/.claude/agents/pr-architect-reviewer.md" \
+    "$REPO_ROOT/.claude/agents/pr-security-reviewer.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "vibe-review-pr backlog metadata hardens handshake and activation gates" {
+  run grep -F 'expected_next_action: "send_context_lead_ready"' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'task_activation_allowed: false' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'activation_state: "awaiting_lead_ready"' \
+    "$REPO_ROOT/skills/vibe-review-pr/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'backlog metadata 应同步推进：发送 `lead_ready` 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`；收到 `agent_ready` 后写入 `task_activation_allowed=true, expected_next_action=send_context_task`。' \
+    "$REPO_ROOT/skills/vibe-review-pr/references/execution-reference.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F 'backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`' \
+    "$REPO_ROOT/.claude/team-templates/pr-review-team.yaml"
+  [ "$status" -eq 0 ]
 }

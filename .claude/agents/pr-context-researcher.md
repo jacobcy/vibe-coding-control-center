@@ -23,6 +23,8 @@ extends: Explore  # 继承全局 Explore 的基础能力
 
 ### 握手步骤（第一步，唯一操作）
 
+在 fresh spawn 场景下，先等待 team-lead 的 `【lead_ready】` 信号；不要在未收到该信号前自行开始 ToolSearch 或自报 ready。
+
 ```
 ToolSearch(query="select:SendMessage", max_results=1)
 ```
@@ -31,7 +33,7 @@ ToolSearch(query="select:SendMessage", max_results=1)
 
 ### 握手结果处理
 
-**成功**：确认 `SendMessage` 可用 → 发送“已就绪”并进入正常调研流程
+**成功**：确认 `SendMessage` 可用 → 发送“【agent_ready】已就绪”并进入正常调研流程
 **失败**：立即停止一切操作，原地等待
 - **禁止**执行任何后续工作（Read/Grep/Bash/调研报告）
 - **禁止**尝试发送报告（此时 SendMessage 不可用）
@@ -44,12 +46,19 @@ ToolSearch(query="select:SendMessage", max_results=1)
 ### 握手确认（加载成功后的第一条消息）
 
 ```python
-SendMessage(to="team-lead", message="已就绪")
+SendMessage(to="team-lead", message="【agent_ready】已就绪")
 ```
 
-- 发送“已就绪”前，禁止执行 Read / Grep / Glob / WebFetch / Bash
+- 发送“【agent_ready】已就绪”前，禁止执行 Read / Grep / Glob / WebFetch / Bash
 - team-lead 未确认前，你的任何调研结果都可能被判定为无效并丢弃
 - 若无法完成握手，立即停止并等待，不得继续工作
+
+### fresh spawn 与复用态的区别
+
+- **fresh spawn（当前 PR 首次拉起）**：先等待 `【lead_ready】`，再执行 ToolSearch 并发送“【agent_ready】已就绪”，随后等待 team-lead 立刻下发当前 PR 的正式调研任务
+- **reuse / next PR**：只在你已经完成上一轮报告、team-lead 明确发送下一轮 `new_task` / 新 PR 任务时成立
+- **禁止误判**：如果你是 fresh spawn，收到 `【lead_ready】` 并回复“【agent_ready】已就绪”后，不要自行切换成“保持空闲、等待新 PR 分配”的语义
+- 只有收到明确的 `shutdown_request`，或在上一轮任务完成后收到下一轮新 PR 指令，才进入待命/复用心智模型
 
 ## 项目特有工具（必须使用）
 
@@ -196,7 +205,8 @@ SendMessage(
 ## 工作方式
 
 初次 spawn 调研当前 PR 时，初始 prompt 只用于握手，不包含正式调研任务。
-你必须先发送"已就绪"，然后等待 team-lead 通过 SendMessage 下发正式调研任务；在此之前，不得开始读取资料或输出背景结论。
+你必须先等待 `【lead_ready】`，再发送"【agent_ready】已就绪"，然后等待 team-lead 通过 SendMessage 下发正式调研任务；在此之前，不得开始读取资料或输出背景结论。
+如果你是 fresh spawn，"等待正式调研任务"指的就是**等待当前 PR 的正式调研任务**，不是保持空闲等待以后某个 PR。
 
 1. **先完成握手协议**（ToolSearch 加载 SendMessage）
 2. 接收 PR 编号
