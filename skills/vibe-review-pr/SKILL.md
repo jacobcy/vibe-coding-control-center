@@ -172,16 +172,55 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 - tool: TaskCreate
   params:
-    subject: "Phase 2.5: Codex verification"
-    description: "(optional) bundle Phase 2 reports, call codex:rescue"
+    subject: "Phase 3: Codex decision"
+    description: |
+      （必选）校验 Phase 2 报告质量，决定是否启用 codex
+      
+      【强制触发条件】满足任一项即启动 codex:rescue：
+      - 安全 PR（涉及认证/授权/路径解析/输入验证）
+      - 大型 PR（diff > 500 行）
+      - 报告冲突（Phase 2 多份报告对同一问题结论矛盾）
+      - 报告缺失（Phase 2 应有报告未送达）
+      
+      【执行步骤】：
+      1. 收集 Phase 2 全部报告，校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
+      2. 失真报告标注"报告作废"，不作为 codex 输入
+      3. 满足触发条件且报告质量合格 → 调用 codex:rescue
+         必须将 Phase 2 完整报告（剔除作废的）作为输入发给 codex
+      4. 不满足触发条件或全部报告均不合格 → 跳过 codex，直接进入 Phase 4
+      
+      【关键约束】：
+      - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告
+      - 不得在 Phase 2 完成前启动（严格串行）
+      - 不得用幻觉报告喂 codex（失效数据无法被 codex 验证）
+      - 此阶段不涉及 agent 握手。
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-3-task-id>"
+    addBlockedBy: ["<phase-2-task-id>"]  # 强制依赖 Phase 2
+    metadata:
+      requires_phase_2_reports: true  # 标记需要 Phase 2 报告
 - tool: TaskCreate
   params:
-    subject: "Phase 3: Synthesis"
-    description: "verify all reports, arbitrate conflicts, final decision"
+    subject: "Phase 4: Synthesis"
+    description: |
+      收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）
+      仲裁不同报告间的冲突，做出最终判断
+      禁止使用已作废的报告做结论
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-4-task-id>"
+    addBlockedBy: ["<phase-3-task-id>"]  # 强制依赖 Phase 3
+    metadata:
+      requires_phase_2_and_3_output: true
 - tool: TaskCreate
   params:
-    subject: "Phase 4: Write back"
-    description: "ask-each mode; post PR comment; create follow-up issues"
+    subject: "Phase 5: Write back"
+    description: "ask-each mode; post PR comment; create follow-up issues。此阶段不涉及 agent 握手。仅限 gh pr comment 和 gh issue create。"
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-5-task-id>"
+    addBlockedBy: ["<phase-4-task-id>"]  # 强制依赖 Phase 4
 ```
 
 **关键步骤（Phase 1 完成后必须执行）**：
@@ -257,13 +296,14 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Step 7
 
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
+| 0 双向握手 | 每 spawn 一个 agent 立即握手；收到该 agent “已就绪”后才分配工作；team-lead 自身先 ToolSearch | 一次 spawn 全部再一起握手；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead | 只打印到终端、未保存为变量、未通过 SendMessage 回传 |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output`；复用 teammate 或补发上下文时才用 SendMessage | **与 Phase 1 并行启动**（issue #742 真实踩坑）；fresh spawn 仍要求额外 SendMessage 才开始，或让复用语义和首轮语义混在一起 |
-| 2.5 Codex验证（可选） | **触发条件**：安全PR、大型PR（>500行）、冲突仲裁；**执行时机**：Phase 2完成后收集所有报告；通过 `codex:rescue` skill 调用；第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选；第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就调用；把”可选触发”误写成”只有不完整才触发” |
-| 3 综合判断 | 检查 `required - received` 缺失；冲突必须仲裁；缺失只能标”审查不完整”；如有 Phase 2.5 报告作为补充材料 | 替缺失 agent 脑补 / 用错误 teammate-message 内容继续 |
-| 4 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 时在 prompt 中直接内嵌 `phase_1_output` | **与 Phase 1 并行启动**；fresh spawn 仍要求额外 SendMessage 才开始 |
+| 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告** | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
+| 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
+| 5 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
-> **没有 Phase 5**。完成 Phase 4 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
+> **没有 Phase 6**。完成 Phase 5 直接回 Step 9。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
 
 详细消息样例见 `references/execution-reference.md`。
 
