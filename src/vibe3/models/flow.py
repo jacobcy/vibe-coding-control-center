@@ -61,10 +61,12 @@ class FlowState(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    indicate_ref: str | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation
     planner_actor: str | None = None
     executor_actor: str | None = None
     reviewer_actor: str | None = None
+    manager_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
     blocked_by: str | None = (
@@ -236,9 +238,11 @@ class FlowStatusResponse(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    indicate_ref: str | None = None
     planner_actor: str | None = None
     executor_actor: str | None = None
     reviewer_actor: str | None = None
+    manager_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
     blocked_by: str | None = None  # Legacy field (deprecated)
@@ -325,9 +329,11 @@ class FlowStatusResponse(BaseModel):
             plan_ref=data.get("plan_ref"),
             report_ref=data.get("report_ref"),
             audit_ref=data.get("audit_ref"),
+            indicate_ref=data.get("indicate_ref"),
             planner_actor=data.get("planner_actor"),
             executor_actor=data.get("executor_actor"),
             reviewer_actor=data.get("reviewer_actor"),
+            manager_actor=data.get("manager_actor"),
             latest_actor=data.get("latest_actor"),
             initiated_by=data.get("initiated_by"),
             blocked_by=data.get("blocked_by"),
