@@ -8,6 +8,23 @@
 - 不发送 shutdown 指令试图"清空 teammates 后重建"
 - 当前会话 team 无法安全复用时，唯一合法恢复是退出会话重建
 
+## 清理与恢复规则（从 SKILL.md Phase 0 Hard Rules 迁移）
+
+**TeamDelete 合法场景**：
+- 任务完成时（Phase 5 写回后，用户确认 end）
+- 状态不一致时按本 playbook 清理流程
+
+**清理优先级**：TeamDelete → rm -rf fallback → 退出重建会话
+
+**禁止手工操作**：
+- 不手工编辑 `~/.claude/projects/.../*.jsonl`
+- 不手工 `rm -rf ~/.claude/teams/`（TeamDelete 失败时的 fallback 例外）
+- 不手工 `tmux kill-pane`
+
+**唯一合法恢复**：当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话。
+
+---
+
 ## 已有 Team 优先复用
 
 判断顺序：当前会话已持有 `pr-review-team` → team 配置可读 → teammates 可通过 inbox / config 追踪。三项都正常 → 直接复用，跳过 TeamCreate。仅在确认 team 缺席时才调用 `TeamCreate(team_name="pr-review-team")`。
