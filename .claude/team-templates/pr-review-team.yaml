@@ -8,7 +8,7 @@
 #    Agent(team_name="pr-review-team", name="<agent-name>",
 #          subagent_type="<subagent_type>", model="<model>", prompt="<prompt>")
 # 4. fresh spawn 背景优先写入 prompt；复用 teammates 或补充上下文时再用 SendMessage
-# 5. Phase 4 由 team-lead 执行（当前 session），不需要 spawn
+# 5. Phase 5 由 team-lead 执行（当前 session），不需要 spawn
 
 name: pr-review-team
 description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
@@ -119,15 +119,15 @@ preflight_checks:
     command: "tmux list-panes -a 2>/dev/null | grep -c '\\%' || echo 0"
     action: |
       如果已有运行中的 teammates（pane 数 > 1）：
-      - 确认是否复用于当前 PR
-      - 复用：SendMessage 唤醒现有 teammates
-      - 不复用：停止当前轮次，由人类决定是否退出并重建会话
+      - 不检查 isActive 或 config.json state（不可靠）
+      - 直接通过握手确认存活（alive = 复用，dead = 清理重建）
+      - 不做"停止当前轮次由人类决定"——握手超时自动淘汰死 agent
 
 # Team-lead 职责边界（强制）
 # - ✅ spawn agent、组织团队、管理 task 生命周期
 # - ✅ 接收 Phase 1 背景报告，并在握手成功后通过第二条 SendMessage 转发给 Phase 2 agents
-# - ✅ Phase 3 综合判断（收集报告、冲突仲裁、最终决策）
-# - ✅ Phase 4 写回：仅限 gh pr comment 和 gh issue create（禁止其他 gh/git 命令）
+# - ✅ Phase 4 综合判断（收集报告、冲突仲裁、最终决策）
+# - ✅ Phase 5 写回：仅限 gh pr comment 和 gh issue create（禁止其他 gh/git 命令）
 # - ❌ 不得自行收集上下文（gh pr view / git diff 等）——这是 context-researcher 的工作
 # - ❌ 显式 PR 编号入口下，不得为了“确认 PR 状态/标题/标签/改动范围”执行 gh pr view
 # - ❌ 不得在 spawn context-researcher 之前做任何背景调查
@@ -143,19 +143,22 @@ preflight_checks:
 # team-lead 只做"转发"，不做"预收集"。context-researcher 用自己工具完成全部背景调研。
 # 显式 PR 编号模式下，lead 的首个有效动作是 backlog + 握手；不是 gh pr view/diff。
 
-# 复用策略
-reuse_policy:
-  enabled: true
-  team_level_rule: "已有健康的 pr-review-team 时，先复用 team，再复用 teammates；不要重复 TeamCreate；不要为恢复目的调用 TeamDelete"
-  conditions:
-    - "相同 agentType"
-    - "teammate 状态为 idle"
-    - "上一个 PR 已完成 Phase 4"
-  action: |
-    1. 检查 ~/.claude/teams/{team-name}/config.json 中 members
-    2. 对每个需要的 agentType，查找匹配的 idle teammate
-    3. 使用 SendMessage(to=agent_name, message={type: "new_task", pr_number, context})
-    4. 如无可复用 teammate，才 spawn 新的
+# 握手即复用策略
+# 不做 isActive 检查（Issue #29271：isActive=false 不代表进程已死）
+# 不做 config.json 状态推断（Issue #44701：跨会话残留条目不可靠）
+# 只做一件事：对已有的 teammate 发送 lead_ready 握手
+#   → 收到 agent_ready = 复用（SendMessage 下发新 PR 任务）
+#   → 3 次超时无响应 = 标记 dead，TeamDelete 清理后重新 spawn
+agent_reuse_via_handshake:
+  rule: "复用判断 = 握手结果。不检查 isActive，不读 config.json state。"
+  procedure: |
+    1. 检查 Team 是否存在（TeamCreate 若报 already exists）
+    2. 如存在 → 对每个非 lead member 尝试握手：
+       SendMessage(to=member, lead_ready)
+       - 收到 agent_ready → 复用，SendMessage 下发新 PR 正式任务
+       - 超时 3 次（各 30s）→ 该 member 不可复用
+    3. 全部 member 不可复用 → TeamDelete → TeamCreate 重建
+    4. 缺失的 agent type → 正常 spawn
 
 # Agent 定义（项目自定义 agents）
 # 注意：使用项目 .claude/agents/pr-*.md 定义，而非全局 agent
@@ -214,7 +217,7 @@ agents:
     description: 代码修复执行者，根据审核意见修复代码并提交
     spawn_config:
       tools: [Read, Edit, Write, Bash, Grep, Glob, SendMessage, ToolSearch]
-      run_in_background: false  # Phase 4 需等待修复完成
+      run_in_background: false  # Phase 5 需等待修复完成
     output_format:
       required_fields: [修复列表, 提交记录, 验证结果]
     trigger: on_demand  # 仅在 auto-fix 或用户选择修复时 spawn
@@ -484,8 +487,8 @@ workflow:
           - 在报告中标注"部分审查未完整"
           - 不要假设未返回的 agent 同意其他结论
 
-  phase_2_5:
-    name: Codex第三方验证（可选）
+  phase_3:
+    name: Codex复查
     executor: team-lead
     agents: []
     parallel: false
@@ -501,15 +504,15 @@ workflow:
           满足以下任一条件：
           1. PR类型为 `security`
           2. 改动行数 > 500 或影响关键架构（inspect base风险高）
-          3. Phase 3 出现需要第三方裁决的冲突
+          3. Phase 2 多份报告对同一问题结论矛盾
           **第二阶段：Phase 2 完整性判断**
           required_agents = [code-analyst, architect-reviewer, security-reviewer]
           检查是否有 agent 超时/未返回结果
 
           **最终触发条件**：
-          - 第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选
-          - 第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制
-          - 第一阶段不满足 → 跳过 Phase 2.5，直接进入 Phase 3
+          - 第一阶段满足且 Phase 2 完整 → Phase 3 保持可选
+          - 第一阶段满足且 Phase 2 不完整 → Phase 3 升级为强制
+          - 第一阶段不满足 → 跳过 Phase 3，直接进入 Phase 4
 
           **注意**：
           - "可选"保留给 security / large / conflict_arbitration 的独立复核场景
@@ -537,14 +540,14 @@ workflow:
         wait_for_result: true
 
       - step: receive_codex_report
-        action: 保存codex验证报告，作为Phase 3补充材料
+        action: 保存codex验证报告，作为Phase 4 补充材料
 
-  phase_3:
-    name: 综合判断与改进
+  phase_4:
+    name: 综合判断
     agents: []
     actions:
       - verify_all_reports_received  # 新增：前置检查
-      - check_codex_report_if_exists  # 新增：检查Phase 2.5输出
+      - check_codex_report_if_exists  # 新增：检查 Phase 3 输出
       - collect_results
       - detect_conflicts
       - arbitrate_if_needed
@@ -576,10 +579,10 @@ workflow:
       - step: make_decision
         action: 生成最终决策（APPROVE/REJECT/NEEDS_INFO）
 
-  phase_4:
-    name: 写回与改进
+  phase_5:
+    name: 写回 + 修复
     executor: team-lead  # 由当前 session（team-lead）执行
-    agents: []
+    agents: [fix-executor]  # 条件性 spawn（仅 auto-fix 模式），trigger: on_demand
     actions:
       - evaluate_execution_mode  # 根据配置决定执行路径
       - write_review_comment
@@ -750,9 +753,8 @@ workflow:
         - [ ] 高 / 中 / 低
     labels: ["type/follow-up", "scope/<component>"]
 
-# 注意：本 workflow 只有 4 个 phase。
-# Phase 4 完成后，控制权直接回到 SKILL.md 的 Step 9（询问继续 / 结束）。
-# 不存在 "phase_5 / 准备下一个 PR / 保留状态" 这类辅助 phase——
+# 注意：本 workflow 只有 5 个 phase。
+# Phase 5 完成后，控制权直接回到 SKILL.md 的 Step 9（询问继续 / 结束）。
 # teammates 的 idle / pane / inbox 由运行时管理，skill 不感知也不操作。
 # 切换 PR 通过 SendMessage 给已有 agent 发新任务即可。
 

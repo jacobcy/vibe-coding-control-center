@@ -142,18 +142,18 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 
 ## Session Lifecycle（强制理解，issue #742 反复踩坑）
 
-> **核心误解**：把 Team 当成"PR-级"对象。事实上 Team 是"会话级"对象。
+> **核心误解**：把 Team 当成”PR-级”对象。事实上 Team 是”会话级”对象。
 
 ```
-环境检查 → TeamCreate（一次） → PR #A → continue → PR #B → ... → end → TeamDelete（一次）
+环境检查 → 检查已有 Team → 握手确认存活 → PR #A → continue → PR #B → ... → end → TeamDelete
 ```
 
 要点：
 
-- 一个会话一个 Team：TeamCreate / TeamDelete 是高代价操作；teammates 状态不应跨 PR 重置。易犯错是每审完一个 PR 就 TeamDelete，下一个又重建。
-- 一个 Team 多个 PR：spawn agent 比 SendMessage 慢 10-100 倍且占资源。易犯错是每个 PR 都重新 spawn `code-analyst`。
-- 切换 PR 用 SendMessage：agent 已就绪，只需告诉它“换审 PR #B”。易犯错是关闭旧 agent 再 spawn 新 agent。
-- TeamDelete 默认仅在用户 end：用户没说结束就保留状态，恢复流程另行处理。易犯错是看到“询问是否继续”就以为要 TeamDelete。
+- 复用判断 = 握手结果：发送 lead_ready → 收到 agent_ready = 复用，超时 = dead（不检查 isActive，不可靠，Issue #29271；不读 config.json 推断状态，Issue #44701）
+- 切换 PR 用 SendMessage（握手成功的复用 agent）或重新 spawn（握手失败的 dead agent）
+- 每次执行先清理残留：如存在 pr-review-team → 对已有 members 握手 → 无存活 → TeamDelete + TeamCreate
+- TeamDelete 默认仅在用户 end：用户没说结束就保留状态，恢复流程另行处理。易犯错是看到”询问是否继续”就以为要 TeamDelete。
 
 Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-编号命名，会强化错误心智模型）。
 
@@ -164,7 +164,7 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 1. 环境检查：只检查 tmux / Agent Teams / TeamCreate / TaskCreate / ToolSearch / SendMessage 可用性；**禁止在这一步执行 `gh pr view` / `gh pr diff` / `git diff`**。
 2. 选执行模式：`auto-fix / comment-only / auto-decide / ask-each`。
 3. 加载 template：读 `.claude/team-templates/pr-review-team.yaml`。
-4. 创建或复用 Team：已存在且健康 → 复用；不存在 → TeamCreate；状态异常 → 停止由人类处理。
+4. 创建或复用 Team：不存在 → TeamCreate；已存在 → 对已有 members 握手确认存活 → 存活则复用，全死则 TeamDelete + TeamCreate。
 5. 创建 Backlog Tasks：TeamCreate 完成后**先只创建 Phase 1 task**（见下方 Backlog Setup）。
 6. **Phase 0 Step 1：team-lead 自身握手**：执行 `ToolSearch(query="select:SendMessage")`，确认 lead 自己可发送消息。
 7. **Phase 1 背景调研**：spawn `context-researcher` → 立即握手 → 收到"已就绪"后再通过第二条 `SendMessage` 下发正式调研任务 → 等待并保存 `phase_1_output`。
@@ -459,9 +459,10 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 ### Team / Session
 
-- TeamCreate 整会话最多一次；TeamDelete 最多一次（任务结束时）
-- 已存在的健康 Team 必须复用，禁止重复 TeamCreate
-- 切换 PR 用 SendMessage，禁止重新 spawn agent
+- Team 尽量复用，但不强制一 session 一个 TeamCreate
+- 复用判断 = 握手结果（alive=复用，dead=清理后 TeamCreate）
+- 有残留 Team 时先尝试握手；不跳过握手直接 TeamCreate
+- 切换 PR 用 SendMessage（握手成功的复用 agent），禁止盲目重新 spawn
 - **TeamDelete 合法场景**：
   - ✅ 任务完成时（Step 10）
   - ✅ 状态不一致时，按 Recovery 先尝试清理
