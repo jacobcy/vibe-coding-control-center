@@ -14,6 +14,7 @@ name: pr-review-team
 description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
 
 # Team 创建配置（供 Phase 0 Step 4 在确认 team 缺席后调用 TeamCreate 使用）
+# Phase 0 不是 Backlog Task，是前置条件。TaskCreate 从 Phase 1 开始。
 team_create_config:
   team_name: pr-review-team
   agent_type: general-purpose  # team-lead 类型
@@ -256,8 +257,9 @@ workflow:
     name: 准备与握手
     agents: []  # Phase 0 不 spawn agent，由 team-lead 直接执行
     parallel: false
+    not_a_backlog_task: true  # Phase 0 是前置条件，不创建 TaskCreate
     description: |
-      Team 创建/复用 + Backlog Task 创建 + lead 自身握手（ToolSearch） + 已有 agent 握手存活检测。
+      Team 创建/复用 + lead 自身握手（ToolSearch） + 已有 agent 握手存活检测。
       这是整个审查流程的入口，Phase 0 失败 → 立即停止，不创建后续 Backlog task。
     execution:
       - step: check_environment
@@ -285,14 +287,6 @@ workflow:
           4. 全死 → TeamDelete → TeamCreate 重建
           5. 部分存活 → 复用存活者，缺失的 agent type 在对应 Phase spawn
           不检查 isActive（Issue #29271），不推断 config.json 状态（Issue #44701）。
-      - step: create_phase_0_backlog_task
-        action: |
-          TaskCreate → TaskUpdate(owner="team-lead", status="in_progress")
-          taskId 保存为 phase_0_task_id，后续 Phase 依赖此 task。
-          metadata:
-            activation_state: "awaiting_environment_check"
-            expected_next_action: "verify_environment"
-            lead_handshake_status: "pending"
       - step: lead_toolsearch
         action: |
           team-lead 自身执行 ToolSearch(query="select:SendMessage")。
@@ -300,7 +294,6 @@ workflow:
           失败 → 立即停止，不进入 Phase 1。
     gate:
       - Team 已创建（TeamCreate 成功）
-      - Phase 0 Backlog Task 已创建且 status="in_progress"
       - team-lead 已完成 ToolSearch
       - 复用场景：所有需复用的 agent 已握手确认存活
 
@@ -807,7 +800,7 @@ workflow:
         - [ ] 高 / 中 / 低
     labels: ["type/follow-up", "scope/<component>"]
 
-# 注意：本 workflow 有 6 个 phase（Phase 0-5）。
+# 注意：本 workflow 有 6 个 phase（Phase 0-5），Phase 0 是前置条件（非 Backlog Task），Phase 1-5 各是一个 Backlog Task。
 # Phase 5 完成后，控制权回到 SKILL.md 的会话收尾（询问继续 / 结束）。
 # teammates 的 idle / pane / inbox 由运行时管理，skill 不感知也不操作。
 # 切换 PR 通过 SendMessage 给已有 agent 发新任务即可。
