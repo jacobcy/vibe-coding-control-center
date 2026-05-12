@@ -94,8 +94,8 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 
 ## Hard Rules
 
-- **Phase 0 必须先于任何 subagent 执行**：环境检查 → TeamCreate → team-lead ToolSearch。已有 Team 时先握手检测存活
-- **复用判断 = 握手结果**（alive=复用，dead=清理后 TeamCreate）；有残留 Team 时先尝试握手，不跳过握手直接 TeamCreate
+- **Phase 0 必须先于任何 subagent 执行**
+- **复用判断 = 握手结果**（alive=复用，dead=清理后 TeamCreate），禁止跳过握手直接 TeamCreate
 - **切换 PR 用 SendMessage**（握手成功的复用 agent），禁止盲目重新 spawn
 - **TeamDelete 合法场景**：任务完成时（Phase 5 写回后）；状态不一致时按 Recovery 清理
 - **清理优先级**：TeamDelete → rm -rf fallback → 退出重建会话
@@ -359,8 +359,7 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ### Step 2: 校验报告数据
 
-收集 Phase 2 全部报告，校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致。
-失真报告标注"报告作废"，不作为 codex 输入。
+按 Step 1 yaml 模板步骤 2-3 执行：校验基础数据 → 失真报告标注作废。
 
 ### Step 3: 决定是否启用 codex
 
@@ -388,12 +387,9 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ## Hard Rules
 
-- 此阶段不涉及 agent 握手，team-lead 直接执行
-- **必选动作**：校验各报告基础数据，失真报告标注"报告作废"
-- **绝对禁止传 diff 给 codex**：只传 Phase 2 结构化报告
+- **绝对禁止传 diff 给 codex**：只传 Phase 2 结构化报告（文件列表、行数、安全声明等）
+- 任一报告存在严重幻觉 → 跳过 codex，直接进入 Phase 4
 - 不得在 Phase 2 完成前启动 codex（严格串行）
-- 任一报告存在严重幻觉 → 跳过 codex
-- 不与 Phase 2 并行执行；未收集完整 Phase 2 报告不得做决策
 
 ---
 
@@ -434,15 +430,11 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ### Step 2: 收集可用报告 + 冲突仲裁
 
-1. 收集 Phase 2 可用报告，剔除 Phase 3 标记为作废的
-2. 收集 Phase 3 codex 报告（如有）
-3. 仲裁不同报告间的冲突，记录仲裁理由
+按 Step 1 yaml 模板步骤 1-3 执行：收集 Phase 2 可用报告 + Phase 3 codex 报告 → 仲裁冲突。
 
 ### Step 3: 出具最终决策 + 质量自查
 
-1. 生成最终决策（APPROVE / NEEDS_CHANGES / REJECT）
-2. 按 Review Quality Standards 自审查报告（§Review Quality Standards）
-3. 缺失 agent 报告标注"审查不完整"，不脑补结论
+按 Step 1 yaml 模板步骤 4-6 执行：生成最终决策 → 质量自查 → 标注缺失报告。
 
 ## Contracts
 
@@ -455,13 +447,11 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ## Hard Rules
 
-- 禁止使用已作废的报告做结论
+- 禁止使用已作废报告做结论
 - 替缺失 agent 脑补结论 → 标记"审查不完整"
-- 必须通过 §Review Quality Standards 全部 8 条自查（写回前）
-- teammate-message PR 编号不匹配时必须如实标注，并说明正确报告来源
-- 缺失报告必须标"审查不完整"，禁止脑补缺失 agent 的同意 / 反对
+- teammate-message PR 编号不匹配时必须如实标注
 - 拒绝"已合并 / CI 通过 / 无漏洞"这类无证据声明
-- team-lead 职责：综合判断、仲裁冲突
+- 必须通过 §Review Quality Standards 全部 8 条自查（写回前）
 
 ---
 
@@ -506,10 +496,7 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 
 ### Step 3: spawn fix-executor + 修复（仅 auto-fix）
 
-1. spawn fix-executor，prompt 仅含握手指令
-2. 按 `handshake_agent("fix-executor")` 执行握手（见 §握手与唤醒协议规范）
-3. 收到 `agent_ready` 后，SendMessage 下发修复任务
-4. 等待修复完成并验证
+按 Step 1 yaml 模板步骤 3 执行：spawn → 握手 → 分配修复任务 → 等待验证。
 
 ### Step 4: 创建 follow-up issues
 
@@ -570,9 +557,8 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 ```
 
 要点：
-- 复用判断 = 握手结果：发送 lead_ready → 收到 agent_ready = 复用，超时 = dead
-- 不检查 isActive（不可靠，Issue #29271），不读 config.json 推断状态（Issue #44701）
-- 切换 PR 用 SendMessage（握手成功的复用 agent）或重新 spawn（握手失败的 dead agent）
+- Team 是会话级对象，不是 PR 级。一个会话一个 Team，多个 PR 复用
+- 复用判断见 Phase 0 Step 4（握手 = 存活检测，不检查 isActive/config.json）
 - TeamDelete 默认仅在用户 end：用户没说结束就保留状态
 
 ---
