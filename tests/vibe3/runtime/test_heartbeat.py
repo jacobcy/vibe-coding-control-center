@@ -25,7 +25,7 @@ class _MockService(ServiceBase):
     async def handle_event(self, event: GitHubEvent) -> None:
         self.events.append(event)
 
-    async def on_tick(self) -> None:
+    async def on_tick(self, tick_id: int = 0) -> None:
         self.ticks += 1
 
 
@@ -78,8 +78,8 @@ async def test_tick_calls_on_tick_for_all_services() -> None:
     server.register(svc1)
     server.register(svc2)
 
-    await server._tick_service(svc1)
-    await server._tick_service(svc2)
+    await server._tick_service(svc1, 1)
+    await server._tick_service(svc2, 1)
 
     assert svc1.ticks == 1
     assert svc2.ticks == 1
