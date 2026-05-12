@@ -294,7 +294,6 @@ workflow:
           - 未通过握手的 context-researcher 即使后续产出报告，也不得作为有效 Phase 1 输出
           - Phase 2 读取背景前必须检查 context-researcher 握手状态为 ready
           - 收到”已就绪”后，下一步必须进入 send_context_task；不得发送 idle/待命类消息
-          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_context_task, activation_state=awaiting_task_dispatch`
       - step: send_context_task
         tool: SendMessage
         params:
