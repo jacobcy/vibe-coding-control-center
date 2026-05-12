@@ -83,26 +83,37 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
 ```
 
-### Step 6: 创建 Phase 1-5 Backlog 骨架 Task（强制）
+### Step 6: 创建 Phase 1 meta-task（强制）
 
-一次性批量创建所有后续 Phase 的 Backlog task，作为执行约束检查点。
+创建一个meta-task，指示下一阶段需要创建 Phase 1 Backlog task。
 
-**执行流程**：使用 `references/backlog-task-templates.yaml` 中的 Phase 1-5 模板批量创建骨架 task。
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 1 backlog"
+    description: |
+      使用 references/backlog-task-templates.yaml Phase 1 模板创建完整的 Backlog task。
+      创建后标记为 in_progress 并补充执行时 metadata。
+    metadata:
+      template_ref: "phase1"
+      target_phase: 1
+    owner: "team-lead"
+    status: "pending"
+```
 
 **关键约束**：
-- Phase 0 必须创建所有后续 Phase 的 Backlog task（硬规则）
-- 每个 Backlog task 的 `metadata` 必须包含强制字段（见 §Hard Rules）
-- Backlog task 的 `blockedBy` 设置依赖关系，确保 Phase 串行执行
-- Backlog task 的 `owner` 默认为空，Phase 开始时设置为 "team-lead"
+- Phase 0 只创建 Phase 1 的 meta-task（不创建 Phase 2-5）
+- meta-task 是执行指令，不是 Backlog task 本身
+- Phase N 结束时才创建 Phase N+1 的 meta-task
 
 ## Contracts
 
 | 项目 | 内容 |
 |------|------|
 | 输入 | 无（独立执行） |
-| 输出 | Team 就绪 + team-lead ToolSearch 完成 + **Phase 1-5 Backlog task 已创建** |
-| 门禁 | Team 已创建、team-lead 已完成 ToolSearch、**所有 Backlog task 已创建**、复用场景下需复用的 agent 已握手存活 |
-| 失败处理 | 立即停止，不创建任何 Backlog task |
+| 输出 | Team 就绪 + team-lead ToolSearch 完成 + **Phase 1 meta-task 已创建** |
+| 门禁 | Team 已创建、team-lead 已完成 ToolSearch、meta-task 已创建、复用场景下需复用的 agent 已握手存活 |
+| 失败处理 | 立即停止，不创建任何 meta-task |
 
 ## Hard Rules
 
@@ -115,7 +126,7 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
   - 禁止手工操作（不编辑*.jsonl、不手工rm -rf、不kill-pane）
   - 唯一合法恢复：退出会话重建
   - 详细场景处理见 `references/recovery-playbook.md`
-- **Phase 0 必须创建 Phase 1-5 的骨架 Backlog task**（硬规则，不可跳过）
+- **Phase 0 必须创建 Phase 1 meta-task**（硬规则，不可跳过）
 - **Backlog 约束详细说明**：见 `references/execution-reference.md`
 
 ---
@@ -127,39 +138,50 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 
 ## Steps
 
-### Step 1: 创建 Phase 1 Backlog Task
+### Step 1: 执行 meta-task → 创建 Phase 1 Backlog Task
+
+Phase 0 创建的 meta-task 指示创建 Phase 1 Backlog task。
+
+**执行流程**：
+
+1. **读取 meta-task**：TaskGet 获取 Phase 0 创建的"创建 Phase 1 backlog"task
+2. **创建 Backlog task**：使用 `references/backlog-task-templates.yaml` Phase 1 模板创建完整task
+3. **激活 task**：TaskUpdate 标记为 in_progress，补充执行时metadata
 
 ```yaml
+# 使用模板创建完整 Backlog task
 - tool: TaskCreate
   params:
     subject: "Phase 1: 背景调研"
     description: |
       【输入】PR 编号
       【输出】phase_1_output（结构化背景报告）
-      【步骤】
-      1. spawn context-researcher → 握手 → 分配调研任务
-      2. 等待报告 → 保存 phase_1_output 到 Task metadata
-      【门禁】
-      - handshake_status.context-researcher == "ready"
-      - phase_1_output 非空
-      - team-lead 不得自行执行 gh pr view/diff
+      【步骤】spawn context-researcher → 握手 → 分配任务 → 等待报告 → 保存 output
+      【门禁】handshake_status.context-researcher == "ready"、phase_1_output 非空
+    metadata:
+      handshake_required: true
+      handshake_protocol: "ordered_v1"
+      handshake_agents: ["context-researcher"]
+      handshake_status:
+        context-researcher: "pending"
+      task_activation_allowed: false
+      expected_next_action: "send_context_lead_ready"
+      activation_state: "awaiting_lead_ready"
+      wakeup_policy:
+        max_attempts: 3
+        timeout: "30s"
+      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
+      phase_order: 1
+      depends_on_phase: 0
+      must_create_next_phase_backlog: true
+    owner: "team-lead"
+    status: "pending"
+
+# 激活 task
 - tool: TaskUpdate
   params:
     taskId: "<phase-1-task-id>"
     status: "in_progress"
-    owner: "team-lead"
-    metadata:
-      handshake_protocol: "ordered_v1"
-      handshake_required: true
-      lead_handshake_status: "ready"
-      lead_ready_sent: false
-      task_activation_allowed: false
-      expected_next_action: "send_context_lead_ready"
-      activation_state: "awaiting_lead_ready"
-      handshake_agents: ["context-researcher"]
-      handshake_status:
-        context-researcher: "pending"
-      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
 ```
 
 ### Step 2: spawn → 握手 → 分配任务
@@ -187,9 +209,9 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
         [完整的 context-researcher 报告内容，包括所有章节]
 ```
 
-### Step 4: PR 分类 + 补建后续 Backlog
+### Step 4: PR 分类 + 创建下一个 Phase meta-task
 
-基于 `phase_1_output` 判断 PR 类型。
+基于 `phase_1_output` 判断 PR 类型，并创建对应的下一个 Phase meta-task。
 
 > **常见错误**：看到"文档改动"就归类 `simple`。这是错的。
 
@@ -201,25 +223,34 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 任一不满足 → 不是 simple。
 
-| 类型 | 条件 |
-|------|------|
-| `simple` | 4 项全满足 |
-| `security` | 涉及认证/授权/数据/凭据/输入验证 |
-| `refactor` | ≥ 5 文件或大规模重构 |
-| `standard` | 不属于上述 |
+| 类型 | 条件 | 下一 Phase |
+|------|------|-----------|
+| `simple` | 4 项全满足 | Phase 3 |
+| `security` | 涉及认证/授权/数据/凭据/输入验证 | Phase 2 |
+| `refactor` | ≥ 5 文件或大规模重构 | Phase 2 |
+| `standard` | 不属于上述 | Phase 2 |
 
 **反例**（issue #742 真实踩坑）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 + 文档 → 错误归类 `simple` → 实际应按 `standard` 处理。**只要包含代码改动或多文件，就不是 simple。**
 
-按 PR 类型补建后续 Backlog Task：
+创建下一个 Phase 的 meta-task：
 
-| 类型 | 需创建的 Task | 说明 |
-|------|-------------|------|
-| `simple` | Phase 3, 4, 5 | 跳过 Phase 2（不 spawn agent），Phase 1 报告直接交给 Phase 3 |
-| `security` | Phase 2, 3, 4, 5 | Phase 2 必须含 `security-reviewer` |
-| `refactor` | Phase 2, 3, 4, 5 | Phase 2 spawn code-analyst + architect-reviewer |
-| `standard` | Phase 2, 3, 4, 5 | Phase 2 spawn code-analyst + architect-reviewer |
+```yaml
+# simple → 创建 Phase 3 meta-task
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 3 backlog"
+    metadata:
+      template_ref: "phase3"
+      target_phase: 3
 
-**Phase 1 是入口统一创建的**（Phase 0 完成后立即 TaskCreate），不在补建之列。
+# 其他 → 创建 Phase 2 meta-task
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 2 backlog"
+    metadata:
+      template_ref: "phase2"
+      target_phase: 2
+```
 
 ## Contracts
 
@@ -249,52 +280,52 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ## Steps
 
-### Step 1: 创建 Phase 2 Backlog Task
+### Step 1: 执行 meta-task → 创建 Phase 2 Backlog Task
+
+Phase 1 创建的 meta-task 指示创建 Phase 2 Backlog task。
+
+**执行流程**：
+1. **读取 meta-task**：TaskGet 获取 Phase 1 创建的"创建 Phase 2 backlog"task
+2. **创建 Backlog task**：使用 `references/backlog-task-templates.yaml` Phase 2 模板创建完整task
+3. **激活 task**：TaskUpdate 标记为 in_progress
 
 ```yaml
+# 使用模板创建完整 Backlog task（简化表示）
 - tool: TaskCreate
   params:
     subject: "Phase 2: 专家评审"
     description: |
       【输入】phase_1_output（从 Phase 1 task metadata 获取）
       【输出】code-analyst / architect-reviewer / security-reviewer 的审查报告
-      【步骤】
-      1. TaskGet Phase 1 → 提取 phase_1_output
-      2. 确认 context-researcher handshake_status == "ready"（未 ready → 停止）
-      3. 依次对 code-analyst → architect-reviewer → security-reviewer：
-         a. spawn agent，prompt 仅含握手指令，run_in_background=true
-         b. 按 handshake_agent(agent_name) 执行握手（最多 3 次唤醒，30s 超时，见 §握手与唤醒协议规范）
-         c. 收到 agent_ready 后，SendMessage 下发正式任务（含 phase_1_output）
-         d. 派发后不得 idle，立即继续下一个 agent
-      4. 等待所有已握手 agent 的 task-notification
-      5. 收集全部报告
-      【门禁】
-      - 至少 1 个 agent handshake_status == "ready" 且返回了有效报告
-      - 未握手 agent 的报告标记为无效
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-2-task-id>"
-    addBlockedBy: ["<phase-1-task-id>"]
+      【步骤】spawn agents → 逐个握手 → 分配任务 → 等待报告 → 收集全部
+      【门禁】至少 1 个 agent handshake_status == "ready" 且返回有效报告
     metadata:
-      handshake_protocol: "ordered_v1"
-      requires_phase_1_output: true
       handshake_required: true
-      task_activation_allowed: false
-      expected_next_action: "send_code_analyst_lead_ready"
-      activation_state: "awaiting_first_lead_ready"
       handshake_agents: ["code-analyst", "architect-reviewer", "security-reviewer"]
-      lead_ready_sent:
-        code-analyst: false
-        architect-reviewer: false
-        security-reviewer: false
       handshake_status:
         code-analyst: "pending"
         architect-reviewer: "pending"
         security-reviewer: "pending"
-      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
+      task_activation_allowed: false
+      expected_next_action: "send_code_analyst_lead_ready"
+      activation_state: "awaiting_first_lead_ready"
       wakeup_policy:
         max_attempts: 3
-        timeout: 30s
+        timeout: "30s"
+      requires_phase_1_output: true
+      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
+      phase_order: 2
+      depends_on_phase: 1
+      must_create_next_phase_backlog: true
+    addBlockedBy: ["<phase-1-task-id>"]
+    owner: "team-lead"
+    status: "pending"
+
+# 激活 task
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-2-task-id>"
+    status: "in_progress"
 ```
 
 ### Step 2: spawn → 逐个握手 → 分配任务
@@ -311,9 +342,20 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 - 握手阶段不得内嵌 `phase_1_output` 或正式审查任务
 - 复用 teammate 或补发上下文时也用 SendMessage
 
-### Step 3: 收集报告
+### Step 3: 收集报告 + 创建 Phase 3 meta-task
 
 等待所有已握手 agent 的 task-notification（status=completed），收集全部审查报告。
+
+收集完成后，创建 Phase 3 meta-task：
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 3 backlog"
+    metadata:
+      template_ref: "phase3"
+      target_phase: 3
+```
 
 ### Step 4: agent idle 自动检测与重新握手（自动化流程）
 
@@ -360,31 +402,26 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ## Steps
 
-### Step 1: 创建 Phase 3 Backlog Task
+### Step 1: 执行 meta-task → 创建 Phase 3 Backlog Task
+
+Phase 2 创建的 meta-task 指示创建 Phase 3 Backlog task。
+
+**执行流程**：
+1. **读取 meta-task**：TaskGet 获取 Phase 2 创建的"创建 Phase 3 backlog"task
+2. **创建 Backlog task**：使用 `references/backlog-task-templates.yaml` Phase 3 模板
+3. **激活 task**：TaskUpdate 标记为 in_progress
 
 ```yaml
+# 使用模板创建（简化表示，完整模板见backlog-task-templates.yaml）
 - tool: TaskCreate
   params:
     subject: "Phase 3: Codex 复查"
-    description: |
-      【输入】Phase 2 全部审查报告
-      【输出】codex 验证报告（或 skip 标记及原因）
-      【步骤】
-      1. 收集 Phase 2 全部报告
-      2. 校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
-      3. 失真报告标注"报告作废"，不作为 codex 输入
-      4. 判断触发条件（安全PR / diff>500行 / 报告冲突 / 报告缺失）
-      5. 满足且报告质量合格 → 调用 codex:rescue（仅传结构化报告，禁止传 diff/代码片段）
-      6. 不满足或全部报告不合格 → 记录 skip 原因，直接进入 Phase 4
-      【门禁】
-      - 已做出"启用 codex"或"跳过 codex"的明确决定（不可跳过此判断）
-      - 如启用 codex：codex 报告已收到并保存
+    # ... 完整参数见模板 ...
+
 - tool: TaskUpdate
   params:
     taskId: "<phase-3-task-id>"
-    addBlockedBy: ["<phase-2-task-id>"]
-    metadata:
-      requires_phase_2_reports: true
+    status: "in_progress"
 ```
 
 ### Step 2: 校验报告数据
@@ -404,6 +441,19 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 - 不得在 Phase 2 完成前启动（严格串行）
 - 不得用幻觉报告喂 codex（失效数据无法被 codex 验证）
 - 任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4
+
+### Step 4: 创建 Phase 4 meta-task
+
+Codex决策完成后，创建 Phase 4 meta-task：
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 4 backlog"
+    metadata:
+      template_ref: "phase4"
+      target_phase: 4
+```
 
 ## Contracts
 
@@ -430,41 +480,45 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ## Steps
 
-### Step 1: 创建 Phase 4 Backlog Task
+### Step 1: 执行 meta-task → 创建 Phase 4 Backlog Task
+
+Phase 3 创建的 meta-task 指示创建 Phase 4 Backlog task。
+
+**执行流程**：
+1. **读取 meta-task**：TaskGet 获取 Phase 3 创建的"创建 Phase 4 backlog"task
+2. **创建 Backlog task**：使用 `references/backlog-task-templates.yaml` Phase 4 模板
+3. **激活 task**：TaskUpdate 标记为 in_progress
 
 ```yaml
 - tool: TaskCreate
   params:
     subject: "Phase 4: 综合判断"
-    description: |
-      【输入】Phase 2 可用报告（剔除作废） + Phase 3 codex 报告（如有）
-      【输出】最终决策（APPROVE / NEEDS_CHANGES / REJECT）+ 结构化审查报告
-      【步骤】
-      1. 收集 Phase 2 可用报告，剔除 Phase 3 标记为作废的
-      2. 收集 Phase 3 codex 报告（如有）
-      3. 仲裁不同报告间的冲突，记录仲裁理由
-      4. 生成最终决策
-      5. 按 Review Quality Standards 自审查报告（禁虚假评分、禁无关指标、强制规则引用，见 §Review Quality Standards）
-      6. 缺失 agent 报告标注"审查不完整"，不脑补结论
-      【门禁】
-      - 最终决策已做出
-      - 审查报告已通过 Review Quality Standards 全部 8 条自查
-      - 未使用已作废的报告做结论
+    # ... 完整参数见backlog-task-templates.yaml ...
+
 - tool: TaskUpdate
   params:
     taskId: "<phase-4-task-id>"
-    addBlockedBy: ["<phase-3-task-id>"]
-    metadata:
-      requires_phase_2_and_3_output: true
+    status: "in_progress"
 ```
 
 ### Step 2: 收集可用报告 + 冲突仲裁
 
 按 Step 1 yaml 模板步骤 1-3 执行：收集 Phase 2 可用报告 + Phase 3 codex 报告 → 仲裁冲突。
 
-### Step 3: 出具最终决策 + 质量自查
+### Step 3: 出具最终决策 + 质量自查 + 创建 Phase 5 meta-task
 
 按 Step 1 yaml 模板步骤 4-6 执行：生成最终决策 → 质量自查 → 标注缺失报告。
+
+决策完成后，创建 Phase 5 meta-task：
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 5 backlog"
+    metadata:
+      template_ref: "phase5"
+      target_phase: 5
+```
 
 ## Contracts
 
@@ -500,32 +554,25 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 ## Steps
 
-### Step 1: 创建 Phase 5 Backlog Task
+### Step 1: 执行 meta-task → 创建 Phase 5 Backlog Task
+
+Phase 4 创建的 meta-task 指示创建 Phase 5 Backlog task。
+
+**执行流程**：
+1. **读取 meta-task**：TaskGet 获取 Phase 4 创建的"创建 Phase 5 backlog"task
+2. **创建 Backlog task**：使用 `references/backlog-task-templates.yaml` Phase 5 模板
+3. **激活 task**：TaskUpdate 标记为 in_progress
 
 ```yaml
 - tool: TaskCreate
   params:
     subject: "Phase 5: 写回 + 修复"
-    description: |
-      【输入】Phase 4 最终决策和审查报告
-      【输出】PR comment + follow-up issues + 可选修复 commit
-      【步骤】
-      1. 判断执行模式（auto-fix / comment-only / auto-decide / ask-each）
-      2. 写 PR comment（含：决策/已解决技术债/遗留问题/规则引用/follow-up 链接）
-      3. 如 auto-fix 模式：
-         a. spawn fix-executor，prompt 仅含握手指令
-         b. 按 handshake_agent("fix-executor") 执行握手（最多 3 次唤醒，30s 超时，见 §握手与唤醒协议规范）
-         c. 收到 agent_ready 后，SendMessage 下发修复任务（含审查报告）
-         d. 等待修复完成并验证
-      4. 范围外问题创建 follow-up issues（先搜索去重，禁止重复创建）
-      【门禁】
-      - PR comment 已通过 gh pr comment 发布
-      - 范围外问题已创建 follow-up issue 或确认无需创建
-      - 禁止把当前 PR 阻塞问题转为 follow-up
+    # ... 完整参数见backlog-task-templates.yaml ...
+
 - tool: TaskUpdate
   params:
     taskId: "<phase-5-task-id>"
-    addBlockedBy: ["<phase-4-task-id>"]
+    status: "in_progress"
 ```
 
 ### Step 2: 写 PR comment
