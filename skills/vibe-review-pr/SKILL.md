@@ -458,6 +458,54 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 
 等待所有已握手 agent 的 task-notification（status=completed），收集全部审查报告。
 
+### Step 4: agent idle 自动检测与重新握手（自动化流程）
+
+收到任何 Phase 2 agent 的 idle 通知后，team-lead 立即执行自动化处理（无需用户干预）。
+
+**自动化流程**：
+
+1. **检查 inbox**：
+   - 是否收到该 agent 的 task-notification（status=completed）？
+   - 是 → 提取报告，保存到 Phase 2 task metadata，继续等待其他 agent
+   - 否 → 继续 Step 2
+
+2. **检查 pane**（诊断）：
+   - 执行 Bash 工具：
+     ```bash
+     tmux capture-pane -t <pane-id> -p -S -1000
+     ```
+   - 分析输出：
+     - `InputValidationError` → 该 agent 未执行 ToolSearch，需要重新握手
+     - `Bash/Read` 输出 → agent 正在执行中，等待完成（不做操作）
+     - `❯ 等待输入` → agent idle 但未完成，需要重新握手
+
+3. **重新握手**（如需要）：
+   - SendMessage(to=agent_name, lead_ready)
+   - 等待 agent_ready（最多 30s）
+   - 收到 → 立即重新发布任务（含 phase_1_output）
+   - 未收到 → 标记该 agent blocked，在 metadata 中标注"审查不完整：该 agent 失联"
+
+4. **循环检测**：
+   - 每收到一次 idle，自动执行上述 1-3 步
+   - 直到收到 task-notification 或标记 blocked
+
+**约束**：
+- 全自动化，无需用户干预
+- 每次重新握手间隔不得 < 10s（避免频繁唤醒）
+- 最多重新握手 3 次，超过则标记 blocked
+- 标记 blocked 后仍继续等待其他 agent（不停止流程）
+- 通过 TaskUpdate 同步状态：
+  ```yaml
+  - tool: TaskUpdate
+    params:
+      taskId: "phase-2-task-id"
+      metadata:
+        handshake_status:
+          code-analyst: "ready" | "blocked" | "pending"
+        blocked_agents: ["code-analyst"]  # 如有
+        incomplete_reason: "code-analyst 失联（idle 超过 3 次握手）"
+  ```
+
 ## Contracts
 
 | 项目 | 内容 |
