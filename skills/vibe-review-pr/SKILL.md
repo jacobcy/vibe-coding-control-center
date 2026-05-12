@@ -187,123 +187,171 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
 先为 Phase 1 创建 task，并用 `TaskUpdate(owner="team-lead")` 设置归属；**显式 PR 编号入口不得在这里让 team-lead 先做 `gh pr view/diff` 验证**。必须先完成 Phase 0 Step 1 和 context-researcher 握手，由 Phase 1 报告提供 PR 事实，再判定为 `standard` / `refactor` / `security`，随后补建 Phase 2 / 3 / 4 / 5 的 task：
 
 ```yaml
+# ============================================================
+# Phase 1: 背景调研
+# ============================================================
 - tool: TaskCreate
   params:
-    subject: "Phase 1: Context research"
+    subject: “Phase 1: 背景调研”
     description: |
-      spawn context-researcher, collect PR background and save to metadata
-      【强制握手协议】：
-      1. team-lead 先执行 ToolSearch(query="select:SendMessage") 确认自身可用
-      2. spawn context-researcher 后，立即发送 `【lead_ready】`：
-         SendMessage(to="context-researcher", message="【lead_ready】team-lead 已完成握手，请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'【agent_ready】已就绪'")
-      3. 收到"【agent_ready】已就绪"后，才能分配调研任务
-      4. 未握手成功前，不得给该 agent 分配任何工作
-      5. 显式指定 PR 编号时，team-lead 不得为“确认 PR 是否存在/状态/基本信息”执行 `gh pr view`；首次接触 PR 的主体必须是 context-researcher
+      【输入】PR 编号
+      【输出】phase_1_output（结构化背景报告，保存到 task metadata）
+      【步骤】
+      1. team-lead 执行 ToolSearch(query=”select:SendMessage”) 确认自身可用
+      2. spawn context-researcher，prompt 仅含握手指令，不得含调研任务
+      3. 按 handshake_agent(“context-researcher”) 执行握手（含 3 次唤醒，见 §握手与唤醒协议规范）
+      4. 收到 agent_ready 后，SendMessage 下发正式调研任务（含 PR 编号）
+      5. 等待 teammate-message 获取背景报告
+      6. TaskUpdate 保存 phase_1_output 到 metadata，标记 status=”completed”
+      【门禁】
+      - handshake_status.context-researcher == “ready”
+      - phase_1_output 非空，包含 PR 概述 / 改动范围 / 关联 issue / 风险评估
+      - team-lead 不得自行执行 gh pr view/diff（这是 context-researcher 的工作）
 - tool: TaskUpdate
   params:
-    taskId: "<phase-1-task-id>"
-    status: "in_progress"
-    owner: "team-lead"
+    taskId: “<phase-1-task-id>”
+    status: “in_progress”
+    owner: “team-lead”
     metadata:
-      handshake_protocol: "ordered_v1"
+      handshake_protocol: “ordered_v1”
       handshake_required: true
-      lead_handshake_status: "ready"
+      lead_handshake_status: “ready”
       lead_ready_sent: false
       task_activation_allowed: false
-      expected_next_action: "send_context_lead_ready"
-      activation_state: "awaiting_lead_ready"
-      handshake_agents: ["context-researcher"]
+      expected_next_action: “send_context_lead_ready”
+      activation_state: “awaiting_lead_ready”
+      handshake_agents: [“context-researcher”]
       handshake_status:
-        context-researcher: "pending"
-      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
+        context-researcher: “pending”
+      on_handshake_failure: “skip_phase_and_fallback_to_single_agent”
 
-# Phase 2 必须等待 Phase 1 完成并通过 task dependency 强制传递背景
+# ============================================================
+# Phase 2: 专家评审（依赖 Phase 1 完成）
+# ============================================================
 - tool: TaskCreate
   params:
-    subject: "Phase 2: Parallel review"
+    subject: “Phase 2: 专家评审”
     description: |
-      spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background
-      【强制握手协议】（逐个进行，非批量）：
-      1. 依次 spawn 每个 agent，每 spawn 一个立即握手：
-         SendMessage(to="<agent-name>", message="【lead_ready】team-lead 已完成握手，请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'【agent_ready】已就绪'")
-      2. 收到该 agent "【agent_ready】已就绪"后，才能分配审查任务
-      3. 每个 agent 必须单独握手确认
-      4. 握手阶段不得内嵌 `phase_1_output` 或任何正式审查任务；收到"已就绪"后，再通过第二条 SendMessage 发送 phase_1_output（从 task #1 metadata 获取）
+      【输入】phase_1_output（从 Phase 1 task metadata 获取）
+      【输出】code-analyst / architect-reviewer / security-reviewer 的审查报告
+      【步骤】
+      1. TaskGet Phase 1 → 提取 phase_1_output
+      2. 确认 context-researcher handshake_status == “ready”（未 ready → 停止，回退单 agent）
+      3. 依次对 code-analyst → architect-reviewer → security-reviewer：
+         a. spawn agent，prompt 仅含握手指令，run_in_background=true
+         b. 按 handshake_agent(agent_name) 执行握手（含 3 次唤醒，见 §握手与唤醒协议规范）
+         c. 收到 agent_ready 后，SendMessage 下发正式任务（含 phase_1_output）
+         d. 派发后不得 idle，立即继续下一个 agent
+      4. 等待所有已握手 agent 的 task-notification（status=completed）
+      5. 收集全部报告
+      【门禁】
+      - 至少 1 个 agent handshake_status == “ready” 且返回了有效报告
+      - 未握手 agent 的报告标记为无效，不计入 Phase 3/4
 - tool: TaskUpdate
   params:
-    taskId: "<phase-2-task-id>"
-    addBlockedBy: ["<phase-1-task-id>"]  # 强制依赖 Phase 1
+    taskId: “<phase-2-task-id>”
+    addBlockedBy: [“<phase-1-task-id>”]
     metadata:
-      handshake_protocol: "ordered_v1"
-      requires_phase_1_output: true  # 标记需要背景信息
+      handshake_protocol: “ordered_v1”
+      requires_phase_1_output: true
       handshake_required: true
       task_activation_allowed: false
-      expected_next_action: "send_code_analyst_lead_ready"
-      activation_state: "awaiting_first_lead_ready"
-      handshake_agents: ["code-analyst", "architect-reviewer", "security-reviewer"]
+      expected_next_action: “send_code_analyst_lead_ready”
+      activation_state: “awaiting_first_lead_ready”
+      handshake_agents: [“code-analyst”, “architect-reviewer”, “security-reviewer”]
       lead_ready_sent:
         code-analyst: false
         architect-reviewer: false
         security-reviewer: false
       handshake_status:
-        code-analyst: "pending"
-        architect-reviewer: "pending"
-        security-reviewer: "pending"
-      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
+        code-analyst: “pending”
+        architect-reviewer: “pending”
+        security-reviewer: “pending”
+      on_handshake_failure: “skip_unready_agent_and_mark_review_incomplete”
       wakeup_policy:
         max_attempts: 3
         timeout: 30s
 
+# ============================================================
+# Phase 3: Codex 复查（依赖 Phase 2 完成）
+# ============================================================
 - tool: TaskCreate
   params:
-    subject: "Phase 3: Codex decision"
+    subject: “Phase 3: Codex 复查”
     description: |
-      （必选）校验 Phase 2 报告质量，决定是否启用 codex
-      【强制触发条件】满足任一项即启动 codex:rescue：
-      - 安全 PR（涉及认证/授权/路径解析/输入验证）
-      - 大型 PR（diff > 500 行）
-      - 报告冲突（Phase 2 多份报告对同一问题结论矛盾）
-      - 报告缺失（Phase 2 应有报告未送达）
-      【执行步骤】：
-      1. 收集 Phase 2 全部报告，校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
-      2. 失真报告标注"报告作废"，不作为 codex 输入
-      3. 满足触发条件且报告质量合格 → 调用 codex:rescue
-         必须将 Phase 2 完整报告（剔除作废的）作为输入发给 codex
-      4. 不满足触发条件或全部报告均不合格 → 跳过 codex，直接进入 Phase 4
-      
-      【关键约束】：
-      - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告
-      - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告（文件列表、行数、安全声明、红队测试结果等），不得包含 git diff、代码片段、代码变更内容
-      - 不得在 Phase 2 完成前启动（严格串行）
-      - 不得用幻觉报告喂 codex（失效数据无法被 codex 验证）
-      - 此阶段不涉及 agent 握手。
+      【输入】Phase 2 全部审查报告
+      【输出】codex 验证报告（或 skip 标记及原因）
+      【步骤】
+      1. 收集 Phase 2 全部报告
+      2. 校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
+      3. 失真报告标注”报告作废”，不作为 codex 输入
+      4. 判断触发条件（安全PR / diff>500行 / 报告冲突 / 报告缺失）
+      5. 满足且报告质量合格 → 调用 codex:rescue（仅传结构化报告，禁止传 diff/代码片段）
+      6. 不满足或全部报告不合格 → 记录 skip 原因，直接进入 Phase 4
+      【门禁】
+      - 已做出”启用 codex”或”跳过 codex”的明确决定（不可跳过此判断）
+      - 如启用 codex：codex 报告已收到并保存
+      - 此阶段不涉及 agent 握手
 - tool: TaskUpdate
   params:
-    taskId: "<phase-3-task-id>"
-    addBlockedBy: ["<phase-2-task-id>"]  # 强制依赖 Phase 2
+    taskId: “<phase-3-task-id>”
+    addBlockedBy: [“<phase-2-task-id>”]
     metadata:
-      requires_phase_2_reports: true  # 标记需要 Phase 2 报告
+      requires_phase_2_reports: true
+
+# ============================================================
+# Phase 4: 综合判断（依赖 Phase 3 完成）
+# ============================================================
 - tool: TaskCreate
   params:
-    subject: "Phase 4: Synthesis"
+    subject: “Phase 4: 综合判断”
     description: |
-      收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）
-      仲裁不同报告间的冲突，做出最终判断
-      禁止使用已作废的报告做结论
+      【输入】Phase 2 可用报告（剔除作废） + Phase 3 codex 报告（如有）
+      【输出】最终决策（APPROVE / NEEDS_CHANGES / REJECT）+ 结构化审查报告
+      【步骤】
+      1. 收集 Phase 2 可用报告，剔除 Phase 3 标记为作废的
+      2. 收集 Phase 3 codex 报告（如有）
+      3. 仲裁不同报告间的冲突，记录仲裁理由
+      4. 生成最终决策
+      5. 按 Review Quality Standards 自审查报告（禁虚假评分、禁无关指标、强制规则引用）
+      6. 缺失 agent 报告标注”审查不完整”，不脑补结论
+      【门禁】
+      - 最终决策已做出
+      - 审查报告已通过 Review Quality Standards 全部 8 条自查
+      - 未使用已作废的报告做结论
 - tool: TaskUpdate
   params:
-    taskId: "<phase-4-task-id>"
-    addBlockedBy: ["<phase-3-task-id>"]  # 强制依赖 Phase 3
+    taskId: “<phase-4-task-id>”
+    addBlockedBy: [“<phase-3-task-id>”]
     metadata:
       requires_phase_2_and_3_output: true
+
+# ============================================================
+# Phase 5: 写回 + 修复（依赖 Phase 4 完成）
+# ============================================================
 - tool: TaskCreate
   params:
-    subject: "Phase 5: Write back"
-    description: "ask-each mode; post PR comment; create follow-up issues。此阶段不涉及 agent 握手。仅限 gh pr comment 和 gh issue create。"
+    subject: “Phase 5: 写回 + 修复”
+    description: |
+      【输入】Phase 4 最终决策和审查报告
+      【输出】PR comment + follow-up issues + 可选修复 commit
+      【步骤】
+      1. 判断执行模式（auto-fix / comment-only / auto-decide / ask-each）
+      2. 写 PR comment（含：决策/已解决技术债/遗留问题/规则引用/follow-up 链接）
+      3. 如 auto-fix 模式：
+         a. spawn fix-executor，prompt 仅含握手指令
+         b. 按 handshake_agent(“fix-executor”) 执行握手（含 3 次唤醒，见 §握手与唤醒协议规范）
+         c. 收到 agent_ready 后，SendMessage 下发修复任务（含审查报告）
+         d. 等待修复完成并验证
+      4. 范围外问题创建 follow-up issues（先搜索去重，禁止重复创建）
+      【门禁】
+      - PR comment 已通过 gh pr comment 发布
+      - 范围外问题已创建 follow-up issue 或确认无需创建
+      - 禁止把当前 PR 阻塞问题转为 follow-up
 - tool: TaskUpdate
   params:
-    taskId: "<phase-5-task-id>"
-    addBlockedBy: ["<phase-4-task-id>"]  # 强制依赖 Phase 4
+    taskId: “<phase-5-task-id>”
+    addBlockedBy: [“<phase-4-task-id>”]
 ```
 
 **关键步骤（Phase 1 完成后必须执行）**：
