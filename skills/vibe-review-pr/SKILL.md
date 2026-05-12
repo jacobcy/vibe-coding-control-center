@@ -7,7 +7,7 @@ description: |
 
 # Vibe PR Review Skill
 
-`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。本文件定义生命周期、执行步骤、phase 契约、审查质量标准与硬边界。消息样例与恢复细节在 `references/`。
+`vibe-review-pr` 是 **Claude Code Agent Teams 专用入口**。本文件按 Phase 0→5 执行顺序组织，每个 Phase 是一个 Backlog Task。参考手册（契约表、握手协议、质量标准）在附录。
 
 非 Claude team 环境（含 Codex）一律分流：docs-only PR → `vibe-review-docs`；其他 → `vibe-review-code`。
 
@@ -34,80 +34,489 @@ description: |
 
 需要消息样例或恢复路径时再读 `references/execution-reference.md` / `references/recovery-playbook.md`。
 
-## Common Pitfalls（已知陷阱，issue #787）
+---
 
-> **⚠️ 最高优先级提醒：握手失败排查**
-> 
-> 如果握手无法完成，**最常见的原因**是 team-lead 自己没有执行 `ToolSearch`。
-> 
-> **强制规则**：
-> - **不得以任何理由假设自己已经 deferred tools**
-> - 如果无法完成握手，**必须**先执行 `ToolSearch(query="select:SendMessage")`
-> - 然后通知 agent 执行 `ToolSearch`
-> - 重复操作最多 3 次
-> - 3 次后仍失败 → 标记该 agent 为阻塞，大声说自己是傻瓜
+# Phase 0: 准备与握手
 
-### Deferred Tools 加载（有序双向握手协议，issue #787，强制执行）
+> **目标**：Team 就绪 + lead ToolSearch 完成 + 已有 agent 握手存活确认。
+> Phase 0 失败 → 立即停止，不创建后续 Backlog task。
 
-**核心问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。
+## Step 1: 环境检查
 
-**死锁陷阱**：如果 agent 不执行 `ToolSearch`，就没有 `SendMessage` 能力，**根本无法汇报被阻塞**——之前"失败时报告给 team-lead"的设计是自相矛盾的。
+只检查 tmux / Agent Teams / TeamCreate / TaskCreate / ToolSearch / SendMessage 可用性。
+**禁止在这一步执行 `gh pr view` / `gh pr diff` / `git diff`**。
 
-**正确方案：Phase 0 有序双向握手（强制执行，不可跳过）**
+任一缺失 → 立即停止。
 
+## Step 2: 选择执行模式
+
+`auto-fix / comment-only / auto-decide / ask-each`。
+用户指定 → 使用用户指定；未指定 → `ask-each`。
+
+## Step 3: 加载 template
+
+读 `.claude/team-templates/pr-review-team.yaml`，确认配置完整。
+
+## Step 4: 创建或复用 Team
+
+1. 检查 Team 是否已存在（TeamCreate 若报 already exists）
+2. 不存在 → `TeamCreate(team_name="pr-review-team")`
+3. 已存在 → 对已有 members（除 team-lead）逐个握手检测存活：
+   - `SendMessage(to=member, lead_ready)`
+   - 收到 `agent_ready` → 存活，可复用
+   - 超时 3 次（各 30s）→ 标记 dead
+4. 全死 → `TeamDelete` → `TeamCreate` 重建
+5. 部分存活 → 复用存活者，缺失的 agent type 在对应 Phase spawn
+
+> **复用判断 = 握手结果**。不检查 `isActive`（不可靠，Issue #29271），不读 `config.json` 推断状态（Issue #44701）。
+
+Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-编号命名）。
+
+## Step 5: 创建 Phase 0 Backlog Task
+
+> **踩坑记录**：TeamCreate 之前创建的 TaskCreate 不会关联到 team 的 task list，`TaskList` 返回空。必须先 TeamCreate 再 TaskCreate。
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "Phase 0: 准备与握手"
+    description: |
+      【输入】无
+      【输出】Team 就绪 + lead ToolSearch 完成 + 已有 agent 握手存活确认
+      【步骤】
+      1. 环境检查：tmux / Agent Teams / TeamCreate / TaskCreate / ToolSearch / SendMessage
+      2. 选择执行模式
+      3. 加载 pr-review-team.yaml
+      4. 创建或复用 Team（含握手存活检测）
+      5. team-lead 自身 ToolSearch(query="select:SendMessage")
+      【门禁】
+      - Team 已创建（TeamCreate 成功）
+      - team-lead 已完成 ToolSearch
+      - 复用场景：所有需要复用的 agent 已握手确认存活
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-0-task-id>"
+    status: "in_progress"
+    owner: "team-lead"
+    metadata:
+      handshake_protocol: "ordered_v1"
+      lead_handshake_status: "pending"
+      lead_ready_sent: false
+      task_activation_allowed: false
+      expected_next_action: "verify_environment"
+      activation_state: "awaiting_environment_check"
 ```
-Phase 0: 有序双向握手协议（lead_ready → agent_ready → send_task）
 
-Step 1 - team-lead 自身握手（整个 Phase 0 的第一步，仅一次，强制执行）：
-  【强制】team-lead 必须执行：
-    ToolSearch(query="select:SendMessage", max_results=1)
-  
-  【关键说明】：
-  - 即使会话开始时 UserPromptSubmit hook 自动触发了其他 ToolSearch，
-    team-lead 也必须重新执行此步骤作为 Phase 0 的正式握手
-  - 会话开始时的 ToolSearch 是响应 hook，不是 Phase 0 的正式握手
-  - Deferred tools 机制：声明在 agent 定义中 ≠ schema 已加载
-  - 必须显式执行 ToolSearch 才能加载 SendMessage schema
-  
-  失败 → 立即停止，禁止 spawn 任何 agent
+## Step 6: team-lead 自身 ToolSearch
 
-Step 2 - team-lead 每 spawn 一个 agent，立即发送 lead_ready：
-  SendMessage(to="<agent-name>", message="【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch，并在成功后回复【agent_ready】已就绪。")
+执行 `ToolSearch(query="select:SendMessage")`，确认 lead 自己可发送消息。
 
-Step 3 - agent 在收到 lead_ready 后响应：
-  agent 执行 ToolSearch(query="select:SendMessage", max_results=1)
-  成功 → SendMessage(to="team-lead", message="【agent_ready】已就绪")
-  失败 → agent 无法发送消息，team-lead 超时检测
+> **⚠️ 最高优先级**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于 schema 已加载。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。即使会话开始时 hook 自动触发了其他 ToolSearch，team-lead 也必须重新执行此步骤作为 Phase 0 的正式握手。
 
-Step 4 - team-lead 确认该 agent：
-  收到"【agent_ready】已就绪" → 该 agent 可参与后续工作，下一步必须发送正式任务
-  超时未收到 → 再次发送 lead_ready 握手消息通知 agent
-  多次超时 → 标记该 agent 为阻塞，后续 Phase 标注"审查不完整"
-```
-
-**关键理解**：这是**有方向、有时序**的握手，不是双方同时各说一次“已就绪”。
-
-- **Phase 1 阶段**：spawn context-researcher → lead 发送 `lead_ready` → agent 回复 `agent_ready` → 分配调研任务
-- **Phase 2 阶段**：spawn code-analyst + architect + security → lead 分别发送 `lead_ready` → 各 agent 分别回复 `agent_ready` → 并行分配任务
-
-team-lead 在 spawn 一个 agent 后，必须先发 `lead_ready`，等该 agent 返回 `agent_ready`，才能继续该阶段的工作。
-不等到该 agent 的 `agent_ready`，不得给该 agent 分配任何工作。
-
-**强制规则**：
-- **team-lead**：spawn agent 后必须立即发送 `lead_ready`；收到 `agent_ready` 前不得给该 agent 分配工作
-- **teammate**：收到 `lead_ready` 消息后，**唯一合法操作**是执行 ToolSearch 并回复 `agent_ready`
-- **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何其他操作**
+失败 → 立即停止，禁止 spawn 任何 agent。
 
 **诊断**（如 agent 未发送报告）：
 ```bash
 tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
 ```
 
-详见：`.claude/agents/pr-*.md` 的 "握手协议" 章节。
+## Phase 0 强制规则
+
+- **Phase 0 必须先于任何 subagent 执行**：TeamCreate → TaskCreate(Phase 0) → team-lead ToolSearch。已有 Team 时先握手检测存活
+- **复用判断 = 握手结果**（alive=复用，dead=清理后 TeamCreate）；有残留 Team 时先尝试握手，不跳过握手直接 TeamCreate
+- **切换 PR 用 SendMessage**（握手成功的复用 agent），禁止盲目重新 spawn
+- **TeamDelete 合法场景**：任务完成时（Phase 5 写回后）；状态不一致时按 Recovery 清理
+- **清理优先级**：TeamDelete → rm -rf fallback → 退出重建会话
+- 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
+
+---
+
+# Phase 1: 背景调研
+
+> **目标**：产出 `phase_1_output` — 结构化 PR 背景报告（概述、改动范围、关联 issue、风险评估）。
+> **依赖**：Phase 0 完成。
+
+## Step 1: 创建 Phase 1 Backlog Task
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "Phase 1: 背景调研"
+    description: |
+      【输入】PR 编号
+      【输出】phase_1_output（结构化背景报告）
+      【步骤】
+      1. spawn context-researcher → 握手 → 分配调研任务
+      2. 等待报告 → 保存 phase_1_output 到 Task metadata
+      【门禁】
+      - handshake_status.context-researcher == "ready"
+      - phase_1_output 非空
+      - team-lead 不得自行执行 gh pr view/diff
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-1-task-id>"
+    status: "in_progress"
+    owner: "team-lead"
+    addBlockedBy: ["<phase-0-task-id>"]
+    metadata:
+      handshake_protocol: "ordered_v1"
+      handshake_required: true
+      lead_handshake_status: "ready"
+      lead_ready_sent: false
+      task_activation_allowed: false
+      expected_next_action: "send_context_lead_ready"
+      activation_state: "awaiting_lead_ready"
+      handshake_agents: ["context-researcher"]
+      handshake_status:
+        context-researcher: "pending"
+      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
+```
+
+## Step 2: spawn → 握手 → 分配任务
+
+1. spawn context-researcher，prompt 仅含握手指令（见 yaml phase_1 execution）
+2. 按 `handshake_agent("context-researcher")` 执行握手（最多 3 次唤醒，30s 超时，见 §握手与唤醒协议规范）
+3. 收到 `【agent_ready】已就绪` 后，立即 SendMessage 下发正式调研任务（含 PR 编号）
+4. **未握手成功前，不得给该 agent 分配任何工作**
+
+backlog gate：发送 lead_ready 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`
+backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_context_task, activation_state=awaiting_task_dispatch`
+
+## Step 3: 等待报告 → 保存 output
+
+收到 context-researcher 报告后：
+
+```yaml
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-1-task-id>"
+    status: "completed"
+    metadata:
+      phase_1_output: |
+        ## PR #<number> 背景报告
+        [完整的 context-researcher 报告内容，包括所有章节]
+```
+
+## Step 4: PR 分类 + 补建后续 Backlog
+
+基于 `phase_1_output` 判断 PR 类型。
+
+> **常见错误**：看到"文档改动"就归类 `simple`。这是错的。
+
+`simple` 必须**同时**满足全部 4 项：
+- ✅ **单文件**改动
+- ✅ 改动 **< 30 行**
+- ✅ 仅文档 / 注释 / 字符串 / 重命名
+- ✅ 无 `security/*` 标签
+
+任一不满足 → 不是 simple。
+
+| 类型 | 条件 | Backlog |
+|------|------|---------|
+| `simple` | 4 项全满足 | 仅 Phase 1 |
+| `security` | 涉及认证/授权/数据/凭据/输入验证 | Phase 1+2，**必须**含 `security-reviewer` |
+| `refactor` | ≥ 5 文件或大规模重构 | Phase 1+2 |
+| `standard` | 不属于上述 | Phase 1+2 |
+
+**反例**（issue #742 真实踩坑）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 + 文档 → 错误归类 `simple` → 实际应按 `standard` 处理。**只要包含代码改动或多文件，就不是 simple。**
+
+按类型补建 Phase 2-5 的 Backlog Task（simple 只保留 Phase 1）。
+
+## Phase 1 强制规则
+
+- **team-lead 不得自行收集上下文**（gh pr view、git diff、git log 等），这是 context-researcher 的工作
+- **显式 PR 编号入口禁止 lead 预调查**：`/vibe-review-pr 821` 这类入口下，team-lead 不得为"确认状态/标题/标签/变更范围"执行 `gh pr view` / `gh pr diff`；这些事实必须由 Phase 1 背景报告提供
+- **禁止 team-lead 执行其他 shell 命令**：gh pr diff、git show、git commit、git push 等调研或修改操作
+- 唯一的 context 传递：从 Phase 1 报告通过第二条 SendMessage **转发**到 Phase 2 agents，不做预收集
+- `保持空闲 / 等待新 PR` 只适用于**上一轮任务已完成的复用 teammate**；不适用于本轮 fresh spawn 且刚完成握手的 agent
+
+---
+
+# Phase 2: 专家评审
+
+> **目标**：code-analyst / architect-reviewer / security-reviewer 的独立审查报告。
+> **依赖**：Phase 1 完成（`handshake_status.context-researcher == "ready"` + `phase_1_output` 非空）。
+> **启动前**：`TaskGet Phase 1` → 提取 `phase_1_output`；未 ready → 停止，回退单 agent。
+
+## Step 1: 创建 Phase 2 Backlog Task
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "Phase 2: 专家评审"
+    description: |
+      【输入】phase_1_output（从 Phase 1 task metadata 获取）
+      【输出】code-analyst / architect-reviewer / security-reviewer 的审查报告
+      【步骤】
+      1. TaskGet Phase 1 → 提取 phase_1_output
+      2. 确认 context-researcher handshake_status == "ready"（未 ready → 停止）
+      3. 依次对 code-analyst → architect-reviewer → security-reviewer：
+         a. spawn agent，prompt 仅含握手指令，run_in_background=true
+         b. 按 handshake_agent(agent_name) 执行握手（最多 3 次唤醒，30s 超时）
+         c. 收到 agent_ready 后，SendMessage 下发正式任务（含 phase_1_output）
+         d. 派发后不得 idle，立即继续下一个 agent
+      4. 等待所有已握手 agent 的 task-notification
+      5. 收集全部报告
+      【门禁】
+      - 至少 1 个 agent handshake_status == "ready" 且返回了有效报告
+      - 未握手 agent 的报告标记为无效
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-2-task-id>"
+    addBlockedBy: ["<phase-1-task-id>"]
+    metadata:
+      handshake_protocol: "ordered_v1"
+      requires_phase_1_output: true
+      handshake_required: true
+      task_activation_allowed: false
+      expected_next_action: "send_code_analyst_lead_ready"
+      activation_state: "awaiting_first_lead_ready"
+      handshake_agents: ["code-analyst", "architect-reviewer", "security-reviewer"]
+      lead_ready_sent:
+        code-analyst: false
+        architect-reviewer: false
+        security-reviewer: false
+      handshake_status:
+        code-analyst: "pending"
+        architect-reviewer: "pending"
+        security-reviewer: "pending"
+      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
+      wakeup_policy:
+        max_attempts: 3
+        timeout: 30s
+```
+
+## Step 2: spawn → 逐个握手 → 分配任务
+
+多 agent **同一响应**内并行 spawn，但握手逐个进行（非批量）：
+
+1. 每 spawn 一个立即发送 `【lead_ready】`
+2. 收到该 agent `【agent_ready】已就绪` → 通过第二条 SendMessage 发送 `phase_1_output` 和正式审查任务
+3. 派发完一个后 team-lead 不得进入 idle；必须继续处理下一个 agent，直到全部完成
+4. 超时未收到 → 按 `handshake_agent()` 重试/blocked 逻辑处理
+
+**约束**：
+- fresh spawn 先只做握手，收到"已就绪"后才分配工作
+- 握手阶段不得内嵌 `phase_1_output` 或正式审查任务
+- 复用 teammate 或补发上下文时也用 SendMessage
+
+## Step 3: 收集报告
+
+等待所有已握手 agent 的 task-notification（status=completed），收集全部审查报告。
+
+## Phase 2 强制规则
+
+- Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
+- fresh spawn 的初始 prompt 只允许握手
+- fresh spawn 的 agent 一旦回复"【agent_ready】已就绪"，team-lead 的**下一条有效动作**必须是正式任务激活（`send_code_analyst_task` 等）；不得插入"保持空闲 / 等待新 PR"之类待命消息
+- backlog metadata 必须同时记录 `expected_next_action` 与 `task_activation_allowed`；若元数据仍处于 `awaiting_lead_ready` / `awaiting_agent_ready`，则任何正式任务下发都视为协议违规
+
+---
+
+# Phase 3: Codex 复查
+
+> **目标**：校验 Phase 2 报告质量，决定是否启用 codex 复查。
+> **依赖**：Phase 2 完成（全部 agent 报告已送达或已标记 blocked）。
+> **此阶段不涉及 agent 握手。**
+
+## Step 1: 创建 Phase 3 Backlog Task
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "Phase 3: Codex 复查"
+    description: |
+      【输入】Phase 2 全部审查报告
+      【输出】codex 验证报告（或 skip 标记及原因）
+      【步骤】
+      1. 收集 Phase 2 全部报告
+      2. 校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
+      3. 失真报告标注"报告作废"，不作为 codex 输入
+      4. 判断触发条件（安全PR / diff>500行 / 报告冲突 / 报告缺失）
+      5. 满足且报告质量合格 → 调用 codex:rescue（仅传结构化报告，禁止传 diff/代码片段）
+      6. 不满足或全部报告不合格 → 记录 skip 原因，直接进入 Phase 4
+      【门禁】
+      - 已做出"启用 codex"或"跳过 codex"的明确决定（不可跳过此判断）
+      - 如启用 codex：codex 报告已收到并保存
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-3-task-id>"
+    addBlockedBy: ["<phase-2-task-id>"]
+    metadata:
+      requires_phase_2_reports: true
+```
+
+## Step 2: 校验报告数据
+
+收集 Phase 2 全部报告，校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致。
+失真报告标注"报告作废"，不作为 codex 输入。
+
+## Step 3: 决定是否启用 codex
+
+**触发条件**（满足任一项）：
+- 安全 PR（涉及认证/授权/路径解析/输入验证）
+- 大型 PR（diff > 500 行）
+- 报告冲突（Phase 2 多份报告对同一问题结论矛盾）
+- 报告缺失（Phase 2 应有报告未送达）
+
+**调用约束**：
+- **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告（文件列表、行数、安全声明、红队测试结果等），不得包含 git diff、代码片段、代码变更内容
+- 不得在 Phase 2 完成前启动（严格串行）
+- 不得用幻觉报告喂 codex（失效数据无法被 codex 验证）
+- 任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4
+
+---
+
+# Phase 4: 综合判断
+
+> **目标**：收集全部可用报告，仲裁冲突，出具最终决策。
+> **依赖**：Phase 3 完成。
+
+## Phase 4 Backlog Task
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "Phase 4: 综合判断"
+    description: |
+      【输入】Phase 2 可用报告（剔除作废） + Phase 3 codex 报告（如有）
+      【输出】最终决策（APPROVE / NEEDS_CHANGES / REJECT）+ 结构化审查报告
+      【步骤】
+      1. 收集 Phase 2 可用报告，剔除 Phase 3 标记为作废的
+      2. 收集 Phase 3 codex 报告（如有）
+      3. 仲裁不同报告间的冲突，记录仲裁理由
+      4. 生成最终决策
+      5. 按 Review Quality Standards 自审查报告（禁虚假评分、禁无关指标、强制规则引用）
+      6. 缺失 agent 报告标注"审查不完整"，不脑补结论
+      【门禁】
+      - 最终决策已做出
+      - 审查报告已通过 Review Quality Standards 全部 8 条自查
+      - 未使用已作废的报告做结论
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-4-task-id>"
+    addBlockedBy: ["<phase-3-task-id>"]
+    metadata:
+      requires_phase_2_and_3_output: true
+```
+
+## Phase 4 强制规则
+
+- 禁止使用已作废的报告做结论
+- 替缺失 agent 脑补结论 → 标记"审查不完整"
+- 必须通过 Review Quality Standards 全部 8 条自查
+
+---
+
+# Phase 5: 写回 + 修复
+
+> **目标**：PR comment + follow-up issues + 可选修复 commit。
+> **依赖**：Phase 4 完成。
+
+## Phase 5 Backlog Task
+
+```yaml
+- tool: TaskCreate
+  params:
+    subject: "Phase 5: 写回 + 修复"
+    description: |
+      【输入】Phase 4 最终决策和审查报告
+      【输出】PR comment + follow-up issues + 可选修复 commit
+      【步骤】
+      1. 判断执行模式（auto-fix / comment-only / auto-decide / ask-each）
+      2. 写 PR comment（含：决策/已解决技术债/遗留问题/规则引用/follow-up 链接）
+      3. 如 auto-fix 模式：
+         a. spawn fix-executor，prompt 仅含握手指令
+         b. 按 handshake_agent("fix-executor") 执行握手（最多 3 次唤醒，30s 超时）
+         c. 收到 agent_ready 后，SendMessage 下发修复任务（含审查报告）
+         d. 等待修复完成并验证
+      4. 范围外问题创建 follow-up issues（先搜索去重，禁止重复创建）
+      【门禁】
+      - PR comment 已通过 gh pr comment 发布
+      - 范围外问题已创建 follow-up issue 或确认无需创建
+      - 禁止把当前 PR 阻塞问题转为 follow-up
+- tool: TaskUpdate
+  params:
+    taskId: "<phase-5-task-id>"
+    addBlockedBy: ["<phase-4-task-id>"]
+```
+
+## Phase 5 强制规则
+
+- 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`
+- 范围外问题转 follow-up issue；禁止把范围外技术债塞进当前 PR comment
+- 仅限 `gh pr comment` 和 `gh issue create`（禁止其他 gh/git 命令）
+
+## 会话收尾
+
+1. 询问继续：continue → 回 Phase 0 Step 4（复用 Team）；end → 下一步
+2. 向所有 teammates 发 `shutdown_request`：
+   ```
+   SendMessage(to="code-analyst",      message={"type": "shutdown_request"})
+   SendMessage(to="architect-reviewer", message={"type": "shutdown_request"})
+   SendMessage(to="security-reviewer",  message={"type": "shutdown_request"})
+   SendMessage(to="context-researcher", message={"type": "shutdown_request"})
+   ```
+3. 等待 idle 通知后 `TeamDelete()`
+4. 若 TeamDelete 返回 "no team found" → 手动清理：`rm -rf ~/.claude/teams/pr-review-team ~/.claude/tasks/pr-review-team`
+
+**会话中途**不得发送 shutdown 指令（Phase 5 完成前的 idle 通知是正常现象，不是关闭信号）。
+
+---
+
+## 跨 PR 管理
+
+`TaskList` 可随时用于确认进度，避免重复创建。
+
+**每个 PR 开始审查前**：
+1. 检查 `TaskList`，如有上一轮 PR 的未完成 task，标记为 `completed`（附带说明：上一 PR 遗留）
+2. 如有上一轮 PR 已完成但未标记的 task，标记为 `completed`
+3. 为当前 PR 创建 Phase 0 task
+
+**每个 Phase 执行时**：
+- 开始 Phase → `TaskUpdate(status="in_progress")`
+- 完成 Phase → `TaskUpdate(status="completed")`
+
+**会话结束时**：所有 task 由 TeamDelete 自动清理，无需手动删除。
+
+---
+
+## Session Lifecycle（强制理解，issue #742 反复踩坑）
+
+> **核心误解**：把 Team 当成"PR-级"对象。事实上 Team 是"会话级"对象。
+
+```
+环境检查 → 检查已有 Team → 握手确认存活 → PR #A → continue → PR #B → ... → end → TeamDelete
+```
+
+要点：
+- 复用判断 = 握手结果：发送 lead_ready → 收到 agent_ready = 复用，超时 = dead
+- 不检查 isActive（不可靠，Issue #29271），不读 config.json 推断状态（Issue #44701）
+- 切换 PR 用 SendMessage（握手成功的复用 agent）或重新 spawn（握手失败的 dead agent）
+- TeamDelete 默认仅在用户 end：用户没说结束就保留状态
+
+---
+
+## Phase Contracts
+
+| Phase | 强制要求 | 易错点 |
+|-------|---------|-------|
+| 0 准备与握手 | TeamCreate 后先建 Phase 0 Backlog Task；team-lead 自身先 ToolSearch；已有 Team 则握手确认 agent 存活（alive=复用，dead=清理重建） | 跳过 Phase 0 TaskCreate 直接开始 Phase 1；不复用也不清理，直接 TeamCreate 重复创建；team-lead 自身未 ToolSearch |
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到"已就绪"后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
+| 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注"报告作废"；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
+| 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
+| 5 写回 + 修复 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
+
+> **没有 Phase 6**。完成 Phase 5 后流程结束。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
+
+详细消息样例见 `references/execution-reference.md`。
+
+---
 
 ## 握手与唤醒协议规范
 
-参数定义见 Backlog metadata `wakeup_policy`（`max_attempts`、`timeout`）。以下流程是**单源真源**，修改参数只需改 metadata 一处，以下伪代码自动跟随。
+参数定义见 Backlog metadata `wakeup_policy`（`max_attempts`、`timeout`）。以下流程是**单源真源**，修改参数只需改 metadata 一处。
 
 ### handshake_agent(agent_name)
 
@@ -132,334 +541,31 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 4. check pane: ❯ 等待输入 → 正常 idle，任务尚未完成，继续等待
 ```
 
-### 其他常见陷阱
+### 握手强制规则
 
-详见 `references/debug-guide.md`：
-- Pane 可见性说明（非 bug）
-- Agent 执行过程查看方法
-- Model 参数核查
-- PR 编号路由诊断
+**这是有方向、有时序的握手，不是双方同时各说一次"已就绪"。**
 
-## Session Lifecycle（强制理解，issue #742 反复踩坑）
+**team-lead 必须**：
+1. Phase 0 中自身先执行 `ToolSearch(query="select:SendMessage")`
+2. 每 spawn 一个 agent，立即发送 `【lead_ready】`
+3. 收到 `【agent_ready】已就绪` 后，必须立即发送该 phase 的正式任务；fresh spawn 不得先进入 idle / 待命态
+4. 超时未收到 → 按 `handshake_agent()` 重试/blocked 逻辑处理
 
-> **核心误解**：把 Team 当成”PR-级”对象。事实上 Team 是”会话级”对象。
+**team-lead 禁止**：
+- 自身未 ToolSearch 就 spawn 任何 agent
+- spawn 后不发 `lead_ready`，假设 agent 会自动执行
+- 未收到 `agent_ready` 就给该 agent 分配工作
+- 对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR"
+- 替未响应的 agent 脑补结论
 
+**诊断**（如 agent 未发送报告）：
+```bash
+tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
 ```
-环境检查 → 检查已有 Team → 握手确认存活 → PR #A → continue → PR #B → ... → end → TeamDelete
-```
 
-要点：
-
-- 复用判断 = 握手结果：发送 lead_ready → 收到 agent_ready = 复用，超时 = dead（不检查 isActive，不可靠，Issue #29271；不读 config.json 推断状态，Issue #44701）
-- 切换 PR 用 SendMessage（握手成功的复用 agent）或重新 spawn（握手失败的 dead agent）
-- 每次执行先清理残留：如存在 pr-review-team → 对已有 members 握手 → 无存活 → TeamDelete + TeamCreate
-- TeamDelete 默认仅在用户 end：用户没说结束就保留状态，恢复流程另行处理。易犯错是看到”询问是否继续”就以为要 TeamDelete。
-
-Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-编号命名，会强化错误心智模型）。
-
-## Execution Flow
-
-执行按 Phase 0 → Phase 5 严格串行。每个 Phase 是一个 Backlog Task（由 `TaskCreate` 创建），Phase 内的 Step 是子步骤。
-
-### Phase 0: 准备阶段
-
-1. **环境检查**：只检查 tmux / Agent Teams / TeamCreate / TaskCreate / ToolSearch / SendMessage 可用性；**禁止在这一步执行 `gh pr view` / `gh pr diff` / `git diff`**。
-2. **选执行模式**：`auto-fix / comment-only / auto-decide / ask-each`。
-3. **加载 template**：读 `.claude/team-templates/pr-review-team.yaml`。
-4. **创建或复用 Team**：不存在 → TeamCreate；已存在 → 对已有 members 握手确认存活 → 存活则复用，全死则 TeamDelete + TeamCreate。
-5. **创建 Phase 0 Backlog Task**：`TaskCreate("Phase 0: 准备与握手")` → `TaskUpdate(owner="team-lead")`（见下方 Backlog Setup）。
-6. **team-lead 自身 ToolSearch**：执行 `ToolSearch(query="select:SendMessage")`，确认 lead 自己可发送消息。
-
-### Phase 1: 背景调研
-
-1. **spawn context-researcher** → 立即握手 → 收到"已就绪"后再通过第二条 `SendMessage` 下发正式调研任务
-2. **等待报告** → 保存 `phase_1_output` 到 Phase 1 Task metadata
-3. **PR 分类**：基于 `phase_1_output` 判断 PR 类型（simple / standard / refactor / security）
-4. **补建后续 Backlog Tasks**：`simple` 只保留 Phase 1；其他类型再创建 Phase 2 / 3 / 4 / 5 task
-
-> **显式 PR 编号入口**：PR 事实来自 Phase 1 报告，team-lead 不得自行执行 `gh pr view/diff`。
-
-### Phase 2: 专家评审
-
-spawn code-analyst + architect-reviewer + security-reviewer → 逐个握手 → 分配正式审查任务 → 收集报告。
-
-### Phase 3: Codex 复查
-
-校验 Phase 2 报告数据 → 判断是否触发 codex → 执行或用 skip。
-
-### Phase 4: 综合判断
-
-收集全部可用报告 → 冲突仲裁 → 质量自查 → 出最终决策（APPROVE / NEEDS_CHANGES / REJECT）。
-
-### Phase 5: 写回 + 修复
-
-判断执行模式 → 写 PR comment → 可选 spawn fix-executor + 握手 + 修复 → 创建 follow-up issues。
-
-### 会话收尾
-
-询问继续：continue → 回 Phase 0 Step 4（复用 Team）；end → 向所有 teammates 发 `shutdown_request` → `TeamDelete`。
+其他常见陷阱详见 `references/debug-guide.md`。
 
 ---
-
-### Backlog Setup（TeamCreate 后先建 Phase 0，后续按 Phase 补建）
-
-> **踩坑记录**：TeamCreate 之前创建的 TaskCreate 不会关联到 team 的 task list，`TaskList` 返回空。必须先 TeamCreate 再 TaskCreate。
-
-**强制顺序**：
-
-```
-TeamCreate → TaskCreate(Phase 0) → TaskUpdate(owner="team-lead") → ToolSearch(lead) →
-  按 Phase 1-5 依次：TaskCreate → 执行 → TaskUpdate(completed)
-```
-
-Phase 0 是正式 Backlog Task（不再是"前置条件"），包含准备、Team 复用检测、lead 握手：
-
-```yaml
-# ============================================================
-# Phase 0: 准备与握手
-# ============================================================
-- tool: TaskCreate
-  params:
-    subject: "Phase 0: 准备与握手"
-    description: |
-      【输入】无
-      【输出】Team 就绪 + lead ToolSearch 完成 + 已有 agent 握手存活确认
-      【步骤】
-      1. 环境检查：tmux / Agent Teams / TeamCreate / TaskCreate / ToolSearch / SendMessage
-      2. 选择执行模式
-      3. 加载 pr-review-team.yaml
-      4. 创建或复用 Team（含握手存活检测，见 agent_reuse_via_handshake）
-      5. team-lead 自身 ToolSearch(query="select:SendMessage")
-      【门禁】
-      - Team 已创建（TeamCreate 成功）
-      - team-lead 已完成 ToolSearch
-      - 复用场景：所有需要复用的 agent 已握手确认存活
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-0-task-id>"
-    status: "in_progress"
-    owner: "team-lead"
-    metadata:
-      handshake_protocol: "ordered_v1"
-      lead_handshake_status: "pending"
-      lead_ready_sent: false
-      task_activation_allowed: false
-      expected_next_action: "verify_environment"
-      activation_state: "awaiting_environment_check"
-
-# ============================================================
-# Phase 1: 背景调研（依赖 Phase 0 完成）
-# ============================================================
-```
-
-Phase 0 完成后，为 Phase 1 创建 task，并用 `TaskUpdate(owner="team-lead")` 设置归属；**显式 PR 编号入口不得在这里让 team-lead 先做 `gh pr view/diff` 验证**。必须先完成 context-researcher 握手，由 Phase 1 报告提供 PR 事实，再判定为 `standard` / `refactor` / `security`，随后补建 Phase 2 / 3 / 4 / 5 的 task：
-
-```yaml
-- tool: TaskCreate
-  params:
-    subject: "Phase 1: Context research"
-    description: |
-      spawn context-researcher, collect PR background and save to metadata
-      【强制握手协议】：
-      1. team-lead 先执行 ToolSearch(query="select:SendMessage") 确认自身可用
-      2. spawn context-researcher 后，立即发送 `【lead_ready】`：
-         SendMessage(to="context-researcher", message="【lead_ready】team-lead 已完成握手，请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'【agent_ready】已就绪'")
-      3. 收到"【agent_ready】已就绪"后，才能分配调研任务
-      4. 未握手成功前，不得给该 agent 分配任何工作
-      5. 显式指定 PR 编号时，team-lead 不得为“确认 PR 是否存在/状态/基本信息”执行 `gh pr view`；首次接触 PR 的主体必须是 context-researcher
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-1-task-id>"
-    status: "in_progress"
-    owner: "team-lead"
-    addBlockedBy: ["<phase-0-task-id>"]
-    metadata:
-      handshake_protocol: "ordered_v1"
-      handshake_required: true
-      lead_handshake_status: "ready"
-      lead_ready_sent: false
-      task_activation_allowed: false
-      expected_next_action: "send_context_lead_ready"
-      activation_state: "awaiting_lead_ready"
-      handshake_agents: ["context-researcher"]
-      handshake_status:
-        context-researcher: "pending"
-      on_handshake_failure: "skip_phase_and_fallback_to_single_agent"
-
-# Phase 2 必须等待 Phase 1 完成并通过 task dependency 强制传递背景
-- tool: TaskCreate
-  params:
-    subject: "Phase 2: Parallel review"
-    description: |
-      spawn code-analyst + architect-reviewer + security-reviewer with Phase 1 background
-      【强制握手协议】（逐个进行，非批量）：
-      1. 依次 spawn 每个 agent，每 spawn 一个立即握手：
-         SendMessage(to="<agent-name>", message="【lead_ready】team-lead 已完成握手，请执行 ToolSearch(query='select:SendMessage', max_results=1) 并回复'【agent_ready】已就绪'")
-      2. 收到该 agent "【agent_ready】已就绪"后，才能分配审查任务
-      3. 每个 agent 必须单独握手确认
-      4. 握手阶段不得内嵌 `phase_1_output` 或任何正式审查任务；收到"已就绪"后，再通过第二条 SendMessage 发送 phase_1_output（从 task #1 metadata 获取）
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-2-task-id>"
-    addBlockedBy: ["<phase-1-task-id>"]  # 强制依赖 Phase 1
-    metadata:
-      handshake_protocol: "ordered_v1"
-      requires_phase_1_output: true  # 标记需要背景信息
-      handshake_required: true
-      task_activation_allowed: false
-      expected_next_action: "send_code_analyst_lead_ready"
-      activation_state: "awaiting_first_lead_ready"
-      handshake_agents: ["code-analyst", "architect-reviewer", "security-reviewer"]
-      lead_ready_sent:
-        code-analyst: false
-        architect-reviewer: false
-        security-reviewer: false
-      handshake_status:
-        code-analyst: "pending"
-        architect-reviewer: "pending"
-        security-reviewer: "pending"
-      on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
-      wakeup_policy:
-        max_attempts: 3
-        timeout: 30s
-
-- tool: TaskCreate
-  params:
-    subject: "Phase 3: Codex decision"
-    description: |
-      （必选）校验 Phase 2 报告质量，决定是否启用 codex
-      【强制触发条件】满足任一项即启动 codex:rescue：
-      - 安全 PR（涉及认证/授权/路径解析/输入验证）
-      - 大型 PR（diff > 500 行）
-      - 报告冲突（Phase 2 多份报告对同一问题结论矛盾）
-      - 报告缺失（Phase 2 应有报告未送达）
-      【执行步骤】：
-      1. 收集 Phase 2 全部报告，校验各报告基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致
-      2. 失真报告标注"报告作废"，不作为 codex 输入
-      3. 满足触发条件且报告质量合格 → 调用 codex:rescue
-         必须将 Phase 2 完整报告（剔除作废的）作为输入发给 codex
-      4. 不满足触发条件或全部报告均不合格 → 跳过 codex，直接进入 Phase 4
-      
-      【关键约束】：
-      - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告
-      - **绝对禁止传 diff 给 codex**：codex 的输入只能是 Phase 2 的结构化报告（文件列表、行数、安全声明、红队测试结果等），不得包含 git diff、代码片段、代码变更内容
-      - 不得在 Phase 2 完成前启动（严格串行）
-      - 不得用幻觉报告喂 codex（失效数据无法被 codex 验证）
-      - 此阶段不涉及 agent 握手。
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-3-task-id>"
-    addBlockedBy: ["<phase-2-task-id>"]  # 强制依赖 Phase 2
-    metadata:
-      requires_phase_2_reports: true  # 标记需要 Phase 2 报告
-- tool: TaskCreate
-  params:
-    subject: "Phase 4: Synthesis"
-    description: |
-      收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）
-      仲裁不同报告间的冲突，做出最终判断
-      禁止使用已作废的报告做结论
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-4-task-id>"
-    addBlockedBy: ["<phase-3-task-id>"]  # 强制依赖 Phase 3
-    metadata:
-      requires_phase_2_and_3_output: true
-- tool: TaskCreate
-  params:
-    subject: "Phase 5: Write back"
-    description: "ask-each mode; post PR comment; create follow-up issues。此阶段不涉及 agent 握手。仅限 gh pr comment 和 gh issue create。"
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-5-task-id>"
-    addBlockedBy: ["<phase-4-task-id>"]  # 强制依赖 Phase 4
-```
-
-**关键步骤（Phase 1 完成后必须执行）**：
-
-```yaml
-# Phase 1 完成时，必须将背景报告保存到 task metadata
-- tool: TaskUpdate
-  params:
-    taskId: "<phase-1-task-id>"
-    status: "completed"
-    metadata:
-      phase_1_output: |
-        ## PR #<number> 背景报告
-
-        [完整的 context-researcher 报告内容，包括所有章节]
-```
-
-**Phase 2 启动前检查**：
-
-```yaml
-# Phase 2 开始前，必须从 Phase 1 task 获取背景信息
-- tool: TaskGet
-  params:
-    taskId: "<phase-1-task-id>"
-  # 从 metadata.phase_1_output 提取完整背景报告
-  # 然后嵌入 Phase 2 agents 的 prompt 中
-  # 同时检查 metadata.handshake_status.context-researcher == "ready"
-  # 未 ready → 停止 Phase 2，回退到单 agent review
-```
-
-`TaskList` 可随时用于确认进度，避免重复创建。
-
-### Task Lifecycle（跨 PR 管理）
-
-> **踩坑记录**：跨 PR 审查时，旧 PR 的 task 会累积在 task list 中，造成视觉混乱和状态不一致。
-
-**每个 PR 开始审查前**：
-
-1. 检查 `TaskList`，如有上一轮 PR 的未完成 task，标记为 `completed`（附带说明：上一 PR 遗留）
-2. 如有上一轮 PR 已完成但未标记的 task，标记为 `completed`
-3. 为当前 PR 创建 Phase 0 task（按 Backlog Setup）
-
-**每个 Phase 执行时**：
-
-- 开始 Phase → `TaskUpdate(status="in_progress")`
-- 完成 Phase → `TaskUpdate(status="completed")`
-
-**会话结束时**：
-
-- 所有 task 由 TeamDelete 自动清理，无需手动删除
-
-### PR 分类（多维判断，禁止简化）
-
-> **常见错误**：看到"文档改动"就归类 `simple`。这是错的。
-
-`simple` 必须**同时**满足全部 4 项：
-
-- ✅ **单文件**改动
-- ✅ 改动 **< 30 行**
-- ✅ 仅文档 / 注释 / 字符串 / 重命名
-- ✅ 无 `security/*` 标签
-
-任一不满足 → 不是 simple。
-
-分类规则：
-
-- `simple`：上述 4 项**全**满足。处理方式是仅 Phase 1，由 team-lead 调用 `vibe-review-docs` 或 `vibe-review-code`。
-- `security`：涉及认证 / 授权 / 数据 / 凭据 / 输入验证。处理方式是 Phase 1+2，且**必须**含 `security-reviewer`。
-- `refactor`：≥ 5 文件或大规模重构。处理方式是 Phase 1+2。
-- `standard`：不属于上述。处理方式是 Phase 1+2。
-
-**反例**（issue #742 真实踩坑）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 + 文档 → 错误归类 `simple` → 实际应按 `standard` 处理。**只要包含代码改动或多文件，就不是 simple。**
-
-## Phase Contracts
-
-| Phase | 强制要求 | 易错点 |
-|-------|---------|-------|
-| 0 准备与握手 | TeamCreate 后先建 Phase 0 Backlog Task；team-lead 自身先 ToolSearch；已有 Team 则握手确认 agent 存活（alive=复用，dead=清理重建） | 跳过 Phase 0 TaskCreate 直接开始 Phase 1；不复用也不清理，直接 TeamCreate 重复创建；team-lead 自身未 ToolSearch |
-| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到”已就绪”后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
-| 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
-| 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
-| 5 写回 + 修复 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
-
-> **没有 Phase 6**。完成 Phase 5 后流程结束。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考”清理 inbox”或”保留状态”，停下——这不是你的工作。
-
-详细消息样例见 `references/execution-reference.md`。
 
 ## Review Quality Standards（强制，写回前自查）
 
@@ -519,94 +625,43 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 **必须包含**：决策一行（APPROVE / NEEDS_CHANGES / REJECT） / 已解决技术债（带 diff 引用） / 遗留问题（每条带规则引用） / follow-up issue 链接 / 审查依据（引用了哪些规则文档）。
 
 **禁止包含**：
-
 - ❌ 百分制 / 字母评分（除非用户明确要求）
 - ❌ "Phase 1 / Phase 2 / Phase 3" 内部流程标题作叙事结构（这是 skill 的执行结构，不是审查报告的叙事结构）
 - ❌ 已解决与未解决问题混在一起
 
+---
+
 ## Hard Rules
 
-### Team / Session
-
-- Team 尽量复用，但不强制一 session 一个 TeamCreate
-- 复用判断 = 握手结果（alive=复用，dead=清理后 TeamCreate）
-- 有残留 Team 时先尝试握手；不跳过握手直接 TeamCreate
-- 切换 PR 用 SendMessage（握手成功的复用 agent），禁止盲目重新 spawn
-- **TeamDelete 合法场景**：
-  - ✅ 任务完成时（Phase 5 写回后）
-  - ✅ 状态不一致时，按 Recovery 先尝试清理
-- **清理优先级**：TeamDelete → rm -rf fallback → 退出重建会话
-- 当前会话若无法安全复用现有 Team，唯一合法恢复是退出并重建会话
+以下规则跨多个 Phase，未整合进单个 Phase 的强制规则中。
 
 ### Phase 流程
 
-- **Phase 0 必须先于任何 subagent 执行**：TeamCreate → TaskCreate(Phase 0) → team-lead 自身先完成 ToolSearch；已有 Team 时先握手检测存活。随后每个 agent 在其所属 phase 内按 `lead_ready -> agent_ready` 单独握手，未收到 `agent_ready` 前不得给该 agent 分配工作
-- Phase 1 / Phase 2 严格**串行**，禁止并行 spawn
-- fresh spawn 的初始 prompt 只允许握手；收到 `agent_ready` 后，再通过第二条 SendMessage 下发 `phase_1_output` 和正式任务
-- fresh spawn 的 agent 一旦回复“【agent_ready】已就绪”，team-lead 的**下一条有效动作**必须是对应的正式任务激活（如 `send_context_task` / `send_code_analyst_task`）；不得插入“保持空闲 / 等待新 PR / 稍后再分配”之类待命消息
-- backlog metadata 必须同时记录 `expected_next_action` 与 `task_activation_allowed`；若元数据仍处于 `awaiting_lead_ready` / `awaiting_agent_ready`，则任何正式任务下发都视为协议违规
+- Phase 0 → Phase 5 严格串行
+- Phase 1 / Phase 2 禁止并行 spawn
 - 切换到下一 PR、复用 teammate 或补发额外上下文时，才使用 SendMessage
-- 仅 `refactor / security / standard` 走双阶段；`simple` 只做 Phase 1
+- 仅 `refactor / security / standard` 走完整流程；`simple` 只做 Phase 1
+- backlog metadata 必须同时记录 `expected_next_action` 与 `task_activation_allowed`
 
-### Lead 职责边界（强制，issue #823）
+### Lead 职责边界
 
 - team-lead 职责：spawn agent、管理 task 生命周期、Phase 3 决定是否启用 codex、Phase 4 综合判断、Phase 5 写回（仅限 `gh pr comment` 和 `gh issue create`）
 - **禁止 team-lead 自行收集上下文**（gh pr view、git diff、git log 等），这是 context-researcher 的工作
-- **显式 PR 编号入口禁止 lead 预调查**：`/vibe-review-pr 821` 这类入口下，team-lead 不得为了“确认状态/标题/标签/变更范围”执行 `gh pr view` / `gh pr diff`；这些事实必须由 Phase 1 背景报告提供
 - **禁止 team-lead 执行其他 shell 命令**：gh pr diff、git show、git commit、git push 等调研或修改操作
-- Phase 1 只需：创建 Phase 1 Backlog Task（依赖 Phase 0）→ spawn context-researcher → 握手成功后发送正式调研任务 → 等待报告 → 保存到 task metadata
-- 唯一的 context 传递是：从 Phase 1 报告通过第二条 SendMessage **转发**到 Phase 2 agents，不做预收集
-- `保持空闲 / 等待新 PR` 只适用于**上一轮任务已完成的复用 teammate**；不适用于本轮 fresh spawn 且刚完成握手的 agent
-
-### 握手协议（强制，按阶段分别执行）
-
-**握手不是一次性集合操作，而是"spawn 谁 → 跟谁握手"的逐个确认过程。**
-
-**Phase 1**：spawn context-researcher → 握手 → 等"已就绪" → 分配调研任务
-**Phase 2**：spawn code-analyst + architect + security → 分别与每个握手 → 都"已就绪" → 并行分配任务
-
-**team-lead 必须**：
-1. Phase 0 中自身先执行 `ToolSearch(query="select:SendMessage")`
-2. 每 spawn 一个 agent，立即发送 `【lead_ready】` 握手消息
-3. 收到该 agent 的 `【agent_ready】已就绪` 回复后，必须立即发送该 phase 的正式任务；fresh spawn 不得先进入 idle / 待命态
-4. 超时未收到 → 再次发送 `lead_ready` 通知；多次超时 → 标记该 agent 为阻塞
-
-**team-lead 禁止**：
-- 自身未 ToolSearch 就 spawn 任何 agent
-- spawn 后不发 `lead_ready`，假设 agent 会自动执行
-- 未收到 `agent_ready` 就给该 agent 分配工作
-- 对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR / 等待以后再分配"
-- 替未响应的 agent 脑补结论
 
 ### 状态操作
 
 - 不手工编辑 `~/.claude/projects/.../*.jsonl`
 - 不手工 `rm -rf ~/.claude/teams/`（TeamDelete 失败时的 fallback 例外）
 - 不手工 `tmux kill-pane`
-- **会话结束通常先发 shutdown_request，再 TeamDelete；恢复流程可例外**：
-
-  ```python
-  # 标准关闭流程
-  # 1. 向所有活跃 teammates 发送 shutdown_request
-  SendMessage(to="code-analyst",      message={"type": "shutdown_request"})
-  SendMessage(to="architect-reviewer", message={"type": "shutdown_request"})
-  SendMessage(to="security-reviewer",  message={"type": "shutdown_request"})
-  SendMessage(to="context-researcher", message={"type": "shutdown_request"})
-
-  # 2. 等待 idle 通知后执行 TeamDelete
-  TeamDelete()
-
-  # 3. 若 TeamDelete 返回 "no team found"（teammates 已自行退出）
-  #    则手动清理：rm -rf ~/.claude/teams/pr-review-team ~/.claude/tasks/pr-review-team
-  ```
-
-- **会话中途**不得发送 shutdown 指令（Phase 5 完成前的 idle 通知是正常现象，不是关闭信号）
 
 ### 诚信
 
 - teammate-message PR 编号不匹配时必须如实标注，并说明正确报告来源（session 文件路径）
 - 缺失报告必须标"审查不完整"，禁止脑补缺失 agent 的同意 / 反对
 - 拒绝"已合并 / CI 通过 / 无漏洞"这类无证据声明（按 yaml `anti_hallucination` 提供证据）
+
+---
 
 ## Recovery
 
