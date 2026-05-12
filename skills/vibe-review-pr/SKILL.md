@@ -665,6 +665,73 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 
 # 附录
 
+## Agent Teams 消息传递机制（强制理解）
+
+### 核心机制
+
+**teammate-message 系统只转发特定类型的系统消息，不转发工作报告**。
+
+| 消息类型 | 是否转发 | 说明 |
+|---------|---------|------|
+| idle_notification | ✅ 转发 | 心跳信号（每 2-4 秒） |
+| permission_request | ✅ 转发 | 权限审批请求 |
+| plan_approval_request | ✅ 转发 | 计划审批请求 |
+| shutdown_response | ✅ 转发 | 关闭确认 |
+| **工作报告** | ❌ 不转发 | 写入 inbox，需主动检查 |
+
+### idle_notification 的语义
+
+**idle_notification 是触发信号，不是完成确认**。
+
+- **语义**：agent 空闲了，可能完成了工作，请检查 inbox
+- **机制**：每 2-4 秒自动发送（心跳）
+- **状态可能性**：
+  - ✅ 工作完成 → inbox 中有报告（`"read": false`）
+  - ⏳ 等待输入 → pane 显示 `❯` 提示符
+  - ❌ 工具加载失败 → pane 显示 `InputValidationError`
+  - 💥 进程崩溃 → 停止发送 idle（不再收到通知）
+
+### 正确处理流程
+
+收到 idle_notification 后：
+
+```
+1. 立即检查 inbox（~/.claude/teams/{team}/inboxes/team-lead.json）
+   - 查找非 idle_notification 消息
+   - 筛选条件：from == agent_name 且 text 不包含 "idle_notification"
+   
+2. 如有报告 → 提取并继续流程
+
+3. 如无报告 → 检查 pane（tmux capture-pane）
+   - InputValidationError → 重新握手
+   - 正在执行（Bash/Read 输出）→ 继续等待
+   - 等待输入（❯）→ 继续 idle，继续等待下一次 idle_notification
+```
+
+### 常见误解
+
+| 误解 | 正确理解 |
+|------|---------|
+| idle_notification = 工作完成 | idle_notification = 触发检查 inbox 的信号 |
+| 等待 teammate-message 自动转发报告 | teammate-message 不转发报告，必须主动检查 inbox |
+| idle 后什么都不做 | idle 后必须立即检查 inbox |
+| 继续等待 = 原地不动 | 继续等待 = 检查后确认正常，等待下一次 idle_notification |
+
+### 为什么需要这个机制？
+
+**设计原因**：
+- teammate-message 系统设计为"轻量级通知系统"
+- 只转发需要用户/lead 干预的事件（权限审批、计划审批、关闭确认）
+- 工作报告可能是大量文本，转发会污染对话上下文
+- 通过 inbox 存储，允许 lead 按需提取
+
+**实际效果**：
+- ✅ 避免对话上下文污染
+- ✅ 支持 lead 按需处理报告
+- ❌ 需要显式检查 inbox（不是自动的）
+
+---
+
 ## Phase Contracts 速查表
 
 | Phase | 强制要求 | 易错点 |
