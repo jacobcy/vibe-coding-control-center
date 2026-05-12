@@ -320,3 +320,41 @@ question: |
   - continue: 复用当前 Team / agents 审查下一个
   - end: TeamDelete，结束会话
 ```
+
+---
+
+# Backlog Task 约束机制详细说明
+
+> 本章节从 SKILL.md Phase 0 Hard Rules 迁移，补充详细说明。
+
+## 强制约束字段
+
+每个 Phase 的 Backlog task 必须包含以下 metadata 字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `phase_order` | integer | Phase 编号（1-5） |
+| `depends_on_phase` | integer | 前一 Phase 编号 |
+| `must_create_next_phase_backlog` | boolean | 强制约束标记（true） |
+
+## Phase 依赖链
+
+Backlog task 的 `blockedBy` 设置确保 Phase 串行执行：
+
+- Phase 2 blockedBy: Phase 1
+- Phase 3 blockedBy: Phase 2
+- Phase 4 blockedBy: Phase 3
+- Phase 5 blockedBy: Phase 4
+
+## 未创建下一 Phase Backlog 的处理
+
+如果 Phase N 结束时未创建/补充 Phase N+1 的 Backlog：
+
+1. 当前 Phase 标记为 blocked
+2. 流程立即停止，不进入下一 Phase
+3. 输出明确错误："Phase N 未创建 Phase N+1 Backlog，流程停止"
+
+## TaskCreate 和 TaskUpdate 执行时机
+
+- **Phase 开始**：TaskUpdate(status="in_progress")
+- **Phase 结束**：TaskUpdate(status="completed") + 补充下一 Phase metadata
