@@ -374,23 +374,9 @@ workflow:
             wakeup_attempts.code-analyst = 0  # 重置计数器
             log_info(“code-analyst 握手成功”)
 
-          握手成功 → 下一步进入 send_code_analyst_task；派发后不得进入 idle，必须继续处理下一个 agent
+          继续等待其他 agents 握手，保持活动状态，不得进入 idle
 
           backlog gate：写入 `lead_ready_sent.code-analyst=true` 和 `wakeup_attempts.code-analyst`
-      - step: send_code_analyst_task
-        tool: SendMessage
-        params:
-          to: "code-analyst"
-          message: |
-            【正式审查任务】
-            分析 PR #{pr_number} 的代码质量。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            请基于以上背景分析代码质量。
-
-          **重要**：派发后 team-lead 不得进入 idle，必须立即继续处理下一个 agent 的握手。
       - step: spawn_architect_reviewer
         tool: Agent
         params:
@@ -434,30 +420,9 @@ workflow:
             wakeup_attempts.architect-reviewer = 0  # 重置计数器
             log_info(“architect-reviewer 握手成功”)
 
-          握手成功 → 下一步进入 send_architect_task；派发后不得进入 idle，必须继续处理下一个 agent
+          继续等待其他 agents 握手，保持活动状态，不得进入 idle
 
           backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 和 `wakeup_attempts.architect-reviewer`
-      - step: send_architect_task
-        tool: SendMessage
-        params:
-          to: "architect-reviewer"
-          message: |
-            【正式审查任务】
-            评估 PR #{pr_number} 的架构影响。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            ## 获取 diff 指引
-            你可以使用 Bash 工具获取所需的 diff 数据：
-            - 完整 diff: `gh pr diff {pr_number}`
-            - 特定文件: `git show {pr_branch}:{file_path}`
-            - 提交历史: `git log --oneline {base_branch}..{pr_branch}`
-            - 改动统计: `git diff --stat {base_branch}...{pr_branch}`
-
-            请基于以上背景评估架构影响。
-
-          **重要**：派发后 team-lead 不得进入 idle，必须立即继续处理下一个 agent 的握手。
       - step: spawn_security_reviewer
         tool: Agent
         params:
@@ -501,23 +466,39 @@ workflow:
             wakeup_attempts.security-reviewer = 0  # 重置计数器
             log_info(“security-reviewer 握手成功”)
 
-          握手成功 → 下一步进入 send_security_task
-
           backlog gate：写入 `lead_ready_sent.security-reviewer=true` 和 `wakeup_attempts.security-reviewer`
-      - step: send_security_task
-        tool: SendMessage
-        params:
-          to: “security-reviewer”
-          message: |
-            【正式审查任务】
-            评估 PR #{pr_number} 的安全性。
+      - step: check_all_phase_2_agents_ready
+        action: |
+          **强制检查**：确认所有 Phase 2 agents 都已握手成功。
 
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
+          required_agents = [“code-analyst”, “architect-reviewer”, “security-reviewer”]
+          ready_agents = [agent for agent in required_agents if metadata.handshake_status[agent] == “ready”]
 
-            请基于以上背景评估安全性。
+          **检查逻辑**：
+          if len(ready_agents) < len(required_agents):
+            # 部分未就绪，继续等待
+            保持 `task_activation_allowed=false`
+            保持活动状态，**不得进入 idle**
+            `expected_next_action=continue_waiting_for_handshakes`
+          else:
+            # 全部就绪，准备批量发送任务
+            设置 `task_activation_allowed=true`
+            `expected_next_action=send_all_phase_2_tasks`
+            **下一步必须批量发送正式任务给所有 agents**
 
-          **重要**：全部 agent 任务派发完成后，进入 check_agent_pane_status 验证交付状态。
+          **禁止**：
+          - ❌ 只等部分 agent 握手就发送任务
+          - ❌ 在部分 agent 握手成功后进入 idle
+          - ❌ 未收到所有”已就绪”就假设可以分配工作
+      - step: send_all_phase_2_tasks
+        action: |
+          批量发送正式审查任务给所有 Phase 2 agents（code-analyst, architect-reviewer, security-reviewer）。
+          每个 agent 通过独立的 SendMessage 接收任务和 phase_1_output。
+
+          **必须同步更新 backlog**：
+          设置 `task_sent_to_agents=true`
+
+          下一步必须进入 check_agent_pane_status；不得直接进入 wait_for_phase_2_results
       - step: check_agent_pane_status
         action: |
           **强制检查**：任务发送后，检查 agent pane 状态（不要被动等待）。
