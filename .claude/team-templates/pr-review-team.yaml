@@ -226,24 +226,26 @@ codex:
   call_method: bash  # 通过 codex-companion.mjs 调用
 
 # PR 类型判断
+# 权威规则见 SKILL.md §Step 7（PR 分类，内容判定，Phase 1 完成后执行）
+# 此处仅做执行模式映射，不得定义竞争性分类条件
 pr_classification:
   simple:
-    condition: "additions < 50 and not security_related"
+    condition: 见 SKILL.md §Step 7（4 项全部满足：单文件 + <30行 + 仅文档/注释/字符串/重命名 + 无 security/* 标签）
     flow: phase_1_only
     agents: []
 
   refactor:
-    condition: "'refactor' in title.lower()"
+    condition: 见 SKILL.md §Step 7（≥5 文件或大规模重构）
     flow: standard
-    agents: [context-researcher, code-analyst, architect-reviewer]
+    agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
 
   security:
-    condition: "has_security_label or 'fix' in labels"
+    condition: 见 SKILL.md §Step 7（涉及认证/授权/数据/凭据/输入验证）
     flow: standard_security
     agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
 
   standard:
-    condition: default
+    condition: 见 SKILL.md §Step 7（不属于上述类型）
     flow: standard
     agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
 
