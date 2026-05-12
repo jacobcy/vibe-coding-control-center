@@ -47,63 +47,23 @@ description: |
 > - 重复操作最多 3 次
 > - 3 次后仍失败 → 标记该 agent 为阻塞，大声说自己是傻瓜
 
-### Deferred Tools 加载（有序双向握手协议，issue #787，强制执行）
+### Deferred Tools 加载（issue #787）
 
 **核心问题**：`SendMessage` 是 deferred tool，声明在 agent 定义中不等于加载 schema。调用前必须先 `ToolSearch` 加载，否则报 `InputValidationError`。
 
-**死锁陷阱**：如果 agent 不执行 `ToolSearch`，就没有 `SendMessage` 能力，**根本无法汇报被阻塞**——之前"失败时报告给 team-lead"的设计是自相矛盾的。
+**死锁陷阱**：如果 agent 不执行 `ToolSearch`，就没有 `SendMessage` 能力，**根本无法汇报被阻塞**。
 
-**正确方案：Phase 0 有序双向握手（强制执行，不可跳过）**
-
-```
-Phase 0: 有序双向握手协议（lead_ready → agent_ready → send_task）
-
-Step 1 - team-lead 自身握手（整个 Phase 0 的第一步，仅一次，强制执行）：
-  【强制】team-lead 必须执行：
-    ToolSearch(query="select:SendMessage", max_results=1)
-  
-  【关键说明】：
-  - 即使会话开始时 UserPromptSubmit hook 自动触发了其他 ToolSearch，
-    team-lead 也必须重新执行此步骤作为 Phase 0 的正式握手
-  - 会话开始时的 ToolSearch 是响应 hook，不是 Phase 0 的正式握手
-  - Deferred tools 机制：声明在 agent 定义中 ≠ schema 已加载
-  - 必须显式执行 ToolSearch 才能加载 SendMessage schema
-  
-  失败 → 立即停止，禁止 spawn 任何 agent
-
-Step 2 - team-lead 每 spawn 一个 agent，立即发送 lead_ready：
-  SendMessage(to="<agent-name>", message="【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch，并在成功后回复【agent_ready】已就绪。")
-
-Step 3 - agent 在收到 lead_ready 后响应：
-  agent 执行 ToolSearch(query="select:SendMessage", max_results=1)
-  成功 → SendMessage(to="team-lead", message="【agent_ready】已就绪")
-  失败 → agent 无法发送消息，team-lead 超时检测
-
-Step 4 - team-lead 确认该 agent：
-  收到"【agent_ready】已就绪" → 该 agent 可参与后续工作，下一步必须发送正式任务
-  超时未收到 → 再次发送 lead_ready 握手消息通知 agent
-  多次超时 → 标记该 agent 为阻塞，后续 Phase 标注"审查不完整"
-```
-
-**关键理解**：这是**有方向、有时序**的握手，不是双方同时各说一次“已就绪”。
-
-- **Phase 1 阶段**：spawn context-researcher → lead 发送 `lead_ready` → agent 回复 `agent_ready` → 分配调研任务
-- **Phase 2 阶段**：spawn code-analyst + architect + security → lead 分别发送 `lead_ready` → 各 agent 分别回复 `agent_ready` → 并行分配任务
-
-team-lead 在 spawn 一个 agent 后，必须先发 `lead_ready`，等该 agent 返回 `agent_ready`，才能继续该阶段的工作。
-不等到该 agent 的 `agent_ready`，不得给该 agent 分配任何工作。
+**方案**：Phase 0 有序双向握手协议（`lead_ready → agent_ready → send_task`），详见 §握手与唤醒协议规范。
 
 **强制规则**：
-- **team-lead**：spawn agent 后必须立即发送 `lead_ready`；收到 `agent_ready` 前不得给该 agent 分配工作
+- **team-lead**：Phase 0 第一步自身先执行 `ToolSearch(query=”select:SendMessage”)`；spawn agent 后必须立即发送 `lead_ready`；收到 `agent_ready` 前不得给该 agent 分配工作
 - **teammate**：收到 `lead_ready` 消息后，**唯一合法操作**是执行 ToolSearch 并回复 `agent_ready`
 - **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何其他操作**
 
 **诊断**（如 agent 未发送报告）：
 ```bash
-tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
+tmux capture-pane -t <pane-id> -p -S -1000 | grep -E “ToolSearch|SendMessage|InputValidationError”
 ```
-
-详见：`.claude/agents/pr-*.md` 的 "握手协议" 章节。
 
 ## 握手与唤醒协议规范
 
@@ -177,6 +137,10 @@ Team 名称固定为 `pr-review-team`（**不要**用 `pr-review-713` 这种 PR-
 ### Step 6.5: Backlog Setup（TeamCreate 后先建 Phase 1，后续按 PR 类型补建）
 
 > **踩坑记录**：TeamCreate 之前创建的 TaskCreate 不会关联到 team 的 task list，`TaskList` 返回空。必须先 TeamCreate 再 TaskCreate。
+
+> **Phase 0（有序双向握手）是 Backlog 的前置条件，不是 Backlog task。**
+> team-lead 自身 ToolSearch + 逐个 agent 的 `lead_ready → agent_ready` 握手流程在进入 Step 6.5 之前完成。
+> Phase 0 失败 → 立即停止，不创建任何 Backlog task。
 
 **强制顺序**：
 
@@ -536,24 +500,25 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - 唯一的 context 传递是：从 Phase 1 报告通过第二条 SendMessage **转发**到 Phase 2 agents，不做预收集
 - `保持空闲 / 等待新 PR` 只适用于**上一轮任务已完成的复用 teammate**；不适用于本轮 fresh spawn 且刚完成握手的 agent
 
-### 握手协议（强制，按阶段分别执行）
+### 握手协议（强制）
 
-**握手不是一次性集合操作，而是"spawn 谁 → 跟谁握手"的逐个确认过程。**
+**流程定义见 §握手与唤醒协议规范**（`handshake_agent()` / `handle_agent_idle_after_task()`）。以下为不可违反的硬边界：
 
-**Phase 1**：spawn context-researcher → 握手 → 等"已就绪" → 分配调研任务
-**Phase 2**：spawn code-analyst + architect + security → 分别与每个握手 → 都"已就绪" → 并行分配任务
+**按阶段执行**：
+- **Phase 1**：spawn context-researcher → 握手 → 等"已就绪" → 分配调研任务
+- **Phase 2**：spawn code-analyst + architect + security → 分别与每个握手 → 逐个派发正式任务
 
 **team-lead 必须**：
 1. 整个 Phase 0 的第一步：自身先执行 `ToolSearch(query="select:SendMessage")`
 2. 每 spawn 一个 agent，立即发送 `【lead_ready】` 握手消息
 3. 收到该 agent 的 `【agent_ready】已就绪` 回复后，必须立即发送该 phase 的正式任务；fresh spawn 不得先进入 idle / 待命态
-4. 超时未收到 → 再次发送 `lead_ready` 通知；多次超时 → 标记该 agent 为阻塞
+4. 超时未收到 → 按 `handshake_agent()` 重试/blocked 逻辑处理
 
 **team-lead 禁止**：
 - 自身未 ToolSearch 就 spawn 任何 agent
 - spawn 后不发 `lead_ready`，假设 agent 会自动执行
 - 未收到 `agent_ready` 就给该 agent 分配工作
-- 对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR / 等待以后再分配"
+- 对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR"
 - 替未响应的 agent 脑补结论
 
 ### 状态操作
