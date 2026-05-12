@@ -98,115 +98,6 @@ team-lead 在 spawn 一个 agent 后，必须先发 `lead_ready`，等该 agent 
 - **teammate**：收到 `lead_ready` 消息后，**唯一合法操作**是执行 ToolSearch 并回复 `agent_ready`
 - **任何 agent**：在 Deferred Tools 完成加载前，**不得执行任何其他操作**
 
-### 唤醒流程与 Idle 检查（强制执行，写入 backlog）
-
-**问题**：agent 在初始化阶段或任务发送后可能进入 idle 状态，team-lead 需要主动检查而非被动等待。
-
-**唤醒流程（3 次重试机制）**：
-
-```python
-# 对于每个 agent，维护唤醒计数器
-wakeup_attempts[agent_name] = 0
-max_wakeup_attempts = 3
-
-# 握手流程
-def handshake_agent(agent_name):
-    # Step 1: 发送 lead_ready
-    SendMessage(to=agent_name, message="【lead_ready】...")
-    lead_ready_sent[agent_name] = True
-    
-    # Step 2: 等待 agent_ready
-    if not received_agent_ready(agent_name, timeout=30s):
-        # 未收到，执行唤醒
-        wakeup_attempts[agent_name] += 1
-        
-        if wakeup_attempts[agent_name] < max_wakeup_attempts:
-            # 重试
-            SendMessage(to=agent_name, message="【lead_ready】... (第 {wakeup_attempts} 次唤醒)")
-            return "retry"
-        else:
-            # 超过最大次数，标记阻塞
-            handshake_status[agent_name] = "blocked"
-            return "blocked"
-    else:
-        # 握手成功
-        handshake_status[agent_name] = "ready"
-        wakeup_attempts[agent_name] = 0  # 重置计数器
-        return "ready"
-```
-
-**Idle 检查流程（任务发送后）**：
-
-```python
-# 任务发送后，agent 进入 idle 的处理
-def handle_agent_idle_after_task(agent_name):
-    # Step 1: 检查 inbox（SendMessage 是否成功送达）
-    if not inbox_check_passed:
-        log_warning(f"{agent_name} inbox 检查失败，重新发送任务")
-        resend_task_to_agent(agent_name)
-        return
-    
-    # Step 2: 检查 pane（agent 是否真的在执行任务）
-    pane_output = tmux_capture_pane(agent_name)
-    
-    # 检查是否卡在 ToolSearch / InputValidationError
-    if "InputValidationError" in pane_output:
-        log_error(f"{agent_name} 遇到 InputValidationError，ToolSearch 未成功")
-        # 重新触发握手
-        handshake_agent(agent_name)
-        return
-    
-    # 检查是否在等待输入（真的是 idle）
-    if "waiting for input" in pane_output or "❯" in pane_output:
-        log_info(f"{agent_name} 正常 idle，等待 team-lead 指令")
-        agent_idle_after_task[agent_name] = True
-        return
-    
-    # 检查是否在执行任务
-    if "Bash(" in pane_output or "Read(" in pane_output:
-        log_info(f"{agent_name} 正在执行任务")
-        return
-    
-    # 检查是否已完成任务
-    if "报告已发送" in pane_output or "complete" in pane_output:
-        log_info(f"{agent_name} 任务已完成，等待报告送达")
-        return
-```
-
-**Backlog Metadata 检查项**：
-
-```yaml
-metadata:
-  # 唤醒计数器
-  wakeup_attempts:
-    code-analyst: 0
-    architect-reviewer: 0
-    security-reviewer: 0
-  max_wakeup_attempts: 3
-  
-  # 握手状态
-  handshake_status:
-    code-analyst: "pending" | "ready" | "blocked"
-    architect-reviewer: "pending" | "ready" | "blocked"
-    security-reviewer: "pending" | "ready" | "blocked"
-  
-  # 任务发送后的 idle 检查
-  task_sent_to_agents: false
-  agent_idle_after_task:
-    code-analyst: false
-    architect-reviewer: false
-    security-reviewer: false
-  pane_check_required: true
-```
-
-**关键约束**：
-- ✅ 初始化阶段：必须执行 3 次唤醒流程直到握手成功或报错
-- ✅ 任务发送后：agent 进入 idle 时，必须检查 inbox 和 pane
-- ✅ 所有检查结果必须写入 backlog metadata
-- ❌ 禁止被动等待（看到 idle 就以为在等待报告）
-- ❌ 禁止假设 SendMessage 自动送达（必须验证 inbox）
-- ❌ 禁止跳过 pane 检查（pane 可见性是唯一的真实状态）
-
 **诊断**（如 agent 未发送报告）：
 ```bash
 tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
@@ -331,19 +222,6 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
         code-analyst: "pending"
         architect-reviewer: "pending"
         security-reviewer: "pending"
-      # 唤醒机制（强制）
-      wakeup_attempts:
-        code-analyst: 0
-        architect-reviewer: 0
-        security-reviewer: 0
-      max_wakeup_attempts: 3
-      # 任务发送后的 idle 检查
-      task_sent_to_agents: false
-      agent_idle_after_task:
-        code-analyst: false
-        architect-reviewer: false
-        security-reviewer: false
-      pane_check_required: true
       on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
 
 - tool: TaskCreate
@@ -475,7 +353,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
 |-------|---------|-------|
 | 0 有序双向握手 | team-lead 自身先 ToolSearch；每个 agent 在所属 phase 内逐个 spawn；lead 先发 `lead_ready`，agent 再回 `agent_ready`；收到该 agent `agent_ready` 后才分配工作 | 双方同时各说一次“已就绪”；一次 spawn 全部再一起握手；要求所有 phase 的 agent 先集体 ready；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，**必须等待所有 Phase 2 agents 都握手成功后才批量发送正式任务**；收到所有”已就绪”后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage；等待期间保持活动状态，不得进入 idle | **与 Phase 1 并行启动**；只等部分 agent 握手就发送任务；**在部分 agent 握手成功后进入 idle**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到“已就绪”后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
 | 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
 | 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
 | 5 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |

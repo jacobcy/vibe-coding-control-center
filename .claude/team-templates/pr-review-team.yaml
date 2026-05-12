@@ -353,30 +353,24 @@ workflow:
           message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_code_analyst_handshake
         action: |
-          等待 code-analyst 回复”【agent_ready】已就绪”。
+          等待 code-analyst 回复“【agent_ready】已就绪”。
+          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
+          下一步必须进入 send_code_analyst_task；不得先发送 idle/待命类消息
+          backlog gate：写入 `lead_ready_sent.code-analyst=true` 后，`expected_next_action=verify_code_analyst_handshake`
+          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+      - step: send_code_analyst_task
+        tool: SendMessage
+        params:
+          to: "code-analyst"
+          message: |
+            【正式审查任务】
+            分析 PR #{pr_number} 的代码质量。
 
-          **3 次唤醒机制**：
-          if not received_agent_ready(“code-analyst”, timeout=30s):
-            wakeup_attempts.code-analyst += 1
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
 
-            if wakeup_attempts.code-analyst < max_wakeup_attempts:
-              # 重新发送 lead_ready
-              SendMessage(to=”code-analyst”, message=”【lead_ready】... (第 {wakeup_attempts.code-analyst} 次唤醒)”)
-              return “retry”
-            else:
-              # 超过最大次数，标记阻塞
-              handshake_status.code-analyst = “blocked”
-              log_error(“code-analyst 握手失败，跳过该 agent”)
-              return “blocked”
-          else:
-            # 握手成功
-            handshake_status.code-analyst = “ready”
-            wakeup_attempts.code-analyst = 0  # 重置计数器
-            log_info(“code-analyst 握手成功”)
-
-          继续等待其他 agents 握手，保持活动状态，不得进入 idle
-
-          backlog gate：写入 `lead_ready_sent.code-analyst=true` 和 `wakeup_attempts.code-analyst`
+            请基于以上背景分析代码质量。
       - step: spawn_architect_reviewer
         tool: Agent
         params:
@@ -399,30 +393,31 @@ workflow:
           message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_architect_handshake
         action: |
-          等待 architect-reviewer 回复”【agent_ready】已就绪”。
+          等待 architect-reviewer 回复“【agent_ready】已就绪”。
+          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
+          下一步必须进入 send_architect_task；不得先发送 idle/待命类消息
+          backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 后，`expected_next_action=verify_architect_handshake`
+          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+      - step: send_architect_task
+        tool: SendMessage
+        params:
+          to: "architect-reviewer"
+          message: |
+            【正式审查任务】
+            评估 PR #{pr_number} 的架构影响。
 
-          **3 次唤醒机制**：
-          if not received_agent_ready(“architect-reviewer”, timeout=30s):
-            wakeup_attempts.architect-reviewer += 1
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
 
-            if wakeup_attempts.architect-reviewer < max_wakeup_attempts:
-              # 重新发送 lead_ready
-              SendMessage(to=”architect-reviewer”, message=”【lead_ready】... (第 {wakeup_attempts.architect-reviewer} 次唤醒)”)
-              return “retry”
-            else:
-              # 超过最大次数，标记阻塞
-              handshake_status.architect-reviewer = “blocked”
-              log_error(“architect-reviewer 握手失败，跳过该 agent”)
-              return “blocked”
-          else:
-            # 握手成功
-            handshake_status.architect-reviewer = “ready”
-            wakeup_attempts.architect-reviewer = 0  # 重置计数器
-            log_info(“architect-reviewer 握手成功”)
+            ## 获取 diff 指引
+            你可以使用 Bash 工具获取所需的 diff 数据：
+            - 完整 diff: `gh pr diff {pr_number}`
+            - 特定文件: `git show {pr_branch}:{file_path}`
+            - 提交历史: `git log --oneline {base_branch}..{pr_branch}`
+            - 改动统计: `git diff --stat {base_branch}...{pr_branch}`
 
-          继续等待其他 agents 握手，保持活动状态，不得进入 idle
-
-          backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 和 `wakeup_attempts.architect-reviewer`
+            请基于以上背景评估架构影响。
       - step: spawn_security_reviewer
         tool: Agent
         params:
@@ -445,106 +440,24 @@ workflow:
           message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_security_handshake
         action: |
-          等待 security-reviewer 回复”【agent_ready】已就绪”。
+          等待 security-reviewer 回复“【agent_ready】已就绪”。
+          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
+          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
+          下一步必须进入 send_security_task；不得先发送 idle/待命类消息
+          backlog gate：写入 `lead_ready_sent.security-reviewer=true` 后，`expected_next_action=verify_security_handshake`
+          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+      - step: send_security_task
+        tool: SendMessage
+        params:
+          to: "security-reviewer"
+          message: |
+            【正式审查任务】
+            评估 PR #{pr_number} 的安全性。
 
-          **3 次唤醒机制**：
-          if not received_agent_ready(“security-reviewer”, timeout=30s):
-            wakeup_attempts.security-reviewer += 1
+            ## PR #{pr_number} 背景报告
+            {phase_1_output}
 
-            if wakeup_attempts.security-reviewer < max_wakeup_attempts:
-              # 重新发送 lead_ready
-              SendMessage(to=”security-reviewer”, message=”【lead_ready】... (第 {wakeup_attempts.security-reviewer} 次唤醒)”)
-              return “retry”
-            else:
-              # 超过最大次数，标记阻塞
-              handshake_status.security-reviewer = “blocked”
-              log_error(“security-reviewer 握手失败，跳过该 agent”)
-              return “blocked”
-          else:
-            # 握手成功
-            handshake_status.security-reviewer = “ready”
-            wakeup_attempts.security-reviewer = 0  # 重置计数器
-            log_info(“security-reviewer 握手成功”)
-
-          backlog gate：写入 `lead_ready_sent.security-reviewer=true` 和 `wakeup_attempts.security-reviewer`
-      - step: check_all_phase_2_agents_ready
-        action: |
-          **强制检查**：确认所有 Phase 2 agents 都已握手成功。
-
-          required_agents = [“code-analyst”, “architect-reviewer”, “security-reviewer”]
-          ready_agents = [agent for agent in required_agents if metadata.handshake_status[agent] == “ready”]
-
-          **检查逻辑**：
-          if len(ready_agents) < len(required_agents):
-            # 部分未就绪，继续等待
-            保持 `task_activation_allowed=false`
-            保持活动状态，**不得进入 idle**
-            `expected_next_action=continue_waiting_for_handshakes`
-          else:
-            # 全部就绪，准备批量发送任务
-            设置 `task_activation_allowed=true`
-            `expected_next_action=send_all_phase_2_tasks`
-            **下一步必须批量发送正式任务给所有 agents**
-
-          **禁止**：
-          - ❌ 只等部分 agent 握手就发送任务
-          - ❌ 在部分 agent 握手成功后进入 idle
-          - ❌ 未收到所有”已就绪”就假设可以分配工作
-      - step: send_all_phase_2_tasks
-        action: |
-          批量发送正式审查任务给所有 Phase 2 agents（code-analyst, architect-reviewer, security-reviewer）。
-          每个 agent 通过独立的 SendMessage 接收任务和 phase_1_output。
-
-          **必须同步更新 backlog**：
-          设置 `task_sent_to_agents=true`
-
-          下一步必须进入 check_agent_pane_status；不得直接进入 wait_for_phase_2_results
-      - step: check_agent_pane_status
-        action: |
-          **强制检查**：任务发送后，检查 agent pane 状态（不要被动等待）。
-
-          **检查流程**：
-          for agent in ["code-analyst", "architect-reviewer", "security-reviewer"]:
-            # Step 1: 检查 inbox（SendMessage 是否成功）
-            if not inbox_delivered(agent):
-              log_warning(f"{agent} inbox 未送达，重新发送任务")
-              resend_task_to_agent(agent)
-              continue
-
-            # Step 2: 检查 pane（agent 真实状态）
-            pane_output = tmux_capture_pane(agent)
-
-            # 检查是否卡在 InputValidationError
-            if "InputValidationError" in pane_output:
-              log_error(f"{agent} ToolSearch 失败，重新握手")
-              wakeup_attempts[agent] += 1
-              if wakeup_attempts[agent] < max_wakeup_attempts:
-                handshake_agent(agent)  # 重新握手
-              else:
-                handshake_status[agent] = "blocked"
-              continue
-
-            # 检查是否在执行任务
-            if "Bash(" in pane_output or "Read(" in pane_output:
-              log_info(f"{agent} 正在执行任务")
-              agent_idle_after_task[agent] = False
-              continue
-
-            # 检查是否已完成
-            if "报告已发送" in pane_output or "complete" in pane_output:
-              log_info(f"{agent} 任务已完成，等待报告")
-              agent_idle_after_task[agent] = False
-              continue
-
-            # 检查是否正常 idle
-            if "❯" in pane_output:
-              log_info(f"{agent} 正常 idle")
-              agent_idle_after_task[agent] = True
-
-          **更新 backlog**：
-          写入所有 agent 的 `agent_idle_after_task` 状态
-
-          下一步进入 wait_for_phase_2_results
+            请基于以上背景评估安全性。
 
       # 【说明】fresh spawn 的背景已在 prompt 中传递
       # 如果需要补充额外信息或复用已有 teammate，可再使用 SendMessage
@@ -558,20 +471,20 @@ workflow:
           - security-reviewer
 
           **等待策略**：
-          1. 收到 idle 通知 → **不假设 agent 在等待报告**，检查 pane 状态
+          1. 收到 idle 通知 → 不操作，继续等待（idle 是正常状态，不代表完成）
           2. 收到 task-notification（status=completed）→ 读取结果
-          3. 超时（5 分钟）→ 检查 pane 状态，标注”审查不完整”，进入 Phase 3
+          3. 超时（5 分钟）→ 标注"审查不完整"，进入 Phase 3
 
           **重要**：
-          - idle 通知不是”完成信号”，只是 agent 状态提示
-          - 必须通过 pane 检查确认 agent 是否真的在执行任务或已完成
-          - 只有先前已回复”已就绪”的 agent，才允许进入结果收集
+          - idle 通知是 agent 的正常状态（等待输入），不代表"未开始"或"失败"
+          - 实际审查结果通过 task-notification 返回
+          - 不要在收到 idle 后立即 SendMessage 提示 agent 执行任务
+          - 只有先前已回复“已就绪”的 agent，才允许进入结果收集
           - 未通过握手的 agent 即使后来返回报告，也视为无效报告并跳过
 
           如果超时仍有 agent 未返回：
           - 记录 WARNING
-          - 检查 pane 状态（是否卡在 ToolSearch / InputValidationError）
-          - 在报告中标注”部分审查未完整”
+          - 在报告中标注"部分审查未完整"
           - 不要假设未返回的 agent 同意其他结论
 
   phase_2_5:
