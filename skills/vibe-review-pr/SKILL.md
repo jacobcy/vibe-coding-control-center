@@ -561,122 +561,13 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
 > 目标：PR comment + follow-up issues + 可选修复 commit。
 > 依赖：Phase 4 完成。
 
-## 执行模式说明
+**执行模式**：Phase 5 根据 `execution_mode` 参数选择执行路径。详细说明见 `references/execution-modes.md`：
+- **ask-each**（默认）：用户决策，最安全
+- **auto-decide**：team-lead 根据复杂度自动决策
+- **auto-fix**：自动修复（高风险，有约束）
+- **comment-only**：只写 comment（最安全）
 
-Phase 5 根据 `execution_mode` 参数选择不同的执行路径：
-
-### ask-each（默认，最安全）
-
-**workflow**: `review → 询问用户 → 执行用户选择`
-
-**决策者**: 用户
-
-**适用场景**: 默认模式，所有情况都适用
-
-**具体流程**：
-```
-审查完成 → team-lead 询问用户：
-  选项 1: 直接根据审核意见修复代码（触发 auto-fix 流程）
-  选项 2: 将意见写回 PR comments（仅 comment-only）
-  选项 3: 由 team-lead 协助决定（触发 auto-decide 流程）
-
-用户选择 → team-lead 执行对应流程
-```
-
-**风险**: 无（用户自己决定）
-
----
-
-### auto-decide（复杂度自动决策）
-
-**workflow**: `review → lead 判断 → fix 或 comment`
-
-**决策者**: team-lead
-
-**适用场景**: 用户明确授权自动决策
-
-**具体流程**：
-```
-审查完成 → team-lead 计算复杂度得分（0-1）：
-
-复杂度评估指标：
-  - 改动行数（权重 0.3）
-    * low: < 50 行 → 0 分
-    * medium: 50-200 行 → 0.5 分
-    * high: > 200 行 → 1 分
-  - 文件数（权重 0.2）
-    * low: 1-2 个文件 → 0 分
-    * medium: 3-5 个文件 → 0.5 分
-    * high: > 5 个文件 → 1 分
-  - 安全相关（权重 0.4）
-    * low: 无安全标签 → 0 分
-    * medium: 涉及认证/授权 → 0.5 分
-    * high: 安全修复或敏感数据处理 → 1 分
-  - 测试覆盖（权重 0.1）
-    * low: 有完整测试 → 0 分
-    * medium: 部分测试 → 0.5 分
-    * high: 无测试 → 1 分
-
-决策矩阵：
-  - 复杂度得分 < 0.3 且无安全相关改动 → auto_fix
-  - 复杂度得分 >= 0.3 或有安全相关改动 → ask_user（升级为 ask-each）
-  - 复杂度得分 >= 0.7 或 lead 置信度 < 0.6 → comment_only
-```
-
-**风险**: 中（依赖 lead 的复杂度评估）
-
----
-
-### auto-fix（自动修复）
-
-**workflow**: `review → fix → commit → comment`
-
-**适用场景**: 用户明确要求自动修复
-
-**触发条件**: 用户明确要求"自动修复"
-
-**具体流程**：
-1. spawn fix-executor agent
-2. 握手 → 下发修复任务（含审查报告）
-3. 等待修复完成 → 验证测试通过
-4. 写 PR comment（包含修复内容）
-
-**风险**: 高（可能引入新问题）
-
-**约束**：
-- 仅适用于改动行数 < 200 且无安全相关改动的 PR
-- 修复前必须备份当前状态（git stash）
-- 修复后必须运行测试验证
-
----
-
-### comment-only（只写 comment）
-
-**workflow**: `review → comment`
-
-**适用场景**: 用户要求只审核不修复
-
-**触发条件**: 用户明确要求"只审核不修复"
-
-**具体流程**：
-1. 生成审查报告
-2. 写 PR comment
-3. 创建 follow-up issues（如有范围外发现）
-
-**风险**: 无
-
-**适用场景**: 所有情况都适用
-
----
-
-## 执行模式选择建议
-
-| PR 类型 | 推荐模式 | 理由 |
-|---------|---------|------|
-| 简单 PR（< 50 行，无安全相关） | auto-decide 或 auto-fix | 低风险，自动化效率高 |
-| 标准 PR（50-200 行） | ask-each | 用户参与决策，平衡效率与安全 |
-| 安全 PR（涉及认证/授权） | ask-each | 高风险，必须用户确认 |
-| 大型 PR（> 200 行） | ask-each 或 comment-only | 复杂度高，避免自动修复引入问题 |
+**执行模式选择建议**：简单 PR（< 50 行，无安全相关）→ auto-decide；标准 PR（50-200 行）→ ask-each；安全 PR → ask-each；大型 PR → comment-only。
 
 ## Steps
 
