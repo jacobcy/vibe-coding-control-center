@@ -189,7 +189,7 @@ class HandoffService:
         ref_kind: str,
         ref_value: str,
         next_step: str | None,
-        blocked_by: str | None,
+        reason: str | None,
         actor: str | None,
         verdict: str | None = None,
     ) -> Path:
@@ -230,8 +230,8 @@ class HandoffService:
             flow_updates[actor_field] = effective_actor
         if next_step:
             flow_updates["next_step"] = next_step
-        if blocked_by:
-            flow_updates["blocked_by"] = blocked_by
+        if reason:
+            flow_updates["blocked_reason"] = reason
 
         if verdict:
             role = extract_role_from_actor(effective_actor)
@@ -241,7 +241,7 @@ class HandoffService:
                 role=role,
                 timestamp=datetime.now(UTC),
                 reason=next_step or f"Recorded {ref_kind} reference",
-                issues=blocked_by,
+                issues=reason,
                 flow_branch=branch,
             )
             flow_updates["latest_verdict"] = record.model_dump_json()
@@ -251,8 +251,8 @@ class HandoffService:
             message = f"verdict: {verdict}\n{message}"
         if next_step:
             message += f"\nNext Step: {next_step}"
-        if blocked_by:
-            message += f"\nBlocked By: {blocked_by}"
+        if reason:
+            message += f"\nBlocked By: {reason}"
 
         self.store.update_flow_state(branch, **flow_updates)
 
@@ -291,27 +291,27 @@ class HandoffService:
         self,
         plan_ref: str,
         next_step: str | None = None,
-        blocked_by: str | None = None,
+        reason: str | None = None,
         actor: str | None = None,
     ) -> Path:
         """Record plan handoff reference."""
-        return self._record_ref("plan", plan_ref, next_step, blocked_by, actor)
+        return self._record_ref("plan", plan_ref, next_step, reason, actor)
 
     def record_report(
         self,
         report_ref: str,
         next_step: str | None = None,
-        blocked_by: str | None = None,
+        reason: str | None = None,
         actor: str | None = None,
     ) -> Path:
         """Record report handoff reference."""
-        return self._record_ref("report", report_ref, next_step, blocked_by, actor)
+        return self._record_ref("report", report_ref, next_step, reason, actor)
 
     def record_audit(
         self,
         audit_ref: str,
         next_step: str | None = None,
-        blocked_by: str | None = None,
+        reason: str | None = None,
         actor: str | None = None,
         verdict: str | None = None,
         is_system_auto: bool = False,
@@ -330,7 +330,7 @@ class HandoffService:
                 branch=None,
                 verdict=verdict,
                 next_step=next_step,
-                blocked_by=blocked_by,
+                reason=reason,
             )
             # record_passive_artifact returns Path or None, but this method
             # always returns Path
@@ -345,7 +345,7 @@ class HandoffService:
                 "audit",
                 audit_ref,
                 next_step,
-                blocked_by,
+                reason,
                 actor,
                 verdict=verdict,
             )
@@ -354,11 +354,11 @@ class HandoffService:
         self,
         indicate_ref: str,
         next_step: str | None = None,
-        blocked_by: str | None = None,
+        reason: str | None = None,
         actor: str | None = None,
     ) -> Path:
         """Record manager indicate handoff reference."""
-        return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)
+        return self._record_ref("indicate", indicate_ref, next_step, reason, actor)
 
     def record_passive_artifact(
         self,
@@ -371,12 +371,12 @@ class HandoffService:
         # Audit-specific optional parameters
         verdict: str | None = None,
         next_step: str | None = None,
-        blocked_by: str | None = None,
+        reason: str | None = None,
     ) -> Path | None:
         """Record a shared fallback artifact without upgrading authoritative refs.
 
         Supports all three artifact kinds: plan, report, audit.
-        Audit can optionally include verdict, next_step, blocked_by.
+        Audit can optionally include verdict, next_step, reason.
 
         Args:
             kind: Artifact kind ("plan", "report", or "audit")
@@ -386,7 +386,7 @@ class HandoffService:
             branch: Target branch (current if None)
             verdict: Optional verdict value (audit only)
             next_step: Optional next step (audit only)
-            blocked_by: Optional blocked by description (audit only)
+            reason: Optional blocking reason (audit only)
 
         Returns:
             Path to created artifact, or None if content is empty
@@ -464,8 +464,8 @@ class HandoffService:
                 detail_parts.insert(0, f"verdict: {verdict}")
             if next_step:
                 detail_parts.append(f"Next Step: {next_step}")
-            if blocked_by:
-                detail_parts.append(f"Blocked By: {blocked_by}")
+            if reason:
+                detail_parts.append(f"Blocked By: {reason}")
             detail = "\n".join(detail_parts)
 
         self.store.add_event(
