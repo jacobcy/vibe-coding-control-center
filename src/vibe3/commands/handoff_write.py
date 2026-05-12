@@ -95,8 +95,8 @@ def plan(
     next_step: Annotated[
         str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
     ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    reason: Annotated[
+        str | None, typer.Option("--reason", "-r", help="Blocking reason")
     ] = None,
     actor: Annotated[
         str | None,
@@ -119,7 +119,7 @@ def plan(
         ref_label="Plan",
         ref_value=plan_ref,
         next_step=next_step,
-        blocked_by=blocked_by,
+        blocked_by=reason,
         actor=actor,
         trace=trace,
         method_name="record_plan",
@@ -131,8 +131,8 @@ def report(
     next_step: Annotated[
         str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
     ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    reason: Annotated[
+        str | None, typer.Option("--reason", "-r", help="Blocking reason")
     ] = None,
     actor: Annotated[
         str | None,
@@ -155,7 +155,7 @@ def report(
         ref_label="Report",
         ref_value=report_ref,
         next_step=next_step,
-        blocked_by=blocked_by,
+        blocked_by=reason,
         actor=actor,
         trace=trace,
         method_name="record_report",
@@ -170,8 +170,8 @@ def indicate(
         str | None,
         typer.Option("--next-step", "-n", help="Next step for downstream agents"),
     ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    reason: Annotated[
+        str | None, typer.Option("--reason", "-r", help="Blocking reason")
     ] = None,
     actor: Annotated[
         str | None,
@@ -198,7 +198,7 @@ def indicate(
         ref_label="Indicate",
         ref_value=indicate_ref,
         next_step=next_step,
-        blocked_by=blocked_by,
+        blocked_by=reason,
         actor=actor,
         trace=trace,
         method_name="record_indicate",
@@ -210,8 +210,8 @@ def audit(
     next_step: Annotated[
         str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
     ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    reason: Annotated[
+        str | None, typer.Option("--reason", "-r", help="Blocking reason")
     ] = None,
     actor: Annotated[
         str | None,
@@ -234,7 +234,7 @@ def audit(
         ref_label="Audit",
         ref_value=audit_ref,
         next_step=next_step,
-        blocked_by=blocked_by,
+        blocked_by=reason,
         actor=actor,
         trace=trace,
         method_name="record_audit",
