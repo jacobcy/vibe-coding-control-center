@@ -43,7 +43,11 @@ def _serialize_snapshot(snapshot: "OrchestraSnapshot") -> dict:
                 "worktree_path": entry.worktree_path,
                 "has_pr": entry.has_pr,
                 "pr_number": entry.pr_number,
-                "blocked_by": list(entry.blocked_by),
+                "blocked_by": (
+                    list(entry.blocked_reason)
+                    if hasattr(entry, "blocked_reason")
+                    else []
+                ),
                 # Queue metadata
                 "milestone": entry.milestone,
                 "roadmap": entry.roadmap,
@@ -94,8 +98,8 @@ def format_snapshot_for_mcp(snapshot: "OrchestraSnapshot") -> str:
             lines.append(f"  - Assignee: {entry.assignee}")
         if entry.has_pr and entry.pr_number:
             lines.append(f"  - PR: #{entry.pr_number}")
-        if entry.blocked_by:
-            blocked_str = ", ".join(f"#{n}" for n in entry.blocked_by)
+        if hasattr(entry, "blocked_reason") and entry.blocked_reason:
+            blocked_str = ", ".join(f"#{n}" for n in entry.blocked_reason)
             lines.append(f"  - Blocked by: {blocked_str}")
         lines.append("")
 
@@ -148,7 +152,11 @@ def create_mcp_server(
                 "has_flow": entry.has_flow,
                 "has_pr": entry.has_pr,
                 "pr_number": entry.pr_number,
-                "blocked_by": list(entry.blocked_by),
+                "blocked_by": (
+                    list(entry.blocked_reason)
+                    if hasattr(entry, "blocked_reason")
+                    else []
+                ),
             }
             for entry in snapshot.active_issues
         ]
@@ -206,7 +214,11 @@ def create_mcp_server(
                         "worktree_path": entry.worktree_path,
                         "has_pr": entry.has_pr,
                         "pr_number": entry.pr_number,
-                        "blocked_by": list(entry.blocked_by),
+                        "blocked_by": (
+                            list(entry.blocked_reason)
+                            if hasattr(entry, "blocked_reason")
+                            else []
+                        ),
                     },
                     indent=2,
                 )
