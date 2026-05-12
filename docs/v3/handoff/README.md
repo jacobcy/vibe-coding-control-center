@@ -86,7 +86,7 @@ related_docs:
 - ✅ `vibe handoff init` - Create shared handoff file
 - ✅ `vibe handoff show` - Display handoff content
 - ✅ `vibe handoff append` - Append lightweight update block to shared handoff
-- ✅ `vibe handoff plan <ref>` - Record plan handoff with optional `--next-step` and `--blocked-by`
+- ✅ `vibe handoff plan <ref>` - Record plan handoff with optional `--next-step` and `--reason`
 - ✅ `vibe handoff report <ref>` - Record report handoff
 - ✅ `vibe handoff audit <ref>` - Record audit handoff
 - ✅ `vibe check` - Verify handoff store consistency

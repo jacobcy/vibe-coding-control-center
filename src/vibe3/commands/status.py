@@ -423,8 +423,8 @@ def status(
                 number = cast(int, item["number"])
                 title = cast(str, item["title"])
                 flow = cast(FlowStatusResponse | None, item["flow"])
-                blocked_reason = item.get("blocked_reason")
-                blocked_by_issue = item.get("blocked_by_issue")
+                blocked_by = cast(tuple[int, ...] | None, item.get("blocked_by"))
+                blocked_reason = cast(str | None, item.get("blocked_reason"))
 
                 # Title: truncate only if needed, no forced ellipsis
                 display_title = title[:60] + ("..." if len(title) > 60 else "")
@@ -437,14 +437,14 @@ def status(
                     console.print("         [dim]flow:[/] [dim](no flow scene)[/]")
 
                 # Blocked metadata
+                if blocked_by:
+                    blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)
+                    console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
+
+                # Blocked reason: extract key information from verbose error messages
                 if blocked_reason:
-                    console.print(
-                        f"         [yellow]blocked reason:[/] {blocked_reason}"
-                    )
-                if blocked_by_issue:
-                    console.print(
-                        f"         [yellow]blocked by issue:[/] #{blocked_by_issue}"
-                    )
+                    reason_summary = _extract_blocked_reason_summary(blocked_reason)
+                    console.print(f"         [yellow]reason:[/] {reason_summary}")
         else:
             console.print("  [dim](none)[/]")
 

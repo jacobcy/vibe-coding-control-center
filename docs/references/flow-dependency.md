@@ -78,7 +78,7 @@ CREATE TABLE flow_state (
 | 命令 | 使用场景 | 数据影响 | 建立依赖关系 |
 |------|---------|---------|------------|
 | `flow blocked --by <issue>` | Flow 执行中遇到依赖阻塞 | `flow_issue_links` + `flow_state` | ✅ 是 |
-| `handoff --blocked-by <text>` | Agent 交接时记录阻塞状态 | 仅 `flow_state` | ❌ 否 |
+| `handoff --reason <text>` | Agent 交接时记录阻塞状态 | 仅 `flow_state` | ❌ 否 |
 
 ### 详细操作影响
 
@@ -124,7 +124,7 @@ VALUES
 - 自动更新 `flow_status` 和 `blocked_by`
 - 避免遗漏依赖关系
 
-#### 2. `vibe3 handoff plan/report/audit --blocked-by <text>`
+#### 2. `vibe3 handoff plan/report/audit --reason <text>`
 
 **使用场景**：Agent 完成 plan/report/audit 阶段时记录阻塞状态。
 
@@ -136,9 +136,9 @@ VALUES
 
 **命令示例**：
 ```bash
-vibe3 handoff plan docs/plans/feature-a.md --blocked-by "等待外部反馈"
+vibe3 handoff plan docs/plans/feature-a.md --reason "等待外部反馈"
 
-vibe3 handoff report docs/reports/feature-a.md --blocked-by "需要等待 API 完成"
+vibe3 handoff report docs/reports/feature-a.md --reason "需要等待 API 完成"
 ```
 
 **数据库变更**：
@@ -209,7 +209,7 @@ vibe3 task resume
 - 需要在数据库中建立依赖关系
 - 方便后续查询和分析
 
-**使用 `handoff --blocked-by`**：
+**使用 `handoff --reason`**：
 - Agent 交接时记录阻塞状态
 - 阻塞原因不一定是具体的 issue
 - 阻塞原因可能是：外部反馈、资源等待、审批流程等
@@ -220,7 +220,7 @@ vibe3 task resume
 # 场景：Agent 在 plan 阶段发现依赖阻塞
 
 # Step 1: Agent 执行 handoff
-vibe3 handoff plan docs/plans/feature-a.md --blocked-by "需要等待 API 完成"
+vibe3 handoff plan docs/plans/feature-a.md --reason "需要等待 API 完成"
 
 # Step 2: 开发者补充依赖关系
 vibe3 flow blocked --by 218
