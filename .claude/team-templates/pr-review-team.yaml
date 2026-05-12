@@ -13,7 +13,7 @@
 name: pr-review-team
 description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
 
-# Team 创建配置（供 Step 6 在确认 team 缺席后调用 TeamCreate 使用）
+# Team 创建配置（供 Phase 0 Step 4 在确认 team 缺席后调用 TeamCreate 使用）
 team_create_config:
   team_name: pr-review-team
   agent_type: general-purpose  # team-lead 类型
@@ -114,7 +114,7 @@ preflight_checks:
       如果团队成员超过 10 个：
       - 提示用户当前 team 现场可能复杂
       - 优先继续复用当前 team
-      - 如人类明确决定结束当前 team，应走 Step 10，而不是恢复路径
+      - 如人类明确决定结束当前 team，应走会话收尾流程（参见 ## Session Lifecycle），而不是恢复路径
   - name: 检查现有 teammates
     command: "tmux list-panes -a 2>/dev/null | grep -c '\\%' || echo 0"
     action: |
@@ -252,11 +252,65 @@ pr_classification:
 
 # 工作流程（可执行配置）
 workflow:
+  phase_0:
+    name: 准备与握手
+    agents: []  # Phase 0 不 spawn agent，由 team-lead 直接执行
+    parallel: false
+    description: |
+      Team 创建/复用 + Backlog Task 创建 + lead 自身握手（ToolSearch） + 已有 agent 握手存活检测。
+      这是整个审查流程的入口，Phase 0 失败 → 立即停止，不创建后续 Backlog task。
+    execution:
+      - step: check_environment
+        action: |
+          验证所有前置条件：
+          1. TMUX 已设置
+          2. CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+          3. ToolSearch、SendMessage、TeamCreate、TaskCreate、TaskUpdate、TaskList 可用
+          任一缺失 → 立即停止
+      - step: select_mode
+        action: |
+          选择执行模式（auto-fix / comment-only / auto-decide / ask-each）。
+          用户指定 → 使用用户指定；未指定 → ask-each。
+      - step: load_template
+        action: |
+          读取 .claude/team-templates/pr-review-team.yaml（本文件），确认配置完整。
+      - step: create_or_reuse_team
+        action: |
+          1. 检查 Team 是否已存在（TeamCreate 若报 already exists）
+          2. 不存在 → TeamCreate(team_name="pr-review-team")
+          3. 已存在 → 对已有 members（除 team-lead）逐个握手检测存活：
+             - SendMessage(to=member, lead_ready)
+             - 收到 agent_ready → 存活，可复用
+             - 超时 3 次（各 30s）→ 标记 dead
+          4. 全死 → TeamDelete → TeamCreate 重建
+          5. 部分存活 → 复用存活者，缺失的 agent type 在对应 Phase spawn
+          不检查 isActive（Issue #29271），不推断 config.json 状态（Issue #44701）。
+      - step: create_phase_0_backlog_task
+        action: |
+          TaskCreate → TaskUpdate(owner="team-lead", status="in_progress")
+          taskId 保存为 phase_0_task_id，后续 Phase 依赖此 task。
+          metadata:
+            activation_state: "awaiting_environment_check"
+            expected_next_action: "verify_environment"
+            lead_handshake_status: "pending"
+      - step: lead_toolsearch
+        action: |
+          team-lead 自身执行 ToolSearch(query="select:SendMessage")。
+          此步骤是强制性的——不得假设 deferred tools 已加载（Issue #787）。
+          失败 → 立即停止，不进入 Phase 1。
+    gate:
+      - Team 已创建（TeamCreate 成功）
+      - Phase 0 Backlog Task 已创建且 status="in_progress"
+      - team-lead 已完成 ToolSearch
+      - 复用场景：所有需复用的 agent 已握手确认存活
+
   phase_1:
     name: 背景调研
     agents: [context-researcher]
     parallel: false
+    requires_phase_0: true
     output_to_phase_2: true
+    # 【关键】Phase 1 依赖 Phase 0（Team 就绪 + lead ToolSearch 完成）
     # 【关键】Phase 1 的输出是 Phase 2 的必要输入
     # 如果不传递背景报告，Phase 2 agents 将处于"盲审"状态
     # 执行指令
@@ -753,8 +807,8 @@ workflow:
         - [ ] 高 / 中 / 低
     labels: ["type/follow-up", "scope/<component>"]
 
-# 注意：本 workflow 只有 5 个 phase。
-# Phase 5 完成后，控制权直接回到 SKILL.md 的 Step 9（询问继续 / 结束）。
+# 注意：本 workflow 有 6 个 phase（Phase 0-5）。
+# Phase 5 完成后，控制权回到 SKILL.md 的会话收尾（询问继续 / 结束）。
 # teammates 的 idle / pane / inbox 由运行时管理，skill 不感知也不操作。
 # 切换 PR 通过 SendMessage 给已有 agent 发新任务即可。
 
