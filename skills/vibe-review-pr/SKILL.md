@@ -109,7 +109,12 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 - **Phase 0 必须先于任何 subagent 执行**
 - **复用判断 = 握手结果**（alive=复用，dead=清理后 TeamCreate），禁止跳过握手直接 TeamCreate
 - **切换 PR 用 SendMessage**（握手成功的复用 agent），禁止盲目重新 spawn
-- **清理与恢复规则**：见 `references/recovery-playbook.md`
+- **清理与恢复规则**：
+  - TeamDelete仅用于任务完成或状态不一致清理
+  - 清理优先级：TeamDelete → rm -rf fallback → 退出重建会话
+  - 禁止手工操作（不编辑*.jsonl、不手工rm -rf、不kill-pane）
+  - 唯一合法恢复：退出会话重建
+  - 详细场景处理见 `references/recovery-playbook.md`
 - **Phase 0 必须创建 Phase 1-5 的骨架 Backlog task**（硬规则，不可跳过）
 - **Backlog 约束详细说明**：见 `references/execution-reference.md`
 
