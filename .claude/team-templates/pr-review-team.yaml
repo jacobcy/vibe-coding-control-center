@@ -470,8 +470,9 @@ workflow:
 
           **等待策略**：
           1. 收到 idle 通知 → 不操作，继续等待（idle 是正常状态，不代表完成）
-          2. 收到 task-notification（status=completed）→ 读取结果
-          3. 超时（5 分钟）→ 标注"审查不完整"，进入 Phase 3
+          2. 如怀疑交付问题（非例行 idle），按 handle_agent_idle_after_task(agent_name) 排查（见 SKILL.md §握手与唤醒协议规范）
+          3. 收到 task-notification（status=completed）→ 读取结果
+          4. 超时（5 分钟）→ 标注"审查不完整"，进入 Phase 3
 
           **重要**：
           - idle 通知是 agent 的正常状态（等待输入），不代表"未开始"或"失败"
@@ -580,7 +581,7 @@ workflow:
   phase_5:
     name: 写回 + 修复
     executor: team-lead  # 由当前 session（team-lead）执行
-    agents: []
+    agents: [fix-executor]  # 条件性 spawn（仅 auto-fix 模式），trigger: on_demand
     actions:
       - evaluate_execution_mode  # 根据配置决定执行路径
       - write_review_comment
