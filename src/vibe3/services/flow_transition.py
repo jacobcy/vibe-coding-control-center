@@ -271,7 +271,8 @@ class FlowTransitionMixin(FlowWriteMixin):
             execution_pid=None,
             execution_started_at=None,
             execution_completed_at=None,
-            blocked_by=None,
+            blocked_reason=None,
+            blocked_by_issue=None,
             next_step=None,
             initiated_by=initiator,
         )

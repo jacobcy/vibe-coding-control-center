@@ -153,8 +153,8 @@ def render_flow_status(
         status.spec_ref, status.task_issue_number
     )
     kv("spec", spec_display, 1)
-    if status.blocked_by:
-        kv("blocked_by", status.blocked_by, 1)
+    if status.blocked_reason:
+        kv("blocked_reason", status.blocked_reason, 1)
     if status.next_step:
         kv("next_step", status.next_step, 1)
 

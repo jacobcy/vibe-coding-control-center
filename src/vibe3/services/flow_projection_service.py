@@ -26,7 +26,7 @@ class FlowProjection:
     task_issue_number: int | None = None
     spec_ref: str | None = None
     next_step: str | None = None
-    blocked_by: str | None = None
+    blocked_reason: str | None = None
 
     # GitHub PR data
     pr_number: int | None = None
@@ -50,7 +50,7 @@ class FlowProjection:
             pr_number=status.pr_number,
             spec_ref=status.spec_ref,
             next_step=status.next_step,
-            blocked_by=status.blocked_by,
+            blocked_reason=status.blocked_reason,
         )
 
 

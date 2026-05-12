@@ -69,9 +69,6 @@ class FlowState(BaseModel):
     manager_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
-    blocked_by: str | None = (
-        None  # Legacy field (deprecated, kept for backward compatibility)
-    )
     blocked_by_issue: int | None = (
         None  # NEW: Dependency issue number (semantic clarity)
     )
@@ -246,7 +243,6 @@ class FlowStatusResponse(BaseModel):
     manager_actor: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
-    blocked_by: str | None = None  # Legacy field (deprecated)
     blocked_by_issue: int | None = None  # NEW: Dependency issue number
     blocked_reason: str | None = None  # NEW: Block reason text
     failed_reason: str | None = None  # Deprecated: use blocked_reason instead
@@ -337,7 +333,6 @@ class FlowStatusResponse(BaseModel):
             manager_actor=data.get("manager_actor"),
             latest_actor=data.get("latest_actor"),
             initiated_by=data.get("initiated_by"),
-            blocked_by=data.get("blocked_by"),
             blocked_by_issue=data.get("blocked_by_issue"),
             blocked_reason=data.get("blocked_reason"),
             failed_reason=data.get("failed_reason"),
