@@ -36,7 +36,8 @@ def _record_handoff_reference(
         method = getattr(service, method_name)
         # Support optional 'action' kwarg for indicate command
         extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
-        method(ref_value, next_step, blocked_by, actor, **extra_kwargs)
+        # Map blocked_by to reason parameter
+        method(ref_value, next_step, reason=blocked_by, actor=actor, **extra_kwargs)
         console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
