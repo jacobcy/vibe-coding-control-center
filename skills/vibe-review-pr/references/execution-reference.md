@@ -2,40 +2,41 @@
 
 承接 `SKILL.md`，提供消息样例与等待策略。SKILL.md 定义生命周期、phase 契约与质量标准；本文件只展示样例。
 
-> 审查会话只有 4 个 phase：背景调研 → 专项审查 → 综合判断 → 写回。完成 Phase 4 控制权回 Step 9。**没有 Phase 5**，不要操作 teammates 的 idle / pane / inbox。
+> **Phase 0-5结构**：Phase 0是前置条件（内联操作），Phase 1-5各是Backlog Task。Phase 0创建Phase 1 meta-task，各Phase结束时创建下一个Phase的meta-task。**不要操作teammates的idle/pane/inbox**（由运行时管理）。
 
-## Step 6: TeamCreate + Backlog Setup
+## Phase 0 Step 6: TeamCreate + 创建Phase 1 meta-task
 
 > **顺序铁律**：先 TeamCreate，后 TaskCreate。反序创建的 task 不关联 team，TaskList 永远返回空。
 > **显式 PR 编号入口铁律**：`/vibe-review-pr 821` 这类入口下，team-lead 在 Step 6 不得执行 `gh pr view` / `gh pr diff` / `git diff`。PR 基本信息和 diff 首次接触者必须是 Phase 1 的 `context-researcher`。
 
-```python
+```yaml
 # 1. 创建 Team
-TeamCreate(team_name="pr-review-team", description="PR review for PR #{pr_number}")
+- tool: TeamCreate
+  params:
+    team_name: "pr-review-team"
+    description: "PR review for PR #{pr_number}"
 
-# 2. TeamCreate 成功后先只创建 Phase 1 task
-t1 = TaskCreate(subject="Phase 1: Context research", description="...")
+# 2. team-lead 自身 ToolSearch（前置握手）
+- tool: ToolSearch
+  params:
+    query: "select:SendMessage"
+    max_results: 1
 
-# 3. 立即将 Phase 1 标记为 in_progress 并归属 team-lead
-TaskUpdate(
-  taskId=t1.id,
-  status="in_progress",
-  owner="team-lead",
-  metadata={
-    "handshake_protocol": "ordered_v1",
-    "lead_handshake_status": "ready",
-    "lead_ready_sent": False,
-    "task_activation_allowed": False,
-    "expected_next_action": "send_context_lead_ready",
-    "activation_state": "awaiting_lead_ready",
-  },
-)
+# 3. 创建 Phase 1 meta-task（不是直接创建Phase 1 Backlog task）
+- tool: TaskCreate
+  params:
+    subject: "创建 Phase 1 backlog"
+    description: |
+      使用 references/backlog-task-templates.yaml Phase 1 模板创建完整的 Backlog task。
+      创建后标记为 in_progress 并补充执行时 metadata。
+    metadata:
+      template_ref: "phase1"
+      target_phase: 1
+    owner: "team-lead"
+    status: "pending"
 
-# 4. team-lead 先完成自身握手，再进入 Phase 1
-ToolSearch(query="select:SendMessage", max_results=1)
-
-# 5. spawn context-researcher 后，先发送 lead_ready；收到 agent_ready 后再发送正式任务
-# 6. 等待 context-researcher 报告后，再决定是否补建 Phase 2/3/4/5 tasks
+# 4. spawn context-researcher 后，先发送 lead_ready；收到 agent_ready 后再发送正式任务
+# 5. Phase 1 结束时创建 Phase 2 meta-task（或根据PR类型跳到Phase 3）
 ```
 
 ## Phase 1: 背景调研
@@ -235,10 +236,26 @@ fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
       请基于以上背景分析新的 PR。
 ```
 
-注意：这里的“已有 agent”只指**上一轮任务已经完成并进入复用态**的 teammate。
-fresh spawn 且刚完成握手的 agent 不属于“已有空闲 teammate”；它的下一步必须是当前 PR 的正式任务，而不是待命。
+注意：这里的”已有 agent”只指**上一轮任务已经完成并进入复用态**的 teammate。
+fresh spawn 且刚完成握手的 agent 不属于”已有空闲 teammate”；它的下一步必须是当前 PR 的正式任务，而不是待命。
 
-## Phase 3: 综合判断
+## Phase 3: Codex 复查
+
+此阶段校验Phase 2报告质量，决定是否启用codex复查。不涉及agent握手。
+
+**触发条件**（满足任一项）：
+- 安全 PR（涉及认证/授权/路径解析/输入验证）
+- 大型 PR（diff > 500 行）
+- 报告冲突（Phase 2 多份报告对同一问题结论矛盾）
+- 报告缺失（Phase 2 应有报告未送达）
+
+**调用约束**：
+- **绝对禁止传 diff 给 codex**：只传 Phase 2 结构化报告（文件列表、行数、安全声明等）
+- 任一报告存在严重幻觉 → 跳过 codex，直接进入 Phase 4
+
+Phase 3结束后创建Phase 4 meta-task。
+
+## Phase 4: 综合判断
 
 ### 消息验证（强制）
 
@@ -266,7 +283,7 @@ cat ~/.claude/projects/.../<sessionId>.jsonl | grep -A 5 "PR #"
 
 逐条核对：无虚假评分、每条违规有规则引用、数字基于本 PR diff、不滑动靶点、无无关指标、扫了重复模式、测试评估区分性质、comment 格式合规。任一不满足先修正。
 
-## Phase 4: 写回与改进
+## Phase 5: 写回 + 修复
 
 ```yaml
 - action: 评估 execution_mode
@@ -341,6 +358,7 @@ question: |
 
 Backlog task 的 `blockedBy` 设置确保 Phase 串行执行：
 
+- Phase 1: 第一个 Backlog task，依赖 Phase 0 完成（`depends_on_phase: 0`）
 - Phase 2 blockedBy: Phase 1
 - Phase 3 blockedBy: Phase 2
 - Phase 4 blockedBy: Phase 3
