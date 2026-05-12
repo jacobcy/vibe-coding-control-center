@@ -242,6 +242,24 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 - 不手工编辑 `~/.claude/projects/.../*.jsonl`
 - 不手工 `rm -rf ~/.claude/teams/`（TeamDelete 失败时的 fallback 例外）
 - 不手工 `tmux kill-pane`
+- **Phase 0 必须创建 Phase 1-5 的骨架 Backlog task**（硬规则，不可跳过）
+- **每个 Phase 的 Backlog task 必须包含强制约束字段**：
+    - `metadata.phase_order`：Phase 编号（1-5）
+    - `metadata.depends_on_phase`：前一 Phase 编号
+    - `metadata.must_create_next_phase_backlog`：true（强制约束）
+    - `metadata.next_phase_task_id`：明确指定下一个 task id
+- **如果 Phase N 结束时未创建/补充 Phase N+1 的 Backlog**：
+    - 当前 Phase 标记为 blocked
+    - 流程立即停止，不进入下一 Phase
+    - 输出明确错误："Phase N 未创建 Phase N+1 Backlog，流程停止"
+- **Backlog task 的 blockedBy 必须正确设置**：
+    - Phase 2 blockedBy: Phase 1
+    - Phase 3 blockedBy: Phase 2
+    - Phase 4 blockedBy: Phase 3
+    - Phase 5 blockedBy: Phase 4
+- **TaskCreate 和 TaskUpdate 必须在 Phase 开始和结束时执行**：
+    - Phase 开始：TaskUpdate(status="in_progress")
+    - Phase 结束：TaskUpdate(status="completed") + 补充下一 Phase metadata
 
 ---
 
