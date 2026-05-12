@@ -217,8 +217,8 @@ def render_task_show(
         console.print(f"Verdict: [{color}]{v.verdict}[/] ({v.actor})")
     if task.next_step:
         console.print(f"Next Step: {task.next_step}")
-    if task.blocked_by:
-        console.print(f"Blocked By: {task.blocked_by}")
+    if task.blocked_reason:
+        console.print(f"Blocked Reason: {task.blocked_reason}")
 
     if task_result.latest_ref:
         latest_ref = task_result.latest_ref
