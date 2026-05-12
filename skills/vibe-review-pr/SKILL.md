@@ -194,9 +194,19 @@ Phase 0 创建的 meta-task 指示创建 Phase 1 Backlog task。
 backlog gate：发送 lead_ready 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`
 backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_context_task, activation_state=awaiting_task_dispatch`
 
-### Step 3: 等待报告 → 保存 output
+### Step 3: 等待报告 → idle 处理 → 保存 output
 
-收到 context-researcher 报告后：
+收到 context-researcher 的 idle 通知后，team-lead 立即执行自动化处理：
+
+**自动化流程**：
+1. 检查 inbox（`~/.claude/teams/pr-review-team/inboxes/team-lead.json`）
+2. 查找最新的非 idle_notification 消息（通过 `timestamp` 和 `"from": "context-researcher"` 筛选）
+3. 提取背景报告内容（消息的 `text` 字段）
+4. 如无报告 → 检查 pane（tmux capture-pane）诊断 agent 状态
+   - InputValidationError → 重新握手
+   - 正在执行（Bash/Read 输出）→ 继续等待
+   - 等待输入（❯）→ 继续等待
+5. 收到报告后 → 保存为 `phase_1_output` → TaskUpdate 标记完成
 
 ```yaml
 - tool: TaskUpdate
@@ -208,6 +218,11 @@ backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expec
         ## PR #<number> 背景报告
         [完整的 context-researcher 报告内容，包括所有章节]
 ```
+
+**约束**：
+- 每次 idle 通知触发一次 inbox 检查
+- inbox 检查优先于 pane 检查（报告可能已送达但未通知）
+- 通过 TaskUpdate 同步状态（`phase_1_output` 非空）
 
 ### Step 4: PR 分类 + 创建下一个 Phase meta-task
 
@@ -655,13 +670,13 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
 | 0 准备与握手 | 环境检查 → TeamCreate → team-lead ToolSearch（内联操作，不是 Backlog Task）；已有 Team 则握手确认 agent 存活（alive=复用，dead=清理重建） | 跳过 Phase 0 直接开始 Phase 1；不复用也不清理，直接 TeamCreate 重复创建；team-lead 自身未 ToolSearch |
-| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
+| 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher；**收到 idle 通知必须检查 inbox**（teammate-message 不转发工作报告） | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher；收到 idle 通知后不检查 inbox，等待永远不会到来的 teammate-message |
 | 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，收到"已就绪"后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
 | 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注"报告作废"；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
 | 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
 | 5 写回 + 修复 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
 
-> **没有 Phase 6**。完成 Phase 5 后流程结束。teammates 的 idle / pane / inbox 由运行时管理，**skill 不感知不操作**。如果你正在思考"清理 inbox"或"保留状态"，停下——这不是你的工作。
+> **没有 Phase 6**。完成 Phase 5 后流程结束。
 
 详细消息样例见 `references/execution-reference.md`。
 
@@ -683,16 +698,32 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 
 **约束**：派发完一个 agent 后 team-lead 不得进入 idle；必须继续处理下一个 agent，直到全部完成。
 
-### handle_agent_idle_after_task(agent_name)
+### handle_agent_idle(agent_name)
+
+**统一的 idle 处理流程**（适用于 Phase 1/2/5）：
 
 ```
-收到 agent 的 idle 通知后（仅用于排查交付问题，不用于常规状态检查）：
+收到 agent 的 idle 通知后：
 
-1. 检查 inbox：任务结果是否已送达
-2. check pane: InputValidationError → 该 agent 可能未加载 SendMessage，重新握手
-3. check pane: Bash/Read 输出 → agent 正在执行中，正常等待
-4. check pane: ❯ 等待输入 → 正常 idle，任务尚未完成，继续等待
+1. 检查 inbox（~/.claude/teams/pr-review-team/inboxes/team-lead.json）
+   - 查找最新的非 idle_notification 消息
+   - 筛选条件：from == agent_name 且 text 不包含 "idle_notification"
+   - 如有报告 → 提取并继续流程
+
+2. 如无报告 → 检查 pane（tmux capture-pane）
+   - InputValidationError → 该 agent 未加载 SendMessage，重新握手
+   - Bash/Read 输出 → agent 正在执行中，正常等待
+   - ❯ 等待输入 → 正常 idle，继续等待
+
+3. 如需重新握手 → SendMessage(lead_ready)
+   - 等待 agent_ready，最多 3 次
+   - 超时 → 标记 blocked
 ```
+
+**关键约束**：
+- **inbox 检查优先**：teammate-message 系统只转发 idle_notification，不转发实际工作报告，必须主动检查 inbox
+- **适用于所有 Phase**：Phase 1/2/5 统一使用此流程
+- **自动化**：无需用户干预，team-lead 自动执行
 
 ### 握手强制规则
 
