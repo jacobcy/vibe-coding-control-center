@@ -104,7 +104,7 @@ class TestHandoffAdvancedCommands:
         assert "✓" in result.output
         assert "Plan handoff recorded" in result.output
         mock_service.record_plan.assert_called_once_with(
-            "docs/plans/test-plan.md", None, None, "claude/sonnet-4.6"
+            "docs/plans/test-plan.md", None, reason=None, actor="claude/sonnet-4.6"
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -132,8 +132,8 @@ class TestHandoffAdvancedCommands:
         mock_service.record_report.assert_called_once_with(
             "docs/reports/test-report.md",
             "Address feedback",
-            None,
-            "claude/sonnet-4.6",
+            reason=None,
+            actor="claude/sonnet-4.6",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -148,7 +148,7 @@ class TestHandoffAdvancedCommands:
                 "handoff",
                 "audit",
                 "docs/audits/test-audit.md",
-                "--blocked-by",
+                "--reason",
                 "Waiting for review",
                 "--actor",
                 "claude/sonnet-4.6",
@@ -161,8 +161,8 @@ class TestHandoffAdvancedCommands:
         mock_service.record_audit.assert_called_once_with(
             "docs/audits/test-audit.md",
             None,
-            "Waiting for review",
-            "claude/sonnet-4.6",
+            reason="Waiting for review",
+            actor="claude/sonnet-4.6",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -179,7 +179,7 @@ class TestHandoffAdvancedCommands:
                 "docs/plans/test-plan.md",
                 "--next-step",
                 "Start implementation",
-                "--blocked-by",
+                "--reason",
                 "API key needed",
                 "--actor",
                 "claude/sonnet-4.6",
@@ -190,8 +190,8 @@ class TestHandoffAdvancedCommands:
         mock_service.record_plan.assert_called_once_with(
             "docs/plans/test-plan.md",
             "Start implementation",
-            "API key needed",
-            "claude/sonnet-4.6",
+            reason="API key needed",
+            actor="claude/sonnet-4.6",
         )
 
     def test_handoff_audit_command_real_service_path(self, tmp_path, monkeypatch):
