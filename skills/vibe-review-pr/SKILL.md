@@ -206,6 +206,7 @@ metadata:
 - ❌ 禁止被动等待（看到 idle 就以为在等待报告）
 - ❌ 禁止假设 SendMessage 自动送达（必须验证 inbox）
 - ❌ 禁止跳过 pane 检查（pane 可见性是唯一的真实状态）
+- ❌ 禁止在部分 agent 完成握手+派发后进入 idle（所有 agent 全部握手+派发完成前，team-lead 必须保持活动状态）
 
 **诊断**（如 agent 未发送报告）：
 ```bash
@@ -475,7 +476,7 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
 |-------|---------|-------|
 | 0 有序双向握手 | team-lead 自身先 ToolSearch；每个 agent 在所属 phase 内逐个 spawn；lead 先发 `lead_ready`，agent 再回 `agent_ready`；收到该 agent `agent_ready` 后才分配工作 | 双方同时各说一次“已就绪”；一次 spawn 全部再一起握手；要求所有 phase 的 agent 先集体 ready；未握手就给 agent 分配工作；team-lead 自身未 ToolSearch |
 | 1 背景调研 | 必须**先于** Phase 2 完成；产出 `phase_1_output` 并回传 team-lead；**team-lead 不得自行收集上下文**，必须 spawn context-researcher | 只打印到终端、未保存为变量、未通过 SendMessage 回传；team-lead 自己跑 gh pr view / git diff 而不是 spawn context-researcher |
-| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，**必须等待所有 Phase 2 agents 都握手成功后才批量发送正式任务**；收到所有”已就绪”后再通过 SendMessage 下发 `phase_1_output` 和正式任务；复用 teammate 或补发上下文时也用 SendMessage；等待期间保持活动状态，不得进入 idle | **与 Phase 1 并行启动**；只等部分 agent 握手就发送任务；**在部分 agent 握手成功后进入 idle**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
+| 2 专项审查 | 多 agent **同一响应**内并行 spawn；fresh spawn 先只做握手，逐个握手成功后立即派发任务，**在所有 agent 都完成握手+任务派发前，team-lead 不得进入 idle**；复用 teammate 或补发上下文时也用 SendMessage | **与 Phase 1 并行启动**；**在部分 agent 握手+派发完成后进入 idle**；把正式任务直接写进 spawn prompt；让复用语义和首轮语义混在一起 |
 | 3 Codex决策（必选） | **必选动作**：校验各报告的基础数据（文件数/行数/涉及模块）是否与 PR 实际 diff 一致，失真报告标注”报告作废”；**决定是否启用 codex**——报告质量合格且满足触发条件（安全PR、大型PR>500行、冲突仲裁）时调用 `codex:rescue`；**调用时只传 Phase 2 结构化报告（禁止传 diff/代码片段）**；任一报告存在严重幻觉 → 跳过 codex 直接进入 Phase 4 | 与 Phase 2 并行执行；未收集完整 Phase 2 报告就做决策；**在报告质量不合格时仍调用 codex（幻觉数据无法被 codex 验证）**；**给 codex 传 diff 而不是报告**；**未将 Phase 2 报告发给 codex** |
 | 4 综合判断 | 收集 Phase 2 可用报告（剔除 Phase 3 标记为作废的）和 Phase 3 codex 报告（如有）；仲裁不同报告间的冲突；做出最终判断 | 使用已作废的报告做结论；替缺失 agent 脑补结论 |
 | 5 写回 | 模式决定路径；仅 `auto-fix` 可 spawn `pr-fix-executor`；范围外问题转 follow-up issue | 把范围外技术债塞进当前 PR comment |
@@ -590,7 +591,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 **team-lead 必须**：
 1. 整个 Phase 0 的第一步：自身先执行 `ToolSearch(query="select:SendMessage")`
 2. 每 spawn 一个 agent，立即发送 `【lead_ready】` 握手消息
-3. 收到该 agent 的 `【agent_ready】已就绪` 回复后，必须立即发送该 phase 的正式任务；fresh spawn 不得先进入 idle / 待命态
+3. 收到该 agent 的 `【agent_ready】已就绪` 回复后，必须立即发送该 phase 的正式任务；派发完一个 agent 后立即继续处理下一个，所有 agent 全部握手+派发完成前不得进入 idle / 待命态
 4. 超时未收到 → 再次发送 `lead_ready` 通知；多次超时 → 标记该 agent 为阻塞
 
 **team-lead 禁止**：
