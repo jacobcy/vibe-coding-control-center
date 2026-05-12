@@ -326,6 +326,9 @@ workflow:
     parallel: true
     requires_phase_1_output: true
     message_passing: SendMessage
+    handshake_protocol: |
+      逐个 agent 握手+派发，具体流程见 SKILL.md §握手与唤醒协议规范。
+      约束：派发完一个 agent 后不得 idle，必须继续下一个；全部完成前 team-lead 不得 idle。
     # 【关键】fresh spawn 初始 prompt 只允许握手
     # Phase 1 背景必须在收到“已就绪”后，通过第二条 SendMessage 下发
     # 执行指令
@@ -353,12 +356,10 @@ workflow:
           message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_code_analyst_handshake
         action: |
-          等待 code-analyst 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
-          下一步必须进入 send_code_analyst_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.code-analyst=true` 后，`expected_next_action=verify_code_analyst_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+          等待 code-analyst 回复”【agent_ready】已就绪”，按 handshake_protocol 执行（见 SKILL.md §握手与唤醒协议规范）。
+          未收到 → 按 handshake_agent() 重试/blocked 逻辑处理。
+          收到 → 同步 handshake_status.code-analyst = “ready”，立即进入 send_code_analyst_task。
+          派发后不得 idle，必须继续处理下一个 agent。
       - step: send_code_analyst_task
         tool: SendMessage
         params:
@@ -393,12 +394,10 @@ workflow:
           message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_architect_handshake
         action: |
-          等待 architect-reviewer 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
-          下一步必须进入 send_architect_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 后，`expected_next_action=verify_architect_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+          等待 architect-reviewer 回复”【agent_ready】已就绪”，按 handshake_protocol 执行（见 SKILL.md §握手与唤醒协议规范）。
+          未收到 → 按 handshake_agent() 重试/blocked 逻辑处理。
+          收到 → 同步 handshake_status.architect-reviewer = “ready”，立即进入 send_architect_task。
+          派发后不得 idle，必须继续处理下一个 agent。
       - step: send_architect_task
         tool: SendMessage
         params:
@@ -440,12 +439,10 @@ workflow:
           message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
       - step: verify_security_handshake
         action: |
-          等待 security-reviewer 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
-          下一步必须进入 send_security_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.security-reviewer=true` 后，`expected_next_action=verify_security_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
+          等待 security-reviewer 回复”【agent_ready】已就绪”，按 handshake_protocol 执行（见 SKILL.md §握手与唤醒协议规范）。
+          未收到 → 按 handshake_agent() 重试/blocked 逻辑处理。
+          收到 → 同步 handshake_status.security-reviewer = “ready”，立即进入 send_security_task。
+          派发后不得 idle，必须继续处理下一个 agent。
       - step: send_security_task
         tool: SendMessage
         params:

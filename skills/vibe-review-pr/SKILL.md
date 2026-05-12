@@ -105,6 +105,33 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|Inp
 
 详见：`.claude/agents/pr-*.md` 的 "握手协议" 章节。
 
+## 握手与唤醒协议规范
+
+参数定义见 Backlog metadata `wakeup_policy`（`max_attempts`、`timeout`）。以下流程是**单源真源**，修改参数只需改 metadata 一处，以下伪代码自动跟随。
+
+### handshake_agent(agent_name)
+
+```
+1. SendMessage(to=agent_name, lead_ready)
+2. 等待 agent_ready 回复（timeout=wakeup_policy.timeout）
+3. 超时 & 重试次数 < wakeup_policy.max_attempts → 重试（告知第 N 次唤醒）
+4. 超时 & 重试次数 >= wakeup_policy.max_attempts → 标记 blocked，继续处理下一个 agent
+5. 收到 agent_ready → 该 agent ready，重置计数器，立即分配正式任务
+```
+
+**约束**：派发完一个 agent 后 team-lead 不得进入 idle；必须继续处理下一个 agent，直到全部完成。
+
+### handle_agent_idle_after_task(agent_name)
+
+```
+收到 agent 的 idle 通知后（仅用于排查交付问题，不用于常规状态检查）：
+
+1. 检查 inbox：任务结果是否已送达
+2. check pane: InputValidationError → 该 agent 可能未加载 SendMessage，重新握手
+3. check pane: Bash/Read 输出 → agent 正在执行中，正常等待
+4. check pane: ❯ 等待输入 → 正常 idle，任务尚未完成，继续等待
+```
+
 ### 其他常见陷阱
 
 详见 `references/debug-guide.md`：
@@ -223,6 +250,9 @@ TeamCreate → TaskCreate(Phase 1) → TaskUpdate(owner="team-lead") → Phase 0
         architect-reviewer: "pending"
         security-reviewer: "pending"
       on_handshake_failure: "skip_unready_agent_and_mark_review_incomplete"
+      wakeup_policy:
+        max_attempts: 3
+        timeout: 30s
 
 - tool: TaskCreate
   params:
