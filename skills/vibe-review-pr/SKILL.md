@@ -772,23 +772,25 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 ```
 收到 agent 的 idle 通知后：
 
-1. 检查 inbox（~/.claude/teams/pr-review-team/inboxes/team-lead.json）
-   - 查找最新的非 idle_notification 消息
-   - 筛选条件：from == agent_name 且 text 不包含 "idle_notification"
-   - 如有报告 → 提取并继续流程
+1. 使用 agent-event.sh 检查事件存在性
+   - 检查握手：agent-event.sh <agent> agent_ready --latest
+   - 检查报告：agent-event.sh <agent> agent_report --latest
+   - 如有报告事件 → 提取 content_start 后的内容并继续流程
 
-2. 如无报告 → 检查 pane（tmux capture-pane）
+2. 如无报告事件 → 检查 pane（tmux capture-pane）
    - InputValidationError → 该 agent 未加载 SendMessage，重新握手
    - Bash/Read 输出 → agent 正在执行中，正常等待
    - ❯ 等待输入 → 正常 idle，继续等待
 
-3. 如需重新握手 → SendMessage(lead_ready)
-   - 等待 agent_ready，最多 3 次
+3. 如需重新握手 → SendMessage(【lead_ready】)
+   - 等待 【agent_ready】，最多 3 次
    - 超时 → 标记 blocked
 ```
 
 **关键约束**：
-- **inbox 检查优先**：teammate-message 系统只转发 idle_notification，不转发实际工作报告，必须主动检查 inbox
+- **事件验证优先**：使用 agent-event.sh 验证事件存在性，替代手动 inbox 检查
+- **脚本输出格式**：event_type / agent / timestamp / content_start / [实际内容]
+- **避免幻觉**：脚本输出 event_status=missing 时，不得假设事件存在
 - **适用于所有 Phase**：Phase 1/2/5 统一使用此流程
 - **自动化**：无需用户干预，team-lead 自动执行
 
@@ -810,8 +812,26 @@ PR comment 格式要求见 §Review Quality Standards 第 8 条。
 - 替未响应的 agent 脑补结论
 
 **诊断**（如 agent 未发送报告）：
+
+**1. 检查事件前缀格式**：
+```bash
+# 检查 agent 是否发送了事件前缀消息
+skills/vibe-review-pr/scripts/agent-event.sh <agent> agent_report --latest
+
+# 输出解读：
+# - event_status=missing → agent 未发送报告事件（可能协议违规）
+# - event_type=agent_report → 找到报告事件，检查 content_start 后内容
+```
+
+**2. 检查工具加载**：
 ```bash
 tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
+```
+
+**3. 检查 inbox 文件完整性**：
+```bash
+# 直接检查 inbox（调试 fallback）
+cat ~/.claude/teams/pr-review-team/inboxes/team-lead.json | jq 'map(select(.from == "<agent>"))'
 ```
 
 其他常见陷阱详见 `references/debug-guide.md`。
