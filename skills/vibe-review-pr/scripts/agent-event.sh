@@ -9,50 +9,27 @@ source "$SCRIPT_DIR/lib.sh"
 show_usage() {
   cat <<'EOF'
 Usage:
-  agent-event.sh <agent_name> <event_type> [--latest]
-  agent-event.sh <agent_name> <event_type> [--group <name>] [--latest]
+  agent-event.sh
+  agent-event.sh <agent_name>
+  agent-event.sh <agent_name> --group <name>
 
 Behavior:
+  - Without agent_name: list all agents with latest event status.
+  - With agent_name: list all events from that agent (event_type, timestamp, title).
   - Reads team-lead inbox only.
-  - Extracts messages with event prefix from the requested agent.
-  - Supports both 【event_type】 and [event_type] formats.
-  - By default prints all matching events sorted by timestamp.
-  - Use --latest to print only the most recent event.
-
-Event Types:
-  - agent_ready: handshake ready notification
-  - agent_report: task completion report
-  - agent_progress: progress update (optional)
-  - agent_blocked: task blocked notification (optional)
-  - agent_handoff: task handoff notification (optional)
-
-Examples:
-  # Check if context-researcher completed handshake
-  agent-event.sh context-researcher agent_ready --latest
-
-  # Extract latest report from architect-reviewer
-  agent-event.sh architect-reviewer agent_report --latest
-
-  # List all progress updates from code-analyst
-  agent-event.sh code-analyst agent_progress
+  - Supports both Chinese brackets 【】 and English brackets [].
 EOF
   usage_common
 }
 
 GROUP_NAME="$DEFAULT_TEAM_GROUP"
 AGENT_NAME=""
-EVENT_TYPE=""
-LATEST_ONLY="0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --group)
       GROUP_NAME="${2:?missing group name}"
       shift 2
-      ;;
-    --latest)
-      LATEST_ONLY="1"
-      shift
       ;;
     -h|--help)
       show_usage
@@ -64,33 +41,71 @@ while [[ $# -gt 0 ]]; do
       exit 2
       ;;
     *)
-      if [[ -z "$AGENT_NAME" ]]; then
-        AGENT_NAME="$1"
-      elif [[ -z "$EVENT_TYPE" ]]; then
-        EVENT_TYPE="$1"
-      else
+      if [[ -n "$AGENT_NAME" ]]; then
         echo "unexpected extra argument: $1" >&2
         show_usage >&2
         exit 2
       fi
+      AGENT_NAME="$1"
       shift
       ;;
   esac
 done
 
-if [[ -z "$AGENT_NAME" || -z "$EVENT_TYPE" ]]; then
-  show_usage >&2
-  exit 2
+# 列表模式：显示所有 agent 的最新事件状态
+if [[ -z "$AGENT_NAME" ]]; then
+  LEAD_INBOX="$(lead_inbox_path "$GROUP_NAME")"
+  if [[ ! -f "$LEAD_INBOX" ]]; then
+    echo "lead inbox not found: $LEAD_INBOX" >&2
+    exit 1
+  fi
+
+  echo "# Event Status Overview"
+  echo "# Use: agent-event.sh <agent_name> to list all events"
+  echo "#"
+  echo "group=$GROUP_NAME"
+  echo "team_inbox_dir=$(team_inbox_dir "$GROUP_NAME")"
+  printf '%-22s %-10s %-20s\n' "agent" "events" "latest_event"
+
+  while IFS= read -r agent_name; do
+    latest="$(
+      jq -r \
+        --arg agent "$agent_name" '
+        def is_idle:
+          startswith("{\"type\":\"idle_notification\"");
+        def extract_event_type:
+          if test("^(【|\\[)agent_[a-z_]+(】|\\])") then
+            capture("^(【|\\[)(?<type>agent_[a-z_]+)(】|\\])") | .type
+          elif test("^## PR #") or test("^# PR #") or contains("审查报告") or contains("背景报告") then
+            "agent_report"
+          else
+            "message"
+          end;
+        map(select(.from == $agent))
+        | map(select((.text | is_idle) | not))
+        | sort_by(.timestamp)
+        | if length == 0 then
+            "-"
+          else
+            .[-1].text | split("\n")[0]
+          end
+      ' "$LEAD_INBOX"
+    )"
+
+    if [[ "$latest" == "-" ]]; then
+      events="none"
+      event_type="-"
+    else
+      events="ok"
+      event_type="$latest"
+    fi
+
+    printf '%-22s %-10s %-20s\n' "$agent_name" "$events" "$event_type"
+  done < <(defined_agent_names)
+  exit 0
 fi
 
-VALID_EVENTS="agent_ready agent_report agent_progress agent_blocked agent_handoff"
-case " $VALID_EVENTS " in
-  *" $EVENT_TYPE "*) ;;
-  *) echo "unknown event type: $EVENT_TYPE" >&2
-     echo "valid types: agent_ready, agent_report, agent_progress, agent_blocked, agent_handoff" >&2
-     exit 2 ;;
-esac
-
+# 详细模式：列出单个 agent 的所有事件
 assert_defined_agent "$AGENT_NAME"
 
 LEAD_INBOX="$(lead_inbox_path "$GROUP_NAME")"
@@ -99,74 +114,34 @@ if [[ ! -f "$LEAD_INBOX" ]]; then
   exit 1
 fi
 
-# 兼容中文和英文方括号
-OUTPUT="$(
-  jq -r \
-    --arg agent "$AGENT_NAME" \
-    --arg event "$EVENT_TYPE" \
-    --arg latest "$LATEST_ONLY" '
-  ("【" + $event + "】") as $event_cn
-  | ("[" + $event + "]") as $event_en
-  | def is_event:
-      startswith($event_cn) or startswith($event_en);
+echo "# Events from $AGENT_NAME"
+echo "# Use: cat $LEAD_INBOX | jq to see full content"
+echo "#"
+printf '%-20s %-30s %s\n' "event_type" "timestamp" "title"
+
+jq -r \
+  --arg agent "$AGENT_NAME" '
   def is_idle:
-      startswith("{\"type\":\"idle_notification\"");
-  def split_text($text):
-      ($text | split("\n")) as $lines
-      | reduce $lines[] as $line (
-          {head_lines: [], body_lines: [], in_body: false};
-          if .in_body then
-            .body_lines += [$line]
-          elif $line == "" then
-            .in_body = true
-          else
-            .head_lines += [$line]
-          end
-        )
-      | {
-          head: (.head_lines | join("\n")),
-          body: (.body_lines | join("\n"))
-        };
-  map(select(.from == $agent))
-  | map(. + split_text(.text))
-  | map(select((.text | is_idle) | not))
-  | map(select(.text | is_event))
-  | sort_by(.timestamp)
-  | if length == 0 then
-      empty
-    elif $latest == "1" then
-      .[-1] as $msg
-      | (if $msg.body == "" then $msg.text else $msg.body end) as $content
-      | [
-          ("event_type=" + $event),
-          ("agent=" + $msg.from),
-          ("timestamp=" + $msg.timestamp),
-          "content_start",
-          $content
-        ]
-      | join("\n")
+    startswith("{\"type\":\"idle_notification\"");
+  def extract_event_type:
+    # 尝试提取【agent_xxx】或[agent_xxx]
+    if test("^(【|\\[)agent_[a-z_]+(】|\\])") then
+      capture("^(【|\\[)(?<type>agent_[a-z_]+)(】|\\])") | .type
+    elif test("^## PR #") or test("^# PR #") or contains("审查报告") or contains("背景报告") then
+      "agent_report"
     else
-      map(
-        . as $msg
-        | (if $msg.body == "" then $msg.text else $msg.body end) as $content
-        | [
-            ("event_type=" + $event),
-            ("agent=" + $msg.from),
-            ("timestamp=" + $msg.timestamp),
-            "content_start",
-            $content
-          ]
-        | join("\n")
-      )
-      | join("\n---\n")
-    end
-' "$LEAD_INBOX"
-)"
-
-if [[ -z "$OUTPUT" ]]; then
-  echo "event_type=$EVENT_TYPE" >&2
-  echo "event_status=missing" >&2
-  exit 3
-fi
-
-printf '%s\n' "$OUTPUT"
+      "message"
+    end;
+  map(select(.from == $agent))
+  | map(select((.text | is_idle) | not))
+  | sort_by(.timestamp)
+  | .[]
+  | [
+      (.text | extract_event_type),
+      .timestamp,
+      (.text | split("\n")[0])
+    ]
+  | @tsv
+' "$LEAD_INBOX" | while IFS=$'\t' read -r event_type timestamp title; do
+  printf '%-20s %-30s %s\n' "$event_type" "$timestamp" "$title"
+done

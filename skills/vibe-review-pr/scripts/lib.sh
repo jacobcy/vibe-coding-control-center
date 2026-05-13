@@ -176,21 +176,21 @@ get_status_suggestion() {
 
   # pane 缺失但 inbox 存在：历史启动过但当前不在运行
   if [[ "$pane" == "missing" ]]; then
-    echo "agent not running in pane, send handshake to verify"
+    echo "send handshake to verify"
     return
   fi
 
   # pane 存在，检查 alive 状态
   if [[ "$alive" == never ]]; then
-    echo "agent spawned but never sent messages, send handshake to verify"
+    echo "send handshake to verify"
   elif [[ "$alive" =~ inactive ]]; then
-    echo "agent inactive, send handshake to verify"
+    echo "send handshake to verify"
   elif [[ "$alive" =~ stale ]]; then
-    echo "agent stale, send handshake to verify"
+    echo "send handshake to verify"
   elif [[ "$alive" =~ idle ]]; then
-    echo "agent idle, available for task"
+    echo "available for task"
   elif [[ "$alive" =~ active ]]; then
-    echo "agent active, working on task"
+    echo "working on task"
   else
     echo "unknown status"
   fi
