@@ -29,7 +29,7 @@ description: |
 | architect-reviewer | pr-architect-reviewer | 2 | `scripts/agent-report.sh context-researcher` |
 | security-reviewer | pr-security-reviewer | 2 | `scripts/agent-report.sh context-researcher` |
 | codex | pr-codex | 3 | `scripts/agent-report.sh context-researcher` + `scripts/agent-report.sh code-analyst` + `scripts/agent-report.sh architect-reviewer` + `scripts/agent-report.sh security-reviewer` |
-| fix-executor | pr-fix-executor | 5 | 全部前序 agent 报告 |
+| fix-executor | pr-fix-executor | 5 | Phase 4 结论中提取的修复指令（lead 直接写入 prompt） |
 
 真源文件：`skills/vibe-review-pr/runtime/agents.sh`
 
@@ -409,9 +409,10 @@ done
 
 ### Step 3: 按决策行动
 
-auto-fix 且有阻塞问题:
+auto-fix 且有阻塞问题 — 先提取可修复项，再激活 Phase 5:
 
 ```yaml
+# 从 Phase 1/2/3 报告中提取具体修复点，整理为修复指令
 - tool: TaskUpdate
   params:
     taskId: "<phase-4-task-id>"
@@ -421,6 +422,20 @@ auto-fix 且有阻塞问题:
   params:
     taskId: "<phase-5-task-id>"
     status: "in_progress"
+```
+
+**修复指令格式**（Phase 4 产出，写入 Phase 5 prompt）：
+
+```text
+## 修复指令
+
+基于 Phase 1-3 审查结论，以下问题可在当前 PR 范围内修复：
+
+1. [具体问题] — 来源: [agent 名] — 修复方式: [具体操作]
+2. ...
+
+不可自动修复的问题（已转 follow-up issue / PR comment）：
+- [问题] — 原因: [为何不可自动修复]
 ```
 
 否则标记 Phase 5 为 skipped。
@@ -444,24 +459,33 @@ auto-fix 且有阻塞问题:
 
 > **Prompt 必须包含**: 脚本报错 -> 立即发 `【agent_blocked】`，停止执行。
 
-prompt 中告知如何读取前序报告：
+lead 将 Phase 4 产出的修复指令直接写入 prompt，fix-executor 不需要读任何前序报告：
 
 ```text
-你是 fix-executor。根据所有审查报告修复 PR #<number> 的问题。
+你是 fix-executor。根据 team-lead 提供的修复指令修复 PR #<number>。
 
-读取所有前序报告：
-  skills/vibe-review-pr/scripts/agent-report.sh context-researcher
-  skills/vibe-review-pr/scripts/agent-report.sh code-analyst
-  skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
-  skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
-  skills/vibe-review-pr/scripts/agent-report.sh codex
+修复指令：
+<Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
 
-根据报告中的阻塞问题执行修复。完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 修复报告\n...")
+职责：
+1. 按修复指令逐条执行修复
+2. 不要自行扩大修复范围
+3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 修复报告\n...")
 ```
 
-### Step 3: 等待修复报告
+spawn:
 
-### Step 4: 修复完成
+```yaml
+- tool: Agent
+  params:
+    as: "fix-executor"
+    team_name: "pr-review-team"
+    prompt: "<上述 prompt，包含 Phase 4 修复指令>"
+```
+
+### Step 2: 等待修复报告
+
+### Step 3: 修复完成
 
 标记 Phase 5 完成 -> 清理。
 
@@ -469,7 +493,7 @@ prompt 中告知如何读取前序报告：
 
 | 项目 | 内容 |
 |------|------|
-| 输入 | Phase 1/2/3/4 全部报告 |
+| 输入 | Phase 4 结论中的修复指令（lead 直接写入 prompt） |
 | 输出 | 修复提交 + 修复报告 |
 
 ---
