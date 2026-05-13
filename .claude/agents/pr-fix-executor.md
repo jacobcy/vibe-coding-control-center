@@ -46,6 +46,65 @@ ToolSearch(query="select:SendMessage", max_results=1)
 
 你声明的 `SendMessage` 是 deferred tool，系统不会自动加载其 schema。上述握手通过 `ToolSearch` 显式加载。
 
+## 事件前缀约束（强制）
+
+> **硬规则**：握手和完成报告必须使用中文方括号事件前缀，无例外。
+
+### 格式要求
+
+**唯一合法格式**：`【事件类型】消息内容`
+
+### 强制事件类型
+
+| 事件类型 | 语义 | 触发时机 |
+|---------|------|---------|
+| `agent_ready` | 握手就绪 | ToolSearch 加载 SendMessage 后第一条消息 |
+| `agent_report` | 任务完成报告 | 工作完成后发送完整报告时 |
+
+### 可选事件类型（建议使用）
+
+- `agent_progress` — 进度更新（长时间任务中）
+- `agent_blocked` — 任务阻塞（无法继续执行时）
+- `agent_handoff` — 任务交接（需要移交给其他 agent）
+
+### 约束执行点
+
+SendMessage 调用前必须检查：
+```
+1. 确认是握手/报告 → 必须添加事件前缀
+2. 确认前缀格式为 【事件类型】
+3. 确认事件类型在强制列表中（ready/report）
+4. 不满足 → 重写消息为正确格式
+5. 满足 → 发送
+```
+
+### 示例（正确）
+
+```python
+# 握手成功
+SendMessage(to="team-lead", message="【agent_ready】已就绪")
+
+# 提交修复报告
+SendMessage(to="team-lead", message="""【agent_report】
+
+## 修复报告
+...
+""")
+```
+
+### 反例（禁止）
+
+```python
+# ❌ 握手无前缀
+SendMessage(to="team-lead", message="已就绪")
+
+# ❌ 报告无前缀
+SendMessage(to="team-lead", message="已完成修复")
+
+# ❌ 使用英文方括号（虽然 shell 兼容，但 prompt 要求中文）
+SendMessage(to="team-lead", message="[agent_ready] ready")
+```
+
 ## 项目特有约束（必须遵守）
 
 ### Git 纪律（强制）
