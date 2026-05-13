@@ -116,7 +116,8 @@ check_last_alive() {
     return
   fi
 
-  now=$(date +%s)
+  # 使用 UTC 时区获取当前时间（epoch）
+  now=$(TZ=UTC date +%s)
 
   # 提取最新消息时间戳
   last_timestamp=$(jq -r --arg agent "$agent_name" '
@@ -131,9 +132,10 @@ check_last_alive() {
   fi
 
   # 解析 ISO 8601 时间戳（去掉毫秒和 Z）
-  # 例如：2026-05-13T04:35:33.664Z -> 2026-05-13T04:35:33
-  local ts_clean="${last_timestamp%%.*}Z"
-  last_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts_clean" +%s 2>/dev/null || echo "0")
+  # 例如：2026-05-13T04:52:11.068Z -> 2026-05-13T04:52:11
+  local ts_clean="${last_timestamp%%.*}"
+  # 使用 UTC 时区解析时间戳
+  last_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%S" "$ts_clean" +%s 2>/dev/null || echo "0")
 
   if [[ "$last_epoch" -eq 0 ]]; then
     echo "never"
