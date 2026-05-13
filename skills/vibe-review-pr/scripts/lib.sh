@@ -85,14 +85,19 @@ print_agent_table_header() {
 
 check_pane_exists() {
   local agent_name="$1"
-  local agent_type
+  local agent_type current_session
   agent_type="$(agent_type_for "$agent_name")"
 
-  # 检查 tmux pane 标题是否包含 agent_type 或 agent_name
-  if tmux list-panes -a -F "#{pane_title} #{pane_current_command}" 2>/dev/null | \
+  # 获取当前 tmux session（如果不在 tmux 中，返回失败）
+  if ! current_session=$(tmux display-message -p "#{session_name}" 2>/dev/null); then
+    return 1
+  fi
+
+  # 只在当前 session 中检查 tmux pane 标题是否包含 agent_type 或 agent_name
+  if tmux list-panes -t "$current_session" -F "#{pane_title} #{pane_current_command}" 2>/dev/null | \
      grep -qE "(^|✳ |⠐ |⠂ )${agent_type}.*claude"; then
     return 0
-  elif tmux list-panes -a -F "#{pane_title} #{pane_current_command}" 2>/dev/null | \
+  elif tmux list-panes -t "$current_session" -F "#{pane_title} #{pane_current_command}" 2>/dev/null | \
        grep -qE "(^|✳ |⠐ |⠂ )${agent_name}.*claude"; then
     return 0
   else
