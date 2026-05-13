@@ -176,24 +176,17 @@ get_status_suggestion() {
 
   # pane 缺失但 inbox 存在：历史启动过但当前不在运行
   if [[ "$pane" == "missing" ]]; then
-    echo "check if agent crashed, respawn if needed"
+    echo "agent not running in pane, send handshake to verify"
     return
   fi
 
   # pane 存在，检查 alive 状态
   if [[ "$alive" == never ]]; then
-    echo "agent spawned but never sent messages, check logs"
+    echo "agent spawned but never sent messages, send handshake to verify"
   elif [[ "$alive" =~ inactive ]]; then
-    # 从 inactive 中提取时间
-    local age="${alive#inactive (}"
-    age="${age%s)}"
-    if [[ "$age" -gt 3600 ]]; then
-      echo "agent inactive for long time (${age}s), may need restart"
-    else
-      echo "agent inactive (${age}s), send handshake to verify"
-    fi
+    echo "agent inactive, send handshake to verify"
   elif [[ "$alive" =~ stale ]]; then
-    echo "agent stale, may be stuck"
+    echo "agent stale, send handshake to verify"
   elif [[ "$alive" =~ idle ]]; then
     echo "agent idle, available for task"
   elif [[ "$alive" =~ active ]]; then
