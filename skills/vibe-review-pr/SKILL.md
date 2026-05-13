@@ -20,6 +20,23 @@ description: |
 
 任一缺失 -> 立即停止，按文件范围回退到单 agent 审查。
 
+## Must Read
+
+需要消息样例或恢复路径时读 `references/execution-reference.md` / `references/recovery-playbook.md`。
+
+## File Map
+
+| 文件 | 职责 |
+|------|------|
+| `SKILL.md` | 生命周期、phase 契约、握手协议、硬边界 |
+| `references/execution-reference.md` | 消息样例与等待策略 |
+| `references/recovery-playbook.md` | 故障恢复路径 |
+| `references/debug-guide.md` | pane 可见性、agent 执行过程查看、model 参数核查、PR 编号路由诊断 |
+| `runtime/agents.sh` | Agent 注册表（名称 + 类型映射） |
+| `.claude/agents/pr-*.md` | Teammate 项目特定职责定义 |
+
+脚本使用见 [附录 A] Shell 脚本速查。
+
 ## Agent 定义
 
 | agent | agent_type | Phase | 需要读取 |
@@ -41,6 +58,38 @@ description: |
 | `scripts/agent-exist.sh` | 检查 agent 存在性（definition/inbox/pane/alive） |
 | `scripts/agent-event.sh` | 列出 agent 事件（标题+时间） |
 | `scripts/agent-report.sh` | 提取 agent 报告全文 |
+
+## 握手协议（简化版）
+
+> **核心原则**：所有 agent 必须先完成握手，才能接收正式任务。握手是**有方向、有时序**的，不是双方同时各说一次"已就绪"。
+
+### 握手流程
+
+1. **Phase 0**: team-lead 先执行 `ToolSearch(query="select:SendMessage")` 加载 SendMessage
+2. **spawn agent**: prompt 只包含握手准备，不包含具体任务
+3. **team-lead 发送握手**: `SendMessage(to=<agent>, summary="握手信号", message="【lead_ready】")`
+4. **agent 回复**: 等待 `【lead_ready】` → 执行 ToolSearch → 发送 `【agent_ready】已就绪`
+5. **team-lead 下发任务**: 收到 `【agent_ready】` 后，立即发送正式任务（含 PR 编号、具体指令）
+
+### 握手约束
+
+**team-lead 必须**：
+- spawn 后立即发送 `【lead_ready】`
+- 收到 `【agent_ready】` 后，**立即**发送正式任务（fresh spawn 不得先进入 idle）
+- 超时未收到 → 重试（最多 3 次，每次 30s）→ 标记 blocked
+
+**team-lead 禁止**：
+- spawn 后不发 `【lead_ready】`，假设 agent 会自动执行
+- 未收到 `【agent_ready】` 就给该 agent 分配工作
+- 对 fresh spawn 且刚回复"【agent_ready】已就绪"的 agent 发送"保持空闲 / 等待新 PR"
+
+### 握手失败处理
+
+- 超时 3 次 → 标记 agent 为 blocked
+- 使用 `scripts/agent-exist.sh <agent>` 诊断状态
+- 使用 `scripts/agent-event.sh <agent>` 查看事件
+- 详细恢复路径见 `references/recovery-playbook.md`
+- 常见诊断问题见 `references/debug-guide.md`
 
 ## 阻塞处理
 
@@ -74,11 +123,11 @@ Agent 执行过程中遇到脚本错误或参数错误，必须立即发送 `【
 
 1. `TeamCreate(team_name="pr-review-team")` — 若 already exists 则跳过创建
 2. 对已有 members（除 team-lead）逐个握手存活检测：
-   - `SendMessage(to=member, message="lead_ready")`
+   - `SendMessage(to=member, summary="握手检测", message="【lead_ready】")`
    - 收到 `【agent_ready】` -> 存活，可复用
    - 超时 3 次（各 30s）-> 标记 dead
 3. 全死 -> TeamDelete -> TeamCreate 重建
-4. 部分存活 -> 复用存活者，缺失的在对应 Phase 用 `Agent(as="agent_name")` spawn
+4. 部分存活 -> 复用存活者，缺失的在对应 Phase 用 `Agent(name="agent_name")` spawn
 
 > TeamCreate 后才能 TaskCreate，否则 task 不关联 team
 
@@ -100,8 +149,6 @@ Phase 1:
     metadata:
       phase_order: 1
       depends_on_phase: 0
-    owner: "team-lead"
-    status: "pending"
 ```
 
 Phase 2:
@@ -114,8 +161,6 @@ Phase 2:
     metadata:
       phase_order: 2
       depends_on_phase: 1
-    owner: "team-lead"
-    status: "pending"
 ```
 
 Phase 3:
@@ -128,8 +173,6 @@ Phase 3:
     metadata:
       phase_order: 3
       depends_on_phase: 2
-    owner: "team-lead"
-    status: "pending"
 ```
 
 Phase 4:
@@ -142,8 +185,6 @@ Phase 4:
     metadata:
       phase_order: 4
       depends_on_phase: 3
-    owner: "team-lead"
-    status: "pending"
 ```
 
 Phase 5:
@@ -156,8 +197,6 @@ Phase 5:
     metadata:
       phase_order: 5
       depends_on_phase: 4
-    owner: "team-lead"
-    status: "pending"
 ```
 
 ### Step 5: 激活 Phase 1
@@ -189,19 +228,14 @@ Phase 5:
 
 ### Step 1: spawn context-researcher
 
-prompt 中包含：
+spawn 时 prompt **只包含握手准备，不包含具体任务**：
 
 ```text
-你是 context-researcher。分析 PR #<number> 并产出一份结构化背景报告。
+你是 context-researcher。
 
-职责：
-1. 阅读 CLAUDE.md、AGENTS.md、glossary.md、PR description、PR diff
-2. 不要修改任何文件
-3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## PR #<number> 背景报告\n...")
+等待 team-lead 的握手信号和正式调研任务。
 
-报告将保存在 team-lead.json inbox 中，后续 agent 通过 scripts/agent-report.sh context-researcher 读取。
-
-**脚本错误处理**：如 scripts/agent-report.sh 或其他脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+不要自行开始调研工作。
 ```
 
 spawn:
@@ -211,11 +245,59 @@ spawn:
   params:
     description: "PR 背景调研"
     prompt: "<上述 prompt>"
-    as: "context-researcher"
+    name: "context-researcher"
+    subagent_type: "pr-context-researcher"
     team_name: "pr-review-team"
 ```
 
-### Step 2: 等待报告
+### Step 2: 验证 spawn 成功
+
+执行脚本确认 agent 已正确注册到 team：
+
+```bash
+skills/vibe-review-pr/scripts/agent-exist.sh context-researcher
+```
+
+**期望输出**：
+```
+def=ok, inbox=ok, pane=ok, alive=yes
+```
+
+**失败处理**：
+- `def=missing` → agent 定义文件不存在，检查 `.claude/agents/`
+- `inbox=missing` → agent 未注册到 team，检查 `name` 参数
+- `alive=never` → agent 进程未启动，等待几秒后重试
+- 任意字段异常 → 停止流程，诊断修复后重新 spawn
+
+**禁止跳过验证直接握手**。
+
+### Step 3: 握手 → 分配任务
+
+1. 发送握手信号：`SendMessage(to="context-researcher", summary="握手信号", message="【lead_ready】")`
+2. 等待 `【agent_ready】已就绪` 回复（最多 3 次，每次 30s 超时）
+3. 收到 `【agent_ready】` 后，立即发送正式调研任务：
+
+```yaml
+- tool: SendMessage
+  params:
+    to: "context-researcher"
+    summary: "PR #843 背景调研任务"
+    message: |
+      分析 PR #843 并产出一份结构化背景报告。
+
+      职责：
+      1. 阅读 CLAUDE.md、AGENTS.md、glossary.md、PR description、PR diff
+      2. 不要修改任何文件
+      3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## PR #843 背景报告\n...")
+
+      报告将保存在 team-lead.json inbox 中，后续 agent 通过 scripts/agent-report.sh context-researcher 读取。
+
+      **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+```
+
+**未握手成功前，不得给该 agent 分配任何工作。**
+
+### Step 4: 等待报告
 
 收到 context-researcher 的 idle 通知后:
 
@@ -230,7 +312,7 @@ spawn:
     status: "completed"
 ```
 
-### Step 3: 激活 Phase 2
+### Step 5: 激活 Phase 2
 
 `TaskUpdate(taskId=<phase-2>, status="in_progress")`
 
@@ -257,41 +339,18 @@ spawn:
 
 ### Step 1: 并行 spawn 三个 agent
 
-> **所有 agent prompt 必须包含**: 脚本报错 -> 立即发 `【agent_blocked】`，停止执行。
-
-每个 agent 的 prompt 中告知如何读取前序报告。
-
-code-analyst prompt:
+spawn 时 prompt **只包含握手准备，不包含具体任务**：
 
 ```text
-你是 code-analyst。分析 PR #<number> 的代码质量和技术债。
-
-读取 Phase 1 背景报告：
-  skills/vibe-review-pr/scripts/agent-report.sh context-researcher
-
-完成分析后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 代码质量分析报告\n...")
+你是 code-analyst。等待 team-lead 的握手信号和正式审查任务。不要自行开始工作。
 ```
 
-architect-reviewer prompt:
-
 ```text
-你是 architect-reviewer。审查 PR #<number> 的架构影响。
-
-读取 Phase 1 背景报告：
-  skills/vibe-review-pr/scripts/agent-report.sh context-researcher
-
-完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 架构审查报告\n...")
+你是 architect-reviewer。等待 team-lead 的握手信号和正式审查任务。不要自行开始工作。
 ```
 
-security-reviewer prompt:
-
 ```text
-你是 security-reviewer。审查 PR #<number> 的安全问题。
-
-读取 Phase 1 背景报告：
-  skills/vibe-review-pr/scripts/agent-report.sh context-researcher
-
-完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 安全审查报告\n...")
+你是 security-reviewer。等待 team-lead 的握手信号和正式审查任务。不要自行开始工作。
 ```
 
 spawn:
@@ -299,22 +358,115 @@ spawn:
 ```yaml
 - tool: Agent
   params:
-    as: "code-analyst"
+    description: "代码质量分析"
+    name: "code-analyst"
+    subagent_type: "pr-code-analyst"
     team_name: "pr-review-team"
-    prompt: "<code-analyst prompt>"
+    prompt: "<code-analyst 握手 prompt>"
 - tool: Agent
   params:
-    as: "architect-reviewer"
+    description: "架构审查"
+    name: "architect-reviewer"
+    subagent_type: "pr-architect-reviewer"
     team_name: "pr-review-team"
-    prompt: "<architect-reviewer prompt>"
+    prompt: "<architect-reviewer 握手 prompt>"
 - tool: Agent
   params:
-    as: "security-reviewer"
+    description: "安全审查"
+    name: "security-reviewer"
+    subagent_type: "pr-security-reviewer"
     team_name: "pr-review-team"
-    prompt: "<security-reviewer prompt>"
+    prompt: "<security-reviewer 握手 prompt>"
 ```
 
-### Step 3: 等待全部报告
+### Step 2: 验证 spawn 成功
+
+执行脚本确认所有 agent 已正确注册到 team：
+
+```bash
+skills/vibe-review-pr/scripts/agent-exist.sh
+```
+
+**期望输出**（检查以下三行）：
+```
+code-analyst          pr-code-analyst              ok         ok         ok         yes
+architect-reviewer    pr-architect-reviewer        ok         ok         ok         yes
+security-reviewer     pr-security-reviewer         ok         ok         ok         yes
+```
+
+**失败处理**：
+- 任意 agent 的 `def/inbox/pane/alive` 字段异常 → 停止流程
+- `def=missing` → agent 定义文件不存在，检查 `.claude/agents/`
+- `inbox=missing` → agent 未注册到 team，检查 `name` 参数
+- `alive=never` → agent 进程未启动，等待几秒后重试
+
+**禁止跳过验证直接握手**。
+
+### Step 3: 并行握手 → 分配任务
+
+对每个 agent 执行握手（可并行）：
+
+1. 发送握手信号：`SendMessage(to=<agent>, summary="握手信号", message="【lead_ready】")`
+2. 等待 `【agent_ready】已就绪` 回复（最多 3 次，每次 30s 超时）
+3. 收到 `【agent_ready】` 后，立即发送正式审查任务：
+
+code-analyst 任务：
+
+```yaml
+- tool: SendMessage
+  params:
+    to: "code-analyst"
+    summary: "PR #843 代码质量分析任务"
+    message: |
+      分析 PR #843 的代码质量和技术债。
+
+      读取 Phase 1 背景报告：
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+
+      完成分析后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 代码质量分析报告\n...")
+
+      **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+```
+
+architect-reviewer 任务：
+
+```yaml
+- tool: SendMessage
+  params:
+    to: "architect-reviewer"
+    summary: "PR #843 架构审查任务"
+    message: |
+      审查 PR #843 的架构影响。
+
+      读取 Phase 1 背景报告：
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+
+      完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 架构审查报告\n...")
+
+      **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+```
+
+security-reviewer 任务：
+
+```yaml
+- tool: SendMessage
+  params:
+    to: "security-reviewer"
+    summary: "PR #843 安全审查任务"
+    message: |
+      审查 PR #843 的安全问题。
+
+      读取 Phase 1 背景报告：
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+
+      完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 安全审查报告\n...")
+
+      **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+```
+
+**未握手成功前，不得给该 agent 分配任何工作。**
+
+### Step 4: 等待全部报告
 
 对每个 agent:
 1. 收到 idle 通知 -> `scripts/agent-report.sh <agent>` 检查报告
@@ -457,20 +609,10 @@ auto-fix 且有阻塞问题 — 先提取可修复项，再激活 Phase 5:
 
 ### Step 1: spawn fix-executor
 
-> **Prompt 必须包含**: 脚本报错 -> 立即发 `【agent_blocked】`，停止执行。
-
-lead 将 Phase 4 产出的修复指令直接写入 prompt，fix-executor 不需要读任何前序报告：
+spawn 时 prompt **只包含握手准备，不包含具体任务**：
 
 ```text
-你是 fix-executor。根据 team-lead 提供的修复指令修复 PR #<number>。
-
-修复指令：
-<Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
-
-职责：
-1. 按修复指令逐条执行修复
-2. 不要自行扩大修复范围
-3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 修复报告\n...")
+你是 fix-executor。等待 team-lead 的握手信号和正式修复任务。不要自行开始工作。
 ```
 
 spawn:
@@ -478,14 +620,61 @@ spawn:
 ```yaml
 - tool: Agent
   params:
-    as: "fix-executor"
+    description: "修复执行"
+    name: "fix-executor"
+    subagent_type: "pr-fix-executor"
     team_name: "pr-review-team"
-    prompt: "<上述 prompt，包含 Phase 4 修复指令>"
+    prompt: "<上述握手 prompt>"
 ```
 
-### Step 2: 等待修复报告
+### Step 2: 验证 spawn 成功
 
-### Step 3: 修复完成
+执行脚本确认 agent 已正确注册到 team：
+
+```bash
+skills/vibe-review-pr/scripts/agent-exist.sh fix-executor
+```
+
+**期望输出**：
+```
+def=ok, inbox=ok, pane=ok, alive=yes
+```
+
+**失败处理**：
+- 验证失败 → 停止流程，诊断修复后重新 spawn
+
+**禁止跳过验证直接握手**。
+
+### Step 3: 握手 → 分配任务
+
+1. 发送握手信号：`SendMessage(to="fix-executor", summary="握手信号", message="【lead_ready】")`
+2. 等待 `【agent_ready】已就绪` 回复（最多 3 次，每次 30s 超时）
+3. 收到 `【agent_ready】` 后，立即发送正式修复任务：
+
+```yaml
+- tool: SendMessage
+  params:
+    to: "fix-executor"
+    summary: "PR #843 修复任务"
+    message: |
+      根据 team-lead 提供的修复指令修复 PR #843。
+
+      修复指令：
+      <Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
+
+      职责：
+      1. 按修复指令逐条执行修复
+      2. 不要自行扩大修复范围
+      3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 修复报告\n...")
+
+      **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+```
+
+**未握手成功前，不得给该 agent 分配任何工作。**
+
+### Step 4: 等待修复报告
+
+### Step 5: 修复完成
 
 标记 Phase 5 完成 -> 清理。
 
@@ -532,12 +721,15 @@ scripts/agent-report.sh code-analyst    # 完整报告正文
 3. 若仅有 `agent_ready` -> 检查报告是否未发送，是则 SendMessage 提醒
 4. 若 `event_status=missing` -> `scripts/agent-exist.sh <agent>` 诊断
 
+详细消息样例见 `references/execution-reference.md`。
+
 # [附录 C] 恢复
 
 Agent 失联:
 
 1. `scripts/agent-exist.sh <agent>` 诊断
-2. `SendMessage(to=<agent>, message="lead_ready")` 测试握手
-3. 3 次超时 -> 重新 `Agent(as=<agent>, team_name="pr-review-team")` spawn
+2. `SendMessage(to=<agent>, summary="握手测试", message="【lead_ready】")` 测试握手
+3. 3 次超时 -> 重新 `Agent(name=<agent>, subagent_type=pr-<agent>, team_name="pr-review-team")` spawn
 
 详细恢复流程见 `references/recovery-playbook.md`。
+常见诊断问题见 `references/debug-guide.md`。
