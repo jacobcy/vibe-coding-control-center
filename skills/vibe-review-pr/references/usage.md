@@ -1,260 +1,137 @@
-# vibe-review-pr runtime usage
+# vibe-review-pr 运行时参考
 
-这份文档只定义 `vibe-review-pr` 在运行时新增的两个事件与两个 shell 脚本。
-
-目标很简单：
-
-- `【agent_ready】` 继续保留，作为握手与通信检查事件
-- `【agent_report】` 可以作为报告标记，但不是强制前提
-- agent 名称和 agent type 的关系只认 `runtime/agents.sh`
-- 报告提取只认 `team-lead.json`
-- shell 只做核验，不做流程控制
+这份文档定义 vibe-review-pr 的运行约束和事件规范。执行流程（Phase 0-5）以 `SKILL.md` 为准。
 
 ## 真源文件
 
 - agent 清单：`skills/vibe-review-pr/runtime/agents.sh`
 - 公共函数：`skills/vibe-review-pr/scripts/lib.sh`
-- ready 检查：`skills/vibe-review-pr/scripts/agent-ready.sh`
+- 存在性检查：`skills/vibe-review-pr/scripts/agent-exist.sh`
+- 事件列表：`skills/vibe-review-pr/scripts/agent-event.sh`
 - 报告提取：`skills/vibe-review-pr/scripts/agent-report.sh`
 
 ## 定义约束
 
-`runtime/agents.sh` 只保留 3 类信息：
-
-1. `group`
-2. `agent_name`
-3. `agent_type`
-
-其他路径全部推断：
+`runtime/agents.sh` 只保留 3 类信息：`group`、`agent_name`、`agent_type`。所有路径全部推断：
 
 - agent inbox: `~/.claude/teams/<group>/inboxes/<agent_name>.json`
 - lead inbox: `~/.claude/teams/<group>/inboxes/team-lead.json`
 - agent definition: `.claude/agents/<agent_type>.md`
-- `SendMessage(to=...)`: 必须使用 `agent_name`
-- `team-lead.json` 中的 `.from`: 必须等于 `agent_name`
+- 报告归宿: `team-lead.json` 中 `.from == <agent_name>` 的消息
 
-## 事件格式
+## 事件规格
 
-### 1. Ready 事件
+### 事件前缀
 
-保留原来的 ready 语义，不要求额外字段。
+**Prompt 层**：所有 agent 使用中文方括号 `【事件类型】`。
 
-```text
+**Shell 层**：脚本同时兼容英文方括号 `[事件类型]`（处理历史数据）。
+
+### 事件类型
+
+| 事件类型 | 语义 | 强制性 |
+|---------|------|--------|
+| `agent_ready` | 握手就绪 | 强制 |
+| `agent_report` | 任务完成报告 | 强制 |
+
+可选事件类型：`agent_progress`、`agent_blocked`、`agent_handoff`。
+
+### 事件格式
+
+```
 【agent_ready】已就绪
 ```
 
-规则：
+报告建议以 `【agent_report】` 开头：
 
-- 发送者不需要重复写 `agent_name`
-- `agent_name` 直接从 `team-lead.json` 的 `.from` 推断
-- `agent_type` 通过 `runtime/agents.sh` 反查
-
-### 2. Report 事件
-
-推荐正式报告使用 `【agent_report】` 开头，这样最容易提取。
-
-```text
+```
 【agent_report】
 
 ## PR #843 架构审查报告
 ...
-```
-
-规则：
-
-- 事件头和正文之间建议空一行
-- 如果历史消息没有 `【agent_report】`，脚本会回退提取“像报告的消息”
-- “像报告”目前指：`## PR #` / `# PR #` / 包含”审查报告” / 包含”背景报告”
-
-## 新增事件类型与验证脚本
-
-### 事件前缀格式要求
-
-**Prompt 层要求**：所有 agent 必须使用中文方括号 `【事件类型】`
-
-**Shell 层兼容**：脚本同时兼容英文方括号 `[事件类型]`（处理历史数据）
-
-### 强制事件类型
-
-| 事件类型 | 语义 | 强制性 |
-|---------|------|--------|
-| `agent_ready` | 握手就绪 | **强制** |
-| `agent_report` | 任务完成报告 | **强制** |
-
-### 可选事件类型
-
-- `agent_progress` — 进度更新
-- `agent_blocked` — 任务阻塞
-- `agent_handoff` — 任务交接
-
-### agent-event.sh 通用事件提取脚本
-
-替代特定场景的快捷入口（`agent-ready.sh`、`agent-report.sh`），支持参数化事件类型。
-
-**用法**：
-
-```bash
-# 检查握手事件是否存在
-skills/vibe-review-pr/scripts/agent-event.sh context-researcher agent_ready --latest
-
-# 输出示例：
-# event_type=agent_ready
-# agent=context-researcher
-# timestamp=2026-05-13T10:00:00.000Z
-# content_start
-# 【agent_ready】已就绪
-
-# 提取最新报告
-skills/vibe-review-pr/scripts/agent-event.sh architect-reviewer agent_report --latest
-
-# 列出所有进度更新
-skills/vibe-review-pr/scripts/agent-event.sh code-analyst agent_progress
-
-# 检查事件不存在
-skills/vibe-review-pr/scripts/agent-event.sh architect-reviewer agent_report --latest
-# 输出：event_type=agent_report event_status=missing（退出码 3）
-```
-
-**输出格式**：
-- 默认：列出所有匹配事件，用 `---` 分隔
-- `--latest`：只输出最新事件
-- 格式字段：`event_type`、`agent`、`timestamp`、`content_start`、[实际内容]
-
-**Team-lead 验证流程**：
-
-收到 agent idle 通知后：
-
-```bash
-# 1. 检查握手事件
-skills/vibe-review-pr/scripts/agent-event.sh <agent> agent_ready --latest
-
-# 2. 检查报告事件
-skills/vibe-review-pr/scripts/agent-event.sh <agent> agent_report --latest
-
-# 3. 如 event_status=missing → 检查 pane 诊断
-tmux capture-pane -t <pane-id> -p -S -1000 | grep -E “ToolSearch|SendMessage|InputValidationError”
 ```
 
 ## 脚本用法
 
-### 新增：通用事件提取脚本 agent-event.sh
+### `agent-exist.sh` — 存在性检查
 
-以下两个脚本保留为特定场景快捷入口，推荐使用通用脚本 `agent-event.sh`：
-
-- `agent-exist.sh` — 存在性检查（definition、inbox、pane）
-- `agent-report.sh` — 报告提取（等同于 `agent-event.sh <agent> agent_report --latest`）
-
-### `agent-exist.sh`
-
-检查 agent 的三层存在性：definition 文件、inbox 文件、tmux pane。
-
-不带参数时，列出所有定义的 agent 及其存在状态：
+检查 agent 的三层存在性：definition 文件、inbox 文件、tmux pane + alive 状态。
 
 ```bash
+# 列出所有 agent 状态
 skills/vibe-review-pr/scripts/agent-exist.sh
+
+# 检查单个 agent
+skills/vibe-review-pr/scripts/agent-exist.sh context-researcher
 ```
 
-输出示例：
+输出包含：agent、type、definition、inbox、pane、alive、suggestion。
 
-```text
-group=pr-review-team
-team_inbox_dir=/Users/you/.claude/teams/pr-review-team/inboxes
-agent                  type                         definition inbox      pane      
-context-researcher     pr-context-researcher        ok         ok         ok        
-code-analyst           pr-code-analyst              ok         ok         ok        
-architect-reviewer     pr-architect-reviewer        ok         ok         ok        
-security-reviewer      pr-security-reviewer         ok         ok         ok        
-fix-executor           pr-fix-executor              ok         missing    ok        
-```
+### `agent-event.sh` — 事件概览
 
-检查单个 agent：
+列出 agent 在 team-lead inbox 中的所有事件（只看标题和时间戳，不看详情）。
 
 ```bash
-skills/vibe-review-pr/scripts/agent-exist.sh architect-reviewer
+# 列出所有 agent 的最新事件
+skills/vibe-review-pr/scripts/agent-event.sh
+
+# 列出某个 agent 的所有事件
+skills/vibe-review-pr/scripts/agent-event.sh context-researcher
 ```
 
-可能输出：
+查看完整内容直接读 inbox JSON 文件。
 
-```text
-agent                  type                         definition inbox      pane      
-architect-reviewer     pr-architect-reviewer        ok         ok         ok        
-ready_event=found
-from=architect-reviewer
-timestamp=2026-05-12T13:31:07.117Z
-text=【agent_ready】已就绪
-```
+### `agent-report.sh` — 报告提取
 
-如果没找到 ready 事件：
-
-```text
-ready_event=missing
-```
-
-### `agent-report.sh`
-
-从 `team-lead.json` 提取某个 agent 的最新报告样消息。
+提取 agent 的完整报告内容。
 
 ```bash
-skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
+# 列出所有 agent 的报告状态
+skills/vibe-review-pr/scripts/agent-report.sh
+
+# 提取单个 agent 的报告
+skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 ```
 
-默认输出 metadata + 正文：
+输出：agent 名 + timestamp + 完整报告正文。
 
-```text
-agent=architect-reviewer
-timestamp=2026-05-12T13:37:06.001Z
-body_start
+## 执行模型
 
-## PR #843 架构审查报告
-...
+### 核心原则
+
+- **不再使用 backlog 做参数传递**。backlog 不可靠，不再通过 TaskCreate/TaskUpdate 传递报告或状态。
+- **下游 agent 直接读报告**。Phase 2 的 agent 读 Phase 1 报告；Phase 3 (codex) 读 Phase 1 + Phase 2 报告。team-lead 不转发。
+- **Phase 0 一次创建完整 backlog**。Phase 0 结束时创建全部 Phase 1-5 的 backlog task，不再逐 Phase 增量创建。
+- **不再逐 Step 更新 backlog**。backlog task 只做完成/阻塞标记，不存储报告内容。
+- **报告清理**。审查完成后清理 backlog（TaskCreate 创建的全部 task）。
+
+### Agent 读取链
+
+```
+Phase 1: context-researcher → team-lead.json (【agent_report】)
+Phase 2: code-analyst       → 读 team-lead.json context-researcher 的报告
+         architect-reviewer → 读 team-lead.json context-researcher 的报告
+         security-reviewer  → 读 team-lead.json context-researcher 的报告
+Phase 3: codex              → 读 team-lead.json Phase 1 + Phase 2 的所有报告
+Phase 5: fix-executor       → 读 team-lead.json 所有审查报告
 ```
 
-只输出正文：
+**读取方式**：每个 subagent 被 spawn 时，prompt 中包含前序 agent 的报告内容（team-lead 通过 `agent-report.sh` 提取后写入 prompt）。subagent 不需要自己跑脚本。
 
-```bash
-skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer --body-only
-```
+> 更精确的读取方式以 SKILL.md 各 Phase Steps 为准。上表描述的是信息流向，不是 shell 调用方式。
 
-## 推荐运行方式
+### Team-lead 职责
 
-### Team-lead
+1. Phase 0: 环境检查 → 创建/复用 Team → 创建完整 backlog
+2. 每个 Phase: spawn agent → 等待 `【agent_report】` → 标记完成
+3. idle 处理: 跑 `agent-event.sh <agent> agent_report --latest`（或直接用 `agent-report.sh` 检查），不是人工判断
+4. Phase 4: 汇总报告 → 输出结论
+5. 审查完成: 清理 backlog team
+6. **不转发报告**。下游 agent 在自己的 prompt 里已经有前序报告内容。
 
-1. 先跑 `agent-exist.sh`
-2. 确认 agent 名称、type、definition/inbox/pane 都一致
-3. 发送 `【lead_ready】`
-4. 用 `agent-event.sh <agent> agent_ready --latest` 检查 ready 是否出现
-5. 下发正式任务时，最好要求 agent 用 `【agent_report】` 开头发报告
-6. 用 `agent-report.sh` 提取报告，不再靠猜哪条是有效报告
+### Subagent 职责
 
-### Subagent
-
-握手仍然按原协议执行，但正式报告请统一用下面格式发回 `team-lead`：
-
-```text
-【agent_report】
-
-<你的完整报告正文>
-```
-
-## 设计边界
-
-这些脚本解决的是：
-
-- agent 名字是否定义清楚
-- definition 文件是否存在
-- inbox 文件是否存在
-- tmux pane 是否真正运行（检测 pane 标题 + claude 进程）
-- `【agent_ready】` 是否真的出现在 lead inbox
-- 报告消息是否真的存在，以及如何稳定提取
-
-这些脚本**不负责**：
-
-- 直接推进 backlog 状态
-- 自动判断 phase 是否完成
-- 改写现有握手协议
-
-也就是说：
-
-- backlog 仍可保留
-- handshake 仍可保留
-- 但存在性检查和报告提取从现在开始有 shell 真源，不再靠 lead 或 agent 口头判断
+1. 启动后发送 `【agent_ready】已完成 ToolSearch`
+2. 执行任务
+3. 完成后发送 `【agent_report】` + 完整报告
+4. 报告直接发到 team-lead（SendMessage），这就是报告的唯一真源
