@@ -72,8 +72,9 @@ print_agent_row "$AGENT_NAME" "$GROUP_NAME"
 
 LEAD_INBOX="$(lead_inbox_path "$GROUP_NAME")"
 if [[ ! -f "$LEAD_INBOX" ]]; then
+  echo "ready_event=waiting"
   echo "lead inbox not found: $LEAD_INBOX" >&2
-  exit 1
+  exit 0
 fi
 
 jq -r \
