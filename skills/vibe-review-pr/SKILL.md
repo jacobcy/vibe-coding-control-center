@@ -135,7 +135,11 @@ stop() → 输出错误原因 → 等待用户指示
 
 ### 下游 Agent 遇到错误
 
-Agent 执行过程中遇到脚本错误或参数错误，必须立即发送 `【agent_blocked】` 并停止当前任务。
+Agent 执行过程中遇到**任何错误**，必须立即发送 `【agent_blocked】` 并停止当前任务：
+
+- 工具调用返回错误（不管原因）
+- 脚本执行返回非零退出码
+- 任何未预期的行为
 
 ```
 【agent_blocked】脚本 agent-report.sh 执行失败：agent xxx not defined
