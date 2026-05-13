@@ -221,7 +221,7 @@ spawn:
 
 1. `scripts/agent-report.sh context-researcher` 检查报告是否到达
 2. 无报告 -> `scripts/agent-exist.sh context-researcher` 诊断
-3. 有报告 -> 保存为变量，标记 Phase 1 完成
+3. 有报告 -> 标记 Phase 1 完成
 
 ```yaml
 - tool: TaskUpdate

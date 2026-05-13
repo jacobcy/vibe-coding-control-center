@@ -20,7 +20,7 @@ PR 审查 skill，基于 Claude Code Agent Teams 多 agent 协作。
 ## 设计原则
 
 - **报告在 inbox，不在 backlog**。agent 报告存在 team-lead.json，不通过 TaskCreate metadata 传递
-- **下游 agent 自己读上游**。Phase 2 agent 自己跑 `agent-report.sh` 读 Phase 1 报告，Phase 3 读 Phase 1+2。team-lead 不转发、不注入。
+- **下游 agent 自己读上游**。Phase 2 agent 自己跑 `agent-report.sh` 读 Phase 1 报告。codex 是外部 plugin（通过 codex:rescue 调用），fix-executor 接收 Phase 4 修复指令。team-lead 不转发、不注入。
 - **脚本做验证**。agent-exist/event/report.sh 提供事实，不由 lead 口头判断
 - **简化握手**。无 polling/poking/spawned/isActive 等概念，握手即存活检测
 

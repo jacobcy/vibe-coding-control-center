@@ -100,7 +100,9 @@ skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 ### 核心原则
 
 - **不再使用 backlog 做参数传递**。backlog 不可靠，不再通过 TaskCreate/TaskUpdate 传递报告或状态。
-- **下游 agent 直接读报告**。Phase 2 的 agent 读 Phase 1 报告；Phase 3 (codex) 读 Phase 1 + Phase 2 报告。team-lead 不转发。
+- **下游 teammate 自己跑脚本读报告**。Phase 2 的 agent prompt 中包含 `agent-report.sh context-researcher` 命令，自行读取 Phase 1 报告。team-lead 不提取、不转发。
+- **fix-executor 不读报告**。Phase 5 的 fix-executor 接收 Phase 4 lead 产出的具体修复指令，不自己读审查报告。
+- **codex 是外部 plugin**。通过 `codex:rescue` skill 调用，不是 teammate。lead 提取报告拼接材料包后调用。输出由 skill 直接返回。
 - **Phase 0 一次创建完整 backlog**。Phase 0 结束时创建全部 Phase 1-5 的 backlog task，不再逐 Phase 增量创建。
 - **不再逐 Step 更新 backlog**。backlog task 只做完成/阻塞标记，不存储报告内容。
 - **报告清理**。审查完成后清理 backlog（TaskCreate 创建的全部 task）。
@@ -109,25 +111,28 @@ skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
 ```
 Phase 1: context-researcher → team-lead.json (【agent_report】)
-Phase 2: code-analyst       → 读 team-lead.json context-researcher 的报告
-         architect-reviewer → 读 team-lead.json context-researcher 的报告
-         security-reviewer  → 读 team-lead.json context-researcher 的报告
-Phase 3: codex              → 读 team-lead.json Phase 1 + Phase 2 的所有报告
-Phase 5: fix-executor       → 读 team-lead.json 所有审查报告
+Phase 2: code-analyst       → prompt 中跑 agent-report.sh context-researcher
+         architect-reviewer → prompt 中跑 agent-report.sh context-researcher
+         security-reviewer  → prompt 中跑 agent-report.sh context-researcher
+Phase 3: codex              → lead 提取 Phase 1+2 报告 → 拼接材料包 → 调用 codex:rescue skill
+Phase 5: fix-executor       → lead 写入 Phase 4 修复指令到 prompt（不读报告）
 ```
 
-**读取方式**：每个 subagent 被 spawn 时，prompt 中包含前序 agent 的报告内容（team-lead 通过 `agent-report.sh` 提取后写入 prompt）。subagent 不需要自己跑脚本。
+**读取方式**：
+- Phase 2 agent：prompt 中告知 `skills/vibe-review-pr/scripts/agent-report.sh context-researcher`，agent 自行执行脚本读取
+- Phase 3 codex：lead 跑 agent-report.sh 提取所有 teammate 报告 → 拼接材料包 → 传入 codex:rescue skill
+- Phase 5 fix-executor：lead 将 Phase 4 结论中的修复指令直接写入 prompt，fix-executor 不跑任何 agent-report.sh
 
-> 更精确的读取方式以 SKILL.md 各 Phase Steps 为准。上表描述的是信息流向，不是 shell 调用方式。
+> 更精确的读取方式以 SKILL.md 各 Phase Steps 为准。
 
 ### Team-lead 职责
 
 1. Phase 0: 环境检查 → 创建/复用 Team → 创建完整 backlog
 2. 每个 Phase: spawn agent → 等待 `【agent_report】` → 标记完成
-3. idle 处理: 跑 `agent-event.sh <agent> agent_report --latest`（或直接用 `agent-report.sh` 检查），不是人工判断
+3. idle 处理: 跑 `agent-event.sh <agent>` + `agent-report.sh <agent>` 检查，不是人工判断
 4. Phase 4: 汇总报告 → 输出结论
 5. 审查完成: 清理 backlog team
-6. **不转发报告**。下游 agent 在自己的 prompt 里已经有前序报告内容。
+6. **不转发报告**。Phase 2 agent 自行通过 prompt 中的 agent-report.sh 命令读取；Phase 5 fix-executor 接收修复指令。
 
 ### Subagent 职责
 
