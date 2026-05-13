@@ -676,9 +676,14 @@ spawn:
     prompt: "<上述握手 prompt>"
 ```
 
-### Step 2: 验证 spawn 成功
+### Step 2: 握手
 
-执行脚本确认 agent 已正确注册到 team：
+1. 发送握手信号：`SendMessage(to="fix-executor", summary="握手信号", message="【lead_ready】")`
+2. 等待 `【agent_ready】已就绪` 回复（最多 3 次，每次 30s 超时）
+
+### Step 3: 验证握手成功 → 分配任务
+
+1. 执行脚本验证握手成功：
 
 ```bash
 skills/vibe-review-pr/scripts/agent-exist.sh fix-executor
@@ -686,19 +691,18 @@ skills/vibe-review-pr/scripts/agent-exist.sh fix-executor
 
 **期望输出**：
 ```
-def=ok, inbox=ok, pane=ok, alive=yes
+ready_event=found
+from=fix-executor
+timestamp=...
+text=【agent_ready】已就绪
 ```
 
-**失败处理**：
-- 验证失败 → 停止流程，诊断修复后重新 spawn
+**验证失败处理**：
+- `ready_event=waiting/missing` → 重试握手（最多 3 次）
+- `alive=no` → 重新 spawn + 握手（最多 3 次）
+- 重试失败 → `stop()` 等待用户指示
 
-**禁止跳过验证直接握手**。
-
-### Step 3: 握手 → 分配任务
-
-1. 发送握手信号：`SendMessage(to="fix-executor", summary="握手信号", message="【lead_ready】")`
-2. 等待 `【agent_ready】已就绪` 回复（最多 3 次，每次 30s 超时）
-3. 收到 `【agent_ready】` 后，立即发送正式修复任务：
+2. 验证通过后，立即发送正式修复任务：
 
 ```yaml
 - tool: SendMessage
@@ -719,7 +723,7 @@ def=ok, inbox=ok, pane=ok, alive=yes
       **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
 ```
 
-**未握手成功前，不得给该 agent 分配任何工作。**
+**未验证握手成功前，不得给该 agent 分配任何工作。**
 
 ### Step 4: 等待修复报告
 
