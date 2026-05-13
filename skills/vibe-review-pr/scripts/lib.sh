@@ -79,8 +79,8 @@ agent_definition_path() {
 }
 
 print_agent_table_header() {
-  printf '%-22s %-28s %-10s %-10s %-10s\n' \
-    "agent" "type" "definition" "inbox" "pane"
+  printf '%-22s %-28s %-10s %-10s %-10s %-15s %s\n' \
+    "agent" "type" "def" "inbox" "pane" "alive" "suggestion"
 }
 
 check_pane_exists() {
@@ -105,14 +105,112 @@ check_pane_exists() {
   fi
 }
 
+check_last_alive() {
+  local agent_name="$1"
+  local lead_inbox="$2"
+  local now last_timestamp last_epoch age
+
+  # 如果 lead_inbox 不存在，返回 never
+  if [[ ! -f "$lead_inbox" ]]; then
+    echo "never"
+    return
+  fi
+
+  now=$(date +%s)
+
+  # 提取最新消息时间戳
+  last_timestamp=$(jq -r --arg agent "$agent_name" '
+    map(select(.from == $agent))
+    | .[-1]
+    | .timestamp // empty
+  ' "$lead_inbox" 2>/dev/null)
+
+  if [[ -z "$last_timestamp" ]]; then
+    echo "never"
+    return
+  fi
+
+  # 解析 ISO 8601 时间戳（去掉毫秒和 Z）
+  # 例如：2026-05-13T04:35:33.664Z -> 2026-05-13T04:35:33
+  local ts_clean="${last_timestamp%%.*}Z"
+  last_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts_clean" +%s 2>/dev/null || echo "0")
+
+  if [[ "$last_epoch" -eq 0 ]]; then
+    echo "never"
+    return
+  fi
+
+  age=$((now - last_epoch))
+
+  # 判断状态并输出
+  if [[ $age -lt 10 ]]; then
+    echo "active (${age}s)"
+  elif [[ $age -lt 60 ]]; then
+    echo "idle (${age}s)"
+  elif [[ $age -lt 300 ]]; then
+    echo "stale (${age}s)"
+  else
+    echo "inactive (${age}s)"
+  fi
+}
+
+get_status_suggestion() {
+  local definition="$1"
+  local inbox="$2"
+  local pane="$3"
+  local alive="$4"
+
+  # 层级检查：definition 必须先存在
+  if [[ "$definition" == "missing" ]]; then
+    echo "fix definition file first"
+    return
+  fi
+
+  # inbox 缺失：未启动
+  if [[ "$inbox" == "missing" ]]; then
+    echo "spawn agent"
+    return
+  fi
+
+  # pane 缺失但 inbox 存在：历史启动过但当前不在运行
+  if [[ "$pane" == "missing" ]]; then
+    echo "check if agent crashed, respawn if needed"
+    return
+  fi
+
+  # pane 存在，检查 alive 状态
+  if [[ "$alive" == never ]]; then
+    echo "agent spawned but never sent messages, check logs"
+  elif [[ "$alive" =~ inactive ]]; then
+    # 从 inactive 中提取时间
+    local age="${alive#inactive (}"
+    age="${age%s)}"
+    if [[ "$age" -gt 3600 ]]; then
+      echo "agent inactive for long time (${age}s), may need restart"
+    else
+      echo "agent inactive (${age}s), send handshake to verify"
+    fi
+  elif [[ "$alive" =~ stale ]]; then
+    echo "agent stale, may be stuck"
+  elif [[ "$alive" =~ idle ]]; then
+    echo "agent idle, available for task"
+  elif [[ "$alive" =~ active ]]; then
+    echo "agent active, working on task"
+  else
+    echo "unknown status"
+  fi
+}
+
 print_agent_row() {
   local agent_name="$1"
   local group_name="$2"
-  local agent_type definition_path inbox_path definition_status inbox_status pane_status
+  local agent_type definition_path inbox_path lead_inbox_path
+  local definition_status inbox_status pane_status alive_status suggestion
 
   agent_type="$(agent_type_for "$agent_name")"
   definition_path="$(agent_definition_path "$agent_name")"
   inbox_path="$(agent_inbox_path "$group_name" "$agent_name")"
+  lead_inbox_path="$(lead_inbox_path "$group_name")"
 
   if [[ -f "$definition_path" ]]; then
     definition_status="ok"
@@ -132,6 +230,9 @@ print_agent_row() {
     pane_status="missing"
   fi
 
-  printf '%-22s %-28s %-10s %-10s %-10s\n' \
-    "$agent_name" "$agent_type" "$definition_status" "$inbox_status" "$pane_status"
+  alive_status=$(check_last_alive "$agent_name" "$lead_inbox_path")
+  suggestion=$(get_status_suggestion "$definition_status" "$inbox_status" "$pane_status" "$alive_status")
+
+  printf '%-22s %-28s %-10s %-10s %-10s %-15s %s\n' \
+    "$agent_name" "$agent_type" "$definition_status" "$inbox_status" "$pane_status" "$alive_status" "$suggestion"
 }
