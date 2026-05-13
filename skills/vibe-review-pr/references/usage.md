@@ -141,15 +141,17 @@ tmux capture-pane -t <pane-id> -p -S -1000 | grep -E “ToolSearch|SendMessage|I
 
 以下两个脚本保留为特定场景快捷入口，推荐使用通用脚本 `agent-event.sh`：
 
-- `agent-ready.sh` — 握手检查（等同于 `agent-event.sh <agent> agent_ready --latest`）
+- `agent-exist.sh` — 存在性检查（definition、inbox、pane）
 - `agent-report.sh` — 报告提取（等同于 `agent-event.sh <agent> agent_report --latest`）
 
-### `agent-ready.sh`
+### `agent-exist.sh`
 
-不带参数时，列出所有定义的 agent，以及 inbox 是否存在。
+检查 agent 的三层存在性：definition 文件、inbox 文件、tmux pane。
+
+不带参数时，列出所有定义的 agent 及其存在状态：
 
 ```bash
-skills/vibe-review-pr/scripts/agent-ready.sh
+skills/vibe-review-pr/scripts/agent-exist.sh
 ```
 
 输出示例：
@@ -157,37 +159,32 @@ skills/vibe-review-pr/scripts/agent-ready.sh
 ```text
 group=pr-review-team
 team_inbox_dir=/Users/you/.claude/teams/pr-review-team/inboxes
-agent                  type                         definition inbox      status
-context-researcher     pr-context-researcher       ok         ok         spawned
-code-analyst           pr-code-analyst             ok         ok         spawned
-architect-reviewer     pr-architect-reviewer       ok         ok         spawned
-security-reviewer      pr-security-reviewer        ok         missing    not-spawned
+agent                  type                         definition inbox      pane      
+context-researcher     pr-context-researcher        ok         ok         ok        
+code-analyst           pr-code-analyst              ok         ok         ok        
+architect-reviewer     pr-architect-reviewer        ok         ok         ok        
+security-reviewer      pr-security-reviewer         ok         ok         ok        
+fix-executor           pr-fix-executor              ok         missing    ok        
 ```
 
 检查单个 agent：
 
 ```bash
-skills/vibe-review-pr/scripts/agent-ready.sh architect-reviewer
-```
-
-检查某个 agent 是否发过 ready：
-
-```bash
-skills/vibe-review-pr/scripts/agent-ready.sh architect-reviewer
+skills/vibe-review-pr/scripts/agent-exist.sh architect-reviewer
 ```
 
 可能输出：
 
 ```text
-agent                  type                         definition inbox      status
-architect-reviewer     pr-architect-reviewer       ok         ok         spawned
+agent                  type                         definition inbox      pane      
+architect-reviewer     pr-architect-reviewer        ok         ok         ok        
 ready_event=found
 from=architect-reviewer
 timestamp=2026-05-12T13:31:07.117Z
 text=【agent_ready】已就绪
 ```
 
-如果没找到：
+如果没找到 ready 事件：
 
 ```text
 ready_event=missing
@@ -222,10 +219,10 @@ skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer --body-only
 
 ### Team-lead
 
-1. 先跑 `agent-ready.sh`
-2. 确认 agent 名称、type、inbox 文件都一致
+1. 先跑 `agent-exist.sh`
+2. 确认 agent 名称、type、definition/inbox/pane 都一致
 3. 发送 `【lead_ready】`
-4. 用 `agent-ready.sh <agent>` 检查 ready 是否出现
+4. 用 `agent-event.sh <agent> agent_ready --latest` 检查 ready 是否出现
 5. 下发正式任务时，最好要求 agent 用 `【agent_report】` 开头发报告
 6. 用 `agent-report.sh` 提取报告，不再靠猜哪条是有效报告
 
@@ -244,7 +241,9 @@ skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer --body-only
 这些脚本解决的是：
 
 - agent 名字是否定义清楚
+- definition 文件是否存在
 - inbox 文件是否存在
+- tmux pane 是否真正运行（检测 pane 标题 + claude 进程）
 - `【agent_ready】` 是否真的出现在 lead inbox
 - 报告消息是否真的存在，以及如何稳定提取
 
@@ -258,4 +257,4 @@ skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer --body-only
 
 - backlog 仍可保留
 - handshake 仍可保留
-- 但报告提取和 ready 检查从现在开始有 shell 真源，不再靠 lead 或 agent 口头判断
+- 但存在性检查和报告提取从现在开始有 shell 真源，不再靠 lead 或 agent 口头判断
