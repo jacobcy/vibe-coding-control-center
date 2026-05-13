@@ -28,8 +28,9 @@ description: |
 | code-analyst | pr-code-analyst | 2 | `scripts/agent-report.sh context-researcher` |
 | architect-reviewer | pr-architect-reviewer | 2 | `scripts/agent-report.sh context-researcher` |
 | security-reviewer | pr-security-reviewer | 2 | `scripts/agent-report.sh context-researcher` |
-| codex | pr-codex | 3 | `scripts/agent-report.sh context-researcher` + `scripts/agent-report.sh code-analyst` + `scripts/agent-report.sh architect-reviewer` + `scripts/agent-report.sh security-reviewer` |
 | fix-executor | pr-fix-executor | 5 | Phase 4 结论中提取的修复指令（lead 直接写入 prompt） |
+
+> **codex 是外部 plugin**，通过 `codex:rescue` skill 调用，不是 teammate。不在 agents.sh 中，不能用 agent-report.sh 读取。输出由 skill 调用直接返回给 lead。
 
 真源文件：`skills/vibe-review-pr/runtime/agents.sh`
 
@@ -123,7 +124,7 @@ Phase 3:
 - tool: TaskCreate
   params:
     subject: "Phase 3: Codex 复查"
-    description: "spawn codex -> 等待报告 -> 标记完成"
+    description: "调用 codex:rescue skill -> 等待复查结果 -> 标记完成"
     metadata:
       phase_order: 3
       depends_on_phase: 2
@@ -344,37 +345,37 @@ spawn:
 
 ## Steps
 
-### Step 1: spawn codex
+### Step 1: 提取 Phase 1+2 报告，调用 codex:rescue
 
-> **Prompt 必须包含**: 脚本报错 -> 立即发 `【agent_blocked】`，停止执行。
+lead 先提取 teammate 报告，拼接为材料包，再调用 codex:rescue skill：
 
-```text
-你是 codex。复查 PR #<number> 的全部审查报告，给出综合评估。
-
-读取 Phase 1 背景报告：
-  skills/vibe-review-pr/scripts/agent-report.sh context-researcher
-
-读取 Phase 2 专家评审：
-  skills/vibe-review-pr/scripts/agent-report.sh code-analyst
-  skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
-  skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
-
-完成复查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## Codex 复查报告\n...")
+```bash
+# 提取所有 teammate 报告
+skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+skills/vibe-review-pr/scripts/agent-report.sh code-analyst
+skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
+skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
 ```
-
-spawn:
 
 ```yaml
-- tool: Agent
+# 调用 codex:rescue 做第三方复查
+- tool: Skill
   params:
-    as: "codex"
-    team_name: "pr-review-team"
-    prompt: "<codex prompt>"
+    skill: codex:rescue
+    args: |
+      ## PR #<number> 审查材料包
+
+      <拼接的 Phase 1+2 报告>
+
+      请基于以上审查报告进行独立验证，给出第三方评估意见。
+      重点关注：是否有遗漏、结论是否一致、建议是否可行。
 ```
 
-### Step 2: 等待报告 -> 激活 Phase 4
+> codex 是外部 plugin，不是 teammate。其输出由 skill 调用直接返回给 lead，不需要 agent-report.sh。
 
-收到 idle 通知 -> `scripts/agent-report.sh codex` 检查报告 -> 标记完成 -> 激活 Phase 4。
+### Step 2: 收到 codex 复查结果 -> 激活 Phase 4
+
+标记 Phase 3 完成，激活 Phase 4。
 
 ## Contracts
 
@@ -394,10 +395,12 @@ spawn:
 ### Step 1: 提取所有报告
 
 ```bash
-for agent in context-researcher code-analyst architect-reviewer security-reviewer codex; do
+for agent in context-researcher code-analyst architect-reviewer security-reviewer; do
   skills/vibe-review-pr/scripts/agent-report.sh "$agent"
 done
 ```
+
+> codex 复查结果已在 Phase 3 由 skill 调用直接返回，不在 inbox 中。
 
 ### Step 2: 输出审查结论
 
