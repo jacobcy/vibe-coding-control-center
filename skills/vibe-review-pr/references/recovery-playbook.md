@@ -4,7 +4,7 @@
 
 1. `skills/vibe-review-pr/scripts/agent-exist.sh <agent>` 查看状态
 2. 若 pane=missing: 重新 spawn
-3. 若 alive=inactive/stale: `SendMessage(to=<agent>, message="lead_ready")` 测试握手
+3. 若 alive=inactive/stale: `SendMessage(to=<agent>, message="【lead_ready】")` 测试握手
 4. 3 次超时无应答: 标记 dead, 重新 spawn
 
 ## Team 状态不一致
