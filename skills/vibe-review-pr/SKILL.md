@@ -427,36 +427,37 @@ spawn:
     prompt: "<security-reviewer 握手 prompt>"
 ```
 
-### Step 2: 验证 spawn 成功
-
-执行脚本确认所有 agent 已正确注册到 team：
-
-```bash
-skills/vibe-review-pr/scripts/agent-exist.sh
-```
-
-**期望输出**（检查以下三行）：
-```
-code-analyst          pr-code-analyst              ok         ok         ok         yes
-architect-reviewer    pr-architect-reviewer        ok         ok         ok         yes
-security-reviewer     pr-security-reviewer         ok         ok         ok         yes
-```
-
-**失败处理**：
-- 任意 agent 的 `def/inbox/pane/alive` 字段异常 → 停止流程
-- `def=missing` → agent 定义文件不存在，检查 `.claude/agents/`
-- `inbox=missing` → agent 未注册到 team，检查 `name` 参数
-- `alive=never` → agent 进程未启动，等待几秒后重试
-
-**禁止跳过验证直接握手**。
-
-### Step 3: 并行握手 → 分配任务
+### Step 2: 并行握手
 
 对每个 agent 执行握手（可并行）：
 
 1. 发送握手信号：`SendMessage(to=<agent>, summary="握手信号", message="【lead_ready】")`
 2. 等待 `【agent_ready】已就绪` 回复（最多 3 次，每次 30s 超时）
-3. 收到 `【agent_ready】` 后，立即发送正式审查任务：
+
+### Step 3: 验证握手成功 → 分配任务
+
+对每个 agent 执行验证（可并行）：
+
+1. 执行脚本验证握手成功：
+
+```bash
+skills/vibe-review-pr/scripts/agent-exist.sh <agent>
+```
+
+**期望输出**：
+```
+ready_event=found
+from=<agent>
+timestamp=...
+text=【agent_ready】已就绪
+```
+
+**验证失败处理**：
+- `ready_event=waiting/missing` → 重试握手（最多 3 次）
+- `alive=no` → 重新 spawn + 握手（最多 3 次）
+- 重试失败 → `stop()` 等待用户指示
+
+2. 验证通过后，立即发送正式审查任务：
 
 code-analyst 任务：
 
@@ -512,7 +513,7 @@ security-reviewer 任务：
       **脚本错误处理**：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
 ```
 
-**未握手成功前，不得给该 agent 分配任何工作。**
+**未验证握手成功前，不得给该 agent 分配任何工作。**
 
 ### Step 4: 等待全部报告
 
