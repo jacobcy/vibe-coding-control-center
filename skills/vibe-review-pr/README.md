@@ -1,33 +1,32 @@
-# Vibe PR Review Skill - 开发文档
+# vibe-review-pr
+
+PR 审查 skill，基于 Claude Code Agent Teams 多 agent 协作。
+
+## 结构
+
+| 文件 | 职责 |
+|------|------|
+| `SKILL.md` | 主执行文档（Phase 0-5 流程） |
+| `references/usage.md` | 事件规格和脚本用法 |
+| `references/execution-reference.md` | 消息样例和诊断命令 |
+| `references/recovery-playbook.md` | 异常恢复流程 |
+| `references/debug-guide.md` | 调试指南 |
+| `runtime/agents.sh` | Agent 清单（名称、类型） |
+| `scripts/lib.sh` | 公共函数库 |
+| `scripts/agent-exist.sh` | Agent 存在性检查 |
+| `scripts/agent-event.sh` | Agent 事件列表 |
+| `scripts/agent-report.sh` | Agent 报告提取 |
+
+## 设计原则
+
+- **报告在 inbox，不在 backlog**。agent 报告存在 team-lead.json，不通过 TaskCreate metadata 传递
+- **下游 agent 自己读上游**。Phase 2 agent 自己跑 `agent-report.sh` 读 Phase 1 报告，Phase 3 读 Phase 1+2。team-lead 不转发、不注入。
+- **脚本做验证**。agent-exist/event/report.sh 提供事实，不由 lead 口头判断
+- **简化握手**。无 polling/poking/spawned/isActive 等概念，握手即存活检测
 
 ## 版本历史
 
-- **v2026-05-12**: 修复 Phase 0 Backlog 约束、Phase 2 agent idle 处理、Phase 5 执行模式说明
-- **v2026-04-27**: 基于 PR #842 稳定版本重组（执行顺序组织）
-
----
-
-## 改进摘要
-
-**本次改进解决的核心问题**：
-
-1. **Phase 0 Backlog 约束缺失** → 现在强制创建所有 Phase 1-5 的 Backlog task，防止流程跳过
-2. **agent idle 处理缺失** → 现在收到 idle 通知后自动检查并重新握手，无需用户干预
-3. **Phase 5 执行模式说明缺失** → 现在明确说明 ask-each / auto-decide / auto-fix / comment-only 四种模式的区别和适用场景
-
-**关键设计决策**：
-
-- **混合 Backlog 创建策略**：Phase 0 创建骨架 task，各 Phase 结束时补充详细 metadata
-- **全自动化 agent idle 处理**：无需用户干预，自动检测、诊断、重新握手
-- **渐进式执行模式**：从最安全的 ask-each 到高效的 auto-fix，用户可根据风险偏好选择
-
----
-
-## 技术实现说明
-
-详细实现规范见：
-- **SKILL.md** - Agent执行主文档
-- **references/backlog-task-templates.yaml** - Phase 1-5 TaskCreate 模板
-- **references/execution-modes.md** - 执行模式详细说明
-- **references/execution-reference.md** - 消息样例与约束机制
-- **references/recovery-playbook.md** - 异常恢复流程
+- **v4 (2026-05-13)**: 重写，删除 backlog 参数传递、meta-task 模式、复杂握手协议。下游 agent 直接读前序报告。
+- **v3 (2026-05-12)**: PR #842 fix alignment — Phase number alignment + handshake reuse
+- **v2 (2026-05-09)**: PR #831 四步握手+POLLING 协议
+- **v1 (2026-04)**: 原始实现
