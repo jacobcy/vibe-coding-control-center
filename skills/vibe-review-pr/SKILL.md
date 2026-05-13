@@ -30,7 +30,7 @@ description: |
 | security-reviewer | pr-security-reviewer | 2 | `scripts/agent-report.sh context-researcher` |
 | fix-executor | pr-fix-executor | 5 | Phase 4 结论中提取的修复指令（lead 直接写入 prompt） |
 
-> **codex 是外部 plugin**，通过 `codex:rescue` skill 调用，不是 teammate。不在 agents.sh 中，不能用 agent-report.sh 读取。输出由 skill 调用直接返回给 lead。
+> **codex 是外部 plugin**，通过 `codex:rescue` skill 调用，不是 teammate。不在 agents.sh 中。能跑脚本读 inbox，但不能收 SendMessage。输出由 skill 调用直接返回给 lead。
 
 真源文件：`skills/vibe-review-pr/runtime/agents.sh`
 
@@ -345,33 +345,30 @@ spawn:
 
 ## Steps
 
-### Step 1: 提取 Phase 1+2 报告，调用 codex:rescue
+### Step 1: 调用 codex:rescue
 
-lead 先提取 teammate 报告，拼接为材料包，再调用 codex:rescue skill：
-
-```bash
-# 提取所有 teammate 报告
-skills/vibe-review-pr/scripts/agent-report.sh context-researcher
-skills/vibe-review-pr/scripts/agent-report.sh code-analyst
-skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
-skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
-```
+codex 自己通过脚本读取前序报告（和 Phase 2 agent 一样），输出由 skill 调用直接返回给 lead：
 
 ```yaml
-# 调用 codex:rescue 做第三方复查
 - tool: Skill
   params:
     skill: codex:rescue
     args: |
-      ## PR #<number> 审查材料包
+      复查 PR #<number> 的全部审查报告，给出第三方独立评估。
 
-      <拼接的 Phase 1+2 报告>
+      读取 Phase 1 背景报告：
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
-      请基于以上审查报告进行独立验证，给出第三方评估意见。
+      读取 Phase 2 专家评审：
+        skills/vibe-review-pr/scripts/agent-report.sh code-analyst
+        skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
+        skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
+
       重点关注：是否有遗漏、结论是否一致、建议是否可行。
+      给出综合评估意见。
 ```
 
-> codex 是外部 plugin，不是 teammate。其输出由 skill 调用直接返回给 lead，不需要 agent-report.sh。
+> codex 是外部 plugin，不是 teammate。能跑脚本读 inbox，但不能收 SendMessage。输出由 skill 调用直接返回给 lead。
 
 ### Step 2: 收到 codex 复查结果 -> 激活 Phase 4
 

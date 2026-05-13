@@ -102,7 +102,7 @@ skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 - **不再使用 backlog 做参数传递**。backlog 不可靠，不再通过 TaskCreate/TaskUpdate 传递报告或状态。
 - **下游 teammate 自己跑脚本读报告**。Phase 2 的 agent prompt 中包含 `agent-report.sh context-researcher` 命令，自行读取 Phase 1 报告。team-lead 不提取、不转发。
 - **fix-executor 不读报告**。Phase 5 的 fix-executor 接收 Phase 4 lead 产出的具体修复指令，不自己读审查报告。
-- **codex 是外部 plugin**。通过 `codex:rescue` skill 调用，不是 teammate。lead 提取报告拼接材料包后调用。输出由 skill 直接返回。
+- **codex 是外部 plugin**。通过 `codex:rescue` skill 调用，不是 teammate。能跑脚本读 inbox，但不能收 SendMessage。输出由 skill 直接返回给 lead。
 - **Phase 0 一次创建完整 backlog**。Phase 0 结束时创建全部 Phase 1-5 的 backlog task，不再逐 Phase 增量创建。
 - **不再逐 Step 更新 backlog**。backlog task 只做完成/阻塞标记，不存储报告内容。
 - **报告清理**。审查完成后清理 backlog（TaskCreate 创建的全部 task）。
@@ -114,13 +114,13 @@ Phase 1: context-researcher → team-lead.json (【agent_report】)
 Phase 2: code-analyst       → prompt 中跑 agent-report.sh context-researcher
          architect-reviewer → prompt 中跑 agent-report.sh context-researcher
          security-reviewer  → prompt 中跑 agent-report.sh context-researcher
-Phase 3: codex              → lead 提取 Phase 1+2 报告 → 拼接材料包 → 调用 codex:rescue skill
+Phase 3: codex              → prompt 中跑 agent-report.sh 读 Phase 1+2 报告
 Phase 5: fix-executor       → lead 写入 Phase 4 修复指令到 prompt（不读报告）
 ```
 
 **读取方式**：
 - Phase 2 agent：prompt 中告知 `skills/vibe-review-pr/scripts/agent-report.sh context-researcher`，agent 自行执行脚本读取
-- Phase 3 codex：lead 跑 agent-report.sh 提取所有 teammate 报告 → 拼接材料包 → 传入 codex:rescue skill
+- Phase 3 codex：prompt 中告知各 `agent-report.sh` 命令，codex 自行执行脚本读取（能跑脚本，不能收 SendMessage）
 - Phase 5 fix-executor：lead 将 Phase 4 结论中的修复指令直接写入 prompt，fix-executor 不跑任何 agent-report.sh
 
 > 更精确的读取方式以 SKILL.md 各 Phase Steps 为准。
