@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from vibe3.agents.models import CodeagentResult, create_codeagent_command
 from vibe3.agents.run_prompt import (
@@ -40,11 +40,14 @@ from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_executor_issue
 
+if TYPE_CHECKING:
+    from vibe3.models.flow import FlowStatusResponse
+
 
 def validate_run_prerequisites(
     flow_service: FlowService,
     target_branch: str,
-) -> tuple[Any, int | None]:
+) -> tuple[FlowStatusResponse, int | None]:
     """Validate flow exists and return flow status with issue number.
 
     Args:
@@ -57,8 +60,6 @@ def validate_run_prerequisites(
     Raises:
         UserError: If no flow exists for branch
     """
-    from vibe3.models.flow import FlowStatusResponse
-
     flow: FlowStatusResponse | None = flow_service.get_flow_status(target_branch)
 
     if not flow:

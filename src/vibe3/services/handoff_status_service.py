@@ -1,5 +1,6 @@
 """Handoff status aggregation service."""
 
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,6 +47,8 @@ class HandoffStatusService:
     - Worktree path resolution
     """
 
+    _registry_lock = threading.Lock()
+
     store: SQLiteClient
     git_client: GitClient
     flow_service: FlowService
@@ -66,7 +69,12 @@ class HandoffStatusService:
             git_client: GitClient instance for git operations
             flow_service: FlowService instance for flow operations
         """
-        self.store = store or SQLiteClient()
+        if store is not None:
+            self.store = store
+        elif flow_service is not None:
+            self.store = flow_service.store
+        else:
+            self.store = SQLiteClient()
         self.git_client = git_client or GitClient()
         self.flow_service = flow_service or FlowService(
             store=self.store, git_client=self.git_client
@@ -138,9 +146,11 @@ class HandoffStatusService:
         from vibe3.agents.backends.codeagent import CodeagentBackend
 
         if self.session_registry is None:
-            backend = CodeagentBackend()
-            self.session_registry = SessionRegistryService(
-                store=self.store, backend=backend
-            )
+            with self._registry_lock:
+                if self.session_registry is None:
+                    backend = CodeagentBackend()
+                    self.session_registry = SessionRegistryService(
+                        store=self.store, backend=backend
+                    )
 
         return self.session_registry.get_truly_live_sessions_for_branch(branch)
