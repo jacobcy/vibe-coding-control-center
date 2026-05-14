@@ -11,7 +11,7 @@ from typer import echo
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import append_governance_event
 from vibe3.roles.governance import (
     build_governance_snapshot_context,

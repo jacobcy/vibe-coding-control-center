@@ -7,10 +7,10 @@ ErrorTrackingService captures API errors in the sync chain.
 
 from loguru import logger
 
+from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.handler_registry import register_handler
-from vibe3.execution.store_context import get_store
 from vibe3.models.orchestration import IssueInfo
 
 

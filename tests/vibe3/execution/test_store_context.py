@@ -1,6 +1,6 @@
 """Tests for SQLiteClient context manager."""
 
-from vibe3.execution.store_context import get_store
+from vibe3.clients.store_context import get_store
 
 
 def test_get_store_provides_client():

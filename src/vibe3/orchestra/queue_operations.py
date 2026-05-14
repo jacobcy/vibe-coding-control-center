@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.execution.flow_dispatch import FlowManager
+    from vibe3.orchestra.flow_dispatch import FlowManager
 
 
 def select_ready_issues(

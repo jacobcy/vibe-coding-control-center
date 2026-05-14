@@ -12,6 +12,7 @@ from typing import Callable
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import (
     ExecutorDispatchIntent,
@@ -21,7 +22,6 @@ from vibe3.domain.events import (
 from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.execution.store_context import get_store
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.plan import build_plan_request

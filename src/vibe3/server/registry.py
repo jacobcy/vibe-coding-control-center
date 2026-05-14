@@ -16,10 +16,10 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.capacity_service import CapacityService
-from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.runtime.circuit_breaker import CircuitBreaker

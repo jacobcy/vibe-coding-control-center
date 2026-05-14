@@ -9,12 +9,12 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.execution.actor_support import format_agent_actor
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec
+from vibe3.services.actor_support import format_agent_actor
 
 
 def _load_issue_info(config: OrchestraConfig, issue_number: int) -> IssueInfo:

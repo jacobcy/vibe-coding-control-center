@@ -18,9 +18,9 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
-from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
+from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 

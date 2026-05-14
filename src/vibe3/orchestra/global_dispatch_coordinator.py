@@ -21,10 +21,10 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.domain import publish
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
-from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.pr import PRState
+from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,

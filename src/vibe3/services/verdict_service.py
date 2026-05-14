@@ -14,8 +14,8 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.execution.actor_support import extract_role_from_actor
 from vibe3.models.verdict import VerdictRecord
+from vibe3.services.actor_support import extract_role_from_actor
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
