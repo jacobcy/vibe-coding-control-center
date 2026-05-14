@@ -248,12 +248,6 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
-def _as_string_tuple(value: Any) -> tuple[str, ...]:
-    if not isinstance(value, list):
-        return ()
-    return tuple(str(item) for item in value)
-
-
 def _parse_section_specs(sections_raw: Any) -> tuple[PromptSectionSpec, ...]:
     """Parse sections list supporting both string and object format."""
     if not isinstance(sections_raw, list):
