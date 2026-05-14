@@ -136,6 +136,7 @@ class OrchestraStatusService:
         orchestrator: FlowReader | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         failed_gate: Any | None = None,
+        git_client: GitClient | None = None,
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
@@ -149,7 +150,7 @@ class OrchestraStatusService:
         self._orchestrator = orchestrator
 
         self._circuit_breaker = circuit_breaker
-        self._git = GitClient()
+        self._git = git_client or GitClient()
         self._label_service = LabelService(repo=config.repo)
         self._failed_gate = failed_gate
 

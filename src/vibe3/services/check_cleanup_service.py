@@ -13,6 +13,7 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.flow_cleanup_service import FlowCleanupService
 
@@ -34,9 +35,11 @@ class CheckCleanupService:
         self,
         store: "SQLiteClient",
         git_client: "GitClient",
+        github_client: "GitHubClient | None" = None,
     ) -> None:
         self.store = store
         self.git_client = git_client
+        self._github_client = github_client
 
     def clean_residual_branches(self) -> dict[str, object]:
         """Check and clean residual branches for terminal flows.
@@ -210,7 +213,7 @@ class CheckCleanupService:
 
             from vibe3.clients.github_client import GitHubClient
 
-            gh = GitHubClient()
+            gh = self._github_client or GitHubClient()
             gh_issue = gh.view_issue(issue_number)
             if (
                 isinstance(gh_issue, dict)
