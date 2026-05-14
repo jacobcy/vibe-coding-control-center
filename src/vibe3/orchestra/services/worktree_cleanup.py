@@ -317,8 +317,12 @@ class WorktreeCleanupService(ServiceBase):
             dry_run=self.config.cleanup.dry_run,
         )
 
-    async def on_tick(self) -> None:
-        """Periodic TTL-based GC."""
+    async def on_tick(self, tick_id: int = 0) -> None:
+        """Periodic TTL-based GC.
+
+        Args:
+            tick_id: Current tick number (default: 0)
+        """
         if not self.config.cleanup.enabled:
             return
 

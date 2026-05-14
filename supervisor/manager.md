@@ -263,7 +263,7 @@ uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
 
 - 调用 `uv run python src/vibe3/cli.py serve ...`
 - 直接探查 `.git/vibe3`
-- 在当前阶段执行 `uv run python src/vibe3/cli.py flow show`
+- 在当前阶段执行 `uv run python src/vibe3/cli.py flow show`（`is_flow_terminal()` 中的合法用途除外）
 - 在已有 target scene 上重复执行与 spec_ref 无关的 `flow update` 操作
 - 用关联 issue 是否 open 机械覆盖最新人类指示
 - 用全局 `task status` / server 可达性直接判定当前 `ready` issue 不健康
@@ -294,6 +294,20 @@ uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
   3. 检查 task-scene 是否一致
   4. 返回 scene 是否健康的结果
 - 注意：`state/ready` 阶段的 scene 健康只根据 **target issue + target branch/worktree/task-scene** 判断；全局 `task status`、server `stopped/unreachable`、或"当前没有 active issues"这些全局信号本身都**不能单独构成 blocker**
+
+#### `is_flow_terminal()`
+- 作用：检查 flow 是否处于终态（done/aborted）
+- Steps:
+  1. 使用 `vibe3 flow show --json` 命令获取 flow status
+  2. 检查 `flow_status` 字段是否为 `done` 或 `aborted`
+  3. `done` = PR merged，flow 已完成
+  4. `aborted` = PR closed without merge，flow 已终止
+  5. 返回是否为终态的结果
+- 注意：终态检测只依赖 `flow_status` 字段，不依赖 refs 是否完整
+- **验证命令**：
+  ```bash
+  uv run python src/vibe3/cli.py flow show --json
+  ```
 
 ### `read_context()`
 
@@ -523,8 +537,31 @@ Steps:
    - 检查当前 issue 是否已经关联 PR、当前 branch 是否已有打开的 PR、当前 PR 的 CI / review 现场是否可读
    - 若存在 PR 现场，则**优先按 PR 现场决策**，不要因为 `pr_ref` 缺失或历史 handoff 落后就机械重跑
    - 只有确认当前 scene 中没有可用 PR 现场时，才按 refs 缺失路径处理
-5. 根据 refs 和现场真源决定当前 issue 应进入哪一步
-6. 如果当前无法推进：
+5. **终态检测**：检查 flow 是否处于终态（done/aborted）
+   - 调用 `is_flow_terminal()` 检查 flow status
+   - **幂等性检查**：检查 handoff 历史中是否已存在清理指令
+     - 若已发出过清理 indicate，跳过重复信号，保持当前状态，`exit()`
+   - 若 flow 为终态：
+     - 确定清理模式：
+       - `done` → `preserve` 模式（保留 flow record 作为历史）
+       - `aborted` → `reset` 模式（软删除 flow record）
+     - 写 handoff indicate：向 closeout skill 传递清理指令
+       ```bash
+       uv run python src/vibe3/cli.py handoff indicate docs/closeout/<branch>.md
+       ```
+       指令内容包含：
+       - cleanup_mode: preserve|reset
+       - branch: <branch>
+       - reason: "flow reached terminal state"
+       - keep_flow_record: True for done, False for aborted
+     - 写 issue comment：通报终态并说明已触发清理流程
+       ```
+       [manager] Flow reached terminal state ({flow_status}), cleanup signaled
+       ```
+     - 保持当前状态（done 保持 done，handoff 保持 handoff）
+     - `exit()`
+6. 根据 refs 和现场真源决定当前 issue 应进入哪一步
+7. 如果当前无法推进：
    - 先检查最新评论里是否已经解释原因
    - 若无解释，再检查已有 comments 是否已经覆盖同一 blocker
    - 只有在 blocker 是新的、现有 comments 没有覆盖时，才写新的 issue comment

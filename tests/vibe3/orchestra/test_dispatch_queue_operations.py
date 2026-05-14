@@ -37,8 +37,8 @@ class TestQueueOperations:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -64,8 +64,8 @@ class TestQueueOperations:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -91,8 +91,8 @@ class TestQueueOperations:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -119,8 +119,8 @@ class TestQueueOperations:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -158,8 +158,8 @@ class TestQueueOperations:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -194,8 +194,8 @@ class TestQueueOperations:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -234,7 +234,7 @@ class TestQueueOperations:
         emit_calls = []
         call_count = [0]
 
-        def emit_with_failure(role, issue):
+        def emit_with_failure(role, issue, tick_id=0):
             call_count[0] += 1
             if call_count[0] == 1:
                 raise RuntimeError("emit failed")
@@ -275,8 +275,8 @@ class TestQueueOperations:
         install_issue_loader(coordinator, {10: IssueState.CLAIMED})
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -301,8 +301,8 @@ class TestQueueOperations:
         install_issue_loader(coordinator, {})
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()

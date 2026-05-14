@@ -47,5 +47,9 @@ class ServiceBase(ABC):
         """React to a GitHub event."""
         ...
 
-    async def on_tick(self) -> None:
-        """Called on each heartbeat tick."""
+    async def on_tick(self, tick_id: int = 0) -> None:
+        """Called on each heartbeat tick.
+
+        Args:
+            tick_id: Current tick number (0 if not available)
+        """

@@ -115,14 +115,20 @@ class GlobalDispatchCoordinator:
         return ready
 
     def _emit_dispatch_intent(
-        self, role: "TriggerableRoleDefinition", issue: IssueInfo
+        self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
     ) -> None:
-        """Emit dispatch intent for an issue."""
+        """Emit dispatch intent for an issue.
+
+        Args:
+            role: Triggerable role definition
+            issue: Issue info
+            tick_id: Heartbeat tick number for error tracking
+        """
         # Pre-dispatch cleanup: remove conflicting state/* labels
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
-        publish(build_label_dispatch_event(role, issue, branch=branch))
+        publish(build_label_dispatch_event(role, issue, branch=branch, tick_id=tick_id))
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
         """Get flow context for an issue (backward compatibility)."""
@@ -198,8 +204,12 @@ class GlobalDispatchCoordinator:
 
         return True
 
-    async def coordinate(self) -> None:
-        """Run one heartbeat tick against the frozen queue."""
+    async def coordinate(self, tick_id: int = 0) -> None:
+        """Run one heartbeat tick against the frozen queue.
+
+        Args:
+            tick_id: Current tick number from heartbeat (default: 0)
+        """
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
             if not self._frozen_queue:
@@ -320,7 +330,7 @@ class GlobalDispatchCoordinator:
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
                     f"#{issue.number} ({role.registry_role})",
                 )
-                self._emit_dispatch_intent(role, issue)
+                self._emit_dispatch_intent(role, issue, tick_id)
                 entry.waiting_state = entry.collected_state
                 dispatched_count += 1
 

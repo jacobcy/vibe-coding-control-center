@@ -33,7 +33,6 @@ class TaskBridgeModel(BaseModel):
     spec_ref: str | None = None
     plan_ref: str | None = None
     next_step: str | None = None
-    blocked_by: str | None = None
     latest_actor: str | None = None
 
     # --- Truth 字段标记（ClassVar，不参与序列化/持久化）---

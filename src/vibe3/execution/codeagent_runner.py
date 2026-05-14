@@ -313,7 +313,7 @@ class CodeagentExecutionService:
             error_tracking.record_error(
                 error_code=error_code,
                 error_message=str(exc),
-                tick_id=0,  # Not in tick context during execution
+                tick_id=command.tick_id,  # Use tick_id from command
                 issue_number=command.issue_number,
                 branch=command.branch,
             )
@@ -399,5 +399,6 @@ class CodeagentExecutionService:
             fallback_prompt=request.fallback_prompt,
             fallback_include_global_notice=request.fallback_include_global_notice,
             dry_run_summary=request.dry_run_summary,
+            tick_id=request.tick_id,
         )
         return self.execute_sync(command)

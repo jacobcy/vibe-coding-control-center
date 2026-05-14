@@ -56,7 +56,7 @@ async def test_heartbeat_tick_blocked_by_active_gate() -> None:
         event_types: list[str] = []
         is_dispatch_service = True
 
-        async def on_tick(self) -> None:
+        async def on_tick(self, tick_id: int = 0) -> None:
             tick_calls.append("tick")
 
     server.register(TickService())

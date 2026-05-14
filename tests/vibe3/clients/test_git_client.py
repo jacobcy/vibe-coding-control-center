@@ -1,6 +1,7 @@
 """GitClient 单元测试."""
 
 from pathlib import Path
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -120,6 +121,7 @@ branch refs/heads/task/issue-123
             text=True,
             check=True,
             cwd="/tmp/main",
+            env=mock.ANY,
         )
 
 

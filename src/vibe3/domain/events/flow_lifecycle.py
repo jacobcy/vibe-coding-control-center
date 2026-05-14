@@ -65,6 +65,7 @@ class ManagerDispatchIntent(DomainEvent):
     issue_title: str | None = None
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
+    tick_id: int = 0  # Heartbeat tick number for error tracking
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ class PlannerDispatchIntent(DomainEvent):
     trigger_state: str  # "claimed"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
+    tick_id: int = 0  # Heartbeat tick number for error tracking
 
 
 @dataclass(frozen=True)
@@ -104,6 +106,7 @@ class ExecutorDispatchIntent(DomainEvent):
     trigger_state: str  # "in-progress"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
+    tick_id: int = 0  # Heartbeat tick number for error tracking
 
 
 @dataclass(frozen=True)
@@ -125,3 +128,4 @@ class ReviewerDispatchIntent(DomainEvent):
     trigger_state: str  # "review"
     actor: str = "orchestra:dispatcher"
     timestamp: str | None = None
+    tick_id: int = 0  # Heartbeat tick number for error tracking

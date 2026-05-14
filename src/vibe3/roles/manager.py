@@ -125,6 +125,7 @@ def build_manager_request(
     registry: SessionRegistryService | None = None,
     repo_path: Path | None = None,
     actor: str = "orchestra:manager",
+    tick_id: int = 0,
 ) -> ExecutionRequest | None:
     """Build the manager execution request from declarative role policy."""
     flow_manager = FlowManager(config, registry=registry)

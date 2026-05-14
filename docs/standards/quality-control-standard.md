@@ -335,6 +335,30 @@ code_limits:
 
 ---
 
+### 2.8 CI Parity Verification（CI 一致性验证）
+
+**目的**：确保本地测试结果与 CI 一致
+
+**检查内容**：
+- 测试不依赖特定工作目录
+- 测试不依赖特定 git 状态
+- 测试不依赖特定环境变量（除非显式 mock）
+
+**阻断性**：
+- Pre-push: ⚠️ Warning（可选择性启用 CI 模拟）
+- CI: ✅ 自动验证（真实 CI 环境）
+
+**配置**：
+```bash
+# 方式一：设置 CI 环境变量运行测试
+GITHUB_ACTIONS=true uv run pytest tests/vibe3
+
+# 方式二：使用 pre-push CI 模拟模式
+VIBE_CI_SIMULATE=1 bash scripts/hooks/pre-push.sh
+```
+
+---
+
 ## 三、特殊场景处理
 
 ### 3.1 紧急修复（Hotfix）

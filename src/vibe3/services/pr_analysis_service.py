@@ -184,30 +184,32 @@ def _calculate_risk_score(
     return generate_score_report(dims)
 
 
+def _fetch_pr_commit_shas(pr_number: int) -> list[str]:
+    """Fetch commit SHAs for a PR via direct gh CLI call."""
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "view",
+            str(pr_number),
+            "--json",
+            "commits",
+            "--jq",
+            ".commits[].oid",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
+
+
 def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
     """Return latest commit messages for a PR via direct gh CLI call."""
     from vibe3.utils.git_helpers import get_commit_message
 
     try:
-        # Direct gh CLI call instead of client wrapper
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                str(pr_number),
-                "--json",
-                "commits",
-                "--jq",
-                ".commits[].oid",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        commit_shas = [
-            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
-        ]
+        commit_shas = _fetch_pr_commit_shas(pr_number)
     except Exception as e:
         logger.warning(f"Failed to get commits for PR {pr_number}: {e}")
         return []
@@ -235,25 +237,7 @@ def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
 def _get_pr_commit_count(pr_number: int) -> int:
     """Return total commit count for a PR via direct gh CLI call."""
     try:
-        # Direct gh CLI call instead of client wrapper
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                str(pr_number),
-                "--json",
-                "commits",
-                "--jq",
-                ".commits[].oid",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        commits = [
-            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
-        ]
+        commits = _fetch_pr_commit_shas(pr_number)
         return len(commits)
     except Exception as e:
         logger.warning(f"Failed to get commit count for PR {pr_number}: {e}")

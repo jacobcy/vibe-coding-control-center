@@ -30,6 +30,7 @@ class ExecutionRequest:
     fallback_include_global_notice: bool = True
     dry_run_summary: Dict[str, Any] = field(default_factory=dict)
     worktree_requirement: WorktreeRequirement = WorktreeRequirement.NONE
+    tick_id: int = 0  # Heartbeat tick number for error tracking
 
 
 @dataclass
