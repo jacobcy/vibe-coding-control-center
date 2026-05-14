@@ -40,13 +40,15 @@ class TestGetNumstat:
     def test_branch_source_uses_merge_base(self) -> None:
         """Test branch source uses merge-base correctly."""
         run = MagicMock(return_value="20\t10\tsrc/feature.py")
-        get_merge_base = MagicMock(return_value="base456")
+        merge_base_sha = "a" * 40
+        get_merge_base = MagicMock(return_value=merge_base_sha)
         source = BranchSource(branch="feature", base="main")
 
         result = get_numstat(run, source, get_merge_base=get_merge_base)
 
         get_merge_base.assert_called_once_with("feature", "main")
-        run.assert_called_once_with(["diff", "--numstat", "base456...feature"])
+        expected_args = ["diff", "--numstat", f"{merge_base_sha}...feature"]
+        run.assert_called_once_with(expected_args)
         assert result == "20\t10\tsrc/feature.py"
 
     def test_branch_source_raises_without_merge_base_callable(self) -> None:
@@ -65,7 +67,8 @@ class TestGetNumstat:
         pr_info.head_branch = "pr-branch"
         pr_info.base_branch = "main"
         github_client.get_pr.return_value = pr_info
-        get_merge_base = MagicMock(return_value="merge789")
+        merge_base_sha = "c" * 40
+        get_merge_base = MagicMock(return_value=merge_base_sha)
         source = PRSource(pr_number=42)
 
         result = get_numstat(
@@ -74,7 +77,8 @@ class TestGetNumstat:
 
         github_client.get_pr.assert_called_once_with(42)
         get_merge_base.assert_called_once_with("pr-branch", "main")
-        run.assert_called_once_with(["diff", "--numstat", "merge789...pr-branch"])
+        expected_args = ["diff", "--numstat", f"{merge_base_sha}...pr-branch"]
+        run.assert_called_once_with(expected_args)
         assert result == "30\t15\tsrc/pr_file.py"
 
     def test_pr_source_raises_without_github_client(self) -> None:
@@ -115,7 +119,7 @@ class TestNumstatViaMergeBase:
     def test_calls_merge_base_with_head_and_base(self) -> None:
         """Test that get_merge_base is called with (head, base) arguments."""
         run = MagicMock(return_value="5\t3\tsrc/file.py")
-        get_merge_base = MagicMock(return_value="merge123")
+        get_merge_base = MagicMock(return_value="a" * 40)
 
         result = _numstat_via_merge_base(run, get_merge_base, "feature", "main")
 
@@ -125,9 +129,30 @@ class TestNumstatViaMergeBase:
     def test_calls_run_with_correct_diff_args(self) -> None:
         """Test that run is called with correct diff --numstat arguments."""
         run = MagicMock(return_value="10\t2\tsrc/other.py")
-        get_merge_base = MagicMock(return_value="base456")
+        get_merge_base = MagicMock(return_value="b" * 40)
 
         result = _numstat_via_merge_base(run, get_merge_base, "branch", "main")
 
-        run.assert_called_once_with(["diff", "--numstat", "base456...branch"])
+        run.assert_called_once_with(["diff", "--numstat", "b" * 40 + "...branch"])
         assert result == "10\t2\tsrc/other.py"
+
+    def test_raises_on_empty_merge_base(self) -> None:
+        """Test that empty merge_base raises SystemError."""
+        run = MagicMock()
+        get_merge_base = MagicMock(return_value="")
+        with pytest.raises(SystemError, match="invalid SHA format"):
+            _numstat_via_merge_base(run, get_merge_base, "feature", "main")
+
+    def test_raises_on_wrong_length_merge_base(self) -> None:
+        """Test that non-40-char merge_base raises SystemError."""
+        run = MagicMock()
+        get_merge_base = MagicMock(return_value="abc123")
+        with pytest.raises(SystemError, match="invalid SHA format"):
+            _numstat_via_merge_base(run, get_merge_base, "feature", "main")
+
+    def test_raises_on_non_hex_merge_base(self) -> None:
+        """Test that non-hex merge_base raises SystemError."""
+        run = MagicMock()
+        get_merge_base = MagicMock(return_value="ghij" + "0" * 36)
+        with pytest.raises(SystemError, match="invalid SHA format"):
+            _numstat_via_merge_base(run, get_merge_base, "feature", "main")
