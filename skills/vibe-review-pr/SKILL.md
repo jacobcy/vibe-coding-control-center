@@ -261,8 +261,31 @@ Phase_0():
   // 禁止在此步执行 gh pr view / gh pr diff / git diff
 
   // Step 2: 选择执行模式
-  mode = user_specified or "ask-each"
-  // 选项: auto-fix / comment-only / auto-decide / ask-each
+  // 询问用户选择执行模式
+  AskUserQuestion(questions=[{
+    "question": "选择 PR 审查执行模式？",
+    "header": "执行模式",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "ask-each（推荐）",
+        "description": "每步操作前询问用户确认，适合标准 PR 和安全 PR"
+      },
+      {
+        "label": "auto-decide",
+        "description": "team-lead 根据复杂度自动决策，适合简单 PR（< 50 行，无安全相关）"
+      },
+      {
+        "label": "auto-fix",
+        "description": "自动修复阻塞问题，适合阻塞项 < 3 个、修改面 < 3 文件"
+      },
+      {
+        "label": "comment-only",
+        "description": "只写 comment，不修复，适合大型 PR、高风险改动"
+      }
+    ]
+  }])
+  mode = user_selected_option or "ask-each"
 
   // Step 3: Team 创建或复用
   result = TeamCreate(team_name="pr-review-team")
