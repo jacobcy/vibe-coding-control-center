@@ -161,6 +161,23 @@ class SQLiteFlowStateRepo:
             ).debug("Retrieved issue links")
             return links
 
+    def get_dependency_links(self, branch: str) -> list[int]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT issue_number FROM flow_issue_links "
+                "WHERE branch = ? AND issue_role = 'dependency'",
+                (branch,),
+            )
+            deps = [row[0] for row in cursor.fetchall()]
+            logger.bind(
+                external="sqlite",
+                operation="get_dependency_links",
+                branch=branch,
+                count=len(deps),
+            ).debug("Retrieved dependency links")
+            return deps
+
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
         with sqlite3.connect(self.db_path) as conn:
