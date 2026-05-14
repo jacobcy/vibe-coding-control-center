@@ -60,7 +60,7 @@ def test_pr_create_requires_human_confirmation(
     assert "此命令需要明确确认" in result.output
     assert "--yes" in result.output
     assert "--agent" in result.output
-    mock_pr_service.create_draft_pr.assert_not_called()
+    mock_pr_service.create_pr.assert_not_called()
 
 
 @patch("vibe3.commands.pr_create.render_pr_created")
@@ -83,13 +83,13 @@ def test_pr_create_allows_yes_when_task_issue_missing(
 
     mock_pr_service = MagicMock()
     mock_pr_service.get_pr.return_value = None
-    mock_pr_service.create_draft_pr.return_value = MagicMock(model_dump=lambda: {})
+    mock_pr_service.create_pr.return_value = MagicMock(model_dump=lambda: {})
     mock_pr_service_cls.return_value = mock_pr_service
 
     result = runner.invoke(app, ["pr", "create", "-t", "Test PR", "--yes"])
 
     assert result.exit_code == 0
-    mock_pr_service.create_draft_pr.assert_called_once()
+    mock_pr_service.create_pr.assert_called_once()
 
 
 @patch("vibe3.commands.pr_query.FlowService")

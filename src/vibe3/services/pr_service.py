@@ -52,21 +52,21 @@ class PRService:
             self.github_client
         )
 
-    def create_draft_pr(
+    def create_pr(
         self,
         title: str,
         body: str,
         base_branch: str = "main",
         actor: str | None = None,
     ) -> PRResponse:
-        """Create a draft PR."""
+        """Create a pull request."""
         logger.bind(
             domain="pr",
-            action="create_draft",
+            action="create",
             title=title,
             base_branch=base_branch,
             actor=actor,
-        ).info("Creating draft PR")
+        ).info("Creating pull request")
 
         if not self.github_client.check_auth():
             raise UserError("Not authenticated to GitHub. Run 'gh auth login' first.")
@@ -112,7 +112,7 @@ class PRService:
             body=enhanced_body,
             head_branch=head_branch,
             base_branch=base_branch,
-            draft=True,
+            draft=False,
             metadata=metadata,
         )
 
@@ -121,12 +121,12 @@ class PRService:
         self._sync_pr_flow_state(pr, actor=effective_actor)
         self.store.add_event(
             head_branch,
-            "pr_draft",
+            "pr_created",
             effective_actor,
-            f"Draft PR #{pr.number} created: {pr.url}",
+            f"Pull request #{pr.number} created: {pr.url}",
         )
 
-        logger.bind(pr_number=pr.number, url=pr.url).success("Draft PR created")
+        logger.bind(pr_number=pr.number, url=pr.url).success("Pull request created")
         return pr
 
     def get_pr(

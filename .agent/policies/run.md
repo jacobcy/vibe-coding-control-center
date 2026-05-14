@@ -247,6 +247,14 @@
 - 关键输出契约被破坏
 - 发现自己正在越过项目边界
 
+## PR 创建规则
+
+创建 PR 时，必须创建正式 PR（非 draft），除非 plan 或 handoff 明确要求 draft：
+
+- 使用 `gh pr create` 时，显式传递 `--draft=false`
+- 使用 `vibe3 pr create` 时，默认已创建正式 PR（非 draft）
+- 如果 PR 已经是 draft 状态，使用 `gh pr edit <number> --draft=false` 修正
+
 ## 交付要求
 
 执行结果必须能回答：
