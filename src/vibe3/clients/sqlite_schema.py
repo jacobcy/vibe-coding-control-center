@@ -265,6 +265,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added indicate_ref column to flow_state"
         )
 
+    # Migration: add manager_actor column for manager role tracking
+    if "manager_actor" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN manager_actor TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added manager_actor column to flow_state"
+        )
+
     # Migration: migrate existing blocked_by data to new fields
     # Pattern: "#218" → blocked_by_issue=218, other text → blocked_reason
     if "blocked_by" in existing and (
