@@ -183,6 +183,9 @@ code_limits:
       - path: "tests/vibe3/services/test_task_resume_operations.py"
         limit: 410
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
+      - path: "tests/vibe3/clients/test_github_client_prs.py"
+        limit: 450
+        reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations 等多个场景，新增 GH_TOKEN 认证测试后略微超标"
 
   total_file_loc:
     v2_shell: 3000         # Shell 核心代码总行数

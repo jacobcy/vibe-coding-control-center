@@ -1,5 +1,6 @@
 """Tests for GitHub client."""
 
+import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -26,17 +27,20 @@ def mock_subprocess() -> MagicMock:
 def test_check_auth_success(
     github_client: GitHubClient, mock_subprocess: MagicMock
 ) -> None:
-    """Test auth check success."""
-    mock_subprocess.return_value.returncode = 0
+    """Test auth check success with GH_TOKEN."""
+    with patch.dict(os.environ, {"GH_TOKEN": "test-token"}):
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "testuser\n"
 
-    result = github_client.check_auth()
+        result = github_client.check_auth()
 
-    assert result is True
-    mock_subprocess.assert_called_once_with(
-        ["gh", "auth", "status"],
-        capture_output=True,
-        text=True,
-    )
+        assert result is True
+        mock_subprocess.assert_called_once_with(
+            ["gh", "api", "user", "-q", ".login"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
 
 
 def _client() -> GitHubClient:

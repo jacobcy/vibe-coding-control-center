@@ -1,5 +1,6 @@
 """GitHub client base functionality."""
 
+import os
 import subprocess
 from typing import NoReturn
 
@@ -54,8 +55,28 @@ class GitHubClientBase:
     """
 
     def check_auth(self) -> bool:
-        """Check if authenticated to GitHub."""
+        """Check if authenticated to GitHub.
+
+        Strategy:
+        1. If GH_TOKEN is set, verify it works by testing API access
+        2. Otherwise, check gh auth status
+
+        This approach is more robust than relying solely on 'gh auth status'
+        return code, which can fail due to keyring warnings even when GH_TOKEN
+        is valid and functional.
+        """
         try:
+            # If GH_TOKEN is set, test API access directly
+            if os.environ.get("GH_TOKEN"):
+                result = subprocess.run(
+                    ["gh", "api", "user", "-q", ".login"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                return result.returncode == 0 and bool(result.stdout.strip())
+
+            # Otherwise, check gh auth status
             result = subprocess.run(
                 ["gh", "auth", "status"],
                 capture_output=True,

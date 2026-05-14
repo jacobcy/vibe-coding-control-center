@@ -1,6 +1,7 @@
 """Tests for GitHub client."""
 
 import json
+import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -25,31 +26,70 @@ def mock_subprocess() -> MagicMock:
         yield mock
 
 
-def test_check_auth_success(
+def test_check_auth_success_with_token(
     github_client: GitHubClient, mock_subprocess: MagicMock
 ) -> None:
-    """Test auth check success."""
-    mock_subprocess.return_value.returncode = 0
+    """Test auth check success with GH_TOKEN."""
+    with patch.dict(os.environ, {"GH_TOKEN": "test-token"}):
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "testuser\n"
 
-    result = github_client.check_auth()
+        result = github_client.check_auth()
 
-    assert result is True
-    mock_subprocess.assert_called_once_with(
-        ["gh", "auth", "status"],
-        capture_output=True,
-        text=True,
-    )
+        assert result is True
+        mock_subprocess.assert_called_once_with(
+            ["gh", "api", "user", "-q", ".login"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
 
 
-def test_check_auth_failure(
+def test_check_auth_success_without_token(
     github_client: GitHubClient, mock_subprocess: MagicMock
 ) -> None:
-    """Test auth check failure."""
-    mock_subprocess.return_value.returncode = 1
+    """Test auth check success without GH_TOKEN (fallback to gh auth status)."""
+    with patch.dict(os.environ, {}, clear=True):
+        # Remove GH_TOKEN if present
+        os.environ.pop("GH_TOKEN", None)
 
-    result = github_client.check_auth()
+        mock_subprocess.return_value.returncode = 0
 
-    assert result is False
+        result = github_client.check_auth()
+
+        assert result is True
+        mock_subprocess.assert_called_once_with(
+            ["gh", "auth", "status"],
+            capture_output=True,
+            text=True,
+        )
+
+
+def test_check_auth_failure_with_token(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
+    """Test auth check failure with GH_TOKEN."""
+    with patch.dict(os.environ, {"GH_TOKEN": "invalid-token"}):
+        mock_subprocess.return_value.returncode = 1
+
+        result = github_client.check_auth()
+
+        assert result is False
+
+
+def test_check_auth_failure_without_token(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
+    """Test auth check failure without GH_TOKEN."""
+    with patch.dict(os.environ, {}, clear=True):
+        # Remove GH_TOKEN if present
+        os.environ.pop("GH_TOKEN", None)
+
+        mock_subprocess.return_value.returncode = 1
+
+        result = github_client.check_auth()
+
+        assert result is False
 
 
 def test_create_pr_success(
