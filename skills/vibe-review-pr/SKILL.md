@@ -159,11 +159,17 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 - 超时 3 次 → 标记 agent 为 blocked，继续处理下一个 agent
 - team-lead 自身必须先 `ToolSearch("select:SendMessage")` 再 spawn 任何 agent
 
-## @wait_for_report(agent_name, timeout=90, max_attempts=3) → report | TIMEOUT
+## @wait_for_report(agent_name, timeout=180, max_attempts=3) → report | TIMEOUT
 
 ```
 @wait_for_report(agent_name):
-  """主动轮询等待 agent 报告。禁止被动 idle。"""
+  """主动轮询等待 agent 报告。禁止被动 idle。
+  
+  注意：stale 状态只表示长时间无消息，不代表 agent 失联。
+  如果 agent-exist.sh 显示 stale/inactive，应先捕获 tmux pane 内容确认是否有输出。
+  如果 pane 有输出（agent 正在工作），继续等待，不要重新握手。
+  只有 pane 无输出时才重新握手。"""
+  
   for attempt in 1..max_attempts:
     sleep(timeout)
     $ agent-report.sh {agent_name}
@@ -193,13 +199,18 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
   case status.alive:
     "active" or "idle"  → continue waiting（agent 可能仍在执行）
     "stale" or "inactive" or "never" → 
-      // 重新握手
-      for attempt in 1..3:
-        SendMessage(to=agent_name, message="【lead_ready】")
-        sleep(90)
-        $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
-        if found: return RETRY  // 重新分配任务
-      return BLOCKED
+      // 捕获 tmux pane 内容（确认是否有输出）
+      pane_content = tmux capture-pane -t <pane_id> -p -S -50
+      if pane_content has recent output:
+        continue waiting  // agent 正在工作，不要握手
+      else:
+        // 重新握手
+        for attempt in 1..3:
+          SendMessage(to=agent_name, message="【lead_ready】")
+          sleep(180)  // fix-executor 等待 180s
+          $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
+          if found: return RETRY  // 重新分配任务
+        return BLOCKED
 ```
 
 > idle_notification 语义：agent 空闲了，**可能**完成了工作。teammate-message 系统不转发工作报告（工作报告写入 inbox），只转发 idle_notification / permission_request / plan_approval_request。收到 idle 后必须主动检查 inbox/pane，不能假设工作已完成。

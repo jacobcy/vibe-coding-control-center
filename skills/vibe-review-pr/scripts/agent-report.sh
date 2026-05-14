@@ -146,6 +146,8 @@ OUTPUT="$(
 
 if [[ -z "$OUTPUT" ]]; then
   echo "report_event=missing" >&2
+  echo "No report yet. Agent may still be working. Check agent-exist.sh to verify status." >&2
+  echo "If stale/inactive, capture tmux pane content before retrying handshake." >&2
   exit 3
 fi
 
