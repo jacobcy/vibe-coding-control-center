@@ -1,26 +1,27 @@
-"""Helper functions for dispatch queue operations."""
+"""Queue operations for dispatch coordination."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
-from loguru import logger
-
-from vibe3.clients.github_labels import GhIssueLabelPort
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.issue_loader import (
+    find_role_for_state,
+    get_flow_context,
+    is_auto_task_branch,
+    load_issue,
+)
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
-from vibe3.roles.registry import LABEL_DISPATCH_ROLES
-from vibe3.utils.label_utils import should_skip_from_queue
+from vibe3.utils.label_utils import normalize_labels, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.flow_dispatch import FlowManager
-    from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
 def select_ready_issues(
@@ -106,74 +107,6 @@ def select_ready_issues(
         selected.append(issue)
 
     return sort_ready_issues(selected)
-
-
-def find_role_for_state(
-    state: IssueState,
-) -> "TriggerableRoleDefinition | None":
-    """Find the role definition for a state label."""
-    for role in LABEL_DISPATCH_ROLES:
-        if role.trigger_state == state:
-            return role
-    return None
-
-
-def normalize_labels(raw_labels: object) -> list[str]:
-    """Normalize raw labels from GitHub API.
-
-    Args:
-        raw_labels: Raw labels object from GitHub
-
-    Returns:
-        List of label names
-    """
-    labels: list[str] = []
-    if not isinstance(raw_labels, list):
-        return labels
-    for item in raw_labels:
-        if isinstance(item, dict):
-            name = item.get("name")
-            if isinstance(name, str) and name:
-                labels.append(name)
-    return labels
-
-
-def is_auto_task_branch(branch: str) -> bool:
-    """Check if branch is an auto-task branch.
-
-    Args:
-        branch: Branch name to check
-
-    Returns:
-        True if branch starts with 'task/issue-'
-    """
-    return branch.startswith("task/issue-")
-
-
-def get_flow_context(
-    issue_number: int,
-    config: OrchestraConfig,
-    github: "GitHubClient",
-    store: "SQLiteClient",
-    flow_manager: "FlowManager",
-) -> tuple[str, dict[str, object] | None]:
-    """Get flow context (branch and state) for an issue.
-
-    Args:
-        issue_number: Issue number to look up
-        config: Orchestra configuration
-        github: GitHub client
-        store: SQLite client
-        flow_manager: Flow manager
-
-    Returns:
-        Tuple of (branch, flow_state)
-    """
-    flow = flow_manager.get_flow_for_issue(issue_number)
-    branch = str(flow.get("branch") or "").strip() if flow else ""
-    if not branch:
-        return "", None
-    return branch, store.get_flow_state(branch)
 
 
 def promote_progressed_entries(
@@ -274,49 +207,3 @@ def promote_progressed_entries(
         )
 
     return promoted, retained, removed
-
-
-def load_issue(
-    issue_number: int, config: OrchestraConfig, github: "GitHubClient"
-) -> IssueInfo | None:
-    """Load the current issue snapshot for an already-frozen issue."""
-    from vibe3.models.orchestration import IssueInfo
-
-    try:
-        payload = github.view_issue(issue_number, repo=config.repo)
-    except Exception as exc:
-        logger.bind(domain="global_dispatch", issue=issue_number).error(
-            f"view_issue failed for #{issue_number}: {exc}"
-        )
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return IssueInfo.from_github_payload(payload)
-
-
-def clean_old_state_labels(
-    issue: IssueInfo,
-    role: "TriggerableRoleDefinition",
-    config: OrchestraConfig,
-) -> None:
-    """Remove conflicting state/* labels before dispatch.
-
-    Args:
-        issue: Issue to clean labels for
-        role: Role definition for this dispatch
-        config: Orchestra configuration
-    """
-    old_state_labels = [
-        lb
-        for lb in issue.labels
-        if lb.startswith("state/") and lb != role.trigger_state.to_label()
-    ]
-    if old_state_labels:
-        try:
-            label_port = GhIssueLabelPort(repo=config.repo)
-            for old_lb in old_state_labels:
-                label_port.remove_issue_label(issue.number, old_lb)
-        except Exception as exc:
-            logger.bind(domain="orchestra").warning(
-                f"Failed to clean old state labels for #{issue.number}: {exc}"
-            )
