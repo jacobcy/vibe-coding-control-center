@@ -24,6 +24,7 @@ from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.pr import PRState
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
@@ -115,14 +116,20 @@ class GlobalDispatchCoordinator:
         return ready
 
     def _emit_dispatch_intent(
-        self, role: "TriggerableRoleDefinition", issue: IssueInfo
+        self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
     ) -> None:
-        """Emit dispatch intent for an issue."""
+        """Emit dispatch intent for an issue.
+
+        Args:
+            role: Triggerable role definition
+            issue: Issue info
+            tick_id: Heartbeat tick number for error tracking
+        """
         # Pre-dispatch cleanup: remove conflicting state/* labels
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
-        publish(build_label_dispatch_event(role, issue, branch=branch))
+        publish(build_label_dispatch_event(role, issue, branch=branch, tick_id=tick_id))
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
         """Get flow context for an issue (backward compatibility)."""
@@ -134,8 +141,76 @@ class GlobalDispatchCoordinator:
         """Load issue snapshot (backward compatibility)."""
         return load_issue(issue_number, self._config, self._github)
 
-    async def coordinate(self) -> None:
-        """Run one heartbeat tick against the frozen queue."""
+    def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
+        """Check issue health before dispatch.
+
+        Health checks:
+        1. Issue must not be closed on GitHub
+        2. If issue has a PR, PR must not be merged
+
+        Returns:
+            True if issue is healthy and can be dispatched
+            False if issue should be skipped
+
+        Side effects:
+            - Closes issues with merged PRs
+            - Logs health check results
+        """
+        # Check 1: Issue closed on GitHub
+        try:
+            payload = self._github.view_issue(issue.number, repo=self._config.repo)
+        except Exception as e:
+            logger.bind(domain="orchestra").error(
+                f"Health check failed for #{issue.number}: {e}"
+            )
+            return True  # Fail open: dispatch if we can't verify
+        if isinstance(payload, dict) and payload.get("state") == "CLOSED":
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                f"(issue is closed on GitHub)",
+            )
+            return False
+
+        # Check 2: PR merged (auto-close issue)
+        pr_number = self._flow_manager.get_pr_for_issue(issue.number)
+        if pr_number:
+            try:
+                pr = self._github.get_pr(pr_number=int(pr_number))
+            except Exception as e:
+                logger.bind(domain="orchestra").warning(
+                    f"Failed to check PR #{pr_number} "
+                    f"for issue #{issue.number}: {e}"
+                )
+                return True  # Fail open
+            if pr is not None and pr.state == PRState.MERGED:
+                try:
+                    self._github.close_issue_if_open(
+                        issue.number,
+                        closing_comment=(
+                            f"PR #{pr_number} 已合并，系统自动关闭此 issue。"
+                        ),
+                        repo=self._config.repo,
+                    )
+                except Exception as e:
+                    logger.bind(domain="orchestra").error(
+                        f"Failed to close issue #{issue.number} after PR merge: {e}"
+                    )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    f"(PR #{pr_number} merged, issue auto-closed)",
+                )
+                return False
+
+        return True
+
+    async def coordinate(self, tick_id: int = 0) -> None:
+        """Run one heartbeat tick against the frozen queue.
+
+        Args:
+            tick_id: Current tick number from heartbeat (default: 0)
+        """
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
             if not self._frozen_queue:
@@ -237,6 +312,17 @@ class GlobalDispatchCoordinator:
                     self._frozen_queue.pop(index)
                     continue
 
+            # === NEW: Pre-dispatch health check ===
+            if not self._health_check_before_dispatch(issue):
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    "(health check failed)",
+                )
+                self._frozen_queue.pop(index)
+                continue
+            # === END health check ===
+
             try:
                 green = "\033[32m"
                 reset = "\033[0m"
@@ -245,7 +331,7 @@ class GlobalDispatchCoordinator:
                     f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
                     f"#{issue.number} ({role.registry_role})",
                 )
-                self._emit_dispatch_intent(role, issue)
+                self._emit_dispatch_intent(role, issue, tick_id)
                 entry.waiting_state = entry.collected_state
                 dispatched_count += 1
 

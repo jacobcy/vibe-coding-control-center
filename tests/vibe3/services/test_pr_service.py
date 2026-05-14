@@ -34,10 +34,8 @@ def no_conflict_git():
     return git
 
 
-def test_create_draft_pr_success(
-    pr_service: PRService, no_conflict_git: MagicMock
-) -> None:
-    """Test create draft PR success."""
+def test_create_pr_success(pr_service: PRService, no_conflict_git: MagicMock) -> None:
+    """Test create PR success."""
     gh_instance = pr_service.github_client
     gh_instance.check_auth.return_value = True
     gh_instance.get_current_branch.return_value = "feature-branch"
@@ -60,10 +58,11 @@ def test_create_draft_pr_success(
     with patch.object(pr_service, "git_client", no_conflict_git):
         with patch.object(pr_service, "store", mock_store):
             no_conflict_git.get_current_branch.return_value = "feature-branch"
-            pr = pr_service.create_draft_pr(title="Test PR", body="Test body")
+            pr = pr_service.create_pr(title="Test PR", body="Test body")
 
             assert pr.number == 123
             gh_instance.create_pr.assert_called_once()
+            assert gh_instance.create_pr.call_args[0][0].draft is False
             mock_store.update_flow_state.assert_called_once()
             mock_store.add_event.assert_called_once()
 
@@ -163,7 +162,19 @@ def test_pr_service_preserves_falsey_injected_dependencies() -> None:
     assert service.briefing_service.github_client is github_client
 
 
-def test_create_draft_pr_push_failure_surfaces_upstream_guidance(
+def test_pr_service_default_instantiation_creates_all_dependencies() -> None:
+    """PRService() with zero arguments creates all default collaborators."""
+    service = PRService()
+
+    assert service.github_client is not None
+    assert service.git_client is not None
+    assert service.store is not None
+    assert service.version_service is not None
+    assert service.briefing_service is not None
+    assert service.loc_comment_service is not None
+
+
+def test_create_pr_push_failure_surfaces_upstream_guidance(
     pr_service: PRService, no_conflict_git: MagicMock
 ) -> None:
     gh_instance = pr_service.github_client
@@ -178,7 +189,7 @@ def test_create_draft_pr_push_failure_surfaces_upstream_guidance(
 
     with patch.object(pr_service, "git_client", no_conflict_git):
         with pytest.raises(UserError) as exc_info:
-            pr_service.create_draft_pr(title="Test PR", body="Test body")
+            pr_service.create_pr(title="Test PR", body="Test body")
 
     message = str(exc_info.value)
     assert "git branch -vv" in message

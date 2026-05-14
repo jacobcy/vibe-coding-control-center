@@ -264,6 +264,21 @@ uv run ruff check
 
 只运行与本次改动相称的验证，但没有验证证据，不得声称完成。
 
+### CI 环境模拟验证
+
+对于可能在 CI 和本地环境表现不一致的测试（特别是 subprocess 测试）：
+
+```bash
+# 方式一：设置 CI 环境变量运行测试
+GITHUB_ACTIONS=true uv run pytest tests/vibe3/path/to/test.py
+
+# 方式二：使用 pre-push CI 模拟模式
+VIBE_CI_SIMULATE=1 bash scripts/hooks/pre-push.sh
+
+# 方式三：运行 CI parity 测试
+uv run pytest tests/vibe3/integration/test_ci_parity.py -v
+```
+
 ## 必须使用 Handoff Append 的触发场景
 
 以下情况**必须**立即 `handoff append`：

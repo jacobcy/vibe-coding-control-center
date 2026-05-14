@@ -42,7 +42,7 @@ def show(
         typer.Argument(help="Issue number (auto-resolves to task branch if exists)"),
     ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
-    format: FormatOption = "table",
+    output_format: FormatOption = "table",
     full: Annotated[
         bool, typer.Option("--full", help="Show complete summary without truncation")
     ] = False,
@@ -61,12 +61,12 @@ def show(
     entering manager/plan/executor/reviewer prompts.
     """
     # Handle deprecated --json flag
-    if json_output and format == "table":
+    if json_output and output_format == "table":
         typer.echo(
             "Warning: --json is deprecated, use --format json instead",
             err=True,
         )
-        format = "json"
+        output_format = "json"
 
     task_svc = TaskService()
 
@@ -92,10 +92,10 @@ def show(
         elif target_branch.isdigit():
             issue_number = int(target_branch)
 
-        render_task_show(task_result, format, full=full)
+        render_task_show(task_result, output_format, full=full)
 
         # Always show recent comments (if issue exists and not json/yaml output)
-        if issue_number and format == "table":
+        if issue_number and output_format == "table":
             issue_data = task_svc.fetch_issue_with_comments(issue_number)
             if issue_data == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")

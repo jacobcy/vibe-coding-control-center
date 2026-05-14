@@ -3,6 +3,7 @@
 import json
 import re
 from dataclasses import asdict
+from types import ModuleType
 from typing import TYPE_CHECKING
 
 from vibe3.ui.console import console
@@ -18,6 +19,13 @@ MAX_SUMMARY_LINES = 3  # Maximum summary lines shown in non-full mode
 MAX_COMMENTS_DISPLAY = 3  # Maximum recent comments to display
 
 
+def _get_yaml() -> ModuleType:
+    """Lazy import yaml to avoid unconditional import cost."""
+    import yaml
+
+    return yaml
+
+
 def build_task_show_payload(task_result: "TaskShowResult") -> dict[str, object]:
     """Build a single JSON payload for task show."""
     return task_result.to_payload()
@@ -25,14 +33,14 @@ def build_task_show_payload(task_result: "TaskShowResult") -> dict[str, object]:
 
 def render_task_show(
     task_result: "TaskShowResult",
-    format: str,
+    output_format: str,
     full: bool = False,
 ) -> None:
     """Render task show output.
 
     Args:
         task_result: Task show query result
-        format: Output format (json, yaml, or table)
+        output_format: Output format (json, yaml, or table)
         full: If True, show complete summary without truncation (table mode only)
     """
     # Handle case where no flow exists
@@ -43,12 +51,10 @@ def render_task_show(
             # Branch is an issue number without flow
             # Try to fetch and display basic issue info
             if task_result.issue_title or task_result.issue_state:
-                if format == "json":
-                    pr_data = (
-                        asdict(task_result.pr_summary)
-                        if task_result.pr_summary
-                        else None
-                    )
+                pr_data = (
+                    asdict(task_result.pr_summary) if task_result.pr_summary else None
+                )
+                if output_format == "json":
                     console.print(
                         json.dumps(
                             {
@@ -63,16 +69,9 @@ def render_task_show(
                         ),
                         markup=False,
                     )
-                elif format == "yaml":
-                    import yaml
-
-                    pr_data = (
-                        asdict(task_result.pr_summary)
-                        if task_result.pr_summary
-                        else None
-                    )
+                elif output_format == "yaml":
                     console.print(
-                        yaml.dump(
+                        _get_yaml().dump(
                             {
                                 "branch": branch,
                                 "issue_number": int(branch),
@@ -101,15 +100,13 @@ def render_task_show(
                             console.print(f"Checks: {pr.checks}")
                 return
             # No issue info available
-            if format in ("json", "yaml"):
+            if output_format in ("json", "yaml"):
                 output_data = {"branch": branch, "error": "No flow found"}
-                if format == "json":
+                if output_format == "json":
                     console.print(json.dumps(output_data), markup=False)
                 else:
-                    import yaml
-
                     console.print(
-                        yaml.dump(output_data, default_flow_style=False),
+                        _get_yaml().dump(output_data, default_flow_style=False),
                         markup=False,
                     )
             else:
@@ -117,22 +114,21 @@ def render_task_show(
                 console.print("Tip: Use 'vibe3 flow new' to create a flow")
             return
         # Non-numeric branch without flow
-        if format in ("json", "yaml"):
+        if output_format in ("json", "yaml"):
             output_data = {"branch": branch, "error": "No flow found"}
-            if format == "json":
+            if output_format == "json":
                 console.print(json.dumps(output_data), markup=False)
             else:
-                import yaml
-
                 console.print(
-                    yaml.dump(output_data, default_flow_style=False), markup=False
+                    _get_yaml().dump(output_data, default_flow_style=False),
+                    markup=False,
                 )
         else:
             console.print(f"[yellow]No flow found: {branch}[/]")
         return
 
     task = task_result.local_task
-    if format == "json":
+    if output_format == "json":
         console.print(
             json.dumps(
                 build_task_show_payload(task_result),
@@ -145,11 +141,9 @@ def render_task_show(
         )
         return
 
-    if format == "yaml":
-        import yaml
-
+    if output_format == "yaml":
         console.print(
-            yaml.dump(
+            _get_yaml().dump(
                 build_task_show_payload(task_result),
                 default_flow_style=False,
                 allow_unicode=True,
@@ -217,8 +211,8 @@ def render_task_show(
         console.print(f"Verdict: [{color}]{v.verdict}[/] ({v.actor})")
     if task.next_step:
         console.print(f"Next Step: {task.next_step}")
-    if task.blocked_by:
-        console.print(f"Blocked By: {task.blocked_by}")
+    if task.blocked_reason:
+        console.print(f"Blocked Reason: {task.blocked_reason}")
 
     if task_result.latest_ref:
         latest_ref = task_result.latest_ref

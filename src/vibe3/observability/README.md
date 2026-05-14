@@ -44,10 +44,10 @@ from loguru import logger
 
 # 绑定语义上下文（Agent 友好）
 logger.bind(
-    command="pr draft",
+    command="pr create",
     domain="pr",
-    action="create_draft"
-).info("Creating draft PR")
+    action="create_pr"
+).info("Creating PR")
 
 # 记录错误时保留完整堆栈
 try:
@@ -63,13 +63,13 @@ except Exception as e:
 from vibe3.observability import Tracer, TraceContext
 
 # 方式 1: 使用上下文管理器
-with TraceContext(command="pr draft", domain="pr"):
+with TraceContext(command="pr create", domain="pr"):
     # 执行命令
     pass
 
 # 方式 2: 使用 Tracer API
 tracer = Tracer()
-span = tracer.trace_call("service.pr.create_draft", args={"title": "Fix"})
+span = tracer.trace_call("service.pr.create", args={"title": "Fix"})
 span.result = {"pr_number": 123}
 ```
 

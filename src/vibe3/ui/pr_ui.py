@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def render_pr_created(pr: PRResponse) -> None:
-    console.print("[green]✓[/] Draft PR created successfully!")
+    console.print("[green]✓[/] PR created successfully!")
     console.print(f"\n[cyan]PR #{pr.number}[/]: {pr.title}")
     console.print(f"[dim]{pr.url}[/]")
     console.print(

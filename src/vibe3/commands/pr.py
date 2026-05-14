@@ -4,7 +4,7 @@ This module provides the main PR command group with all subcommands
 organized in separate modules for maintainability.
 
 Public commands:
-- create: Create draft PR
+- create: Create a pull request
 - ready: Mark PR as ready for review
 - show: Show PR details
 

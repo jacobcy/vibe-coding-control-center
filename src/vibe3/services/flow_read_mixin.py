@@ -16,6 +16,7 @@ class FlowReadMixin:
 
     store: SQLiteClient
     git_client: GitPathProtocol
+    github_client: GitHubClient | None = None
 
     def get_flow_state(self: Self, branch: str) -> FlowState | None:
         """Get flow state for branch.
@@ -53,7 +54,7 @@ class FlowReadMixin:
 
         # Fetch PR info from GitHub (truth)
         # TODO: Optimize with cache service when implemented
-        gh = GitHubClient()
+        gh = getattr(self, "github_client", None) or GitHubClient()
         pr_number, pr_ready = None, False  # Default values
 
         try:

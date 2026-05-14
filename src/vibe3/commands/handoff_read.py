@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timezone
+from types import ModuleType
 from typing import Annotated
 
 import typer
@@ -75,6 +76,13 @@ See also:
 """
 
 
+def _get_yaml() -> ModuleType:
+    """Lazy import yaml to avoid unconditional import cost."""
+    import yaml
+
+    return yaml
+
+
 def show(
     target: Annotated[
         str | None,
@@ -129,7 +137,7 @@ def status(
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
-    format: FormatOption = "table",
+    output_format: FormatOption = "table",
     verbose: VerboseOption = False,
     json_output: Annotated[
         bool,
@@ -142,12 +150,12 @@ def status(
 ) -> None:
     """Show current flow handoff status and recent records."""
     # Handle deprecated --json flag
-    if json_output and format == "table":
+    if json_output and output_format == "table":
         typer.echo(
             "Warning: --json is deprecated, use --format json instead",
             err=True,
         )
-        format = "json"
+        output_format = "json"
 
     with trace_scope(trace, "handoff status", domain="handoff"):
         logger.bind(command="handoff status", branch=branch).info(
@@ -175,7 +183,7 @@ def status(
             typer.echo(f"Error: {error}", err=True)
             raise typer.Exit(1) from error
 
-        if format == "json":
+        if output_format == "json":
             output = {
                 "state": result.state.model_dump(),
                 "events": [e.model_dump() for e in result.events],
@@ -183,14 +191,14 @@ def status(
             typer.echo(json.dumps(output, indent=2, default=str))
             return
 
-        if format == "yaml":
-            import yaml
-
+        if output_format == "yaml":
             output = {
                 "state": result.state.model_dump(),
                 "events": [e.model_dump() for e in result.events],
             }
-            typer.echo(yaml.dump(output, default_flow_style=False, allow_unicode=True))
+            typer.echo(
+                _get_yaml().dump(output, default_flow_style=False, allow_unicode=True)
+            )
             return
 
         # Table format (default)

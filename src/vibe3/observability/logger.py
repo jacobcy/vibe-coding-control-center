@@ -16,8 +16,8 @@ Usage:
     from loguru import logger
 
     logger.bind(
-        command="pr draft", domain="pr", action="create_draft"
-    ).info("Creating draft PR")
+        command="pr create", domain="pr", action="create_pr"
+    ).info("Creating PR")
 
 Reference: docs/v3/infrastructure/05-logging.md
 """

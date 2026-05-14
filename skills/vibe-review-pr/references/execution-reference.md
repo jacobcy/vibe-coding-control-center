@@ -1,322 +1,56 @@
-# Execution Reference
+# execution-reference
 
-承接 `SKILL.md`，提供消息样例与等待策略。SKILL.md 定义生命周期、phase 契约与质量标准；本文件只展示样例。
+只展示消息样例和常用诊断命令。完整流程以 SKILL.md 为准。
 
-> 审查会话只有 4 个 phase：背景调研 → 专项审查 → 综合判断 → 写回。完成 Phase 4 控制权回 Step 9。**没有 Phase 5**，不要操作 teammates 的 idle / pane / inbox。
+## 消息样例
 
-## Step 6: TeamCreate + Backlog Setup
-
-> **顺序铁律**：先 TeamCreate，后 TaskCreate。反序创建的 task 不关联 team，TaskList 永远返回空。
-> **显式 PR 编号入口铁律**：`/vibe-review-pr 821` 这类入口下，team-lead 在 Step 6 不得执行 `gh pr view` / `gh pr diff` / `git diff`。PR 基本信息和 diff 首次接触者必须是 Phase 1 的 `context-researcher`。
-
-```python
-# 1. 创建 Team
-TeamCreate(team_name="pr-review-team", description="PR review for PR #{pr_number}")
-
-# 2. TeamCreate 成功后先只创建 Phase 1 task
-t1 = TaskCreate(subject="Phase 1: Context research", description="...")
-
-# 3. 立即将 Phase 1 标记为 in_progress 并归属 team-lead
-TaskUpdate(
-  taskId=t1.id,
-  status="in_progress",
-  owner="team-lead",
-  metadata={
-    "handshake_protocol": "ordered_v1",
-    "lead_handshake_status": "ready",
-    "lead_ready_sent": False,
-    "task_activation_allowed": False,
-    "expected_next_action": "send_context_lead_ready",
-    "activation_state": "awaiting_lead_ready",
-  },
-)
-
-# 4. team-lead 先完成自身握手，再进入 Phase 1
-ToolSearch(query="select:SendMessage", max_results=1)
-
-# 5. spawn context-researcher 后，先发送 lead_ready；收到 agent_ready 后再发送正式任务
-# 6. 等待 context-researcher 报告后，再决定是否补建 Phase 2/3/4/5 tasks
-```
-
-## Phase 1: 背景调研
-
-产出 `phase_1_output` 并回传 team-lead。
-
-```yaml
-- tool: Agent
-  params:
-    team_name: pr-review-team
-    name: context-researcher
-    subagent_type: pr-context-researcher
-    model: haiku
-    prompt: |
-      【第一步只能握手】
-      你现在不得开始调研，也不得抢先自报 ready。
-      等待 team-lead 发送 `【lead_ready】`。
-      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-      在收到 team-lead 后续正式任务前，不得开始任何调研。
-
-- tool: SendMessage
-  params:
-    to: "context-researcher"
-    message: |
-      【lead_ready】team-lead 已完成握手。
-      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“【agent_ready】已就绪”；未完成握手前不得开始任何调研工作。
-
-- tool: SendMessage
-  params:
-    to: "context-researcher"
-    message: |
-      【正式调研任务】
-      收集 PR #{pr_number} 的背景：
-      1. 阅读 CLAUDE.md, AGENTS.md, docs/standards/glossary.md
-      2. 读取相关 issue 的 body 与 comments（task/issue-* 分支）
-      3. 分析依赖关系与时效性
-
-      完成后通过 SendMessage 发送结构化报告给 team-lead。
-```
-
-接收报告优先级：team inbox → teammate-message → 必要时 SendMessage 补发。
-fresh spawn 只有在收到"【agent_ready】已就绪"后，team-lead 才能把该 teammate 视为有效执行者。
-未收到 ready 的 context-researcher，即使后续发来报告，也不得作为有效 Phase 1 输出。
-握手成功后，才通过第二条 SendMessage 下发正式调研任务。
-对 fresh spawn 的 context-researcher，收到"【agent_ready】已就绪"后的下一条 team-lead 消息必须是正式调研任务；不得先发送"保持空闲""等待新 PR"之类待命指令。
-backlog metadata 应同步推进：发送 `lead_ready` 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`；收到 `agent_ready` 后写入 `task_activation_allowed=true, expected_next_action=send_context_task`。
-显式 PR 编号入口下，PR 状态、标题、标签、改动范围也必须来自该 Phase 1 报告，而不是 team-lead 自己的预调查。
-
-## Phase 2: 专项审查
-
-仅适用 `refactor / security / standard`。**Phase 1 必须先完成**，禁止并行启动。
-
-fresh spawn 的 Phase 2 agent 不在初始 prompt 中接收正式审查任务。
-它们必须先收到 team-lead 的 `lead_ready`，再回复 `agent_ready`，之后再由 team-lead 通过第二条 SendMessage 下发背景和正式任务。
-
-同一响应内并行 spawn：
-
-```yaml
-- tool: Agent
-  params:
-    team_name: pr-review-team
-    name: code-analyst
-    subagent_type: pr-code-analyst
-    model: sonnet
-    prompt: |
-      【第一步只能握手】
-      你现在不得开始审查，也不得抢先自报 ready。
-      等待 team-lead 发送 `【lead_ready】`。
-      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-      在收到 team-lead 后续正式任务前，不得开始任何审查。
-    run_in_background: true
-
-- tool: SendMessage
-  params:
-    to: "code-analyst"
-    message: |
-      【lead_ready】team-lead 已完成握手。
-      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“【agent_ready】已就绪”；未收到握手确认前，不得开始审查。
-
-- tool: SendMessage
-  params:
-    to: "code-analyst"
-    message: |
-      【正式审查任务】
-      分析 PR #{pr_number} 的代码质量。
-
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
-
-      请基于以上背景开始审查。
-
-- tool: Agent
-  params:
-    team_name: pr-review-team
-    name: architect-reviewer
-    subagent_type: pr-architect-reviewer
-    model: opus
-    prompt: |
-      【第一步只能握手】
-      你现在不得开始审查，也不得抢先自报 ready。
-      等待 team-lead 发送 `【lead_ready】`。
-      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-      在收到 team-lead 后续正式任务前，不得开始任何审查。
-    run_in_background: true
-
-- tool: SendMessage
-  params:
-    to: "architect-reviewer"
-    message: |
-      【lead_ready】team-lead 已完成握手。
-      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“【agent_ready】已就绪”；未收到握手确认前，不得开始审查。
-
-- tool: SendMessage
-  params:
-    to: "architect-reviewer"
-    message: |
-      【正式审查任务】
-      评估 PR #{pr_number} 的架构影响。
-
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
-
-      你可以使用 Bash 工具补充读取 diff / git show / git log 数据。
-
-- tool: Agent
-  params:
-    team_name: pr-review-team
-    name: security-reviewer
-    subagent_type: pr-security-reviewer
-    model: sonnet
-    prompt: |
-      【第一步只能握手】
-      你现在不得开始审查，也不得抢先自报 ready。
-      等待 team-lead 发送 `【lead_ready】`。
-      收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-      然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-      在收到 team-lead 后续正式任务前，不得开始任何审查。
-    run_in_background: true
-
-- tool: SendMessage
-  params:
-    to: "security-reviewer"
-    message: |
-      【lead_ready】team-lead 已完成握手。
-      请现在执行 ToolSearch(query="select:SendMessage", max_results=1)。
-      完成后仅回复“【agent_ready】已就绪”；未收到握手确认前，不得开始审查。
-
-- tool: SendMessage
-  params:
-    to: "security-reviewer"
-    message: |
-      【正式审查任务】
-      评估 PR #{pr_number} 的安全性。
-
-      ## PR #{pr_number} 背景报告
-      {phase_1_output}
-```
-
-除强制握手和正式任务激活外，fresh spawn 不需要额外 SendMessage 传背景。只有两类场景继续使用 SendMessage：
-
-- 复用上一轮已经存在的 teammate
-- Phase 2 过程中需要补发额外上下文
-
-但“握手用的 SendMessage”不在上述例外之外，它是 fresh spawn 的强制 gate：
-- 未回复“已就绪”的 teammate 不计入有效执行
-- 未通过握手的 teammate 报告必须丢弃，并在最终结论中标注审查不完整
-
-```yaml
-- tool: SendMessage
-  params:
-    to: "code-analyst"
-    message: |
-      ## 切换到 PR #{next_pr_number}
-      {phase_1_output_of_next_pr}
-      请基于以上背景分析新的 PR。
-```
-
-等待策略：idle 只表示空闲/等待态，最终结果以 `task-notification(status=completed)` 为准；默认 5 分钟超时；超时只能标"部分审查未完成"。
-
-### 多 PR 复用模式（第二个及之后的 PR）
-
-**不 spawn 新 agent**，给已有 agent 发新任务：
-
-```yaml
-- tool: SendMessage
-  params:
-    to: "code-analyst"
-    message: |
-      ## 切换到 PR #{next_pr_number}
-      {phase_1_output_of_next_pr}
-      请基于以上背景分析新的 PR。
-```
-
-注意：这里的“已有 agent”只指**上一轮任务已经完成并进入复用态**的 teammate。
-fresh spawn 且刚完成握手的 agent 不属于“已有空闲 teammate”；它的下一步必须是当前 PR 的正式任务，而不是待命。
-
-## Phase 3: 综合判断
-
-### 消息验证（强制）
+### idle notification
 
 ```
-if message.pr_number != current_pr_number:
-    检查 session 文件 → 确认是否存在正确报告 → 标注消息路由错误
+{"type":"idle_notification","from":"context-researcher","timestamp":"...","idleReason":"available"}
 ```
 
-定位 session 文件（消息错误时）：
+idle notification 是正常通知，说明 agent 正在工作。收到后运行 `agent-event.sh <agent>` 检查事件。
+
+### agent_ready
+
+```
+SendMessage(to="team-lead", message="【agent_ready】已就绪")
+```
+
+### agent_report
+
+```
+SendMessage(to="team-lead", message="【agent_report】
+
+## PR #843 审查报告
+
+# 审查范围
+...")
+```
+
+## 诊断命令
+
+### 检查 agent 存活
 
 ```bash
-cat ~/.claude/teams/pr-review-team/config.json | jq '.members[] | select(.name=="architect-reviewer")'
-cat ~/.claude/projects/.../<sessionId>.jsonl | grep -A 5 "PR #"
+skills/vibe-review-pr/scripts/agent-exist.sh <agent>
 ```
 
-### 缺失处理
+### 查看 agent 事件
 
-1. 检查 `required_agents - received_agents`
-2. 缺失 → 标"审查不完整"
-3. 冲突 → team-lead 仲裁并说明理由
-
-禁止：脑补缺失 agent 立场 / 假装收到完整报告 / 用错误内容作审查依据。
-
-### 写回前质量自查（按 SKILL.md 的 Review Quality Standards 8 条）
-
-逐条核对：无虚假评分、每条违规有规则引用、数字基于本 PR diff、不滑动靶点、无无关指标、扫了重复模式、测试评估区分性质、comment 格式合规。任一不满足先修正。
-
-## Phase 4: 写回与改进
-
-```yaml
-- action: 评估 execution_mode
-
-- condition: mode == "auto_fix"
-  tool: Agent
-  params:
-    team_name: pr-review-team
-    name: fix-executor
-    subagent_type: pr-fix-executor
-
-- tool: Bash
-  params:
-    command: gh pr comment {pr_number} --body "{final_report}"
+```bash
+skills/vibe-review-pr/scripts/agent-event.sh <agent>
 ```
 
-**comment 应含**：决策一行 / 已解决（带 diff） / 遗留（带规则引用） / follow-up issue 链接 / 审查依据。
+### 提取 agent 报告
 
-**comment 禁含**：百分制 / 字母评分 / 内部 phase 标题作叙事结构 / 与本 PR 无关的项目级指标。
-
-范围外的真实技术债转 follow-up issue，不塞 comment。
-
-## Step 10: 会话结束（TeamDelete 前必发 shutdown_request）
-
-```python
-# 1. 向所有活跃 teammates 广播 shutdown_request
-for agent in ["code-analyst", "architect-reviewer", "security-reviewer", "context-researcher"]:
-    SendMessage(to=agent, message={"type": "shutdown_request"})
-
-# 2. 等待 idle 通知（通常 < 5s），然后执行 TeamDelete
-TeamDelete()
-
-# 3. 若 TeamDelete 返回 "no team found"（agents 已自行退出）
-#    fallback 手动清理：
-#    rm -rf ~/.claude/teams/pr-review-team ~/.claude/tasks/pr-review-team
+```bash
+skills/vibe-review-pr/scripts/agent-report.sh <agent>
 ```
 
-## AskUserQuestion 样例
+### 检查 agent pane 错误
 
-执行模式：
-
-```yaml
-question: 请选择审核后的执行模式：1. auto-fix  2. comment-only  3. auto-decide  4. ask-each
-```
-
-继续下一 PR：
-
-```yaml
-question: |
-  PR #{pr_number} 审查完成。是否继续？
-  - continue: 复用当前 Team / agents 审查下一个
-  - end: TeamDelete，结束会话
+```bash
+tmux capture-pane -t <pane-id> -p -S -1000 | grep -E "ToolSearch|SendMessage|InputValidationError"
 ```

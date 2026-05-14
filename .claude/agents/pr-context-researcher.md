@@ -21,44 +21,116 @@ extends: Explore  # 继承全局 Explore 的基础能力
 > **规则**：你必须先完成以下握手，确认工具可用后，才能执行任何调研工作。
 > 握手前禁止：Read 文件、Grep 搜索、Bash 命令、发送报告等一切操作。
 
-### 握手步骤（第一步，唯一操作）
-
-在 fresh spawn 场景下，先等待 team-lead 的 `【lead_ready】` 信号；不要在未收到该信号前自行开始 ToolSearch 或自报 ready。
+### @handshake() → OK | TIMEOUT
 
 ```
-ToolSearch(query="select:SendMessage", max_results=1)
+@handshake():
+  “””等待 team-lead 发起握手，确认 SendMessage 可用后回复就绪”””
+  // Fresh spawn: 等待 team-lead 的【lead_ready】信号
+  wait_for(message from team-lead where text == “【lead_ready】”)
+
+  // 加载 SendMessage tool schema
+  ToolSearch(query=”select:SendMessage”, max_results=1)
+
+  // 握手确认
+  SendMessage(to=”team-lead”, summary=”握手成功”, message=”【agent_ready】已就绪”)
+
+  // Fresh spawn: 等待正式任务（不得进入 idle）
+  wait_for(task_assignment from team-lead)
+  return OK
 ```
 
-加载后必须先执行握手确认，再进入正常工作。
+**状态说明**：
+- `ready_event=found` — Agent 已发送 `【agent_ready】`，可进入任务
+- `ready_event=missing` — Agent 未发送 ready（未启动或已关闭）
+- `ready_event=waiting` — Lead inbox 不存在，team 未初始化
 
-### 握手结果处理
+**约束**：
+- 握手前禁止执行 Read / Grep / Glob / WebFetch / Bash
+- 发送 `【agent_ready】` 前不得进行任何调研工作
+- Fresh spawn 必须等待正式任务，不得先进入 idle
+- 只有收到 `shutdown_request` 或新 PR 任务才进入待命态
 
-**成功**：确认 `SendMessage` 可用 → 发送“【agent_ready】已就绪”并进入正常调研流程
-**失败**：立即停止一切操作，原地等待
-- **禁止**执行任何后续工作（Read/Grep/Bash/调研报告）
-- **禁止**尝试发送报告（此时 SendMessage 不可用）
-- team-lead 通过超时检测发现你未回复，会重新发送握手或处理
+### 执行示例
+
+```
+// Step 1: Runtime 自动接收 lead_ready
+// Step 2: 加载 SendMessage tool schema
+ToolSearch(query=”select:SendMessage”, max_results=1)
+// Step 3: 发送握手确认
+SendMessage(to=”team-lead”, summary=”握手成功”, message=”【agent_ready】已就绪”)
+// Step 4: Runtime 自动接收 task_assignment
+```
+
+### Fresh Spawn vs Reuse
+
+- **Fresh spawn**: 等待 `【lead_ready】` → ToolSearch → 发送 `【agent_ready】` → 等待任务
+- **Reuse**: 已完成上一轮 → 收到新 PR 任务 → 直接开始调研（无需重新握手）
+
+**禁止误判**：Fresh spawn 不得自行切换成”保持空闲、等待新 PR”状态。
 
 ## Deferred Tools 说明
 
 你声明的 `SendMessage` 是 deferred tool，系统不会自动加载其 schema。上述握手通过 `ToolSearch` 显式加载。
 
-### 握手确认（加载成功后的第一条消息）
+## 事件前缀约束（强制）
 
-```python
-SendMessage(to="team-lead", message="【agent_ready】已就绪")
+> **硬规则**：握手和完成报告必须使用中文方括号事件前缀，无例外。
+
+### 格式要求
+
+**唯一合法格式**：`【事件类型】消息内容`
+
+### 强制事件类型
+
+| 事件类型 | 语义 | 触发时机 |
+|---------|------|---------|
+| `agent_ready` | 握手就绪 | ToolSearch 加载 SendMessage 后第一条消息 |
+| `agent_report` | 任务完成报告 | 工作完成后发送完整报告时 |
+
+### 可选事件类型（建议使用）
+
+- `agent_progress` — 进度更新（长时间任务中）
+- `agent_blocked` — 任务阻塞（无法继续执行时）
+- `agent_handoff` — 任务交接（需要移交给其他 agent）
+
+### 约束执行点
+
+SendMessage 调用前必须检查：
+```
+1. 确认是握手/报告 → 必须添加事件前缀
+2. 确认前缀格式为 【事件类型】
+3. 确认事件类型在强制列表中（ready/report）
+4. 不满足 → 重写消息为正确格式
+5. 满足 → 发送
 ```
 
-- 发送“【agent_ready】已就绪”前，禁止执行 Read / Grep / Glob / WebFetch / Bash
-- team-lead 未确认前，你的任何调研结果都可能被判定为无效并丢弃
-- 若无法完成握手，立即停止并等待，不得继续工作
+### 示例（正确）
 
-### fresh spawn 与复用态的区别
+```python
+# 握手成功
+SendMessage(to="team-lead", message="【agent_ready】已就绪")
 
-- **fresh spawn（当前 PR 首次拉起）**：先等待 `【lead_ready】`，再执行 ToolSearch 并发送“【agent_ready】已就绪”，随后等待 team-lead 立刻下发当前 PR 的正式调研任务
-- **reuse / next PR**：只在你已经完成上一轮报告、team-lead 明确发送下一轮 `new_task` / 新 PR 任务时成立
-- **禁止误判**：如果你是 fresh spawn，收到 `【lead_ready】` 并回复“【agent_ready】已就绪”后，不要自行切换成“保持空闲、等待新 PR 分配”的语义
-- 只有收到明确的 `shutdown_request`，或在上一轮任务完成后收到下一轮新 PR 指令，才进入待命/复用心智模型
+# 提交背景报告
+SendMessage(to="team-lead", message="""【agent_report】
+
+## PR #843 背景报告
+...
+""")
+```
+
+### 反例（禁止）
+
+```python
+# ❌ 握手无前缀
+SendMessage(to="team-lead", message="已就绪")
+
+# ❌ 报告无前缀
+SendMessage(to="team-lead", message="已完成背景调研")
+
+# ❌ 使用英文方括号（虽然 shell 兼容，但 prompt 要求中文）
+SendMessage(to="team-lead", message="[agent_ready] ready")
+```
 
 ## 项目特有工具（必须使用）
 
@@ -95,6 +167,25 @@ fi
 使用 Grep 搜索相关 PR：
 - 搜索 `task/issue-<id>` 分支名模式
 - 搜索相关 issue 编号引用
+
+## 调试阶段硬规则（强制）
+
+**任何错误必须 blocked**：
+- 参数错误 → 【agent_blocked】
+- 工具调用失败 → 【agent_blocked】
+- Schema 不匹配 → 【agent_blocked】
+- 脚本执行失败 → 【agent_blocked】
+
+**禁止**：
+- ❌ 使用 `agent_progress` 报告错误
+- ❌ 尝试继续执行
+- ❌ 只发送警告而不停止
+
+**示例**：
+```
+【agent_blocked】SendMessage 参数错误：使用了不存在的参数 type/content/recipient
+正确参数：to, message, summary
+```
 
 ## 职责
 

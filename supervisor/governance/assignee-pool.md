@@ -54,7 +54,7 @@ Allowed:
 - `state/labels.write`: 两项动作，性质不同：
 
   1. **入池评估与标签补齐**（本职工作）：
-     触发条件：当前 issue 有 manager assignee，且缺少任何 `state/*` label
+     触发条件：当前 issue 有 manager assignee，且缺少任何 `state/*` label，**且已有优先级 label**（`priority/[0-9]` 或 legacy priority）
      - 必须先评估优先级：检查 issue 内容，确定合适的 `priority/[0-9]` 或 legacy priority
      - 检查并补齐 `roadmap/*` 标签（如缺失）
      - 检查并补齐 `priority/*` 标签（如缺失）
@@ -62,6 +62,7 @@ Allowed:
      - **禁止**在 priority 评估完成前设置 `state/ready`
      - 设置后必须写 `[governance suggest]` comment 说明评估依据
      - 如果认为前一个 agent 判断错误或不值得执行，写 `[governance suggest]` 建议而非直接拒绝
+     - **关键要求**：优先级 label 是 assignee pool 评估的证据。有 priority = 已经过 assignee pool 评估，只是漏改 state；无 priority = 还没经过 assignee pool，应走完整评估流程
 
   2. **漏改 blocked 恢复**（唯一补偿动作）：
      触发条件：当前 issue 已在 `state/blocked`
@@ -248,12 +249,15 @@ Steps:
 4. **入池评估与标签补齐**：
    - 扫描 assignee issue pool 中有 manager assignee 但缺少 `state/*` label 的 issue
    - 对每个候选 issue：
-     a. 检查是否已有活跃 flow（`has_flow=True`）→ 跳过（说明已在执行中）
-     b. 评估优先级：阅读 issue 内容，确定合适的 `priority/[0-9]` 或 legacy priority
-     c. 检查并补齐 `roadmap/*` 标签（如缺失）
-     d. 检查并补齐 `priority/*` 标签（如缺失）
-     e. 设置 `state/ready`
-     f. 写 `[governance suggest]` comment 说明评估依据
+     a. 检查是否已有优先级 label（`priority/[0-9]` 或 legacy priority）
+        - **若无优先级 label**：这是 roadmap intake 刚分配的 assignee，应走完整评估流程（步骤 b-f）
+        - **若已有优先级 label**：说明已经过 assignee pool 评估，只是漏改 state，可直接跳到步骤 e
+     b. 检查是否已有活跃 flow（`has_flow=True`）→ 跳过（说明已在执行中）
+     c. 评估优先级：阅读 issue 内容，确定合适的 `priority/[0-9]` 或 legacy priority
+     d. 检查并补齐 `roadmap/*` 标签（如缺失）
+     e. 检查并补齐 `priority/*` 标签（如缺失）
+     f. 设置 `state/ready`
+     g. 写 `[governance suggest]` comment 说明评估依据
    - **禁止**在 priority 评估完成前设置 `state/ready`
 5. **Blocked Issues 抽查恢复**：
    - 随机抽取 1-2 个处于 `state/blocked` 的 issues 进行检查

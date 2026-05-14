@@ -88,43 +88,6 @@ class PRReadMixin:
             metadata=None,
         )
 
-    def get_pr_commits(self: Any, pr_number: int) -> list[str]:
-        """Get list of commit SHAs for a PR."""
-        logger.bind(
-            external="github",
-            operation="get_pr_commits",
-            pr_number=pr_number,
-        ).debug("Calling GitHub API: get_pr_commits")
-
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                str(pr_number),
-                "--json",
-                "commits",
-                "--jq",
-                ".commits[].oid",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        # Parse commit SHAs from output
-        commits = [
-            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
-        ]
-
-        logger.bind(
-            external="github",
-            pr_number=pr_number,
-            commit_count=len(commits),
-        ).debug("Retrieved PR commits")
-
-        return commits
-
     def list_all_prs(
         self: Any, state: str = "open", limit: int = 100
     ) -> list[PRResponse]:

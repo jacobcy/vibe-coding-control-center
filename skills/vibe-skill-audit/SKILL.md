@@ -52,6 +52,7 @@ Forbidden:
 - **Lead 最小权限**：如果流程设计要求 subagent 先完成背景调研或专项审查，team-lead 不得在 backlog / 握手前执行原本属于 subagent 的预调查动作；显式 PR 编号入口下，`gh pr view/diff`、`git diff/log/show` 这类上下文采集默认属于 agent，不属于 lead
 - **fresh spawn / 复用分离**：首次 spawn 的 agent 与已完成上一轮任务的复用 teammate 必须使用不同语义；不得把“待命/等待新 PR”指令混入 fresh spawn 的握手后路径
 - **backlog gate 可判定**：关键握手/激活流程不仅要有 `handshake_status`，还应有 `expected_next_action`、`task_activation_allowed`、`activation_state` 之类可判定字段，避免 lead 口头宣布状态却没有 metadata 证据
+- **伪代码符号约定**：使用伪代码的 skill 必须包含 Pseudocode Convention 节，明确定义 `@function()`（伪代码函数）、`ToolName()`（真实 Tool）、`$ cmd`（Shell 命令）、`{variable}`（占位符）的视觉区分规则；不得出现 agent 无法判断是伪代码还是真实命令的模糊写法
 
 ## Truth Sources
 
@@ -81,7 +82,8 @@ Forbidden:
 11. 涉及 team-lead + subagent 分工的 skill，必须检查 lead 是否被误授予“预调查”权限；如果显式 PR 入口要求 lead 先 `gh pr view/diff`，直接判 Blocking
 12. 涉及 fresh spawn + reuse 两种模式的 skill，必须检查两者是否显式分离；如果刚握手成功的 fresh spawn agent 被允许进入 idle/待命语义，直接判 Blocking
 13. 涉及双向握手的 skill，必须检查是否存在明确时序；如果 lead 和 agent 可以同时各说一次“已就绪”而没有 `lead_ready -> agent_ready` 顺序，直接判 Blocking
-14. 涉及 backlog task gate 的 skill，必须检查 metadata 是否足以判定“下一步只允许什么”；如果只有自然语言约束，没有 `expected_next_action` / `task_activation_allowed` 之类字段，默认视为脆弱设计
+14. 涉及 backlog task gate 的 skill，必须检查 metadata 是否足以判定”下一步只允许什么”；如果只有自然语言约束，没有 `expected_next_action` / `task_activation_allowed` 之类字段，默认视为脆弱设计
+15. 涉及伪代码的 skill，必须检查是否定义了 Pseudocode Convention 节；若伪代码函数与真实 Tool 调用无法视觉区分（如 `stop()` vs `TeamCreate()`），直接判 Blocking
 
 ## `exit()` 语义
 
@@ -166,6 +168,35 @@ Steps:
 
 Exit: 发现绕过 Shell 边界时立即修正改用真实命令；能力不存在时标注 `Capability Gap`
 
+### `check_pseudocode_convention()`
+
+Inputs: skill 文案（全部 SKILL.md 内容）
+
+Steps:
+
+1. 判断 skill 是否包含伪代码（检查是否存在缩进伪代码块、`Phase_N()` 定义、`// comment` 注释等伪代码特征）
+2. 若无伪代码特征 → 跳过本检查，返回 N/A
+3. 若有伪代码，检查是否定义了 **Pseudocode Convention** 节：
+   - 未定义 → 判 `Blocking`，必须补充
+4. Pseudocode Convention 节必须明确以下视觉区分规则：
+   - `@function()` 前缀用于伪代码函数（本文件定义的元指令）
+   - `ToolName()` 首字母大写无前缀用于真实的 Claude Code Tool
+   - `$ cmd` 前缀用于伪代码块中的 Shell 命令
+   - `{variable}` 用于占位符
+   - `` ```bash `` 代码块用于可直接执行的 Shell 脚本
+5. 检查实际使用是否与约定一致：
+   - 伪代码函数是否统一使用 `@` 前缀（`@stop` / `@handshake` 等）
+   - 真实 Tool 调用是否无前缀（`TeamCreate` / `SendMessage` 等）
+   - 脚本调用是否区分了 `$ cmd`（伪代码内）vs `` ```bash ``（独立执行）
+   - 是否存在 `function_name()` 无前缀的模糊写法（agent 无法判断是伪代码还是真实 Tool）
+6. 检查是否存在违反显式停止条件的模糊模式：
+   - `handle errors appropriately` → 应改为 `if exit ≠ 0: @stop("原因")`
+   - `wait for completion` → 应改为 `@wait_for_report(...)` 或 `if timeout: @stop(...)`
+   - `use script.sh` 或 `check file.md` → 应明确是执行还是读取参考
+7. 返回伪代码约定状态（Aligned / Blocking / N/A）
+
+Exit: 伪代码约定缺失或实际使用不一致 → 判 `Blocking`，立即修正；模糊命令引用 → 标注具体行号并修正
+
 ### `handle_create()`
 
 When: 用户要求创建新的 `skills/vibe-*`
@@ -199,7 +230,7 @@ Forbidden: 保留过时描述作为主路径、只报漂移警告而不修正、
 Steps:
 
 1. 读取目标 skill 文案
-2. 执行 `check_command_alignment()`、`check_standard_citation()`、`check_shell_boundary()` 验证
+2. 执行 `check_command_alignment()`、`check_standard_citation()`、`check_shell_boundary()`、`check_pseudocode_convention()` 验证
 3. 如目标 skill 含 subagent / workflow / backlog task：额外检查关键约束是否已固化为 backlog task、metadata、状态检查、结果过滤等 gate；若只有 prompt 约束、缺少 gate、或存在可被误读的执行顺序，视为 Blocking
 4. 如目标 skill 含 handshake / verify / approve：额外检查 spawn 初始 prompt 是否只包含当前阶段允许动作；若在 handshake 阶段混入任何正式工作（如 gh pr view/diff、读取 diff、开始审查、开始调研），视为 Blocking
 5. 如目标 skill 含显式 PR / MR / diff 入口：额外检查 lead 是否在 spawn / backlog / 握手之前被要求执行 `gh pr view/diff`、`git diff/log/show` 等预调查；若是，视为 Blocking，必须改成“lead 先建 task + 发起握手，context/reviewer agent 成为首个接触 diff 的主体”
@@ -255,6 +286,7 @@ Steps:
    - `check_command_alignment()`：提取所有 `vibe3` 命令，逐一 CLI help 验证
    - `check_standard_citation()`：提取所有标准文件引用，检查存在性和必引用完整性
    - `check_shell_boundary()`：识别共享状态/外部系统操作，检查是否使用 `vibe3` 命令
+   - `check_pseudocode_convention()`：若 skill 含伪代码，检查 Pseudocode Convention 节是否存在、视觉区分规则是否完整、实际使用是否一致
 
 7. **SKILL.md 最小规范检查**（基于 skill-standard.md 第 174-188 行）：
    - 检查是否有 Overview、When to Use、Execution Flow、Guardrails 部分
@@ -277,6 +309,9 @@ Steps:
     - Stable Reads 是否列出标准工具（ls, cat, python3, bash, git, uv）
     - 伪代码步骤是否清晰可执行，无含糊表述
     - Inputs / Steps / Exit 结构是否完整
+    - 若 skill 使用伪代码，检查 Pseudocode Convention 节：`@` 伪代码函数 / `ToolName()` 真实 Tool / `$ cmd` Shell 命令 / `{variable}` 占位符 是否均已定义且实际使用一致
+    - 检查伪代码块中是否存在 `function_name()` 无前缀写法（agent 无法判断是伪代码还是真实 Tool）
+    - 检查脚本引用是否区分了"执行"（`$ script.sh`）vs "读取参考"（`Read reference: ...`），禁止出现 `use script.sh` / `check file.md` 等模糊指令
     - 若 skill 涉及 subagent / workflow / backlog task：检查是否把关键行为固化为 backlog task、metadata、状态检查、结果过滤等 gate
     - 检查是否存在“写了必须先验证/先握手，但执行模板先开始工作”的顺序漏洞
     - 检查 reference 样例、执行模板、agent 文案之间是否互相打架，给 agent 留下“我以为 prompt 已经正式放行”的解释空间
@@ -343,6 +378,7 @@ Steps:
     | 术语使用 | ⭐ X/5 | 符合 glossary.md，无废弃术语 |
     | 动作词边界 | ⭐ X/5 | 符合 action-verbs.md，未超出语义 |
     | SKILL.md 结构 | ⭐ X/5 | Overview/When to Use/Flow/Guardrails 完整 |
+    | 伪代码约定 | ⭐ X/5 | Pseudocode Convention 完整、视觉区分一致 |
     | 虚构参数检查 | ⭐ X/5 | 无虚构路径/用户名/命令 |
     | 工具推荐 | ⭐ X/5 | 工具明确可执行 |
     | 执行流程 | ⭐ X/5 | 步骤清晰无含糊 |
@@ -358,10 +394,11 @@ Steps:
     - 动作词边界超出评分不得高于 3/5
     - 虚构参数评分不得高于 3/5
     - 文件超过 400 行且存在冗余评分不得高于 3/5
+    - **使用伪代码但缺少 Pseudocode Convention 节评分不得高于 3/5**
     - 完全符合所有标准评分 5/5
 
 16. **输出审计报告**：
-    - 已执行检查清单（用 ✅ 标记）：前置规范阅读、被审核 skill 必读文档检查、对象模型边界检查、术语检查、动作词检查、SKILL.md 结构检查、命令对齐、标准引用、Shell 边界、虚构参数检查、工具推荐、执行流程检查、冗余清理
+    - 已执行检查清单（用 ✅ 标记）：前置规范阅读、被审核 skill 必读文档检查、对象模型边界检查、术语检查、动作词检查、SKILL.md 结构检查、命令对齐、标准引用、Shell 边界、伪代码约定检查、虚构参数检查、工具推荐、执行流程检查、冗余清理
     - 所有发现及修正情况（发现位置、问题、违规类型、严重程度、修正方案）
     - 冗余清理情况：清理内容类型、清理位置、清理行数、清理后文件行数
     - 未修正警告的原因说明
@@ -374,6 +411,7 @@ Steps:
     - 确认无虚构参数残留
     - 确认无对象模型重定义
     - 确认术语和动作词符合真源
+    - 确认伪代码约定（如适用）：Pseudocode Convention 节存在、`@`/`$`/`{var}` 前缀一致、无模糊命令引用
 
 18. `exit()`
 
@@ -385,6 +423,7 @@ Hard rule:
 - **文件超过 400 行且存在冗余内容时必须清理**，评分不得高于 3/5
 - **涉及 subagent / workflow 的 skill，如关键约束只存在于 prompt 而未落到 gate，必须判为 Blocking 并立即修正**
 - **涉及 handshake / verify / approve 的 skill，如 spawn 初始 prompt 混入正式工作，必须判为 Blocking 并立即修正**
+- **使用伪代码但缺少 Pseudocode Convention 节，或伪代码函数与真实 Tool 无法视觉区分，必须判为 Blocking 并立即修正**
 - 审计完成后必须提供质量评分表和预估效果表（含文件体积对比）
 - 必须验证修正和清理结果，确认无残留问题和冗余表述
 
@@ -392,10 +431,10 @@ Hard rule:
 
 审计报告必须包含：
 
-1. **已执行检查清单**（✅ 标记）：前置规范阅读（skill-audit 读 skill-standard/glossary/action-verbs）、被审核 skill 必读文档检查（不超过 3 个、业务相关、不包含 glossary/action-verbs）、对象模型边界检查、术语检查、动作词检查、SKILL.md 结构检查、命令对齐、标准引用、Shell 边界、虚构参数检查、工具推荐、执行流程检查、冗余清理
+1. **已执行检查清单**（✅ 标记）：前置规范阅读（skill-audit 读 skill-standard/glossary/action-verbs）、被审核 skill 必读文档检查（不超过 3 个、业务相关、不包含 glossary/action-verbs）、对象模型边界检查、术语检查、动作词检查、SKILL.md 结构检查、命令对齐、标准引用、Shell 边界、伪代码约定检查、虚构参数检查、工具推荐、执行流程检查、冗余清理
 
 2. **发现分类**：
-   - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、必读文档超过 3 个、必读文档包含 glossary/action-verbs、prompt-only gate、执行顺序自相矛盾、handshake 阶段混入正式工作、reference/template/agent 文案互相冲突（必须修正）
+   - `Blocking`: 真源违规、对象模型重定义、术语混用、动作词边界超出、虚构参数、必读文档超过 3 个、必读文档包含 glossary/action-verbs、prompt-only gate、执行顺序自相矛盾、handshake 阶段混入正式工作、reference/template/agent 文案互相冲突、**伪代码缺少 Pseudocode Convention 节、伪代码函数与真实 Tool 无法视觉区分**（必须修正）
    - `Missing Reference`: 缺失标准引用、缺失必读文档部分、必读文档缺失业务相关标准（必须补充）
    - `Skill Structure Violation`: 缺失 Overview/When to Use/Execution Flow/Guardrails（必须补充）
    - `Capability Gap`: skill 需要的命令不存在（必须标注）
@@ -403,7 +442,7 @@ Hard rule:
 
    Blocking/Missing Reference/Skill Structure Violation 必须标注：发现位置（行号）、问题描述、违规类型、严重程度（HIGH/MEDIUM/LOW）、修正方案
 
-3. **质量评分表**（十维度 ⭐ 1-5/5）：前置规范阅读（skill-audit 自己）、必读文档检查（不超过 3 个、业务相关）、对象模型边界、术语使用、动作词边界、SKILL.md 结构、虚构参数检查、工具推荐、执行流程、冗余清理
+3. **质量评分表**（十一维度 ⭐ 1-5/5）：前置规范阅读（skill-audit 自己）、必读文档检查（不超过 3 个、业务相关）、对象模型边界、术语使用、动作词边界、SKILL.md 结构、伪代码约定、虚构参数检查、工具推荐、执行流程、冗余清理
 
 4. **冗余清理情况**：清理内容类型（重复表述/过度详细表格/重复 Restrictions）、清理位置（行号范围）、清理行数、清理后文件行数、清理效果评估
 

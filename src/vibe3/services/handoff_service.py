@@ -231,7 +231,7 @@ class HandoffService:
         if next_step:
             flow_updates["next_step"] = next_step
         if blocked_by:
-            flow_updates["blocked_by"] = blocked_by
+            flow_updates["blocked_reason"] = blocked_by
 
         if verdict:
             role = extract_role_from_actor(effective_actor)

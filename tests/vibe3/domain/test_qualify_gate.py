@@ -302,20 +302,12 @@ class TestGetIssueDependencies:
     def test_dependencies_found(self, qualify_gate_service, mock_store):
         """Should return dependency issue numbers."""
         mock_store.get_flows_by_issue.return_value = [{"branch": "task/issue-123-test"}]
+        mock_store.get_dependency_links.return_value = [456, 789]
 
-        # Mock sqlite3 connection
-        mock_cursor = Mock()
-        mock_cursor.fetchall.return_value = [(456,), (789,)]
-
-        mock_conn = Mock()
-        mock_conn.cursor.return_value = mock_cursor
-        mock_conn.__enter__ = Mock(return_value=mock_conn)
-        mock_conn.__exit__ = Mock(return_value=False)
-
-        with patch("sqlite3.connect", return_value=mock_conn):
-            result = qualify_gate_service._get_issue_dependencies(123)
+        result = qualify_gate_service._get_issue_dependencies(123)
 
         assert result == [456, 789]
+        mock_store.get_dependency_links.assert_called_once_with("task/issue-123-test")
 
 
 class TestIsDependencySatisfied:

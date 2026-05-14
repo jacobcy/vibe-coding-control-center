@@ -51,6 +51,8 @@ class OrchestrationFacade(ServiceBase):
         capacity: "CapacityService | None" = None,
         failed_gate: "FailedGate | None" = None,
         store: "SQLiteClient | None" = None,
+        github: "GitHubClient | None" = None,
+        flow_manager: "FlowManager | None" = None,
     ) -> None:
         """Initialize facade with tick counter.
 
@@ -67,6 +69,10 @@ class OrchestrationFacade(ServiceBase):
                 here; gating belongs on the authoritative sync execution path.
             store: Optional SQLiteClient for dependency injection. When omitted
                 with capacity provided, creates a new SQLiteClient instance.
+            github: Optional GitHubClient for dependency injection. When omitted,
+                creates a new GitHubClient instance.
+            flow_manager: Optional FlowManager for dependency injection. When omitted,
+                creates a new FlowManager instance with the provided config.
         """
         self._tick_count = tick_count
         self._config = config or load_orchestra_config()
@@ -75,6 +81,8 @@ class OrchestrationFacade(ServiceBase):
         self._capacity = capacity
         self._coordinator: GlobalDispatchCoordinator | None = None
         self._failed_gate = failed_gate
+        self._github = github or GitHubClient()
+        self._flow_manager = flow_manager or FlowManager(self._config)
 
         if self._capacity is not None:
             from vibe3.environment.session_registry import SessionRegistryService
@@ -83,15 +91,13 @@ class OrchestrationFacade(ServiceBase):
             )
 
             actual_store = store or SQLiteClient()
-            github = GitHubClient()
-            flow_manager = FlowManager(self._config)
             registry = SessionRegistryService(actual_store, self._capacity._backend)
             self._coordinator = GlobalDispatchCoordinator(
                 config=self._config,
                 capacity=self._capacity,
-                github=github,
+                github=self._github,
                 store=actual_store,
-                flow_manager=flow_manager,
+                flow_manager=self._flow_manager,
                 registry=registry,
             )
 
@@ -100,7 +106,7 @@ class OrchestrationFacade(ServiceBase):
         if self._coordinator:
             self._coordinator.shutdown()
 
-    async def on_tick(self) -> None:
+    async def on_tick(self, tick_id: int = 0) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
 
         Called by runtime heartbeat periodically:
@@ -108,6 +114,9 @@ class OrchestrationFacade(ServiceBase):
         2. Publishes SupervisorIssueIdentified for matching issues
         3. Reconciles in-flight markers (always, even when frozen)
         4. Polls issue labels and dispatches (only when not frozen)
+
+        Args:
+            tick_id: Current tick number from HeartbeatServer (default: 0)
         """
 
         self.on_heartbeat_tick()
@@ -146,6 +155,12 @@ class OrchestrationFacade(ServiceBase):
 
         # Poll issue labels for all trigger states
         if self._coordinator is None:
+            logger.bind(
+                domain="orchestration_facade",
+            ).warning(
+                "GlobalDispatchCoordinator not initialized, dispatch skipped "
+                "(capacity not provided)"
+            )
             return
 
         # Always reconcile session state to prevent stale capacity tracking.
@@ -171,7 +186,7 @@ class OrchestrationFacade(ServiceBase):
                 )
                 # Continue to dispatch even if reconciliation fails
 
-        await self._coordinator.coordinate()
+        await self._coordinator.coordinate(tick_id)
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event.
@@ -296,8 +311,6 @@ class OrchestrationFacade(ServiceBase):
             reason: Reason for the decision requirement
             suggested_action: Optional suggested action
         """
-        from vibe3.clients.github_client import GitHubClient
-
         logger.bind(
             domain="orchestration_facade",
             issue_number=issue_info.number,
@@ -308,7 +321,7 @@ class OrchestrationFacade(ServiceBase):
         if suggested_action:
             comment_body += f"**Suggested Action**: {suggested_action}\n\n"
 
-        GitHubClient().add_comment(issue_info.number, comment_body)
+        self._github.add_comment(issue_info.number, comment_body)
 
     async def on_supervisor_scan(self) -> tuple[int, int]:
         """扫描 supervisor candidates 并发布 SupervisorIssueIdentified 事件.
@@ -333,13 +346,11 @@ class OrchestrationFacade(ServiceBase):
             )
             return (0, 0)
 
-        from vibe3.clients.github_client import GitHubClient
         from vibe3.roles.supervisor import iter_supervisor_identified_events
 
-        github = GitHubClient()
         config = self._config
 
-        raw_issues = github.list_issues(
+        raw_issues = self._github.list_issues(
             limit=100,
             state="open",
             assignee=None,
