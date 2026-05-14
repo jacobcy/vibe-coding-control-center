@@ -60,16 +60,13 @@ def select_ready_issues(
         if not any(lbl.startswith("state/") for lbl in labels):
             continue
 
-        # Skip blocked issues (FAILED unified to BLOCKED)
-        if IssueState.BLOCKED.to_label() in labels:
-            continue
-
         issue = IssueInfo.from_github_payload(item)
         if issue is None:
             continue
 
         # BLOCKED_ROLE: collect all candidates without qualify gate.
         # Gate runs at intent time in GlobalDispatchCoordinator.
+        # This allows blocked issues to be collected and checked for unblock conditions.
         if role.trigger_name == "blocked":
             selected.append(issue)
             continue
