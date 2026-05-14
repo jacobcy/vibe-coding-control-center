@@ -1,804 +1,90 @@
 # PR Review Team Template
 # 用于 vibe-review-pr skill 加载团队配置
-#
-# === 执行说明 ===
-# 1. Skill 读取此配置后，应按 workflow.phases 顺序执行
-# 2. 每个 phase 的 agents 列表指示需要 spawn 的 teammates
-# 3. 使用 Agent tool spawn teammate:
-#    Agent(team_name="pr-review-team", name="<agent-name>",
-#          subagent_type="<subagent_type>", model="<model>", prompt="<prompt>")
-# 4. fresh spawn 背景优先写入 prompt；复用 teammates 或补充上下文时再用 SendMessage
-# 5. Phase 4 由 team-lead 执行（当前 session），不需要 spawn
+# 详细执行流程以 SKILL.md 为准
 
 name: pr-review-team
-description: 多代理协作的 PR 审查团队，支持背景调研、代码分析、安全审查、架构评估
-
-# Team 创建配置（供 Step 6 在确认 team 缺席后调用 TeamCreate 使用）
-team_create_config:
-  team_name: pr-review-team
-  agent_type: general-purpose  # team-lead 类型
+description: 多 agent 协作的 PR 审查团队
 
 # 执行模式配置
 execution_mode:
-  # 可选值：auto-fix, comment-only, auto-decide, ask-each
-  # 默认 ask-each（最安全）
   default: ask-each
-
-  # 模式说明
   modes:
     auto-fix:
       description: 自动修复审核发现的问题并提交
-      trigger: 用户明确要求自动修复
-      workflow: review → fix → commit → comment
-      risk: 高（可能引入新问题）
-
     comment-only:
       description: 只发布审核意见，不修改代码
-      trigger: 用户要求只审核不修复
-      workflow: review → comment
-      risk: 无
-
     auto-decide:
-      description: team-lead 根据PR复杂度自动决定
-      trigger: 用户授权自动决策
-      workflow: review → lead判断 → fix或comment
-      risk: 中（依赖lead判断）
-      decision_criteria:
-        # 复杂度评估指标
-        complexity_factors:
-          - name: 改动行数
-            weight: 0.3
-            thresholds:
-              low: "< 50 行"
-              medium: "50-200 行"
-              high: "> 200 行"
-          - name: 文件数
-            weight: 0.2
-            thresholds:
-              low: "1-2 个文件"
-              medium: "3-5 个文件"
-              high: "> 5 个文件"
-          - name: 安全相关
-            weight: 0.4
-            thresholds:
-              low: "无安全标签"
-              medium: "涉及认证/授权"
-              high: "安全修复或敏感数据处理"
-          - name: 测试覆盖
-            weight: 0.1
-            thresholds:
-              low: "有完整测试"
-              medium: "部分测试"
-              high: "无测试"
-
-        # 决策矩阵
-        decision_matrix:
-          auto_fix:
-            condition: "复杂度得分 < 0.3 且无安全相关改动"
-            confidence_threshold: 0.85
-          ask_user:
-            condition: "复杂度得分 >= 0.3 或有安全相关改动"
-          comment_only:
-            condition: "复杂度得分 >= 0.7 或 lead 置信度 < 0.6"
-
+      description: team-lead 根据 PR 复杂度自动决定
     ask-each:
       description: 每次审核完毕后询问用户
-      trigger: 默认模式
-      workflow: review → 询问用户 → 执行用户选择
-      risk: 无（用户决策）
-      prompt: |
-        审核完成。请选择后续操作：
-        1. 直接根据审核意见修复代码
-        2. 将意见写回 PR comments
-        3. 由 team-lead 协助决定
-
-        输入数字 (1/2/3) 或描述你的需求：
 
 # 环境要求
 requirements:
-  tmux: required  # 必须在 tmux session 内
-  team_mode: required  # CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+  tmux: required
+  team_mode: required
 
-# 启动前检查
-preflight_checks:
-  - name: 检查已有 agent
-    command: "ls ~/.claude/agents/*.md | xargs -I {} basename {} .md"
-    action: |
-      如果全局已有类似功能的 agent：
-      - 优先复用全局 agent（设置 agentType）
-      - 或继承其定义，添加项目特定的 prompt 扩展
-      - 不要创建重复功能的 agent
-  - name: 检查团队成员
-    command: "cat ~/.claude/teams/{team-name}/config.json | jq '.members | length'"
-    action: |
-      如果团队成员超过 10 个：
-      - 提示用户当前 team 现场可能复杂
-      - 优先继续复用当前 team
-      - 如人类明确决定结束当前 team，应走 Step 10，而不是恢复路径
-  - name: 检查现有 teammates
-    command: "tmux list-panes -a 2>/dev/null | grep -c '\\%' || echo 0"
-    action: |
-      如果已有运行中的 teammates（pane 数 > 1）：
-      - 确认是否复用于当前 PR
-      - 复用：SendMessage 唤醒现有 teammates
-      - 不复用：停止当前轮次，由人类决定是否退出并重建会话
+# 握手复用策略
+# 复用判断 = 握手结果。不做 isActive 检查，不读 config.json state。
+agent_reuse_via_handshake:
+  rule: "复用判断 = 握手结果。"
+  procedure: |
+    1. 检查 Team 是否存在
+    2. 对已有 members 逐个握手：SendMessage(to=member, lead_ready)
+       - 收到 agent_ready → 复用
+       - 超时 3 次（各 30s）→ 不可复用
+    3. 全不可复用 → TeamDelete → TeamCreate 重建
 
-# Team-lead 职责边界（强制）
-# - ✅ spawn agent、组织团队、管理 task 生命周期
-# - ✅ 接收 Phase 1 背景报告，并在握手成功后通过第二条 SendMessage 转发给 Phase 2 agents
-# - ✅ Phase 3 综合判断（收集报告、冲突仲裁、最终决策）
-# - ✅ Phase 4 写回：仅限 gh pr comment 和 gh issue create（禁止其他 gh/git 命令）
-# - ❌ 不得自行收集上下文（gh pr view / git diff 等）——这是 context-researcher 的工作
-# - ❌ 显式 PR 编号入口下，不得为了“确认 PR 状态/标题/标签/改动范围”执行 gh pr view
-# - ❌ 不得在 spawn context-researcher 之前做任何背景调查
-# - ❌ fresh spawn 的 agent 握手成功后，不得先让它"保持空闲/等待新 PR"；必须立即激活当前 phase 的正式任务
-# - ❌ 不得越权替缺失 agent 脑补审查结论
-# - ❌ 不得执行 gh pr diff / git log / git show 等调研命令
-# - ❌ 不得执行 git commit / git push 等修改操作
-
-# Context 传递链路（单向）
-#
-#   context-researcher ──(phase_1_output)──▶ team-lead ──(嵌入 prompt)──▶ Phase 2 agents
-#
-# team-lead 只做"转发"，不做"预收集"。context-researcher 用自己工具完成全部背景调研。
-# 显式 PR 编号模式下，lead 的首个有效动作是 backlog + 握手；不是 gh pr view/diff。
-
-# 复用策略
-reuse_policy:
-  enabled: true
-  team_level_rule: "已有健康的 pr-review-team 时，先复用 team，再复用 teammates；不要重复 TeamCreate；不要为恢复目的调用 TeamDelete"
-  conditions:
-    - "相同 agentType"
-    - "teammate 状态为 idle"
-    - "上一个 PR 已完成 Phase 4"
-  action: |
-    1. 检查 ~/.claude/teams/{team-name}/config.json 中 members
-    2. 对每个需要的 agentType，查找匹配的 idle teammate
-    3. 使用 SendMessage(to=agent_name, message={type: "new_task", pr_number, context})
-    4. 如无可复用 teammate，才 spawn 新的
-
-# Agent 定义（项目自定义 agents）
-# 注意：使用项目 .claude/agents/pr-*.md 定义，而非全局 agent
+# Agent 定义
 agents:
   context-researcher:
-    # 引用项目 agent 定义文件
     agent_definition: .claude/agents/pr-context-researcher.md
     subagent_type: pr-context-researcher
     model: haiku
-    description: 背景调研员，收集项目背景和领域知识
+    description: 背景调研员
     spawn_config:
       tools: [Read, Grep, Glob, WebFetch, Bash, SendMessage, ToolSearch]
-      run_in_background: false  # Phase 1 需等待结果
-    output_format:
-      required_fields: [时效性, 依赖关系, 类似实现]
 
   code-analyst:
     agent_definition: .claude/agents/pr-code-analyst.md
     subagent_type: pr-code-analyst
     model: sonnet
-    description: 代码分析员，分析代码框架和技术债
+    description: 代码分析员
     spawn_config:
       tools: [Read, Grep, Glob, Bash, SendMessage, ToolSearch]
-      run_in_background: true  # Phase 2 可并行
-    output_format:
-      required_fields: [技术债列表, 架构符合性, 代码质量]
 
   architect-reviewer:
     agent_definition: .claude/agents/pr-architect-reviewer.md
     subagent_type: pr-architect-reviewer
     model: opus
-    description: 架构审查专家，评估 PR 对项目架构的影响
+    description: 架构审查专家
     spawn_config:
       tools: [Read, Grep, Glob, WebSearch, Bash, SendMessage, ToolSearch]
-      run_in_background: true  # Phase 2 可并行
-    output_format:
-      required_fields: [结论, 置信度, 关键发现]
 
   security-reviewer:
     agent_definition: .claude/agents/pr-security-reviewer.md
     subagent_type: pr-security-reviewer
     model: sonnet
-    description: 安全审查专家，红队测试和安全评估
+    description: 安全审查专家
     spawn_config:
       tools: [Read, Grep, Glob, Bash, SendMessage, ToolSearch]
-      run_in_background: true  # Phase 2 可并行
-    output_format:
-      required_fields: [安全等级, 绕过方式, 修复建议]
-    trigger: always  # 始终参与审查（即使非安全 PR）
 
-  # 执行角色：修复 review 发现的问题
   fix-executor:
     agent_definition: .claude/agents/pr-fix-executor.md
     subagent_type: pr-fix-executor
     model: sonnet
-    description: 代码修复执行者，根据审核意见修复代码并提交
+    description: 代码修复执行者
     spawn_config:
       tools: [Read, Edit, Write, Bash, Grep, Glob, SendMessage, ToolSearch]
-      run_in_background: false  # Phase 4 需等待修复完成
-    output_format:
-      required_fields: [修复列表, 提交记录, 验证结果]
-    trigger: on_demand  # 仅在 auto-fix 或用户选择修复时 spawn
 
-# Codex 配置（预留扩展点；当前 skill 主流程不依赖）
-codex:
-  model: gpt-5.4
-  trigger: [security_pr, conflict_arbitration]
-  call_method: bash  # 通过 codex-companion.mjs 调用
-
-# PR 类型判断
-pr_classification:
-  simple:
-    condition: "additions < 50 and not security_related"
-    flow: phase_1_only
-    agents: []
-
-  refactor:
-    condition: "'refactor' in title.lower()"
-    flow: standard
-    agents: [context-researcher, code-analyst, architect-reviewer]
-
-  security:
-    condition: "has_security_label or 'fix' in labels"
-    flow: standard_security
-    agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
-
-  standard:
-    condition: default
-    flow: standard
-    agents: [context-researcher, code-analyst, architect-reviewer, security-reviewer]
-
-# 工作流程（可执行配置）
-workflow:
-  phase_1:
-    name: 背景调研
-    agents: [context-researcher]
-    parallel: false
-    output_to_phase_2: true
-    # 【关键】Phase 1 的输出是 Phase 2 的必要输入
-    # 如果不传递背景报告，Phase 2 agents 将处于"盲审"状态
-    # 执行指令
-    execution:
-      - step: spawn_context_researcher
-        tool: Agent
-        params:
-          team_name: pr-review-team
-          name: context-researcher
-          subagent_type: pr-context-researcher
-          model: sonnet  # 使用 sonnet 避免 haiku extended thinking 限制
-          prompt: |
-            【第一步只能握手】
-            你现在不得开始调研，也不得抢先自报 ready。
-            等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何调研。
-      - step: send_context_handshake
-        tool: SendMessage
-        params:
-          to: "context-researcher"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始任何调研工作。"
-      - step: verify_context_handshake
-        action: |
-          等待 context-researcher 回复“【agent_ready】已就绪”。
-
-          验证规则：
-          1. 最多重试 3 次握手消息
-          2. 只有收到明确“【agent_ready】已就绪”，才能将该 teammate 视为有效执行者
-          3. 收到“【agent_ready】已就绪”后，立即同步 Phase 1 task metadata.handshake_status.context-researcher = "ready"
-          4. 未收到"【agent_ready】已就绪" → 标记 context-researcher blocked，停止 Phase 1，并回退到单 agent review
-
-          关键约束：
-          - 未通过握手的 context-researcher 即使后续产出报告，也不得作为有效 Phase 1 输出
-          - Phase 2 读取背景前必须检查 context-researcher 握手状态为 ready
-          - 一旦收到“已就绪”，下一步必须进入 send_context_task；不得发送 idle/待命类消息
-          - backlog gate：发送 lead_ready 后写入 `lead_ready_sent=true, expected_next_action=verify_context_handshake, activation_state=awaiting_agent_ready`
-          - backlog gate：收到 agent_ready 后写入 `task_activation_allowed=true, expected_next_action=send_context_task, activation_state=awaiting_task_dispatch`
-      - step: send_context_task
-        tool: SendMessage
-        params:
-          to: "context-researcher"
-          message: |
-            【正式调研任务】
-            审查 PR #{pr_number}，请自主完成背景调研。
-            1. 使用 gh pr view {pr_number} 获取 PR 基本信息（标题、描述、改动文件、标签）
-            2. 使用 gh pr diff {pr_number} 获取完整 diff，分析改动范围
-            3. 使用 git log 获取 PR 分支的提交历史（从 base 分叉点开始）
-            4. 检查关联 issue 的评论和上下文
-            5. 分析 handoff 状态（如适用）
-            6. 输出结构化背景报告：PR 概述、改动范围、关联 issue、领域知识、风险评估
-
-            ## 重要
-            - 这是握手成功后的正式工作指令
-            - 完成后通过 SendMessage 将报告发送给 team-lead
-      - step: receive_context_report
-        action: 等待 teammate-message，获取背景报告
-      - step: save_phase_1_output
-        action: |
-          【关键步骤】将背景报告内容保存为 phase_1_output 变量
-          这是 Phase 2 fresh spawn prompt / reuse SendMessage 的共同输入
-          如果不保存，Phase 2 将无法获取背景信息
-      - step: prepare_phase_2_context
-        action: 保存背景，供 fresh spawn prompt 或复用 teammate 的 SendMessage 使用
-
-  phase_2:
-    name: 专项审查
-    agents: [code-analyst, architect-reviewer, security-reviewer]
-    parallel: true
-    requires_phase_1_output: true
-    message_passing: SendMessage
-    # 【关键】fresh spawn 初始 prompt 只允许握手
-    # Phase 1 背景必须在收到“已就绪”后，通过第二条 SendMessage 下发
-    # 执行指令
-    execution:
-      - step: spawn_code_analyst
-        tool: Agent
-        params:
-          # 握手 gate 优先于“同一响应并行 spawn”优化；先确认 ready，再把结果算作有效执行
-          team_name: pr-review-team
-          name: code-analyst
-          subagent_type: pr-code-analyst
-          model: sonnet  # 代码分析需要强模型，与 agent 定义一致
-          prompt: |
-            【第一步只能握手】
-            你现在不得开始审查，也不得抢先自报 ready。
-            等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何审查。
-          run_in_background: true
-      - step: send_code_analyst_handshake
-        tool: SendMessage
-        params:
-          to: "code-analyst"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
-      - step: verify_code_analyst_handshake
-        action: |
-          等待 code-analyst 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.code-analyst = "ready"
-          下一步必须进入 send_code_analyst_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.code-analyst=true` 后，`expected_next_action=verify_code_analyst_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
-      - step: send_code_analyst_task
-        tool: SendMessage
-        params:
-          to: "code-analyst"
-          message: |
-            【正式审查任务】
-            分析 PR #{pr_number} 的代码质量。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            请基于以上背景分析代码质量。
-      - step: spawn_architect_reviewer
-        tool: Agent
-        params:
-          team_name: pr-review-team
-          name: architect-reviewer
-          subagent_type: pr-architect-reviewer
-          model: sonnet
-          prompt: |
-            【第一步只能握手】
-            你现在不得开始审查，也不得抢先自报 ready。
-            等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何审查。
-          run_in_background: true
-      - step: send_architect_handshake
-        tool: SendMessage
-        params:
-          to: "architect-reviewer"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
-      - step: verify_architect_handshake
-        action: |
-          等待 architect-reviewer 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.architect-reviewer = "ready"
-          下一步必须进入 send_architect_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.architect-reviewer=true` 后，`expected_next_action=verify_architect_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
-      - step: send_architect_task
-        tool: SendMessage
-        params:
-          to: "architect-reviewer"
-          message: |
-            【正式审查任务】
-            评估 PR #{pr_number} 的架构影响。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            ## 获取 diff 指引
-            你可以使用 Bash 工具获取所需的 diff 数据：
-            - 完整 diff: `gh pr diff {pr_number}`
-            - 特定文件: `git show {pr_branch}:{file_path}`
-            - 提交历史: `git log --oneline {base_branch}..{pr_branch}`
-            - 改动统计: `git diff --stat {base_branch}...{pr_branch}`
-
-            请基于以上背景评估架构影响。
-      - step: spawn_security_reviewer
-        tool: Agent
-        params:
-          team_name: pr-review-team
-          name: security-reviewer
-          subagent_type: pr-security-reviewer
-          model: sonnet
-          prompt: |
-            【第一步只能握手】
-            你现在不得开始审查，也不得抢先自报 ready。
-            等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何审查。
-          run_in_background: true
-      - step: send_security_handshake
-        tool: SendMessage
-        params:
-          to: "security-reviewer"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复“【agent_ready】已就绪”。未完成握手前不得开始审查。"
-      - step: verify_security_handshake
-        action: |
-          等待 security-reviewer 回复“【agent_ready】已就绪”。
-          未收到"【agent_ready】已就绪" → 标记该 agent blocked，跳过该 agent 的审查结果，并在 Phase 3 标注审查不完整
-          收到"【agent_ready】已就绪"后，同步 Phase 2 task metadata.handshake_status.security-reviewer = "ready"
-          下一步必须进入 send_security_task；不得先发送 idle/待命类消息
-          backlog gate：写入 `lead_ready_sent.security-reviewer=true` 后，`expected_next_action=verify_security_handshake`
-          backlog gate：收到 agent_ready 后，若其他 reviewer 尚未 ready，则保持 `task_activation_allowed=false`；全部 required reviewer ready 后再置 `task_activation_allowed=true`
-      - step: send_security_task
-        tool: SendMessage
-        params:
-          to: "security-reviewer"
-          message: |
-            【正式审查任务】
-            评估 PR #{pr_number} 的安全性。
-
-            ## PR #{pr_number} 背景报告
-            {phase_1_output}
-
-            请基于以上背景评估安全性。
-
-      # 【说明】fresh spawn 的背景已在 prompt 中传递
-      # 如果需要补充额外信息或复用已有 teammate，可再使用 SendMessage
-      - step: wait_for_phase_2_results
-        action: |
-          等待所有 Phase 2 agents 返回结果。
-
-          **必须等待**：
-          - code-analyst
-          - architect-reviewer
-          - security-reviewer
-
-          **等待策略**：
-          1. 收到 idle 通知 → 不操作，继续等待（idle 是正常状态，不代表完成）
-          2. 收到 task-notification（status=completed）→ 读取结果
-          3. 超时（5 分钟）→ 标注"审查不完整"，进入 Phase 3
-
-          **重要**：
-          - idle 通知是 agent 的正常状态（等待输入），不代表"未开始"或"失败"
-          - 实际审查结果通过 task-notification 返回
-          - 不要在收到 idle 后立即 SendMessage 提示 agent 执行任务
-          - 只有先前已回复“已就绪”的 agent，才允许进入结果收集
-          - 未通过握手的 agent 即使后来返回报告，也视为无效报告并跳过
-
-          如果超时仍有 agent 未返回：
-          - 记录 WARNING
-          - 在报告中标注"部分审查未完整"
-          - 不要假设未返回的 agent 同意其他结论
-
-  phase_2_5:
-    name: Codex第三方验证（可选）
-    executor: team-lead
-    agents: []
-    parallel: false
-    trigger:
-      - security_pr  # 安全PR类型
-      - large_pr     # 改动 > 500行或影响关键架构
-    execution:
-      - step: check_trigger_conditions
-        action: |
-          判断是否触发Codex验证（两阶段判断）：
-
-          **第一阶段：PR 风险判断**
-          满足以下任一条件：
-          1. PR类型为 `security`
-          2. 改动行数 > 500 或影响关键架构（inspect base风险高）
-          3. Phase 3 出现需要第三方裁决的冲突
-          **第二阶段：Phase 2 完整性判断**
-          required_agents = [code-analyst, architect-reviewer, security-reviewer]
-          检查是否有 agent 超时/未返回结果
-
-          **最终触发条件**：
-          - 第一阶段满足且 Phase 2 完整 → Phase 2.5 保持可选
-          - 第一阶段满足且 Phase 2 不完整 → Phase 2.5 升级为强制
-          - 第一阶段不满足 → 跳过 Phase 2.5，直接进入 Phase 3
-
-          **注意**：
-          - "可选"保留给 security / large / conflict_arbitration 的独立复核场景
-          - "升级为强制"只适用于第一阶段已命中的高风险 PR
-
-      - step: collect_phase_2_reports
-        action: |
-          打包所有Phase 2审查报告：
-          - architect-reviewer 报告
-          - code-analyst 报告
-          - security-reviewer 报告
-
-          构建完整审查材料包（markdown格式）
-
-      - step: call_codex_rescue
-        tool: Skill
-        params:
-          skill: codex:rescue
-          args: |
-            ## PR #{pr_number} 审查材料包
-
-            {phase_2_reports_bundle}
-
-            请基于以上审查报告进行独立验证，输出第三方验证意见。
-        wait_for_result: true
-
-      - step: receive_codex_report
-        action: 保存codex验证报告，作为Phase 3补充材料
-
-  phase_3:
-    name: 综合判断与改进
-    agents: []
-    actions:
-      - verify_all_reports_received  # 新增：前置检查
-      - check_codex_report_if_exists  # 新增：检查Phase 2.5输出
-      - collect_results
-      - detect_conflicts
-      - arbitrate_if_needed
-      - final_decision
-      - generate_improvement_plan
-    # 执行指令
-    execution:
-      # Step 0: 前置检查（新增）
-      - step: verify_all_reports
-        action: |
-          验证所有 Phase 2 agents 已返回报告：
-
-          required_agents = ["code-analyst", "architect-reviewer", "security-reviewer"]
-          ready_agents = [handshake_status == "ready" 的 agent]
-          received_agents = [从 task-notification(status=completed) 获取，且属于 ready_agents]
-
-          missing = set(required_agents) - set(received_agents)
-          if missing:
-            log_warning(f"缺失审查报告: {missing}")
-            在最终报告中标注"审查不完整：缺失 {missing}"
-            # 重要：不要假设缺失的 agent 同意其他结论
-
-      - step: collect_all_reports
-        action: 从 task-notification（status=completed）收集各 agent 报告
-      - step: detect_conflicts
-        action: 对比各报告，找出差异点
-      - step: arbitrate
-        action: 如有冲突，进行仲裁并记录理由
-      - step: make_decision
-        action: 生成最终决策（APPROVE/REJECT/NEEDS_INFO）
-
-  phase_4:
-    name: 写回与改进
-    executor: team-lead  # 由当前 session（team-lead）执行
-    agents: []
-    actions:
-      - evaluate_execution_mode  # 根据配置决定执行路径
-      - write_review_comment
-      - fix_issues_or_skip       # 根据模式分支
-      - create_follow_up_issues
-    # 执行指令（根据 execution_mode 分支）
-    execution:
-      # Step 1: 评估执行模式
-      - step: evaluate_mode
-        action: |
-          根据 execution_mode 配置选择执行路径：
-          - auto-fix → 直接执行修复流程
-          - comment-only → 只写 comment
-          - auto-decide → team-lead 评估复杂度后决定
-          - ask-each → 询问用户
-
-      # Step 2: auto-decide 模式评估复杂度
-      - step: evaluate_complexity
-        condition: execution_mode == "auto-decide"
-        action: |
-          计算复杂度得分（0-1）：
-          1. 改动行数（weight 0.3）
-          2. 文件数（weight 0.2）
-          3. 安全相关（weight 0.4）
-          4. 测试覆盖（weight 0.1）
-
-          决策：
-          - 得分 < 0.3 且无安全相关 → auto_fix
-          - 得分 >= 0.3 或有安全相关 → ask_user
-          - 得分 >= 0.7 或置信度 < 0.6 → comment_only
-
-      # Step 3: ask-each 模式询问用户
-      - step: ask_user
-        condition: execution_mode == "ask-each" OR (auto-decide && need_user_input)
-        tool: AskUserQuestion
-        params:
-          question: |
-            审核完成。请选择后续操作：
-
-            1. 直接根据审核意见修复代码
-            2. 将意见写回 PR comments
-            3. 由 team-lead 协助决定
-
-            输入数字 (1/2/3) 或描述你的需求：
-          options:
-            - key: "1"
-              value: "auto_fix"
-              description: "自动修复并提交"
-            - key: "2"
-              value: "comment_only"
-              description: "只写 comment"
-            - key: "3"
-              value: "lead_decide"
-              description: "由 lead 根据复杂度决定"
-
-      # Step 4a: comment-only 路径
-      - step: write_comment_only
-        condition: mode == "comment_only"
-        tool: Bash
-        params:
-          command: gh pr comment {pr_number} --body "{review_report}"
-
-      # Step 4b: auto-fix 路径（需要完整握手协议）
-      - step: spawn_fix_executor
-        condition: mode == "auto_fix"
-        tool: Agent
-        params:
-          team_name: pr-review-team
-          name: fix-executor
-          subagent_type: pr-fix-executor
-          model: sonnet
-          prompt: |
-            【第一步只能握手】
-            你现在不得开始修复，也不得抢先自报 ready。
-            等待 team-lead 发送 `【lead_ready】`。
-            收到 `【lead_ready】` 后，执行 ToolSearch(query="select:SendMessage", max_results=1)，
-            然后立刻 SendMessage(to="team-lead", message="【agent_ready】已就绪")。
-            在收到 team-lead 后续正式任务前，不得开始任何修复工作。
-        wait_for_result: false
-
-      - step: send_fix_handshake
-        condition: mode == "auto_fix"
-        tool: SendMessage
-        params:
-          to: "fix-executor"
-          message: "【lead_ready】team-lead 已完成握手。请现在执行 ToolSearch(query='select:SendMessage', max_results=1)，然后仅回复\"【agent_ready】已就绪\"。未完成握手前不得开始任何修复工作。"
-
-      - step: wait_fix_ready
-        condition: mode == "auto_fix"
-        action: |
-          等待 fix-executor 回复"【agent_ready】已就绪"。
-          超时未收到（30秒）→ 第1次重试：再次发送 lead_ready
-          超时未收到（再30秒）→ 第2次重试：再次发送 lead_ready
-          超时未收到（再30秒）→ 第3次重试：再次发送 lead_ready
-          3次重试失败 → 标记 fix-executor 为失联，创建 follow-up issue
-
-      - step: send_fix_task
-        condition: mode == "auto_fix"
-        tool: SendMessage
-        params:
-          to: "fix-executor"
-          message: |
-            【正式修复任务】
-            根据 PR #{pr_number} 的审核意见修复代码：
-
-            审核报告：{review_report}
-
-            需要修复的问题：{fixable_issues}
-
-            请：
-            1. 评估修复风险
-            2. 执行修复（遵守 Git 纪律）
-            3. 提交并验证
-
-            输出修复报告。
-        wait_for_result: true
-
-      # Step 5: 写 comment（所有模式都需要）
-      - step: write_pr_comment
-        condition: mode != "comment_only"  # comment_only 已在 Step 4a 执行
-        tool: Bash
-        params:
-          command: gh pr comment {pr_number} --body "{final_report}"
-          # final_report 包含审核报告 + 修复报告（如果有）
-
-      # Step 6: 创建 follow-up issues
-      - step: create_follow_up_issues
-        condition: has_out_of_scope_findings
-        tool: Bash
-        params:
-          command: gh issue create --title "{issue_title}" --body "{issue_body}"
-
-    conditions:
-      APPROVE:
-        - 写评论，说明建议
-        - auto-fix 模式：无阻塞问题，可选修复改进项
-        - 如有范围外发现，创建 follow-up issue
-      NEEDS_INFO:
-        - 写评论，请求更多信息
-        - 不执行修复，等待作者响应
-      REJECT:
-        - 写评论，说明拒绝理由
-        - 不执行修复，交给后续流程
-      has_fixable_issues:
-        - 根据执行模式决定：修复或写 comment
-        - 修复后验证测试通过
-
-  # Follow-up Issue 创建规则
-  follow_up_issue_policy:
-    trigger: when_out_of_scope_findings_exist
-    requirements:
-      - 先搜索现有 issue，避免重复
-      - issue body 必须标注来源 PR、审查角色、问题范围和建议优先级
-      - 不把需要当前 PR 修复的阻塞问题转成 follow-up issue
-    template:
-      title: "[follow-up] <简短描述>"
-      body: |
-        ## 来源
-        PR #<number> 审查中发现
-
-        ## 问题描述
-        [具体描述]
-
-        ## 建议处理方式
-        [可选]
-
-        ## 优先级建议
-        - [ ] 高 / 中 / 低
-    labels: ["type/follow-up", "scope/<component>"]
-
-# 注意：本 workflow 只有 4 个 phase。
-# Phase 4 完成后，控制权直接回到 SKILL.md 的 Step 9（询问继续 / 结束）。
-# 不存在 "phase_5 / 准备下一个 PR / 保留状态" 这类辅助 phase——
-# teammates 的 idle / pane / inbox 由运行时管理，skill 不感知也不操作。
-# 切换 PR 通过 SendMessage 给已有 agent 发新任务即可。
-
-# 防幻觉机制
-anti_hallucination:
-  evidence_required:
-    "已合并": "gh pr view output"
-    "CI 通过": "gh pr checks output"
-    "无漏洞": "检查的文件和函数列表"
-    "符合架构": "架构文档引用位置"
-
-# 审查质量硬要求（与 SKILL.md 的 Review Quality Standards 对齐）
+# 审查质量要求
 review_quality_requirements:
   forbidden:
-    - "百分制 / 字母评分（89.75/100、A-、B+ 等虚假精度）"
-    - "援引与本 PR 无关的指标（如 PR 不改 PRService 却列 PRService LOC）"
+    - "百分制 / 字母评分"
+    - "援引与本 PR 无关的指标"
     - "安全/架构论证滑动到本 PR 未触碰的相邻代码"
     - "称'违规'但不引用具体规则来源"
     - "把测试数量等同于覆盖质量"
-    - "comment 使用内部 phase 标题（Phase 1/2/3）作为叙事结构"
   required:
-    - "每条'违规/技术债'必须引用规则来源（CLAUDE.md / coding-standards.md / 等）"
-    - "数字/行数/LOC 声明必须基于本 PR 实际 diff"
+    - "每条违规必须引用规则来源（CLAUDE.md / coding-standards.md 等）"
+    - "数字/行数声明必须基于本 PR 实际 diff"
     - "区分本 PR 改动 vs 既有代码"
-    - "code-analyst 必须扫描代码内重复模式与冗余防御"
-    - "测试评估区分单元/集成、happy path/错误分支"
-    - "范围外真实技术债转 follow-up issue"
-
-# 输出格式（最终 PR comment 结构）
-output_format: |
-  ## PR #<number> 审查报告
-
-  **决策**：APPROVE / NEEDS_CHANGES / REJECT
-
-  ### 已解决技术债
-  - [diff 引用 + 简述]
-
-  ### 遗留问题
-  - [每条带规则引用，如 CLAUDE.md HARD RULE 13 / coding-standards.md § X]
-
-  ### Follow-up Issue
-  - #<issue_number>（如适用）
-
-  ### 审查依据
-  - 引用的规则文档列表
-  - 审查方式（diff 全量阅读 / 规则交叉核查 / etc）

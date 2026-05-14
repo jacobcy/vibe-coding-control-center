@@ -47,8 +47,8 @@ class TestStateTransitions:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -96,8 +96,8 @@ class TestStateTransitions:
         )
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -143,8 +143,8 @@ class TestStateTransitions:
         install_issue_loader(coordinator, states)
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -191,8 +191,8 @@ class TestStateTransitions:
         install_issue_loader(coordinator, states)
 
         emit_calls = []
-        coordinator._emit_dispatch_intent = lambda role, issue: emit_calls.append(
-            (role, issue)
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
         await coordinator.coordinate()
@@ -292,7 +292,7 @@ class TestLoggingBehavior:
             capture_event,
         )
 
-        def emit_side_effect(role, issue) -> None:
+        def emit_side_effect(role, issue, tick_id=0) -> None:
             capture_event(
                 "dispatcher",
                 "planner launch failed for #467: Failed to resolve permanent worktree",

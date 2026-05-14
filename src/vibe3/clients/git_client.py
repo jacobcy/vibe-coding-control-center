@@ -1,5 +1,6 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -117,6 +118,7 @@ class GitClient:
         self._github_client = github_client
         self._cwd = Path(cwd) if cwd else None
         self._pr_diff_cache: dict[int, str] = {}
+        self._pr_numstat_cache: dict[int, str] = {}
 
     def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
@@ -133,6 +135,14 @@ class GitClient:
         """
         cmd = ["git", *args]
         effective_cwd = Path(cwd) if cwd else self._cwd
+
+        # Remove GIT_DIR and GIT_PREFIX to ensure git uses
+        # normal repository discovery. These variables are set
+        # by git hooks and can break git rev-parse --show-toplevel
+        env = dict(os.environ)
+        env.pop("GIT_DIR", None)
+        env.pop("GIT_PREFIX", None)
+
         try:
             result = subprocess.run(
                 cmd,
@@ -140,6 +150,7 @@ class GitClient:
                 text=True,
                 check=True,
                 cwd=str(effective_cwd) if effective_cwd else None,
+                env=env,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
@@ -218,7 +229,13 @@ class GitClient:
 
     def get_numstat(self, source: ChangeSource) -> str:
         """Get git diff --numstat output for a change source."""
-        return _get_numstat(self._run, source, self._github_client, self.get_merge_base)
+        return _get_numstat(
+            self._run,
+            source,
+            self._github_client,
+            self.get_merge_base,
+            self._pr_numstat_cache,
+        )
 
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""

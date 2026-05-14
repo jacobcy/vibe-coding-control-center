@@ -112,6 +112,7 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
                         config,
                         issue_info,
                         registry=registry,
+                        tick_id=event.tick_id,
                     ),
                 )
 

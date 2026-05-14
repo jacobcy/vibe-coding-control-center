@@ -39,7 +39,7 @@ class TestPRCreateCommandAI:
         mock_service.return_value.sync_pr_state_from_remote.assert_called_once_with(
             existing_pr, actor=None
         )
-        mock_service.return_value.create_draft_pr.assert_not_called()
+        mock_service.return_value.create_pr.assert_not_called()
 
     def test_pr_create_existing_pr_shows_confirmed_status(
         self, runner: CliRunner
@@ -84,7 +84,7 @@ class TestPRCreateCommandAI:
             patch("vibe3.commands.pr_create.PRService") as mock_service,
         ):
             mock_service.return_value.get_pr.return_value = None
-            mock_service.return_value.create_draft_pr.return_value = MagicMock(
+            mock_service.return_value.create_pr.return_value = MagicMock(
                 number=123,
                 title="Test PR",
                 body="Test body",
@@ -92,7 +92,7 @@ class TestPRCreateCommandAI:
             )
             result = runner.invoke(app, ["pr", "create", "-t", "Test PR", "--yes"])
         assert result.exit_code == 0
-        mock_service.return_value.create_draft_pr.assert_called_once_with(
+        mock_service.return_value.create_pr.assert_called_once_with(
             title="Test PR",
             body="",
             base_branch="main",
@@ -104,7 +104,7 @@ class TestPRCreateCommandAI:
         with patch.dict(os.environ, {}, clear=True):
             with patch("vibe3.commands.pr_create.PRService") as mock_service:
                 mock_service.return_value.get_pr.return_value = None
-                mock_service.return_value.create_draft_pr.return_value = MagicMock(
+                mock_service.return_value.create_pr.return_value = MagicMock(
                     number=123,
                     title="Test PR",
                     body="Test body",
@@ -167,9 +167,9 @@ class TestPRCreateCommandAI:
                                         "body": "Summary\n\n- change",
                                     },
                                 )
-                                (
-                                    mock_service.return_value.create_draft_pr.return_value
-                                ) = mock_pr
+                                mock_service.return_value.create_pr.return_value = (
+                                    mock_pr
+                                )
                                 result = runner.invoke(
                                     app,
                                     ["pr", "create", "--ai", "--json", "--yes"],

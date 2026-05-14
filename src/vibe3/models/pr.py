@@ -82,7 +82,7 @@ class CreatePRRequest(BaseModel):
     body: str = Field(..., description="PR body/description")
     head_branch: str = Field(..., description="Head branch name")
     base_branch: str = Field("main", description="Base branch name")
-    draft: bool = Field(True, description="Create as draft PR")
+    draft: bool = Field(False, description="Create as regular (non-draft) PR")
     metadata: Optional[PRMetadata] = Field(None, description="PR metadata")
 
 

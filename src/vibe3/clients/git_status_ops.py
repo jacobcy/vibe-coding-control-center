@@ -1,5 +1,6 @@
 """Git status operations - diff and status helpers."""
 
+import re
 from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
@@ -170,6 +171,8 @@ def _numstat_via_merge_base(
 ) -> str:
     """Get numstat via merge-base resolution."""
     merge_base = get_merge_base(head, base)
+    if not re.match(r"^[a-f0-9]{40}$", merge_base):
+        raise SystemError(f"get_merge_base returned invalid SHA format: '{merge_base}'")
     return run(["diff", "--numstat", f"{merge_base}...{head}"])
 
 
@@ -194,6 +197,7 @@ def get_numstat(
     source: ChangeSource,
     github_client: "GitHubClient | None" = None,
     get_merge_base: Callable[[str, str], str] | None = None,
+    pr_numstat_cache: dict[int, str] | None = None,
 ) -> str:
     """Unified interface: get git diff --numstat output.
 
@@ -202,6 +206,7 @@ def get_numstat(
         source: Change source (PR/Commit/Branch/Uncommitted)
         github_client: Optional GitHubClient for PR ref resolution
         get_merge_base: Optional merge-base resolver callable
+        pr_numstat_cache: Optional PR numstat cache dict
 
     Returns:
         numstat output string (tab-separated: added deleted filepath)
@@ -248,15 +253,20 @@ def get_numstat(
             )
         if not get_merge_base:
             raise SystemError("get_merge_base callable required for PRSource")
-        pr_info = github_client.get_pr(source.pr_number)
-        if not pr_info:
-            raise GitError(
-                "get_numstat",
-                f"PR #{source.pr_number} not found",
+        if pr_numstat_cache is not None and source.pr_number in pr_numstat_cache:
+            output = pr_numstat_cache[source.pr_number]
+        else:
+            pr_info = github_client.get_pr(source.pr_number)
+            if not pr_info:
+                raise GitError(
+                    "get_numstat",
+                    f"PR #{source.pr_number} not found",
+                )
+            output = _numstat_via_merge_base(
+                run, get_merge_base, pr_info.head_branch, pr_info.base_branch
             )
-        output = _numstat_via_merge_base(
-            run, get_merge_base, pr_info.head_branch, pr_info.base_branch
-        )
+            if pr_numstat_cache is not None:
+                pr_numstat_cache[source.pr_number] = output
     else:
         raise GitError("get_numstat", f"Unknown source type: {source.type}")
 

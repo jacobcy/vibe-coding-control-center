@@ -185,6 +185,7 @@ class IssueInfo(BaseModel):
     assignees: list[str] = Field(default_factory=list)  # GitHub login names
     url: str | None = None
     milestone: str | None = None  # GitHub milestone title
+    github_state: str | None = None  # GitHub issue state: "OPEN" or "CLOSED"
 
     @property
     def slug(self) -> str:
@@ -219,6 +220,9 @@ class IssueInfo(BaseModel):
             if isinstance(milestone_data, dict) and "title" in milestone_data:
                 milestone = milestone_data["title"]
 
+            # Parse GitHub issue state
+            github_state = payload.get("state", "OPEN")  # Default to OPEN
+
             return cls(
                 number=int(payload["number"]),
                 title=str(payload.get("title", "")),
@@ -227,6 +231,7 @@ class IssueInfo(BaseModel):
                 assignees=[a["login"] for a in payload.get("assignees", [])],
                 url=payload.get("html_url") or payload.get("url"),
                 milestone=milestone,
+                github_state=github_state,
             )
         except (KeyError, ValueError) as exc:
             logger.bind(domain="orchestra").warning(

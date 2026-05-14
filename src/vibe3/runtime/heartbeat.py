@@ -214,7 +214,7 @@ class HeartbeatServer:
             tick_services: list[str] = []
             for svc in self._services:
                 tick_services.append(svc.service_name)
-                tasks.append(self._tick_service(svc))
+                tasks.append(self._tick_service(svc, tick_number))
 
             # Only log services list in DEBUG mode
             if tick_services:
@@ -245,10 +245,10 @@ class HeartbeatServer:
                 )
                 self.stop()
 
-    async def _tick_service(self, service: ServiceBase) -> None:
+    async def _tick_service(self, service: ServiceBase, tick_id: int) -> None:
         async with self._semaphore:
             try:
-                await service.on_tick()
+                await service.on_tick(tick_id)
             except Exception as exc:
                 append_orchestra_event(
                     "server",
