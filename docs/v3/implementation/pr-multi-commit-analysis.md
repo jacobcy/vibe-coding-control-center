@@ -119,8 +119,25 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> dict[str, object
     score = generate_score_report(dims)
 
     # 6. 获取 commits 信息（用于显示）
-    gh = GitHubClient()
-    commit_shas = gh.get_pr_commits(pr_number)
+    # Direct gh CLI call to get commit SHAs
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "view",
+            str(pr_number),
+            "--json",
+            "commits",
+            "--jq",
+            ".commits[].oid",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    commit_shas = [
+        line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+    ]
 
     # 获取每个commit的message
     commits_info = []
@@ -331,10 +348,10 @@ $ vibe inspect pr 42 --json
 ## 📋 实施步骤
 
 ### Phase 1: 核心实现
-- [ ] 添加 `GitHubClient.get_pr_commits()`（获取commits列表）
-- [ ] 修改 `build_change_analysis()` 添加 PR 分支
-- [ ] 实现 `build_pr_analysis()` 聚焦关键文件
-- [ ] 更新 CLI 输出格式
+- [x] 使用直接 gh CLI 调用获取 commits 列表
+- [x] 修改 `build_change_analysis()` 添加 PR 分支
+- [x] 实现 `build_pr_analysis()` 聚焦关键文件
+- [x] 更新 CLI 输出格式
 
 ### Phase 2: 测试
 - [ ] 测试小 PR（3-5 files, 3-5 commits）
