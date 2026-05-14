@@ -5,7 +5,10 @@ from typing import Self
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
+from vibe3.models.orchestration import IssueState
+from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
 
 
@@ -65,6 +68,18 @@ class FlowLifecycleMixin:
             blocked_reason=reason,
             latest_actor=effective_actor,
         )
+
+        # Transition issue state to BLOCKED if task_issue_number exists
+        issue_number = flow_data.get("task_issue_number")
+        if issue_number:
+            # Transition issue state to BLOCKED
+            LabelService().transition(
+                issue_number, IssueState.BLOCKED, effective_actor, force=False
+            )
+
+            # Add comment if reason is provided
+            if reason:
+                GitHubClient().add_comment(issue_number, f"Flow blocked: {reason}")
 
         self.store.add_event(
             branch,
