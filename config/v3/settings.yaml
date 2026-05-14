@@ -19,6 +19,8 @@ github_project:
   owner: "jacobcy"
   project_number: 17
   org: ""             # 已废弃，请使用 owner
+  # Integration test target
+  test_issue_repo: "jacobcy/vibe-coding-control-center"
 
 # AI 辅助配置
 # 用于 AI 文案辅助能力（如 pr create --ai）
