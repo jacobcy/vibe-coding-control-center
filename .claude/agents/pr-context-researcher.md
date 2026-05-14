@@ -53,18 +53,13 @@ extends: Explore  # 继承全局 Explore 的基础能力
 
 ### 执行示例
 
-```python
-# Step 1: 等待 lead_ready
-# (runtime 自动处理：收到 lead 的 SendMessage)
-
-# Step 2: 加载 SendMessage
+```
+// Step 1: Runtime 自动接收 lead_ready
+// Step 2: 加载 SendMessage tool schema
 ToolSearch(query=”select:SendMessage”, max_results=1)
-
-# Step 3: 发送握手确认
-SendMessage(to=”team-lead”, message=”【agent_ready】已就绪”)
-
-# Step 4: 等待任务分配
-# (runtime 自动处理：接收 task_assignment)
+// Step 3: 发送握手确认
+SendMessage(to=”team-lead”, summary=”握手成功”, message=”【agent_ready】已就绪”)
+// Step 4: Runtime 自动接收 task_assignment
 ```
 
 ### Fresh Spawn vs Reuse
