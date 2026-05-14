@@ -208,8 +208,7 @@ Forbidden:
    - **边界明确的 refactor / cleanup**
 4. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
 5. 对可纳入对象执行最小动作：
-   - 派为 assignee issue，并明确指派给 `vibe-manager-agent`（从 `config/v3/settings.yaml` 的 `manager_usernames` 读取）
-   - **禁止分配给人类用户**（如 `jacobcy`、`alice`），否则 manager dispatch 不会触发
+   - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `vibe-manager-agent`，禁止使用人类用户名）
    - 如有必要补最小 routing labels
 6. 对不适合纳入的对象记录简短原因
 7. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
