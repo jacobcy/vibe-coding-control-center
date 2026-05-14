@@ -159,7 +159,7 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 - 超时 3 次 → 标记 agent 为 blocked，继续处理下一个 agent
 - team-lead 自身必须先 `ToolSearch("select:SendMessage")` 再 spawn 任何 agent
 
-## @wait_for_report(agent_name, timeout=180, max_attempts=3) → report | TIMEOUT
+## @wait_for_report(agent_name, timeout=90, max_attempts=3) → report | TIMEOUT
 
 ```
 @wait_for_report(agent_name):
@@ -207,7 +207,7 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
         // 重新握手
         for attempt in 1..3:
           SendMessage(to=agent_name, message="【lead_ready】")
-          sleep(180)  // fix-executor 等待 180s
+          sleep(90)
           $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
           if found: return RETRY  // 重新分配任务
         return BLOCKED
@@ -666,8 +666,8 @@ Phase_5():
       脚本错误处理：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
     """)
 
-    // 等待修复报告
-    report = @wait_for_report("fix-executor")
+    // 等待修复报告（修复任务耗时较长，timeout=180）
+    report = @wait_for_report("fix-executor", timeout=180)
     if report == TIMEOUT: @stop("fix-executor 报告超时")
 
   // Step 3: 创建 follow-up issues（范围外问题）
