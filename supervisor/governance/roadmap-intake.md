@@ -125,6 +125,45 @@ Assignee Pool（第二道）：
 - **保守兜底**：不确定时等待，避免误纳入或误关闭
 - **纳入优于空转**：如果当前 ready queue 很浅，且候选 issue 满足三级审查，不要因为“可能有别的实现写法”而空转
 
+## Assignee Selection Rule
+
+当 issue 通过三级审查并决定纳入 assignee issue pool 时，**必须明确指派给正确的 manager assignee**。
+
+### 配置来源
+
+Manager assignee 配置位于：
+- **配置文件**：`config/v3/settings.yaml`
+- **配置字段**：`manager_usernames`
+- **默认值**：`["vibe-manager-agent"]`
+
+### 选择规则（强制）
+
+**必须使用**：
+- ✅ `vibe-manager-agent`（自动化启动的默认 manager）
+
+**禁止使用**：
+- ❌ 仓库 owner（如 `jacobcy`、`alice`）
+- ❌ 其他人类用户名
+- ❌ 示例中的 placeholder（如 `@alice`）
+
+### 理由
+
+- **Manager Dispatch 机制**：只检测 `manager_usernames` 配置中的 assignee（如 `vibe-manager-agent`）
+- **自动化触发**：issue 分配给 `vibe-manager-agent` → manager dispatch 自动启动
+- **人类 assignee**：分配给人类用户不会触发自动化流程，违背 intake 的自动化目标
+
+### 示例修正
+
+**错误示例**（旧版本）：
+```
+[governance suggest] Intake: assigned to @alice (manager-pool); scope=bugfix.
+```
+
+**正确示例**：
+```
+[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=bugfix.
+```
+
 ## Permission Contract
 
 Allowed:
@@ -143,6 +182,7 @@ Forbidden:
 - 进入 plan/run/review 执行链
 - 执行 `state/*` label 变更
 - 对不确定是否适合自动化的 issue 强行纳入 assignee issue pool
+- **分配给错误的人类 assignee（如 `jacobcy`、`alice`）** ⭐ 新增
 
 ## What It Reads
 
@@ -168,7 +208,8 @@ Forbidden:
    - **边界明确的 refactor / cleanup**
 4. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
 5. 对可纳入对象执行最小动作：
-   - 派为 assignee issue，并明确指派给一个配置中的 manager assignee
+   - 派为 assignee issue，并明确指派给 `vibe-manager-agent`（从 `config/v3/settings.yaml` 的 `manager_usernames` 读取）
+   - **禁止分配给人类用户**（如 `jacobcy`、`alice`），否则 manager dispatch 不会触发
    - 如有必要补最小 routing labels
 6. 对不适合纳入的对象记录简短原因
 7. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
@@ -187,7 +228,7 @@ Forbidden:
 
 合规示例：
 ```
-[governance suggest] Intake: assigned to @alice (manager-pool); scope=bugfix.
+[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=bugfix.
 [governance suggest] Skipped: needs human scope confirmation before automation.
 ```
 
