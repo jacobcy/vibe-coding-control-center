@@ -500,6 +500,15 @@ Phase_3():
     len(valid_reports) < len(expected_agents)  // 报告缺失
   )
 
+  // Step 2.1: 输出决策依据（让决策过程透明可见）
+  output("Codex 触发决策依据：")
+  output(f"  - is_security_pr: {is_security_pr}")
+  output(f"  - diff > 500 lines: {diff > 500} (实际 diff: {diff} lines)")
+  output(f"  - reports_conflict: {reports_conflict(valid_reports)}")
+  output(f"  - 报告缺失: {len(valid_reports)} < {len(expected_agents)}")
+  output(f"  - 任一报告有严重幻觉: {any_report_invalid}")
+  output(f"  → trigger_codex = {trigger_codex}")
+
   if any_report_invalid:  // 任一报告有严重幻觉 → 跳过 codex
     trigger_codex = false
 
@@ -552,11 +561,21 @@ Phase_4():
   if codex_result: all_reports.append(codex_result)
   // 剔除 Phase 3 标记为作废的报告
 
+  // Step 1.5: 复验测试脚本（如果 PR 包含新增测试脚本）
+  if PR contains new test files:
+    output("检测到新增测试脚本，team-lead 执行复验...")
+    for test_file in new_test_files:
+      $ uv run pytest {test_file} -v
+      if exit ≠ 0:
+        @stop("测试脚本复验失败：{test_file}")
+    output("✅ 所有新增测试脚本通过复验")
+
   // Step 2: 仲裁冲突 + 出具最终决策
   decision = @arbitrate(all_reports, mode)
   // decision ∈ {APPROVE, NEEDS_CHANGES, REJECT}
 
-  // Step 3: 质量自查（写回前强制执行，见 Appendix A）
+  // Step 3: 质量自查（写回前强制执行，不得在生成 Phase 5 产出后再自查，见 Appendix A）
+  // ⚠️ 禁止延迟自查：不得在生成 PR comment 后才执行质量自查，必须在 Step 4 之前严格执行
   for rule in QUALITY_STANDARDS:
     if not @pass(rule): @fix_before_proceeding()
 
@@ -701,6 +720,11 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 判定为"违规 / 技术债 / 应修复"的条目，必须引用具体规则来源。
 - ❌ "异常类型不一致（ValueError 应改为 SystemError）"
 - ✅ "`ValueError` 不在 `CLAUDE.md` HARD RULE 13 规定的 `SystemError / UserError / BatchError` 体系内"
+
+**引用格式示例**：
+- **文件级别引用**：`CLAUDE.md` HARD RULE 13
+- **章节级别引用**：`.claude/rules/coding-standards.md §Size And Complexity §文件大小`
+- **段落级别引用**：`docs/standards/error-handling.md §错误处理分类 §SystemError 定义`
 
 合法引用源：`CLAUDE.md` 第 N 条 / `.claude/rules/coding-standards.md § X` / `.claude/rules/python-standards.md` / `docs/standards/error-handling.md` 等。
 
