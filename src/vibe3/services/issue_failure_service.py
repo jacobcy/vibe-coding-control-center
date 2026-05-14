@@ -374,14 +374,44 @@ def fail_manager_issue(
 def block_manager_noop_issue(
     *, issue_number: int, repo: str | None, reason: str, actor: str
 ) -> None:
-    block_issue(
-        issue_number=issue_number,
-        reason=reason,
-        role="manager",
-        actor=actor,
-        repo=repo,
-        is_noop=True,
-    )
+    """Block issue via unified block_flow logic.
+
+    Refactored to reuse FlowService.block_flow() for consistency.
+    """
+    try:
+        issue_flow_service = _get_issue_flow_service()
+        store = issue_flow_service.store
+
+        # Find any flow for this issue
+        flows = store.get_flows_by_issue(issue_number, role="task")
+        if not flows:
+            return
+
+        branch = str(flows[0].get("branch") or "").strip()
+        if not branch:
+            return
+
+        # Reuse block_flow() - eliminates duplication
+        from vibe3.services import flow_service
+
+        flow_service.FlowService().block_flow(branch, reason=reason, actor=actor)
+
+        # Add block event for observability (separate from flow_blocked event)
+        store.add_event(
+            branch,
+            "blocked",
+            actor,
+            detail=reason,
+            refs={"issue": str(issue_number), "action": "block"},
+        )
+
+    except Exception as e:
+        logger.bind(
+            domain="flow",
+            action="block_manager_noop",
+            issue_number=issue_number,
+            error=str(e),
+        ).warning(f"Failed to block issue #{issue_number}")
 
 
 def block_planner_noop_issue(

@@ -20,9 +20,7 @@ def test_block_manager_noop_issue_reuses_block_flow():
             {"branch": "task/issue-123", "task_issue_number": 123}
         ]
 
-        with patch(
-            "vibe3.services.issue_failure_service.FlowService"
-        ) as mock_flow_service:
+        with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
             mock_flow_instance = mock_flow_service.return_value
 
             block_manager_noop_issue(
@@ -47,7 +45,7 @@ def test_block_manager_noop_issue_adds_blocked_event():
 
         mock_store.get_flows_by_issue.return_value = [{"branch": "task/issue-123"}]
 
-        with patch("vibe3.services.issue_failure_service.FlowService"):
+        with patch("vibe3.services.flow_service.FlowService"):
             block_manager_noop_issue(
                 issue_number=123, repo=None, reason="Test reason", actor="test:actor"
             )
@@ -75,9 +73,7 @@ def test_block_manager_noop_issue_no_flow():
         # No flow found
         mock_store.get_flows_by_issue.return_value = []
 
-        with patch(
-            "vibe3.services.issue_failure_service.FlowService"
-        ) as mock_flow_service:
+        with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
             block_manager_noop_issue(
                 issue_number=123, repo=None, reason="Test reason", actor="test:actor"
             )
