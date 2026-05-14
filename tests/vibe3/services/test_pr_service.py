@@ -162,6 +162,18 @@ def test_pr_service_preserves_falsey_injected_dependencies() -> None:
     assert service.briefing_service.github_client is github_client
 
 
+def test_pr_service_default_instantiation_creates_all_dependencies() -> None:
+    """PRService() with zero arguments creates all default collaborators."""
+    service = PRService()
+
+    assert service.github_client is not None
+    assert service.git_client is not None
+    assert service.store is not None
+    assert service.version_service is not None
+    assert service.briefing_service is not None
+    assert service.loc_comment_service is not None
+
+
 def test_create_pr_push_failure_surfaces_upstream_guidance(
     pr_service: PRService, no_conflict_git: MagicMock
 ) -> None:

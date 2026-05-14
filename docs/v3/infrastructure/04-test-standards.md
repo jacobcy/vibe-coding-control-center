@@ -195,6 +195,73 @@ def test_create_flow(mock_git_client):
 
 ---
 
+## 默认依赖实例化验证（强制）
+
+### 必须验证默认实例化行为
+
+当服务构造函数包含可选依赖（`X | None = None`）并有默认实例化逻辑时，必须至少有一个测试以零参数调用 `Service()` 并验证所有默认依赖已正确创建。
+
+**强制规则：**
+
+1. **Rule 1**：必须有一个测试验证零参数构造函数的默认实例化行为
+2. **Rule 2**：手动注入依赖的测试是**补充场景**，不能替代默认行为的验证
+3. **Rule 3**：测试应模拟真实生产环境的使用方式（即匹配生产代码中的调用模式）
+
+**动机（反面案例）：**
+
+Issue #297 暴露了一个系统性缺陷：`PRService()` 在生产代码中以零参数调用，依赖默认实例化逻辑创建各服务实例（如 `loc_comment_service = PRLocCommentService(...)`）。然而，所有现有测试都使用手动注入的 mock 对象，从未验证 `PRService()` 的默认构造行为。结果，当默认实例化逻辑遗漏 `loc_comment_service`（设置为 `None`），生产环境调用时直接崩溃，但测试套件依然通过，因为测试从未触发该默认路径。
+
+**正确示例：**
+
+```python
+# tests/vibe3/services/test_pr_service.py
+def test_pr_service_default_instantiation_creates_all_dependencies() -> None:
+    """PRService() with zero arguments creates all default collaborators."""
+    service = PRService()
+
+    assert service.github_client is not None
+    assert service.git_client is not None
+    assert service.store is not None
+    assert service.version_service is not None
+    assert service.briefing_service is not None
+    assert service.loc_comment_service is not None
+```
+
+**错误示例（反模式）：**
+
+```python
+# ❌ 错误：所有测试都使用手动注入，未覆盖默认路径
+@pytest.fixture
+def pr_service():
+    """创建 PRService 并手动注入所有依赖"""
+    gh_mock = Mock()
+    git_mock = Mock()
+    store_mock = Mock()
+    return PRService(
+        github_client=gh_mock,
+        git_client=git_mock,
+        store=store_mock,
+        version_service=Mock(),
+        briefing_service=Mock(),
+        loc_comment_service=Mock(),
+    )
+
+def test_create_pr_success(pr_service):
+    """测试创建 PR"""
+    # ... 使用 fixture 提供的 pr_service
+```
+
+**问题：**
+- Fixture 手动注入所有依赖，绕过了 `PRService.__init__` 的默认实例化逻辑
+- 如果默认实例化有 bug（如遗漏某个依赖），测试无法发现
+- 生产代码调用 `PRService()` 时，实际触发的路径从未被测试覆盖
+
+**覆盖率原则：**
+
+默认实例化验证测试**不负责**验证各依赖服务自身的正确性（那是各服务单元测试的职责）。它只负责验证 `Service()` 零参数调用时，所有预期的默认依赖实例已正确创建。
+
+---
+
 ## 测试命名规范（强制）
 
 ### 测试文件命名
