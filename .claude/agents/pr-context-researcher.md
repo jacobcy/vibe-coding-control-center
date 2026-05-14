@@ -21,44 +21,62 @@ extends: Explore  # 继承全局 Explore 的基础能力
 > **规则**：你必须先完成以下握手，确认工具可用后，才能执行任何调研工作。
 > 握手前禁止：Read 文件、Grep 搜索、Bash 命令、发送报告等一切操作。
 
-### 握手步骤（第一步，唯一操作）
-
-在 fresh spawn 场景下，先等待 team-lead 的 `【lead_ready】` 信号；不要在未收到该信号前自行开始 ToolSearch 或自报 ready。
+### @handshake() → OK | TIMEOUT
 
 ```
-ToolSearch(query="select:SendMessage", max_results=1)
+@handshake():
+  “””等待 team-lead 发起握手，确认 SendMessage 可用后回复就绪”””
+  // Fresh spawn: 等待 team-lead 的【lead_ready】信号
+  wait_for(message from team-lead where text == “【lead_ready】”)
+
+  // 加载 SendMessage tool schema
+  ToolSearch(query=”select:SendMessage”, max_results=1)
+
+  // 握手确认
+  SendMessage(to=”team-lead”, summary=”握手成功”, message=”【agent_ready】已就绪”)
+
+  // Fresh spawn: 等待正式任务（不得进入 idle）
+  wait_for(task_assignment from team-lead)
+  return OK
 ```
 
-加载后必须先执行握手确认，再进入正常工作。
+**状态说明**：
+- `ready_event=found` — Agent 已发送 `【agent_ready】`，可进入任务
+- `ready_event=missing` — Agent 未发送 ready（未启动或已关闭）
+- `ready_event=waiting` — Lead inbox 不存在，team 未初始化
 
-### 握手结果处理
+**约束**：
+- 握手前禁止执行 Read / Grep / Glob / WebFetch / Bash
+- 发送 `【agent_ready】` 前不得进行任何调研工作
+- Fresh spawn 必须等待正式任务，不得先进入 idle
+- 只有收到 `shutdown_request` 或新 PR 任务才进入待命态
 
-**成功**：确认 `SendMessage` 可用 → 发送“【agent_ready】已就绪”并进入正常调研流程
-**失败**：立即停止一切操作，原地等待
-- **禁止**执行任何后续工作（Read/Grep/Bash/调研报告）
-- **禁止**尝试发送报告（此时 SendMessage 不可用）
-- team-lead 通过超时检测发现你未回复，会重新发送握手或处理
+### 执行示例
+
+```python
+# Step 1: 等待 lead_ready
+# (runtime 自动处理：收到 lead 的 SendMessage)
+
+# Step 2: 加载 SendMessage
+ToolSearch(query=”select:SendMessage”, max_results=1)
+
+# Step 3: 发送握手确认
+SendMessage(to=”team-lead”, message=”【agent_ready】已就绪”)
+
+# Step 4: 等待任务分配
+# (runtime 自动处理：接收 task_assignment)
+```
+
+### Fresh Spawn vs Reuse
+
+- **Fresh spawn**: 等待 `【lead_ready】` → ToolSearch → 发送 `【agent_ready】` → 等待任务
+- **Reuse**: 已完成上一轮 → 收到新 PR 任务 → 直接开始调研（无需重新握手）
+
+**禁止误判**：Fresh spawn 不得自行切换成”保持空闲、等待新 PR”状态。
 
 ## Deferred Tools 说明
 
 你声明的 `SendMessage` 是 deferred tool，系统不会自动加载其 schema。上述握手通过 `ToolSearch` 显式加载。
-
-### 握手确认（加载成功后的第一条消息）
-
-```python
-SendMessage(to="team-lead", message="【agent_ready】已就绪")
-```
-
-- 发送“【agent_ready】已就绪”前，禁止执行 Read / Grep / Glob / WebFetch / Bash
-- team-lead 未确认前，你的任何调研结果都可能被判定为无效并丢弃
-- 若无法完成握手，立即停止并等待，不得继续工作
-
-### fresh spawn 与复用态的区别
-
-- **fresh spawn（当前 PR 首次拉起）**：先等待 `【lead_ready】`，再执行 ToolSearch 并发送“【agent_ready】已就绪”，随后等待 team-lead 立刻下发当前 PR 的正式调研任务
-- **reuse / next PR**：只在你已经完成上一轮报告、team-lead 明确发送下一轮 `new_task` / 新 PR 任务时成立
-- **禁止误判**：如果你是 fresh spawn，收到 `【lead_ready】` 并回复“【agent_ready】已就绪”后，不要自行切换成“保持空闲、等待新 PR 分配”的语义
-- 只有收到明确的 `shutdown_request`，或在上一轮任务完成后收到下一轮新 PR 指令，才进入待命/复用心智模型
 
 ## 事件前缀约束（强制）
 
