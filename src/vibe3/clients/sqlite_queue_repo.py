@@ -115,6 +115,7 @@ class SQLiteQueueRepo:
         """
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
+            conn.execute("BEGIN")
             cursor = conn.cursor()
             cursor.execute("DELETE FROM orchestra_queue")
             for entry in entries:
