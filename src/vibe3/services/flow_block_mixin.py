@@ -72,14 +72,30 @@ class FlowLifecycleMixin:
         # Transition issue state to BLOCKED if task_issue_number exists
         issue_number = flow_data.get("task_issue_number")
         if issue_number:
-            # Transition issue state to BLOCKED
-            LabelService().transition(
-                issue_number, IssueState.BLOCKED, effective_actor, force=False
-            )
+            try:
+                # Transition issue state to BLOCKED
+                LabelService().transition(
+                    issue_number, IssueState.BLOCKED, effective_actor, force=False
+                )
+            except Exception as e:
+                logger.bind(
+                    domain="flow",
+                    action="block",
+                    branch=branch,
+                    issue_number=issue_number,
+                ).warning(f"Failed to transition issue state: {e}")
 
             # Add comment if reason is provided
             if reason:
-                GitHubClient().add_comment(issue_number, f"Flow blocked: {reason}")
+                try:
+                    GitHubClient().add_comment(issue_number, f"Flow blocked: {reason}")
+                except Exception as e:
+                    logger.bind(
+                        domain="flow",
+                        action="block",
+                        branch=branch,
+                        issue_number=issue_number,
+                    ).warning(f"Failed to add comment: {e}")
 
         self.store.add_event(
             branch,
