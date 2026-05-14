@@ -394,7 +394,9 @@ def block_manager_noop_issue(
         # Reuse block_flow() - eliminates duplication
         from vibe3.services import flow_service
 
-        flow_service.FlowService().block_flow(branch, reason=reason, actor=actor)
+        flow_service.FlowService(store=store).block_flow(
+            branch, reason=reason, actor=actor
+        )
 
         # Add block event for observability (separate from flow_blocked event)
         store.add_event(
