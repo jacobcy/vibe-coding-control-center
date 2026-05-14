@@ -183,7 +183,9 @@ orchestra:
 class TestBuildSupervisorApplyRequest:
     """Tests for build_supervisor_apply_request."""
 
-    @patch("vibe3.roles.supervisor.resolve_supervisor_agent_options")
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
     def test_request_structure(self, mock_opts):
         mock_opts.return_value = MagicMock()
         config = _make_config()
@@ -196,7 +198,9 @@ class TestBuildSupervisorApplyRequest:
         assert req.mode == "async"
         assert req.worktree_requirement == WorktreeRequirement.TEMPORARY
 
-    @patch("vibe3.roles.supervisor.resolve_supervisor_agent_options")
+    @patch(
+        "vibe3.execution.execution_role_policy.ExecutionRolePolicyService.resolve_effective_agent_options"
+    )
     def test_env_has_async_child(self, mock_opts):
         mock_opts.return_value = MagicMock()
         config = _make_config()

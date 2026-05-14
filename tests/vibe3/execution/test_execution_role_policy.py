@@ -128,7 +128,6 @@ def test_all_roles_resolve_backend(sample_config: OrchestraConfig) -> None:
     service = ExecutionRolePolicyService(config=sample_config)
 
     # Only orchestra roles are handled by ExecutionRolePolicyService
-    # Command roles (planner/executor/reviewer) are handled by agent_resolver.py
     roles = ["manager", "supervisor", "governance"]
     for role in roles:
         backend = service.resolve_backend(role)

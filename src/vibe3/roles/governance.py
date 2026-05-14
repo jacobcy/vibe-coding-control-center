@@ -12,8 +12,8 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.execution.agent_resolver import resolve_governance_agent_options
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -433,7 +433,9 @@ def render_governance_prompt(
 
 def resolve_governance_options(config: OrchestraConfig) -> Any:
     """Resolve governance agent options."""
-    return resolve_governance_agent_options(config)
+    return ExecutionRolePolicyService(config).resolve_effective_agent_options(
+        "governance"
+    )
 
 
 def build_governance_execution_name(tick_count: int) -> str:

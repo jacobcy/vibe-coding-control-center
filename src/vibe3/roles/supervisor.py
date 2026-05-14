@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
-from vibe3.execution.agent_resolver import resolve_supervisor_agent_options
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import use_current_branch
 from vibe3.execution.role_contracts import (
     SUPERVISOR_APPLY_GATE_CONFIG,
@@ -117,7 +117,9 @@ def build_supervisor_handoff_payload(
     rendered = assembler.render(recipe, runtime_context=snapshot_context)
     prompt = rendered.rendered_text
 
-    options = resolve_supervisor_agent_options(config)
+    options = ExecutionRolePolicyService(config).resolve_effective_agent_options(
+        "supervisor"
+    )
     task = build_supervisor_task_string(
         config,
         issue_number,
@@ -260,7 +262,9 @@ def build_supervisor_cli_sync_request(
 
 SUPERVISOR_CLI_SYNC_SPEC = IssueRoleSyncSpec(
     role_name="supervisor",
-    resolve_options=resolve_supervisor_agent_options,
+    resolve_options=lambda c: ExecutionRolePolicyService(
+        c
+    ).resolve_effective_agent_options("supervisor"),
     resolve_branch=use_current_branch,
     build_async_request=lambda config, issue, actor: build_supervisor_cli_request(
         config,
