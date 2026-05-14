@@ -56,7 +56,7 @@ def test_block_manager_noop_issue_adds_blocked_event():
                 "blocked",
                 "test:actor",
                 detail="Test reason",
-                refs={"issue": "123"},
+                refs={"issue": "123", "action": "block"},
             )
 
 

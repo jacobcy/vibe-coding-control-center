@@ -9,7 +9,7 @@ Note: Dispatch queue filtering tests moved to test_global_dispatch_coordinator.p
 after StateLabelDispatchService deletion in issue-462 refactoring.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -186,25 +186,39 @@ class TestManagerBlockedReasonWriting:
     def test_manager_blocked_calls_ensure_flow_state(
         self,
     ) -> None:
-        """Manager blocked 应该调用 _ensure_flow_state_for_issue"""
+        """Manager blocked 应该通过 block_flow 设置 blocked_reason"""
         mock_issue_number = 305
 
         with patch(
-            "vibe3.services.issue_failure_service._ensure_flow_state_for_issue"
-        ) as mock_ensure:
-            from vibe3.services.issue_failure_service import block_manager_noop_issue
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
+        ) as mock_get_service:
+            mock_service = MagicMock()
+            mock_store = MagicMock()
+            mock_service.store = mock_store
+            mock_get_service.return_value = mock_service
 
-            block_manager_noop_issue(
-                issue_number=mock_issue_number,
-                repo="jacobcy/vibe-coding-control-center",
-                reason="manager 本轮未产生状态迁移",
-                actor="test-backend/test-model",
-            )
+            # Mock flow data
+            mock_store.get_flows_by_issue.return_value = [
+                {"branch": "task/issue-305", "task_issue_number": 305}
+            ]
 
-            # Verify: _ensure_flow_state_for_issue called with "block" action
-            mock_ensure.assert_called_once_with(
-                mock_issue_number,
-                "block",  # ← action 参数
-                "manager 本轮未产生状态迁移",  # ← reason
-                "test-backend/test-model",  # ← actor (透传)
-            )
+            with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
+                mock_flow_instance = mock_flow_service.return_value
+
+                from vibe3.services.issue_failure_service import (
+                    block_manager_noop_issue,
+                )
+
+                block_manager_noop_issue(
+                    issue_number=mock_issue_number,
+                    repo="jacobcy/vibe-coding-control-center",
+                    reason="manager 本轮未产生状态迁移",
+                    actor="test-backend/test-model",
+                )
+
+                # Verify: block_flow called with correct parameters
+                mock_flow_instance.block_flow.assert_called_once_with(
+                    "task/issue-305",
+                    reason="manager 本轮未产生状态迁移",
+                    actor="test-backend/test-model",
+                )
