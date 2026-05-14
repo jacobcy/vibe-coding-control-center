@@ -70,6 +70,17 @@ assert_defined_agent "$AGENT_NAME"
 print_agent_table_header
 print_agent_row "$AGENT_NAME" "$GROUP_NAME"
 
+# Output handshake state based on lead inbox status
+#
+# States:
+#   waiting — Lead inbox does not exist, team not initialized
+#   missing  — Lead inbox exists but agent has not sent 【agent_ready】
+#   found    — Agent has sent 【agent_ready】 event
+#
+# Semantics:
+#   waiting → team-lead should wait for team initialization
+#   missing → agent not ready, continue waiting or respawn
+#   found   → agent ready, proceed with task assignment
 LEAD_INBOX="$(lead_inbox_path "$GROUP_NAME")"
 if [[ ! -f "$LEAD_INBOX" ]]; then
   echo "ready_event=waiting"

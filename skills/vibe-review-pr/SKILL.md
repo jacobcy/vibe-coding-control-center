@@ -141,7 +141,17 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
   return TIMEOUT
 ```
 
-> `agent-exist.sh <agent>` 输出最后一行包含 `ready_event=found|missing|waiting`，grep `ready_event=found` 确认 agent 已回复 `【agent_ready】`。
+> **State Semantics**:
+> - `ready_event=found` — Agent 已发送 `【agent_ready】` 事件，可进入下一步任务分配
+> - `ready_event=missing` — Agent 未发送过 ready 事件（可能未启动、已关闭、或 inbox 为空）
+> - `ready_event=waiting` — Lead inbox 不存在（team 结构未初始化），需要先执行 team 创建流程
+>
+> **Detection Strategy**:
+> - 握手检测应区分 `found`（成功）和 `missing/waiting`（需要等待或重试）
+> - `waiting` 状态表示基础设施未就绪，应等待 team 初始化完成
+> - `missing` 状态表示 agent 未响应，应等待或重新 spawn
+
+`agent-exist.sh <agent>` 输出最后一行包含 `ready_event=found|missing|waiting`，grep `ready_event=found` 确认 agent 已回复 `【agent_ready】`。
 
 **约束**：
 - spawn 后必须先握手，不得跳过
