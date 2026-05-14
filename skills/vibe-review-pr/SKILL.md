@@ -141,7 +141,17 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
   return TIMEOUT
 ```
 
-> `agent-exist.sh <agent>` 输出最后一行包含 `ready_event=found|missing|waiting`，grep `ready_event=found` 确认 agent 已回复 `【agent_ready】`。
+> **State Semantics**:
+> - `ready_event=found` — Agent 已发送 `【agent_ready】` 事件，可进入下一步任务分配
+> - `ready_event=missing` — Agent 未发送过 ready 事件（可能未启动、已关闭、或 inbox 为空）
+> - `ready_event=waiting` — Lead inbox 不存在（team 结构未初始化），需要先执行 team 创建流程
+>
+> **Detection Strategy**:
+> - 握手检测应区分 `found`（成功）和 `missing/waiting`（需要等待或重试）
+> - `waiting` 状态表示基础设施未就绪，应等待 team 初始化完成
+> - `missing` 状态表示 agent 未响应，应等待或重新 spawn
+
+`agent-exist.sh <agent>` 输出最后一行包含 `ready_event=found|missing|waiting`，grep `ready_event=found` 确认 agent 已回复 `【agent_ready】`。
 
 **约束**：
 - spawn 后必须先握手，不得跳过
@@ -153,7 +163,13 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 
 ```
 @wait_for_report(agent_name):
-  """主动轮询等待 agent 报告。禁止被动 idle。"""
+  """主动轮询等待 agent 报告。禁止被动 idle。
+  
+  注意：stale 状态只表示长时间无消息，不代表 agent 失联。
+  如果 agent-exist.sh 显示 stale/inactive，应先捕获 tmux pane 内容确认是否有输出。
+  如果 pane 有输出（agent 正在工作），继续等待，不要重新握手。
+  只有 pane 无输出时才重新握手。"""
+  
   for attempt in 1..max_attempts:
     sleep(timeout)
     $ agent-report.sh {agent_name}
@@ -165,31 +181,28 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 
 > `agent-report.sh` 输出格式：`agent=<name>` / `timestamp=<ts>` / `body_start` / 完整消息正文。`body_start` 之后的内容即为 agent 通过 SendMessage 发送的原始报告。
 
-## @handle_idle(agent_name) → report | RETRY | BLOCKED
+## @handle_idle(agent_name) → void
 
 ```
 @handle_idle(agent_name):
-  """收到 idle 通知后的统一处理。idle_notification 是触发信号，不是完成确认。"""
-  // 1. 检查是否有报告（agent-report.sh 直接判断，exit 0 = 有报告）
-  $ agent-report.sh {agent_name} > /dev/null 2>&1
-  if exit == 0:
-    return $(agent-report.sh {agent_name})   // exit 0, stdout = 完整报告
-
-  // 2. 无报告 → 检查 agent 状态诊断
-  status = $(agent-exist.sh {agent_name})     // 看 alive 字段: active/idle/stale/inactive/never
-  events = $(agent-event.sh {agent_name})     // 看最新事件类型: agent_ready/agent_report/message
-
-  // 3. 根据状态行动
-  case status.alive:
-    "active" or "idle"  → continue waiting（agent 可能仍在执行）
-    "stale" or "inactive" or "never" → 
-      // 重新握手
-      for attempt in 1..3:
-        SendMessage(to=agent_name, message="【lead_ready】")
-        sleep(90)
-        $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
-        if found: return RETRY  // 重新分配任务
-      return BLOCKED
+  """收到 idle 通知后的状态检查（不干预，只提示）。
+  
+  注意：此函数不进行轮询或重新握手，只检查 tmux pane 内容并输出提示。
+  报告轮询由 @wait_for_report 负责。"""
+  
+  // 检查 agent 状态
+  status = $(agent-exist.sh {agent_name})
+  
+  // 捕获 tmux pane 内容（确认是否有输出）
+  pane_content = tmux capture-pane -t <pane_id> -p -S -50
+  
+  if pane_content has recent output:
+    output("Agent {agent_name} 正在工作，继续等待...")
+    return  // 不干预，让 @wait_for_report 继续轮询
+  else:
+    output("Agent {agent_name} 可能已失联（pane 无输出）")
+    output("建议：等待 @wait_for_report 超时后重新 spawn")
+    return  // 不干预，让 @wait_for_report 超时处理
 ```
 
 > idle_notification 语义：agent 空闲了，**可能**完成了工作。teammate-message 系统不转发工作报告（工作报告写入 inbox），只转发 idle_notification / permission_request / plan_approval_request。收到 idle 后必须主动检查 inbox/pane，不能假设工作已完成。
@@ -248,8 +261,31 @@ Phase_0():
   // 禁止在此步执行 gh pr view / gh pr diff / git diff
 
   // Step 2: 选择执行模式
-  mode = user_specified or "ask-each"
-  // 选项: auto-fix / comment-only / auto-decide / ask-each
+  // 询问用户选择执行模式
+  AskUserQuestion(questions=[{
+    "question": "选择 PR 审查执行模式？",
+    "header": "执行模式",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "ask-each（推荐）",
+        "description": "每步操作前询问用户确认，适合标准 PR 和安全 PR"
+      },
+      {
+        "label": "auto-decide",
+        "description": "team-lead 根据复杂度自动决策，适合简单 PR（< 50 行，无安全相关）"
+      },
+      {
+        "label": "auto-fix",
+        "description": "自动修复阻塞问题，适合阻塞项 < 3 个、修改面 < 3 文件"
+      },
+      {
+        "label": "comment-only",
+        "description": "只写 comment，不修复，适合大型 PR、高风险改动"
+      }
+    ]
+  }])
+  mode = user_selected_option or "ask-each"
 
   // Step 3: Team 创建或复用
   result = TeamCreate(team_name="pr-review-team")
@@ -376,17 +412,16 @@ Phase_1():
 
 ## idle 自动处理
 
-收到 context-researcher 的 idle 通知后，立即执行 `@handle_idle("context-researcher")`：
-- 有报告 → 提取并继续 Phase 1 Step 4
-- 需重新握手 → SendMessage(【lead_ready】)，最多 3 次
-- 标记 blocked → @stop("context-researcher blocked，回退单 agent 审查")
+收到 context-researcher 的 idle 通知后，执行 `@handle_idle("context-researcher")`：
+- 检查 tmux pane 内容，输出状态提示
+- 不干预流程，继续等待 `@wait_for_report` 轮询结果
 
 ## Hard Rules
 
 - team-lead 不得自行收集上下文（这是 context-researcher 的工作）
 - 不得在未收到报告前激活 Phase 2/3
 - 保持空闲 / 等待新 PR 只适用于复用 teammate；不适用于 fresh spawn 且刚完成握手的 agent
-- 收到 idle 通知后必须使用 `@handle_idle`，不得直接轮询
+- 收到 idle 通知后可执行 `@handle_idle` 检查状态，但不干预轮询流程
 
 ---
 
@@ -425,7 +460,7 @@ Phase_2():
       分析 PR #N。
 
       读取 Phase 1 背景报告：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
       完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## <角色>报告\n...")
 
@@ -453,10 +488,9 @@ Phase_2():
 
 ## idle 自动处理
 
-收到任何 Phase 2 agent 的 idle 通知后，立即执行 `@handle_idle(agent_name)`：
-- 有报告 → 提取并继续
-- 需重新握手 → SendMessage(【lead_ready】)，最多 3 次
-- 标记 blocked 后仍继续等待其他 agent
+收到任何 Phase 2 agent 的 idle 通知后，执行 `@handle_idle(agent_name)`：
+- 检查 tmux pane 内容，输出状态提示
+- 不干预流程，继续等待 `@wait_for_report` 轮询结果
 
 ## Hard Rules
 
@@ -490,6 +524,15 @@ Phase_3():
     len(valid_reports) < len(expected_agents)  // 报告缺失
   )
 
+  // Step 2.1: 输出决策依据（让决策过程透明可见）
+  output("Codex 触发决策依据：")
+  output(f"  - is_security_pr: {is_security_pr}")
+  output(f"  - diff > 500 lines: {diff > 500} (实际 diff: {diff} lines)")
+  output(f"  - reports_conflict: {reports_conflict(valid_reports)}")
+  output(f"  - 报告缺失: {len(valid_reports)} < {len(expected_agents)}")
+  output(f"  - 任一报告有严重幻觉: {any_report_invalid}")
+  output(f"  → trigger_codex = {trigger_codex}")
+
   if any_report_invalid:  // 任一报告有严重幻觉 → 跳过 codex
     trigger_codex = false
 
@@ -498,12 +541,12 @@ Phase_3():
       复查 PR #N 的全部审查报告，给出第三方独立评估。
 
       读取 Phase 1 背景报告：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
       读取 Phase 2 专家评审：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh code-analyst
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
+        skills/vibe-review-pr/scripts/agent-report.sh code-analyst
+        skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
+        skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
 
       重点关注：是否有遗漏、结论是否一致、建议是否可行。
     """)
@@ -542,11 +585,21 @@ Phase_4():
   if codex_result: all_reports.append(codex_result)
   // 剔除 Phase 3 标记为作废的报告
 
+  // Step 1.5: 复验测试脚本（如果 PR 包含新增测试脚本）
+  if PR contains new test files:
+    output("检测到新增测试脚本，team-lead 执行复验...")
+    for test_file in new_test_files:
+      $ uv run pytest {test_file} -v
+      if exit ≠ 0:
+        @stop("测试脚本复验失败：{test_file}")
+    output("✅ 所有新增测试脚本通过复验")
+
   // Step 2: 仲裁冲突 + 出具最终决策
   decision = @arbitrate(all_reports, mode)
   // decision ∈ {APPROVE, NEEDS_CHANGES, REJECT}
 
-  // Step 3: 质量自查（写回前强制执行，见 Appendix A）
+  // Step 3: 质量自查（写回前强制执行，不得在生成 Phase 5 产出后再自查，见 Appendix A）
+  // ⚠️ 禁止延迟自查：不得在生成 PR comment 后才执行质量自查，必须在 Step 4 之前严格执行
   for rule in QUALITY_STANDARDS:
     if not @pass(rule): @fix_before_proceeding()
 
@@ -613,7 +666,7 @@ Phase_5():
       根据 team-lead 提供的修复指令修复 PR #N。
 
       读取 Phase 1 背景报告：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
       修复指令：
       <Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
@@ -626,8 +679,8 @@ Phase_5():
       脚本错误处理：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
     """)
 
-    // 等待修复报告
-    report = @wait_for_report("fix-executor")
+    // 等待修复报告（修复任务耗时较长，timeout=180）
+    report = @wait_for_report("fix-executor", timeout=180)
     if report == TIMEOUT: @stop("fix-executor 报告超时")
 
   // Step 3: 创建 follow-up issues（范围外问题）
@@ -692,6 +745,11 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 - ❌ "异常类型不一致（ValueError 应改为 SystemError）"
 - ✅ "`ValueError` 不在 `CLAUDE.md` HARD RULE 13 规定的 `SystemError / UserError / BatchError` 体系内"
 
+**引用格式示例**：
+- **文件级别引用**：`CLAUDE.md` HARD RULE 13
+- **章节级别引用**：`.claude/rules/coding-standards.md §Size And Complexity §文件大小`
+- **段落级别引用**：`docs/standards/error-handling.md §错误处理分类 §SystemError 定义`
+
 合法引用源：`CLAUDE.md` 第 N 条 / `.claude/rules/coding-standards.md § X` / `.claude/rules/python-standards.md` / `docs/standards/error-handling.md` 等。
 
 ### 3. 验证再断言（数字基于本 PR 实际 diff）
@@ -742,7 +800,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 # Appendix B: Shell Scripts Interface Reference
 
-> 所有脚本位于 `.claude/skills/vibe-review-pr/scripts/`，需从仓库根目录调用。
+> 所有脚本位于 `skills/vibe-review-pr/scripts/`，需从仓库根目录调用。
 > 脚本从 `runtime/agents.sh` 读取 agent 注册表，team group 默认为 `pr-review-team`。
 
 ## agent-exist.sh
@@ -816,8 +874,8 @@ body_start
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
 | 0 | 环境检查 → TeamCreate → ToolSearch（内联操作）；已有 Team 则握手确认存活 | 跳过 Phase 0 直接开始 Phase 1；不复用也不清理直接 TeamCreate；team-lead 未 ToolSearch |
-| 1 | 必须先于 Phase 2 完成；产出 phase_1_output；team-lead 不得自行收集上下文；收到 idle 必须使用 @handle_idle | 只打印到终端未保存；team-lead 自己跑 gh pr view；收到 idle 不使用 @handle_idle 直接轮询 |
-| 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务；收到 idle 必须使用 @handle_idle | 与 Phase 1 并行启动；把正式任务写进 spawn prompt；收到 idle 不使用 @handle_idle |
+| 1 | 必须先于 Phase 2 完成；产出 phase_1_output；team-lead 不得自行收集上下文 | 只打印到终端未保存；team-lead 自己跑 gh pr view |
+| 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务 | 与 Phase 1 并行启动；把正式任务写进 spawn prompt |
 | 3 | 校验报告基础数据；失真报告标注作废；决定是否启用 codex；只传结构化报告给 codex | 与 Phase 2 并行；报告不合格仍调用 codex；给 codex 传 diff |
 | 4 | 收集可用报告（剔除作废）；仲裁冲突；通过 8 条质量自查 | 使用已作废报告；替缺失 agent 脑补结论 |
 | 5 | 模式决定路径；仅 auto-fix 可 spawn fix-executor；范围外问题转 follow-up；**会话收尾必须询问用户** | 把范围外技术债塞进 PR comment；把阻塞问题转 follow-up；**直接发送 shutdown 不询问用户** |

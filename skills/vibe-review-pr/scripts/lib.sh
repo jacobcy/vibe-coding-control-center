@@ -156,13 +156,13 @@ check_last_alive() {
 
   # 判断状态并输出
   if [[ $age -lt 10 ]]; then
-    echo "active (${age}s)"
-  elif [[ $age -lt 60 ]]; then
-    echo "idle (${age}s)"
-  elif [[ $age -lt 300 ]]; then
-    echo "stale (${age}s)"
+    echo "active (${age}s)  # estimate only; check tmux pane content to verify"
+  elif [[ $age -lt 180 ]]; then
+    echo "idle (${age}s)    # estimate only; check tmux pane content to verify"
+  elif [[ $age -lt 600 ]]; then
+    echo "stale (${age}s)   # estimate only; capture tmux pane output before handshake"
   else
-    echo "inactive (${age}s)"
+    echo "inactive (${age}s) # estimate only; capture tmux pane output before handshake"
   fi
 }
 

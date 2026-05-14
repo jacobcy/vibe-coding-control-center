@@ -33,37 +33,44 @@ extends: architect  # 继承全局 architect 的基础能力
 > **规则**：你必须先完成以下握手，确认工具可用后，才能执行任何架构审查。
 > 握手前禁止：Read 文件、Grep 搜索、Bash 命令、发送报告等一切操作。
 
-### 握手步骤（第一步，唯一操作）
-
-在 fresh spawn 场景下，先等待 team-lead 的 `【lead_ready】` 信号；不要在未收到该信号前自行开始 ToolSearch 或自报 ready。
+### @handshake() → OK | TIMEOUT
 
 ```
-ToolSearch(query="select:SendMessage", max_results=1)
+@handshake():
+  “””等待 team-lead 发起握手，确认 SendMessage 可用后回复就绪”””
+  // Fresh spawn: 等待 team-lead 的【lead_ready】信号
+  wait_for(message from team-lead where text == “【lead_ready】”)
+
+  // 加载 SendMessage tool schema
+  ToolSearch(query=”select:SendMessage”, max_results=1)
+
+  // 握手确认
+  SendMessage(to=”team-lead”, summary=”握手成功”, message=”【agent_ready】已就绪”)
+
+  // Fresh spawn: 等待正式任务（不得进入 idle）
+  wait_for(task_assignment from team-lead)
+  return OK
 ```
 
-加载后必须先执行握手确认，再进入正常工作。
+**状态说明**：
+- `ready_event=found` — Agent 已就绪
+- `ready_event=missing` — Agent 未发送 ready
+- `ready_event=waiting` — Team 未初始化
 
-### 握手结果处理
+**约束**：
+- 握手前禁止执行任何架构审查操作
+- 必须等待 team-lead 的 `【lead_ready】` 信号
 
-**成功**：确认 `SendMessage` 可用 → 发送“【agent_ready】已就绪”并进入正常审查流程
-**失败**：立即停止一切操作，原地等待
-- **禁止**执行任何后续工作（Read/Grep/Bash/审查报告）
-- **禁止**尝试发送报告（此时 SendMessage 不可用）
-- team-lead 通过超时检测发现你未回复，会重新发送握手或处理
+### 执行示例
 
-## Deferred Tools 说明
-
-你声明的 `SendMessage` 是 deferred tool，系统不会自动加载其 schema。上述握手通过 `ToolSearch` 显式加载。
-
-### 握手确认（加载成功后的第一条消息）
-
-```python
-SendMessage(to="team-lead", message="【agent_ready】已就绪")
 ```
-
-- 发送“【agent_ready】已就绪”前，禁止执行 Read / Grep / Glob / WebSearch / Bash
-- team-lead 未确认前，你的任何审查结果都可能被判定为无效并丢弃
-- 若无法完成握手，立即停止并等待，不得继续工作
+// Step 1: Runtime 自动接收 lead_ready
+// Step 2: 加载 SendMessage tool schema
+ToolSearch(query=”select:SendMessage”, max_results=1)
+// Step 3: 发送握手确认
+SendMessage(to=”team-lead”, summary=”握手成功”, message=”【agent_ready】已就绪”)
+// Step 4: Runtime 自动接收 task_assignment
+```
 
 ## 事件前缀约束（强制）
 
