@@ -92,7 +92,7 @@ class TestPreDispatchHealthChecks:
         )
 
         # Mock no PR exists
-        flow_manager.get_flow_for_issue.return_value = None
+        flow_manager.get_pr_for_issue.return_value = None
 
         # Execute
         result = coordinator._health_check_before_dispatch(issue)
@@ -135,11 +135,8 @@ class TestPreDispatchHealthChecks:
             github_state="OPEN",
         )
 
-        # Mock flow with PR number
-        flow_manager.get_flow_for_issue.return_value = {
-            "issue_number": 44,
-            "pr_number": 123,
-        }
+        # Mock PR number retrieval
+        flow_manager.get_pr_for_issue.return_value = 123
 
         # Mock merged PR
         github.get_pr.return_value = PRResponse(
@@ -201,11 +198,8 @@ class TestPreDispatchHealthChecks:
             github_state="OPEN",
         )
 
-        # Mock flow with PR number
-        flow_manager.get_flow_for_issue.return_value = {
-            "issue_number": 45,
-            "pr_number": 124,
-        }
+        # Mock PR number retrieval
+        flow_manager.get_pr_for_issue.return_value = 124
 
         # Mock open PR
         github.get_pr.return_value = PRResponse(

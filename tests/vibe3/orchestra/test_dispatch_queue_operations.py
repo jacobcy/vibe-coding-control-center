@@ -344,7 +344,7 @@ class TestHealthCheckBeforeDispatch:
 
         coordinator = make_coordinator("planner", [])
         coordinator._github.view_issue.return_value = {"state": "OPEN"}
-        coordinator._flow_manager.get_flow_for_issue.return_value = {"pr_number": 123}
+        coordinator._flow_manager.get_pr_for_issue.return_value = 123
         pr = PRResponse(
             number=123,
             title="Test PR",
@@ -372,7 +372,7 @@ class TestHealthCheckBeforeDispatch:
 
         coordinator = make_coordinator("planner", [])
         coordinator._github.view_issue.return_value = {"state": "OPEN"}
-        coordinator._flow_manager.get_flow_for_issue.return_value = {"pr_number": 123}
+        coordinator._flow_manager.get_pr_for_issue.return_value = 123
         pr = PRResponse(
             number=123,
             title="Test PR",
