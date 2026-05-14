@@ -115,13 +115,7 @@ def test_task_show_json_includes_summary_fields(
     result = runner.invoke(app, ["task", "show", "--json"])
 
     assert result.exit_code == 0
-    # Parse JSON output after deprecation warning
-    output_lines = result.output.split("\n", 1)
-    if output_lines[0].startswith("Warning:"):
-        json_output = output_lines[1]
-    else:
-        json_output = result.output
-    payload = json.loads(json_output)
+    payload = json.loads(result.stdout)
     assert payload["issue_title"] == "JSON summary view"
     assert payload["latest_ref"]["kind"] == "plan"
     assert payload["latest_comment"]["author"] == "reviewer-bot"
@@ -235,9 +229,9 @@ def test_task_show_deprecated_json_flag(mock_task_service_cls) -> None:
     result = runner.invoke(app, ["task", "show", "--json"])
 
     assert result.exit_code == 0
-    assert "deprecated" in result.output.lower()
+    assert "deprecated" in result.stderr.lower()
     # Output should still be valid JSON
-    payload = json.loads(result.output.split("Warning:", 1)[1].split("\n", 1)[1])
+    payload = json.loads(result.stdout)
     assert payload["issue_title"] == "Format test"
 
 
@@ -343,12 +337,6 @@ def test_task_show_json_includes_task_issue_numbers(
     result = runner.invoke(app, ["task", "show", "--json"])
 
     assert result.exit_code == 0
-    # Parse JSON output after deprecation warning
-    output_lines = result.output.split("\n", 1)
-    if output_lines[0].startswith("Warning:"):
-        json_output = output_lines[1]
-    else:
-        json_output = result.output
-    payload = json.loads(json_output)
+    payload = json.loads(result.stdout)
     # Should include task_issue_numbers array
     assert payload["task_issue_numbers"] == [123, 456]
