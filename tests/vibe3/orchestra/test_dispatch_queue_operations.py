@@ -308,3 +308,83 @@ class TestQueueOperations:
         await coordinator.coordinate()
 
         assert len(emit_calls) == 0
+
+
+class TestHealthCheckBeforeDispatch:
+    """Tests for _health_check_before_dispatch method."""
+
+    def test_issue_closed_on_github_returns_false(
+        self, make_coordinator, make_issue_info
+    ):
+        """Closed issue should cause health check to return False."""
+        coordinator = make_coordinator("planner", [])
+        coordinator._github.view_issue.return_value = {"state": "CLOSED"}
+
+        issue = make_issue_info(1, IssueState.READY)
+        result = coordinator._health_check_before_dispatch(issue)
+
+        assert result is False
+
+    def test_issue_open_no_pr_returns_true(self, make_coordinator, make_issue_info):
+        """Open issue with no PR should pass health check."""
+        coordinator = make_coordinator("planner", [])
+        coordinator._github.view_issue.return_value = {"state": "OPEN"}
+        coordinator._flow_manager.get_flow_for_issue.return_value = None
+
+        issue = make_issue_info(1, IssueState.READY)
+        result = coordinator._health_check_before_dispatch(issue)
+
+        assert result is True
+
+    def test_pr_merged_auto_closes_issue_returns_false(
+        self, make_coordinator, make_issue_info
+    ):
+        """Merged PR should trigger auto-close and return False."""
+        from vibe3.models.pr import PRResponse, PRState
+
+        coordinator = make_coordinator("planner", [])
+        coordinator._github.view_issue.return_value = {"state": "OPEN"}
+        coordinator._flow_manager.get_pr_for_issue.return_value = 123
+        pr = PRResponse(
+            number=123,
+            title="Test PR",
+            state=PRState.MERGED,
+            head_branch="task/issue-1",
+            base_branch="main",
+            url="https://github.com/owner/repo/pull/123",
+        )
+        coordinator._github.get_pr.return_value = pr
+        coordinator._github.close_issue_if_open.return_value = "closed"
+
+        issue = make_issue_info(1, IssueState.READY)
+        result = coordinator._health_check_before_dispatch(issue)
+
+        assert result is False
+        coordinator._github.close_issue_if_open.assert_called_once_with(
+            1,
+            closing_comment="PR #123 已合并，系统自动关闭此 issue。",
+            repo="owner/repo",
+        )
+
+    def test_pr_open_returns_true(self, make_coordinator, make_issue_info):
+        """Open PR should not block dispatch."""
+        from vibe3.models.pr import PRResponse, PRState
+
+        coordinator = make_coordinator("planner", [])
+        coordinator._github.view_issue.return_value = {"state": "OPEN"}
+        coordinator._flow_manager.get_pr_for_issue.return_value = 123
+        pr = PRResponse(
+            number=123,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="task/issue-1",
+            base_branch="main",
+            url="https://github.com/owner/repo/pull/123",
+        )
+        coordinator._github.get_pr.return_value = pr
+
+        issue = make_issue_info(1, IssueState.READY)
+        result = coordinator._health_check_before_dispatch(issue)
+
+        assert result is True
+        coordinator._github.close_issue_if_open.assert_not_called()
