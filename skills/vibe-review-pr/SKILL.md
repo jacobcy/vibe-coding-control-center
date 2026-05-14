@@ -181,36 +181,28 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 
 > `agent-report.sh` 输出格式：`agent=<name>` / `timestamp=<ts>` / `body_start` / 完整消息正文。`body_start` 之后的内容即为 agent 通过 SendMessage 发送的原始报告。
 
-## @handle_idle(agent_name) → report | RETRY | BLOCKED
+## @handle_idle(agent_name) → void
 
 ```
 @handle_idle(agent_name):
-  """收到 idle 通知后的统一处理。idle_notification 是触发信号，不是完成确认。"""
-  // 1. 检查是否有报告（agent-report.sh 直接判断，exit 0 = 有报告）
-  $ agent-report.sh {agent_name} > /dev/null 2>&1
-  if exit == 0:
-    return $(agent-report.sh {agent_name})   // exit 0, stdout = 完整报告
-
-  // 2. 无报告 → 检查 agent 状态诊断
-  status = $(agent-exist.sh {agent_name})     // 看 alive 字段: active/idle/stale/inactive/never
-  events = $(agent-event.sh {agent_name})     // 看最新事件类型: agent_ready/agent_report/message
-
-  // 3. 根据状态行动
-  case status.alive:
-    "active" or "idle"  → continue waiting（agent 可能仍在执行）
-    "stale" or "inactive" or "never" → 
-      // 捕获 tmux pane 内容（确认是否有输出）
-      pane_content = tmux capture-pane -t <pane_id> -p -S -50
-      if pane_content has recent output:
-        continue waiting  // agent 正在工作，不要握手
-      else:
-        // 重新握手
-        for attempt in 1..3:
-          SendMessage(to=agent_name, message="【lead_ready】")
-          sleep(90)
-          $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
-          if found: return RETRY  // 重新分配任务
-        return BLOCKED
+  """收到 idle 通知后的状态检查（不干预，只提示）。
+  
+  注意：此函数不进行轮询或重新握手，只检查 tmux pane 内容并输出提示。
+  报告轮询由 @wait_for_report 负责。"""
+  
+  // 检查 agent 状态
+  status = $(agent-exist.sh {agent_name})
+  
+  // 捕获 tmux pane 内容（确认是否有输出）
+  pane_content = tmux capture-pane -t <pane_id> -p -S -50
+  
+  if pane_content has recent output:
+    output("Agent {agent_name} 正在工作，继续等待...")
+    return  // 不干预，让 @wait_for_report 继续轮询
+  else:
+    output("Agent {agent_name} 可能已失联（pane 无输出）")
+    output("建议：等待 @wait_for_report 超时后重新 spawn")
+    return  // 不干预，让 @wait_for_report 超时处理
 ```
 
 > idle_notification 语义：agent 空闲了，**可能**完成了工作。teammate-message 系统不转发工作报告（工作报告写入 inbox），只转发 idle_notification / permission_request / plan_approval_request。收到 idle 后必须主动检查 inbox/pane，不能假设工作已完成。
@@ -397,17 +389,16 @@ Phase_1():
 
 ## idle 自动处理
 
-收到 context-researcher 的 idle 通知后，立即执行 `@handle_idle("context-researcher")`：
-- 有报告 → 提取并继续 Phase 1 Step 4
-- 需重新握手 → SendMessage(【lead_ready】)，最多 3 次
-- 标记 blocked → @stop("context-researcher blocked，回退单 agent 审查")
+收到 context-researcher 的 idle 通知后，执行 `@handle_idle("context-researcher")`：
+- 检查 tmux pane 内容，输出状态提示
+- 不干预流程，继续等待 `@wait_for_report` 轮询结果
 
 ## Hard Rules
 
 - team-lead 不得自行收集上下文（这是 context-researcher 的工作）
 - 不得在未收到报告前激活 Phase 2/3
 - 保持空闲 / 等待新 PR 只适用于复用 teammate；不适用于 fresh spawn 且刚完成握手的 agent
-- 收到 idle 通知后必须使用 `@handle_idle`，不得直接轮询
+- 收到 idle 通知后可执行 `@handle_idle` 检查状态，但不干预轮询流程
 
 ---
 
@@ -474,10 +465,9 @@ Phase_2():
 
 ## idle 自动处理
 
-收到任何 Phase 2 agent 的 idle 通知后，立即执行 `@handle_idle(agent_name)`：
-- 有报告 → 提取并继续
-- 需重新握手 → SendMessage(【lead_ready】)，最多 3 次
-- 标记 blocked 后仍继续等待其他 agent
+收到任何 Phase 2 agent 的 idle 通知后，执行 `@handle_idle(agent_name)`：
+- 检查 tmux pane 内容，输出状态提示
+- 不干预流程，继续等待 `@wait_for_report` 轮询结果
 
 ## Hard Rules
 
@@ -861,8 +851,8 @@ body_start
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
 | 0 | 环境检查 → TeamCreate → ToolSearch（内联操作）；已有 Team 则握手确认存活 | 跳过 Phase 0 直接开始 Phase 1；不复用也不清理直接 TeamCreate；team-lead 未 ToolSearch |
-| 1 | 必须先于 Phase 2 完成；产出 phase_1_output；team-lead 不得自行收集上下文；收到 idle 必须使用 @handle_idle | 只打印到终端未保存；team-lead 自己跑 gh pr view；收到 idle 不使用 @handle_idle 直接轮询 |
-| 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务；收到 idle 必须使用 @handle_idle | 与 Phase 1 并行启动；把正式任务写进 spawn prompt；收到 idle 不使用 @handle_idle |
+| 1 | 必须先于 Phase 2 完成；产出 phase_1_output；team-lead 不得自行收集上下文 | 只打印到终端未保存；team-lead 自己跑 gh pr view |
+| 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务 | 与 Phase 1 并行启动；把正式任务写进 spawn prompt |
 | 3 | 校验报告基础数据；失真报告标注作废；决定是否启用 codex；只传结构化报告给 codex | 与 Phase 2 并行；报告不合格仍调用 codex；给 codex 传 diff |
 | 4 | 收集可用报告（剔除作废）；仲裁冲突；通过 8 条质量自查 | 使用已作废报告；替缺失 agent 脑补结论 |
 | 5 | 模式决定路径；仅 auto-fix 可 spawn fix-executor；范围外问题转 follow-up；**会话收尾必须询问用户** | 把范围外技术债塞进 PR comment；把阻塞问题转 follow-up；**直接发送 shutdown 不询问用户** |
