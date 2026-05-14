@@ -425,7 +425,7 @@ Phase_2():
       分析 PR #N。
 
       读取 Phase 1 背景报告：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
       完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## <角色>报告\n...")
 
@@ -498,12 +498,12 @@ Phase_3():
       复查 PR #N 的全部审查报告，给出第三方独立评估。
 
       读取 Phase 1 背景报告：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
       读取 Phase 2 专家评审：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh code-analyst
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
+        skills/vibe-review-pr/scripts/agent-report.sh code-analyst
+        skills/vibe-review-pr/scripts/agent-report.sh architect-reviewer
+        skills/vibe-review-pr/scripts/agent-report.sh security-reviewer
 
       重点关注：是否有遗漏、结论是否一致、建议是否可行。
     """)
@@ -613,7 +613,7 @@ Phase_5():
       根据 team-lead 提供的修复指令修复 PR #N。
 
       读取 Phase 1 背景报告：
-        .claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
       修复指令：
       <Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
@@ -742,7 +742,7 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 
 # Appendix B: Shell Scripts Interface Reference
 
-> 所有脚本位于 `.claude/skills/vibe-review-pr/scripts/`，需从仓库根目录调用。
+> 所有脚本位于 `skills/vibe-review-pr/scripts/`，需从仓库根目录调用。
 > 脚本从 `runtime/agents.sh` 读取 agent 注册表，team group 默认为 `pr-review-team`。
 
 ## agent-exist.sh
