@@ -374,11 +374,19 @@ Phase_1():
 
 > 反例（issue #742）：PR #713 改 6 文件、+11/-10、含 `manager.py` 代码改动 → 错误归类 simple → 实际应按 standard 处理。只要包含代码改动或多文件，就不是 simple。
 
+## idle 自动处理
+
+收到 context-researcher 的 idle 通知后，立即执行 `@handle_idle("context-researcher")`：
+- 有报告 → 提取并继续 Phase 1 Step 4
+- 需重新握手 → SendMessage(【lead_ready】)，最多 3 次
+- 标记 blocked → @stop("context-researcher blocked，回退单 agent 审查")
+
 ## Hard Rules
 
 - team-lead 不得自行收集上下文（这是 context-researcher 的工作）
 - 不得在未收到报告前激活 Phase 2/3
 - 保持空闲 / 等待新 PR 只适用于复用 teammate；不适用于 fresh spawn 且刚完成握手的 agent
+- 收到 idle 通知后必须使用 `@handle_idle`，不得直接轮询
 
 ---
 
@@ -649,6 +657,7 @@ Phase_5():
 - 禁止把当前 PR 阻塞问题转为 follow-up
 - 仅限 `gh pr comment` 和 `gh issue create`（禁止其他 gh/git 命令）
 - 会话中途不得发送 shutdown 指令
+- **会话收尾必须询问用户**：完成 Phase 5 后必须执行 `@ask_user("继续审查下一个 PR？")`，不得直接发送 shutdown 或清理 Team
 
 ---
 
@@ -807,10 +816,10 @@ body_start
 | Phase | 强制要求 | 易错点 |
 |-------|---------|-------|
 | 0 | 环境检查 → TeamCreate → ToolSearch（内联操作）；已有 Team 则握手确认存活 | 跳过 Phase 0 直接开始 Phase 1；不复用也不清理直接 TeamCreate；team-lead 未 ToolSearch |
-| 1 | 必须先于 Phase 2 完成；产出 phase_1_output；team-lead 不得自行收集上下文；收到 idle 必须检查 inbox | 只打印到终端未保存；team-lead 自己跑 gh pr view；收到 idle 不检查 inbox |
-| 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务；复用场景也用 SendMessage | 与 Phase 1 并行启动；把正式任务写进 spawn prompt |
+| 1 | 必须先于 Phase 2 完成；产出 phase_1_output；team-lead 不得自行收集上下文；收到 idle 必须使用 @handle_idle | 只打印到终端未保存；team-lead 自己跑 gh pr view；收到 idle 不使用 @handle_idle 直接轮询 |
+| 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务；收到 idle 必须使用 @handle_idle | 与 Phase 1 并行启动；把正式任务写进 spawn prompt；收到 idle 不使用 @handle_idle |
 | 3 | 校验报告基础数据；失真报告标注作废；决定是否启用 codex；只传结构化报告给 codex | 与 Phase 2 并行；报告不合格仍调用 codex；给 codex 传 diff |
 | 4 | 收集可用报告（剔除作废）；仲裁冲突；通过 8 条质量自查 | 使用已作废报告；替缺失 agent 脑补结论 |
-| 5 | 模式决定路径；仅 auto-fix 可 spawn fix-executor；范围外问题转 follow-up | 把范围外技术债塞进 PR comment；把阻塞问题转 follow-up |
+| 5 | 模式决定路径；仅 auto-fix 可 spawn fix-executor；范围外问题转 follow-up；**会话收尾必须询问用户** | 把范围外技术债塞进 PR comment；把阻塞问题转 follow-up；**直接发送 shutdown 不询问用户** |
 
 > 没有 Phase 6。完成 Phase 5 后流程结束。
