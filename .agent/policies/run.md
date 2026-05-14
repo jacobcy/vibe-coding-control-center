@@ -217,6 +217,27 @@
   - 如果 git status 显示有未提交改动，**不能**声称执行完成
   - 必须先完成 commit，再写 execution report
 
+### CI-like 环境验证
+
+对于以下场景，executor 必须在声称完成前验证 CI-like 环境：
+
+1. **Subprocess 测试**：涉及 subprocess 调用的测试
+   - 验证工作目录无关性
+   - 验证环境变量独立性
+   - 验证 git 路径独立性
+
+2. **Git 操作测试**：涉及 git 命令的测试
+   - 验证在 bare repository 场景下的行为
+   - 验证在不同 branch topology 下的行为
+
+3. **文件路径测试**：涉及特定路径假设的测试
+   - 验证相对路径在 CI 根目录和 worktree 中都能工作
+
+验证方式：
+- 设置 `GITHUB_ACTIONS=true` 环境变量运行测试
+- 或使用 `VIBE_CI_SIMULATE=1` 触发 pre-push CI 模拟
+- 对于 subprocess 测试，确认 mock 覆盖完整或使用 fixture
+
 ## 何时必须停止
 
 出现以下情况应先停下处理，不要继续堆改动：

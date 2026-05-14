@@ -2,6 +2,13 @@
 # pre-push hook - Local quality gate, catch issues before push
 set -euo pipefail
 
+# CI Simulation mode
+if [ "${VIBE_CI_SIMULATE:-0}" = "1" ]; then
+    export GITHUB_ACTIONS=true
+    export CI=true
+    echo "Running in CI simulation mode..."
+fi
+
 echo "Running pre-push checks..."
 PUSH_STDIN=$(cat)
 
@@ -108,6 +115,21 @@ else
         echo "ERROR: Tests failed"
         exit 1
     }
+fi
+
+# Optional CI parity verification
+if [ "${VIBE_CI_PARITY:-0}" = "1" ]; then
+    echo "  -> CI parity check (simulating CI environment)..."
+    # Re-run tests with GITHUB_ACTIONS=true to catch CI-specific issues
+    if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
+        echo "     Skipping CI parity (no test targets)"
+    else
+        GITHUB_ACTIONS=true uv run pytest "${TEST_TARGETS[@]}" -q --tb=short || {
+            echo "WARNING: Tests passed locally but failed in CI simulation"
+            echo "This may indicate environment-dependent test behavior"
+            # Non-blocking warning for now
+        }
+    fi
 fi
 
 # 4. LOC checks (fast, <2s) - WARNING ONLY in pre-push
