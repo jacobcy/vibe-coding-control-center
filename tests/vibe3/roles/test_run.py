@@ -103,11 +103,16 @@ def test_execute_manual_run_no_async_publishes_issue_failed_on_exception() -> No
     from vibe3.roles.run import execute_manual_run
 
     with (
-        patch("vibe3.roles.run.CodeagentExecutionService") as mock_service_cls,
         patch(
-            "vibe3.roles.run.make_run_context_builder", return_value=lambda: "prompt"
+            "vibe3.execution.codeagent_runner.CodeagentExecutionService"
+        ) as mock_service_cls,
+        patch(
+            "vibe3.agents.run_prompt.make_run_context_builder",
+            return_value=lambda: "prompt",
         ),
-        patch("vibe3.roles.run.publish_run_command_failure") as mock_publish_failure,
+        patch(
+            "vibe3.roles.run_helpers.publish_run_command_failure"
+        ) as mock_publish_failure,
     ):
         mock_service_cls.return_value.execute_sync.side_effect = RuntimeError(
             "backend returned empty result"

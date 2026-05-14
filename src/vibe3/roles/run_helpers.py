@@ -1,0 +1,186 @@
+"""Executor role helpers and definitions."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any
+
+from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import UserError
+from vibe3.execution.issue_role_support import (
+    build_task_flow_branch_resolver,
+    resolve_env_overridable_agent_options,
+)
+from vibe3.execution.role_contracts import EXECUTOR_GATE_CONFIG
+from vibe3.models.orchestration import IssueState
+from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.services.flow_service import FlowService
+
+if TYPE_CHECKING:
+    from vibe3.models.flow import FlowStatusResponse
+    from vibe3.models.orchestra_config import OrchestraConfig
+
+
+def validate_run_prerequisites(
+    flow_service: FlowService,
+    target_branch: str,
+) -> tuple[FlowStatusResponse, int | None]:
+    """Validate flow exists and return flow status with issue number.
+
+    Args:
+        flow_service: FlowService instance for flow operations
+        target_branch: Target branch name
+
+    Returns:
+        Tuple of (flow status, issue number)
+
+    Raises:
+        UserError: If no flow exists for branch
+    """
+    flow: FlowStatusResponse | None = flow_service.get_flow_status(target_branch)
+
+    if not flow:
+        raise UserError(
+            f"No flow for branch '{target_branch}'.\n"
+            "Run 'vibe3 flow update' or 'vibe3 flow bind <issue> --role task' first."
+        )
+
+    issue_number: int | None = flow.task_issue_number
+    return flow, issue_number
+
+
+EXECUTOR_ROLE = TriggerableRoleDefinition(
+    name="executor",
+    registry_role="executor",
+    worktree=EXECUTOR_GATE_CONFIG,
+    trigger_name="run",
+    trigger_state=IssueState.IN_PROGRESS,
+)
+
+EXECUTOR_PUBLISH_ROLE = TriggerableRoleDefinition(
+    name="executor-publish",
+    registry_role="executor",
+    worktree=EXECUTOR_GATE_CONFIG,
+    trigger_name="run",
+    trigger_state=IssueState.MERGE_READY,
+)
+
+
+def resolve_run_options(config: OrchestraConfig) -> Any:
+    """Resolve executor agent options with env override support."""
+    from vibe3.execution.agent_resolver import resolve_executor_agent_options
+
+    return resolve_env_overridable_agent_options(
+        backend_env_key="VIBE3_EXECUTOR_BACKEND",
+        model_env_key="VIBE3_EXECUTOR_MODEL",
+        fallback_resolver=lambda: resolve_executor_agent_options(
+            config, VibeConfig.get_defaults()
+        ),
+    )
+
+
+RUN_BRANCH_RESOLVER = build_task_flow_branch_resolver(
+    fallback_branch=lambda _issue_number, current_branch: current_branch
+)
+
+
+def publish_run_command_success(
+    *,
+    issue_number: int,
+    _branch: str,
+    _result: object,
+) -> None:
+    """Record run command success. State transitions are the agent's responsibility.
+
+    The agent receives run_task / output_format from config/prompts/prompts.yaml
+    (via run.skill recipe with standard providers), which includes the instruction
+    to change issue label to state/handoff. Code layer MUST NOT auto-transition
+    state (noop-gate-boundary-standard).
+    """
+    from loguru import logger as _logger
+
+    _logger.bind(
+        domain="run",
+        event="run_command_success",
+        issue=issue_number,
+    ).info(
+        "Run command completed successfully. "
+        "Agent should handle state transition via run_task instructions."
+    )
+
+
+def publish_run_command_failure(
+    *,
+    issue_number: int,
+    reason: str,
+) -> None:
+    """Publish run failure lifecycle for command-mode execution."""
+    from vibe3.domain.events import IssueFailed
+    from vibe3.domain.publisher import publish
+
+    publish(
+        IssueFailed(
+            issue_number=issue_number,
+            reason=reason,
+            actor="agent:run",
+        )
+    )
+
+
+def find_skill_file(skill_name: str) -> Path | None:
+    """Resolve a skill file from cwd or repo root."""
+    cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
+    if cwd_candidate.exists():
+        return cwd_candidate
+    try:
+        repo_root = Path(FlowService().get_git_common_dir()).parent
+    except Exception:
+        repo_root = Path.cwd()
+    candidate = repo_root / "skills" / skill_name / "SKILL.md"
+    if candidate.exists():
+        return candidate
+    return None
+
+
+def resolve_run_mode(
+    flow_service: Any,
+    branch: str,
+    instructions: str | None,
+    plan: Path | None,
+    skill: str | None,
+) -> SimpleNamespace:
+    """Resolve run command mode from CLI inputs and flow state."""
+    if skill:
+        return SimpleNamespace(mode="skill", message=skill, plan_file=None)
+    if plan:
+        return SimpleNamespace(mode="plan", plan_file=str(plan), message=None)
+    if instructions:
+        preview = instructions[:60]
+        suffix = "..." if len(instructions) > 60 else ""
+        return SimpleNamespace(
+            mode="lightweight",
+            plan_file=None,
+            message=f"-> Task: {preview}{suffix}",
+        )
+    flow = flow_service.get_flow_status(branch)
+    if flow and flow.plan_ref:
+        return SimpleNamespace(
+            mode="flow_plan", plan_file=str(flow.plan_ref), message=None
+        )
+    raise ValueError(
+        "No plan specified.\n"
+        "Use one of:\n"
+        "  vibe3 run <instructions>        # Lightweight mode\n"
+        "  vibe3 run --plan <file>         # With plan file\n"
+        "  vibe3 run --skill <name>        # With skill"
+    )
+
+
+def ensure_plan_file_exists(plan_file: str | None) -> None:
+    """Validate that a referenced plan file exists."""
+    if not plan_file:
+        return
+    if Path(plan_file).exists():
+        return
+    raise FileNotFoundError(f"Plan file not found: {plan_file}")
