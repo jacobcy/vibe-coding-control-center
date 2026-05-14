@@ -27,52 +27,6 @@ def _get_issue_flow_service() -> IssueFlowService:
     return _ISSUE_FLOW_SERVICE_CACHE
 
 
-def _ensure_flow_state_for_issue(
-    issue_number: int,
-    action: str,  # "block" or "fail"
-    reason: str,
-    actor: str,
-) -> None:
-    """Record block/fail reason on the flow for observability.
-
-    Note: Both block and fail now record to blocked_reason field.
-    The failed_reason field is deprecated - all errors are modeled as blocked.
-    """
-    try:
-        issue_flow_service = _get_issue_flow_service()
-        store = issue_flow_service.store
-
-        # Find any flow for this issue (active or otherwise)
-        flows = store.get_flows_by_issue(issue_number, role="task")
-        if not flows:
-            return
-
-        branch = str(flows[0].get("branch") or "").strip()
-        if not branch:
-            return
-
-        # Write flow event for observability
-        event_type = f"{action}ed"  # "blocked" or "failed"
-        store.add_event(
-            branch,
-            event_type,
-            actor,
-            detail=reason,
-            refs={"issue": str(issue_number), "action": action},
-        )
-
-        # Record reason as blocked_reason (unified for both block and fail)
-        store.update_flow_state(branch, blocked_reason=reason, latest_actor=actor)
-
-    except Exception as e:
-        logger.bind(
-            domain="flow",
-            action="ensure_flow_state",
-            issue_number=issue_number,
-            error=str(e),
-        ).warning(f"Flow reason recording failed for issue #{issue_number}")
-
-
 _TERMINAL_LABELS = {
     IssueState.BLOCKED.to_label(),
 }
@@ -200,8 +154,36 @@ def mark_issue(
     role = _ROLE_MAP.get(role, role)
     actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
 
-    # Record event for observability
-    _ensure_flow_state_for_issue(issue_number, action, reason, actor)
+    # Record blocked_reason and event in flow state
+    try:
+        issue_flow_service = _get_issue_flow_service()
+        store = issue_flow_service.store
+
+        flows = store.get_flows_by_issue(issue_number, role="task")
+        if flows:
+            branch = str(flows[0].get("branch") or "").strip()
+            if branch:
+                # Write flow event for observability
+                event_type = f"{action}ed"  # "blocked" or "failed"
+                store.add_event(
+                    branch,
+                    event_type,
+                    actor,
+                    detail=reason,
+                    refs={"issue": str(issue_number), "action": action},
+                )
+
+                # Record reason as blocked_reason (unified for both block and fail)
+                store.update_flow_state(
+                    branch, blocked_reason=reason, latest_actor=actor
+                )
+    except Exception as e:
+        logger.bind(
+            domain="flow",
+            action="mark_issue",
+            issue_number=issue_number,
+            error=str(e),
+        ).warning(f"Flow reason recording failed for issue #{issue_number}")
 
     # Build appropriate comment based on action and is_noop
     if action == "fail":
@@ -251,7 +233,7 @@ def fail_issue(
     with structured blocked_reason field.
 
     IssueFailed event is still recorded for observability.
-    blocked_reason is recorded in flow state via _ensure_flow_state_for_issue().
+    blocked_reason is recorded in flow state directly in mark_issue().
     """
     mark_issue(
         issue_number=issue_number,
@@ -377,6 +359,8 @@ def block_manager_noop_issue(
     """Block issue via unified block_flow logic.
 
     Refactored to reuse FlowService.block_flow() for consistency.
+    All operations (write blocked_reason, transition label, add comment, add event)
+    are handled by block_flow() - no duplication needed.
     """
     try:
         issue_flow_service = _get_issue_flow_service()
@@ -391,21 +375,13 @@ def block_manager_noop_issue(
         if not branch:
             return
 
-        # Reuse block_flow() - eliminates duplication
+        # Reuse block_flow() - eliminates ALL duplication
         from vibe3.services import flow_service
 
         flow_service.FlowService(store=store).block_flow(
             branch, reason=reason, actor=actor
         )
-
-        # Add block event for observability (separate from flow_blocked event)
-        store.add_event(
-            branch,
-            "blocked",
-            actor,
-            detail=reason,
-            refs={"issue": str(issue_number), "action": "block"},
-        )
+        # No separate event needed - block_flow() already adds flow_blocked event
 
     except Exception as e:
         logger.bind(
