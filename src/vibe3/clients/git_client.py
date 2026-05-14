@@ -118,6 +118,7 @@ class GitClient:
         self._github_client = github_client
         self._cwd = Path(cwd) if cwd else None
         self._pr_diff_cache: dict[int, str] = {}
+        self._pr_numstat_cache: dict[int, str] = {}
 
     def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
@@ -228,7 +229,13 @@ class GitClient:
 
     def get_numstat(self, source: ChangeSource) -> str:
         """Get git diff --numstat output for a change source."""
-        return _get_numstat(self._run, source, self._github_client, self.get_merge_base)
+        return _get_numstat(
+            self._run,
+            source,
+            self._github_client,
+            self.get_merge_base,
+            self._pr_numstat_cache,
+        )
 
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""
