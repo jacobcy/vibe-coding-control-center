@@ -42,7 +42,6 @@
 | role_contracts.py | 21 | 角色契约定义 |
 | role_policy.py | 77 | 角色执行策略 |
 | execution_role_policy.py | 180 | 执行角色策略（权限控制） |
-| agent_resolver.py | 120 | Agent 解析器，匹配 agent 到执行请求 |
 | role_request_factory.py | 91 | 角色请求工厂 |
 | prompt_meta.py | 87 | Prompt 元数据构建 |
 | codeagent_support.py | 86 | Codeagent 辅助函数 |

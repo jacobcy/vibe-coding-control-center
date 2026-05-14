@@ -9,10 +9,10 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from vibe3.config.settings import VibeConfig
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
     build_issue_sync_prompt_request,
@@ -57,9 +57,16 @@ def resolve_manager_options(config: OrchestraConfig) -> Any:
             model=_model_override,
         )
 
-    from vibe3.execution.agent_resolver import resolve_manager_agent_options
+    # Validate assignee_dispatch configuration
+    ad = config.assignee_dispatch
+    if not ad.agent and not ad.backend:
+        raise ValueError(
+            "No assignee dispatch agent configuration found in "
+            "orchestra.assignee_dispatch. Configure assignee_dispatch.agent or "
+            "orchestra.assignee_dispatch.backend in settings.yaml."
+        )
 
-    return resolve_manager_agent_options(config, VibeConfig.get_defaults())
+    return ExecutionRolePolicyService(config).resolve_effective_agent_options("manager")
 
 
 MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
@@ -165,11 +172,10 @@ def build_manager_request(
 
     # Inject manager backend/model if not already set
     if not env.get("VIBE3_MANAGER_BACKEND"):
-        from vibe3.config.settings import VibeConfig
-        from vibe3.execution.agent_resolver import resolve_manager_agent_options
-
         try:
-            options = resolve_manager_agent_options(config, VibeConfig.get_defaults())
+            options = ExecutionRolePolicyService(
+                config
+            ).resolve_effective_agent_options("manager")
             if options.backend:
                 env["VIBE3_MANAGER_BACKEND"] = options.backend
             if options.model:
