@@ -34,19 +34,19 @@ SendMessage(to="team-lead", message="【agent_report】
 ### 检查 agent 存活
 
 ```bash
-.claude/skills/vibe-review-pr/scripts/agent-exist.sh <agent>
+skills/vibe-review-pr/scripts/agent-exist.sh <agent>
 ```
 
 ### 查看 agent 事件
 
 ```bash
-.claude/skills/vibe-review-pr/scripts/agent-event.sh <agent>
+skills/vibe-review-pr/scripts/agent-event.sh <agent>
 ```
 
 ### 提取 agent 报告
 
 ```bash
-.claude/skills/vibe-review-pr/scripts/agent-report.sh <agent>
+skills/vibe-review-pr/scripts/agent-report.sh <agent>
 ```
 
 ### 检查 agent pane 错误

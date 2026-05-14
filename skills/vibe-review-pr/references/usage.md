@@ -5,10 +5,10 @@
 ## 真源文件
 
 - agent 清单：`.claude/skills/vibe-review-pr/runtime/agents.sh`
-- 公共函数：`.claude/skills/vibe-review-pr/scripts/lib.sh`
-- 存在性检查：`.claude/skills/vibe-review-pr/scripts/agent-exist.sh`
-- 事件列表：`.claude/skills/vibe-review-pr/scripts/agent-event.sh`
-- 报告提取：`.claude/skills/vibe-review-pr/scripts/agent-report.sh`
+- 公共函数：`skills/vibe-review-pr/scripts/lib.sh`
+- 存在性检查：`skills/vibe-review-pr/scripts/agent-exist.sh`
+- 事件列表：`skills/vibe-review-pr/scripts/agent-event.sh`
+- 报告提取：`skills/vibe-review-pr/scripts/agent-report.sh`
 
 ## 定义约束
 
@@ -59,10 +59,10 @@
 
 ```bash
 # 列出所有 agent 状态
-.claude/skills/vibe-review-pr/scripts/agent-exist.sh
+skills/vibe-review-pr/scripts/agent-exist.sh
 
 # 检查单个 agent
-.claude/skills/vibe-review-pr/scripts/agent-exist.sh context-researcher
+skills/vibe-review-pr/scripts/agent-exist.sh context-researcher
 ```
 
 输出包含：agent、type、definition、inbox、pane、alive、suggestion。
@@ -73,10 +73,10 @@
 
 ```bash
 # 列出所有 agent 的最新事件
-.claude/skills/vibe-review-pr/scripts/agent-event.sh
+skills/vibe-review-pr/scripts/agent-event.sh
 
 # 列出某个 agent 的所有事件
-.claude/skills/vibe-review-pr/scripts/agent-event.sh context-researcher
+skills/vibe-review-pr/scripts/agent-event.sh context-researcher
 ```
 
 查看完整内容直接读 inbox JSON 文件。
@@ -87,10 +87,10 @@
 
 ```bash
 # 列出所有 agent 的报告状态
-.claude/skills/vibe-review-pr/scripts/agent-report.sh
+skills/vibe-review-pr/scripts/agent-report.sh
 
 # 提取单个 agent 的报告
-.claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 ```
 
 输出：agent 名 + timestamp + 完整报告正文。
@@ -119,7 +119,7 @@ Phase 5: fix-executor       → lead 写入 Phase 4 修复指令到 prompt（不
 ```
 
 **读取方式**：
-- Phase 2 agent：prompt 中告知 `.claude/skills/vibe-review-pr/scripts/agent-report.sh context-researcher`，agent 自行执行脚本读取
+- Phase 2 agent：prompt 中告知 `skills/vibe-review-pr/scripts/agent-report.sh context-researcher`，agent 自行执行脚本读取
 - Phase 3 codex：prompt 中告知各 `agent-report.sh` 命令，codex 自行执行脚本读取（能跑脚本，不能收 SendMessage）
 - Phase 5 fix-executor：lead 将 Phase 4 结论中的修复指令直接写入 prompt，fix-executor 不跑任何 agent-report.sh
 
