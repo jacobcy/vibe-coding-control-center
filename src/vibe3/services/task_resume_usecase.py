@@ -210,10 +210,20 @@ class TaskResumeUsecase:
             if not self.candidates.verify_issue_state_for_resume(
                 issue_number, resume_kind, repo
             ):
+                # Generate state-specific skip reason
+                if resume_kind == "all":
+                    skip_reason = "issue 已完成（DONE），跳过恢复"
+                elif resume_kind == "blocked":
+                    skip_reason = "不再处于 blocked 状态，跳过恢复"
+                elif resume_kind == "aborted":
+                    skip_reason = "不再处于可恢复状态（ready/handoff），跳过恢复"
+                else:
+                    skip_reason = "状态验证失败，跳过恢复"
+
                 result["skipped"].append(
                     {
                         "number": issue_number,
-                        "reason": f"不再处于 {resume_kind} 状态，跳过恢复",
+                        "reason": skip_reason,
                     }
                 )
                 continue

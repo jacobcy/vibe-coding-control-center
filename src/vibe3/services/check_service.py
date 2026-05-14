@@ -34,6 +34,7 @@ class CheckResult:
 
     is_valid: bool
     issues: list[str]
+    warnings: list[str] = field(default_factory=list)
     branch: str = ""
 
 
@@ -163,6 +164,7 @@ class CheckService(CheckRemote):
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
         issues: list[str] = []
+        warnings: list[str] = []
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
@@ -347,16 +349,19 @@ class CheckService(CheckRemote):
         # Check worktree ownership consistency
         from vibe3.services.check_ownership_service import check_worktree_ownership
 
-        ownership_issues = check_worktree_ownership(
+        ownership_errors, ownership_warnings = check_worktree_ownership(
             self.store, branch, flow_status, self.INACTIVE_FLOW_STATUSES
         )
-        issues.extend(ownership_issues)
+        issues.extend(ownership_errors)
+        warnings.extend(ownership_warnings)
 
         is_valid = len(issues) == 0
         logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).debug(
             "Check completed"
         )
-        return CheckResult(is_valid=is_valid, issues=issues, branch=branch)
+        return CheckResult(
+            is_valid=is_valid, issues=issues, warnings=warnings, branch=branch
+        )
 
     def _rebuild_stale_ready_flow(
         self,

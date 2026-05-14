@@ -143,6 +143,9 @@ class CheckCleanupService:
     ) -> None:
         """Process a single terminal flow with appropriate cleanup.
 
+        SAFETY CHECK: Before cleanup, verify no live sessions exist.
+        If sessions are still running, skip cleanup and log warning.
+
         Args:
             branch: Branch name
             flow_status: Flow status (done/aborted)
