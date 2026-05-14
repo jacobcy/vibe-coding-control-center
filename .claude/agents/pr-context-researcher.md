@@ -155,6 +155,25 @@ fi
 - 搜索 `task/issue-<id>` 分支名模式
 - 搜索相关 issue 编号引用
 
+## 调试阶段硬规则（强制）
+
+**任何错误必须 blocked**：
+- 参数错误 → 【agent_blocked】
+- 工具调用失败 → 【agent_blocked】
+- Schema 不匹配 → 【agent_blocked】
+- 脚本执行失败 → 【agent_blocked】
+
+**禁止**：
+- ❌ 使用 `agent_progress` 报告错误
+- ❌ 尝试继续执行
+- ❌ 只发送警告而不停止
+
+**示例**：
+```
+【agent_blocked】SendMessage 参数错误：使用了不存在的参数 type/content/recipient
+正确参数：to, message, summary
+```
+
 ## 职责
 
 ### 1. 收集项目背景
