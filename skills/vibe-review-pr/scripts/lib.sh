@@ -6,6 +6,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUNTIME_FILE="$SKILL_DIR/runtime/agents.sh"
 
+# 推导仓库根路径（支持 skills/ 和 .claude/skills/ 两种入口点）
+# 向上查找直到找到 .git 目录或 CLAUDE.md 文件
+REPO_ROOT="$(cd "$SKILL_DIR" && while [[ "$(pwd)" != "/" ]]; do
+  if [[ -f "CLAUDE.md" || -d ".git" ]]; then
+    pwd
+    break
+  fi
+  cd ..
+done)"
+
 if [[ ! -f "$RUNTIME_FILE" ]]; then
   echo "missing runtime file: $RUNTIME_FILE" >&2
   exit 1
@@ -75,7 +85,7 @@ agent_definition_path() {
   local agent_name="$1"
   local agent_type
   agent_type="$(agent_type_for "$agent_name")"
-  printf '%s/.claude/agents/%s.md\n' "$(cd "$SKILL_DIR/../.." && pwd)" "$agent_type"
+  printf '%s/.claude/agents/%s.md\n' "$REPO_ROOT" "$agent_type"
 }
 
 print_agent_table_header() {

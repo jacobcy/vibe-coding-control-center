@@ -4,6 +4,14 @@
 
 ## 消息样例
 
+### idle notification
+
+```
+{"type":"idle_notification","from":"context-researcher","timestamp":"...","idleReason":"available"}
+```
+
+idle notification 是正常通知，说明 agent 正在工作。收到后运行 `agent-event.sh <agent>` 检查事件。
+
 ### agent_ready
 
 ```
@@ -26,19 +34,19 @@ SendMessage(to="team-lead", message="【agent_report】
 ### 检查 agent 存活
 
 ```bash
-skills/vibe-review-pr/scripts/agent-exist.sh <agent>
+.claude/skills/vibe-review-pr/scripts/agent-exist.sh <agent>
 ```
 
 ### 查看 agent 事件
 
 ```bash
-skills/vibe-review-pr/scripts/agent-event.sh <agent>
+.claude/skills/vibe-review-pr/scripts/agent-event.sh <agent>
 ```
 
 ### 提取 agent 报告
 
 ```bash
-skills/vibe-review-pr/scripts/agent-report.sh <agent>
+.claude/skills/vibe-review-pr/scripts/agent-report.sh <agent>
 ```
 
 ### 检查 agent pane 错误
