@@ -4,7 +4,7 @@ from loguru import logger
 
 from vibe3.agents.models import ExecutionRole
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.execution.role_policy import get_role_block_function
+from vibe3.config.role_policy import get_role_block_function
 
 # Loop prevention constants
 TRANSITION_LIMIT_SOFT = 10  # Standard flow limit

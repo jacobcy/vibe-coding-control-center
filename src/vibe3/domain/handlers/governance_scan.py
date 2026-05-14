@@ -9,12 +9,12 @@ import os
 
 from loguru import logger
 
+from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
-from vibe3.execution.store_context import get_store
 
 
 @register_handler("GovernanceScanStarted")
@@ -23,11 +23,11 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
-    from vibe3.execution.flow_dispatch import FlowManager
     from vibe3.execution.issue_role_support import (
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
+    from vibe3.orchestra.flow_dispatch import FlowManager
     from vibe3.orchestra.logging import append_governance_event
     from vibe3.roles.governance import build_governance_execution_name
     from vibe3.services.orchestra_status_service import OrchestraStatusService

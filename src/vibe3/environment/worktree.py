@@ -23,8 +23,8 @@ from vibe3.environment.worktree_support import (
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
-    from vibe3.execution.flow_dispatch import FlowManager
     from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.orchestra.flow_dispatch import FlowManager
 
 
 class WorktreeManager(WorktreePRMixin):

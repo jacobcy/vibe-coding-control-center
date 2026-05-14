@@ -17,8 +17,8 @@ from vibe3.agents.models import (
 )
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.role_policy import get_role_required_ref_key, get_role_section
 from vibe3.config.settings import VibeConfig
-from vibe3.execution.actor_support import format_agent_actor
 from vibe3.execution.codeagent_support import resolve_command_agent_options
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_lifecycle import (
@@ -26,9 +26,9 @@ from vibe3.execution.execution_lifecycle import (
     persist_execution_lifecycle_event,
 )
 from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
-from vibe3.execution.role_policy import get_role_required_ref_key, get_role_section
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
+from vibe3.services.actor_support import format_agent_actor
 from vibe3.services.handoff_service import HandoffService
 
 __all__ = [

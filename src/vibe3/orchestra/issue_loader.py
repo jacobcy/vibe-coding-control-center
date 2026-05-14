@@ -13,8 +13,8 @@ from vibe3.roles.registry import LABEL_DISPATCH_ROLES
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.execution.flow_dispatch import FlowManager
     from vibe3.models.orchestration import IssueInfo
+    from vibe3.orchestra.flow_dispatch import FlowManager
     from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
