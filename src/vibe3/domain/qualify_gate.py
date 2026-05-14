@@ -227,17 +227,7 @@ class QualifyGateService:
         if not branch:
             return []
 
-        # Query dependency links for this branch
-        import sqlite3
-
-        with sqlite3.connect(self._store.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT issue_number FROM flow_issue_links "
-                "WHERE branch = ? AND issue_role = 'dependency'",
-                (branch,),
-            )
-            return [row[0] for row in cursor.fetchall()]
+        return self._store.get_dependency_links(branch)
 
     def _is_dependency_satisfied(self, dep_issue_number: int) -> bool:
         """Check if dependency issue has completed.
