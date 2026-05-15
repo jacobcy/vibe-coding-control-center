@@ -65,11 +65,12 @@ class HandoffStorage:
         """
         self.git_client = git_client or GitClient()
 
-    def get_handoff_dir(self, ensure: bool = True) -> Path:
-        """Get handoff directory for current branch.
+    def get_handoff_dir(self, ensure: bool = True, branch: str | None = None) -> Path:
+        """Get handoff directory for a branch.
 
         Args:
             ensure: If True, create directory if it doesn't exist (idempotent)
+            branch: Target branch name (defaults to current branch)
 
         Returns:
             Path to .git/vibe3/handoff/<branch-safe>/
@@ -78,9 +79,9 @@ class HandoffStorage:
             SystemError: If directory creation fails due to filesystem issues
         """
         git_dir = get_git_common_dir(self.git_client)
-        branch = self.git_client.get_current_branch()
+        target_branch = branch or self.git_client.get_current_branch()
 
-        handoff_dir = get_branch_handoff_dir(git_dir, branch)
+        handoff_dir = get_branch_handoff_dir(git_dir, target_branch)
 
         if ensure:
             try:
@@ -92,22 +93,36 @@ class HandoffStorage:
 
         return handoff_dir
 
-    def ensure_handoff_dir(self) -> Path:
-        """Ensure handoff directory exists for current branch (idempotent)."""
-        logger.bind(domain="handoff", action="ensure_handoff_dir").info(
+    def ensure_handoff_dir(self, branch: str | None = None) -> Path:
+        """Ensure handoff directory exists for a branch (idempotent).
+
+        Args:
+            branch: Target branch name (defaults to current branch)
+        """
+        logger.bind(domain="handoff", action="ensure_handoff_dir", branch=branch).info(
             "Ensuring handoff directory exists"
         )
-        return self.get_handoff_dir(ensure=True)
+        return self.get_handoff_dir(ensure=True, branch=branch)
 
-    def ensure_current_handoff(self, force: bool = False) -> Path:
-        """Ensure shared current.md exists for current branch."""
+    def ensure_current_handoff(
+        self, force: bool = False, branch: str | None = None
+    ) -> Path:
+        """Ensure shared current.md exists for a branch.
+
+        Args:
+            force: If True, overwrite existing file
+            branch: Target branch name (defaults to current branch)
+        """
         logger.bind(
-            domain="handoff", action="ensure_current_handoff", force=force
+            domain="handoff",
+            action="ensure_current_handoff",
+            force=force,
+            branch=branch,
         ).info("Ensuring handoff file exists")
 
         # Ensure directory exists (idempotent)
-        handoff_dir = self.ensure_handoff_dir()
-        branch = self.git_client.get_current_branch()
+        handoff_dir = self.ensure_handoff_dir(branch)
+        target_branch = branch or self.git_client.get_current_branch()
         handoff_path = handoff_dir / "current.md"
 
         if handoff_path.exists():
@@ -122,27 +137,35 @@ class HandoffStorage:
             )
 
         # Create minimal template
-        template = _get_handoff_template(branch)
+        template = _get_handoff_template(target_branch)
         handoff_path.write_text(template, encoding="utf-8")
         logger.bind(path=str(handoff_path)).success("Created handoff file")
 
         return handoff_path
 
-    def read_current_handoff(self) -> str:
-        """Read shared current.md content for current branch."""
-        logger.bind(domain="handoff", action="read_current_handoff").info(
-            "Reading handoff file"
-        )
+    def read_current_handoff(self, branch: str | None = None) -> str:
+        """Read shared current.md content for a branch.
+
+        Args:
+            branch: Target branch name (defaults to current branch)
+        """
+        logger.bind(
+            domain="handoff", action="read_current_handoff", branch=branch
+        ).info("Reading handoff file")
 
         # Get directory path without creating it
-        handoff_dir = self.get_handoff_dir(ensure=False)
+        handoff_dir = self.get_handoff_dir(ensure=False, branch=branch)
         handoff_path = handoff_dir / "current.md"
 
         if not handoff_path.exists():
             from vibe3.exceptions import UserError
 
+            target_branch = branch or self.git_client.get_current_branch()
             raise UserError(
-                message=f"Handoff file not found: {handoff_path}",
+                message=(
+                    f"Handoff file not found for branch "
+                    f"'{target_branch}': {handoff_path}"
+                ),
             )
 
         content = handoff_path.read_text(encoding="utf-8")
@@ -196,9 +219,17 @@ class HandoffStorage:
         message: str,
         actor: str,
         kind: str = "note",
+        branch: str | None = None,
     ) -> Path:
-        """Append a lightweight update block to current.md."""
-        handoff_path = self.ensure_current_handoff()
+        """Append a lightweight update block to current.md for a branch.
+
+        Args:
+            message: Update message
+            actor: Actor identifier
+            kind: Update kind (note/finding/blocker/next)
+            branch: Target branch name (defaults to current branch)
+        """
+        handoff_path = self.ensure_current_handoff(branch=branch)
         content = handoff_path.read_text(encoding="utf-8")
 
         from datetime import datetime
@@ -213,7 +244,9 @@ class HandoffStorage:
             updated = content.rstrip() + "\n\n" + updates_heading + "\n" + update_block
 
         handoff_path.write_text(updated.rstrip() + "\n", encoding="utf-8")
-        logger.bind(path=str(handoff_path)).success("Appended handoff update")
+        logger.bind(path=str(handoff_path), branch=branch).success(
+            "Appended handoff update"
+        )
         return handoff_path
 
     def normalize_ref_value(self, ref_value: str, branch: str) -> str:
