@@ -140,19 +140,19 @@ class GlobalDispatchCoordinator:
 
     def _persist_queue(self) -> None:
         """Persist current frozen queue to database."""
-        if self._frozen_queue is None:
+        if not self._frozen_queue:
             self._store.clear_frozen_queue()
-        else:
-            self._store.save_frozen_queue(
-                [
-                    {
-                        "issue_number": e.issue_number,
-                        "collected_state": e.collected_state,
-                        "waiting_state": e.waiting_state,
-                    }
-                    for e in self._frozen_queue
-                ]
-            )
+            return
+        self._store.save_frozen_queue(
+            [
+                {
+                    "issue_number": e.issue_number,
+                    "collected_state": e.collected_state,
+                    "waiting_state": e.waiting_state,
+                }
+                for e in self._frozen_queue
+            ]
+        )
 
     def get_queued_issue_numbers(self) -> set[int]:
         """Get issue numbers currently in the frozen queue."""
