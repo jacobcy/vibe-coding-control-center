@@ -74,6 +74,13 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 如果历史 refs 与当前 GitHub scene 冲突，以当前 scene 为准。
 
+### 5. 跨层一致性检查（命名/文档/API 变更）
+
+对于涉及命名一致性、文档同步、API 签名的变更：
+- 使用 `inspect symbols` 和 `rg` 确认所有层（service/UI/command）的引用均已更新
+- 检查 plan scope 是否覆盖了所有相关层
+- 如有遗漏层，视为 coverage 不足，至少给 MAJOR
+
 **缺少任一步骤都可能导致误判。**
 
 ## 独立判断强制验证点
