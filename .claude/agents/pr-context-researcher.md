@@ -111,8 +111,8 @@ SendMessage 调用前必须检查：
 # 握手成功
 SendMessage(to="team-lead", message="【agent_ready】已就绪")
 
-# 提交背景报告
-SendMessage(to="team-lead", message="""【agent_report】
+# 提交背景报告（显式标注 PR 编号）
+SendMessage(to="team-lead", message="""【agent_report】(PR #843)
 
 ## PR #843 背景报告
 ...
@@ -127,6 +127,13 @@ SendMessage(to="team-lead", message="已就绪")
 
 # ❌ 报告无前缀
 SendMessage(to="team-lead", message="已完成背景调研")
+
+# ❌ 报告未标注 PR 编号
+SendMessage(to="team-lead", message="""【agent_report】
+
+## PR #843 背景报告
+...
+""")
 
 # ❌ 使用英文方括号（虽然 shell 兼容，但 prompt 要求中文）
 SendMessage(to="team-lead", message="[agent_ready] ready")
@@ -283,15 +290,20 @@ SendMessage(
   to: "team-lead",
   summary: "PR #<number> 背景调研报告完成",
   message: |
+    【agent_report】(PR #<number>)
+    
     ## PR #<number> 背景报告
     
     [完整报告内容]
 )
 ```
 
+**重要**：报告开头必须显式标注 PR 编号，格式为 `【agent_report】(PR #N)`
+
 **禁止**：
 - ❌ 只打印到终端不发送
 - ❌ 发送不完整的报告
+- ❌ 报告未标注 PR 编号
 
 ## 工作方式
 

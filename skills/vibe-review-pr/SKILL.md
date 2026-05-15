@@ -128,6 +128,34 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 
 以下函数在整个审查流程中复用，定义一次，各 Phase 引用。
 
+## extract_pr_number(report_text) → int | None
+
+```
+extract_pr_number(report_text):
+  """从报告中提取 PR 编号。
+  
+  支持格式：
+  - 【agent_report】(PR #892)
+  - ## PR #892 背景报告
+  - PR #892 审查报告"""
+  
+  import re
+  patterns = [
+    r"【agent_report】\(PR #(\d+)\)",  # 格式1：显式标注
+    r"## PR #(\d+)",                   # 格式2：标题
+    r"PR #(\d+)"                       # 格式3：正文提及
+  ]
+  
+  for pattern in patterns:
+    match = re.search(pattern, report_text)
+    if match:
+      return int(match.group(1))
+  
+  return None
+```
+
+> 优先匹配显式标注格式（格式1），确保 agent 按要求在报告开头标注 PR 编号。
+
 ## @handshake(agent_name) → OK | TIMEOUT
 
 ```
@@ -159,22 +187,37 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 - 超时 3 次 → 标记 agent 为 blocked，继续处理下一个 agent
 - team-lead 自身必须先 `ToolSearch("select:SendMessage")` 再 spawn 任何 agent
 
-## @wait_for_report(agent_name, timeout=90, max_attempts=3) → report | TIMEOUT
+## @wait_for_report(agent_name, expected_pr_number, timeout=90, max_attempts=3) → report | TIMEOUT | RETRY
 
 ```
-@wait_for_report(agent_name):
+@wait_for_report(agent_name, expected_pr_number):
   """主动轮询等待 agent 报告。禁止被动 idle。
   
   注意：stale 状态只表示长时间无消息，不代表 agent 失联。
   如果 agent-exist.sh 显示 stale/inactive，应先捕获 tmux pane 内容确认是否有输出。
   如果 pane 有输出（agent 正在工作），继续等待，不要重新握手。
-  只有 pane 无输出时才重新握手。"""
+  只有 pane 无输出时才重新握手。
+  
+  校验逻辑：
+  - 提取报告中的 PR 编号（格式：【agent_report】(PR #N) 或 ## PR #N）
+  - 如果不匹配目标 PR，通过 SendMessage 确认（已知路由 bug #40166/#39651）"""
   
   for attempt in 1..max_attempts:
     sleep(timeout)
     $ agent-report.sh {agent_name}
     if exit code == 0:        // 报告已送达
-      return stdout            // 完整报告文本（agent= / timestamp= / body_start / 正文）
+      report_text = stdout      // 完整报告文本（agent= / timestamp= / body_start / 正文）
+      # 提取 PR 编号
+      actual_pr = extract_pr_number(report_text)
+      if actual_pr and actual_pr != expected_pr_number:
+        # PR 编号路由错误，SendMessage 确认
+        SendMessage(to=agent_name, summary="PR 编号路由错误", message=f"""
+          检测到 PR 编号路由错误（收到 PR #{actual_pr}，目标 PR #{expected_pr_number}）。
+          这是已知 bug (#40166/#39651)。
+          请确认你正在审查哪个 PR，并提供正确报告。
+        """)
+        return RETRY
+      return report_text
     // exit 3 = 暂无报告, exit 2 = 未定义 agent, exit 1 = inbox 不存在
   return TIMEOUT
 ```
@@ -254,10 +297,12 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
 
 ```
 Phase_0():
-  // Step 1: 环境检查
+  // Step 1: 环境检查 + 工具加载
   assert tmux is set
   assert AGENT_TEAMS=1
-  assert TeamCreate, TaskCreate, ToolSearch, SendMessage available
+  ToolSearch(query="select:SendMessage")  // SendMessage 是 deferred tool，必须先加载 schema
+  if failed: @stop("ToolSearch SendMessage 失败")
+  assert TeamCreate, TaskCreate, TaskUpdate available
   // 禁止在此步执行 gh pr view / gh pr diff / git diff
 
   // Step 2: 选择执行模式
@@ -269,7 +314,7 @@ Phase_0():
     "options": [
       {
         "label": "ask-each（推荐）",
-        "description": "每步操作前询问用户确认，适合标准 PR 和安全 PR"
+        "description": "每步操作前询问用户确认（所有操作都可执行，包括修复）。适合标准 PR 和安全 PR"
       },
       {
         "label": "auto-decide",
@@ -277,11 +322,11 @@ Phase_0():
       },
       {
         "label": "auto-fix",
-        "description": "自动修复阻塞问题，适合阻塞项 < 3 个、修改面 < 3 文件"
+        "description": "自动修复阻塞问题（跳过确认，直接执行）。适合阻塞项 < 3 个、修改面 < 3 文件"
       },
       {
         "label": "comment-only",
-        "description": "只写 comment，不修复，适合大型 PR、高风险改动"
+        "description": "只写 comment，不修复（禁止 spawn fix-executor）。适合大型 PR、高风险改动"
       }
     ]
   }])
@@ -298,12 +343,7 @@ Phase_0():
   // Team 名称固定为 pr-review-team（不用 pr-review-<number>）
   // 复用判断 = 握手结果（不检查 isActive/config.json）
 
-  // Step 4: team-lead 自身 ToolSearch
-  ToolSearch(query="select:SendMessage")
-  if failed: @stop("team-lead ToolSearch 失败")
-  // SendMessage 是 deferred tool，必须先加载 schema
-
-  // Step 5: 一次性创建全部 5 个 Backlog Task
+  // Step 4: 一次性创建全部 5 个 Backlog Task
   // 验证清单（提交前必须输出）:
   //   Phase 1: subject="Phase 1: 背景调研", metadata={phase_order:1, depends_on_phase:0}
   //   Phase 2: subject="Phase 2: 专家评审", metadata={phase_order:2, depends_on_phase:1}
@@ -331,7 +371,7 @@ Phase_0():
     description="写 PR comment → 可选 spawn fix-executor 修复 → 创建 follow-up issues",
     metadata={phase_order:5, depends_on_phase:4})
 
-  // Step 6: 激活 Phase 1
+  // Step 5: 激活 Phase 1
   TaskUpdate(phase_1_task_id, status="in_progress")
 ```
 
@@ -362,7 +402,9 @@ Phase_1():
     职责：
     1. 阅读 CLAUDE.md、AGENTS.md、glossary.md、PR description、PR diff
     2. 不要修改任何文件
-    3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## PR #N 背景报告\n...")
+    3. 完成后用 SendMessage(to="team-lead", message="【agent_report】(PR #N)\n\n## PR #N 背景报告\n...")
+
+    重要：报告开头必须显式标注 PR 编号，格式为【agent_report】(PR #N)
 
     脚本错误处理：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
   """)
@@ -370,9 +412,14 @@ Phase_1():
   // 禁止：显式 PR 编号入口下 lead 预调查（确认状态/标题/标签/变更范围）
 
   // Step 3: 等待报告
-  report = @wait_for_report("context-researcher")
+  report = @wait_for_report("context-researcher", expected_pr_number=N)
   if report == TIMEOUT:
     @stop("context-researcher 报告超时，回退单 agent 审查")
+  if report == RETRY:
+    // PR 编号路由错误，已在 @wait_for_report 中 SendMessage 确认，继续等待
+    report = @wait_for_report("context-researcher", expected_pr_number=N)
+    if report == TIMEOUT or RETRY:
+      @stop("context-researcher 报告路由错误未纠正，回退单 agent 审查")
 
   // Step 4: PR 分类
   pr_type = @classify_pr(report)
@@ -462,7 +509,9 @@ Phase_2():
       读取 Phase 1 背景报告：
         skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
-      完成审查后用 SendMessage(to="team-lead", message="【agent_report】\n\n## <角色>报告\n...")
+      完成审查后用 SendMessage(to="team-lead", message="【agent_report】(PR #N)\n\n## <角色>报告\n...")
+
+      重要：报告开头必须显式标注 PR 编号，格式为【agent_report】(PR #N)
 
       脚本错误处理：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
     """)
@@ -471,9 +520,14 @@ Phase_2():
   // Step 4: 等待全部报告
   reports = {}
   for agent in active_agents:
-    report = @wait_for_report(agent)
+    report = @wait_for_report(agent, expected_pr_number=N)
     if report == TIMEOUT:
       @mark_blocked(agent)
+    elif report == RETRY:
+      // PR 编号路由错误，继续等待一次
+      report = @wait_for_report(agent, expected_pr_number=N)
+      if report == TIMEOUT or RETRY:
+        @mark_blocked(agent)
     else:
       reports[agent] = report
 
@@ -510,6 +564,7 @@ Phase_2():
 ```
 Phase_3():
   // Step 1: 校验 Phase 2 报告基础数据
+  // 注意：PR 编号路由错误已在 Phase 1/2 通过 @wait_for_report 校验处理
   for report in phase_2_reports:
     // 检查文件数/行数/涉及模块是否与 PR 实际 diff 一致
     if report has 严重幻觉（数据与 diff 明显矛盾）:
@@ -638,12 +693,12 @@ Phase_4():
 
 ## Execution Modes
 
-| 模式 | 行为 | 适用场景 |
-|------|------|---------|
-| `ask-each`（默认） | 每步操作前询问用户 | 标准 PR、安全 PR |
-| `auto-decide` | team-lead 根据复杂度自动决策 | 简单 PR（< 50 行，无安全相关） |
-| `auto-fix` | 自动修复阻塞问题 | 阻塞项 < 3 个，修改面 < 3 文件 |
-| `comment-only` | 只写 comment，不修复 | 大型 PR、高风险改动 |
+| 模式 | 确认粒度 | 修复能力 | 适用场景 |
+|------|---------|---------|---------|
+| `ask-each`（默认） | 每步操作前询问用户确认 | ✅ 可 spawn fix-executor（需确认修复范围） | 标准 PR、安全 PR |
+| `auto-decide` | team-lead 自动决策（跳过确认） | ✅ 可 spawn fix-executor | 简单 PR（< 50 行，无安全相关） |
+| `auto-fix` | 跳过确认，直接执行 | ✅ 自动 spawn fix-executor | 阻塞项 < 3 个，修改面 < 3 文件 |
+| `comment-only` | 无需确认（只写 comment） | ❌ 禁止 spawn fix-executor | 大型 PR、高风险改动 |
 
 ```
 Phase_5():
