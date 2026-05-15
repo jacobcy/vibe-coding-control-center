@@ -36,12 +36,6 @@ def _default_pid_file() -> Path:
     return Path(".git/vibe3/orchestra.pid")
 
 
-class CommentReplyConfig(BaseModel):
-    """Configuration for the comment reply service."""
-
-    enabled: bool = True
-
-
 class PollingConfig(BaseModel):
     """Configuration for heartbeat polling fallback."""
 
@@ -171,15 +165,6 @@ class SupervisorHandoffConfig(BaseModel):
     )
 
 
-class WorktreeCleanupConfig(BaseModel):
-    """Configuration for temporary worktree cleanup (do/* worktrees)."""
-
-    enabled: bool = True
-    ttl_hours: int = Field(default=72, ge=1)
-    on_pr_closed: bool = True
-    dry_run: bool = False
-
-
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -233,7 +218,6 @@ class OrchestraConfig(BaseModel):
     assignee_dispatch: AssigneeDispatchConfig = Field(
         default_factory=AssigneeDispatchConfig
     )
-    comment_reply: CommentReplyConfig = Field(default_factory=CommentReplyConfig)
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
     )
@@ -245,4 +229,3 @@ class OrchestraConfig(BaseModel):
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
     )
-    cleanup: WorktreeCleanupConfig = Field(default_factory=WorktreeCleanupConfig)
