@@ -117,7 +117,7 @@ def promote_progressed_entries(
     registry: "SessionRegistryService | None",
     supervisor_label: str,
     load_issue_func: Callable[[int], IssueInfo | None] | None = None,
-    max_retry_budget: int = 3,
+    max_retry_budget: int = 20,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """Process frozen queue entries and categorize them.
 
@@ -128,7 +128,7 @@ def promote_progressed_entries(
         registry: Session registry (optional)
         supervisor_label: Supervisor label to check
         load_issue_func: Optional function to load issues (for backward compatibility)
-        max_retry_budget: Max retry attempts before eviction (default 3)
+        max_retry_budget: Max retry attempts before eviction (default 20)
 
     Returns:
         Tuple of (promoted, retained, removed) entries

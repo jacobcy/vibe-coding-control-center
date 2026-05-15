@@ -14,3 +14,12 @@ def test_from_settings_maps_supervisor_prompt_template() -> None:
         config = load_orchestra_config()
 
     assert config.supervisor_handoff.prompt_template == "orchestra.supervisor.apply"
+
+
+def test_orchestra_config_default_retry_budget_aligns_transition_policy() -> None:
+    settings = VibeConfig.get_defaults()
+
+    with patch("vibe3.config.settings.VibeConfig.get_defaults", return_value=settings):
+        config = load_orchestra_config()
+
+    assert config.max_retry_budget == 20

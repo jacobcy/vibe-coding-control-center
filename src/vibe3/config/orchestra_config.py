@@ -247,7 +247,7 @@ class OrchestraConfig(BaseModel):
     )
     cleanup: WorktreeCleanupConfig = Field(default_factory=WorktreeCleanupConfig)
     max_retry_budget: int = Field(
-        default=3,
+        default=20,
         ge=1,
         description=(
             "Max re-dispatch attempts for a queue entry whose issue state "
