@@ -222,6 +222,17 @@ def next_step(
     with trace_scope(trace, "handoff next", domain="handoff"):
         target_branch = resolve_branch_arg(branch)
         service = HandoffService()
+
+        # Validate flow exists before writing next_step
+        flow_state = service.store.get_flow_state(target_branch)
+        if not flow_state:
+            typer.echo(
+                f"Error: 目标分支 '{target_branch}' 没有 flow\n"
+                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+                err=True,
+            )
+            raise typer.Exit(1)
+
         service.record_next_step(target_branch, message, actor)
         console.print(f"[green]✓[/] Next step updated: {message}")
 
