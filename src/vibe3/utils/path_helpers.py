@@ -1,5 +1,6 @@
 """Path helper utilities for normalization and resolution."""
 
+import re
 from pathlib import Path
 
 from vibe3.utils.git_path_client import (
@@ -12,6 +13,56 @@ from vibe3.utils.git_path_client import (
 
 # Backward compatibility alias
 GitClientProtocol = GitPathProtocol
+
+# Branch name validation regex: alphanumeric, slash, underscore, hyphen
+_BRANCH_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9/_-]+$")
+
+
+def _validate_branch_name(branch: str) -> None:
+    """Validate branch name to prevent path traversal attacks.
+
+    Args:
+        branch: Branch name to validate
+
+    Raises:
+        ValueError: If branch name is invalid (contains .., control chars, or empty)
+    """
+    if not branch or not branch.strip():
+        raise ValueError("Invalid branch name: branch cannot be empty or whitespace")
+
+    if ".." in branch:
+        raise ValueError(
+            f"Invalid branch name {branch!r}: contains path traversal sequence '..'"
+        )
+
+    if not _BRANCH_NAME_PATTERN.match(branch):
+        raise ValueError(
+            f"Invalid branch name {branch!r}: contains invalid characters. "
+            f"Only alphanumeric, '/', '_', and '-' are allowed."
+        )
+
+
+def _verify_handoff_dir_boundary(handoff_dir: Path, git_common: str) -> None:
+    """Verify that resolved handoff directory stays within handoff root.
+
+    Args:
+        handoff_dir: Resolved handoff directory path
+        git_common: Git common directory path (.git/)
+
+    Raises:
+        ValueError: If resolved path is outside handoff root
+    """
+    handoff_root = Path(git_common) / "vibe3" / "handoff"
+    resolved_handoff = handoff_dir.resolve()
+    resolved_root = handoff_root.resolve()
+
+    try:
+        resolved_handoff.relative_to(resolved_root)
+    except ValueError:
+        raise ValueError(
+            f"Security violation: resolved handoff directory {resolved_handoff} "
+            f"escapes handoff root {resolved_root}"
+        )
 
 
 def normalize_ref_path(
@@ -282,6 +333,9 @@ def _resolve_shared_artifact(
                     f"Cannot resolve @current without branch specification: {target}"
                 )
 
+        # Validate branch name to prevent path traversal attacks
+        _validate_branch_name(branch)
+
         # Resolve @current to per-branch current.md
         git_common = get_git_common_dir(git_client)
         if not git_common:
@@ -290,6 +344,10 @@ def _resolve_shared_artifact(
             )
 
         handoff_dir = get_branch_handoff_dir(git_common, branch)
+
+        # Verify resolved path stays within handoff root (defense in depth)
+        _verify_handoff_dir_boundary(handoff_dir, git_common)
+
         current_md = handoff_dir / "current.md"
         if not current_md.exists():
             raise FileNotFoundError(
