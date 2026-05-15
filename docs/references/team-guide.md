@@ -1,6 +1,21 @@
+---
+document_type: reference
+title: Team 多代理协作指南
+status: historical-reference
+scope: external-plugin-system
+author: Vibe Team
+related_docs:
+  - ../skills/vibe-review-pr/SKILL.md
+---
+
 # Team 多代理协作指南
 
-> 本文档基于 2026-05-01 的 Team 功能实验总结，记录如何正确使用 Claude Code 的 Team 功能。
+> **说明**：本文档描述早期的 Team 协作实验方案，部分内容已过时。当前 PR 审查架构以 `.claude/team-templates/pr-review-team.yaml` 和 `skills/vibe-review-pr/SKILL.md` 为准。
+
+**过时内容**：
+- Codex 不再作为 teammate（通过 Agent tool 调用），而是作为外部 plugin 通过 `codex:rescue` skill 调用
+- Agent 结构已从 6-agent 更新为 5-agent（移除 codex-expert role，新增 pr-architect-reviewer）
+- 工作流程已重构为 Phase 0-5 结构，详见 SKILL.md
 
 ## 核心原则
 
