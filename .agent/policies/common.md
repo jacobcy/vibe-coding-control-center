@@ -12,6 +12,7 @@
 - 多 worktree 并行开发时，共享运行时数据位于主仓库 git common dir，也就是主仓库 `.git`，不是当前 worktree 自己的局部 `.git`。
 - 当前 flow 的结构化 handoff 以 `vibe3 handoff status` 为准，不要先读 `.agent/context/task.md`。
 - 当前 flow 的共享 handoff 文件路径模式为 `.git/vibe3/handoff/<branch-safe>-<hash>/current.md`。
+- 查看当前 flow 的完整交接链路：`uv run python src/vibe3/cli.py handoff show @current`。
 - 执行过程中出现 finding、bug、blocker、next step、note 等需要留痕的事项，用 `vibe3 handoff append` 单独记录。
 - 这类执行中发现事项不要混进 plan、review、run 的主体输出中冒充正式结论。
 - 凡是依赖环境变量/外部 API 的逻辑，必须验证语义假设，不能只凭文档或经验猜测。
@@ -253,6 +254,42 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 plan 必须建立在真实影响面上，而不是凭直觉列步骤。
 
 至少确认：受影响文件、关键依赖、公开入口或高风险路径、对应验证方式。
+
+## 跨层一致性检查
+
+本项目的核心模块分为三层，命名/API/文档变更时必须全层覆盖检查：
+
+### 三层结构
+
+1. **Service 层**：`src/vibe3/services/` — 业务逻辑实现
+2. **UI 层**：`src/vibe3/ui/` — 命令行交互界面
+3. **Command 层**：`src/vibe3/commands/` — 命令入口定义
+
+### 触发条件
+
+以下任务类型必须执行跨层检查：
+- 命名一致性修复（函数、变量、常量重命名）
+- 文档同步（docstring、help text、error message）
+- API 签名变更（函数参数、返回值、异常）
+- 概念重命名（domain term、command name）
+
+### 检查工具链
+
+- **符号级引用**：`vibe3 inspect symbols <file>:<symbol>` 查找代码引用
+- **字符串引用**：`rg '<old_name>'` 查找文档、配置、测试中的引用
+- **组合使用**：先用 inspect 定位代码引用，再用 rg 补充字符串引用
+
+### 适用阶段
+
+- **Planner**：在 scoping 阶段搜索所有层，确认完整文件列表
+- **Executor**：实现后验证所有层已更新，无遗漏旧引用
+- **Reviewer**：审查时检查 plan scope 是否覆盖所有相关层
+
+### 注意事项
+
+- `rg` 是辅助工具，可能漏掉间接引用（如动态拼接的名称）
+- 优先使用 `inspect symbols` 做符号级确认
+- 如有怀疑，用 handoff 记录潜在遗漏
 
 ## 常用验证命令
 

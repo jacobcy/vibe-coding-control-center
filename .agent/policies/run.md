@@ -119,6 +119,7 @@
 
 执行前优先用项目工具确认影响面：
 - `uv run python src/vibe3/cli.py handoff status`
+- `uv run python src/vibe3/cli.py handoff show @current`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
@@ -151,6 +152,18 @@
   ```
   - 不要跳过或弱化该要求
   - 等待 manager 指示是否调整 scope
+
+### 命名/术语变更验证
+
+对于涉及命名、术语变更的任务，实现完成后必须验证：
+
+- 使用 `rg '<old_name>'` 搜索旧名称的所有引用位置
+- 确认所有层（service/UI/command/tests/docs）中不存在遗漏的旧引用
+- 如果发现遗漏：
+  - 立即修复，或
+  - 记录为 finding：`handoff append "发现遗漏：<位置>" --kind finding`
+
+**禁止**：声称"已全部更新"但未用 rg 全局搜索验证。
 
 ### Python 实现改动
 

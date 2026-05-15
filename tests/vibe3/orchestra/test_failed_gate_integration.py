@@ -1,6 +1,5 @@
 """Integration tests for FailedGate orchestration blocking."""
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,7 +8,6 @@ from typer.testing import CliRunner
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.runtime.service_protocol import GitHubEvent
 from vibe3.server.app import app
 
 
@@ -53,7 +51,6 @@ async def test_heartbeat_tick_blocked_by_active_gate() -> None:
 
     class TickService:
         service_name = "tick-service"
-        event_types: list[str] = []
         is_dispatch_service = True
 
         async def on_tick(self, tick_id: int = 0) -> None:
@@ -78,53 +75,3 @@ async def test_heartbeat_tick_blocked_by_active_gate() -> None:
     # Gate is ACTIVE → on_tick skipped, blocked_ticks incremented
     assert tick_calls == []
     mock_gate.increment_blocked_ticks.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_event_dispatch_not_blocked_by_failed_gate() -> None:
-    """Heartbeat runtime should ignore FailedGate and keep dispatching."""
-    config = OrchestraConfig()
-    mock_gate = MagicMock()
-    mock_gate.check.return_value = GateResult(blocked=True, reason="Blocked")
-
-    server = HeartbeatServer(config, failed_gate=mock_gate)
-    mock_service = MagicMock()
-    mock_service.event_types = ["push"]
-    server.register(mock_service)
-
-    event = GitHubEvent(event_type="push", action="created", payload={})
-    await server._dispatch_event(event)
-
-    mock_service.handle_event.assert_called_once_with(event)
-
-
-@pytest.mark.asyncio
-async def test_event_dispatch_not_blocked_for_non_dispatchers() -> None:
-    """Non-dispatching services continue processing events."""
-    from vibe3.runtime.service_protocol import ServiceBase
-
-    class NonDispatchService(ServiceBase):
-        event_types = ["issue_comment"]
-
-        @property
-        def is_dispatch_service(self) -> bool:
-            return False
-
-        async def handle_event(self, event: GitHubEvent) -> None:
-            pass
-
-    config = OrchestraConfig()
-    mock_gate = MagicMock()
-    mock_gate.check.return_value = GateResult(blocked=True, reason="Blocked")
-
-    server = HeartbeatServer(config, failed_gate=mock_gate)
-    svc = NonDispatchService()
-    svc.handle_event = MagicMock(side_effect=asyncio.Future)  # type: ignore[method-assign]
-    svc.handle_event.return_value.set_result(None)
-    server.register(svc)
-
-    event = GitHubEvent(event_type="issue_comment", action="created", payload={})
-    await server._dispatch_event(event)
-
-    # handle_event SHOULD have been called
-    svc.handle_event.assert_called_once_with(event)

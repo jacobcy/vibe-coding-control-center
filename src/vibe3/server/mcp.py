@@ -1,6 +1,7 @@
 """MCP Server for Orchestra - exposes orchestra state to external AI agents."""
 
 import json
+import re
 from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
@@ -10,6 +11,17 @@ from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.review_runner import AgentOptions
 from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.models import PromptRecipe, PromptVariableSource, VariableSourceKind
+
+# Maximum allowed length for orchestra_ask questions
+MAX_QUESTION_LENGTH = 500
+
+# Forbidden instruction patterns (case-insensitive) - only clear malicious commands
+FORBIDDEN_PATTERNS = [
+    "ignore all previous",
+    "ignore all instructions",
+    "execute:",
+    "rm -rf",
+]
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -100,6 +112,35 @@ def format_snapshot_for_mcp(snapshot: "OrchestraSnapshot") -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _sanitize_output(stdout: str) -> str:
+    """Sanitize stdout to redact sensitive information.
+
+    Applies regex-based redaction for:
+    - api_key patterns
+    - token patterns
+    - password patterns
+
+    Args:
+        stdout: Raw stdout string from sub-agent
+
+    Returns:
+        Sanitized string with sensitive patterns replaced by [REDACTED]
+    """
+    # Match key/value pairs where the value may contain any non-whitespace
+    # characters (covers punctuation, base64, JWT-style tokens, etc.)
+    patterns = [
+        (r'api[_-]?key["\s]*[:=]["\s]*\S+', "[REDACTED]"),
+        (r'token["\s]*[:=]["\s]*\S+', "[REDACTED]"),
+        (r'password["\s]*[:=]["\s]*\S+', "[REDACTED]"),
+    ]
+
+    sanitized = stdout
+    for pattern, replacement in patterns:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+
+    return sanitized
 
 
 def create_mcp_server(
@@ -269,6 +310,34 @@ def create_mcp_server(
         Returns:
             Answer from the project explorer agent, or error message if execution fails
         """
+        # Input validation: check for empty or whitespace-only question
+        if not question or not question.strip():
+            return json.dumps(
+                {"error": "Question cannot be empty or whitespace-only"},
+                indent=2,
+            )
+
+        # Input validation: check question length
+        if len(question) > MAX_QUESTION_LENGTH:
+            return json.dumps(
+                {
+                    "error": (
+                        f"Question too long. Maximum length is "
+                        f"{MAX_QUESTION_LENGTH} characters."
+                    )
+                },
+                indent=2,
+            )
+
+        # Input validation: check for forbidden patterns
+        question_lower = question.lower()
+        for pattern in FORBIDDEN_PATTERNS:
+            if pattern in question_lower:
+                return json.dumps(
+                    {"error": f"Question contains forbidden pattern: '{pattern}'"},
+                    indent=2,
+                )
+
         try:
             # Resolve repo root for working directory context
             repo_root = resolve_orchestra_repo_root()
@@ -277,7 +346,7 @@ def create_mcp_server(
             supervisor_path = repo_root / "supervisor" / "project-explorer.md"
             if not supervisor_path.exists():
                 return json.dumps(
-                    {"error": f"Supervisor file not found: {supervisor_path}"},
+                    {"error": "Supervisor file not found"},
                     indent=2,
                 )
             supervisor_content = supervisor_path.read_text(encoding="utf-8")
@@ -317,15 +386,18 @@ def create_mcp_server(
                 role="explorer",
             )
 
-            # Return stdout as answer
-            return result.stdout or ""
+            # Return sanitized stdout as answer
+            sanitized_output = _sanitize_output(result.stdout or "")
+            return sanitized_output
 
         except Exception as exc:
             logger.bind(domain="orchestra").error(
                 f"Failed to execute orchestra_ask: {exc}"
             )
+            # Sanitize error message to avoid leaking sensitive info
+            error_msg = _sanitize_output(str(exc))
             return json.dumps(
-                {"error": f"Failed to answer question: {exc}"},
+                {"error": f"Failed to answer question: {error_msg}"},
                 indent=2,
             )
 

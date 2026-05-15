@@ -8,7 +8,7 @@ import pytest
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import ServiceBase
 
 
 def _config() -> OrchestraConfig:
@@ -16,14 +16,8 @@ def _config() -> OrchestraConfig:
 
 
 class _MockService(ServiceBase):
-    event_types = ["issues"]
-
     def __init__(self) -> None:
-        self.events: list[GitHubEvent] = []
         self.ticks: int = 0
-
-    async def handle_event(self, event: GitHubEvent) -> None:
-        self.events.append(event)
 
     async def on_tick(self, tick_id: int = 0) -> None:
         self.ticks += 1
@@ -35,39 +29,6 @@ def test_register_service() -> None:
     server.register(svc)
     assert svc in server._services
     assert "MockService" in server.service_names[0]
-
-
-@pytest.mark.asyncio
-async def test_emit_dispatches_to_matching_service() -> None:
-    server = HeartbeatServer(_config())
-    svc = _MockService()
-    server.register(svc)
-
-    event = GitHubEvent(
-        event_type="issues", action="assigned", payload={}, source="webhook"
-    )
-    await server.emit(event)
-
-    # Drain the queue via _dispatch_event directly
-    queued = await server._event_queue.get()
-    await server._dispatch_event(queued)
-
-    assert len(svc.events) == 1
-    assert svc.events[0].action == "assigned"
-
-
-@pytest.mark.asyncio
-async def test_no_dispatch_for_unmatched_event_type() -> None:
-    server = HeartbeatServer(_config())
-    svc = _MockService()  # only handles "issues"
-    server.register(svc)
-
-    event = GitHubEvent(event_type="push", action="push", payload={}, source="webhook")
-    await server.emit(event)
-    queued = await server._event_queue.get()
-    await server._dispatch_event(queued)
-
-    assert svc.events == []
 
 
 @pytest.mark.asyncio

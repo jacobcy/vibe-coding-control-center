@@ -23,9 +23,11 @@
 - 使用项目工具确认受影响文件和符号
 - 判断是否触及关键路径、公开入口或共享状态
 - 判断本次任务属于哪一类改动
+- **如果是命名一致性/文档同步/API 签名变更任务**：使用 `inspect symbols` 和 `rg` 搜索所有层（service/UI/command/tests/docs），确认需要同步更新的完整文件列表，再圈定 plan 范围
 
 优先工具见公共规则；规划阶段通常至少会用到：
 - `uv run python src/vibe3/cli.py handoff status`
+- `uv run python src/vibe3/cli.py handoff show @current`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`

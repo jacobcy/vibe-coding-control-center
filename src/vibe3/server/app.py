@@ -1,4 +1,4 @@
-"""vibe3 server - HTTP webhook receiver and CLI management."""
+"""vibe3 server - HTTP server for orchestra status and CLI management."""
 
 import asyncio
 import os
@@ -30,7 +30,7 @@ from vibe3.server.registry import (
 from vibe3.server.server_utils import ensure_port_available
 
 app = typer.Typer(
-    help="Orchestra server: GitHub webhook receiver + heartbeat polling",
+    help="Orchestra server: heartbeat polling + HTTP status endpoints",
     no_args_is_help=True,
 )
 
@@ -88,7 +88,7 @@ def start(
             "--port",
             "-p",
             help=(
-                "Webhook receiver port override. "
+                "HTTP server port override. "
                 "Default uses orchestra.port from config/v3/settings.yaml"
             ),
         ),
@@ -131,7 +131,7 @@ def start(
             "--ts",
             help=(
                 "Temporary testing mode: auto-run scripts/tsu.sh to expose "
-                "public webhook URL for current port"
+                "public URL for current port (via Tailscale Funnel)"
             ),
         ),
     ] = False,
@@ -142,7 +142,7 @@ def start(
         ),
     ] = 1,
 ) -> None:
-    """Start Orchestra server (webhook receiver + heartbeat polling).
+    """Start Orchestra server (heartbeat polling + HTTP status endpoints).
 
     Defaults from config/v3/settings.yaml; repo defaults to current repository.
     """
@@ -278,7 +278,7 @@ def start(
     )
     typer.echo(f"Main log: {orchestra_events_log_path()}")
     typer.echo(f"Log dir: {orchestra_log_dir()}")
-    typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
+    typer.echo(f"Status endpoint: GET http://0.0.0.0:{config.port}/status")
     typer.echo("Press Ctrl+C to stop")
 
     # Write PID file for the synchronous server process

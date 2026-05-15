@@ -21,10 +21,8 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.server.webhook_utils import make_webhook_router
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
@@ -99,22 +97,6 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
     )
 
-    if config.comment_reply.enabled:
-        heartbeat.register(
-            CommentReplyService(
-                config,
-                github=shared_github,
-            )
-        )
-
-    # Worktree cleanup service for do/* worktrees
-    if config.cleanup.enabled:
-        from vibe3.orchestra.services.worktree_cleanup import WorktreeCleanupService
-
-        heartbeat.register(
-            WorktreeCleanupService(config, repo_path=launch_cwd or Path.cwd())
-        )
-
     # Register OrchestrationFacade as the single domain-first
     # heartbeat entry point. It incorporates governance scan,
     # supervisor scan, and issue-label dispatch polling.
@@ -139,7 +121,6 @@ def _build_server_with_launch_cwd(
     # through ExecutionCoordinator — no per-role service or handler needed.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
-    fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
 
     # Store status_service for HTTP endpoint
     fastapi_app.state.status_service = status_service
@@ -200,7 +181,7 @@ def _resolve_tsu_script() -> Path | None:
 
 
 def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
-    """Enable temporary Tailscale Funnel webhook via scripts/tsu.sh."""
+    """Enable temporary Tailscale Funnel to expose server port via scripts/tsu.sh."""
     tsu = _resolve_tsu_script()
     if tsu is None:
         return (
