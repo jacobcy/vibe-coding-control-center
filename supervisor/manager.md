@@ -157,13 +157,8 @@ This command performs three actions atomically:
 
 **Do NOT**:
 - ❌ Directly modify GitHub labels without writing `blocked_reason`
-- ❌ Use `vibe3 handoff next_step` for blocking (that's only for recording handoff notes)
 
-**Exception**: If you need to record a handoff note about blocking, use:
-```bash
-vibe3 handoff next_step "Blocked: 原因"
-```
-But note: This only writes handoff notes, does NOT transition issue state.
+Note: If you also need to leave a handoff note for downstream agents, use `vibe3 handoff append` separately. But this does NOT replace the `flow blocked --reason` command.
 
 ## Architecture Contract
 - **最小系统原则**：行为判断与推进决策由 agent 自己负责；Orchestra / flow / handoff 只负责观测、记录、展示和最小兜底。系统可以验证是否产生了预期 refs/artifacts，并在没有任何可观察进展时执行 no-op 防守（如进入 `blocked`），但系统不是业务结论的 owner，不替你决定应该 `retry`、`merge-ready` 还是 `blocked`
