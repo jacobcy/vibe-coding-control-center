@@ -6,7 +6,7 @@ from typing import Any
 from loguru import logger
 
 
-class SQLiteQueueRepo:
+class SQLiteFrozenQueueRepo:
     """Frozen queue CRUD operations."""
 
     db_path: str
@@ -20,6 +20,7 @@ class SQLiteQueueRepo:
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            conn.execute("BEGIN")  # Explicit transaction for batch atomicity
             for entry in entries:
                 cursor.execute(
                     """

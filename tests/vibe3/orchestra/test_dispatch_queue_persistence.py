@@ -122,8 +122,8 @@ class TestRestartRecovery:
         capacity._backend = None
         flow_manager = MagicMock()
 
-        # Mock _load_issue to return a DONE issue
-        def mock_load_issue(issue_number: int) -> IssueInfo | None:
+        # Mock load_issue to return a DONE issue BEFORE coordinator creation
+        def mock_load_issue(issue_number: int, *args, **kwargs) -> IssueInfo | None:
             return IssueInfo(
                 number=issue_number,
                 title=f"Issue {issue_number}",
@@ -132,23 +132,32 @@ class TestRestartRecovery:
                 assignees=["manager-bot"],
             )
 
-        # Create coordinator
-        coordinator = GlobalDispatchCoordinator(
-            config=config,
-            capacity=capacity,
-            github=github,
-            store=store,
-            flow_manager=flow_manager,
-            registry=None,
-        )
-        coordinator._load_issue = mock_load_issue
+        # Patch load_issue at module level before coordinator init
+        import vibe3.orchestra.global_dispatch_coordinator as coord_module
 
-        # Verify queue is empty (DONE issue was cleaned up)
-        assert coordinator._frozen_queue is None
+        original_load_issue = coord_module.load_issue
+        coord_module.load_issue = mock_load_issue
 
-        # Verify entry was removed from database
-        persisted = store.load_frozen_queue()
-        assert len(persisted) == 0
+        try:
+            # Create coordinator - it should restore and clean up the queue
+            coordinator = GlobalDispatchCoordinator(
+                config=config,
+                capacity=capacity,
+                github=github,
+                store=store,
+                flow_manager=flow_manager,
+                registry=None,
+            )
+
+            # Verify queue is empty (DONE issue was cleaned up)
+            assert coordinator._frozen_queue is None
+
+            # Verify entry was removed from database
+            persisted = store.load_frozen_queue()
+            assert len(persisted) == 0
+        finally:
+            # Restore original function
+            coord_module.load_issue = original_load_issue
 
     def test_cleanup_invalid_issues_on_restore(self, tmp_path) -> None:
         """Test that non-existent issues are removed from persisted queue on restore."""
@@ -178,27 +187,37 @@ class TestRestartRecovery:
         capacity._backend = None
         flow_manager = MagicMock()
 
-        # Mock _load_issue to return None (issue doesn't exist)
-        def mock_load_issue(issue_number: int) -> IssueInfo | None:
+        # Mock load_issue to return None (issue doesn't exist)
+        # BEFORE coordinator creation
+        def mock_load_issue(issue_number: int, *args, **kwargs) -> IssueInfo | None:
             return None
 
-        # Create coordinator
-        coordinator = GlobalDispatchCoordinator(
-            config=config,
-            capacity=capacity,
-            github=github,
-            store=store,
-            flow_manager=flow_manager,
-            registry=None,
-        )
-        coordinator._load_issue = mock_load_issue
+        # Patch load_issue at module level before coordinator init
+        import vibe3.orchestra.global_dispatch_coordinator as coord_module
 
-        # Verify queue is empty (invalid issue was cleaned up)
-        assert coordinator._frozen_queue is None
+        original_load_issue = coord_module.load_issue
+        coord_module.load_issue = mock_load_issue
 
-        # Verify entry was removed from database
-        persisted = store.load_frozen_queue()
-        assert len(persisted) == 0
+        try:
+            # Create coordinator - it should restore and clean up the queue
+            coordinator = GlobalDispatchCoordinator(
+                config=config,
+                capacity=capacity,
+                github=github,
+                store=store,
+                flow_manager=flow_manager,
+                registry=None,
+            )
+
+            # Verify queue is empty (invalid issue was cleaned up)
+            assert coordinator._frozen_queue is None
+
+            # Verify entry was removed from database
+            persisted = store.load_frozen_queue()
+            assert len(persisted) == 0
+        finally:
+            # Restore original function
+            coord_module.load_issue = original_load_issue
 
     def test_cleanup_supervisor_issues_on_restore(self, tmp_path) -> None:
         """Test that supervisor-labeled issues are removed from persisted queue.
@@ -231,8 +250,9 @@ class TestRestartRecovery:
         capacity._backend = None
         flow_manager = MagicMock()
 
-        # Mock _load_issue to return a supervisor-labeled issue
-        def mock_load_issue(issue_number: int) -> IssueInfo | None:
+        # Mock load_issue to return a supervisor-labeled issue
+        # BEFORE coordinator creation
+        def mock_load_issue(issue_number: int, *args, **kwargs) -> IssueInfo | None:
             return IssueInfo(
                 number=issue_number,
                 title=f"Issue {issue_number}",
@@ -241,23 +261,32 @@ class TestRestartRecovery:
                 assignees=["manager-bot"],
             )
 
-        # Create coordinator
-        coordinator = GlobalDispatchCoordinator(
-            config=config,
-            capacity=capacity,
-            github=github,
-            store=store,
-            flow_manager=flow_manager,
-            registry=None,
-        )
-        coordinator._load_issue = mock_load_issue
+        # Patch load_issue at module level before coordinator init
+        import vibe3.orchestra.global_dispatch_coordinator as coord_module
 
-        # Verify queue is empty (supervisor issue was cleaned up)
-        assert coordinator._frozen_queue is None
+        original_load_issue = coord_module.load_issue
+        coord_module.load_issue = mock_load_issue
 
-        # Verify entry was removed from database
-        persisted = store.load_frozen_queue()
-        assert len(persisted) == 0
+        try:
+            # Create coordinator - it should restore and clean up the queue
+            coordinator = GlobalDispatchCoordinator(
+                config=config,
+                capacity=capacity,
+                github=github,
+                store=store,
+                flow_manager=flow_manager,
+                registry=None,
+            )
+
+            # Verify queue is empty (supervisor issue was cleaned up)
+            assert coordinator._frozen_queue is None
+
+            # Verify entry was removed from database
+            persisted = store.load_frozen_queue()
+            assert len(persisted) == 0
+        finally:
+            # Restore original function
+            coord_module.load_issue = original_load_issue
 
 
 class TestQueuePersistence:
