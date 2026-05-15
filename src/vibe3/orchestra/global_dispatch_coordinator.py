@@ -89,15 +89,7 @@ class GlobalDispatchCoordinator:
             self._executor.shutdown(wait=True)
 
     def _restore_queue(self) -> list[QueueEntry] | None:
-        """Load persisted queue from database on restart.
-
-        Returns:
-            Restored queue entries, or None if no persisted data.
-
-        Side effects:
-            - Removes invalid entries from database (DONE, missing, supervisor issues)
-            - Logs recovery summary
-        """
+        """Load persisted queue from database, removing invalid entries."""
         try:
             entries = self._store.load_frozen_queue()
         except Exception as exc:
@@ -116,42 +108,32 @@ class GlobalDispatchCoordinator:
             issue_number = entry["issue_number"]
             issue = self._load_issue(issue_number)
 
-            # Skip invalid issues (not found)
-            if issue is None:
-                invalid_issue_numbers.append(issue_number)
-                continue
-
-            # Skip DONE issues
-            if issue.state == IssueState.DONE:
-                invalid_issue_numbers.append(issue_number)
-                continue
-
-            # Skip supervisor-labeled issues
-            if should_skip_from_queue(
-                issue,
-                supervisor_label=self._supervisor_label,
-                manager_usernames=self._config.manager_usernames,
-                require_manager_assignee=True,
-            ):
-                invalid_issue_numbers.append(issue_number)
-                continue
-
-            # Restore entry, resetting waiting_state so they are re-dispatched
-            restored.append(
-                QueueEntry(
-                    issue_number=issue_number,
-                    collected_state=entry.get("collected_state"),
-                    waiting_state=None,  # Reset to trigger re-dispatch
+            should_skip = (
+                issue is None
+                or issue.state == IssueState.DONE
+                or should_skip_from_queue(
+                    issue,
+                    supervisor_label=self._supervisor_label,
+                    manager_usernames=self._config.manager_usernames,
+                    require_manager_assignee=True,
                 )
             )
+            if should_skip:
+                invalid_issue_numbers.append(issue_number)
+            else:
+                restored.append(
+                    QueueEntry(
+                        issue_number=issue_number,
+                        collected_state=entry.get("collected_state"),
+                        waiting_state=None,
+                    )
+                )
 
-        # Clean up invalid entries from database
         for issue_number in invalid_issue_numbers:
             self._store.remove_from_frozen_queue(issue_number)
 
         logger.bind(domain="global_dispatch").info(
-            f"Restored {len(restored)} queue entries from persistence "
-            f"(removed {len(invalid_issue_numbers)} invalid entries)"
+            f"Restored {len(restored)}, removed {len(invalid_issue_numbers)}"
         )
 
         return restored if restored else None
@@ -160,27 +142,23 @@ class GlobalDispatchCoordinator:
         """Persist current frozen queue to database."""
         if self._frozen_queue is None:
             self._store.clear_frozen_queue()
-            return
-
-        entries = [
-            {
-                "issue_number": e.issue_number,
-                "collected_state": e.collected_state,
-                "waiting_state": e.waiting_state,
-            }
-            for e in self._frozen_queue
-        ]
-        self._store.save_frozen_queue(entries)
+        else:
+            self._store.save_frozen_queue(
+                [
+                    {
+                        "issue_number": e.issue_number,
+                        "collected_state": e.collected_state,
+                        "waiting_state": e.waiting_state,
+                    }
+                    for e in self._frozen_queue
+                ]
+            )
 
     def get_queued_issue_numbers(self) -> set[int]:
-        """Get the set of issue numbers currently in the frozen queue.
-
-        Returns:
-            Set of issue numbers in the queue, empty set if queue is None/empty.
-        """
-        if not self._frozen_queue:
-            return set()
-        return {e.issue_number for e in self._frozen_queue}
+        """Get issue numbers currently in the frozen queue."""
+        if self._frozen_queue:
+            return {e.issue_number for e in self._frozen_queue}
+        return set()
 
     async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
         """Poll GitHub for issues with a specific state label."""
