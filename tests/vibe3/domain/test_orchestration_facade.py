@@ -4,16 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from vibe3.domain.events import (
-    IssueStateChanged,
-)
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.failed_gate import GateResult
-from vibe3.runtime.service_protocol import GitHubEvent
 
 
 @pytest.fixture
@@ -30,32 +26,6 @@ def sample_issue_info() -> IssueInfo:
 
 class TestOrchestrationFacade:
     """Tests for OrchestrationFacade."""
-
-    def test_facade_subscribes_to_issue_events(self) -> None:
-        facade = OrchestrationFacade()
-        assert "issues" in facade.event_types
-
-    @patch("vibe3.domain.orchestration_facade.publish")
-    def test_on_issue_state_changed_emits_event(
-        self,
-        mock_publish: MagicMock,
-        sample_issue_info: IssueInfo,
-    ) -> None:
-        """Test that on_issue_state_changed emits IssueStateChanged event."""
-        facade = OrchestrationFacade()
-
-        facade.on_issue_state_changed(
-            issue_info=sample_issue_info,
-            from_state="ready",
-        )
-
-        assert mock_publish.called
-
-        event = mock_publish.call_args.args[0]
-        assert isinstance(event, IssueStateChanged)
-        assert event.issue_number == 42
-        assert event.from_state == "ready"
-        assert event.to_state == "claimed"
 
     @patch("vibe3.domain.orchestration_facade.publish")
     @patch("vibe3.domain.orchestration_facade.time.monotonic")
@@ -156,81 +126,6 @@ class TestOrchestrationFacade:
         call_args = mock_add_comment.call_args
         assert call_args.args[0] == 42
         assert "Manual review required" in call_args.args[1]
-
-    @patch("vibe3.domain.orchestration_facade.publish")
-    @patch("vibe3.domain.orchestration_facade.time.monotonic")
-    @patch("vibe3.domain.orchestration_facade.load_orchestra_config")
-    def test_facade_publishes_only_events_not_dispatch(
-        self,
-        mock_load_config: MagicMock,
-        mock_monotonic: MagicMock,
-        mock_publish: MagicMock,
-        sample_issue_info: IssueInfo,
-    ) -> None:
-        """Test facade only publishes domain events, never does execution assembly."""
-        mock_load_config.return_value = MagicMock(
-            polling_interval=1,
-            governance=MagicMock(interval_ticks=1),
-        )
-        mock_monotonic.side_effect = [0.0, 1.0, 1.0]
-        facade = OrchestrationFacade()
-
-        facade.on_issue_state_changed(sample_issue_info, from_state="ready")
-        facade.on_heartbeat_tick()
-
-        # Both calls produce exactly one publish each.
-        assert mock_publish.call_count == 2
-        events = [call.args[0] for call in mock_publish.call_args_list]
-        event_types = {type(e).__name__ for e in events}
-        assert "IssueStateChanged" in event_types
-        assert "GovernanceScanStarted" in event_types
-
-    @pytest.mark.asyncio
-    @patch("vibe3.domain.orchestration_facade.publish")
-    async def test_handle_event_converts_issue_payload_to_domain_event(
-        self,
-        mock_publish: MagicMock,
-    ) -> None:
-        facade = OrchestrationFacade()
-        event = GitHubEvent(
-            event_type="issues",
-            action="labeled",
-            payload={
-                "issue": {
-                    "number": 42,
-                    "title": "Test issue",
-                    "labels": [{"name": "state/claimed"}],
-                    "assignees": [],
-                }
-            },
-            source="webhook",
-        )
-
-        await facade.handle_event(event)
-
-        mock_publish.assert_called_once()
-        published = mock_publish.call_args.args[0]
-        assert isinstance(published, IssueStateChanged)
-        assert published.issue_number == 42
-        assert published.to_state == "claimed"
-
-    @pytest.mark.asyncio
-    @patch("vibe3.domain.orchestration_facade.publish")
-    async def test_handle_event_ignores_non_issue_events(
-        self,
-        mock_publish: MagicMock,
-    ) -> None:
-        facade = OrchestrationFacade()
-        event = GitHubEvent(
-            event_type="issue_comment",
-            action="created",
-            payload={},
-            source="webhook",
-        )
-
-        await facade.handle_event(event)
-
-        mock_publish.assert_not_called()
 
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.append_orchestra_event")

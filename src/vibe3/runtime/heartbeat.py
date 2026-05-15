@@ -16,7 +16,7 @@ from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
-from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.orchestra.failed_gate import FailedGate
@@ -38,10 +38,8 @@ class HeartbeatServer:
         self.config = config
         self._failed_gate = failed_gate
         self._services: list[ServiceBase] = []
-        self._event_queue: asyncio.Queue[GitHubEvent] = asyncio.Queue()
         self._semaphore = asyncio.Semaphore(config.max_concurrent_flows)
         self._running = False
-        self._pending_tasks: set[asyncio.Task[None]] = set()
         self._tick_count = 0
         self._shutdown_callback: Callable[[], object] | None = None
 
@@ -70,18 +68,9 @@ class HeartbeatServer:
         return [s.service_name for s in self._services]
 
     @property
-    def queue_size(self) -> int:
-        """Current number of events waiting in the queue."""
-        return self._event_queue.qsize()
-
-    @property
     def running(self) -> bool:
         """Whether the heartbeat server is currently running."""
         return self._running
-
-    async def emit(self, event: GitHubEvent) -> None:
-        """Push a GitHub event onto the queue for async processing."""
-        await self._event_queue.put(event)
 
     async def run(self) -> None:
         """Start heartbeat. Runs until stop() is called."""
@@ -128,7 +117,10 @@ class HeartbeatServer:
             async with asyncio.TaskGroup() as tg:
                 if self.config.polling.enabled:
                     tg.create_task(self._tick_loop())
-                tg.create_task(self._event_loop())
+                else:
+                    # Keep server running even when polling is disabled
+                    # (for HTTP-only mode: /status, /mcp endpoints)
+                    tg.create_task(self._idle_loop())
         except* Exception as eg:
             for exc in eg.exceptions:
                 append_orchestra_event("server", f"error: {exc}")
@@ -258,53 +250,10 @@ class HeartbeatServer:
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
 
-    async def _event_loop(self) -> None:
-        """Drain the event queue and dispatch to matching services."""
+    async def _idle_loop(self) -> None:
+        """Keep server running when polling is disabled (HTTP-only mode)."""
         while self._running:
-            try:
-                event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
-                continue
-            task = asyncio.create_task(self._dispatch_event(event))
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-    async def _dispatch_event(self, event: GitHubEvent) -> None:
-        matching = [
-            svc for svc in self._services if event.event_type in svc.event_types
-        ]
-
-        if not matching:
-            append_orchestra_event(
-                "server",
-                f"no handler for event_type={event.event_type}",
-            )
-            logger.bind(domain="orchestra").debug(
-                f"No handler for event_type={event.event_type!r}"
-            )
-            return
-
-        tasks = []
-        for svc in matching:
-            tasks.append(self._handle_with_semaphore(svc, event))
-
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-    async def _handle_with_semaphore(
-        self, service: ServiceBase, event: GitHubEvent
-    ) -> None:
-        async with self._semaphore:
-            try:
-                await service.handle_event(event)
-            except Exception as exc:
-                append_orchestra_event(
-                    "server",
-                    f"event error in {type(service).__name__}: {exc}",
-                )
-                logger.bind(domain="orchestra").error(
-                    f"Event error in {type(service).__name__}: {exc}"
-                )
+            await asyncio.sleep(1)
 
     # -- pid management --
 

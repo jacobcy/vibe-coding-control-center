@@ -16,13 +16,12 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain import publish
-from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.execution.capacity_service import CapacityService
@@ -41,8 +40,6 @@ class OrchestrationFacade(ServiceBase):
     这是 Domain-first 架构的 observation 层，runtime 不直接决定链路行为，
     只发布事件；执行装配由订阅对应事件的 domain handler 完成。
     """
-
-    event_types = ["issues"]
 
     def __init__(
         self,
@@ -187,66 +184,6 @@ class OrchestrationFacade(ServiceBase):
                 # Continue to dispatch even if reconciliation fails
 
         await self._coordinator.coordinate(tick_id)
-
-    async def handle_event(self, event: GitHubEvent) -> None:
-        """React to a GitHub event.
-
-        Converts GitHub webhook/poll events to domain events.
-
-        Args:
-            event: GitHub event from webhook or polling
-        """
-        if event.event_type != "issues":
-            return
-
-        logger.bind(
-            domain="orchestration_facade",
-            event_type=event.event_type,
-            action=event.action,
-        ).debug(f"Received GitHub event: {event.event_type}.{event.action}")
-
-        issue_payload = event.payload.get("issue")
-        if not isinstance(issue_payload, dict):
-            return
-
-        issue_info = IssueInfo.from_github_payload(issue_payload)
-        if issue_info is None or issue_info.state is None:
-            return
-
-        self.on_issue_state_changed(issue_info)
-
-    def on_issue_state_changed(
-        self,
-        issue_info: IssueInfo,
-        from_state: str | None = None,
-    ) -> None:
-        """Runtime 观察到 issue 状态变化 -> 发布 IssueStateChanged 事件.
-
-        Args:
-            issue_info: Issue 信息（包含 number、state 等）
-            from_state: Previous state (optional, can be inferred)
-        """
-        to_state = (
-            issue_info.state
-            if isinstance(issue_info.state, str)
-            else str(issue_info.state.value) if issue_info.state else ""
-        )
-
-        event = IssueStateChanged(
-            issue_number=issue_info.number,
-            from_state=from_state,
-            to_state=to_state,
-            issue_title=issue_info.title if issue_info.title else None,
-        )
-
-        logger.bind(
-            domain="orchestration_facade",
-            issue_number=issue_info.number,
-            from_state=from_state,
-            to_state=to_state,
-        ).info("Emitting IssueStateChanged event")
-
-        publish(event)
 
     def on_heartbeat_tick(self) -> None:
         """Heartbeat polling -> 发布 GovernanceScanStarted 事件.
