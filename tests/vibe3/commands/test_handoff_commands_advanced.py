@@ -56,8 +56,13 @@ class TestHandoffAdvancedCommands:
         assert result.exit_code == 0
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    def test_handoff_append_command(self, mock_service_class):
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_handoff_append_command(self, mock_git_class, mock_service_class):
         """Test handoff append command."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/test-branch"
+        mock_git_class.return_value = mock_git
+
         mock_service = MagicMock()
         mock_service.append_current_handoff.return_value = "/path/to/current.md"
         mock_service_class.return_value = mock_service
@@ -81,11 +86,17 @@ class TestHandoffAdvancedCommands:
             "Need to align event taxonomy",
             "codex/gpt-5.4",
             "finding",
+            "task/test-branch",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    def test_handoff_plan_command(self, mock_service_class):
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_handoff_plan_command(self, mock_git_class, mock_service_class):
         """Test handoff plan command."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/test-branch"
+        mock_git_class.return_value = mock_git
+
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
 
@@ -106,11 +117,17 @@ class TestHandoffAdvancedCommands:
         mock_service.record_plan.assert_called_once_with(
             "docs/plans/test-plan.md",
             "claude/sonnet-4.6",
+            branch="task/test-branch",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    def test_handoff_report_command(self, mock_service_class):
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_handoff_report_command(self, mock_git_class, mock_service_class):
         """Test handoff report command."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/test-branch"
+        mock_git_class.return_value = mock_git
+
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
 
@@ -131,11 +148,17 @@ class TestHandoffAdvancedCommands:
         mock_service.record_report.assert_called_once_with(
             "docs/reports/test-report.md",
             "claude/sonnet-4.6",
+            branch="task/test-branch",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    def test_handoff_audit_command(self, mock_service_class):
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_handoff_audit_command(self, mock_git_class, mock_service_class):
         """Test handoff audit command."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/test-branch"
+        mock_git_class.return_value = mock_git
+
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
 
@@ -156,6 +179,7 @@ class TestHandoffAdvancedCommands:
         mock_service.record_audit.assert_called_once_with(
             "docs/audits/test-audit.md",
             "claude/sonnet-4.6",
+            branch="task/test-branch",
         )
 
     def test_handoff_plan_rejects_legacy_next_step_option(self):
