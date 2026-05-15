@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Callable
 
 from vibe3.domain.qualify_gate import QualifyGateService
@@ -116,6 +117,7 @@ def promote_progressed_entries(
     registry: "SessionRegistryService | None",
     supervisor_label: str,
     load_issue_func: Callable[[int], IssueInfo | None] | None = None,
+    max_retry_budget: int = 3,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """Process frozen queue entries and categorize them.
 
@@ -126,6 +128,7 @@ def promote_progressed_entries(
         registry: Session registry (optional)
         supervisor_label: Supervisor label to check
         load_issue_func: Optional function to load issues (for backward compatibility)
+        max_retry_budget: Max retry attempts before eviction (default 3)
 
     Returns:
         Tuple of (promoted, retained, removed) entries
@@ -173,13 +176,36 @@ def promote_progressed_entries(
                     roles=["manager", "planner", "executor", "reviewer"],
                 )
                 if not active:
+                    # No active session: increment retry counter and promote/evict
+                    retry_count = entry.get("retry_count", 0) + 1
+                    entry["retry_count"] = retry_count
+                    entry["last_attempted_at"] = datetime.now(timezone.utc).isoformat()
+
+                    # Check if retry budget exhausted
+                    if retry_count >= max_retry_budget:
+                        removed.append(entry)
+                        append_orchestra_event(
+                            "dispatcher",
+                            (
+                                f"GlobalDispatchCoordinator: evicted "
+                                f"#{entry['issue_number']} from queue "
+                                f"(retry budget exhausted: {retry_count}/"
+                                f"{max_retry_budget}, stuck in "
+                                f"state={current_state})"
+                            ),
+                            level="WARNING",
+                        )
+                        continue
+
+                    # Below threshold: promote for re-dispatch
                     entry["waiting_state"] = None
                     promoted.append(entry)
                     append_orchestra_event(
                         "dispatcher",
                         f"GlobalDispatchCoordinator: requeued "
                         f"#{entry['issue_number']} "
-                        f"(no active session, state={current_state})",
+                        f"(no active session, state={current_state}, "
+                        f"retry={retry_count}/{max_retry_budget})",
                     )
                     continue
             retained.append(entry)
@@ -199,6 +225,8 @@ def promote_progressed_entries(
         # Progress detected (state changed to non-terminal) - promote to front
         entry["waiting_state"] = None
         entry["collected_state"] = current_state  # Sync with current state
+        entry["retry_count"] = 0  # Reset retry counter on progress
+        entry["last_attempted_at"] = None
         promoted.append(entry)
         append_orchestra_event(
             "dispatcher",
