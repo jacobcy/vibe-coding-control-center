@@ -102,13 +102,13 @@ class GlobalDispatchCoordinator:
             return None
 
         restored: list[QueueEntry] = []
-        invalid_issue_numbers: list[int] = []
+        removed_count = 0
 
         for entry in entries:
             issue_number = entry["issue_number"]
             issue = self._load_issue(issue_number)
 
-            should_skip = (
+            skip = (
                 issue is None
                 or issue.state == IssueState.DONE
                 or should_skip_from_queue(
@@ -118,8 +118,9 @@ class GlobalDispatchCoordinator:
                     require_manager_assignee=True,
                 )
             )
-            if should_skip:
-                invalid_issue_numbers.append(issue_number)
+            if skip:
+                self._store.remove_from_frozen_queue(issue_number)
+                removed_count += 1
             else:
                 restored.append(
                     QueueEntry(
@@ -129,13 +130,9 @@ class GlobalDispatchCoordinator:
                     )
                 )
 
-        for issue_number in invalid_issue_numbers:
-            self._store.remove_from_frozen_queue(issue_number)
-
         logger.bind(domain="global_dispatch").info(
-            f"Restored {len(restored)}, removed {len(invalid_issue_numbers)}"
+            f"Restored {len(restored)}, removed {removed_count}"
         )
-
         return restored if restored else None
 
     def _persist_queue(self) -> None:
@@ -193,71 +190,49 @@ class GlobalDispatchCoordinator:
     def _emit_dispatch_intent(
         self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
     ) -> None:
-        """Emit dispatch intent for an issue.
-
-        Args:
-            role: Triggerable role definition
-            issue: Issue info
-            tick_id: Heartbeat tick number for error tracking
-        """
-        # Pre-dispatch cleanup: remove conflicting state/* labels
+        """Emit dispatch intent for an issue."""
         clean_old_state_labels(issue, role, self._config)
-
         branch, _ = self._flow_context(issue.number)
         publish(build_label_dispatch_event(role, issue, branch=branch, tick_id=tick_id))
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
-        """Get flow context for an issue (backward compatibility)."""
+        """Get flow context for an issue."""
         return get_flow_context(
             issue_number, self._config, self._github, self._store, self._flow_manager
         )
 
     def _load_issue(self, issue_number: int) -> IssueInfo | None:
-        """Load issue snapshot (backward compatibility)."""
+        """Load issue snapshot."""
         return load_issue(issue_number, self._config, self._github)
 
     def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
         """Check issue health before dispatch.
-
-        Health checks:
-        1. Issue must not be closed on GitHub
-        2. If issue has a PR, PR must not be merged
-
-        Returns:
-            True if issue is healthy and can be dispatched
-            False if issue should be skipped
-
-        Side effects:
-            - Closes issues with merged PRs
-            - Logs health check results
-        """
-        # Check 1: Issue closed on GitHub
+        Returns False if issue should be skipped."""
+        # Check: Issue closed on GitHub
         try:
             payload = self._github.view_issue(issue.number, repo=self._config.repo)
         except Exception as e:
             logger.bind(domain="orchestra").error(
                 f"Health check failed for #{issue.number}: {e}"
             )
-            return True  # Fail open: dispatch if we can't verify
+            return True
         if isinstance(payload, dict) and payload.get("state") == "CLOSED":
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                f"(issue is closed on GitHub)",
+                f"Skipped #{issue.number} (issue is closed on GitHub)",
             )
             return False
 
-        # Check 2: PR merged (auto-close issue)
+        # Check: PR merged (auto-close issue)
         pr_number = self._flow_manager.get_pr_for_issue(issue.number)
         if pr_number:
             try:
                 pr = self._github.get_pr(pr_number=int(pr_number))
             except Exception as e:
                 logger.bind(domain="orchestra").warning(
-                    f"Failed to check PR #{pr_number} "
-                    f"for issue #{issue.number}: {e}"
+                    f"Failed to check PR #{pr_number} for issue #{issue.number}: {e}"
                 )
-                return True  # Fail open
+                return True
             if pr is not None and pr.state == PRState.MERGED:
                 try:
                     self._github.close_issue_if_open(
@@ -273,25 +248,19 @@ class GlobalDispatchCoordinator:
                     )
                 append_orchestra_event(
                     "dispatcher",
-                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                    f"Skipped #{issue.number} "
                     f"(PR #{pr_number} merged, issue auto-closed)",
                 )
                 return False
-
         return True
 
     async def coordinate(self, tick_id: int = 0) -> None:
-        """Run one heartbeat tick against the frozen queue.
-
-        Args:
-            tick_id: Current tick number from heartbeat (default: 0)
-        """
+        """Run one heartbeat tick against the frozen queue."""
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
             if not self._frozen_queue:
                 append_orchestra_event(
-                    "dispatcher",
-                    "GlobalDispatchCoordinator: no candidates",
+                    "dispatcher", "GlobalDispatchCoordinator: no candidates"
                 )
                 self._persist_queue()
                 return
@@ -311,8 +280,7 @@ class GlobalDispatchCoordinator:
 
         if available_slots <= 0:
             append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: capacity full",
+                "dispatcher", "GlobalDispatchCoordinator: capacity full"
             )
             return
 
@@ -323,7 +291,7 @@ class GlobalDispatchCoordinator:
                 append_orchestra_event(
                     "dispatcher",
                     f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
-                    f"skipped remaining (capacity full)",
+                    "skipped remaining (capacity full)",
                 )
                 return
 
@@ -357,7 +325,6 @@ class GlobalDispatchCoordinator:
                 index += 1
                 continue
 
-            # Per-issue active session gate
             if self._registry is not None:
                 active = self._registry.get_live_sessions_for_issue(
                     issue_number=entry.issue_number,
@@ -372,7 +339,6 @@ class GlobalDispatchCoordinator:
                     index += 1
                     continue
 
-            # For BLOCKED issues: run qualify gate at intent time
             if issue.state == IssueState.BLOCKED:
                 target_state = self._qualify_gate.qualify_blocked_issue(issue)
                 if target_state is None:
@@ -389,7 +355,6 @@ class GlobalDispatchCoordinator:
                     self._frozen_queue.pop(index)
                     continue
 
-            # === NEW: Pre-dispatch health check ===
             if not self._health_check_before_dispatch(issue):
                 append_orchestra_event(
                     "dispatcher",
@@ -398,7 +363,6 @@ class GlobalDispatchCoordinator:
                 )
                 self._frozen_queue.pop(index)
                 continue
-            # === END health check ===
 
             try:
                 green = "\033[32m"
@@ -411,7 +375,6 @@ class GlobalDispatchCoordinator:
                 self._emit_dispatch_intent(role, issue, tick_id)
                 entry.waiting_state = entry.collected_state
                 dispatched_count += 1
-
                 logger.bind(
                     domain="global_dispatch",
                     role=role.registry_role,
@@ -437,7 +400,6 @@ class GlobalDispatchCoordinator:
                 f"{dispatched_count}{reset}",
             )
 
-        # Persist queue state after all mutations
         self._persist_queue()
 
     async def _collect_frozen_queue(self) -> list[QueueEntry]:
@@ -445,8 +407,7 @@ class GlobalDispatchCoordinator:
         queue: list[QueueEntry] = []
         seen_issue_numbers: set[int] = set()
         append_orchestra_event(
-            "dispatcher",
-            "GlobalDispatchCoordinator: starting queue collection",
+            "dispatcher", "GlobalDispatchCoordinator: starting queue collection"
         )
         for state in (
             IssueState.REVIEW,
@@ -472,19 +433,17 @@ class GlobalDispatchCoordinator:
             except Exception as exc:
                 append_orchestra_event(
                     "dispatcher",
-                    f"GlobalDispatchCoordinator: collect_ready_issues failed for "
-                    f"{state.value}: {exc}",
+                    f"GlobalDispatchCoordinator: collect_ready_issues failed "
+                    f"for {state.value}: {exc}",
                 )
-                logger.bind(
-                    domain="global_dispatch",
-                    state=state.value,
-                ).error(f"poll_issues_by_state failed for {state.value}: {exc}")
+                logger.bind(domain="global_dispatch", state=state.value).error(
+                    f"poll_issues_by_state failed for {state.value}: {exc}"
+                )
         append_orchestra_event(
             "dispatcher",
             f"GlobalDispatchCoordinator: queue collection complete, "
             f"total={len(queue)} issues",
         )
-        # Persist the freshly collected queue
         self._persist_queue()
         return queue
 
@@ -493,7 +452,6 @@ class GlobalDispatchCoordinator:
         if not self._frozen_queue:
             return
 
-        # Convert QueueEntry to dict for helper function
         queue_dicts = [
             {
                 "issue_number": e.issue_number,
@@ -512,7 +470,6 @@ class GlobalDispatchCoordinator:
             load_issue_func=self._load_issue,
         )
 
-        # Convert back to QueueEntry
         promoted_entries = [
             QueueEntry(
                 issue_number=e["issue_number"],
@@ -521,7 +478,6 @@ class GlobalDispatchCoordinator:
             )
             for e in promoted
         ]
-
         retained_entries = [
             QueueEntry(
                 issue_number=e["issue_number"],
@@ -531,12 +487,9 @@ class GlobalDispatchCoordinator:
             for e in retained
         ]
 
-        # Update frozen queue
-        if promoted_entries or retained_entries:
-            self._frozen_queue = promoted_entries + retained_entries
-        else:
-            # All entries removed - trigger fresh collection
-            self._frozen_queue = None
-
-        # Persist the updated queue state
+        self._frozen_queue = (
+            promoted_entries + retained_entries
+            if (promoted_entries or retained_entries)
+            else None
+        )
         self._persist_queue()

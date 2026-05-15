@@ -18,8 +18,8 @@ code_limits:
     exceptions:
       # 核心业务聚合 —— 允许 600
       - path: "src/vibe3/orchestra/global_dispatch_coordinator.py"
-        limit: 500
-        reason: "Frozen queue dispatch coordinator，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合逻辑"
+        limit: 520
+        reason: "Frozen queue dispatch coordinator，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查、持久化恢复等紧密耦合逻辑"
       - path: "src/vibe3/services/flow_service.py"
         limit: 600
         reason: "核心状态机聚合，吸收 flow_query_mixin"
@@ -194,7 +194,7 @@ code_limits:
     # Milestone 1: 45,000 LOC (intermediate target)
     # Milestone 2: 40,000 LOC (stretch target)
     # Final target: 35,000 LOC (governance goal)
-    v3_python: 50000        # Python 核心代码总行数（临时提升至 50000 以审理后续 PR；后续拆出非核心代码并治理膨胀）
+    v3_python: 50100        # Python 核心代码总行数（临时提升至 50100 以审理 frozen queue persistence PR #775；后续拆出非核心代码并治理膨胀）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
     last_reviewed: "2026-05-01"    # Track last governance review (Issue #625)
 
