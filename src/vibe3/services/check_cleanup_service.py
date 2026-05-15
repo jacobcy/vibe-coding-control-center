@@ -137,6 +137,9 @@ class CheckCleanupService:
 
         Returns:
             Set of branch names that have truly live sessions.
+
+        Raises:
+            SystemError: If query fails, preventing accidental cleanup.
         """
         try:
             from vibe3.agents.backends.codeagent import CodeagentBackend
@@ -149,10 +152,15 @@ class CheckCleanupService:
             return registry.get_all_branches_with_live_sessions()
 
         except Exception as exc:
-            logger.bind(domain="check").warning(
-                f"Failed to query live sessions: {exc}. Proceeding without filtering."
+            logger.bind(domain="check").error(
+                f"Failed to query live sessions: {exc}. "
+                "Cannot proceed with cleanup - manual verification required."
             )
-            return set()
+            raise SystemError(
+                f"Live session query failed: {exc}. "
+                "Cleanup aborted to prevent accidental deletion of active sessions. "
+                "Please verify manually or retry."
+            ) from exc
 
     def _is_invalid_branch_name(self, branch: str) -> bool:
         """Check if branch name is invalid (e.g., HEAD, HEAD~1)."""
@@ -187,8 +195,11 @@ class CheckCleanupService:
     ) -> None:
         """Process a single terminal flow with appropriate cleanup.
 
-        SAFETY CHECK: Before cleanup, verify no live sessions exist.
-        If sessions are still running, skip cleanup and log warning.
+        SAFETY CHECK: Two-layer protection against live session deletion.
+        - Layer 1 (pre-filter): Batch query upfront for performance optimization
+        - Layer 2 (defensive): Per-branch verification in cleanup_flow_scene()
+          (LiveSessionsDetectedError catches race conditions)
+        If sessions are still running, cleanup aborted by LiveSessionsDetectedError.
 
         Args:
             branch: Branch name
