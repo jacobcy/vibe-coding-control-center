@@ -139,6 +139,7 @@ Forbidden:
 - 如果需要交给后续 agent：
   - **结构化指令文件**（plan/audit/PR directive）：写 **handoff indicate**（`vibe3 handoff indicate <path>`）
   - **轻量级记录**（状态更新、发现问题、注意事项）：写 **handoff append**（`vibe3 handoff append "message"`）
+  - **查看交接记录**：用 **handoff show**（`vibe3 handoff show @current` 查看当前 flow 的完整交接链路）
 - handoff 不代替 issue comment
 - **使用原则**：大部分情况用 `handoff append`，只有在需要传递完整指令文件给下游 agent 时才用 `handoff indicate`
 

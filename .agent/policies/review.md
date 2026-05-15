@@ -39,6 +39,7 @@
 
 ```bash
 uv run python src/vibe3/cli.py handoff status
+uv run python src/vibe3/cli.py handoff show @current
 ```
 
 Manager 可能已写入质量审查意见、重点关注区域、具体修复要求等指令。

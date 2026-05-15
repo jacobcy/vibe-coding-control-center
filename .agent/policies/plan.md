@@ -26,6 +26,7 @@
 
 优先工具见公共规则；规划阶段通常至少会用到：
 - `uv run python src/vibe3/cli.py handoff status`
+- `uv run python src/vibe3/cli.py handoff show @current`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`

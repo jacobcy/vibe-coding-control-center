@@ -119,6 +119,7 @@
 
 执行前优先用项目工具确认影响面：
 - `uv run python src/vibe3/cli.py handoff status`
+- `uv run python src/vibe3/cli.py handoff show @current`
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`
