@@ -9,6 +9,11 @@ if [ "${VIBE_CI_SIMULATE:-0}" = "1" ]; then
     echo "Running in CI simulation mode..."
 fi
 
+detect_rebase() {
+    # Returns 0 if a rebase operation was recently completed
+    git reflog -5 2>/dev/null | grep -qE 'rebase( -i)? \((finish|continue)\)'
+}
+
 echo "Running pre-push checks..."
 PUSH_STDIN=$(cat)
 
@@ -112,7 +117,21 @@ if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
 else
     echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
     uv run pytest "${TEST_TARGETS[@]}" -q --tb=short || {
-        echo "ERROR: Tests failed"
+        if detect_rebase; then
+            echo ""
+            echo "ERROR: Tests failed"
+            echo ""
+            echo "NOTE: A recent rebase was detected. Test failures may be environment"
+            echo "      artifacts rather than real bugs (async/tmux/session-sensitive tests"
+            echo "      sometimes fail after rebase due to stale local state)."
+            echo ""
+            echo "  If you're confident the failures are not caused by your changes:"
+            echo "    - Push with: git push --no-verify"
+            echo "    - Or verify manually: uv run pytest ${TEST_TARGETS[*]} -v"
+            echo "    - CI will run the full suite on push regardless"
+        else
+            echo "ERROR: Tests failed"
+        fi
         exit 1
     }
 fi
