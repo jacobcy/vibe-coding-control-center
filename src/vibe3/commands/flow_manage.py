@@ -233,6 +233,12 @@ def bind(
                     # `flow bind --role dependency` no longer performs independent
                     # dependency writes. It delegates to blocked dependency logic
                     # for a single source of behavior.
+                    # Multi-ref compatibility remains ordered and per-ref:
+                    # each dependency delegates to `block_flow()` in sequence,
+                    # while the outward CLI output is synthesized from IssueLink.
+                    # Because blocked state stores a singular `blocked_by_issue`,
+                    # the effective primary blocker after multi-ref delegation is
+                    # the last dependency ref processed here.
                     flow_service.block_flow(
                         target_branch, blocked_by_issue=issue_number, actor=None
                     )

@@ -1,6 +1,7 @@
 """Tests for flow bind command role semantics."""
 
-from unittest.mock import MagicMock, patch
+import json
+from unittest.mock import MagicMock, call, patch
 
 from typer.testing import CliRunner
 
@@ -84,6 +85,90 @@ def test_flow_bind_dependency_delegates_without_direct_link_issue() -> None:
     flow_service.block_flow.assert_called_once_with(
         "task/demo", blocked_by_issue=218, actor=None
     )
+
+
+def test_flow_bind_dependency_json_output_single_ref() -> None:
+    """dependency compatibility path should keep single-item JSON output shape."""
+    with patch(
+        "vibe3.commands.flow_manage.TaskService", create=True
+    ) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow_manage.FlowService", return_value=flow_service):
+            result = runner.invoke(
+                flow_app, ["bind", "218", "--role", "dependency", "--json"]
+            )
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_not_called()
+    payload = json.loads(result.stdout)
+    assert payload["branch"] == "task/demo"
+    assert payload["issue_number"] == 218
+    assert payload["issue_role"] == "dependency"
+    assert isinstance(payload["created_at"], str)
+
+
+def test_flow_bind_dependency_json_output_multiple_refs() -> None:
+    """dependency compatibility path should keep list JSON output for multiple refs."""
+    with patch(
+        "vibe3.commands.flow_manage.TaskService", create=True
+    ) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow_manage.FlowService", return_value=flow_service):
+            result = runner.invoke(
+                flow_app,
+                ["bind", "218", "219", "--role", "dependency", "--json"],
+            )
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_not_called()
+    payload = json.loads(result.stdout)
+    assert payload == [
+        {
+            "branch": "task/demo",
+            "issue_number": 218,
+            "issue_role": "dependency",
+            "created_at": payload[0]["created_at"],
+        },
+        {
+            "branch": "task/demo",
+            "issue_number": 219,
+            "issue_role": "dependency",
+            "created_at": payload[1]["created_at"],
+        },
+    ]
+    assert all(isinstance(item["created_at"], str) for item in payload)
+    flow_service.block_flow.assert_has_calls(
+        [
+            call("task/demo", blocked_by_issue=218, actor=None),
+            call("task/demo", blocked_by_issue=219, actor=None),
+        ]
+    )
+
+
+def test_flow_bind_dependency_stdout_output_non_json() -> None:
+    """dependency compatibility path should keep legacy stdout messaging."""
+    with patch(
+        "vibe3.commands.flow_manage.TaskService", create=True
+    ) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow_manage.FlowService", return_value=flow_service):
+            result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_not_called()
+    assert "Issue #218 linked as dependency to flow task/demo" in result.stdout
 
 
 def test_flow_bind_with_explicit_branch_option() -> None:
