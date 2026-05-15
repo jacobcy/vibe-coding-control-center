@@ -245,7 +245,7 @@ vibe3 flow bind <issue> [<issue> ...] [--role <role>] [--branch <branch>]
 ### 7.3 `flow blocked`
 
 ```bash
-vibe3 flow blocked [--branch <branch> | --pr <pr>] [--reason <text>] [--task <issue> | --by <issue>]
+vibe3 flow blocked [--branch <branch>] [--reason <text>] [--task <issue>]
 ```
 
 约束：

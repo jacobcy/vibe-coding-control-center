@@ -121,9 +121,7 @@ uv run python src/vibe3/cli.py <subcommand>
    # a. 将完整报告写入 .agent/reports/ 目录
 
    # b. 记录审计事件
-   vibe3 handoff audit "<报告文件路径>" \
-     --next-step "下一步建议" \
-     --actor "<actor标识>"
+   vibe3 handoff audit "<报告文件路径>" --actor "<actor标识>"
 
    # c. 用 handoff append 记录关键发现和下一步
    vibe3 handoff append "发现摘要: ..." --actor "<actor标识>" --kind finding
@@ -164,7 +162,7 @@ uv run python src/vibe3/cli.py <subcommand>
 
 ```bash
 # 记录审计事件（引用报告文件）
-vibe3 handoff audit "<报告路径>" --next-step "..." --actor "<actor标识>"
+vibe3 handoff audit "<报告路径>" --actor "<actor标识>"
 
 # 记录关键发现
 vibe3 handoff append "发现摘要: ..." --actor "<actor标识>" --kind finding

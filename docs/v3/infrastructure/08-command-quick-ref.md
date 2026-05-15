@@ -108,42 +108,24 @@ vibe3 handoff append "Need to align event taxonomy" --actor "codex/gpt-5.4" --ki
 
 Record plan handoff.
 
-**Options**:
-- `--next-step <text>` - Next step suggestion
-- `--blocked-by <text>` - Blocker description
-- `--actor <actor>` - Actor identifier (default: unknown)
-
 ```bash
-vibe3 handoff plan docs/plans/feature-x.md
-vibe3 handoff plan docs/plans/feature-x.md --next-step "Start implementation" --actor "claude/sonnet-4.6"
+vibe3 handoff plan docs/plans/feature-x.md --actor "claude/sonnet-4.6"
 ```
 
 ### `vibe handoff report <report_ref>`
 
 Record report handoff.
 
-**Options**:
-- `--next-step <text>` - Next step suggestion
-- `--blocked-by <text>` - Blocker description
-- `--actor <actor>` - Actor identifier (default: unknown)
-
 ```bash
-vibe3 handoff report docs/reports/review-2026-03-21.md
-vibe3 handoff report docs/reports/review.md --next-step "Address feedback" --actor "claude/sonnet-4.6"
+vibe3 handoff report docs/reports/review-2026-03-21.md --actor "claude/sonnet-4.6"
 ```
 
 ### `vibe handoff audit <audit_ref>`
 
 Record audit handoff.
 
-**Options**:
-- `--next-step <text>` - Next step suggestion
-- `--blocked-by <text>` - Blocker description
-- `--actor <actor>` - Actor identifier (default: unknown)
-
 ```bash
-vibe3 handoff audit docs/audits/security-check.md
-vibe3 handoff audit docs/audits/security.md --actor "reviewer/sonnet-4.6"
+vibe3 handoff audit docs/audits/security-check.md --actor "reviewer/sonnet-4.6"
 ```
 
 ---
