@@ -106,7 +106,7 @@ class OrchestrationFacade(ServiceBase):
         if self._coordinator:
             self._coordinator.shutdown()
 
-def get_queued_issue_numbers(self) -> set[int]:
+    def get_queued_issue_numbers(self) -> set[int]:
         """Get the set of issue numbers currently in the dispatch queue.
 
         Returns:
