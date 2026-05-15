@@ -136,22 +136,21 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
   SendMessage(to=agent_name, summary="握手信号", message="【lead_ready】")
   for attempt in 1..3:
     sleep(30)
-    $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
+    $ agent-event.sh {agent_name} | grep -q "agent_ready"
     if found: return OK
   return TIMEOUT
 ```
 
-> **State Semantics**:
-> - `ready_event=found` — Agent 已发送 `【agent_ready】` 事件，可进入下一步任务分配
-> - `ready_event=missing` — Agent 未发送过 ready 事件（可能未启动、已关闭、或 inbox 为空）
-> - `ready_event=waiting` — Lead inbox 不存在（team 结构未初始化），需要先执行 team 创建流程
+> **Handshake Detection**:
+> - 使用 `agent-event.sh` 查找 `agent_ready` 事件来检测握手成功
+> - **禁止使用 `agent-exist.sh` 检测握手**：`agent-exist.sh` 只用于检查 agent 状态（alive state, suggestion）
 >
-> **Detection Strategy**:
-> - 握手检测应区分 `found`（成功）和 `missing/waiting`（需要等待或重试）
-> - `waiting` 状态表示基础设施未就绪，应等待 team 初始化完成
-> - `missing` 状态表示 agent 未响应，应等待或重新 spawn
+> **team-lead.json 创建时机**:
+> - `team-lead.json` 在**握手成功后**才创建，握手前不会存在
+> - 因此 `agent-exist.sh` 在握手前会显示 `ready_event=waiting`（lead inbox 不存在），这是误导性的
+> - 必须用 `agent-event.sh | grep -q "agent_ready"` 检测握手成功
 
-`agent-exist.sh <agent>` 输出最后一行包含 `ready_event=found|missing|waiting`，grep `ready_event=found` 确认 agent 已回复 `【agent_ready】`。
+握手检测通过 `agent-event.sh <agent>` 查找 `agent_ready` 事件来确认。
 
 **约束**：
 - spawn 后必须先握手，不得跳过
@@ -697,8 +696,15 @@ Phase_5():
   if continue:
     goto Phase_0_Step_3  // 复用 Team，不重建
   else:
+    // 发送关闭请求
     for teammate in all_agents:
       SendMessage(to=teammate, summary="会话结束", message="shutdown_request")
+
+    // 等待 agent 终止（agent 需要时间处理 shutdown 并清理状态）
+    // TeamDelete 会检查是否有 active members，过早调用会失败
+    output("等待 agent 终止...")
+    sleep(20)  // 经验值：agent 异步终止需要 10-20 秒
+
     TeamDelete()
     // 若 TeamDelete 返回 "no team found" → rm -rf ~/.claude/teams/pr-review-team
 ```
@@ -803,17 +809,32 @@ LLM 拟合不出小数点评分，强行打分就是幻觉。
 > 所有脚本位于 `skills/vibe-review-pr/scripts/`，需从仓库根目录调用。
 > 脚本从 `runtime/agents.sh` 读取 agent 注册表，team group 默认为 `pr-review-team`。
 
+## 脚本用途速查
+
+| 脚本 | 用途 | 正确使用场景 | 错误使用场景 |
+|------|------|-------------|-------------|
+| `agent-exist.sh` | Agent **状态检查** | 检查 agent 是否存活（alive/inactive）、定义是否存在、pane 是否在运行 | ❌ 检测握手是否成功 |
+| `agent-event.sh` | Agent **事件历史** | 检测握手成功（grep `agent_ready`）、检查报告事件（grep `agent_report`）、排查阻塞原因 | ❌ 获取报告内容 |
+| `agent-report.sh` | Agent **报告提取** | 获取 agent 通过 SendMessage 发送的报告全文 | ❌ 检测握手是否成功 |
+
+**关键注意**：
+- `agent-exist.sh` 的 `ready_event` 字段依赖 `team-lead.json` 的存在，而该文件在**握手成功后**才创建
+- 握手前 `team-lead.json` 不存在，`agent-exist.sh` 会显示 `ready_event=waiting`，这是**误导性的**
+- 检测握手必须用 `agent-event.sh | grep -q "agent_ready"`
+
 ## agent-exist.sh
 
 ```
 agent-exist.sh                        # 列表模式：全部 agent 的 def/inbox/pane/alive/suggestion 表格
-agent-exist.sh <agent_name>           # 单 agent 模式：表格行 + ready_event=found|missing|waiting
-agent-exist.sh <agent_name> --group <name>  # 指定 team group
+agent-exist.sh <agent_name>           # 单 agent 模式：表格行 + ready_event 行
+agent-exist.sh <agent_name> --group <name>  # 指定 team group（默认 pr-review-team，通常无需指定）
 ```
 
-**握手检测**：单 agent 模式输出最后一行 `ready_event=found` 表示该 agent 已发送 `【agent_ready】`。
-**alive 字段**：`active (<10s)` / `idle (<60s)` / `stale (<5min)` / `inactive (>5min)` / `never`。
-**suggestion 字段**：`spawn agent` / `send handshake to verify` / `available for task` / `working on task`。
+**用途**：检查 agent 存在性和运行状态。
+- `alive` 字段：`active (<10s)` / `idle (<60s)` / `stale (<5min)` / `inactive (>5min)` / `never`
+- `suggestion` 字段：`spawn agent` / `send handshake to verify` / `available for task` / `working on task`
+
+**⚠️ 禁止用于握手检测**：`ready_event` 字段依赖 `team-lead.json`，握手前该文件不存在，结果不可靠。
 
 ## agent-event.sh
 
@@ -823,10 +844,22 @@ agent-event.sh <agent_name>           # 单 agent 模式：该 agent 全部非 i
 agent-event.sh <agent_name> --group <name>
 ```
 
+**用途**：查看 agent 事件历史，**用于握手检测和报告事件检测**。
+
 **输出格式**（单 agent）：TSV — `event_type` `timestamp` `title`
 **event_type 值**：`agent_ready` / `agent_report` / `agent_blocked` / `message`
-**检查报告事件**：`agent-event.sh <agent> | grep -q "agent_report"`
-**检查握手事件**：`agent-event.sh <agent> | grep -q "agent_ready"`
+
+**握手检测**（推荐方式）：
+```bash
+$ agent-event.sh context-researcher | grep -q "agent_ready"
+# 退出码 0 = 握手成功，非 0 = 未握手
+```
+
+**报告事件检测**：
+```bash
+$ agent-event.sh code-analyst | grep -q "agent_report"
+# 退出码 0 = 报告已发送，非 0 = 无报告
+```
 
 ## agent-report.sh
 
@@ -835,6 +868,8 @@ agent-report.sh                       # 列表模式：全部 agent 的报告状
 agent-report.sh <agent_name>          # 提取模式：输出完整报告正文
 agent-report.sh <agent_name> --group <name>
 ```
+
+**用途**：提取 agent 通过 SendMessage 发送的报告全文。
 
 **退出码**：
 | 退出码 | 含义 |
