@@ -1,26 +1,25 @@
 ---
-title: codeagent-wrapper 使用指南
-author: Claude Sonnet 4.6
-created: 2026-03-17
-purpose: 记录 codeagent-wrapper 多后端 AI 任务执行器的使用方法、最佳实践和常见场景
+document_type: reference
+title: codeagent-wrapper 内部实现指南
+status: current
+scope: internal-implementation
+author: Vibe Team
 related_docs:
-  - ../skills/codeagent/SKILL.md
-  - ../standards/glossary.md
-tags: [ai, automation, multi-backend, code-generation]
+  - ../standards/agent-workflow-standard.md
 ---
 
-# codeagent-wrapper 使用指南
+# codeagent-wrapper 内部实现指南
+
+> **定位说明**：本文档描述 `codeagent-wrapper` 的内部实现细节。用户应通过 `vibe3 run` 命令调用，而非直接使用 codeagent-wrapper CLI。详见 [agent-workflow-standard.md](../standards/agent-workflow-standard.md)。
 
 ## 概述
 
-`codeagent-wrapper` 是一个多后端 AI 代码任务执行器，提供统一的接口调用不同的 AI 后端（Codex、Claude、Gemini、OpenCode）来执行代码相关任务。
+`codeagent-wrapper` 是 `vibe3 run` 的底层多后端 AI 执行器，支持 Codex、Claude、Gemini、OpenCode 等后端。
 
 **核心能力**：
 - 多后端支持（Codex、Claude、Gemini、OpenCode）
 - 文件引用语法（`@file`）
-- 并行任务执行
 - Session 恢复机制
-- Worktree 隔离模式
 - Agent 预设配置
 
 ## 安装位置
@@ -31,6 +30,8 @@ tags: [ai, automation, multi-backend, code-generation]
 
 ## 后端选择
 
+> **注意**：后端选择通过 `config/v3/settings.yaml` 的 `agent_config` 字段配置，而非手动指定。
+
 | 后端 | 最适用场景 | 默认模型 |
 |------|-----------|---------|
 | **Codex** | 深度代码分析、大规模重构、算法优化 | gpt-5.2 |
@@ -38,63 +39,53 @@ tags: [ai, automation, multi-backend, code-generation]
 | **Gemini** | UI 组件搭建、设计系统实现 | gemini-3-pro-preview |
 | **OpenCode** | 代码探索、快速原型 | opencode/grok-code |
 
-### 后端选择决策树
+---
 
-```mermaid
-graph TD
-    A[任务类型] --> B{需要深度分析?}
-    B -->|是| C[Codex]
-    B -->|否| D{需要 UI/UX?}
-    D -->|是| E[Gemini]
-    D -->|否| F{需要文档/Prompt?}
-    F -->|是| G[Claude]
-    F -->|否| H[OpenCode]
-```
+## 用户用法（vibe3 run）
 
-## 基础用法
-
-### 1. 单任务执行（推荐 HEREDOC 语法）
+**推荐用法**：通过 `vibe3 run` 调用，而非直接使用 codeagent-wrapper。
 
 ```bash
-# Codex 后端 - 深度代码分析
+# 使用 plan 文件
+vibe3 run --plan .agent/plans/my-plan.md
+
+# 直接传入指令
+vibe3 run "Fix the bug in auth.py"
+```
+
+详见 [agent-workflow-standard.md](../standards/agent-workflow-standard.md)。
+
+---
+
+## 内部实现细节
+
+以下内容供开发者参考，普通用户无需了解。
+
+### 基础用法（内部）
+
+### 1. 单任务执行（内部实现）
+
+```bash
+# 内部实现示例（用户应使用 vibe3 run）
 ~/.claude/bin/codeagent-wrapper --backend codex - . <<'EOF'
 分析 @src/main.py 的架构并提出改进建议
 EOF
-
-# Claude 后端 - 快速文档生成
-~/.claude/bin/codeagent-wrapper --backend claude - . <<'EOF'
-为 @README.md 添加安装和使用说明
-EOF
-
-# Gemini 后端 - UI 原型
-~/.claude/bin/codeagent-wrapper --backend gemini - . <<'EOF'
-创建响应式导航组件
-EOF
 ```
 
-### 2. 简单任务（单行命令）
+### 2. 文件引用语法（内部）
 
 ```bash
-~/.claude/bin/codeagent-wrapper --backend claude "添加类型注解到 @utils.py" .
-```
-
-### 3. 文件引用语法
-
-```bash
-# 引用多个文件
+# 内部实现：引用多个文件
 ~/.claude/bin/codeagent-wrapper --backend codex - . <<'EOF'
 分析 @src/api.py 和 @src/models.py 的依赖关系
 EOF
-
-# 引用整个目录
-~/.claude/bin/codeagent-wrapper --backend codex - . <<'EOF'
-审查 @src/ 目录的安全性
-EOF
 ```
 
-## 高级功能
+---
 
-### 1. Session 恢复
+## Session 管理（调试参考）
+
+### Session 恢复
 
 **Session ID 管理**：
 - 每次执行自动生成 UUID 格式的 session ID
@@ -117,60 +108,9 @@ tail -f /private/tmp/claude-501/<workdir>/<session_id>/tasks/<task_id>.output
 cat /private/tmp/claude-501/<workdir>/<session_id>/tasks/<task_id>.output | tail -50
 ```
 
-### 2. 并行任务执行
+### Agent 预设（内部机制）
 
-**基础并行模式**：
-```bash
-~/.claude/bin/codeagent-wrapper --parallel <<'EOF'
----TASK---
-id: analysis
-backend: codex
-workdir: /path/to/project
----CONTENT---
-分析代码库结构
----TASK---
-id: docs
-backend: claude
-dependencies: analysis
----CONTENT---
-基于分析生成 API 文档
----TASK---
-id: ui
-backend: gemini
-dependencies: docs
----CONTENT---
-生成文档站点的 UI
-EOF
-```
-
-**输出模式**：
-- **Summary 模式**（默认）：结构化报告，节省上下文
-- **Full 模式**（`--full-output`）：完整输出，仅用于调试
-
-**并发控制**：
-```bash
-export CODEAGENT_MAX_PARALLEL_WORKERS=8
-```
-
-### 3. Worktree 隔离模式
-
-自动创建隔离的 git worktree，适合实验性修改：
-
-```bash
-~/.claude/bin/codeagent-wrapper --worktree --backend codex "实现新功能 X" .
-```
-
-### 4. Agent 预设
-
-使用预配置的 agent 能力组合：
-
-```bash
-# 使用规划 agent
-~/.claude/bin/codeagent-wrapper --agent planner "规划重构方案" .
-
-# 使用文档编写 agent
-~/.claude/bin/codeagent-wrapper --agent document-writer "编写 API 文档" .
-```
+> **说明**：Agent 预设通过 `config/v3/settings.yaml` 的 `agent_config` 字段配置，用户通过 `vibe3 run` 间接使用。
 
 **可用预设**（定义在 `~/.codeagent/models.json`）：
 - `oracle`: 深度推理（Claude Opus 4.5）
@@ -437,10 +377,11 @@ export CODEAGENT_MAX_PARALLEL_WORKERS=8
 
 ## 参考资源
 
-- **Skill 文档**：[.claude/skills/codeagent/SKILL.md](../../.claude/skills/codeagent/SKILL.md)
-- **配置文件**：`~/.codeagent/models.json`
-- **Session 存储**：`/private/tmp/claude-501/`
+- **用户文档**：[agent-workflow-standard.md](../standards/agent-workflow-standard.md) - Agent 工作流权威规范
+- **配置参考**：`config/v3/settings.yaml` - Agent 配置文件
+- **Session 存储**：`/private/tmp/claude-501/` - Session 持久化路径（调试用）
 
 ## 更新历史
 
+- 2026-05-15：重构为内部实现文档，更新为 `vibe3 run` 用法
 - 2026-03-17：初始版本，基于 codeagent-wrapper 当前功能编写

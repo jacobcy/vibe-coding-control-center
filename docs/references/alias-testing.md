@@ -1,3 +1,13 @@
+---
+document_type: reference
+title: Alias Testing Guide
+status: current
+scope: shell-testing
+author: Vibe Team
+related_docs:
+  - alias-helper.md
+---
+
 # Alias Testing Guide
 
 ## Quick Start

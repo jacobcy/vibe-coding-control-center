@@ -1,3 +1,13 @@
+---
+document_type: reference
+title: Subagent 推荐使用指南
+status: current
+scope: agent-optimization
+author: Vibe Team
+related_docs:
+  - alias-helper.md
+---
+
 # Subagent 推荐使用指南
 
 ## 概述

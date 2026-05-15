@@ -1,14 +1,30 @@
-下面给出一套工程级 codex review 使用体系。目标是：让代码审查成为 自动化质量网关（quality gate），而不是临时工具。
+---
+document_type: reference
+title: Codex Review 工程级使用体系
+status: current
+scope: code-review
+author: Vibe Team
+related_docs:
+  - SUBAGENT_GUIDELINES.md
+---
+
+# Codex Review 工程级使用体系
+
+> **当前用法说明**：在 Vibe Center 中，codex 作为外部 plugin 通过 `codex:rescue` skill 调用（见 `skills/vibe-review-pr/`）。本文档描述的 review policy 设计理念和与 Serena AST 的结合思路仍有参考价值。
+
+## 概述
+
+目标是：让代码审查成为**自动化质量网关（quality gate）**，而不是临时工具。
 
 结构分为四层：
-	1.	Review Policy
-	2.	本地开发审查
-	3.	PR Gate
-	4.	CI 自动审计
+1. Review Policy
+2. 本地开发审查
+3. PR Gate
+4. CI 自动审计
 
-⸻
+---
 
-1. Review Policy（审查规则文件）
+## Review Policy（审查规则文件）
 
 不要把 prompt 写在命令行。
 应该固化为一个 review policy 文件。
@@ -59,14 +75,14 @@ Output format:
 
 codex review - < .codex/review-policy.md
 
-优点：
-	•	review 规则稳定
-	•	CI 与本地一致
-	•	团队统一审查标准
+**优点**：
+- review 规则稳定
+- CI 与本地一致
+- 团队统一审查标准
 
-⸻
+---
 
-2. 本地开发审查（Developer loop）
+## 本地开发审查（Developer loop）
 
 开发阶段建议使用 uncommitted review。
 
@@ -84,14 +100,14 @@ staged
 unstaged
 untracked
 
-适合：
-	•	commit 前
-	•	debug 逻辑错误
-	•	shell / CLI 安全检查
+**适合**：
+- commit 前
+- debug 逻辑错误
+- shell / CLI 安全检查
 
-⸻
+---
 
-3. Commit Review（逐 commit 审查）
+## Commit Review（逐 commit 审查）
 
 用于：
 
@@ -109,11 +125,9 @@ codex review --commit HEAD~1
 结合 policy：
 
 codex review --commit HEAD - < .codex/review-policy.md
+---
 
-
-⸻
-
-4. PR Review（核心用法）
+## PR Review（核心用法）
 
 PR 审查需要对比 base branch。
 
@@ -129,13 +143,11 @@ codex review \
   --base main \
   --title "PR Review" \
   - < .codex/review-policy.md
+---
 
+## Git Hook 集成
 
-⸻
-
-5. Git Hook 集成
-
-pre-commit
+### pre-commit
 
 .git/hooks/pre-commit
 
@@ -148,13 +160,11 @@ echo "Running Codex Review..."
 codex review --uncommitted \
   - < .codex/review-policy.md
 
-作用：
-	•	防止明显 bug 提交
-	•	本地质量网关
+**作用**：
+- 防止明显 bug 提交
+- 本地质量网关
 
-⸻
-
-pre-push
+### pre-push
 
 更严格：
 
@@ -164,11 +174,9 @@ echo "Running Codex Review (push gate)..."
 
 codex review --base main \
   - < .codex/review-policy.md
+---
 
-
-⸻
-
-6. CI Pipeline 审查
+## CI Pipeline 审查
 
 GitHub Actions 示例：
 
@@ -194,11 +202,9 @@ jobs:
           codex review \
             --base origin/main \
             - < .codex/review-policy.md
+---
 
-
-⸻
-
-7. PR Gate（质量门）
+## PR Gate（质量门）
 
 CI 可以根据 review 输出决定：
 
@@ -211,11 +217,9 @@ Critical	阻止 merge
 Major	需要修复
 Minor	可忽略
 Suggestion	参考
+---
 
-
-⸻
-
-8. 针对 CLI / Shell 项目的审查 Prompt
+## 针对 CLI / Shell 项目的审查 Prompt
 
 你现在项目是：
 
@@ -251,11 +255,9 @@ Detect:
 - inconsistent flags
 - missing help text
 - silent failures
+---
 
-
-⸻
-
-9. 与 Vibe Flow 体系结合
+## 与 Vibe Flow 体系结合
 
 你的流程：
 
@@ -265,85 +267,83 @@ flow
 branch
 PR
 
-建议：
+### Execute 阶段
 
-Execute 阶段
-
+```bash
 codex review --uncommitted
+```
 
+### Review 阶段
 
-⸻
-
-Review 阶段
-
+```bash
 codex review --base main
+```
 
-
-⸻
-
-PR merge gate
+### PR merge gate
 
 CI 自动执行：
 
+```bash
 codex review --base origin/main
+```
 
+---
 
-⸻
+## 高级技巧（少有人用）
 
-10. 高级技巧（少有人用）
-
-Review diff pipeline
+### Review diff pipeline
 
 可以直接：
 
 git diff main | codex review -
 
-优点：
-	•	不依赖 git repo context
-	•	适合 CI
+**优点**：
+- 不依赖 git repo context
+- 适合 CI
 
-⸻
-
-review staged only
+### review staged only
 
 git diff --cached | codex review -
+### review patch file
 
-
-⸻
-
-review patch file
-
+```bash
 codex review - < patch.diff
+```
 
+---
 
-⸻
+## 最实用的三条命令
 
-11. 最实用的三条命令
+**开发阶段**：
 
-开发阶段：
-
+```bash
 codex review --uncommitted
+```
 
-PR 前：
+**PR 前**：
 
+```bash
 codex review --base main
+```
 
-CI：
+**CI**：
 
+```bash
 codex review --base origin/main
+```
 
+---
 
-⸻
+## Codex Review + Serena AST 架构
 
-一、codex review + Serena AST 怎么搭
+### 最合理的架构
 
-1. 最合理的架构
-
-不要让 Codex 直接“盲审” diff。
+不要让 Codex 直接”盲审” diff。
 应该先让 Serena 产出一层结构化语义上下文，再让 Codex review 基于这层上下文审。
 
-推荐链路：
+**推荐链路**：
 
+```
 git diff / PR diff
     ↓
 Serena AST / symbol analysis
@@ -353,29 +353,30 @@ Serena AST / symbol analysis
 codex review 读取 diff + impact summary + review policy
     ↓
 输出审计结论
+```
 
 也就是先回答三个问题：
-	1.	这次改了哪些 symbol
-	2.	这些 symbol 被谁引用
-	3.	改动是否越过模块边界或破坏约束
+1. 这次改了哪些 symbol
+2. 这些 symbol 被谁引用
+3. 改动是否越过模块边界或破坏约束
 
-这些正是 Serena 擅长的点：它提供 find_symbol、find_referencing_symbols、insert_after_symbol 这类 symbol-level 工具，而不是只靠 grep。 ￼
+这些正是 Serena 擅长的点：它提供 `find_symbol`、`find_referencing_symbols`、`insert_after_symbol` 这类 symbol-level 工具，而不是只靠 grep。
 
-⸻
+---
 
-2. 为什么这比单独 codex review 强
+### 为什么这比单独 codex review 强
 
-单独 codex review 的问题不是“看不懂代码”，而是：
-	•	diff 太大时，它容易只盯改动行，忽略调用方
-	•	重构类 PR 里，它容易漏掉隐式影响面
-	•	shell/CLI/多模块仓库中，它可能知道“这里可疑”，但不知道“波及半径多大”
+单独 codex review 的问题不是”看不懂代码”，而是：
+- diff 太大时，它容易只盯改动行，忽略调用方
+- 重构类 PR 里，它容易漏掉隐式影响面
+- shell/CLI/多模块仓库中，它可能知道”这里可疑”，但不知道”波及半径多大”
 
 Serena AST 补的正是这一层：
-它不是给出最终判断，而是把语义影响面展开，让 Codex 少靠猜。Serena 官方就强调它通过 symbol-level 的关系结构来提升 token 效率和代码理解质量。 ￼
+它不是给出最终判断，而是把语义影响面展开，让 Codex 少靠猜。Serena 官方就强调它通过 symbol-level 的关系结构来提升 token 效率和代码理解质量。
 
-⸻
+---
 
-3. 具体落地方式
+### 具体落地方式
 
 方案 A：本地脚本串联
 
@@ -484,11 +485,9 @@ codex-review-gate
 	•	close flow 是否仍可能误删 branch
 	•	resume flow 是否还能正确恢复 handoff
 
-这类问题，单纯 grep 很差，symbol 级分析更靠谱。
+这类问题，单纯 grep 很差，symbol 级分析更靠谱。---
 
-⸻
-
-二、codex review 作为 merge gate 怎么做
+## Codex Review 作为 Merge Gate
 
 这里先说结论：
 
@@ -660,11 +659,9 @@ Return:
 	•	ai-review/override-major
 	•	ai-review/accepted-risk
 
-否则这个 gate 迟早被关。
+否则这个 gate 迟早被关。---
 
-⸻
-
-三、你这个项目里最适合的 merge gate 规则
+## 项目特定的 Merge Gate 规则
 
 按你现在这个 gh wrapper / flow orchestration / handoff 项目，最值得 block 的不是通用“代码味道”，而是下面这些：
 
@@ -684,11 +681,9 @@ Return:
 	•	可抽象未抽象
 
 这个划分很重要。
-你要的是工程真问题 gate，不是“AI 老师批作文”。
+你要的是工程真问题 gate，不是“AI 老师批作文”。---
 
-⸻
-
-四、一个实用落地版本
+## 实用落地版本
 
 你可以直接这么设计：
 
@@ -708,11 +703,9 @@ CI merge gate
 	•	verify 必须过
 	•	impact-analysis 生成摘要
 	•	ai-review 输出 verdict
-	•	BLOCK 或 Major 失败则禁止 merge
+	•	BLOCK 或 Major 失败则禁止 merge---
 
-⸻
-
-五、直说结论
+## 结论
 
 codex review + Serena AST
 
