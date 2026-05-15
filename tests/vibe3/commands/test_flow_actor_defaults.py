@@ -12,14 +12,18 @@ runner = CliRunner()
 
 @patch("vibe3.commands.flow_manage.render_flow_created")
 @patch("vibe3.commands.flow_manage.FlowService")
+@patch("vibe3.utils.branch_arg.GitClient")
 def test_flow_update_idempotent(
+    git_client_cls,
     flow_service_cls,
     _render_flow_created,
 ) -> None:
     """flow update should ensure flow exists."""
-    flow_service = MagicMock()
-    flow_service.get_current_branch.return_value = "task/set-default-flow"
+    git_client = MagicMock()
+    git_client.get_current_branch.return_value = "task/set-default-flow"
+    git_client_cls.return_value = git_client
 
+    flow_service = MagicMock()
     flow = FlowState(
         branch="task/set-default-flow",
         flow_slug="set-default-flow",
