@@ -32,6 +32,10 @@ temp/
 tmpvibe-*
 vibe-init-test*
 **/var/folders/**/*vibe-init-test*
+debug_*.py
+debug_*.sh
+tmp_*.py
+test_git_hook_env.sh
 
 # =============================================================================
 # Python

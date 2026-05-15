@@ -57,6 +57,12 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: check-debug-files
+        name: Check for temporary debug files
+        entry: scripts/hooks/check-debug-files.sh
+        language: script
+        pass_filenames: false
+
   # ── LOC Checks (prevent code bloat) ─────────────────────────────────────────
   # MOVED TO PRE-PUSH: These checks are now warnings only and run before push
   # to allow incremental refactoring without blocking commits.
