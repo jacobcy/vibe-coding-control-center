@@ -6,7 +6,6 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.pr import PRResponse, PRState
 
 runner = CliRunner()
 
@@ -50,54 +49,49 @@ def test_flow_blocked_succeeds_when_flow_exists() -> None:
     )
 
 
-def test_flow_blocked_supports_pr_option() -> None:
-    """--pr should resolve head branch and block that flow."""
+def test_flow_blocked_resolves_numeric_branch_to_canonical_task_branch() -> None:
+    """Numeric --branch should normalize to canonical task branch before block."""
     flow_service = MagicMock()
-    pr_service = MagicMock()
-    pr_service.get_pr.return_value = PRResponse(
-        number=789,
-        title="Test PR",
-        body="",
-        state=PRState.OPEN,
-        head_branch="task/from-pr",
-        base_branch="main",
-        url="https://example.com/pr/789",
-        merged_at=None,
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/issue-235",
+        flow_slug="issue-235",
+        flow_status="active",
+        task_issue_number=235,
+        issues=[],
     )
 
-    with (
-        patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
-        patch("vibe3.commands.flow_lifecycle.PRService", return_value=pr_service),
-    ):
+    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
         result = runner.invoke(
-            app, ["flow", "blocked", "--pr", "789", "--reason", "waiting"]
+            app, ["flow", "blocked", "--branch", "235", "--task", "246"]
         )
 
     assert result.exit_code == 0
-    pr_service.get_pr.assert_called_once_with(pr_number=789)
     flow_service.block_flow.assert_called_once_with(
-        "task/from-pr", reason="waiting", blocked_by_issue=None
+        "task/issue-235", reason=None, blocked_by_issue=246
     )
 
 
-def test_flow_blocked_rejects_branch_and_pr_together() -> None:
-    """--branch and --pr are mutually exclusive for blocked."""
+def test_flow_blocked_rejects_reason_and_task_together() -> None:
+    """--reason and --task are mutually exclusive for blocked."""
     result = runner.invoke(
         app,
-        ["flow", "blocked", "--branch", "task/demo", "--pr", "789"],
+        ["flow", "blocked", "--branch", "235", "--task", "246", "--reason", "wait"],
     )
 
     assert result.exit_code == 1
-    assert "不能同时指定 --branch 与 --pr" in result.output
+    assert "--reason" in result.output
+    assert "--task" in result.output
 
 
-def test_flow_blocked_reports_missing_pr() -> None:
-    """--pr should fail clearly when PR number cannot be resolved."""
-    pr_service = MagicMock()
-    pr_service.get_pr.return_value = None
+def test_flow_blocked_no_longer_supports_pr_option() -> None:
+    """CLI should reject removed --pr option."""
+    result = runner.invoke(app, ["flow", "blocked", "--pr", "789", "--reason", "x"])
 
-    with patch("vibe3.commands.flow_lifecycle.PRService", return_value=pr_service):
-        result = runner.invoke(app, ["flow", "blocked", "--pr", "999"])
+    assert result.exit_code != 0
 
-    assert result.exit_code == 1
-    assert "未找到 PR #999" in result.output
+
+def test_flow_blocked_no_longer_supports_by_alias() -> None:
+    """CLI should reject removed --by alias."""
+    result = runner.invoke(app, ["flow", "blocked", "--by", "246"])
+
+    assert result.exit_code != 0
