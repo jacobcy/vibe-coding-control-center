@@ -77,7 +77,9 @@ def test_migrated_loc_config_loads_total_limits() -> None:
     new_settings = module.load_loc_settings("config/v3/loc_limits.yaml")
 
     assert new_settings.total_v2_shell == 3000
-    assert new_settings.total_v3_python == 50000
+    # Temporarily raised to 50100 for frozen queue persistence (PR #775)
+    # See config/v3/loc_limits.yaml line 197 for justification
+    assert new_settings.total_v3_python == 50100
     assert new_settings.warning_threshold_percent == 90
     assert new_settings.last_reviewed != ""
     assert new_settings.exceptions
