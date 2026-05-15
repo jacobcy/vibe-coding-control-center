@@ -115,19 +115,19 @@ input_examples:
     当前分支已有 **{count}** 个任务，超过建议上限（3个）。
 
     **建议操作：**
-    1. 先完成现有任务：`vibe task list` 查看任务列表
+    1. 先完成现有任务：`vibe3 flow status` 查看 flow 列表
     2. 或切换到新分支：`git checkout -b <new-branch>`
-    3. 或使用 worktree 隔离：`vibe flow create <feature>`
+    3. 或使用 worktree 隔离：`git worktree add <path> -b <branch>` → `vibe3 flow update` → `vibe3 flow bind <issue>`
 
     为避免上下文混乱和任务冲突，请先处理现有任务。
     ```
 
   - 如果任务数 <= 3，继续执行后续步骤
 
-- 确定框架后，调用 `vibe task add "<title>"` 初始化任务记录：
-  - 若为 `/vibe-new <feature>`，则 `vibe task add "<feature>"`
-  - 若为自然语言需求，则根据 AI 分析的标题 `vibe task add <title>`
-- 记录完成后，通过 `vibe task update <task_id> --next-step "Entry: Gate 1 Scope Gate"` 标记进度。
+- 确定框架后，创建分支并初始化 flow：
+  - 若为 `/vibe-new <feature>`：`git checkout -b task/<issue>-<feature>` → `vibe3 flow update` → `vibe3 flow bind <issue>`
+  - 若为自然语言需求：根据 AI 分析创建对应分支，然后 `vibe3 flow update` → `vibe3 flow bind <issue>`
+- 记录完成后，通过 `vibe3 handoff next "Entry: Gate 1 Scope Gate"` 标记下一步。
 - 框架选择通过 `uv run python src/vibe3/cli.py handoff append` 记录，格式：`- <feature> (framework: <superpower|openspec>)`。
 - 同时记录需求特征，用于 future pattern 匹配。
   **选择提示模板（仅在需要询问时使用）：**
@@ -173,9 +173,10 @@ input_examples:
 - 若入口来自 `/vibe-new`，则无权进入此 Gate。此 Gate 仅为 `/vibe-start` 开放。
 - 共享 registry、worktree 绑定、共享任务存储修改必须委托给 Shell 命令（Tier 1）：
   - 当前目录模式：
-    1. 调用 `vibe task add <title>` (若尚未立项)
-    2. 调用 `vibe task update <task-id> --bind-current` 建立绑定关系
-  - 完整流程模式：调用 `vibe flow new <feature>` 创建/切换 worktree 并初始化 context。
+    1. 确保在正确的分支上（`git checkout <branch>` 或创建新分支）
+    2. 使用 `vibe3 flow update` 注册 flow
+    3. 使用 `vibe3 flow bind <issue>` 建立 issue 绑定关系
+  - 完整流程模式：创建分支 → `vibe3 flow update` → `vibe3 flow bind <issue>` 初始化 flow context。
 - 任务数据映射在 `$(_git_common_dir)/vibe/` 下统一管理。
 - 严禁 Vibe Skills 直接操作 `.vibe/` 缓存文件夹，必须通过 CLI 读取。
 - 在进入执行前，先读取并遵循：`docs/standards/serena-usage.md`、`.github/workflows/ci.yml`

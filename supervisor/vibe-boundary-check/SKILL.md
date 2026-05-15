@@ -15,11 +15,11 @@ phase: convergence
 
 ## Overview
 
-在开发过程 (`vibe flow dev`, `vibe flow test`) 中定期触发，检查项目核心目录的代码指标是否符合 `.agent/governance.yaml` 设定的物理边界。针对不同目录实行分级强度（核心目录硬执行，周边脚本建议执行）。
+在开发过程（plan/run 执行阶段）中定期触发，检查项目核心目录的代码指标是否符合 `.agent/governance.yaml` 设定的物理边界。针对不同目录实行分级强度（核心目录硬执行，周边脚本建议执行）。
 
 ## When to Use
 
-- 自动触发：当用户在 `vibe flow dev` 后保存代码，或在 `vibe flow test` 验证通过后。
+- 自动触发：当用户在执行阶段修改代码后，或在验证通过后。
 - 手动调用：当用户或者 rules-enforcer 在 PR 审查前需要生成一份物理边界报告时。
 
 ## Execution Steps

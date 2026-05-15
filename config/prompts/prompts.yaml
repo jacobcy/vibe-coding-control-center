@@ -80,7 +80,8 @@ agent_prompt:
     不要直接访问或编辑主仓库的 `.git/vibe3/handoff/` 目录（该路径在 worktree 中会触发 external_directory 权限拒绝）。
     所有 handoff 操作必须通过 CLI 命令完成：
     - 追加记录：`uv run python src/vibe3/cli.py handoff append "<内容>"`
-    - 读取记录：`uv run python src/vibe3/cli.py handoff show @key`（需要指定 target，例如 `@task-476/run-1.md`）
+    - 查看当前 flow 交接链路：`uv run python src/vibe3/cli.py handoff show @current`
+    - 读取指定 artifact：`uv run python src/vibe3/cli.py handoff show @key`（例如 `@task-476/run-1.md`）
     - 查看当前 flow 状态：`uv run python src/vibe3/cli.py handoff status`
 
     ## Debug Stop Rule
