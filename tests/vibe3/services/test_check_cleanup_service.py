@@ -1,8 +1,14 @@
 """Tests for check_cleanup_service with live session filtering."""
 
+from typing import cast
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.check_cleanup_service import CheckCleanupService
+import pytest
+
+from vibe3.services.check_cleanup_service import (
+    CheckCleanupService,
+    LiveSessionQueryError,
+)
 
 
 def test_clean_residual_branches_filters_live_sessions_before_cleanup() -> None:
@@ -43,11 +49,12 @@ def test_clean_residual_branches_filters_live_sessions_before_cleanup() -> None:
 
             # Verify result structure
             assert "skipped_live" in result
-            assert set(result["skipped_live"]) == {
+            skipped_live = cast(list[str], result["skipped_live"])
+            assert set(skipped_live) == {
                 "task/issue-123",
                 "task/issue-789",
             }
-            assert "task/issue-456" not in result["skipped_live"]
+            assert "task/issue-456" not in skipped_live
 
 
 def test_clean_residual_branches_logs_skipped_branches() -> None:
@@ -132,3 +139,76 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
             # All flows should be processed
             assert mock_process.call_count == 2
             assert result["skipped_live"] == []
+
+
+def test_clean_residual_branches_raises_on_live_session_query_failure() -> None:
+    """Should raise LiveSessionQueryError when batch query fails (fail-fast)."""
+    store = MagicMock()
+    git_client = MagicMock()
+
+    store.get_all_flows.return_value = [
+        {"branch": "task/issue-123", "flow_status": "aborted"},
+    ]
+
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Mock: batch query raises exception (simulates SessionRegistryService failure)
+    with patch.object(
+        service,
+        "_get_branches_with_live_sessions",
+        side_effect=LiveSessionQueryError("Query failed"),
+    ):
+        with pytest.raises(LiveSessionQueryError, match="Query failed"):
+            service.clean_residual_branches()
+
+
+def test_session_registry_injection() -> None:
+    """Should use injected SessionRegistryService instead of lazy init."""
+    store = MagicMock()
+    git_client = MagicMock()
+    mock_registry = MagicMock()
+
+    # Inject mock registry
+    service = CheckCleanupService(
+        store=store,
+        git_client=git_client,
+        session_registry=mock_registry,
+    )
+
+    # Mock: return some live sessions
+    mock_registry.get_all_branches_with_live_sessions.return_value = {"task/issue-123"}
+
+    result = service._get_branches_with_live_sessions()
+
+    # Verify: injected registry was called
+    mock_registry.get_all_branches_with_live_sessions.assert_called_once()
+    assert result == {"task/issue-123"}
+
+
+def test_session_registry_lazy_initialization() -> None:
+    """Should lazy-initialize SessionRegistryService when not injected."""
+    store = MagicMock()
+    git_client = MagicMock()
+
+    # No injection
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    with (
+        patch("vibe3.agents.backends.codeagent.CodeagentBackend") as mock_backend,
+        patch(
+            "vibe3.environment.session_registry.SessionRegistryService"
+        ) as mock_registry_cls,
+    ):
+        mock_registry_instance = MagicMock()
+        mock_registry_cls.return_value = mock_registry_instance
+        mock_registry_instance.get_all_branches_with_live_sessions.return_value = set()
+
+        # Access the property
+        registry = service.session_registry
+
+        # Verify: backend and registry were created
+        mock_backend.assert_called_once()
+        mock_registry_cls.assert_called_once_with(
+            store=store, backend=mock_backend.return_value
+        )
+        assert registry == mock_registry_instance

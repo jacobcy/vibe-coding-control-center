@@ -15,7 +15,12 @@ if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.services.flow_cleanup_service import FlowCleanupService
+
+
+class LiveSessionQueryError(SystemError):
+    """Raised when live session batch query fails, preventing unsafe cleanup."""
 
 
 class CheckCleanupService:
@@ -36,10 +41,25 @@ class CheckCleanupService:
         store: "SQLiteClient",
         git_client: "GitClient",
         github_client: "GitHubClient | None" = None,
+        session_registry: "SessionRegistryService | None" = None,
     ) -> None:
         self.store = store
         self.git_client = git_client
         self._github_client = github_client
+        self._session_registry = session_registry
+
+    @property
+    def session_registry(self) -> "SessionRegistryService":
+        """Lazy-initialized SessionRegistryService with default backend."""
+        if self._session_registry is None:
+            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.environment.session_registry import SessionRegistryService
+
+            backend = CodeagentBackend()
+            self._session_registry = SessionRegistryService(
+                store=self.store, backend=backend
+            )
+        return self._session_registry
 
     def clean_residual_branches(self) -> dict[str, object]:
         """Check and clean residual branches for terminal flows.
@@ -64,7 +84,11 @@ class CheckCleanupService:
         ]
 
         # PRE-FILTER: Get branches with live sessions (batch query)
-        branches_with_live = self._get_branches_with_live_sessions()
+        # Fail-fast: if query fails, abort cleanup to prevent unsafe deletion
+        try:
+            branches_with_live = self._get_branches_with_live_sessions()
+        except LiveSessionQueryError:
+            raise  # Propagate to caller (CLI layer handles user-facing error)
 
         if branches_with_live:
             logger.bind(domain="check").info(
@@ -137,22 +161,27 @@ class CheckCleanupService:
 
         Returns:
             Set of branch names that have truly live sessions.
+
+        Raises:
+            LiveSessionQueryError: If batch query fails, preventing
+                unsafe cleanup. This fail-fast strategy ensures live
+                session protection is never bypassed.
         """
         try:
-            from vibe3.agents.backends.codeagent import CodeagentBackend
-            from vibe3.environment.session_registry import SessionRegistryService
-
-            backend = CodeagentBackend()
-            registry = SessionRegistryService(store=self.store, backend=backend)
-
-            # Reuse existing method: batch query + liveness verification
-            return registry.get_all_branches_with_live_sessions()
+            # Use injected or lazy-initialized SessionRegistryService
+            return self.session_registry.get_all_branches_with_live_sessions()
 
         except Exception as exc:
-            logger.bind(domain="check").warning(
-                f"Failed to query live sessions: {exc}. Proceeding without filtering."
+            logger.bind(domain="check").error(
+                f"Failed to query live sessions: {exc}. "
+                "Cannot proceed with cleanup - "
+                "live session protection must not be bypassed."
             )
-            return set()
+            raise LiveSessionQueryError(
+                f"Live session batch query failed: {exc}. "
+                "Cleanup aborted to prevent accidental deletion of active sessions. "
+                "Please verify manually or retry."
+            ) from exc
 
     def _is_invalid_branch_name(self, branch: str) -> bool:
         """Check if branch name is invalid (e.g., HEAD, HEAD~1)."""
