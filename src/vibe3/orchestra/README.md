@@ -12,7 +12,8 @@
 vibe3 serve start --port 8080
   |
   +-- FastAPI (0.0.0.0:8080)
-  |     GET  /health / /status
+  |     GET  /status
+  |     MCP  /mcp (optional)
   |
   +-- HeartbeatServer (asyncio)
         Semaphore(3)            最多 3 个并发任务

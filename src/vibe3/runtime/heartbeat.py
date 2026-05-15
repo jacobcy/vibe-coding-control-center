@@ -117,6 +117,10 @@ class HeartbeatServer:
             async with asyncio.TaskGroup() as tg:
                 if self.config.polling.enabled:
                     tg.create_task(self._tick_loop())
+                else:
+                    # Keep server running even when polling is disabled
+                    # (for HTTP-only mode: /status, /mcp endpoints)
+                    tg.create_task(self._idle_loop())
         except* Exception as eg:
             for exc in eg.exceptions:
                 append_orchestra_event("server", f"error: {exc}")
@@ -245,6 +249,11 @@ class HeartbeatServer:
                 logger.bind(domain="orchestra").error(
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
+
+    async def _idle_loop(self) -> None:
+        """Keep server running when polling is disabled (HTTP-only mode)."""
+        while self._running:
+            await asyncio.sleep(1)
 
     # -- pid management --
 

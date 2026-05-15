@@ -181,7 +181,7 @@ def _resolve_tsu_script() -> Path | None:
 
 
 def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
-    """Enable temporary Tailscale Funnel webhook via scripts/tsu.sh."""
+    """Enable temporary Tailscale Funnel to expose server port via scripts/tsu.sh."""
     tsu = _resolve_tsu_script()
     if tsu is None:
         return (
