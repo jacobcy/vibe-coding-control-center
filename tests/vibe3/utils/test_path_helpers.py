@@ -306,3 +306,43 @@ def test_resolve_shared_artifact_rejects_empty_branch(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="cannot be empty"):
         resolve_handoff_target("@current", branch=None, git_client=client)
+
+
+def test_resolve_shared_artifact_allows_single_dot_in_branch_name(
+    tmp_path: Path,
+) -> None:
+    """Branch names with single dots should be valid (e.g., release/v1.0.0)."""
+    # Setup: create handoff directory for branch with dots
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    git_common = str(tmp_path / ".git")
+    branch = "release/v1.0.0"
+    handoff_dir = get_branch_handoff_dir(git_common, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    current_md = handoff_dir / "current.md"
+    current_md.write_text("test content")
+
+    client = _make_git_client(git_common, str(tmp_path / "wt"))
+
+    result = resolve_handoff_target("@current", branch=branch, git_client=client)
+    assert result == current_md
+
+
+def test_resolve_shared_artifact_allows_multiple_single_dots(
+    tmp_path: Path,
+) -> None:
+    """Branch names with multiple single dots should be valid (e.g., feature/api.v2)."""
+    # Setup: create handoff directory for branch with multiple dots
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    git_common = str(tmp_path / ".git")
+    branch = "feature/api.v2"
+    handoff_dir = get_branch_handoff_dir(git_common, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    current_md = handoff_dir / "current.md"
+    current_md.write_text("test content")
+
+    client = _make_git_client(git_common, str(tmp_path / "wt"))
+
+    result = resolve_handoff_target("@current", branch=branch, git_client=client)
+    assert result == current_md
