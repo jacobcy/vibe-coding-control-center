@@ -22,6 +22,10 @@ if TYPE_CHECKING:
     from vibe3.services.issue_flow_service import IssueFlowService
 
 
+class LiveSessionsDetectedError(RuntimeError):
+    """Raised when cleanup detects live runtime sessions for a branch."""
+
+
 class FlowCleanupService:
     """Unified service for complete flow scene cleanup.
 
@@ -289,10 +293,10 @@ class FlowCleanupService:
                     "really want to force cleanup."
                 )
                 logger.bind(domain="cleanup", branch=branch).warning(message)
-                raise RuntimeError(message)
+                raise LiveSessionsDetectedError(message)
+        except LiveSessionsDetectedError:
+            raise
         except Exception as exc:
-            if isinstance(exc, RuntimeError):
-                raise
             logger.bind(domain="cleanup", branch=branch).warning(
                 f"Failed to check live sessions: {exc}. Proceeding with termination."
             )
