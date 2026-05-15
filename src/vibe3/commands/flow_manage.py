@@ -143,15 +143,16 @@ def update(
     json_output: JsonOption = False,
 ) -> None:
     """Update flow metadata (idempotent add/update)."""
-    flow_service = FlowService()
-    with trace_scope(trace, "flow update", branch=branch):
-        if not branch:
-            branch = flow_service.get_current_branch()
+    from vibe3.utils.branch_arg import resolve_branch_arg
 
-        _ensure_branch_worktree_ownership(flow_service, branch)
+    target_branch = resolve_branch_arg(branch)
+
+    flow_service = FlowService()
+    with trace_scope(trace, "flow update", branch=target_branch):
+        _ensure_branch_worktree_ownership(flow_service, target_branch)
 
         # Register/Ensure flow
-        flow = flow_service.ensure_flow_for_branch(branch=branch, slug=name)
+        flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
 
         # Update metadata if explicitly provided — keep name and actor separate
         # to avoid silently writing worktree identity when only --name is given.
@@ -166,9 +167,9 @@ def update(
                     explicit_actor=actor
                 )
             if updates:
-                flow_service.update_flow_metadata(branch, **updates)
+                flow_service.update_flow_metadata(target_branch, **updates)
             # Re-fetch flow state
-            updated = flow_service.get_flow_status(branch)
+            updated = flow_service.get_flow_status(target_branch)
             if updated:
                 flow = updated
 
@@ -324,25 +325,29 @@ def restore_flow(
     trace: TraceOption = False,
 ) -> None:
     """Restore a soft-deleted flow."""
-    from vibe3.clients import SQLiteClient
+    from vibe3.utils.branch_arg import resolve_branch_arg
 
-    with trace_scope(trace, "flow restore", branch=branch):
+    target_branch = resolve_branch_arg(branch)
+
+    with trace_scope(trace, "flow restore", branch=target_branch):
+        from vibe3.clients import SQLiteClient
+
         store = SQLiteClient()
 
         # Check if flow exists and is deleted
-        flow = store.get_flow_state_include_deleted(branch)
+        flow = store.get_flow_state_include_deleted(target_branch)
         if flow is None:
-            console.print(f"[red]Error: Flow '{branch}' not found[/]")
+            console.print(f"[red]Error: Flow '{target_branch}' not found[/]")
             raise typer.Exit(1)
 
         if flow.get("deleted_at") is None:
-            console.print(f"[yellow]Flow '{branch}' is not deleted[/]")
+            console.print(f"[yellow]Flow '{target_branch}' is not deleted[/]")
             raise typer.Exit(0)
 
         # Restore the flow
-        store.restore_flow(branch)
-        console.print(f"[green]✓[/] Flow '{branch}' restored successfully")
-        console.print(f"[dim]Run 'vibe flow show {branch}' to verify[/]")
+        store.restore_flow(target_branch)
+        console.print(f"[green]✓[/] Flow '{target_branch}' restored successfully")
+        console.print(f"[dim]Run 'vibe flow show {target_branch}' to verify[/]")
 
 
 def register_manage_commands(app: typer.Typer) -> None:

@@ -15,10 +15,14 @@ class TestFlowAddStatusCheck:
     """Tests for flow add status checking."""
 
     @patch("vibe3.commands.flow_manage.FlowService")
-    def test_unregistered_branch_creates_flow(self, mock_service_class):
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_unregistered_branch_creates_flow(self, mock_git_class, mock_service_class):
         """A branch without any flow record should create a new flow."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "feature/test"
+        mock_git_class.return_value = mock_git
+
         mock_service = MagicMock()
-        mock_service.get_current_branch.return_value = "feature/test"
         mock_service.resolve_flow_name.return_value = "new-flow"
         mock_service.ensure_flow_for_branch.return_value = MagicMock(
             flow_slug="new-flow", branch="feature/test"

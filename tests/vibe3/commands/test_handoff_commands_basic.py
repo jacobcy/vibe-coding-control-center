@@ -17,8 +17,15 @@ class TestHandoffBasicCommands:
 
     @pytest.mark.parametrize("force,expected_force", [(False, False), (True, True)])
     @patch("vibe3.commands.handoff_write.HandoffService")
-    def test_handoff_init_command(self, mock_service_class, force, expected_force):
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_handoff_init_command(
+        self, mock_git_class, mock_service_class, force, expected_force
+    ):
         """Test handoff init command."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/test-branch"
+        mock_git_class.return_value = mock_git
+
         mock_service = MagicMock()
         mock_service.storage.ensure_current_handoff.return_value = "/path/to/current.md"
         mock_service_class.return_value = mock_service
@@ -32,7 +39,7 @@ class TestHandoffBasicCommands:
         assert "✓" in result.output
         assert "Handoff file ready" in result.output
         mock_service.storage.ensure_current_handoff.assert_called_once_with(
-            force=expected_force
+            force=expected_force, branch="task/test-branch"
         )
 
     @patch("vibe3.commands.handoff_read.HandoffStatusService")

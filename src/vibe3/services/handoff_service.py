@@ -164,15 +164,25 @@ class HandoffService:
         message: str,
         actor: str | None,
         kind: str = "note",
+        branch: str | None = None,
     ) -> Path:
-        """Append a lightweight update block to current.md."""
-        branch = self.git_client.get_current_branch()
+        """Append a lightweight update block to current.md for a branch.
+
+        Args:
+            message: Update message
+            actor: Actor identifier
+            kind: Update kind (note/finding/blocker/next)
+            branch: Target branch name (defaults to current branch)
+        """
+        target_branch = branch or self.git_client.get_current_branch()
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
-            branch,
+            target_branch,
             explicit_actor=actor,
         )
-        return self.storage.append_current_handoff(message, effective_actor, kind)
+        return self.storage.append_current_handoff(
+            message, effective_actor, kind, branch
+        )
 
     def _resolve_branch_worktree_root(self, branch: str) -> Path:
         worktree_root = self.git_client.find_worktree_path_for_branch(branch)
@@ -192,30 +202,38 @@ class HandoffService:
         actor: str | None = None,
         *,
         verdict: str | None = None,
+        branch: str | None = None,
     ) -> Path:
         """Internal helper to record an active handoff reference.
+
+        Args:
+            ref_kind: Reference kind (plan/report/audit)
+            ref_value: Reference value (path)
+            actor: Actor identifier
+            verdict: Optional verdict for audit records
+            branch: Target branch name (defaults to current branch)
 
         Note: For passive artifact recording, use record_passive_artifact() instead.
         This method only handles active handoff events (handoff_plan/report/audit).
         """
-        branch = self.git_client.get_current_branch()
+        target_branch = branch or self.git_client.get_current_branch()
         validate_authoritative_ref(
             ref_kind,
             ref_value,
-            branch,
+            target_branch,
             self.git_client,
             self._AUTHORITATIVE_REF_KINDS,
             self._resolve_branch_worktree_root,
         )
         # Inlined _normalize_ref_value
-        ref_value = self.storage.normalize_ref_value(ref_value, branch)
+        ref_value = self.storage.normalize_ref_value(ref_value, target_branch)
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
-            branch,
+            target_branch,
             explicit_actor=actor,
         )
 
-        handoff_path = self.storage.ensure_current_handoff()
+        handoff_path = self.storage.ensure_current_handoff(branch=target_branch)
 
         # Normalize kind and lookup ref field
         normalized_kind = self._normalize_kind(ref_kind)
@@ -238,7 +256,7 @@ class HandoffService:
                 timestamp=datetime.now(UTC),
                 reason=f"Recorded {ref_kind} reference",
                 issues=None,
-                flow_branch=branch,
+                flow_branch=target_branch,
             )
             flow_updates["latest_verdict"] = record.model_dump_json()
 
@@ -246,7 +264,7 @@ class HandoffService:
         if verdict:
             message = f"verdict: {verdict}\n{message}"
 
-        self.store.update_flow_state(branch, **flow_updates)
+        self.store.update_flow_state(target_branch, **flow_updates)
 
         event_refs: dict[str, str] = {"ref": ref_value}
         if verdict:
@@ -255,7 +273,7 @@ class HandoffService:
         # Active handoff event type (passive recorded via record_passive_artifact)
         event_type = f"handoff_{ref_kind.lower()}"
         self.store.add_event(
-            branch,
+            target_branch,
             event_type,
             effective_actor,
             detail=message,
@@ -283,17 +301,31 @@ class HandoffService:
         self,
         plan_ref: str,
         actor: str | None = None,
+        branch: str | None = None,
     ) -> Path:
-        """Record plan handoff reference."""
-        return self._record_ref("plan", plan_ref, actor)
+        """Record plan handoff reference.
+
+        Args:
+            plan_ref: Plan document reference
+            actor: Actor identifier
+            branch: Target branch name (defaults to current branch)
+        """
+        return self._record_ref("plan", plan_ref, actor, branch=branch)
 
     def record_report(
         self,
         report_ref: str,
         actor: str | None = None,
+        branch: str | None = None,
     ) -> Path:
-        """Record report handoff reference."""
-        return self._record_ref("report", report_ref, actor)
+        """Record report handoff reference.
+
+        Args:
+            report_ref: Report document reference
+            actor: Actor identifier
+            branch: Target branch name (defaults to current branch)
+        """
+        return self._record_ref("report", report_ref, actor, branch=branch)
 
     def record_audit(
         self,
@@ -301,8 +333,16 @@ class HandoffService:
         actor: str | None = None,
         verdict: str | None = None,
         is_system_auto: bool = False,
+        branch: str | None = None,
     ) -> Path:
         """Record audit handoff reference.
+
+        Args:
+            audit_ref: Audit document reference
+            actor: Actor identifier
+            verdict: Optional verdict value
+            is_system_auto: If True, creates passive artifact
+            branch: Target branch name (defaults to current branch)
 
         If is_system_auto=True, creates a passive artifact via record_passive_artifact.
         Otherwise, creates an active handoff event.
@@ -313,7 +353,7 @@ class HandoffService:
                 kind="audit",
                 content=audit_ref,
                 actor=actor,
-                branch=None,
+                branch=branch,
                 verdict=verdict,
             )
             # record_passive_artifact returns Path or None, but this method
@@ -321,7 +361,7 @@ class HandoffService:
             # If None (empty content), still return the handoff path
             if result is None:
                 # Fallback: return current handoff path
-                return self.storage.ensure_current_handoff()
+                return self.storage.ensure_current_handoff(branch=branch)
             return result
         else:
             # Active handoff recording
@@ -330,15 +370,23 @@ class HandoffService:
                 audit_ref,
                 actor,
                 verdict=verdict,
+                branch=branch,
             )
 
     def record_indicate(
         self,
         indicate_ref: str,
         actor: str | None = None,
+        branch: str | None = None,
     ) -> Path:
-        """Record manager indicate handoff reference."""
-        return self._record_ref("indicate", indicate_ref, actor)
+        """Record manager indicate handoff reference.
+
+        Args:
+            indicate_ref: Manager indicate document reference
+            actor: Actor identifier
+            branch: Target branch name (defaults to current branch)
+        """
+        return self._record_ref("indicate", indicate_ref, actor, branch=branch)
 
     def record_next_step(
         self,

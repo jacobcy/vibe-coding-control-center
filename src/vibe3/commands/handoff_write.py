@@ -20,6 +20,7 @@ def _record_handoff_reference(
     actor: str | None,
     trace: bool,
     method_name: str,
+    branch: str | None = None,
     **extra_kw: object,
 ) -> None:
     with trace_scope(trace, command, domain="handoff"):
@@ -28,29 +29,43 @@ def _record_handoff_reference(
             command=command,
             actor=actor,
             ref=ref_value,
+            branch=branch,
             **{specific_ref_key: ref_value},
         ).info(f"Recording {ref_label} handoff")
 
         service = HandoffService()
         method = getattr(service, method_name)
         # Support optional 'action' kwarg for indicate command
+        # Branch is resolved to non-None string at command level
         extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
+        extra_kwargs["branch"] = branch
         method(ref_value, actor, **extra_kwargs)
         console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
 def init(
     force: Annotated[bool, typer.Option("--yes", "-y", help="Force overwrite")] = False,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Initialize handoff file for current branch."""
+    """Initialize handoff file for a branch."""
+
+    target_branch = resolve_branch_arg(branch)
+
     with trace_scope(trace, "handoff init", domain="handoff"):
-        logger.bind(command="handoff init", force=force).info("Initializing handoff")
+        logger.bind(command="handoff init", force=force, branch=target_branch).info(
+            "Initializing handoff"
+        )
 
         service = HandoffService()
-        handoff_path = service.storage.ensure_current_handoff(force=force)
+        handoff_path = service.storage.ensure_current_handoff(
+            force=force, branch=target_branch
+        )
 
         console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
 
@@ -72,18 +87,27 @@ def append(
         str,
         typer.Option("--kind", "-k", help="Update kind (finding/blocker/next/note)"),
     ] = "note",
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Append lightweight update to handoff file."""
+    """Append lightweight update to handoff file for a branch."""
+
+    target_branch = resolve_branch_arg(branch)
+
     with trace_scope(trace, "handoff append", domain="handoff"):
-        logger.bind(command="handoff append", actor=actor, kind=kind).info(
-            "Appending handoff update"
-        )
+        logger.bind(
+            command="handoff append", actor=actor, kind=kind, branch=target_branch
+        ).info("Appending handoff update")
 
         service = HandoffService()
-        handoff_path = service.append_current_handoff(message, actor, kind)
+        handoff_path = service.append_current_handoff(
+            message, actor, kind, branch=target_branch
+        )
 
         console.print("[green]✓[/] Appended handoff update")
         console.print(f"  [dim]File: {handoff_path}[/]")
@@ -102,11 +126,18 @@ def plan(
             ),
         ),
     ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Record plan handoff."""
+    """Record plan handoff for a branch."""
+
+    target_branch = resolve_branch_arg(branch)
+
     _record_handoff_reference(
         command="handoff plan",
         ref_label="Plan",
@@ -114,6 +145,7 @@ def plan(
         actor=actor,
         trace=trace,
         method_name="record_plan",
+        branch=target_branch,
     )
 
 
@@ -130,11 +162,18 @@ def report(
             ),
         ),
     ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Record report handoff."""
+    """Record report handoff for a branch."""
+
+    target_branch = resolve_branch_arg(branch)
+
     _record_handoff_reference(
         command="handoff report",
         ref_label="Report",
@@ -142,6 +181,7 @@ def report(
         actor=actor,
         trace=trace,
         method_name="record_report",
+        branch=target_branch,
     )
 
 
@@ -161,14 +201,22 @@ def indicate(
             ),
         ),
     ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Record manager indicate handoff (manager directive to downstream agents).
+    """Record manager indicate handoff for a branch.
 
+    Manager directive to downstream agents.
     Provide a structured handoff file reference for downstream agent context.
     """
+
+    target_branch = resolve_branch_arg(branch)
+
     _record_handoff_reference(
         command="handoff indicate",
         ref_label="Indicate",
@@ -176,6 +224,7 @@ def indicate(
         actor=actor,
         trace=trace,
         method_name="record_indicate",
+        branch=target_branch,
     )
 
 
@@ -192,11 +241,18 @@ def audit(
             ),
         ),
     ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
-    """Record audit handoff."""
+    """Record audit handoff for a branch."""
+
+    target_branch = resolve_branch_arg(branch)
+
     _record_handoff_reference(
         command="handoff audit",
         ref_label="Audit",
@@ -204,6 +260,7 @@ def audit(
         actor=actor,
         trace=trace,
         method_name="record_audit",
+        branch=target_branch,
     )
 
 
@@ -271,12 +328,15 @@ def verdict(
         vibe3 handoff verdict PASS --reason "Code looks good"
         vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
     """
+
+    target_branch = resolve_branch_arg(branch)
+
     with trace_scope(trace, "handoff verdict", domain="handoff"):
         logger.bind(
             command="handoff verdict",
             verdict=verdict_value,
             reason=reason,
-            branch=branch,
+            branch=target_branch,
         ).info("Writing verdict")
 
         service = VerdictService()
@@ -284,7 +344,7 @@ def verdict(
             verdict=verdict_value,
             reason=reason,
             issues=issues,
-            branch=branch,
+            branch=target_branch,
         )
 
         console.print(f"[green]✓[/] Verdict written: {verdict_value}")
