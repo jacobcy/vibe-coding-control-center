@@ -298,12 +298,23 @@ def test_find_item_by_issue(
         # Add test item
         item_id = client.add_item(project_info.project_id, content_id)
 
+        # Set initial status to "Todo"
+        todo_option_id = project_info.status_options["Todo"]
+        client.update_item_status(
+            project_info.project_id,
+            item_id,
+            project_info.status_field_id,
+            todo_option_id,
+        )
+
         # Find by issue URL
         item = client.find_item_by_issue(project_info.project_id, issue_url)
 
         assert item is not None
         assert item.item_id == item_id
         assert item.content["url"] == issue_url
+        # Verify status field is properly populated (regression test for MAJOR bug)
+        assert item.status == "Todo"
 
     finally:
         # Cleanup

@@ -2,7 +2,7 @@
 
 import json
 import subprocess
-from typing import Any, cast
+from typing import Any, Iterator, cast
 
 from vibe3.exceptions import GitHubError
 from vibe3.models.github_project import Item, ProjectInfo
@@ -88,8 +88,10 @@ class GitHubProjectClient:
         Raises:
             GitHubError: If project not found or query fails
         """
-        owner = owner or self.owner
-        project_number = project_number or self.project_number
+        owner = owner if owner is not None else self.owner
+        project_number = (
+            project_number if project_number is not None else self.project_number
+        )
 
         query = """
         query($owner: String!, $projectNumber: Int!) {
@@ -263,9 +265,9 @@ class GitHubProjectClient:
         for item_node in self._paginate_items(project_id):
             content = item_node.get("content")
             if content and content.get("url") == issue_url:
-                # Extract status from fieldValue
+                # Extract status from fieldValueByName
                 status = None
-                field_value = item_node.get("fieldValue")
+                field_value = item_node.get("fieldValueByName")
                 if field_value and field_value.get("name"):
                     status = field_value["name"]
 
@@ -277,7 +279,7 @@ class GitHubProjectClient:
 
         return None
 
-    def _paginate_items(self, project_id: str, page_size: int = 50) -> Any:
+    def _paginate_items(self, project_id: str, page_size: int = 50) -> Iterator[dict]:
         """Generator yielding all project items with cursor pagination.
 
         Args:
