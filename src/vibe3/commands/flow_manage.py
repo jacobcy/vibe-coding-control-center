@@ -11,6 +11,7 @@ from vibe3.commands.command_options import (
     TraceOption,
 )
 from vibe3.commands.common import trace_scope
+from vibe3.models.flow import IssueLink
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 from vibe3.services.worktree_ownership_guard import (
@@ -227,6 +228,23 @@ def bind(
             for ref in refs:
                 issue_number = parse_issue_number(ref)
 
+                if role == "dependency":
+                    # Compatibility path:
+                    # `flow bind --role dependency` no longer performs independent
+                    # dependency writes. It delegates to blocked dependency logic
+                    # for a single source of behavior.
+                    flow_service.block_flow(
+                        target_branch, blocked_by_issue=issue_number, actor=None
+                    )
+                    links.append(
+                        IssueLink(
+                            branch=target_branch,
+                            issue_number=issue_number,
+                            issue_role="dependency",
+                        )
+                    )
+                    continue
+
                 # Create the persistent link in flow_issue_links (Source of Truth)
                 link = task_service.link_issue(
                     target_branch,
@@ -235,13 +253,6 @@ def bind(
                     actor=None,
                 )
                 links.append(link)
-
-                # If it's a dependency, trigger the block side-effects
-                # (label & display field)
-                if role == "dependency":
-                    flow_service.block_flow(
-                        target_branch, blocked_by_issue=issue_number, actor=None
-                    )
 
             if json_output:
                 if len(links) == 1:

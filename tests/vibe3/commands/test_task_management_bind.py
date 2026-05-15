@@ -66,8 +66,8 @@ def test_flow_bind_with_related_role() -> None:
     )
 
 
-def test_flow_bind_with_dependency_role() -> None:
-    """flow bind 218 --role dependency should bind as dependency."""
+def test_flow_bind_dependency_delegates_without_direct_link_issue() -> None:
+    """flow bind 218 --role dependency should only use blocked compatibility logic."""
     with patch(
         "vibe3.commands.flow_manage.TaskService", create=True
     ) as task_service_cls:
@@ -80,6 +80,7 @@ def test_flow_bind_with_dependency_role() -> None:
             result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
 
     assert result.exit_code == 0
+    task_service.link_issue.assert_not_called()
     flow_service.block_flow.assert_called_once_with(
         "task/demo", blocked_by_issue=218, actor=None
     )
