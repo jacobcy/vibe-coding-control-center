@@ -129,6 +129,15 @@ def check(
         elif clean_branch:
             mode = "clean_branch"
             typer.echo("Checking for residual branches (done/aborted flows)...")
+
+            # SAFETY CHECK: Require explicit confirmation for destructive operation
+            # This prevents accidental cleanup of branches that might still be needed
+            if not typer.confirm(
+                "This will delete local/remote branches and worktrees. Continue?",
+                default=False,
+            ):
+                typer.echo("Cleanup cancelled.", err=True)
+                raise typer.Exit(code=0)
         else:
             mode = "fix_all"
 
