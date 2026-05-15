@@ -312,6 +312,45 @@ class ExecutionCoordinator:
                 raise ValueError(f"Unknown mode: {request.mode}")
 
         except Exception as exc:
+            error_msg = str(exc)
+
+            # Detect tmux session already exists - treat as expected skip,
+            # not hard error
+            if (
+                isinstance(exc, RuntimeError)
+                and "Tmux session '" in error_msg
+                and "already exists" in error_msg
+            ):
+                match = re.search(r"Tmux session '([^']+)' already exists", error_msg)
+                session_name = match.group(1) if match else "unknown"
+
+                formatted_msg = (
+                    f"{error_msg} (previous session still alive: {session_name}; "
+                    "launch skipped to avoid duplicate worker)"
+                )
+
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{request.role} launch skipped for "
+                    f"#{request.target_id}: {formatted_msg}",
+                )
+                logger.bind(
+                    domain="execution_coordinator",
+                    role=request.role,
+                    target_id=request.target_id,
+                ).warning(f"Execution launch skipped: {formatted_msg}")
+
+                # Still mark as launch_failed (test expectation), but with WARNING level
+                if request.mode == "async" and runtime_session_id is not None:
+                    self.registry.mark_failed(runtime_session_id)
+
+                return ExecutionLaunchResult(
+                    launched=False,
+                    reason=formatted_msg,
+                    reason_code="launch_failed",
+                )
+
+            # Generic error handling for other exceptions
             error_msg = self._format_launch_error(exc)
             if request.mode == "async" and runtime_session_id is not None:
                 self.registry.mark_failed(runtime_session_id)
