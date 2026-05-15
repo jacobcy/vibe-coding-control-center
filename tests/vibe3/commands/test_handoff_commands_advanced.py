@@ -104,7 +104,8 @@ class TestHandoffAdvancedCommands:
         assert "✓" in result.output
         assert "Plan handoff recorded" in result.output
         mock_service.record_plan.assert_called_once_with(
-            "docs/plans/test-plan.md", None, None, "claude/sonnet-4.6"
+            "docs/plans/test-plan.md",
+            "claude/sonnet-4.6",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -119,8 +120,6 @@ class TestHandoffAdvancedCommands:
                 "handoff",
                 "report",
                 "docs/reports/test-report.md",
-                "--next-step",
-                "Address feedback",
                 "--actor",
                 "claude/sonnet-4.6",
             ],
@@ -131,8 +130,6 @@ class TestHandoffAdvancedCommands:
         assert "Report handoff recorded" in result.output
         mock_service.record_report.assert_called_once_with(
             "docs/reports/test-report.md",
-            "Address feedback",
-            None,
             "claude/sonnet-4.6",
         )
 
@@ -148,8 +145,6 @@ class TestHandoffAdvancedCommands:
                 "handoff",
                 "audit",
                 "docs/audits/test-audit.md",
-                "--blocked-by",
-                "Waiting for review",
                 "--actor",
                 "claude/sonnet-4.6",
             ],
@@ -160,17 +155,10 @@ class TestHandoffAdvancedCommands:
         assert "Audit handoff recorded" in result.output
         mock_service.record_audit.assert_called_once_with(
             "docs/audits/test-audit.md",
-            None,
-            "Waiting for review",
             "claude/sonnet-4.6",
         )
 
-    @patch("vibe3.commands.handoff_write.HandoffService")
-    def test_handoff_with_options(self, mock_service_class):
-        """Test handoff commands with optional parameters."""
-        mock_service = MagicMock()
-        mock_service_class.return_value = mock_service
-
+    def test_handoff_plan_rejects_legacy_next_step_option(self):
         result = runner.invoke(
             app,
             [
@@ -179,20 +167,24 @@ class TestHandoffAdvancedCommands:
                 "docs/plans/test-plan.md",
                 "--next-step",
                 "Start implementation",
-                "--blocked-by",
-                "API key needed",
-                "--actor",
-                "claude/sonnet-4.6",
             ],
         )
 
-        assert result.exit_code == 0
-        mock_service.record_plan.assert_called_once_with(
-            "docs/plans/test-plan.md",
-            "Start implementation",
-            "API key needed",
-            "claude/sonnet-4.6",
+        assert result.exit_code != 0
+
+    def test_handoff_audit_rejects_legacy_blocked_by_option(self):
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "audit",
+                "docs/audits/test-audit.md",
+                "--blocked-by",
+                "Waiting for review",
+            ],
         )
+
+        assert result.exit_code != 0
 
     def test_handoff_audit_command_real_service_path(self, tmp_path, monkeypatch):
         """Test the real service path for handoff audit command with minimal mocking."""
@@ -222,8 +214,6 @@ class TestHandoffAdvancedCommands:
                 "handoff",
                 "audit",
                 audit_ref,
-                "--next-step",
-                "Finalize PR",
                 "--actor",
                 "test-actor",
             ],
@@ -242,12 +232,11 @@ class TestHandoffAdvancedCommands:
         assert handoff_file.exists()
         content = handoff_file.read_text()
         assert audit_ref in content
-        assert "Finalize PR" in content
         assert "test-actor" in content
 
         # Verify side effects in database
         flow_state = real_store.get_flow_state("main")
         assert flow_state is not None
         assert flow_state["audit_ref"] == audit_ref
-        assert flow_state["next_step"] == "Finalize PR"
+        assert flow_state["next_step"] is None
         assert flow_state["reviewer_actor"] == "test-actor"

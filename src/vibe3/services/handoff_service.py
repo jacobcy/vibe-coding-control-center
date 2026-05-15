@@ -56,6 +56,7 @@ class HandoffService:
         "handoff_run",  # backward-compat: legacy event type
         "handoff_audit",
         "handoff_indicate",
+        "next_step_set",
         "plan_recorded",
         "report_recorded",  # new canonical name
         "run_recorded",  # backward-compat: legacy event type
@@ -188,9 +189,8 @@ class HandoffService:
         self,
         ref_kind: str,
         ref_value: str,
-        next_step: str | None,
-        blocked_by: str | None,
         actor: str | None,
+        *legacy_args: str | None,
         verdict: str | None = None,
     ) -> Path:
         """Internal helper to record an active handoff reference.
@@ -198,6 +198,16 @@ class HandoffService:
         Note: For passive artifact recording, use record_passive_artifact() instead.
         This method only handles active handoff events (handoff_plan/report/audit).
         """
+        if actor is None and legacy_args:
+            actor = next(
+                (
+                    candidate
+                    for candidate in reversed(legacy_args)
+                    if candidate is not None
+                ),
+                None,
+            )
+
         branch = self.git_client.get_current_branch()
         validate_authoritative_ref(
             ref_kind,
@@ -228,10 +238,6 @@ class HandoffService:
         actor_field = self._KIND_TO_ACTOR_FIELD.get(normalized_kind)
         if actor_field:
             flow_updates[actor_field] = effective_actor
-        if next_step:
-            flow_updates["next_step"] = next_step
-        if blocked_by:
-            flow_updates["blocked_reason"] = blocked_by
 
         if verdict:
             role = extract_role_from_actor(effective_actor)
@@ -240,8 +246,8 @@ class HandoffService:
                 actor=effective_actor,
                 role=role,
                 timestamp=datetime.now(UTC),
-                reason=next_step or f"Recorded {ref_kind} reference",
-                issues=blocked_by,
+                reason=f"Recorded {ref_kind} reference",
+                issues=None,
                 flow_branch=branch,
             )
             flow_updates["latest_verdict"] = record.model_dump_json()
@@ -249,10 +255,6 @@ class HandoffService:
         message = f"Recorded {ref_kind} reference: {ref_value}"
         if verdict:
             message = f"verdict: {verdict}\n{message}"
-        if next_step:
-            message += f"\nNext Step: {next_step}"
-        if blocked_by:
-            message += f"\nBlocked By: {blocked_by}"
 
         self.store.update_flow_state(branch, **flow_updates)
 
@@ -290,28 +292,22 @@ class HandoffService:
     def record_plan(
         self,
         plan_ref: str,
-        next_step: str | None = None,
-        blocked_by: str | None = None,
         actor: str | None = None,
     ) -> Path:
         """Record plan handoff reference."""
-        return self._record_ref("plan", plan_ref, next_step, blocked_by, actor)
+        return self._record_ref("plan", plan_ref, actor)
 
     def record_report(
         self,
         report_ref: str,
-        next_step: str | None = None,
-        blocked_by: str | None = None,
         actor: str | None = None,
     ) -> Path:
         """Record report handoff reference."""
-        return self._record_ref("report", report_ref, next_step, blocked_by, actor)
+        return self._record_ref("report", report_ref, actor)
 
     def record_audit(
         self,
         audit_ref: str,
-        next_step: str | None = None,
-        blocked_by: str | None = None,
         actor: str | None = None,
         verdict: str | None = None,
         is_system_auto: bool = False,
@@ -329,8 +325,6 @@ class HandoffService:
                 actor=actor,
                 branch=None,
                 verdict=verdict,
-                next_step=next_step,
-                blocked_by=blocked_by,
             )
             # record_passive_artifact returns Path or None, but this method
             # always returns Path
@@ -344,8 +338,6 @@ class HandoffService:
             return self._record_ref(
                 "audit",
                 audit_ref,
-                next_step,
-                blocked_by,
                 actor,
                 verdict=verdict,
             )
@@ -353,12 +345,33 @@ class HandoffService:
     def record_indicate(
         self,
         indicate_ref: str,
-        next_step: str | None = None,
-        blocked_by: str | None = None,
         actor: str | None = None,
     ) -> Path:
         """Record manager indicate handoff reference."""
-        return self._record_ref("indicate", indicate_ref, next_step, blocked_by, actor)
+        return self._record_ref("indicate", indicate_ref, actor)
+
+    def record_next_step(
+        self,
+        branch: str,
+        next_step: str,
+        actor: str | None = None,
+    ) -> None:
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
+        self.store.update_flow_state(
+            branch,
+            next_step=next_step,
+            latest_actor=effective_actor,
+        )
+        self.store.add_event(
+            branch,
+            "next_step_set",
+            effective_actor,
+            detail=f"Next Step: {next_step}",
+        )
 
     def record_passive_artifact(
         self,

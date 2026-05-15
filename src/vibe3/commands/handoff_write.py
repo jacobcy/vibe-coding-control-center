@@ -9,6 +9,7 @@ from vibe3.commands.common import trace_scope
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
+from vibe3.utils.branch_arg import resolve_branch_arg
 
 
 def _record_handoff_reference(
@@ -16,8 +17,6 @@ def _record_handoff_reference(
     command: str,
     ref_label: str,
     ref_value: str,
-    next_step: str | None,
-    blocked_by: str | None,
     actor: str | None,
     trace: bool,
     method_name: str,
@@ -36,7 +35,7 @@ def _record_handoff_reference(
         method = getattr(service, method_name)
         # Support optional 'action' kwarg for indicate command
         extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
-        method(ref_value, next_step, blocked_by, actor, **extra_kwargs)
+        method(ref_value, actor, **extra_kwargs)
         console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
@@ -92,12 +91,6 @@ def append(
 
 def plan(
     plan_ref: Annotated[str, typer.Argument(help="Plan document reference")],
-    next_step: Annotated[
-        str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
-    ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
-    ] = None,
     actor: Annotated[
         str | None,
         typer.Option(
@@ -118,8 +111,6 @@ def plan(
         command="handoff plan",
         ref_label="Plan",
         ref_value=plan_ref,
-        next_step=next_step,
-        blocked_by=blocked_by,
         actor=actor,
         trace=trace,
         method_name="record_plan",
@@ -128,12 +119,6 @@ def plan(
 
 def report(
     report_ref: Annotated[str, typer.Argument(help="Report document reference")],
-    next_step: Annotated[
-        str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
-    ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
-    ] = None,
     actor: Annotated[
         str | None,
         typer.Option(
@@ -154,8 +139,6 @@ def report(
         command="handoff report",
         ref_label="Report",
         ref_value=report_ref,
-        next_step=next_step,
-        blocked_by=blocked_by,
         actor=actor,
         trace=trace,
         method_name="record_report",
@@ -166,13 +149,6 @@ def indicate(
     indicate_ref: Annotated[
         str, typer.Argument(help="Manager indicate document reference")
     ],
-    next_step: Annotated[
-        str | None,
-        typer.Option("--next-step", "-n", help="Next step for downstream agents"),
-    ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
-    ] = None,
     actor: Annotated[
         str | None,
         typer.Option(
@@ -197,8 +173,6 @@ def indicate(
         command="handoff indicate",
         ref_label="Indicate",
         ref_value=indicate_ref,
-        next_step=next_step,
-        blocked_by=blocked_by,
         actor=actor,
         trace=trace,
         method_name="record_indicate",
@@ -207,12 +181,6 @@ def indicate(
 
 def audit(
     audit_ref: Annotated[str, typer.Argument(help="Audit document reference")],
-    next_step: Annotated[
-        str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
-    ] = None,
-    blocked_by: Annotated[
-        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
-    ] = None,
     actor: Annotated[
         str | None,
         typer.Option(
@@ -233,12 +201,29 @@ def audit(
         command="handoff audit",
         ref_label="Audit",
         ref_value=audit_ref,
-        next_step=next_step,
-        blocked_by=blocked_by,
         actor=actor,
         trace=trace,
         method_name="record_audit",
     )
+
+
+def next_step(
+    message: Annotated[str, typer.Argument(help="Next step text")],
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
+    actor: Annotated[str | None, typer.Option("--actor", "-a")] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Write next step to flow state for a target branch."""
+    with trace_scope(trace, "handoff next", domain="handoff"):
+        target_branch = resolve_branch_arg(branch)
+        service = HandoffService()
+        service.record_next_step(target_branch, message, actor)
+        console.print(f"[green]✓[/] Next step updated: {message}")
 
 
 def verdict(
@@ -306,4 +291,5 @@ def register_write_commands(app: typer.Typer) -> None:
     app.command()(report)
     app.command()(indicate)
     app.command()(audit)
+    app.command("next")(next_step)
     app.command()(verdict)
