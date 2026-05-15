@@ -2,45 +2,47 @@
 
 本文档面向后续接手发布的 agent，目标是用最少上下文完成验证、发布与风险控制。
 
-更新时间：2026-03-29
+更新时间：2026-05-16
 
-## 1. 本次变更摘要
+## 1. 当前架构
 
-本轮关键改动聚焦 manager 执行闭环：
+Orchestra 采用**主动轮询 + 被动 webhook 混合架构**：
 
-1. 触发身份配置
-- `manager_usernames` 支持专用账号（当前建议包含 `vibe-manager-agent`）。
+### 主动调度（核心）
+- **GlobalDispatchCoordinator**：frozen queue + assignee pool
+- 每个 tick 周期收集 ready issues，按优先级排序后逐个派发
+- 通过 `vibe3 serve start` 启动的 heartbeat 驱动
 
-2. manager 执行稳定性
-- 不再切换 `serve` 进程当前分支。
-- issue flow 分支不存在 worktree 时自动创建 `.worktrees/issue-<number>`。
-- 在目标 worktree 执行 `vibe3 run`，避免污染守护进程上下文。
+### 被动响应（辅助）
+- **CommentReplyService**：监听 `issue_comment` events，自动回复 @vibe-manager-agent 提及
+- **WorktreeCleanupService**：监听 `pull_request` closed events，清理临时 worktrees
 
-3. 兼容策略
-- 若目标分支 `vibe3 run` 暂不支持 `--worktree`，自动去掉该参数继续执行（兼容旧分支）。
-
-## 2. 发布前检查
-
-1. 配置检查（`config/settings.yaml`）
+### 关键配置（`config/settings.yaml`）
 - `orchestra.enabled: true`
 - `orchestra.assignee_dispatch.enabled: true`
 - `orchestra.pr_review_dispatch.enabled: true`
 - `orchestra.manager_usernames` 包含 `vibe-manager-agent`
+- `orchestra.webhook_secret`: GitHub webhook 签名密钥
+
+## 2. 发布前检查
+
+1. 配置检查
+   - 以上配置项均已正确设置
 
 2. webhook 检查（GitHub 仓库）
-- 事件至少勾选：`Issues`、`Pull requests`
-- URL 指向：`https://<public-host>/webhook/github`
-- secret 与 `orchestra.webhook_secret` 一致
+   - 事件至少勾选：`Issues`、`Pull requests`、`Issue comments`
+   - URL 指向：`https://<public-host>/webhook/github`
+   - secret 与 `orchestra.webhook_secret` 一致
 
 3. 本地启动检查
-- 启动：
-```bash
-uv run python src/vibe3/cli.py serve start -v --port 8080
-```
-- 状态：
-```bash
-curl -sS http://127.0.0.1:8080/status
-```
+   - 启动：
+   ```bash
+   uv run python src/vibe3/cli.py serve start -v --port 8080
+   ```
+   - 状态：
+   ```bash
+   curl -sS http://127.0.0.1:8080/status
+   ```
 
 ## 3. 验证步骤（必须留证据）
 
@@ -50,11 +52,10 @@ curl -sS http://127.0.0.1:8080/status
 uv run python src/vibe3/cli.py serve start -v --dry-run --port 8080
 ```
 
-创建并指派 issue 给 `vibe-manager-agent`，预期日志包含：
-- `Received: issues/assigned`
-- `Webhook: #<n> assigned to 'vibe-manager-agent' (manager)`
-- `Parsed webhook to command: uv run python -m vibe3 run ...`
-- `Dry run, skipping execution`
+创建并指派 issue 给 `vibe-manager-agent`，预期行为：
+- tick 周期触发后，coordinator 收集 ready issues
+- 日志包含 `dispatch intent: manager for #<n>`
+- dry-run 模式下跳过实际执行
 
 ### 3.2 真实执行（收口标准）
 
@@ -69,9 +70,9 @@ uv run python src/vibe3/cli.py serve start -v --dry-run --port 8080
 
 ## 4. 已知 follow-up
 
-1. 临时 worktree 回收尚未完成
-- 追踪 issue：[#366](https://github.com/jacobcy/vibe-coding-control-center/issues/366)
-- 说明：`do-*` / manager 临时 worktree 自动回收策略需后续落地。
+1. 临时 worktree 回收
+   - WorktreeCleanupService 已实现 PR 关闭后自动清理
+   - 追踪 issue：[#366](https://github.com/jacobcy/vibe-coding-control-center/issues/366)
 
 ## 5. 发布 agent 交付清单
 
