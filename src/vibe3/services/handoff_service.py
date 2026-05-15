@@ -189,7 +189,8 @@ class HandoffService:
         self,
         ref_kind: str,
         ref_value: str,
-        actor: str | None,
+        actor: str | None = None,
+        *,
         verdict: str | None = None,
     ) -> Path:
         """Internal helper to record an active handoff reference.
