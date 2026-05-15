@@ -15,13 +15,12 @@ from vibe3.prompts.models import PromptRecipe, PromptVariableSource, VariableSou
 # Maximum allowed length for orchestra_ask questions
 MAX_QUESTION_LENGTH = 500
 
-# Forbidden instruction patterns (case-insensitive)
+# Forbidden instruction patterns (case-insensitive) - only clear malicious commands
 FORBIDDEN_PATTERNS = [
-    "ignore all",
+    "ignore all previous",
+    "ignore all instructions",
     "execute:",
     "rm -rf",
-    "delete",
-    "modify",
 ]
 
 if TYPE_CHECKING:
@@ -129,10 +128,12 @@ def _sanitize_output(stdout: str) -> str:
     Returns:
         Sanitized string with sensitive patterns replaced by [REDACTED]
     """
+    # Match key/value pairs where the value may contain any non-whitespace
+    # characters (covers punctuation, base64, JWT-style tokens, etc.)
     patterns = [
-        (r'api[_-]?key["\s]*[:=]["\s]*[\w\-]+', "[REDACTED]"),
-        (r'token["\s]*[:=]["\s]*[\w\-]+', "[REDACTED]"),
-        (r'password["\s]*[:=]["\s]*[\w\-]+', "[REDACTED]"),
+        (r'api[_-]?key["\s]*[:=]["\s]*\S+', "[REDACTED]"),
+        (r'token["\s]*[:=]["\s]*\S+', "[REDACTED]"),
+        (r'password["\s]*[:=]["\s]*\S+', "[REDACTED]"),
     ]
 
     sanitized = stdout
@@ -309,6 +310,13 @@ def create_mcp_server(
         Returns:
             Answer from the project explorer agent, or error message if execution fails
         """
+        # Input validation: check for empty or whitespace-only question
+        if not question or not question.strip():
+            return json.dumps(
+                {"error": "Question cannot be empty or whitespace-only"},
+                indent=2,
+            )
+
         # Input validation: check question length
         if len(question) > MAX_QUESTION_LENGTH:
             return json.dumps(
@@ -386,8 +394,10 @@ def create_mcp_server(
             logger.bind(domain="orchestra").error(
                 f"Failed to execute orchestra_ask: {exc}"
             )
+            # Sanitize error message to avoid leaking sensitive info
+            error_msg = _sanitize_output(str(exc))
             return json.dumps(
-                {"error": f"Failed to answer question: {exc}"},
+                {"error": f"Failed to answer question: {error_msg}"},
                 indent=2,
             )
 
