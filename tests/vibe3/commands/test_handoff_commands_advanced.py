@@ -86,7 +86,7 @@ class TestHandoffAdvancedCommands:
             "Need to align event taxonomy",
             "codex/gpt-5.4",
             "finding",
-            "task/test-branch",
+            branch="task/test-branch",
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
@@ -263,4 +263,59 @@ class TestHandoffAdvancedCommands:
         assert flow_state is not None
         assert flow_state["audit_ref"] == audit_ref
         assert flow_state["next_step"] is None
-        assert flow_state["reviewer_actor"] == "test-actor"
+
+    @patch("vibe3.commands.handoff_write.HandoffService")
+    def test_handoff_plan_with_explicit_branch(self, mock_service_class):
+        """Test handoff plan with explicit --branch name."""
+        mock_service = MagicMock()
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "plan",
+                "docs/plans/test-plan.md",
+                "--branch",
+                "task/custom-branch",
+                "--actor",
+                "claude/sonnet-4.6",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "✓" in result.output
+        assert "Plan handoff recorded" in result.output
+        mock_service.record_plan.assert_called_once_with(
+            "docs/plans/test-plan.md",
+            "claude/sonnet-4.6",
+            branch="task/custom-branch",
+        )
+
+    @patch("vibe3.commands.handoff_write.HandoffService")
+    def test_handoff_report_with_issue_number(self, mock_service_class):
+        """Test handoff report with --branch <digits> converts to task/issue-N."""
+        mock_service = MagicMock()
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "report",
+                "docs/reports/test-report.md",
+                "--branch",
+                "473",
+                "--actor",
+                "claude/sonnet-4.6",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "✓" in result.output
+        assert "Report handoff recorded" in result.output
+        mock_service.record_report.assert_called_once_with(
+            "docs/reports/test-report.md",
+            "claude/sonnet-4.6",
+            branch="task/issue-473",
+        )

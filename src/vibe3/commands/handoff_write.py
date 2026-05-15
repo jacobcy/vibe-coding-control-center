@@ -36,10 +36,9 @@ def _record_handoff_reference(
         service = HandoffService()
         method = getattr(service, method_name)
         # Support optional 'action' kwarg for indicate command
-        # Support optional 'branch' kwarg for all commands
+        # Branch is resolved to non-None string at command level
         extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
-        if branch is not None:
-            extra_kwargs["branch"] = branch
+        extra_kwargs["branch"] = branch
         method(ref_value, actor, **extra_kwargs)
         console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
@@ -55,7 +54,6 @@ def init(
     ] = False,
 ) -> None:
     """Initialize handoff file for a branch."""
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
@@ -98,7 +96,6 @@ def append(
     ] = False,
 ) -> None:
     """Append lightweight update to handoff file for a branch."""
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
@@ -109,7 +106,7 @@ def append(
 
         service = HandoffService()
         handoff_path = service.append_current_handoff(
-            message, actor, kind, target_branch
+            message, actor, kind, branch=target_branch
         )
 
         console.print("[green]✓[/] Appended handoff update")
@@ -138,7 +135,6 @@ def plan(
     ] = False,
 ) -> None:
     """Record plan handoff for a branch."""
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
@@ -175,7 +171,6 @@ def report(
     ] = False,
 ) -> None:
     """Record report handoff for a branch."""
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
@@ -219,7 +214,6 @@ def indicate(
     Manager directive to downstream agents.
     Provide a structured handoff file reference for downstream agent context.
     """
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
@@ -256,7 +250,6 @@ def audit(
     ] = False,
 ) -> None:
     """Record audit handoff for a branch."""
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
@@ -335,7 +328,6 @@ def verdict(
         vibe3 handoff verdict PASS --reason "Code looks good"
         vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
     """
-    from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
 
