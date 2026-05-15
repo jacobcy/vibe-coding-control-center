@@ -11,7 +11,7 @@ fi
 
 detect_rebase() {
     # Returns 0 if a rebase operation was recently completed
-    git reflog -5 2>/dev/null | grep -qE 'rebase \(finish\)|rebase -i \(finish\)|rebase \(continue\)|rebase -i \(continue\)'
+    git reflog -5 2>/dev/null | grep -qE 'rebase( -i)? \((finish|continue)\)'
 }
 
 echo "Running pre-push checks..."
