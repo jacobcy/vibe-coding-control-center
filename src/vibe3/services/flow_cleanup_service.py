@@ -266,8 +266,21 @@ class FlowCleanupService:
     def _terminate_task_sessions(self, branch: str) -> None:
         """Kill lingering tmux sessions for a task issue.
 
-        SAFETY CHECK: Verify no running sessions before terminating.
-        If sessions are still running, abort cleanup to protect active work.
+        SAFETY CHECK (Defensive Layer 2): Verify no running sessions before terminating.
+        This catches race conditions where sessions started between pre-filter (T1)
+        and cleanup execution (T3). If sessions are still running, abort cleanup
+        to protect active work.
+
+        Note: Pre-filter in check_cleanup_service.py provides Layer 1 protection
+        (batch query optimization). This defensive check provides Layer 2 protection
+        (per-branch verification, catches race conditions).
+
+        The exception LiveSessionsDetectedError will only be raised if:
+        - Race condition: New session started after pre-filter
+        - Pre-filter query failed (and returned empty set as fallback)
+
+        In normal flow (no race condition), this check will find no live sessions
+        and proceed to termination.
         """
         import subprocess
 
@@ -277,7 +290,8 @@ class FlowCleanupService:
         if issue_number is None:
             return
 
-        # SAFETY CHECK: Query runtime_session table for live sessions
+        # DEFENSIVE LAYER 2: Query runtime_session table for live sessions
+        # This catches race conditions where sessions started after pre-filter
         try:
             from vibe3.agents.backends.codeagent import CodeagentBackend
             from vibe3.environment.session_registry import SessionRegistryService
@@ -289,8 +303,10 @@ class FlowCleanupService:
             if live_sessions:
                 message = (
                     f"Skipping cleanup for '{branch}': {len(live_sessions)} live "
-                    "sessions found. Use 'vibe3 task resume --takeover' if you "
-                    "really want to force cleanup."
+                    "sessions found (detected in defensive layer 2). "
+                    "This indicates a race condition where sessions started "
+                    "after pre-filter query. Use 'vibe3 task resume --takeover' "
+                    "if you really want to force cleanup."
                 )
                 logger.bind(domain="cleanup", branch=branch).warning(message)
                 raise LiveSessionsDetectedError(message)
