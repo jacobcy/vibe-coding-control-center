@@ -7,38 +7,7 @@ from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_service import PRService
-
-
-def resolve_pr_to_branch(pr: int) -> str:
-    """Resolve a PR number to its head branch name.
-
-    Returns the head branch name, or exits on error.
-    """
-    pr_data = PRService().get_pr(pr_number=pr)
-    if pr_data is None:
-        typer.echo(f"Error: 未找到 PR #{pr}", err=True)
-        raise typer.Exit(1)
-    return pr_data.head_branch
-
-
-def validate_mutually_exclusive_branch_pr(branch: str | None, pr: int | None) -> None:
-    """Ensure --branch and --pr are not both specified."""
-    if branch is not None and pr is not None:
-        typer.echo("Error: 不能同时指定 --branch 与 --pr", err=True)
-        raise typer.Exit(1)
-
-
-def resolve_target_branch(branch: str | None, pr: int | None) -> str | None:
-    """Resolve target branch from --branch, --pr, or None.
-
-    Returns None when neither option is provided (caller should fallback
-    to current branch).
-    """
-    validate_mutually_exclusive_branch_pr(branch, pr)
-    if pr is not None:
-        return resolve_pr_to_branch(pr)
-    return branch
+from vibe3.utils.branch_arg import resolve_branch_arg
 
 
 def require_flow(service: FlowService, branch: str) -> None:
@@ -54,9 +23,8 @@ def require_flow(service: FlowService, branch: str) -> None:
 
 
 def blocked(
-    branch: Annotated[str | None, typer.Option("--branch", help="Branch name")] = None,
-    pr: Annotated[
-        int | None, typer.Option("--pr", help="PR number to resolve head branch from")
+    branch: Annotated[
+        str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
     reason: Annotated[
         str | None, typer.Option("--reason", help="Blocking reason")
@@ -64,48 +32,42 @@ def blocked(
     task: Annotated[
         int | None, typer.Option("--task", help="Dependency issue number")
     ] = None,
-    by: Annotated[
-        int | None, typer.Option("--by", help="Dependency issue number")
-    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
     """Mark flow as blocked.
 
-    If --task/--by is provided, automatically adds dependency issue link.
+    If --task is provided, automatically adds dependency issue link.
 
     Examples:
         vibe3 flow blocked --reason "等待外部反馈"
         vibe3 flow blocked --task 218
-        vibe3 flow blocked --task 218 --reason "需要 #218 先完成"
     """
+    if reason is not None and task is not None:
+        typer.echo("Error: 不能同时指定 --reason 与 --task", err=True)
+        raise typer.Exit(1)
+
     with trace_scope(trace, "flow blocked", domain="flow"):
         service = FlowService()
-        target_branch = (
-            resolve_target_branch(branch, pr) or service.get_current_branch()
-        )
+        target_branch = resolve_branch_arg(branch)
 
         logger.bind(
             command="flow blocked",
             branch=target_branch,
             reason=reason,
             task=task,
-            by=by,
         ).info("Blocking flow")
 
         require_flow(service, target_branch)
 
-        blocked_by_issue = task if task is not None else by
-        service.block_flow(
-            target_branch, reason=reason, blocked_by_issue=blocked_by_issue
-        )
+        service.block_flow(target_branch, reason=reason, blocked_by_issue=task)
 
         msg = f"Flow blocked on branch '{target_branch}'"
         if reason:
             msg += f": {reason}"
-        if blocked_by_issue:
-            msg += f" (blocked by #{blocked_by_issue})"
+        if task:
+            msg += f" (blocked by #{task})"
         typer.echo(msg)
 
 
