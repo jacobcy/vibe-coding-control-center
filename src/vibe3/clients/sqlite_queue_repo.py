@@ -49,11 +49,10 @@ class SQLiteQueueRepo:
         """DELETE all + INSERT batch in single transaction."""
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("BEGIN")
             conn.execute("DELETE FROM orchestra_queue")
             for entry in entries:
                 conn.execute(
-                    "INSERT INTO orchestra_queue (issue_number, collected_state, waiting_state, updated_at) VALUES (?, ?, ?, ?)",  # noqa: E501
+                    "INSERT OR REPLACE INTO orchestra_queue (issue_number, collected_state, waiting_state, updated_at) VALUES (?, ?, ?, ?)",  # noqa: E501
                     (
                         entry["issue_number"],
                         entry.get("collected_state"),

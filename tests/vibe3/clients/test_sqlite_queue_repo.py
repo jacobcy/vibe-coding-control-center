@@ -140,3 +140,22 @@ def test_updated_at_updates_on_second_save(tmp_path):
     second_updated = client.load_queue_entry(501)["updated_at"]
 
     assert second_updated != first_updated
+
+
+def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
+    """Replace with duplicate issue_numbers — last value wins."""
+    db_path = tmp_path / "test.db"
+    client = SQLiteClient(db_path=str(db_path))
+
+    entries = [
+        {"issue_number": 601, "collected_state": "first"},
+        {"issue_number": 601, "collected_state": "second"},
+        {"issue_number": 602, "collected_state": "other"},
+    ]
+    client.replace_all_queue_entries(entries)
+
+    all_entries = client.load_all_queue_entries()
+    assert len(all_entries) == 2
+    entry_601 = client.load_queue_entry(601)
+    assert entry_601 is not None
+    assert entry_601["collected_state"] == "second"
