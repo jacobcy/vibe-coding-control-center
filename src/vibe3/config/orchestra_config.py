@@ -228,3 +228,11 @@ class OrchestraConfig(BaseModel):
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
     )
+    max_retry_budget: int = Field(
+        default=3,
+        ge=1,
+        description=(
+            "Max re-dispatch attempts for a queue entry whose issue state "
+            "remains unchanged"
+        ),
+    )
