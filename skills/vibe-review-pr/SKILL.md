@@ -85,6 +85,31 @@ TaskCreate(subject=..., ...)   // → 调用 TaskCreate tool
 Agent(name=..., subagent_type=...) // → 调用 Agent tool
 ```
 
+**必需参数补充说明**：
+
+伪代码中省略了部分必需参数，实际调用时必须补充：
+
+| Tool | 伪代码写法 | 实际必需参数 |
+|------|-----------|-------------|
+| `Agent()` | `Agent(name=..., subagent_type=..., team_name=..., model=..., prompt=...)` | `description=...`（必需） |
+| `SendMessage()` | `SendMessage(to=..., message=..., summary=...)` | `type="message"`, `content=...`, `recipient=...`（必需） |
+
+**示例修正**：
+
+```python
+// 伪代码（可省略 description/type/content）：
+Agent(name="context-researcher", subagent_type="pr-context-researcher", prompt="...")
+SendMessage(to="context-researcher", message="【lead_ready】", summary="握手信号")
+
+// 实际调用（必须补充）：
+Agent(name="context-researcher", subagent_type="pr-context-researcher", prompt="...", 
+      description="PR #N 背景调研 agent")
+SendMessage(to="context-researcher", message="【lead_ready】", summary="握手信号",
+            type="message", content="【lead_ready】", recipient="context-researcher")
+```
+
+**注意**：伪代码只用于流程说明，实际执行时必须补充所有必需参数，否则触发 `InputValidationError`。
+
 ## Shell 命令 `$` 约定
 
 伪代码块内用 `$` 前缀的行是真实 Shell 命令：
@@ -703,7 +728,21 @@ Phase_5():
     // 等待 agent 终止（agent 需要时间处理 shutdown 并清理状态）
     // TeamDelete 会检查是否有 active members，过早调用会失败
     output("等待 agent 终止...")
-    sleep(20)  // 经验值：agent 异步终止需要 10-20 秒
+
+    // 轮询检测 agent 是否真正终止（优于固定 sleep）
+    for attempt in 1..10:  // 最多等待 20 秒
+      sleep(2)
+      all_terminated = true
+      for teammate in all_agents:
+        $ agent-exist.sh {teammate}
+        if exit code == 0:  // agent 仍然存在
+          all_terminated = false
+          break
+      if all_terminated:
+        break  // 全部终止，提前退出
+
+    if not all_terminated:
+      output("⚠️ 部分 agent 未在 20 秒内终止，强制删除 team")
 
     TeamDelete()
     // 若 TeamDelete 返回 "no team found" → rm -rf ~/.claude/teams/pr-review-team
