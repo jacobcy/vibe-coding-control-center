@@ -1,4 +1,17 @@
+---
+document_type: reference
+title: Flow 依赖管理参考
+status: current
+scope: flow-dependency
+author: Vibe Team
+related_docs:
+  - ../standards/v3/command-standard.md
+  - ../standards/v3/handoff-store-standard.md
+---
+
 # Flow 依赖管理参考
+
+> **说明**：本文档为参考材料，权威规范见 `docs/standards/v3/*.md`。
 
 本文档说明 V3 架构下 Flow 依赖管理的实现方式和命令使用场景。
 
@@ -77,22 +90,27 @@ CREATE TABLE flow_state (
 
 | 命令 | 使用场景 | 数据影响 | 建立依赖关系 |
 |------|---------|---------|------------|
-| `flow blocked --by <issue>` | Flow 执行中遇到依赖阻塞 | `flow_issue_links` + `flow_state` | ✅ 是 |
+| `flow blocked --task <issue>` | Flow 执行中遇到依赖阻塞 | `flow_issue_links` + `flow_state` | ✅ 是 |
 | `handoff --blocked-by <text>` | Agent 交接时记录阻塞状态 | 仅 `flow_state` | ❌ 否 |
+
+> **注意**：`--task` 是主要选项，`--by` 也是可用别名。
 
 ### 详细操作影响
 
-#### 1. `vibe3 flow blocked --by <issue>`
+#### 1. `vibe3 flow blocked --task <issue>`
 
 **使用场景**：Flow 执行过程中被具体的依赖 issue 阻塞。
 
 **命令示例**：
 ```bash
-# 自动生成描述
+# 自动生成描述（推荐使用 --task）
+vibe3 flow blocked --task 218
+
+# --by 别名也可用
 vibe3 flow blocked --by 218
 
 # 自定义描述
-vibe3 flow blocked --by 218 --reason "需要 #218 的 API 先完成"
+vibe3 flow blocked --task 218 --reason "需要 #218 的 API 先完成"
 
 # 仅记录原因（不建立依赖）
 vibe3 flow blocked --reason "等待外部反馈"
@@ -204,7 +222,7 @@ vibe3 task resume
 
 ### 何时使用哪个命令
 
-**使用 `flow blocked --by`**：
+**使用 `flow blocked --task`**：
 - Flow 执行中遇到具体的 issue 阻塞
 - 需要在数据库中建立依赖关系
 - 方便后续查询和分析
@@ -223,7 +241,7 @@ vibe3 task resume
 vibe3 handoff plan docs/plans/feature-a.md --blocked-by "需要等待 API 完成"
 
 # Step 2: 开发者补充依赖关系
-vibe3 flow blocked --by 218
+vibe3 flow blocked --task 218
 
 # 结果：
 # - flow_state.blocked_by 可能被更新（如果指定了 --reason）
@@ -258,5 +276,4 @@ vibe3 flow blocked --by 218
 
 - [Task & Flow 操作指南](../standards/v3/command-standard.md)
 - [项目概览](../../README.md)
-- [Flow 状态转换计划](../plans/2026-03-23-flow-status-transitions.md)
 - [数据模型标准](../standards/v3/handoff-store-standard.md)

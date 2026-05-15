@@ -1,4 +1,16 @@
-# Oh My OpenCode Agent 系统详解
+---
+document_type: reference
+title: Oh My OpenCode Agent 系统参考
+status: historical-reference
+scope: external-plugin-system
+author: Vibe Team
+related_docs:
+  - agent-workflow-standard.md
+---
+
+# Oh My OpenCode Agent 系统参考
+
+> **说明**：本文档描述外部插件 Oh My OpenCode 的 Agent 体系，非 Vibe Center 核心架构。Vibe Center 使用独立的 Agent 模型（vibe-manager/planner/executor/reviewer），详见 [agent-workflow-standard.md](../standards/agent-workflow-standard.md)。
 
 ## 概述
 
@@ -8,7 +20,9 @@
 
 ---
 
-## 并行 Worktree 协作流程（推荐）
+## 并行 Worktree 协作流程（参考）
+
+> **注意**：以下流程为 Oh My OpenCode 的并行 worktree 方案。Vibe Center 有自己的 worktree 管理方式，详见 CLAUDE.md。
 
 **核心原则**：每个 agent 在独立 worktree 开发并提交 PR；Claude 固定在 `main` 负责测试、审核与合并。
 

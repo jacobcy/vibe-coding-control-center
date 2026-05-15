@@ -1,14 +1,20 @@
+---
+document_type: reference
+title: Vibe Coding Alias Helper（Level 2）
+status: current
+scope: shell-aliases
+author: Vibe Team
+related_docs:
+  - alias-testing.md
+---
+
 # Vibe Coding Alias Helper（Level 2）
 
-这套 alias 的目标只有一句话：
-
-> **Agent（Claude / OpenCode / Codex）全自动干活，你只负责最后检查和提交。**
+> **核心理念**：Agent（Claude / Codex）全自动干活，你只负责最后检查和提交。
 
 你不需要在中间盯着、不需要反复确认、不需要担心误伤主分支。
 
----
-
-## 一、整体理念（先对齐心智模型）
+## 整体理念
 
 - **worktree = 安全沙盒**
 - **tmux = 持久会话容器**
@@ -17,31 +23,32 @@
 
 你的角色不是"一起敲代码"，而是 **reviewer / approver**。
 
----
-
-## 二、基础结构假设
-
-你的仓库结构类似：
+## 目录结构
 
 ```
 repo/
 ├── main/                  # 主分支 worktree（只做人类操作）
 ├── wt-xxx/                # 各种实验 / 功能 worktree
-└── config/
-    ├── aliases.sh         # Alias 加载器（入口）
-    └── aliases/           # Alias 子文件（按类别拆分）
+├── config/
+│   └── shell/
+│       └── aliases.sh     # Alias 入口（sources from lib/alias/）
+└── lib/
+    └── alias/             # Alias 子文件（按类别拆分）
+        ├── loader.sh      # 加载器
+        ├── agent.sh       # Agent 命令
         ├── git.sh         # Git 辅助函数
         ├── tmux.sh        # Tmux 会话管理
         ├── worktree.sh    # Worktree + 工作区命令
-        ├── claude.sh      # Claude CLI 命令
-        ├── opencode.sh    # OpenCode 命令
         ├── openspec.sh    # OpenSpec 命令
-        └── vibe.sh        # Vibe 综合命令
+        ├── vibe.sh        # Vibe 综合命令
+        └── vibe3.sh       # Vibe3 CLI 命令
 ```
+
+**与 V3 的关系**：V3 Python 命令（`vibe3`）已接管核心业务逻辑，Shell alias 主要用于 tmux/worktree 管理和快捷调用。
 
 ---
 
-## 三、助记规则
+## 助记规则
 
 所有命令遵循 **`<工具前缀><动作>`** 的命名模式：
 
@@ -70,7 +77,7 @@ repo/
 
 ---
 
-## 四、tmux 会话命令 (vt*)
+## tmux 会话命令 (vt*)
 
 | 命令 | 功能 | 示例 |
 |------|------|------|
@@ -87,7 +94,7 @@ repo/
 
 ---
 
-## 五、Worktree 管理命令 (wt*)
+## Worktree 管理命令 (wt*)
 
 | 命令 | 功能 | 示例 |
 |------|------|------|
@@ -119,7 +126,7 @@ wtrm all             # 删除所有 wt-* worktree
 
 ---
 
-## 六、Agent 命令
+## Agent 命令
 
 ### Claude 命令 (cc*)
 
@@ -165,7 +172,7 @@ wtrm all             # 删除所有 wt-* worktree
 
 ---
 
-## 七、一键「全套工作台」（核心功能）
+## 全套工作台（核心功能）
 
 ### `vup [wt-dir] [--agent <name>]`
 
@@ -196,7 +203,7 @@ Agent 选项：`claude`（默认）、`codex`、`opencode`、`gemini`
 
 ---
 
-## 八、一键从零开始（最推荐）
+## 从零开始（最推荐）
 
 ### `vnew <branch> [base] [--agent <name>]`
 
@@ -223,7 +230,7 @@ Agent 选项：`claude`（默认）、`codex`、`opencode`
 
 ---
 
-## 九、Vibe 综合命令
+## Vibe 综合命令
 
 | 命令 | 功能 |
 |------|------|
@@ -236,7 +243,7 @@ Agent 选项：`claude`（默认）、`codex`、`opencode`
 
 ---
 
-## 十、推荐练习路线（最省脑）
+## 推荐练习路线（最省脑）
 
 ### Day 1：只用 vnew
 
@@ -258,7 +265,7 @@ vup wt-test-2 --agent opencode
 
 ---
 
-## 十一、安全底线（非常重要）
+## 安全底线（非常重要）
 
 - ❌ 不要在 main/master 用 `ccy` / `ooa`
 - ✅ 所有 agent 操作都在 worktree
@@ -267,7 +274,7 @@ vup wt-test-2 --agent opencode
 
 ---
 
-## 十二、一句话总结
+## 总结
 
 你不是在"和 AI 一起写代码"，
 你是在"调度多个 agent 干活"。

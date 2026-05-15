@@ -1,30 +1,37 @@
 ---
-title: "Advanced Tool Use 参考报告"
+document_type: reference
+title: Anthropic Advanced Tool Use 特性分析
 source: "https://www.anthropic.com/engineering/advanced-tool-use"
-author: "Claude Sonnet 4"
+author: Claude Sonnet 4
 date: "2026-02-28"
+last_updated: "2026-05-15"
+status: current
+scope: anthropic-features
 purpose: "分析 Anthropic 三项高级工具使用特性，评估在 Vibe Center 项目中的应用潜力"
+related_docs:
+  - claude-code-memory.md
+  - SUBAGENT_GUIDELINES.md
 ---
 
 # Advanced Tool Use 参考报告
 
 > **来源**：[Anthropic Engineering — Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)（2025-11-24）
 
-## 一、文章核心概述
+## 概述
 
-Anthropic 发布了三项 Beta 特性，解决 AI Agent 在工具使用中的三大瓶颈：
+本文档分析 Anthropic 发布的三项 Beta 特性，解决 AI Agent 在工具使用中的三大瓶颈：
 
 | 特性 | 解决的问题 | 核心机制 | 效果 |
 |------|-----------|---------|------|
-| **Tool Search Tool** | 工具定义消耗过多 context tokens | 按需发现，延迟加载 | token 消耗减少 **85%**，准确率提升 25%+ |
-| **Programmatic Tool Calling (PTC)** | 中间结果污染 context window | Claude 写代码编排工具调用 | token 减少 **37%**，消除多余推理轮次 |
-| **Tool Use Examples** | JSON Schema 无法表达使用模式 | 在工具定义中嵌入示例 | 复杂参数准确率从 72% → **90%** |
+| **Tool Search Tool** | 工具定义消耗过多 context tokens | 按需发现，延迟加载 | token 消耗减少 **85%** |
+| **Programmatic Tool Calling (PTC)** | 中间结果污染 context window | Claude 写代码编排工具调用 | token 减少 **37%** |
+| **Tool Use Examples** | JSON Schema 无法表达使用模式 | 在工具定义中嵌入示例 | 准确率从 72% → **90%** |
+
+> **实现状态**：Claude Code 已实现 deferred tool loading（系统自动处理），PTC 和 Examples 需要在工具定义中配置。
 
 ---
 
-## 二、三项特性详解
-
-### 2.1 Tool Search Tool — 按需发现
+## 详解：Tool Search Tool
 
 **问题量化**：典型 5 个 MCP Server（GitHub/Slack/Sentry/Grafana/Splunk）= 58 个工具，~55K tokens。Anthropic 内部曾达到 **134K tokens** 仅用于工具定义。
 
@@ -70,7 +77,7 @@ Anthropic 发布了三项 Beta 特性，解决 AI Agent 在工具使用中的三
 
 ---
 
-### 2.2 Programmatic Tool Calling (PTC) — 代码编排
+## 详解：Programmatic Tool Calling (PTC)
 
 **问题**：传统工具调用的两个致命缺陷：
 1. **Context 污染**：处理 10MB 日志时，整个文件进入 context，即使只需要错误频率统计
@@ -108,7 +115,7 @@ Anthropic 发布了三项 Beta 特性，解决 AI Agent 在工具使用中的三
 
 ---
 
-### 2.3 Tool Use Examples — 示例学习
+## 详解：Tool Use Examples
 
 **问题**：JSON Schema 定义结构有效性，但无法表达：
 - 日期格式应该用 `YYYY-MM-DD` 还是 `Nov 6, 2024`？
@@ -127,7 +134,7 @@ Anthropic 发布了三项 Beta 特性，解决 AI Agent 在工具使用中的三
 
 ---
 
-## 三、最佳实践总结
+## 最佳实践
 
 ### 分层策略
 
@@ -168,7 +175,7 @@ Context 被工具定义撑爆？  → Tool Search Tool
 
 ---
 
-## 四、Vibe Center 项目应用分析
+## Vibe Center 应用分析
 
 基于当前项目特点（Zsh CLI 工具、Agent 编排工作区、MCP 集成、Skills 系统），以下是具体应用方向：
 
@@ -274,7 +281,7 @@ graph TD
 
 ---
 
-## 五、优先级建议
+## 优先级建议
 
 | 优先级 | 特性 | 应用场景 | 预期收益 | 实施难度 |
 |--------|------|---------|---------|---------|
@@ -284,7 +291,7 @@ graph TD
 
 ---
 
-## 六、参考链接
+## 参考链接
 
 - **文章原文**：[Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)
 - **Tool Search Tool 文档**：[Documentation](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool) | [Cookbook](https://github.com/anthropics/claude-cookbooks/blob/main/tool_use/tool_search_with_embeddings.ipynb)

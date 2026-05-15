@@ -1,237 +1,159 @@
-meta-layer.spec.md
+---
+document_type: prd
+title: Meta Layer 产品需求文档
+status: draft
+scope: meta-layer-core
+author: Claude Sonnet
+related_docs:
+  - README.md
+  - metaskill-simple-spec.md
+  - harness-integration.md
+---
 
-1. 目标
+# Meta Layer 产品需求文档
+
+本文档定义 Meta Layer 的产品需求、API 设计和参考实现。
+
+## 1. 目标
 
 构建一个独立服务（Meta Layer），用于：
-	•	注入上下文（context）
-	•	注入经验（skills）
-	•	记录执行过程（events / trace）
-	•	在任务结束后生成经验（skills）
 
-⸻
+- 注入上下文（context）
+- 注入经验（skills）
+- 记录执行过程（events / trace）
+- 在任务结束后生成经验（skills）
 
-2. 系统定位
+## 2. 系统定位
 
+```
 Agent → Meta Layer → LLM
-                  ↓
-               Harness
+              ↓
+           Harness
+```
 
+## 3. 核心能力
 
-⸻
+### 3.1 Proxy 服务
 
-3. 必须实现的能力
+**接口**：`POST /v1/chat/completions`
 
-⸻
+**行为流程**：
 
-3.1 Proxy 服务
+1. **获取 context**
+   - 来源：Git（最近文件）、上次 error、当前分支
+   - 输出：`{ "recent_files": [], "last_error": "", "branch": "" }`
 
-接口
+2. **获取 skills**
+   - 来源：`~/.meta-layer/skills.json`
+   - 结构：`["经验1", "经验2"]`
 
-POST /v1/chat/completions
+3. **重写 prompt**
+   ```
+   [PROJECT_CONTEXT]
+   ...
 
+   [LEARNED_SKILLS]
+   ...
 
-⸻
+   [USER_INPUT]
+   ...
+   ```
 
-行为
+4. **转发请求到 LLM**
 
-Step 1：获取 context
-来源：
-	•	Git（最近文件）
-	•	上次 error
-	•	当前分支
+5. **记录 response**（用于 trace）
 
-输出：
+### 3.2 Event 接口
 
-{
-  "recent_files": [],
-  "last_error": "",
-  "branch": ""
-}
+**接口**：`POST /events`
 
+**支持类型**：
 
-⸻
-
-Step 2：获取 skills
-来源：
-
-~/.meta-layer/skills.json
-
-结构：
-
-[
-  "经验1",
-  "经验2"
-]
-
-
-⸻
-
-Step 3：重写 prompt
-拼接：
-
-[PROJECT_CONTEXT]
-...
-
-[LEARNED_SKILLS]
-...
-
-[USER_INPUT]
-...
-
-
-⸻
-
-Step 4：转发请求到 LLM
-
-⸻
-
-Step 5：记录 response（用于 trace）
-
-⸻
-
-⸻
-
-3.2 Event 接口
-
-POST /events
-
-
-⸻
-
-支持类型
-
+```json
 {
   "type": "tool_success | tool_failed | test_passed | test_failed | user_corrected",
   "payload": {}
 }
+```
 
+**行为**：写入当前 task trace
 
-⸻
+### 3.3 Trace 系统
 
-行为
-	•	写入当前 task trace
+**存储路径**：`~/.meta-layer/traces/{task_id}.json`
 
-⸻
+**结构**：
 
-⸻
-
-3.3 Trace 系统
-
-存储路径：
-
-~/.meta-layer/traces/{task_id}.json
-
-
-⸻
-
-结构：
-
+```json
 {
   "task_id": "",
   "events": [],
   "messages": [],
   "result": ""
 }
+```
 
+### 3.4 Skill 生成（核心）
 
-⸻
+**触发**：`POST /task/end`
 
-⸻
+**行为**：调用 LLM 总结经验
 
-3.4 Skill 生成（核心）
-
-触发
-
-POST /task/end
-
-
-⸻
-
-行为
-
-调用 LLM：
-
+```
 根据以下执行过程，总结一条经验（一句话）：
 
 - events
 - 用户修改
 - 错误信息
+```
 
+**存储**：`~/.meta-layer/skills.json`
 
-⸻
+**规则**：
 
-输出
+- 最多 100 条
+- 超出则删除最旧
 
-经验句子
+### 3.5 Skill 注入策略
 
+每次请求：`skills[-5:]`
 
-⸻
+### 3.6 CLI
 
-存储
-
-~/.meta-layer/skills.json
-
-
-⸻
-
-规则：
-	•	最多 100 条
-	•	超出则删除最旧
-
-⸻
-
-⸻
-
-3.5 Skill 注入策略
-
-每次请求：
-
-skills[-5:]
-
-
-⸻
-
-⸻
-
-3.6 CLI（必须）
-
+```bash
 meta-layer start
 meta-layer clear-skills
 meta-layer inspect-trace
+```
 
+## 4. 不做（必须遵守）
 
-⸻
+- 不做 RL
+- 不做 LoRA
+- 不做 embedding
+- 不做多模型 routing
 
-⸻
+## 5. 完成标准
 
-4. 不做（必须遵守）
-	•	不做 RL
-	•	不做 LoRA
-	•	不做 embedding
-	•	不做多模型 routing
+- [ ] 能代理 LLM 请求
+- [ ] 能记录 events
+- [ ] 能生成 skill
+- [ ] skill 能影响下一次行为
 
-⸻
+---
 
-⸻
+## 6. 参考实现
 
-5. 完成标准
-	•	能代理 LLM 请求
-	•	能记录 events
-	•	能生成 skill
-	•	skill 能影响下一次行为
+> 以下是最小可运行的 Meta Layer 示例代码（单文件版）。
+> 目标：先跑通闭环（代理 → 事件 → trace → skill → 注入），再逐步拆模块。
 
-=====
+**依赖**：`fastapi`, `uvicorn`, `httpx`, `python-dotenv`（可选）
 
-下面给你一份最小可运行的 Meta Layer 示例代码（单文件版）。
-目标：先跑通闭环（代理 → 事件 → trace → skill → 注入），再逐步拆模块。
+**启动**：`uvicorn server:app --port 3000`
 
-依赖：fastapi, uvicorn, httpx, python-dotenv（可选）
-启动：uvicorn server:app --port 3000
+### server.py（最小实现）
 
-⸻
-
-✅ server.py（最小实现）
-
+```python
 import os
 import json
 import uuid
@@ -424,63 +346,50 @@ def get_skills():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+```
 
+---
 
-⸻
+## 7. 验证步骤
 
-🚀 怎么验证这个系统是“活的”
+### 7.1 启动
 
-1️⃣ 启动
-
+```bash
 uvicorn server:app --port 3000
+```
 
+### 7.2 配置 Agent
 
-⸻
+将 Agent 的 LLM 端点指向：`http://localhost:3000/v1/chat/completions`
 
-2️⃣ 把你的 Agent 指向：
+### 7.3 模拟流程
 
-http://localhost:3000/v1/chat/completions
+```bash
+# 调用 LLM（正常聊天）
+curl -X POST http://localhost:3000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "hello"}]}'
 
-
-⸻
-
-3️⃣ 模拟一个流程
-
-调用 LLM（正常聊天）
-
-⸻
-
-上报一个失败
-
+# 上报一个失败
 curl -X POST http://localhost:3000/events \
   -H "Content-Type: application/json" \
-  -d '{
-    "type": "tool_failed",
-    "payload": {"error": "file not found"}
-  }'
+  -d '{"type": "tool_failed", "payload": {"error": "file not found"}}'
 
-
-⸻
-
-结束任务
-
+# 结束任务
 curl -X POST http://localhost:3000/task/end
 
-
-⸻
-
-4️⃣ 查看 skill
-
+# 查看 skill
 curl http://localhost:3000/skills
+```
 
+### 7.4 预期结果
 
-⸻
+如果看到：
 
-👉 如果你看到：
-
+```json
 [
   "在这个项目中，文件路径需要提前检查是否存在"
 ]
+```
 
-👉 说明系统已经开始“学习”
-
+说明系统已经开始"学习"。
