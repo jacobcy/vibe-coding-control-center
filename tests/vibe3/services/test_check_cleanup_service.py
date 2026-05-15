@@ -28,34 +28,12 @@ def test_clean_residual_branches_filters_live_sessions_before_cleanup() -> None:
 
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    with (
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend") as backend_cls,
-        patch(
-            "vibe3.environment.session_registry.SessionRegistryService"
-        ) as registry_cls,
+    # Mock: issue-123 and issue-789 have live sessions
+    with patch.object(
+        service,
+        "_get_branches_with_live_sessions",
+        return_value={"task/issue-123", "task/issue-789"},
     ):
-        # Mock live sessions: issue-123 and issue-789 have live sessions
-        backend = backend_cls.return_value
-        backend.has_tmux_session.side_effect = lambda session: session in [
-            "vibe3-run-issue-123",
-            "vibe3-run-issue-789",
-        ]
-
-        registry = registry_cls.return_value
-        registry._store.list_live_runtime_sessions.return_value = [
-            {
-                "branch": "task/issue-123",
-                "tmux_session": "vibe3-run-issue-123",
-                "role": "executor",
-            },
-            {
-                "branch": "task/issue-789",
-                "tmux_session": "vibe3-run-issue-789",
-                "role": "executor",
-            },
-        ]
-
-        # Mock cleanup service
         with patch.object(service, "_process_terminal_flow") as mock_process:
             result = service.clean_residual_branches()
 
@@ -113,24 +91,22 @@ def test_get_branches_with_live_sessions_queries_once() -> None:
     service = CheckCleanupService(store=store, git_client=git_client)
 
     with (
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend") as backend_cls,
+        patch("vibe3.agents.backends.codeagent.CodeagentBackend"),
         patch(
             "vibe3.environment.session_registry.SessionRegistryService"
         ) as registry_cls,
     ):
-        backend = backend_cls.return_value
-        backend.has_tmux_session.return_value = True
-
         registry = registry_cls.return_value
-        registry._store.list_live_runtime_sessions.return_value = [
-            {"branch": "task/issue-123", "tmux_session": "session-1"},
-            {"branch": "task/issue-456", "tmux_session": "session-2"},
-        ]
+        # Mock the new method
+        registry.get_all_branches_with_live_sessions.return_value = {
+            "task/issue-123",
+            "task/issue-456",
+        }
 
         result = service._get_branches_with_live_sessions()
 
         # Verify: called once, not per branch
-        registry._store.list_live_runtime_sessions.assert_called_once()
+        registry.get_all_branches_with_live_sessions.assert_called_once()
 
         # Verify: both branches returned
         assert result == {"task/issue-123", "task/issue-456"}
@@ -148,12 +124,8 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
 
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    with (
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend"),
-        patch("vibe3.environment.session_registry.SessionRegistryService") as registry,
-    ):
-        registry.return_value._store.list_live_runtime_sessions.return_value = []
-
+    # Mock: no live sessions
+    with patch.object(service, "_get_branches_with_live_sessions", return_value=set()):
         with patch.object(service, "_process_terminal_flow") as mock_process:
             result = service.clean_residual_branches()
 
