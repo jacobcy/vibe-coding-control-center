@@ -102,7 +102,10 @@ code_limits:
         limit: 540
         reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑；材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
 
-      # Server —— 允许 485
+      # Server —— 允许 420-485
+      - path: "src/vibe3/server/mcp.py"
+        limit: 420
+        reason: "MCP server 聚合，包含 3 resources + 4 tools + 输入验证 + 输出脱敏，职责单一但 tool 注册密度高"
       - path: "src/vibe3/server/app.py"
         limit: 485
         reason: "Orchestra CLI 入口聚合，职责单一（包含 FailedGate/ErrorTracking status 显示、密钥加载 fallback 检查）"
