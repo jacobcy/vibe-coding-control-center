@@ -63,6 +63,15 @@ class CheckCleanupService:
             f for f in all_flows if f.get("flow_status") in self.TERMINAL_FLOW_STATUSES
         ]
 
+        # PRE-FILTER: Get branches with live sessions (batch query)
+        branches_with_live = self._get_branches_with_live_sessions()
+
+        if branches_with_live:
+            logger.bind(domain="check").info(
+                f"Skipped {len(branches_with_live)} branches with live sessions: "
+                f"{', '.join(sorted(branches_with_live))}"
+            )
+
         cleanup_service = FlowCleanupService(
             git_client=self.git_client,
             store=self.store,
@@ -72,6 +81,7 @@ class CheckCleanupService:
         kept_records: list[str] = []
         removed_invalid: list[str] = []
         failed: list[str] = []
+        skipped_live: list[str] = []
 
         for flow in terminal_flows:
             branch = flow["branch"]
@@ -81,6 +91,11 @@ class CheckCleanupService:
             if self._is_invalid_branch_name(branch):
                 if self._remove_invalid_flow_record(branch):
                     removed_invalid.append(branch)
+                continue
+
+            # SKIP: Branch has live sessions
+            if branch in branches_with_live:
+                skipped_live.append(branch)
                 continue
 
             # Process valid terminal flow
@@ -98,6 +113,8 @@ class CheckCleanupService:
             summary += f", preserved {len(kept_records)} done records"
         if removed_invalid:
             summary += f", removed {len(removed_invalid)} invalid records"
+        if skipped_live:
+            summary += f", skipped {len(skipped_live)} branches with live sessions"
         if failed:
             summary += f", failed {len(failed)}"
 
@@ -107,8 +124,43 @@ class CheckCleanupService:
             "kept_records": kept_records,
             "removed_invalid": removed_invalid,
             "failed": failed,
+            "skipped_live": skipped_live,
             "total_flows_checked": len(terminal_flows),
         }
+
+    def _get_branches_with_live_sessions(self) -> set[str]:
+        """Batch query all live sessions and return branches with active sessions.
+
+        This is a pre-filter optimization: instead of checking live sessions
+        per branch during cleanup (N queries), we query once upfront and
+        filter out branches with live sessions before cleanup attempts.
+
+        Returns:
+            Set of branch names that have truly live sessions.
+
+        Raises:
+            SystemError: If query fails, preventing accidental cleanup.
+        """
+        try:
+            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.environment.session_registry import SessionRegistryService
+
+            backend = CodeagentBackend()
+            registry = SessionRegistryService(store=self.store, backend=backend)
+
+            # Reuse existing method: batch query + liveness verification
+            return registry.get_all_branches_with_live_sessions()
+
+        except Exception as exc:
+            logger.bind(domain="check").error(
+                f"Failed to query live sessions: {exc}. "
+                "Cannot proceed with cleanup - manual verification required."
+            )
+            raise SystemError(
+                f"Live session query failed: {exc}. "
+                "Cleanup aborted to prevent accidental deletion of active sessions. "
+                "Please verify manually or retry."
+            ) from exc
 
     def _is_invalid_branch_name(self, branch: str) -> bool:
         """Check if branch name is invalid (e.g., HEAD, HEAD~1)."""
@@ -142,6 +194,12 @@ class CheckCleanupService:
         failed: list[str],
     ) -> None:
         """Process a single terminal flow with appropriate cleanup.
+
+        SAFETY CHECK: Two-layer protection against live session deletion.
+        - Layer 1 (pre-filter): Batch query upfront for performance optimization
+        - Layer 2 (defensive): Per-branch verification in cleanup_flow_scene()
+          (LiveSessionsDetectedError catches race conditions)
+        If sessions are still running, cleanup aborted by LiveSessionsDetectedError.
 
         Args:
             branch: Branch name

@@ -360,6 +360,37 @@ class SessionRegistryService:
                     result.append(session)
         return result
 
+    def get_all_branches_with_live_sessions(self) -> set[str]:
+        """Return set of all branches that have truly live sessions.
+
+        Batch optimization: instead of calling get_truly_live_sessions_for_branch()
+        per branch (N queries), this method queries once and collects all branches.
+
+        Used by check_cleanup_service for pre-filtering terminal flows.
+
+        Returns:
+            Set of branch names that have at least one truly live session.
+        """
+        sessions = self._store.list_live_runtime_sessions()
+        branches_with_live: set[str] = set()
+        now = datetime.datetime.now()
+
+        for session in sessions:
+            branch = session.get("branch")
+            if not branch:
+                continue
+
+            tmux = session.get("tmux_session")
+            if tmux:
+                if self._has_tmux_session(tmux):
+                    branches_with_live.add(branch)
+            else:
+                # Handle starting sessions without tmux
+                if not self._handle_stale_starting_session(session, now):
+                    branches_with_live.add(branch)
+
+        return branches_with_live
+
     def get_truly_live_sessions_for_branch(self, branch: str) -> list[dict[str, Any]]:
         """Return truly live sessions for a branch, confirming tmux liveness.
 

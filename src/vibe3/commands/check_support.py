@@ -142,6 +142,19 @@ def execute_check_mode(
             results = service.verify_all_flows(status=["active", "stale"])
 
         invalid_fix: list[CheckResult] = [r for r in results if not r.is_valid]
+
+        # Collect warnings from all flows (regardless of validity)
+        all_warnings: list[tuple[str, str]] = []  # (branch, warning_message)
+        for r in results:
+            for warning in r.warnings:
+                all_warnings.append((r.branch, warning))
+
+        # Display warnings separately
+        if all_warnings:
+            typer.echo(f"\nWarnings ({len(all_warnings)}):")
+            for branch, warning in all_warnings:
+                typer.echo(f"  [{branch}] {warning}")
+
         if not invalid_fix:
             return ExecuteCheckResult(
                 mode="fix_all",
@@ -150,7 +163,7 @@ def execute_check_mode(
             )
 
         if not verbose:
-            typer.echo(f"Checking {len(invalid_fix)} flows with issues...")
+            typer.echo(f"\nChecking {len(invalid_fix)} flows with issues...")
 
         fixed_count = 0
         failed: list[str] = []
