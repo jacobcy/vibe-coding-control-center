@@ -7,9 +7,9 @@ from vibe3.clients.sqlite_client import SQLiteClient
 
 
 def test_fresh_db_has_orchestra_queue_table(tmp_path):
-    """Verify that orchestra_queue table exists with correct columns."""
+    """Verify orchestra_queue table exists with correct columns."""
     db_path = tmp_path / "test.db"
-    SQLiteClient(db_path=str(db_path))  # Initialize schema
+    SQLiteClient(db_path=str(db_path))
 
     with sqlite3.connect(str(db_path)) as conn:
         cursor = conn.cursor()
@@ -18,13 +18,9 @@ def test_fresh_db_has_orchestra_queue_table(tmp_path):
             for row in cursor.execute("PRAGMA table_info(orchestra_queue)").fetchall()
         }
 
-    assert "issue_number" in columns
     assert columns["issue_number"] == "INTEGER"
-    assert "collected_state" in columns
     assert columns["collected_state"] == "TEXT"
-    assert "waiting_state" in columns
     assert columns["waiting_state"] == "TEXT"
-    assert "updated_at" in columns
     assert columns["updated_at"] == "TEXT"
 
 
@@ -40,7 +36,6 @@ def test_save_and_load_single_entry(tmp_path):
     )
 
     entry = client.load_queue_entry(123)
-    assert entry is not None
     assert entry["issue_number"] == 123
     assert entry["collected_state"] == "state_collected"
     assert entry["waiting_state"] == "state_waiting"
@@ -48,7 +43,7 @@ def test_save_and_load_single_entry(tmp_path):
 
 
 def test_save_overwrites_existing_entry(tmp_path):
-    """Save twice with different data — second write wins."""
+    """Save twice — second write wins."""
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
@@ -56,7 +51,6 @@ def test_save_overwrites_existing_entry(tmp_path):
     client.save_queue_entry(456, collected_state="second")
 
     entry = client.load_queue_entry(456)
-    assert entry is not None
     assert entry["collected_state"] == "second"
 
 
@@ -65,8 +59,7 @@ def test_load_missing_returns_none(tmp_path):
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    entry = client.load_queue_entry(999)
-    assert entry is None
+    assert client.load_queue_entry(999) is None
 
 
 def test_remove_entry(tmp_path):
@@ -77,8 +70,7 @@ def test_remove_entry(tmp_path):
     client.save_queue_entry(789, collected_state="to_remove")
     client.remove_queue_entry(789)
 
-    entry = client.load_queue_entry(789)
-    assert entry is None
+    assert client.load_queue_entry(789) is None
 
 
 def test_remove_missing_is_noop(tmp_path):
@@ -86,7 +78,6 @@ def test_remove_missing_is_noop(tmp_path):
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    # Should not raise
     client.remove_queue_entry(999)
 
 
@@ -101,20 +92,17 @@ def test_load_all_returns_all_entries(tmp_path):
 
     entries = client.load_all_queue_entries()
     assert len(entries) == 3
-    issue_numbers = {e["issue_number"] for e in entries}
-    assert issue_numbers == {101, 102, 103}
+    assert {e["issue_number"] for e in entries} == {101, 102, 103}
 
 
 def test_replace_all_entries(tmp_path):
-    """Save 2 entries, replace with 3 different ones — only 3 remain."""
+    """Save 2 entries, replace with 3 — only 3 remain."""
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    # Initial entries
     client.save_queue_entry(201, collected_state="old1")
     client.save_queue_entry(202, collected_state="old2")
 
-    # Replace with new entries
     new_entries = [
         {"issue_number": 301, "collected_state": "new1"},
         {"issue_number": 302, "collected_state": "new2"},
@@ -124,10 +112,7 @@ def test_replace_all_entries(tmp_path):
 
     entries = client.load_all_queue_entries()
     assert len(entries) == 3
-    issue_numbers = {e["issue_number"] for e in entries}
-    assert issue_numbers == {301, 302, 303}
-
-    # Verify old entries are gone
+    assert {e["issue_number"] for e in entries} == {301, 302, 303}
     assert client.load_queue_entry(201) is None
     assert client.load_queue_entry(202) is None
 
@@ -138,21 +123,17 @@ def test_updated_at_auto_set_on_save(tmp_path):
     client = SQLiteClient(db_path=str(db_path))
 
     client.save_queue_entry(401, collected_state="test")
-
-    entry = client.load_queue_entry(401)
-    assert entry is not None
-    assert entry["updated_at"] is not None
+    assert client.load_queue_entry(401)["updated_at"] is not None
 
 
 def test_updated_at_updates_on_second_save(tmp_path):
-    """Save, wait briefly, save again — updated_at changes."""
+    """Save, wait, save again — updated_at changes."""
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
     client.save_queue_entry(501, collected_state="first")
     first_updated = client.load_queue_entry(501)["updated_at"]
 
-    # Wait briefly to ensure timestamp differs
     time.sleep(0.01)
 
     client.save_queue_entry(501, collected_state="second")
