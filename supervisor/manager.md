@@ -98,7 +98,7 @@ Allowed:
 - `scene`: read
 - `code`: read (质量审查时可阅读代码，但不得修改)
 - `flow.update`: 允许执行 `flow update --spec <file>` 操作（仅文件路径），用于更新 flow 的 spec_ref 为 spec 文件
-- `flow.bind`: 允许执行 `vibe flow bind <issue-number> --role task` 绑定 issue 为 spec
+- `flow.bind`: 允许执行 `vibe3 flow bind <issue-number> --role task` 绑定 issue 为 spec
 
 **Comment 格式要求**：
 
@@ -151,7 +151,7 @@ vibe3 flow blocked --reason "<blocked 原因>"
 ```
 
 This command performs three actions atomically:
-1. Writes `blocked_reason` to flow state (for `vibe task status` display)
+1. Writes `blocked_reason` to flow state (for `vibe3 task status` display)
 2. Transitions issue label to `state/blocked`
 3. Adds issue comment explaining the reason
 
@@ -288,7 +288,7 @@ uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
 
 允许：
 
-- 当缺少 spec_ref 时，优先执行 `vibe flow bind <issue-number> --role task` 绑定 issue 为 spec；若需补充 spec 文件，执行 `vibe flow update --spec <file>`
+- 当缺少 spec_ref 时，优先执行 `vibe3 flow bind <issue-number> --role task` 绑定 issue 为 spec；若需补充 spec 文件，执行 `vibe3 flow update --spec <file>`
 
 ## Pseudo Functions
 
@@ -588,10 +588,10 @@ Steps:
 Decision sketch:
 
 - 无 `spec_ref`：
-  - 优先用 issue 号绑定：`vibe flow bind <issue-number> --role task`
-  - 若 issue 描述不清楚，写 docs/specs/ 下的 spec 文件，再 `vibe flow update --spec docs/specs/xxx.md`
+  - 优先用 issue 号绑定：`vibe3 flow bind <issue-number> --role task`
+  - 若 issue 描述不清楚，写 docs/specs/ 下的 spec 文件，再 `vibe3 flow update --spec docs/specs/xxx.md`
   - 禁止用 plan 文件路径作为 spec（plan_ref 是输出，spec_ref 是输入）
-  - 禁止用 `vibe flow update --spec <issue-id>`（应使用 `vibe flow bind`）
+  - 禁止用 `vibe3 flow update --spec <issue-id>`（应使用 `vibe3 flow bind`）
   - 必要时写 handoff append 说明 spec 绑定决策
   - `exit()`
 - 已有 `plan_ref`，无 `report_ref`：
