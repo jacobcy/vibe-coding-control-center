@@ -184,7 +184,7 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
 
 
 def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> None:
-    """Quick view should prefer the latest valid ref, not blindly prefer audit."""
+    """Quick view should prefer the latest valid ref by mtime when no role is 'done'."""
     db_path = tmp_path / "fresh.db"
     store = SQLiteClient(db_path=str(db_path))
     service = TaskService(store=store)
@@ -202,11 +202,15 @@ def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> No
     os.utime(audit_ref, (1, 1))
     os.utime(report_ref, (2, 2))
 
+    # Explicitly set statuses to non-"done" to test mtime fallback path
     flow = FlowStatusResponse(
         branch="task/issue-501",
         flow_slug="issue-501",
         flow_status="active",
         task_issue_number=501,
+        planner_status="running",
+        executor_status="running",
+        reviewer_status=None,
         report_ref="notes/report.md",
         audit_ref="notes/audit.md",
         worktree_root=str(tmp_path),
@@ -218,3 +222,185 @@ def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> No
     assert summary.kind == "report"
     assert summary.ref == "notes/report.md"
     assert "最新一轮已经修好" in summary.summary
+
+
+@pytest.mark.parametrize(
+    "planner_status,executor_status,reviewer_status,plan_ref,report_ref,audit_ref,expected_kind,expected_ref",
+    [
+        # State transition scenarios: reviewer → executor → planner priority
+        pytest.param(
+            "running",
+            None,
+            None,
+            "notes/plan.md",
+            None,
+            None,
+            "plan",
+            "notes/plan.md",
+            id="planner_done_with_plan_ref",
+        ),
+        pytest.param(
+            None,
+            "done",
+            None,
+            None,
+            "notes/report.md",
+            None,
+            "report",
+            "notes/report.md",
+            id="executor_done_with_report_ref",
+        ),
+        pytest.param(
+            None,
+            None,
+            "done",
+            None,
+            None,
+            "notes/audit.md",
+            "audit",
+            "notes/audit.md",
+            id="reviewer_done_with_audit_ref",
+        ),
+        pytest.param(
+            "done",
+            "done",
+            "done",
+            "notes/plan.md",
+            "notes/report.md",
+            "notes/audit.md",
+            "audit",
+            "notes/audit.md",
+            id="all_done_reviewer_priority",
+        ),
+        pytest.param(
+            "pending",
+            "done",
+            "pending",
+            "notes/plan.md",
+            "notes/report.md",
+            "notes/audit.md",
+            "report",
+            "notes/report.md",
+            id="executor_done_others_pending",
+        ),
+        pytest.param(
+            "done",
+            "running",
+            None,
+            "notes/plan.md",
+            "notes/report.md",
+            None,
+            "plan",
+            "notes/plan.md",
+            id="planner_done_executor_running",
+        ),
+        # Fallback scenarios: all non-done
+        pytest.param(
+            "running",
+            None,
+            "pending",
+            None,
+            "notes/report.md",
+            "notes/audit.md",
+            "report",
+            "notes/report.md",
+            id="fallback_two_refs_by_mtime",
+        ),
+        pytest.param(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            id="no_refs_returns_none",
+        ),
+    ],
+)
+def test_select_latest_ref_with_state_transitions(
+    tmp_path,
+    planner_status,
+    executor_status,
+    reviewer_status,
+    plan_ref,
+    report_ref,
+    audit_ref,
+    expected_kind,
+    expected_ref,
+) -> None:
+    """Test _select_latest_ref state transition logic.
+
+    When a role status is "done", the corresponding ref should be prioritized.
+    Priority order: reviewer → executor → planner (reverse of execution order).
+    Fallback to mtime when no role is "done".
+    """
+    db_path = tmp_path / "fresh.db"
+    store = SQLiteClient(db_path=str(db_path))
+    service = TaskService(store=store)
+
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+
+    # For mtime fallback scenario, we need actual files with different mtimes
+    if plan_ref and report_ref and audit_ref:
+        # All three refs exist scenario (all_done)
+        plan_file = notes_dir / "plan.md"
+        report_file = notes_dir / "report.md"
+        audit_file = notes_dir / "audit.md"
+        plan_file.write_text("# Plan", encoding="utf-8")
+        report_file.write_text("# Report", encoding="utf-8")
+        audit_file.write_text("# Audit", encoding="utf-8")
+        # Make audit most recent for reviewer priority test
+        os.utime(plan_file, (1, 1))
+        os.utime(report_file, (2, 2))
+        os.utime(audit_file, (3, 3))
+    elif plan_ref and report_ref and not audit_ref:
+        # Planner done, executor active scenario
+        plan_file = notes_dir / "plan.md"
+        report_file = notes_dir / "report.md"
+        plan_file.write_text("# Plan", encoding="utf-8")
+        report_file.write_text("# Report", encoding="utf-8")
+        os.utime(plan_file, (1, 1))
+        os.utime(report_file, (2, 2))
+    elif report_ref and audit_ref and not plan_ref:
+        # Fallback scenario with two refs - audit is older, report is newer
+        report_file = notes_dir / "report.md"
+        audit_file = notes_dir / "audit.md"
+        report_file.write_text("# Report", encoding="utf-8")
+        audit_file.write_text("# Audit", encoding="utf-8")
+        os.utime(audit_file, (1, 1))
+        os.utime(report_file, (2, 2))
+    elif plan_ref:
+        plan_file = notes_dir / "plan.md"
+        plan_file.write_text("# Plan", encoding="utf-8")
+    elif report_ref:
+        report_file = notes_dir / "report.md"
+        report_file.write_text("# Report", encoding="utf-8")
+    elif audit_ref:
+        audit_file = notes_dir / "audit.md"
+        audit_file.write_text("# Audit", encoding="utf-8")
+
+    flow = FlowStatusResponse(
+        branch="task/issue-501",
+        flow_slug="issue-501",
+        flow_status="active",
+        task_issue_number=501,
+        planner_status=planner_status,
+        executor_status=executor_status,
+        reviewer_status=reviewer_status,
+        plan_ref=plan_ref,
+        report_ref=report_ref,
+        audit_ref=audit_ref,
+        worktree_root=str(tmp_path),
+    )
+
+    summary = service._show_service._select_latest_ref("task/issue-501", flow)
+
+    if expected_kind is None:
+        assert summary is None
+    else:
+        assert summary is not None
+        assert summary.kind == expected_kind
+        assert summary.ref == expected_ref
