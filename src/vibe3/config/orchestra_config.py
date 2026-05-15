@@ -203,7 +203,6 @@ class OrchestraConfig(BaseModel):
     dry_run: bool = False
     pid_file: Path = Field(default_factory=_default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
-    webhook_secret: str | None = None
     bot_username: str | None = Field(
         default=None,
         description=(

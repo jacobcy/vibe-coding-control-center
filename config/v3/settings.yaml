@@ -239,11 +239,8 @@ orchestra:
   # GitHub repository (optional). null 表示默认使用当前工作目录对应仓库
   repo: null
 
-  # HTTP port for webhook receiver
+  # HTTP port for status endpoint
   port: 8080
-
-  # Webhook secret (set to same value as GitHub webhook secret)
-  webhook_secret: "vibe-coding-control-center"
 
   # Maximum concurrent flows
   max_concurrent_flows: 3

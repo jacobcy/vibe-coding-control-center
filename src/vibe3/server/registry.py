@@ -23,7 +23,6 @@ from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
-from vibe3.server.webhook_utils import make_webhook_router
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
@@ -122,7 +121,6 @@ def _build_server_with_launch_cwd(
     # through ExecutionCoordinator — no per-role service or handler needed.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
-    fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
 
     # Store status_service for HTTP endpoint
     fastapi_app.state.status_service = status_service
