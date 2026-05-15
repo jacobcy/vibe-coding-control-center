@@ -91,6 +91,11 @@ def make_coordinator() -> callable:
         store.db_path = ":memory:"
         store.get_flow_state = MagicMock(return_value=None)
         store.get_flows_by_issue = MagicMock(return_value=[])
+        # Mock persistence methods for frozen queue
+        store.save_frozen_queue = MagicMock()
+        store.load_frozen_queue = MagicMock(return_value=[])
+        store.remove_from_frozen_queue = MagicMock()
+        store.clear_frozen_queue = MagicMock()
 
         flow_manager = MagicMock()
         flow_manager.get_flow_for_issue = MagicMock(return_value=None)

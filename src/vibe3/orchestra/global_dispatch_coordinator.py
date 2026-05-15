@@ -80,10 +80,107 @@ class GlobalDispatchCoordinator:
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
         self._supervisor_label = config.supervisor_handoff.issue_label
 
+        # Load persisted queue on init (restart recovery)
+        self._frozen_queue = self._restore_queue()
+
     def shutdown(self) -> None:
         """Shutdown the executor if we own it."""
         if self._owns_executor and self._executor:
             self._executor.shutdown(wait=True)
+
+    def _restore_queue(self) -> list[QueueEntry] | None:
+        """Load persisted queue from database on restart.
+
+        Returns:
+            Restored queue entries, or None if no persisted data.
+
+        Side effects:
+            - Removes invalid entries from database (DONE, missing, supervisor issues)
+            - Logs recovery summary
+        """
+        try:
+            entries = self._store.load_frozen_queue()
+        except Exception as exc:
+            logger.bind(domain="global_dispatch").warning(
+                f"Failed to load persisted queue: {exc}"
+            )
+            return None
+
+        if not entries:
+            return None
+
+        restored: list[QueueEntry] = []
+        invalid_issue_numbers: list[int] = []
+
+        for entry in entries:
+            issue_number = entry["issue_number"]
+            issue = self._load_issue(issue_number)
+
+            # Skip invalid issues (not found)
+            if issue is None:
+                invalid_issue_numbers.append(issue_number)
+                continue
+
+            # Skip DONE issues
+            if issue.state == IssueState.DONE:
+                invalid_issue_numbers.append(issue_number)
+                continue
+
+            # Skip supervisor-labeled issues
+            if should_skip_from_queue(
+                issue,
+                supervisor_label=self._supervisor_label,
+                manager_usernames=self._config.manager_usernames,
+                require_manager_assignee=True,
+            ):
+                invalid_issue_numbers.append(issue_number)
+                continue
+
+            # Restore entry, resetting waiting_state so they are re-dispatched
+            restored.append(
+                QueueEntry(
+                    issue_number=issue_number,
+                    collected_state=entry.get("collected_state"),
+                    waiting_state=None,  # Reset to trigger re-dispatch
+                )
+            )
+
+        # Clean up invalid entries from database
+        for issue_number in invalid_issue_numbers:
+            self._store.remove_from_frozen_queue(issue_number)
+
+        logger.bind(domain="global_dispatch").info(
+            f"Restored {len(restored)} queue entries from persistence "
+            f"(removed {len(invalid_issue_numbers)} invalid entries)"
+        )
+
+        return restored if restored else None
+
+    def _persist_queue(self) -> None:
+        """Persist current frozen queue to database."""
+        if self._frozen_queue is None:
+            self._store.clear_frozen_queue()
+            return
+
+        entries = [
+            {
+                "issue_number": e.issue_number,
+                "collected_state": e.collected_state,
+                "waiting_state": e.waiting_state,
+            }
+            for e in self._frozen_queue
+        ]
+        self._store.save_frozen_queue(entries)
+
+    def get_queued_issue_numbers(self) -> set[int]:
+        """Get the set of issue numbers currently in the frozen queue.
+
+        Returns:
+            Set of issue numbers in the queue, empty set if queue is None/empty.
+        """
+        if not self._frozen_queue:
+            return set()
+        return {e.issue_number for e in self._frozen_queue}
 
     async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
         """Poll GitHub for issues with a specific state label."""
@@ -218,6 +315,7 @@ class GlobalDispatchCoordinator:
                     "dispatcher",
                     "GlobalDispatchCoordinator: no candidates",
                 )
+                self._persist_queue()
                 return
 
         self._promote_progressed_entries()
@@ -227,6 +325,7 @@ class GlobalDispatchCoordinator:
                 "dispatcher",
                 "GlobalDispatchCoordinator: queue emptied by state changes",
             )
+            self._persist_queue()
             return
 
         status = self._capacity.get_capacity_status("manager")
@@ -360,6 +459,9 @@ class GlobalDispatchCoordinator:
                 f"{dispatched_count}{reset}",
             )
 
+        # Persist queue state after all mutations
+        self._persist_queue()
+
     async def _collect_frozen_queue(self) -> list[QueueEntry]:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
@@ -404,6 +506,8 @@ class GlobalDispatchCoordinator:
             f"GlobalDispatchCoordinator: queue collection complete, "
             f"total={len(queue)} issues",
         )
+        # Persist the freshly collected queue
+        self._persist_queue()
         return queue
 
     def _promote_progressed_entries(self) -> None:
@@ -455,3 +559,6 @@ class GlobalDispatchCoordinator:
         else:
             # All entries removed - trigger fresh collection
             self._frozen_queue = None
+
+        # Persist the updated queue state
+        self._persist_queue()

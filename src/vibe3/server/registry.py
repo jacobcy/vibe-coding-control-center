@@ -153,7 +153,9 @@ def _build_server_with_launch_cwd(
     try:
         from vibe3.server.mcp import create_mcp_server
 
-        mcp = create_mcp_server(status_service, get_queued=None)
+        mcp = create_mcp_server(
+            status_service, get_queued=facade.get_queued_issue_numbers
+        )
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")
     except ImportError as exc:
