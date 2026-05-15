@@ -335,12 +335,16 @@ def verdict(
         vibe3 handoff verdict PASS --reason "Code looks good"
         vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
     """
+    from vibe3.utils.branch_arg import resolve_branch_arg
+
+    target_branch = resolve_branch_arg(branch)
+
     with trace_scope(trace, "handoff verdict", domain="handoff"):
         logger.bind(
             command="handoff verdict",
             verdict=verdict_value,
             reason=reason,
-            branch=branch,
+            branch=target_branch,
         ).info("Writing verdict")
 
         service = VerdictService()
@@ -348,7 +352,7 @@ def verdict(
             verdict=verdict_value,
             reason=reason,
             issues=issues,
-            branch=branch,
+            branch=target_branch,
         )
 
         console.print(f"[green]✓[/] Verdict written: {verdict_value}")
