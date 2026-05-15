@@ -190,7 +190,6 @@ class HandoffService:
         ref_kind: str,
         ref_value: str,
         actor: str | None,
-        *legacy_args: str | None,
         verdict: str | None = None,
     ) -> Path:
         """Internal helper to record an active handoff reference.
@@ -198,16 +197,6 @@ class HandoffService:
         Note: For passive artifact recording, use record_passive_artifact() instead.
         This method only handles active handoff events (handoff_plan/report/audit).
         """
-        if actor is None and legacy_args:
-            actor = next(
-                (
-                    candidate
-                    for candidate in reversed(legacy_args)
-                    if candidate is not None
-                ),
-                None,
-            )
-
         branch = self.git_client.get_current_branch()
         validate_authoritative_ref(
             ref_kind,

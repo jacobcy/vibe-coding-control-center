@@ -114,6 +114,21 @@ def test_record_ref_rejects_unknown_active_kind(tmp_path: Path) -> None:
     )
 
     with pytest.raises(UserError, match="Unsupported handoff kind: mystery"):
+        service._record_ref("mystery", "docs/unknown.md", "codex/gpt-5.4")
+
+
+def test_record_ref_rejects_legacy_positional_shape(tmp_path: Path) -> None:
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+
+    service = HandoffService(
+        store=SQLiteClient(db_path=str(tmp_path / "handoff.db")),
+        git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+    )
+
+    with pytest.raises(TypeError):
         service._record_ref("mystery", "docs/unknown.md", None, None, "codex/gpt-5.4")
 
 
