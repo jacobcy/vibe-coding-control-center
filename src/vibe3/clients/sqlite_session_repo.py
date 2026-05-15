@@ -144,13 +144,6 @@ class SQLiteSessionRepo:
         Terminal states: orphaned, done, failed, stopped, aborted.
         Used by reconcile_in_flight() to prune in-flight markers for targets
         whose sessions completed or died without being observed as live.
-
-        Args:
-            role: The execution role to query.
-            target_ids: Candidate target IDs (integers) to check.
-
-        Returns:
-            Subset of target_ids that have at least one terminal session.
         """
         if not target_ids:
             return set()
@@ -182,12 +175,6 @@ class SQLiteSessionRepo:
 
         Queries runtime_session for sessions with matching worktree_path
         and status in ('starting', 'running'), ordered by updated_at DESC.
-
-        Args:
-            worktree_path: Absolute path to the worktree directory.
-
-        Returns:
-            Session dict if a live owner exists, None otherwise.
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row

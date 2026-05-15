@@ -63,13 +63,7 @@ class SQLiteFlowStateRepo:
             return None
 
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
-        """Update flow state fields.
-
-        Validation is handled at the service layer (FlowStateService).
-
-        Raises:
-            ValueError: If invalid fields are provided
-        """
+        """Update flow state fields. Raises ValueError for invalid fields."""
         if "updated_at" not in kwargs:
             kwargs["updated_at"] = datetime.datetime.now().isoformat()
 
@@ -222,10 +216,7 @@ class SQLiteFlowStateRepo:
             return int(count)
 
     def soft_delete_flow(self, branch: str) -> None:
-        """Soft delete flow by setting deleted_at timestamp.
-
-        Preserves all flow data for audit trail and potential recovery.
-        """
+        """Soft delete flow by setting deleted_at timestamp."""
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -241,11 +232,7 @@ class SQLiteFlowStateRepo:
         ).info("Soft deleted flow record")
 
     def hard_delete_flow(self, branch: str) -> None:
-        """Hard delete flow with cascade (physical deletion).
-
-        Removes all flow records including runtime_session, events,
-        issue_links, and context cache.
-        """
+        """Hard delete flow with cascade, removing all related records."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
@@ -261,12 +248,7 @@ class SQLiteFlowStateRepo:
         ).info("Hard deleted flow records and cache")
 
     def delete_flow(self, branch: str, force: bool = False) -> None:
-        """Delete flow (soft by default, hard if force=True).
-
-        Args:
-            branch: Branch name
-            force: If True, perform hard delete; otherwise soft delete
-        """
+        """Delete flow (soft by default, hard if force=True)."""
         if force:
             self.hard_delete_flow(branch)
         else:
@@ -314,12 +296,7 @@ class SQLiteFlowStateRepo:
             return None
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
-        """Get flows linked to an issue with specified role (excludes soft-deleted).
-
-        Returns flows ordered by updated_at DESC, branch ASC for stable sorting.
-        Domain-specific priority logic (canonical/active) should be implemented
-        at the service layer, not here.
-        """
+        """Get flows linked to an issue with specified role (excludes soft-deleted)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
