@@ -85,30 +85,31 @@ TaskCreate(subject=..., ...)   // → 调用 TaskCreate tool
 Agent(name=..., subagent_type=...) // → 调用 Agent tool
 ```
 
-**必需参数补充说明**：
+**伪代码参数规范**：
 
-伪代码中省略了部分必需参数，实际调用时必须补充：
+伪代码中的工具调用必须包含所有必需参数，不可省略：
 
-| Tool | 伪代码写法 | 实际必需参数 |
-|------|-----------|-------------|
-| `Agent()` | `Agent(name=..., subagent_type=..., team_name=..., model=..., prompt=...)` | `description=...`（必需） |
-| `SendMessage()` | `SendMessage(to=..., message=..., summary=...)` | `type="message"`, `content=...`, `recipient=...`（必需） |
+| Tool | 必需参数 |
+|------|---------|
+| `Agent()` | `name`, `subagent_type`, `team_name`, `model`, `description`, `prompt` |
+| `SendMessage()` | `to`, `summary`, `message`（字符串）或 JSON object |
 
-**示例修正**：
+**示例**：
 
 ```python
-// 伪代码（可省略 description/type/content）：
-Agent(name="context-researcher", subagent_type="pr-context-researcher", prompt="...")
-SendMessage(to="context-researcher", message="【lead_ready】", summary="握手信号")
+// ✅ 正确：所有必需参数都明确写出
+Agent(name="context-researcher", subagent_type="pr-context-researcher",
+      team_name="pr-review-team", model="sonnet",
+      description="PR #N 背景调研 agent", prompt="...")
+SendMessage(to="context-researcher", summary="握手信号",
+            message="【lead_ready】")
 
-// 实际调用（必须补充）：
-Agent(name="context-researcher", subagent_type="pr-context-researcher", prompt="...", 
-      description="PR #N 背景调研 agent")
-SendMessage(to="context-researcher", message="【lead_ready】", summary="握手信号",
-            type="message", content="【lead_ready】", recipient="context-researcher")
+// ❌ 错误：省略 description 或 summary
+Agent(name="context-researcher", subagent_type="pr-context-researcher", prompt="...")
+SendMessage(to="context-researcher", message="【lead_ready】")
 ```
 
-**注意**：伪代码只用于流程说明，实际执行时必须补充所有必需参数，否则触发 `InputValidationError`。
+**注意**：伪代码必须与实际调用一致，省略必需参数会导致 `InputValidationError`。
 
 ## Shell 命令 `$` 约定
 
@@ -260,11 +261,12 @@ if <脚本失败>: @stop("哪个脚本、什么错误")
     subagent_type=agent_type,
     team_name="pr-review-team",
     model=model,
+    description="PR #N 审查 {agent_type} agent",
     prompt="【第一步只能握手】
       你现在不得开始工作，也不得抢先自报 ready。
       等待 team-lead 发送 `【lead_ready】`。
       收到后执行 ToolSearch(query='select:SendMessage', max_results=1)，
-      然后立刻 SendMessage(to='team-lead', message='【agent_ready】已就绪')。
+      然后立刻 SendMessage(to='team-lead', summary='握手完成', message='【agent_ready】已就绪')。
       在收到正式任务前，不得开始任何工作。"
   )
   return @handshake(agent_name)
@@ -465,12 +467,15 @@ Phase_2():
   parallel:
     Agent(name="code-analyst", subagent_type="pr-code-analyst",
       team_name="pr-review-team", model="sonnet",
+      description="PR #N 代码质量分析 agent",
       prompt="【第一步只能握手】等待 team-lead 发送【lead_ready】...")
     Agent(name="architect-reviewer", subagent_type="pr-architect-reviewer",
       team_name="pr-review-team", model="sonnet",
+      description="PR #N 架构影响评估 agent",
       prompt="【第一步只能握手】等待 team-lead 发送【lead_ready】...")
     Agent(name="security-reviewer", subagent_type="pr-security-reviewer",
       team_name="pr-review-team", model="sonnet",
+      description="PR #N 安全漏洞审查 agent",
       prompt="【第一步只能握手】等待 team-lead 发送【lead_ready】...")
 
   // Step 3: 逐个握手 + 分配任务（非批量，逐个处理）
