@@ -145,21 +145,8 @@ class CheckCleanupService:
             backend = CodeagentBackend()
             registry = SessionRegistryService(store=self.store, backend=backend)
 
-            # Batch query: get all live sessions once
-            all_live_sessions = registry._store.list_live_runtime_sessions()
-
-            # Group by branch (verify tmux liveness)
-            branches_with_live: set[str] = set()
-            for session in all_live_sessions:
-                branch = session.get("branch")
-                if not branch:
-                    continue
-
-                tmux = session.get("tmux_session")
-                if tmux and backend.has_tmux_session(tmux):
-                    branches_with_live.add(branch)
-
-            return branches_with_live
+            # Reuse existing method: batch query + liveness verification
+            return registry.get_all_branches_with_live_sessions()
 
         except Exception as exc:
             logger.bind(domain="check").warning(
