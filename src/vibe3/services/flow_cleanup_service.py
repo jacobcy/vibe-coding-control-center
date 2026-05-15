@@ -263,7 +263,7 @@ class FlowCleanupService:
         """Kill lingering tmux sessions for a task issue.
 
         SAFETY CHECK: Verify no running sessions before terminating.
-        If sessions are still running, skip termination and log warning.
+        If sessions are still running, abort cleanup to protect active work.
         """
         import subprocess
 
@@ -283,13 +283,16 @@ class FlowCleanupService:
             live_sessions = registry.get_truly_live_sessions_for_branch(branch)
 
             if live_sessions:
-                logger.bind(domain="cleanup", branch=branch).warning(
-                    f"Skipping termination: {len(live_sessions)} live sessions "
-                    "found. Use 'vibe3 task resume --takeover' if you really "
-                    "want to force cleanup."
+                message = (
+                    f"Skipping cleanup for '{branch}': {len(live_sessions)} live "
+                    "sessions found. Use 'vibe3 task resume --takeover' if you "
+                    "really want to force cleanup."
                 )
-                return
+                logger.bind(domain="cleanup", branch=branch).warning(message)
+                raise RuntimeError(message)
         except Exception as exc:
+            if isinstance(exc, RuntimeError):
+                raise
             logger.bind(domain="cleanup", branch=branch).warning(
                 f"Failed to check live sessions: {exc}. Proceeding with termination."
             )
