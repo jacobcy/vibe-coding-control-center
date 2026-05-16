@@ -200,11 +200,11 @@ def status(
             local_snap = orch_service.snapshot()
             orch_snapshot = replace(local_snap, server_running=False)
 
-        if output_format == "json":
+        if output_format in ("json", "yaml"):
             service = FlowService()
             flows = service.list_flows(status=None if all_flows else "active")
 
-            json_data = {
+            output_data = {
                 "orchestra": (
                     orch_snapshot.model_dump()
                     if hasattr(orch_snapshot, "model_dump")
@@ -212,7 +212,15 @@ def status(
                 ),
                 "flows": [f.model_dump() for f in flows],
             }
-            typer.echo(json.dumps(json_data, indent=2, default=str))
+
+            if output_format == "json":
+                typer.echo(json.dumps(output_data, indent=2, default=str))
+            else:  # yaml
+                import yaml
+
+                typer.echo(
+                    yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
+                )
             return
 
         # Header
