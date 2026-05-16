@@ -207,7 +207,26 @@ class ExecutionCoordinator:
 
         try:
             # 2. Launch
-            cwd_path = self._resolve_cwd(request)
+            try:
+                cwd_path = self._resolve_cwd(request)
+            except ValueError as exc:
+                # Worktree resolution failure → blocking error for the flow
+                error_msg = str(exc)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{request.role} worktree unavailable for "
+                    f"#{request.target_id}: {error_msg}",
+                )
+                logger.bind(
+                    domain="execution_coordinator",
+                    role=request.role,
+                    target_id=request.target_id,
+                ).error(f"Worktree unavailable: {error_msg}")
+                return ExecutionLaunchResult(
+                    launched=False,
+                    reason=error_msg,
+                    reason_code="worktree_unavailable",
+                )
             env = request.env or dict(os.environ)
 
             # Launch async
