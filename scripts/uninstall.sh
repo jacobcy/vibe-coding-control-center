@@ -136,21 +136,27 @@ _clean_rc_file() {
     # Create backup
     cp "$rc_file" "$rc_file.vibe-backup"
 
-    # Remove Vibe-related lines
+    # Remove Vibe-related lines using markers as anchors
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' '/# Vibe Coding Control Center/d' "$rc_file" 2>/dev/null || true
-        sed -i '' '/source .*\/loader.sh/d' "$rc_file" 2>/dev/null || true
-        sed -i '' '/export VIBE_ROOT/d' "$rc_file" 2>/dev/null || true
-        sed -i '' '/export UV_PROJECT_ENVIRONMENT.*vibe-center/d' "$rc_file" 2>/dev/null || true
-        sed -i '' '/# Vibe Local Bin/d' "$rc_file" 2>/dev/null || true
-        sed -i '' '/export PATH.*\.local\/bin/d' "$rc_file" 2>/dev/null || true
+        # macOS sed
+        # Delete line following Vibe marker (loader.sh source)
+        sed -i '' '/# Vibe Coding Control Center/,+1 d' "$rc_file" 2>/dev/null || true
+        # Delete VIBE_ROOT export
+        sed -i '' '/^export VIBE_ROOT=/d' "$rc_file" 2>/dev/null || true
+        # Delete UV_PROJECT_ENVIRONMENT for vibe-center
+        sed -i '' '/^export UV_PROJECT_ENVIRONMENT=.*vibe-center/d' "$rc_file" 2>/dev/null || true
+        # Delete PATH export following Vibe Local Bin marker
+        sed -i '' '/# Vibe Local Bin/,+1 d' "$rc_file" 2>/dev/null || true
     else
-        sed -i '/# Vibe Coding Control Center/d' "$rc_file" 2>/dev/null || true
-        sed -i '/source .*\/loader.sh/d' "$rc_file" 2>/dev/null || true
-        sed -i '/export VIBE_ROOT/d' "$rc_file" 2>/dev/null || true
-        sed -i '/export UV_PROJECT_ENVIRONMENT.*vibe-center/d' "$rc_file" 2>/dev/null || true
-        sed -i '/# Vibe Local Bin/d' "$rc_file" 2>/dev/null || true
-        sed -i '/export PATH.*\.local\/bin/d' "$rc_file" 2>/dev/null || true
+        # Linux sed
+        # Delete line following Vibe marker (loader.sh source)
+        sed -i '/# Vibe Coding Control Center/,+1 d' "$rc_file" 2>/dev/null || true
+        # Delete VIBE_ROOT export
+        sed -i '/^export VIBE_ROOT=/d' "$rc_file" 2>/dev/null || true
+        # Delete UV_PROJECT_ENVIRONMENT for vibe-center
+        sed -i '/^export UV_PROJECT_ENVIRONMENT=.*vibe-center/d' "$rc_file" 2>/dev/null || true
+        # Delete PATH export following Vibe Local Bin marker
+        sed -i '/# Vibe Local Bin/,+1 d' "$rc_file" 2>/dev/null || true
     fi
 
     log_success "Cleaned $rc_file (backup: $rc_file.vibe-backup)"

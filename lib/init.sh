@@ -2,8 +2,6 @@
 # vibe init - Project Initialization
 # Initializes project directory structure and configuration
 
-set -euo pipefail
-
 # --- Helper Functions ---
 _log_info() { echo "${CYAN}ℹ️  $1${NC}"; }
 _log_success() { echo "${GREEN}✅ $1${NC}"; }
@@ -32,6 +30,9 @@ vibe_init_help() {
 
 # --- Main Function ---
 vibe_init() {
+    # Enable strict mode for this function only
+    set -euo pipefail
+
     # Parse arguments
     local SKIP_CONFIRM=false
     local SKIP_LABELS=false
@@ -104,17 +105,18 @@ vibe_init() {
     if [[ "$SKIP_LABELS" != true ]]; then
         _log_info "Creating GitHub labels..."
 
-        # Define required labels
+        # Define required labels (synced with scripts/sync-labels.sh)
         local -a LABELS
         LABELS=(
-            "state/ready:Ready for manager dispatch:0E8A16"
-            "state/claimed:Claimed and waiting for planning:1D76DB"
-            "state/in-progress:Execution in progress:FBCA04"
-            "state/blocked:Blocked and waiting for follow-up:D93F0B"
-            "state/handoff:Waiting for manager handoff decision:5319E7"
-            "state/review:Waiting for review execution:0052CC"
-            "state/merge-ready:Ready to merge:0E8A16"
-            "state/done:Flow completed:6A737D"
+            "state/ready:Ready for manager dispatch:EEEEEE"
+            "state/claimed:已认领,待进入执行:BFDADC"
+            "state/in-progress:执行中:0052CC"
+            "state/blocked:阻塞中:D73A4A"
+            "state/handoff:待交接:FBCA04"
+            "state/review:待 review:5319E7"
+            "state/merge-ready:已满足合并条件:0E8A16"
+            "state/done:已完成:0E8A16"
+            "state/failed:Execution failed and needs recovery:B60205"
             "vibe-task:Track issues intended for vibe roadmap/task intake:5319E7"
         )
 
