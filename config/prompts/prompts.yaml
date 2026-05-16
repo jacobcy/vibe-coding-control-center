@@ -250,6 +250,18 @@ orchestra:
       你当前处于 supervisor/apply 场景，只处理 handoff 或治理 issue。
       不要进入 governance 周期巡检模式，也不要切换到 run / plan / review 执行模式。
 
+  explorer: |
+    Answer the following question about this project.
+
+    Question: {question}
+
+    Instructions:
+    - Read relevant files to answer the question
+    - Be factual and concise
+    - Provide file references when helpful
+    - If you cannot find information, say so
+
+
 
 # =============================================================================
 # Role Prompt Materials: Manager
