@@ -64,7 +64,7 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
-    # Record 2 API errors (threshold is 2 in 3 ticks)
+    # Record 2 API errors (threshold is 2 in 10 minutes)
     ErrorTrackingService._instance.record_error(
         "E_API_RATE_LIMIT", "Rate limit", tick_id=1
     )
