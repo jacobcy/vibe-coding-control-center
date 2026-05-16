@@ -142,7 +142,8 @@ vibe_init() {
     local VIBE_SKILLS_DIR="$HOME/.vibe/skills"
 
     if [[ -d "$VIBE_SKILLS_DIR" ]]; then
-        for skill in "$VIBE_SKILLS_DIR"/vibe-*; do
+        # Use (N) glob qualifier to suppress "no matches" error
+        for skill in "$VIBE_SKILLS_DIR"/vibe-*(N); do
             if [[ -d "$skill" ]]; then
                 local skill_name
                 skill_name="$(basename "$skill")"
@@ -156,6 +157,13 @@ vibe_init() {
                 fi
             fi
         done
+
+        # Check if any skills were processed
+        local skills_count
+        skills_count=$(find "$VIBE_SKILLS_DIR" -maxdepth 1 -name "vibe-*" -type d | wc -l)
+        if [[ "$skills_count" -eq 0 ]]; then
+            _log_warning "No vibe-* skills found in $VIBE_SKILLS_DIR"
+        fi
     else
         _log_warning "Global skills directory not found: $VIBE_SKILLS_DIR"
         echo "   Run 'scripts/install.sh' first to setup global environment."
