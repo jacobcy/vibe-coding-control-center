@@ -4,11 +4,22 @@
 
 Orchestra MCP Server 提供以下工具和资源：
 
-### MCP 工具（4个）
+### MCP 工具（3个）
 - **orchestra_status**: 查看当前 orchestra 系统状态摘要
 - **orchestra_issue_detail**: 查看特定 issue 的详细信息
 - **orchestra_dispatch_history**: 查看最近的调度执行历史
-- **orchestra_ask**: 向项目探索 agent 提问（**核心功能**）
+
+### ⚠️ 已废弃：orchestra_ask
+
+`orchestra_ask` MCP 工具已废弃，因为 Claude Code 对 stdio transport 有硬编码超时限制（60秒），导致长时间执行的工具调用失败。
+
+**替代方案**：使用 `vibe3 ask` CLI 命令：
+```bash
+vibe3 ask "What is the structure of src/vibe3/?"
+vibe3 ask "How does CapacityService work?" --timeout 300
+```
+
+详见：Issue #47076, #43177
 
 ### MCP 资源（3个）
 - `orchestra://status`: 当前状态 JSON
