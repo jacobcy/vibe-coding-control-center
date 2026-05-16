@@ -19,7 +19,7 @@ from vibe3.prompts.models import (
     VariableSourceKind,
 )
 
-DEFAULT_PROMPT_RECIPES_PATH = Path("config/prompts/prompt-recipes.yaml")
+DEFAULT_PROMPT_RECIPES_PATH = Path("assets/prompts/prompt-recipes.yaml")
 
 PromptProvider = Callable[[], str | None]
 
@@ -76,7 +76,7 @@ class PromptManifest:
         if not recipes_path.exists():
             raise FileNotFoundError(
                 f"Prompt recipes file not found: {recipes_path}. "
-                "Please ensure config/prompts/prompt-recipes.yaml exists "
+                "Please ensure assets/prompts/prompt-recipes.yaml exists "
                 "in the repository."
             )
 

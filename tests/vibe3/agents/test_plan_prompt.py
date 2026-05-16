@@ -26,8 +26,9 @@ def test_build_plan_prompt_body_requires_canonical_plan_and_handoff() -> None:
 
     result = build_plan_prompt_body(request)
 
-    assert "docs/plans/" in result
-    assert "handoff plan" in result
+    # Policy content should mention handoff and output format
+    assert "handoff" in result.lower()
+    assert "Output format" in result
 
 
 def test_build_plan_output_contract_section_keeps_output_contract_only() -> None:

@@ -2,8 +2,8 @@
 
 配置真源原则：
 - config/v3/settings.yaml 是运行时开关、agent preset、policy 路径等配置真源
-- config/prompts/prompts.yaml 是 prompt 文案真源
-- config/prompts/prompt-recipes.yaml 是 role prompt section 装配顺序真源
+- assets/prompts/prompts.yaml 是 prompt 文案真源
+- assets/prompts/prompt-recipes.yaml 是 role prompt section 装配顺序真源
 - Pydantic 模型只提供最小安全默认值（用于降级场景）
 - 正常情况下所有配置都从 YAML 文件读取
 """
@@ -80,7 +80,7 @@ _PROMPT_KEYS: dict[str, set[str]] = {
 def _merge_prompt_fields(data: dict, prompts: dict) -> None:
     """Merge prompt content from prompts.yaml into VibeConfig-compatible sections.
 
-    Prompt text belongs in config/prompts/prompts.yaml. If config/v3/settings.yaml
+    Prompt text belongs in assets/prompts/prompts.yaml. If config/v3/settings.yaml
     also defines these fields, it creates a dual source of truth, so fail fast.
     """
     for section, allowed in _PROMPT_KEYS.items():
@@ -91,7 +91,7 @@ def _merge_prompt_fields(data: dict, prompts: dict) -> None:
             if key in dst:
                 raise ValueError(
                     f"Prompt field '{section}.{key}' must live in "
-                    "config/prompts/prompts.yaml, not config/v3/settings.yaml"
+                    "assets/prompts/prompts.yaml, not config/v3/settings.yaml"
                 )
             # Merge from prompts if available
             if key in src:
@@ -216,8 +216,8 @@ class AgentConfig(BaseModel):
 class ReviewConfig(BaseModel):
     """Review configuration."""
 
-    policy_file: str = Field(default=".agent/policies/review.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    policy_file: str = Field(default="assets/policies/review.md")
+    common_rules: str = Field(default="assets/policies/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     review_task: str = Field(default="")
@@ -228,8 +228,8 @@ class ReviewConfig(BaseModel):
 class PlanConfig(BaseModel):
     """Plan command configuration."""
 
-    policy_file: str = Field(default=".agent/policies/plan.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    policy_file: str = Field(default="assets/policies/plan.md")
+    common_rules: str = Field(default="assets/policies/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     plan_task: str = Field(default="")
@@ -240,8 +240,8 @@ class PlanConfig(BaseModel):
 class RunConfig(BaseModel):
     """Run command configuration."""
 
-    policy_file: str = Field(default=".agent/policies/run.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    policy_file: str = Field(default="assets/policies/run.md")
+    common_rules: str = Field(default="assets/policies/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     run_task: str = Field(default="")

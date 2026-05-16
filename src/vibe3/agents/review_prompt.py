@@ -124,7 +124,7 @@ def build_ast_analysis_section(
 def build_review_task_section(task_text: str | None) -> str:
     """Build review task section.
 
-    Source: config/prompts/prompts.yaml (review.review_task) via VibeConfig,
+    Source: assets/prompts/prompts.yaml (review.review_task) via VibeConfig,
     or default.
 
     Args:
@@ -156,7 +156,7 @@ def build_review_task_section(task_text: str | None) -> str:
 def build_output_contract_section(output_format: str | None) -> str:
     """Build output contract section.
 
-    Source: config/prompts/prompts.yaml (review.output_format) via VibeConfig,
+    Source: assets/prompts/prompts.yaml (review.output_format) via VibeConfig,
     or default.
 
     Args:
@@ -214,7 +214,7 @@ def _build_review_prompt_providers(
     request: ReviewRequest,
     config: VibeConfig,
 ) -> dict[str, PromptProvider]:
-    """Build providers used by config/prompts/prompt-recipes.yaml review sections."""
+    """Build providers used by assets/prompts/prompt-recipes.yaml review sections."""
 
     def review_retry_task() -> str | None:
         return getattr(config.review, "retry_task", None)
