@@ -37,6 +37,9 @@ debug_*.sh
 tmp_*.py
 test_git_hook_env.sh
 
+# GitHub Copilot prompts (local only, not tracked)
+.github/prompts/
+
 # =============================================================================
 # Python
 # =============================================================================

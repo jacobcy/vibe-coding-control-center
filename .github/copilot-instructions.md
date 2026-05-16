@@ -1,5 +1,49 @@
 # Copilot Onboarding — Vibe Center 2.0
 
+## Review 行为要求（重要）
+
+### Verdict 要求
+
+当完成 PR review 后，必须在 review summary 中给出明确的 verdict：
+
+1. **发现问题**：
+   - Review state: `COMMENTED` 或 `CHANGES_REQUESTED`
+   - Summary 末尾必须包含：
+     ```
+     ## Verdict
+     
+     **NEEDS CHANGES**: Found X issues requiring fixes before merge.
+     ```
+   - 每个问题必须在对应代码行给出 inline comment
+
+2. **无问题发现**：
+   - Review state: `APPROVED`（如果支持）或 `COMMENTED`
+   - Summary 末尾必须包含：
+     ```
+     ## Verdict
+     
+     **PASS**: No issues found. PR is ready for merge.
+     ```
+   - 避免"reviewed with no comments"的模糊表述
+
+### Bug 修复原则
+
+如果发现代码中的 bug 或安全问题：
+
+1. **最小修复原则**：
+   - 只修复报告的具体问题，不做无关重构
+   - 保持代码原有结构和风格
+   - 优先最简单的修复方案（如改用 `fullmatch()` 而非重写整个验证逻辑）
+
+2. **修复验证**：
+   - 提供可验证的证据（测试输出、命令结果）
+   - 说明修复的影响范围（哪些测试已运行）
+
+3. **禁止行为**：
+   - ❌ 不要在修复时顺便"改进"其他代码
+   - ❌ 不要修改 PR Title 或 Body（已在"特别注意"中强调）
+   - ❌ 不要提出"建议性"改动（如格式调整、命名优化）
+
 ## 特别注意
 
 - review时，请勿修改PR的Title、Body。
