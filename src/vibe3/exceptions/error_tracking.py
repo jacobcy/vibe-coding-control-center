@@ -9,7 +9,6 @@ All error state is persisted to SQLite for durability across restarts.
 
 from __future__ import annotations
 
-import datetime
 import sqlite3
 from typing import Any
 
@@ -224,19 +223,14 @@ class ErrorTrackingService:
         Returns:
             Number of API/exec errors in the sliding window.
         """
-        cutoff = datetime.datetime.now() - datetime.timedelta(
-            minutes=self.TIME_WINDOW_MINUTES
-        )
-        cutoff_iso = cutoff.isoformat()
-
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(
                 """
                 SELECT COUNT(*) FROM error_log
                 WHERE (error_code LIKE 'E_API_%' OR error_code LIKE 'E_EXEC_%')
-                  AND created_at >= ?
+                  AND created_at >= datetime('now', ? || ' minutes')
                 """,
-                (cutoff_iso,),
+                (f"-{self.TIME_WINDOW_MINUTES}",),
             ).fetchone()
 
         return rows[0] if rows else 0

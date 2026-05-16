@@ -74,7 +74,7 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     result = gate.check()
 
     assert result.blocked
-    assert "API error threshold" in (result.reason or "")
+    assert "API/Exec error threshold" in (result.reason or "")
 
 
 def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
