@@ -84,16 +84,16 @@ def _merge_prompt_fields(data: dict, prompts: dict) -> None:
     also defines these fields, it creates a dual source of truth, so fail fast.
     """
     for section, allowed in _PROMPT_KEYS.items():
-        src = prompts.get(section)
-        if not isinstance(src, dict):
-            continue
+        src = prompts.get(section) or {}
         dst = data.setdefault(section, {})
         for key in allowed:
+            # Always validate, even if no prompts file exists
             if key in dst:
                 raise ValueError(
                     f"Prompt field '{section}.{key}' must live in "
                     "config/prompts/prompts.yaml, not config/v3/settings.yaml"
                 )
+            # Merge from prompts if available
             if key in src:
                 dst[key] = src[key]
 
@@ -281,10 +281,12 @@ class VibeConfig(BaseModel):
     orchestra: OrchestraConfig = Field(default_factory=OrchestraConfig)
 
     @classmethod
-    def _load_supplementary(cls, data: dict) -> dict:
+    def _load_supplementary(cls, data: dict, repo_root: Path | None = None) -> dict:
         """Merge LOC limits and prompt content from their migrated config files."""
         import yaml  # type: ignore[import-untyped]
         from loguru import logger
+
+        from vibe3.assets.resolver import AssetResolver
 
         # Load loc_limits.yaml for code_limits and doc_limits
         # Try new path first, then fallback to old path
@@ -308,21 +310,25 @@ class VibeConfig(BaseModel):
                 if key in supp and key not in data:
                     data[key] = supp[key]
 
-        # Load prompt content from prompts.yaml into VibeConfig fields
-        # Try new path first, then fallback to old path
-        new_prompts_path = Path("config/prompts/prompts.yaml")
-        old_prompts_path = Path("config/prompts.yaml")
-        prompts_path = None
+        # Load prompt content using resolver
+        resolver = AssetResolver()
+        prompts_path = resolver.resolve("prompts/prompts.yaml", repo_root=repo_root)
 
-        if new_prompts_path.exists():
-            prompts_path = new_prompts_path
-        elif old_prompts_path.exists():
-            prompts_path = old_prompts_path
-
+        prompts: dict = {}
         if prompts_path:
-            with open(prompts_path) as f:
-                prompts = yaml.safe_load(f) or {}
-            _merge_prompt_fields(data, prompts)
+            try:
+                with open(prompts_path) as f:
+                    prompts = yaml.safe_load(f) or {}
+            except FileNotFoundError:
+                # Resolver found a path but file doesn't exist (edge case in tests)
+                # Treat as if no prompts file exists
+                logger.bind(
+                    domain="config",
+                    path=str(prompts_path),
+                ).debug("Prompts file not found at resolved path")
+
+        # Always validate and merge (even if no prompts file found)
+        _merge_prompt_fields(data, prompts)
 
         return data
 
@@ -337,7 +343,23 @@ class VibeConfig(BaseModel):
         if data is None:
             data = {}
 
-        data = cls._load_supplementary(data)
+        # Determine repo_root from config_path
+        # Config files are typically in config/v3/ or config/
+        # Walk up from the config file's parent directory to find the repo root
+        # (where .git or config/ directory exists)
+        current = config_path.resolve().parent  # Start from parent of config file
+        repo_root = None
+        while current.parent != current:  # Stop at filesystem root
+            if (current / ".git").exists() or (current / "config").is_dir():
+                repo_root = current
+                break
+            current = current.parent
+
+        # If no repo root found, use parent of config file
+        if repo_root is None:
+            repo_root = config_path.resolve().parent
+
+        data = cls._load_supplementary(data, repo_root=repo_root)
 
         return cls(**data)
 
