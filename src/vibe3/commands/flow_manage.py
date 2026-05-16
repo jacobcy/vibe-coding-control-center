@@ -7,7 +7,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.command_options import (
-    JsonOption,
+    FormatOption,
     TraceOption,
 )
 from vibe3.commands.common import trace_scope
@@ -140,9 +140,24 @@ def update(
     actor: ActorOption = None,
     spec: SpecOption = None,
     trace: TraceOption = False,
-    json_output: JsonOption = False,
+    output_format: FormatOption = "table",
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Update flow metadata (idempotent add/update)."""
+    # Handle deprecated --json flag
+    if json_output and output_format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        output_format = "json"
     from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
@@ -194,7 +209,7 @@ def update(
                 # Bind spec (absolute path)
                 flow_service.bind_spec(flow.branch, str(spec_path.resolve()), actor)
 
-        if json_output:
+        if output_format == "json":
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
             render_flow_created(flow)
@@ -206,9 +221,24 @@ def bind(
     branch: BindBranchOption = None,
     role: BindRoleOption = "task",
     trace: TraceOption = False,
-    json_output: JsonOption = False,
+    output_format: FormatOption = "table",
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Bind an issue to a flow branch. (Usage: vibe flow bind <task-id>)"""
+    # Handle deprecated --json flag
+    if json_output and output_format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        output_format = "json"
     from vibe3.utils.issue_ref import parse_issue_number
 
     issue_refs = _merge_issue_refs(issue, issue_tail, primary_hint="<issue>")
@@ -261,7 +291,7 @@ def bind(
                 )
                 links.append(link)
 
-            if json_output:
+            if output_format == "json":
                 if len(links) == 1:
                     typer.echo(json.dumps(links[0].model_dump(), indent=2, default=str))
                 else:
@@ -283,9 +313,24 @@ def bind(
 
 
 def list_deleted(
-    json_output: JsonOption = False,
+    output_format: FormatOption = "table",
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """List all soft-deleted flows (for audit and recovery)."""
+    # Handle deprecated --json flag
+    if json_output and output_format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        output_format = "json"
     from rich.table import Table
 
     from vibe3.clients import SQLiteClient
@@ -297,7 +342,7 @@ def list_deleted(
         console.print("[yellow]No deleted flows found[/]")
         return
 
-    if json_output:
+    if output_format == "json":
         typer.echo(json.dumps(deleted_flows, indent=2, default=str))
     else:
         table = Table(title=f"Deleted Flows ({len(deleted_flows)} total)")

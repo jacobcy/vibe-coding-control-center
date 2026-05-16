@@ -39,11 +39,6 @@ _BACKEND_OPT = Annotated[
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
 
 # Output format options
-JsonOption = Annotated[
-    bool,
-    typer.Option("--json", help="Output in JSON format"),
-]
-
 AllOption = Annotated[
     bool,
     typer.Option("--all", help="Include all items (not just active)"),

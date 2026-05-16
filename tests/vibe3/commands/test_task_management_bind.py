@@ -103,6 +103,8 @@ def test_flow_bind_dependency_json_output_single_ref() -> None:
             )
 
     assert result.exit_code == 0
+    # Deprecated --json flag should produce warning in stderr
+    assert "Warning: --json is deprecated, use --format json instead" in result.stderr
     task_service.link_issue.assert_not_called()
     payload = json.loads(result.stdout)
     assert payload["branch"] == "task/demo"
@@ -128,6 +130,8 @@ def test_flow_bind_dependency_json_output_multiple_refs() -> None:
             )
 
     assert result.exit_code == 0
+    # Deprecated --json flag should produce warning in stderr
+    assert "Warning: --json is deprecated, use --format json instead" in result.stderr
     task_service.link_issue.assert_not_called()
     payload = json.loads(result.stdout)
     assert payload == [

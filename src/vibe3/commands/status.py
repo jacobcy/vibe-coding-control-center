@@ -8,7 +8,7 @@ import typer
 
 from vibe3.commands.command_options import (
     AllOption,
-    JsonOption,
+    FormatOption,
     TraceOption,
 )
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
@@ -160,10 +160,25 @@ def status(
         bool,
         typer.Option("--check", help="显示前先运行完整 vibe3 check"),
     ] = False,
-    json_output: JsonOption = False,
+    output_format: FormatOption = "table",
     trace: TraceOption = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
+    # Handle deprecated --json flag
+    if json_output and output_format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        output_format = "json"
     with trace_scope(trace, "status", domain="status"):
         if check:
             run_full_check_shortcut()
@@ -185,7 +200,7 @@ def status(
             local_snap = orch_service.snapshot()
             orch_snapshot = replace(local_snap, server_running=False)
 
-        if json_output:
+        if output_format == "json":
             service = FlowService()
             flows = service.list_flows(status=None if all_flows else "active")
 
