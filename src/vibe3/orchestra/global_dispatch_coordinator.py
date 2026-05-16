@@ -416,32 +416,25 @@ class GlobalDispatchCoordinator:
                 continue
             # === END health check ===
 
-            try:
-                green = "\033[32m"
-                reset = "\033[0m"
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
-                    f"#{issue.number} ({role.registry_role})",
-                )
-                self._emit_dispatch_intent(role, issue, tick_id)
-                entry.waiting_state = entry.collected_state
-                dispatched_count += 1
+            green = "\033[32m"
+            reset = "\033[0m"
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: {green}dispatch-intent{reset} "
+                f"#{issue.number} ({role.registry_role})",
+            )
+            self._emit_dispatch_intent(role, issue, tick_id)
+            entry.waiting_state = entry.collected_state
+            dispatched_count += 1
 
-                logger.bind(
-                    domain="global_dispatch",
-                    role=role.registry_role,
-                    issue=issue.number,
-                ).info(
-                    f"Emitted dispatch intent for #{issue.number} "
-                    f"({role.registry_role})"
-                )
-            except Exception as exc:
-                logger.bind(
-                    domain="global_dispatch",
-                    role=role.registry_role,
-                    issue=issue.number,
-                ).error(f"Dispatch failed for #{issue.number}: {exc}")
+            logger.bind(
+                domain="global_dispatch",
+                role=role.registry_role,
+                issue=issue.number,
+            ).info(
+                f"Emitted dispatch intent for #{issue.number} "
+                f"({role.registry_role})"
+            )
             index += 1
 
         if dispatched_count > 0:
