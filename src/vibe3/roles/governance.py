@@ -191,7 +191,7 @@ def _build_broader_repo_entries(
             continue
 
         labels = normalize_labels(item.get("labels"))
-        if "supervisor" in labels:
+        if "supervisor" in labels or "vibe-task" in labels:
             continue
 
         assignees = normalize_assignees(item.get("assignees"))
@@ -222,6 +222,32 @@ def _build_broader_repo_entries(
         )
         entries.append(issue)
     return tuple(entries)
+
+
+def _get_vibe_task_issue_numbers(
+    github: GitHubClient, config: OrchestraConfig
+) -> set[int]:
+    """Fetch issue numbers that have the vibe-task label.
+
+    Args:
+        github: GitHubClient instance for API calls
+        config: OrchestraConfig with repo information
+
+    Returns:
+        Set of issue numbers that have vibe-task label
+    """
+    vibe_task_issues = github.list_issues(
+        label="vibe-task",
+        state="all",
+        repo=config.repo,
+        limit=5000,  # Fetch all vibe-task issues to avoid truncation
+    )
+    numbers: set[int] = set()
+    for item in vibe_task_issues:
+        number = item.get("number")
+        if isinstance(number, int):
+            numbers.add(number)
+    return numbers
 
 
 def build_governance_snapshot_context(
@@ -288,8 +314,24 @@ def build_governance_snapshot_context(
             ),
         )
 
+    # Default: assignee-pool path
+    github = github or GitHubClient()
+    vibe_task_numbers = _get_vibe_task_issue_numbers(github, config)
+
+    # Filter out vibe-task labeled issues from the active issues
+    active_entries = tuple(snapshot.active_issues)
+    filtered_entries = tuple(
+        entry for entry in active_entries if entry.number not in vibe_task_numbers
+    )
+
+    skipped_count = len(active_entries) - len(filtered_entries)
+    if skipped_count > 0:
+        logger.bind(domain="governance").info(
+            f"Filtered {skipped_count} vibe-task labeled issues from governance scan"
+        )
+
     return _build_issue_context(
-        tuple(snapshot.active_issues),
+        filtered_entries,
         server_running=snapshot.server_running,
         active_flows=snapshot.active_flows,
         active_worktrees=snapshot.active_worktrees,
