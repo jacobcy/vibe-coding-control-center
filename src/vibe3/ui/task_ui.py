@@ -111,7 +111,7 @@ def render_task_show(
                     )
             else:
                 console.print(f"[yellow]No flow found for issue #{branch}[/]")
-                console.print("Tip: Use 'vibe3 flow new' to create a flow")
+                console.print("Tip: Use 'vibe3 flow update' to register current branch")
             return
         # Non-numeric branch without flow
         if output_format in ("json", "yaml"):

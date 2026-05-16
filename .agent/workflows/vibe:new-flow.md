@@ -10,7 +10,7 @@ tags: [workflow, vibe, planning, orchestration]
 ## 定位
 
 - `vibe:new-flow` 是一个 `standalone orchestration workflow`。
-- 它不需要同名 skill；它只负责把用户带到”新建逻辑 flow”这一步。
+- 它不需要同名 skill；它只负责把用户带到"新建逻辑 flow"这一步。
 - 它不承担 `GitHub issue` 或 feature 定义职责。
 
 ## Steps
@@ -18,17 +18,18 @@ tags: [workflow, vibe, planning, orchestration]
 1. 回复用户：`我会把当前请求解释为新建逻辑 flow 的入口，并使用现有 shell 命令完成现场创建。`
 2. 先确认当前目标是：
    - 创建新的逻辑执行现场
-   - 为后续 `vibe flow bind <task-id>` 或 task 承载做准备
+   - 为后续 `vibe3 flow bind <issue-number>` 或 task 承载做准备
 3. 使用现有 shell 路径：
 
 ```bash
-vibe flow new <slug> --branch origin/main --save-unstash
-vibe flow bind <task-id>
+git checkout -b dev/issue-<N>
+vibe3 flow update
+vibe3 flow bind <N>
 ```
 
 ## Boundary
 
-- `flow new <slug>` 只创建现场，不创建 feature
-- `flow new <slug>` 默认在当前 worktree 内创建/切换 branch，不新建物理 worktree
-- `task-id` 指向 execution record
-- 若需要决定绑定哪个 task，应先回到 `vibe:task` 或 `vibe:new`，而不是在本入口里扩展规划逻辑
+- `git checkout -b` 创建新分支，`vibe3 flow update` 注册该分支为 flow
+- Flow 创建在当前 worktree 内，不新建物理 worktree
+- `<N>` 是 issue number，用于绑定 flow 与 issue
+- 若需要决定绑定哪个 issue，应先回到 `vibe:task` 或 `vibe:new`，而不是在本入口里扩展规划逻辑
