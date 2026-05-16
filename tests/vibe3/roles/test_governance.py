@@ -221,6 +221,141 @@ class TestBuildSnapshotContext:
         assert ctx["issue_scope_name"] == "broader repo issue pool"
         assert "#301" in ctx["suggested_issue_details"]
 
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_vibe_task_issues_filtered_from_assignee_pool(self, mock_github_cls):
+        """Issues with vibe-task label should be filtered from assignee pool."""
+        snapshot = _make_snapshot()
+        config = _make_config()
+        mock_github = MagicMock()
+
+        # Mock vibe-task labeled issues (should be filtered)
+        mock_github.list_issues.return_value = [
+            {
+                "number": 100,
+                "title": "Already reviewed",
+                "body": "",
+                "assignees": [],
+                "labels": [{"name": "vibe-task"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        # Create snapshot with both vibe-task and normal issues
+        reviewed = IssueStatusEntry(
+            number=100,
+            title="Already reviewed",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        normal = IssueStatusEntry(
+            number=101,
+            title="Needs review",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        snapshot = _make_snapshot(active_issues=(reviewed, normal))
+
+        ctx = build_governance_snapshot_context(snapshot, config=config)
+
+        # Only non-vibe-task issue should appear
+        assert ctx["active_count"] == 1
+        assert "#101" in ctx["suggested_issue_details"]
+        assert "#100" not in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_broader_repo_filters_vibe_task(self, mock_github_cls):
+        """Broader repo candidates should filter vibe-task labeled issues."""
+        snapshot = _make_snapshot()
+        config = _make_config()
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 201,
+                "title": "Fix bug",
+                "body": "Clear scope",
+                "assignees": [],
+                "labels": [{"name": "vibe-task"}],  # Should be filtered
+                "milestone": None,
+            },
+            {
+                "number": 202,
+                "title": "New feature",
+                "body": "Clear scope",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],  # Should pass through
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        # Use roadmap-intake material
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert ctx["active_count"] == 1
+        assert "#202" in ctx["suggested_issue_details"]
+        assert "#201" not in ctx["suggested_issue_details"]
+
+    def test_no_vibe_task_issues_no_filtering(self):
+        """When no vibe-task issues exist, all candidates should pass through."""
+        from unittest.mock import patch
+
+        snapshot = _make_snapshot()
+        config = _make_config()
+
+        with patch("vibe3.roles.governance.GitHubClient") as mock_github_cls:
+            mock_github = MagicMock()
+            mock_github.list_issues.return_value = []  # No vibe-task issues
+            mock_github_cls.return_value = mock_github
+
+            issue1 = IssueStatusEntry(
+                number=1,
+                title="Issue 1",
+                state=None,
+                assignee="vibe-manager-agent",
+                has_flow=False,
+                flow_branch=None,
+                has_worktree=False,
+                worktree_path=None,
+                has_pr=False,
+                pr_number=None,
+                blocked_by=(),
+            )
+            issue2 = IssueStatusEntry(
+                number=2,
+                title="Issue 2",
+                state=None,
+                assignee="vibe-manager-agent",
+                has_flow=False,
+                flow_branch=None,
+                has_worktree=False,
+                worktree_path=None,
+                has_pr=False,
+                pr_number=None,
+                blocked_by=(),
+            )
+            snapshot = _make_snapshot(active_issues=(issue1, issue2))
+
+            ctx = build_governance_snapshot_context(snapshot, config=config)
+
+            # Both issues should appear
+            assert ctx["active_count"] == 2
+
 
 class TestBuildGovernanceRecipe:
     """Tests for build_governance_recipe."""
