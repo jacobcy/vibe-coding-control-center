@@ -103,6 +103,12 @@ class OrchestrationFacade(ServiceBase):
         if self._coordinator:
             self._coordinator.shutdown()
 
+    def get_queued_issue_numbers(self) -> set[int]:
+        """Get issue numbers currently in the dispatch queue."""
+        if self._coordinator:
+            return self._coordinator.get_queued_issue_numbers()
+        return set()
+
     async def on_tick(self, tick_id: int = 0) -> None:
         """Heartbeat polling -> publish governance + supervisor events.
 

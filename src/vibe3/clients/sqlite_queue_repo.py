@@ -60,3 +60,20 @@ class SQLiteQueueRepo:
                         now,
                     ),
                 )
+
+    # Frozen queue compatibility methods (alias for orchestra_queue operations)
+    def save_frozen_queue(self, entries: list[dict[str, Any]]) -> None:
+        """Save frozen queue entries (bulk replace)."""
+        self.replace_all_queue_entries(entries)
+
+    def load_frozen_queue(self) -> list[dict[str, Any]]:
+        """Load frozen queue entries."""
+        return self.load_all_queue_entries()
+
+    def remove_from_frozen_queue(self, issue_number: int) -> None:
+        """Remove an issue from frozen queue."""
+        self.remove_queue_entry(issue_number)
+
+    def clear_frozen_queue(self) -> None:
+        """Clear all entries from frozen queue."""
+        self.replace_all_queue_entries([])
