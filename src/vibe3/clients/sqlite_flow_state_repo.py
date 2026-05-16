@@ -41,6 +41,7 @@ class SQLiteFlowStateRepo:
         "execution_completed_at",
         "latest_verdict",  # Latest verdict record (JSON)
         "deleted_at",  # Soft delete timestamp (ISO 8601 or NULL)
+        "worktree_path",  # Canonical worktree path for flow execution
     }
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
