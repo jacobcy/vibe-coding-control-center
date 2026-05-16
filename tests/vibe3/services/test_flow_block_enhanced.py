@@ -63,6 +63,7 @@ class TestBlockFlowEnhanced:
         branch = "task/issue-42"
         reason = "Waiting for dependency"
         actor = "test-actor"
+        mock_github_client.get_issue_body.return_value = "Test issue body"
 
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
@@ -122,6 +123,7 @@ class TestBlockFlowEnhanced:
         branch = "task/issue-42"
         reason = None
         actor = "test-actor"
+        mock_github_client.get_issue_body.return_value = "Test issue body"
 
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
