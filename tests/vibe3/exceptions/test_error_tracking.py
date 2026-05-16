@@ -224,3 +224,59 @@ def test_get_status_category_sums_match_total(temp_store: SQLiteClient) -> None:
         status["model_errors"] + status["api_errors"] + status["exec_errors"]
         == status["total_errors"]
     )
+
+
+def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
+    """record_error should work with only required parameters."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Call with minimal parameters (non-API error)
+    threshold_reached, error_count = ErrorTrackingService._instance.record_error(
+        "E_EXEC_ERROR", "Test message"
+    )
+
+    # Verify return values (non-API errors don't trigger threshold)
+    assert threshold_reached is False
+    assert error_count == 0
+
+    # Verify database state - record should be persisted
+    with sqlite3.connect(temp_store.db_path) as conn:
+        row = conn.execute("""
+            SELECT tick_id, error_code, error_message, issue_number, branch
+            FROM error_log
+            ORDER BY created_at DESC LIMIT 1
+            """).fetchone()
+        assert row is not None
+        assert row[0] == 0  # tick_id defaults to 0
+        assert row[1] == "E_EXEC_ERROR"
+        assert row[2] == "Test message"
+        assert row[3] is None  # issue_number is NULL
+        assert row[4] is None  # branch is NULL
+
+
+def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
+    """record_error should work with tick_id but no issue_number/branch."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Call with tick_id only (mirrors governance_sync_runner usage)
+    threshold_reached, error_count = ErrorTrackingService._instance.record_error(
+        "E_EXEC_ERROR", "Test message", tick_id=42
+    )
+
+    # Verify return values (non-API errors don't trigger threshold)
+    assert threshold_reached is False
+    assert error_count == 0
+
+    # Verify database state - record should be persisted
+    with sqlite3.connect(temp_store.db_path) as conn:
+        row = conn.execute("""
+            SELECT tick_id, error_code, error_message, issue_number, branch
+            FROM error_log
+            ORDER BY created_at DESC LIMIT 1
+            """).fetchone()
+        assert row is not None
+        assert row[0] == 42  # tick_id preserved
+        assert row[1] == "E_EXEC_ERROR"
+        assert row[2] == "Test message"
+        assert row[3] is None  # issue_number is NULL
+        assert row[4] is None  # branch is NULL
