@@ -197,3 +197,30 @@ def test_cleanup_does_not_affect_threshold_detection(
     # Verify threshold detection after cleanup
     api_count_after = ErrorTrackingService._instance.get_api_error_count()
     assert api_count_after == 2  # Still same count
+
+
+def test_get_status_category_sums_match_total(temp_store: SQLiteClient) -> None:
+    """get_status() should count actual errors, not unique error codes."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Record errors with duplicate codes
+    for _ in range(3):
+        ErrorTrackingService._instance.record_error("E_API_RATE_LIMIT", "Rate limit")
+    for _ in range(5):
+        ErrorTrackingService._instance.record_error(
+            "E_EXEC_UNKNOWN", "Unknown exec error"
+        )
+    for _ in range(2):
+        ErrorTrackingService._instance.record_error("E_EXEC_NO_OUTPUT", "No output")
+
+    status = ErrorTrackingService._instance.get_status()
+
+    # Verify category sums match total
+    assert status["total_errors"] == 10
+    assert status["model_errors"] == 0
+    assert status["api_errors"] == 3
+    assert status["exec_errors"] == 7
+    assert (
+        status["model_errors"] + status["api_errors"] + status["exec_errors"]
+        == status["total_errors"]
+    )
