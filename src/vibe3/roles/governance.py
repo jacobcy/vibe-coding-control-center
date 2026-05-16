@@ -240,6 +240,7 @@ def _get_vibe_task_issue_numbers(
         label="vibe-task",
         state="all",
         repo=config.repo,
+        limit=5000,  # Fetch all vibe-task issues to avoid truncation
     )
     numbers: set[int] = set()
     for item in vibe_task_issues:

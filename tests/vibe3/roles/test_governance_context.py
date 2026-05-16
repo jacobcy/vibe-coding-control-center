@@ -304,8 +304,6 @@ class TestBuildSnapshotContext:
 
     def test_no_vibe_task_issues_no_filtering(self):
         """When no vibe-task issues exist, all candidates should pass through."""
-        from unittest.mock import patch
-
         snapshot = _make_snapshot()
         config = _make_config()
 
