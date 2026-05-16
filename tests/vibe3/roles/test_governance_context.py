@@ -41,7 +41,12 @@ def _make_config(**overrides) -> OrchestraConfig:
 class TestBuildSnapshotContext:
     """Tests for build_governance_snapshot_context."""
 
-    def test_empty_issues(self):
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_empty_issues(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
         snapshot = _make_snapshot()
         ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["server_status"] == "running"
@@ -54,7 +59,12 @@ class TestBuildSnapshotContext:
         assert "(无 running issues)" in ctx["running_issue_details"]
         assert "(无建议 issue)" in ctx["suggested_issue_details"]
 
-    def test_with_running_and_suggested_issues(self):
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_with_running_and_suggested_issues(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
         running = IssueStatusEntry(
             number=42,
             title="Running",
@@ -93,12 +103,22 @@ class TestBuildSnapshotContext:
         assert "#42" in ctx["running_issue_details"]
         assert "#43" in ctx["suggested_issue_details"]
 
-    def test_server_stopped(self):
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_server_stopped(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
         snapshot = _make_snapshot(server_running=False)
         ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert ctx["server_status"] == "stopped"
 
-    def test_truncation_note(self):
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_truncation_note(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
         issues = tuple(
             IssueStatusEntry(
                 number=i,
