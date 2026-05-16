@@ -9,13 +9,14 @@ All error state is persisted to SQLite for durability across restarts.
 
 from __future__ import annotations
 
+import datetime
 import sqlite3
 from typing import Any
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions.error_codes import is_api_error, is_model_error
+from vibe3.exceptions.error_codes import is_api_error, is_exec_error, is_model_error
 
 
 class ErrorTrackingService:
@@ -148,27 +149,27 @@ class ErrorTrackingService:
             tick=tick_id,
         ).info("Error recorded to error_log")
 
-        # Only track API errors for threshold
-        if not is_api_error(error_code):
+        # Track API errors AND execution errors for threshold
+        if not is_api_error(error_code) and not is_exec_error(error_code):
             # Model config errors → immediate threshold (but handled separately)
-            # Execution errors → no threshold
+            # Other errors → no threshold
             return False, 0
 
-        # Count API errors in recent window
-        api_error_count = self.get_api_error_count()
+        # Count API and exec errors in recent window
+        error_count = self.get_api_and_exec_error_count()
 
         # Check threshold
-        threshold_reached = api_error_count >= self.THRESHOLD_COUNT
+        threshold_reached = error_count >= self.THRESHOLD_COUNT
 
         if threshold_reached:
             logger.bind(
                 domain="error_tracking",
                 error_code=error_code,
-                window_count=api_error_count,
+                window_count=error_count,
                 threshold=self.THRESHOLD_COUNT,
-            ).error("API error threshold reached")
+            ).error("API/EXEC error threshold reached")
 
-        return threshold_reached, api_error_count
+        return threshold_reached, error_count
 
     def get_error_counts(self) -> dict[str, int]:
         """Get current error counts from error_log.
@@ -211,6 +212,29 @@ class ErrorTrackingService:
                 WHERE error_code LIKE 'E_API_%'
                   AND created_at >= datetime('now', '-10 minutes')
                 """).fetchone()
+
+        return rows[0] if rows else 0
+
+    def get_api_and_exec_error_count(self) -> int:
+        """Get count of E_API_* and E_EXEC_* errors within time window.
+
+        Returns:
+            Number of API/exec errors in the sliding window.
+        """
+        cutoff = datetime.datetime.now() - datetime.timedelta(
+            minutes=self.TIME_WINDOW_MINUTES
+        )
+        cutoff_iso = cutoff.isoformat()
+
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT COUNT(*) FROM error_log
+                WHERE (error_code LIKE 'E_API_%' OR error_code LIKE 'E_EXEC_%')
+                  AND created_at >= ?
+                """,
+                (cutoff_iso,),
+            ).fetchone()
 
         return rows[0] if rows else 0
 
