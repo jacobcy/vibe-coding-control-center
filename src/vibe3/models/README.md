@@ -14,10 +14,9 @@ Pydantic 领域数据模型，定义系统中流转的核心数据结构。
 | trace.py | 153 | 执行追踪（ExecutionStep、TraceOutput） |
 | pr.py | 152 | PR 请求/响应模型 |
 | review.py | 103 | Review 模型、ReviewResult |
-| task_bridge.py | 74 | Task-review 桥接模型 |
+| task_bridge.py | 71 | Task-review 桥接模型（bridge 字段验证） |
 | plan.py | 71 | Plan 模型、计划元数据 |
 | review_runner.py | 53 | Agent 选项、Agent 结果 |
-| project_item.py | 52 | GitHub Project item |
 | coverage.py | 52 | Coverage 数据 |
 | pr_analysis.py | 48 | PR 分析结果 |
 | change_source.py | 47 | 变更源元数据 |
@@ -27,7 +26,7 @@ Pydantic 领域数据模型，定义系统中流转的核心数据结构。
 | runtime_session.py | 32 | 运行时会话模型 |
 | handoff.py | 21 | Handoff 记录模型 |
 
-**总计**: 20 文件，2191 行代码
+**总计**: 19 文件，1878 行代码
 
 ## 架构说明
 
@@ -54,9 +53,8 @@ Models 模块按职责分为 4 个类别：
 - **pr.py**: PR 请求/响应模型
 - **review.py**: Review 模型、ReviewResult
 - **review_runner.py**: Agent 选项、Agent 结果
-- **task_bridge.py**: Task-review 桥接
+- **task_bridge.py**: Task-review 桥接（bridge 字段验证）
 - **pr_analysis.py**: PR 分析结果
-- **project_item.py**: GitHub Project item
 - **change_source.py**: 变更源元数据
 - **runtime_session.py**: 运行时会话
 
@@ -73,7 +71,6 @@ models/
 │   ├── pr.py
 │   ├── plan.py
 │   ├── review_runner.py
-│   ├── project_item.py
 │   ├── coverage.py
 │   ├── pr_analysis.py
 │   ├── change_source.py

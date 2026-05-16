@@ -170,14 +170,3 @@ prompt_text:
   notes:
     - "Owns prompt text/output contracts/retry guidance."
     - "config/v3/settings.yaml must not define these fields; loader fails fast."
-
-github_project:
-  source_file: "config/v3/settings.yaml"
-  schema: "N/A (not wired)"
-  consumers: []
-  tests: []
-  status: "dead"
-  notes:
-    - "Defined in settings.yaml but not in VibeConfig schema"
-    - "Appears to be legacy task-bridge config"
-    - "Remove in next cleanup cycle"

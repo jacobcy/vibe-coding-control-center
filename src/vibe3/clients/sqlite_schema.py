@@ -32,8 +32,6 @@ _CREATE_FLOW_STATE = """
         next_step TEXT,
         flow_status TEXT NOT NULL DEFAULT 'active',
         updated_at TEXT NOT NULL,
-        project_item_id TEXT,
-        project_node_id TEXT,
         planner_status TEXT,
         executor_status TEXT,
         reviewer_status TEXT,
@@ -181,19 +179,10 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_SCHEMA_META)
     cursor.execute(_CREATE_FLOW_STATE)
 
-    # Migration: add bridge columns if missing (idempotent)
+    # Migration: add initiated_by column if missing
     existing = {
         row[1] for row in cursor.execute("PRAGMA table_info(flow_state)").fetchall()
     }
-    # Safe to use f-string: col values are hardcoded in the loop below
-    for col in ("project_item_id", "project_node_id"):
-        if col not in existing:
-            cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} TEXT")
-            logger.bind(external="sqlite", operation="migration").info(
-                f"Added {col} column to flow_state"
-            )
-
-    # Migration: add initiated_by column if missing
     if "initiated_by" not in existing:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN initiated_by TEXT")
         logger.bind(external="sqlite", operation="migration").info(

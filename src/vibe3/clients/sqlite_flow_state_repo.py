@@ -33,8 +33,6 @@ class SQLiteFlowStateRepo:
         "next_step",
         "flow_status",
         "updated_at",
-        "project_item_id",
-        "project_node_id",
         "planner_status",
         "executor_status",
         "reviewer_status",
@@ -317,26 +315,6 @@ class SQLiteFlowStateRepo:
                 count=len(flows),
             ).debug("Retrieved flows by issue")
             return flows
-
-    def update_bridge_fields(
-        self,
-        branch: str,
-        project_item_id: str | None,
-        project_node_id: str | None,
-    ) -> None:
-        from vibe3.models.task_bridge import TaskBridgeModel
-
-        fields: dict[str, Any] = {}
-        if project_item_id is not None:
-            fields["project_item_id"] = project_item_id
-        if project_node_id is not None:
-            fields["project_node_id"] = project_node_id
-
-        TaskBridgeModel.assert_no_truth_write(fields)
-        self.update_flow_state(branch, **fields)
-        logger.bind(
-            external="sqlite", operation="update_bridge_fields", branch=branch
-        ).debug("Updated bridge fields")
 
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get dependent flows (excludes soft-deleted flows)."""
