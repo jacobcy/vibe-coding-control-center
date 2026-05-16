@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from vibe3.models.pr import PRResponse
 from vibe3.ui.console import console
+from vibe3.utils.time_format import format_age_aware_time
 
 if TYPE_CHECKING:
     from vibe3.analysis.local_review_report import LocalReviewReport
@@ -147,5 +148,5 @@ def render_local_review_summary(
     console.print(f"- [cyan]Report[/]: {local_review.report_path}")
 
     if local_review.created_at:
-        created_str = local_review.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        created_str = format_age_aware_time(local_review.created_at)
         console.print(f"- [cyan]Created At[/]: {created_str}")

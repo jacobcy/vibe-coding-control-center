@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -13,6 +12,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions.error_tracking import ErrorTrackingService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.utils.time_format import format_age_aware_time
 
 
 class ServeStatusService:
@@ -192,26 +192,9 @@ class ServeStatusService:
                 table.add_column("Message", style="white")
 
                 for err in recent_errors:
-                    # Format time as HH:MM:SS (convert UTC to local timezone)
+                    # Format time with age-aware display (convert UTC to local timezone)
                     time_str = err.get("created_at", "")
-                    if time_str and len(time_str) >= 19:
-                        try:
-                            # Parse UTC time from database
-                            utc_time = datetime.strptime(
-                                time_str[:19], "%Y-%m-%d %H:%M:%S"
-                            )
-                            utc_time = utc_time.replace(tzinfo=timezone.utc)
-
-                            # Convert to system local timezone
-                            local_time = utc_time.astimezone()
-
-                            # Extract HH:MM:SS
-                            time_display = local_time.strftime("%H:%M:%S")
-                        except (ValueError, TypeError):
-                            # Fallback: just extract time part
-                            time_display = time_str[11:19]
-                    else:
-                        time_display = time_str
+                    time_display = format_age_aware_time(time_str)
 
                     # Format issue number (NULL for governance errors)
                     issue_num = err.get("issue_number")
