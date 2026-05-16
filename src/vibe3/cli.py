@@ -20,6 +20,7 @@ from vibe3.commands import (
     handoff,
     inspect,
     internal,
+    mcp,
     plan,
     pr,
     review,
@@ -67,6 +68,7 @@ app.add_typer(scan.app, name="scan")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")
+app.add_typer(mcp.app, name="mcp")
 
 
 @app.command(name="status", hidden=True)

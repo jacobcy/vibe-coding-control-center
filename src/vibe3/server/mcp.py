@@ -342,23 +342,10 @@ def create_mcp_server(
             # Resolve repo root for working directory context
             repo_root = resolve_orchestra_repo_root()
 
-            # Read supervisor file
-            supervisor_path = repo_root / "supervisor" / "project-explorer.md"
-            if not supervisor_path.exists():
-                return json.dumps(
-                    {"error": "Supervisor file not found"},
-                    indent=2,
-                )
-            supervisor_content = supervisor_path.read_text(encoding="utf-8")
-
-            # Build prompt recipe
+            # Build prompt recipe with simplified template (no supervisor content)
             recipe = PromptRecipe(
                 template_key="orchestra.explorer",
                 variables={
-                    "supervisor_content": PromptVariableSource(
-                        kind=VariableSourceKind.LITERAL,
-                        value=supervisor_content,
-                    ),
                     "question": PromptVariableSource(
                         kind=VariableSourceKind.LITERAL,
                         value=question,
@@ -372,18 +359,26 @@ def create_mcp_server(
             prompt = render_result.rendered_text
 
             # Configure agent options with 180s timeout
+            # Use claude/sonnet backend directly for reliability
             options = AgentOptions(
-                agent="vibe-reviewer",
+                backend="claude",
+                model="sonnet",
                 timeout_seconds=180,
             )
 
             # Execute via CodeagentBackend
             backend = CodeagentBackend()
+            logger.bind(domain="orchestra").info(
+                f"orchestra_ask: task={question!r}, "
+                f"backend={options.backend}, model={options.model}"
+            )
             result = backend.run(
                 prompt=prompt,
                 options=options,
                 cwd=repo_root,
                 role="explorer",
+                task=question,  # Pass question as task for codeagent-wrapper
+                include_global_notice=False,  # Disable global rules for simple Q&A
             )
 
             # Return sanitized stdout as answer
