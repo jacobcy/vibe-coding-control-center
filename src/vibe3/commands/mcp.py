@@ -29,7 +29,6 @@ def run() -> None:
       - orchestra_status: Get current orchestra system status
       - orchestra_issue_detail: Get detailed info about a specific issue
       - orchestra_dispatch_history: View recent dispatch execution history
-      - orchestra_ask: Ask questions about project knowledge
 
     MCP resources:
       - orchestra://status: Current status as JSON
