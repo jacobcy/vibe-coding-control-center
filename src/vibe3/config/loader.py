@@ -18,6 +18,7 @@ def _expand_variables(
     """Expand variable references in configuration values.
 
     Supports ${path.to.value} syntax for referencing other config values.
+    Performs iterative expansion to handle nested references with cycle detection.
     """
     if context is None:
         context = config
@@ -26,22 +27,34 @@ def _expand_variables(
 
     for key, value in config.items():
         if isinstance(value, str):
-            # Expand ${...} variable references
-            pattern = r"\$\{([^}]+)\}"
+            # Expand ${...} variable references iteratively
+            expanded = value
+            max_iterations = 10  # Prevent infinite loops
+            for _ in range(max_iterations):
+                pattern = r"\$\{([^}]+)\}"
 
-            def replace_var(match: re.Match[str]) -> str:
-                var_path = match.group(1)
-                # Navigate to referenced value
-                current: Any = context
-                for part in var_path.split("."):
-                    if isinstance(current, dict) and part in current:
-                        current = current[part]
-                    else:
-                        # Variable not found, keep original reference
-                        return match.group(0)
-                return str(current) if not isinstance(current, dict) else match.group(0)
+                def replace_var(match: re.Match[str]) -> str:
+                    var_path = match.group(1)
+                    # Navigate to referenced value
+                    current: Any = context
+                    for part in var_path.split("."):
+                        if isinstance(current, dict) and part in current:
+                            current = current[part]
+                        else:
+                            # Variable not found, keep original reference
+                            return match.group(0)
+                    return (
+                        str(current)
+                        if not isinstance(current, dict)
+                        else match.group(0)
+                    )
 
-            result[key] = re.sub(pattern, replace_var, value)
+                new_expanded = re.sub(pattern, replace_var, expanded)
+                if new_expanded == expanded:
+                    break  # No more changes, reached fixpoint
+                expanded = new_expanded
+
+            result[key] = expanded
         elif isinstance(value, dict):
             result[key] = _expand_variables(value, context)
         else:
@@ -63,10 +76,19 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
     return merged
 
 
-def load_yaml_config(path: Path) -> dict[str, Any]:
+def load_yaml_config(path: Path, strict: bool = False) -> dict[str, Any]:
     """Load YAML configuration file.
 
-    Returns empty dict if file doesn't exist or is invalid.
+    Args:
+        path: Path to YAML file
+        strict: If True, raise ConfigError for invalid YAML; if False, return empty dict
+
+    Returns:
+        Dictionary with config data, or empty dict if file doesn't exist
+        (non-strict mode)
+
+    Raises:
+        ConfigError: If strict=True and file exists but is invalid YAML
     """
     if not path.exists():
         return {}
@@ -78,11 +100,15 @@ def load_yaml_config(path: Path) -> dict[str, Any]:
                 return cast(dict[str, Any], raw)
             return {}
     except yaml.YAMLError as exc:
+        if strict:
+            raise ConfigError(f"Invalid YAML in {path}: {exc}") from exc
         logger.bind(domain="config", action="load", path=str(path)).warning(
             f"Invalid YAML in config file: {exc}"
         )
         return {}
     except OSError as exc:
+        if strict:
+            raise ConfigError(f"Cannot read config file {path}: {exc}") from exc
         logger.bind(domain="config", action="load", path=str(path)).warning(
             f"Cannot read config file: {exc}"
         )
@@ -142,9 +168,10 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
     """Load configuration from file or use defaults.
 
     Configuration layers (priority order):
-    1. Project config: .vibe/settings.yaml
-    2. Global config: ~/.vibe/settings.yaml
-    3. Repo fallback: config/v3/settings.yaml
+    1. Explicit config_path (if provided)
+    2. Project config: .vibe/settings.yaml
+    3. Global config: ~/.vibe/settings.yaml
+    4. Repo fallback: config/v3/settings.yaml
 
     Args:
         config_path: Optional explicit path to config file.
@@ -163,26 +190,43 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
 
     # Load with layering support
     if config_path and config_path.exists():
-        # Load the three layers
+        # Determine the base config path
+        # If explicit config_path is provided, treat it as highest priority
+        # Otherwise, use repo fallback as base
         repo_config_path = Path("config/v3/settings.yaml")
+
+        # Check if config_path is auto-detected or explicit
+        auto_detected = find_config_file()
+        if config_path == auto_detected:
+            # Auto-detected path, use standard layering with repo as base
+            base_config_data: dict[str, Any] = load_yaml_config(repo_config_path)
+        else:
+            # Explicit config_path provided, use it as base
+            base_config_data = load_yaml_config(config_path)
+
+        # Load and merge other layers
         global_config_path = Path.home() / ".vibe" / "settings.yaml"
         project_config_path = Path(".vibe/settings.yaml")
 
-        # Start with repo default
-        config_data: dict[str, Any] = load_yaml_config(repo_config_path)
+        # Start with base config
+        config_data = base_config_data
 
-        # Merge global config
-        if global_config_path.exists():
-            global_config = load_yaml_config(global_config_path)
+        # Merge global config with strict=True for user-provided layers
+        if global_config_path.exists() and global_config_path != config_path:
+            global_config = load_yaml_config(global_config_path, strict=True)
             config_data = _deep_merge(config_data, global_config)
 
-        # Merge project config
-        if project_config_path.exists():
-            project_config = load_yaml_config(project_config_path)
+        # Merge project config with strict=True for user-provided layers
+        if project_config_path.exists() and project_config_path != config_path:
+            project_config = load_yaml_config(project_config_path, strict=True)
             config_data = _deep_merge(config_data, project_config)
 
         # Expand variable references
         config_data = _expand_variables(config_data)
+
+        # Apply supplementary loading (loc_limits + prompts)
+        # This ensures we don't bypass VibeConfig.from_yaml() semantics
+        config_data = VibeConfig._load_supplementary(config_data)
 
         try:
             config = VibeConfig(**config_data)
