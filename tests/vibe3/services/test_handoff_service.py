@@ -100,6 +100,7 @@ def test_record_indicate_writes_indicate_ref(tmp_path: Path) -> None:
     flow_state = store.get_flow_state("task/issue-304")
     assert flow_state is not None
     assert flow_state["indicate_ref"] == "docs/indicate.md"
+    assert flow_state["manager_actor"] == "codex/gpt-5.4"
 
 
 def test_record_ref_rejects_unknown_active_kind(tmp_path: Path) -> None:

@@ -22,16 +22,19 @@ from vibe3.ui.handoff_ui import render_handoff_detail
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
-def _format_relative_time(timestamp: datetime) -> str:
+def _format_relative_time(timestamp: datetime, now: datetime | None = None) -> str:
     """Format datetime as human-readable relative time.
 
     Args:
         timestamp: Datetime to format
+        now: Optional fixed timestamp for testing (defaults to
+            datetime.now(timezone.utc))
 
     Returns:
         Human-readable string like "2 hours ago", "3 days ago", etc.
     """
-    now = datetime.now(timezone.utc)
+    if now is None:
+        now = datetime.now(timezone.utc)
     if timestamp.tzinfo is None:
         # Assume UTC if no timezone
         timestamp = timestamp.replace(tzinfo=timezone.utc)
