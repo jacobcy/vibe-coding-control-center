@@ -272,7 +272,18 @@ def test_resolve_shared_artifact_rejects_relative_traversal(tmp_path: Path) -> N
         )
 
 
-def test_resolve_shared_artifact_rejects_invalid_chars(tmp_path: Path) -> None:
+def test_resolve_shared_artifact_rejects_trailing_newline(
+    tmp_path: Path,
+) -> None:
+    """Branch name with trailing newline should be rejected (Copilot review fix)."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    # re.match() with $ anchor would accept this, but fullmatch() rejects it
+    with pytest.raises(ValueError, match="invalid characters"):
+        resolve_handoff_target("@current", branch="valid\n", git_client=client)
+
+
+def test_resolve_shared_artifact_rejects_control_chars(tmp_path: Path) -> None:
     """Branch name with control characters should be rejected."""
     client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
 

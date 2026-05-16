@@ -15,7 +15,9 @@ from vibe3.utils.git_path_client import (
 GitClientProtocol = GitPathProtocol
 
 # Branch name validation regex: alphanumeric, slash, underscore, hyphen, period
-_BRANCH_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9/_.-]+$")
+# Note: re.fullmatch() ensures the entire string matches, preventing control
+# characters like trailing newlines from being accepted
+_BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.-]+")
 
 
 def _validate_branch_name(branch: str) -> None:
@@ -35,7 +37,7 @@ def _validate_branch_name(branch: str) -> None:
             f"Invalid branch name {branch!r}: contains path traversal sequence '..'"
         )
 
-    if not _BRANCH_NAME_PATTERN.match(branch):
+    if not _BRANCH_NAME_PATTERN.fullmatch(branch):
         raise ValueError(
             f"Invalid branch name {branch!r}: contains invalid characters. "
             f"Only alphanumeric, '/', '_', '-', and '.' are allowed."
