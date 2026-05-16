@@ -108,7 +108,8 @@ class WorktreeManager(WorktreePRMixin):
                 wt_path, branch, issue_number, source_pr_number
             )
             if context:
-                # Success! Return PR-based worktree
+                # Success! Record worktree path and return
+                self._record_worktree_path(branch, str(context.path))
                 return context
 
             # Failed, log and fall back to default
@@ -144,7 +145,9 @@ class WorktreeManager(WorktreePRMixin):
                 ).warning("Failed to record fallback event")
 
         # Default: create from standard base (origin/main)
-        return self._create_issue_worktree(wt_path, branch, issue_number)
+        context = self._create_issue_worktree(wt_path, branch, issue_number)
+        self._record_worktree_path(branch, str(context.path))
+        return context
 
     def release_issue_worktree(self, context: WorktreeContext) -> None:
         """Release an issue worktree (optional, typically kept for flow lifecycle).
@@ -353,6 +356,25 @@ class WorktreeManager(WorktreePRMixin):
             branch=branch,
             issue_number=issue_number,
         )
+
+    def _record_worktree_path(self, branch: str, worktree_path: str) -> None:
+        """Persist worktree path to flow_state for canonical worktree tracking."""
+        try:
+            git_common_dir = self.repo_path / ".git"
+            vibe3_dir = git_common_dir / "vibe3"
+            db_path = str(vibe3_dir / "handoff.db")
+            store = SQLiteClient(db_path=db_path)
+            store.update_flow_state(branch, worktree_path=worktree_path)
+            logger.bind(
+                domain="worktree",
+                branch=branch,
+                worktree_path=worktree_path,
+            ).debug("Recorded worktree_path to flow_state")
+        except Exception as exc:
+            logger.bind(
+                domain="worktree",
+                branch=branch,
+            ).warning(f"Failed to record worktree_path to flow_state: {exc}")
 
     def _create_temporary_worktree(
         self,
