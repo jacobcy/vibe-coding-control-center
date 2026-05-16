@@ -36,19 +36,23 @@ def test_format_relative_time_boundary_values(seconds_offset, expected_output):
     - 23h → 24h: 23 hours ago → 1 day ago
     - 29d → 30d: 29 days ago → 1 month ago
     """
-    now = datetime.now(timezone.utc)
-    timestamp = now - timedelta(seconds=seconds_offset)
-    result = _format_relative_time(timestamp)
+    # Use fixed clock to avoid scheduler delay flakiness
+    # Pass explicit now parameter instead of relying on real clock
+    fixed_now = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    timestamp = fixed_now - timedelta(seconds=seconds_offset)
+    result = _format_relative_time(timestamp, now=fixed_now)
     assert result == expected_output
 
 
 def test_format_relative_time_assumes_utc_for_naive_datetime():
     """Test that naive datetime (no timezone) is assumed to be UTC."""
-    # Create a naive datetime 5 minutes ago
-    now_utc = datetime.now(timezone.utc)
-    naive_timestamp = (now_utc - timedelta(minutes=5)).replace(tzinfo=None)
-
-    result = _format_relative_time(naive_timestamp)
-
+    # Use fixed clock to avoid scheduler delay flakiness
+    # Pass explicit now parameter instead of relying on real clock
+    # If the test reads the real clock twice (once here, once in the function),
+    # and the scheduler delays between calls, "5 minutes ago" could become
+    # "6 minutes ago" and fail the assertion.
+    fixed_now = datetime(2026, 1, 1, 12, 5, 0, tzinfo=timezone.utc)
+    naive_timestamp = (fixed_now - timedelta(minutes=5)).replace(tzinfo=None)
+    result = _format_relative_time(naive_timestamp, now=fixed_now)
     # Should treat it as UTC and return "5 minutes ago"
     assert result == "5 minutes ago"
