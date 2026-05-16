@@ -144,10 +144,10 @@ code_limits:
         limit: 450
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
 
-      # Utils 层 —— 允许 500
+      # Utils 层 —— 允许 550
       - path: "src/vibe3/utils/path_helpers.py"
-        limit: 500
-        reason: "路径解析核心工具，专注于路径解析和 handoff 路径处理。GitClientProtocol 和 Git wrapper 已移至 git_path_client.py，BranchBoundGitClient 已移除（死代码）"
+        limit: 550
+        reason: "路径解析核心工具与安全验证聚合：包含路径解析、handoff 路径处理、分支名安全验证（regex校验+路径边界检查）的三层防御机制。安全函数紧密耦合，拆分会降低代码可审计性和维护性。"
 
       # 强耦合测试例外
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
