@@ -287,10 +287,14 @@ class ErrorTrackingService:
             Dict with error statistics
         """
         error_counts = self.get_error_counts()
-        model_errors = sum(1 for code in error_counts.keys() if is_model_error(code))
-        api_errors = sum(1 for code in error_counts.keys() if is_api_error(code))
+        model_errors = sum(
+            count for code, count in error_counts.items() if is_model_error(code)
+        )
+        api_errors = sum(
+            count for code, count in error_counts.items() if is_api_error(code)
+        )
         exec_errors = sum(
-            1 for code in error_counts.keys() if code.startswith("E_EXEC_")
+            count for code, count in error_counts.items() if code.startswith("E_EXEC_")
         )
 
         return {
