@@ -38,17 +38,26 @@ class IssueBodyMixin:
             "body",
         ]
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to get issue #{issue_number} body"
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
             )
-            return None
+            if result.returncode != 0:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to get issue #{issue_number} body"
+                )
+                return None
 
-        data = json.loads(result.stdout)
-        return cast(str | None, data.get("body", ""))
+            data = json.loads(result.stdout)
+            return cast(str | None, data.get("body", ""))
+        except (json.JSONDecodeError, subprocess.TimeoutExpired) as e:
+            logger.bind(
+                external="github",
+                operation="get_issue_body",
+                issue_number=issue_number,
+                error=str(e),
+            ).warning(f"Transient error reading issue body: {e}")
+            return None
 
     def update_issue_body(
         self: Any,
@@ -80,12 +89,21 @@ class IssueBodyMixin:
             body,
         ]
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
-        )
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).error(
-                f"Failed to update issue #{issue_number} body"
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=GH_API_TIMEOUT
             )
+            if result.returncode != 0:
+                logger.bind(external="github", error=result.stderr).error(
+                    f"Failed to update issue #{issue_number} body"
+                )
+                return False
+            return True
+        except subprocess.TimeoutExpired as e:
+            logger.bind(
+                external="github",
+                operation="update_issue_body",
+                issue_number=issue_number,
+                error=str(e),
+            ).warning(f"Timeout updating issue body: {e}")
             return False
-        return True

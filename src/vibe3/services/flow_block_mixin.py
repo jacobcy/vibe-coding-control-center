@@ -41,8 +41,12 @@ class FlowLifecycleMixin:
             blocked_reason=reason,
         )
 
-        # Merge and update
+        # Merge and update (short-circuit if unchanged)
         merged = merge_projection(current_body, proj)
+        if merged == current_body:
+            # No change, skip API call
+            return
+
         if not client.update_issue_body(issue_number, merged):
             logger.bind(issue_number=issue_number).warning(
                 "Failed to update issue body projection"
@@ -129,11 +133,19 @@ class FlowLifecycleMixin:
                     ).warning(f"Failed to add comment: {e}")
 
             # Project blocked state to issue body
-            self._project_blocked_state(
-                issue_number,
-                blocked_by_issue=blocked_by_issue,
-                reason=reason,
-            )
+            try:
+                self._project_blocked_state(
+                    issue_number,
+                    blocked_by_issue=blocked_by_issue,
+                    reason=reason,
+                )
+            except Exception as e:
+                logger.bind(
+                    domain="flow",
+                    action="block",
+                    branch=branch,
+                    issue_number=issue_number,
+                ).warning(f"Failed to project blocked state: {e}")
 
         self.store.add_event(
             branch,
