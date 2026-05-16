@@ -18,8 +18,8 @@ code_limits:
     exceptions:
       # 核心业务聚合 —— 允许 600
       - path: "src/vibe3/orchestra/global_dispatch_coordinator.py"
-        limit: 500
-        reason: "Frozen queue dispatch coordinator，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查等紧密耦合逻辑"
+        limit: 600
+        reason: "Frozen queue dispatch coordinator，核心调度聚合，包含 frozen queue 管理、dispatch 协调、issue 状态管理、健康检查、重启恢复等紧密耦合逻辑"
       - path: "src/vibe3/services/flow_service.py"
         limit: 600
         reason: "核心状态机聚合，吸收 flow_query_mixin"
