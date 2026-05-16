@@ -99,8 +99,8 @@ code_limits:
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
       - path: "src/vibe3/roles/governance.py"
-        limit: 540
-        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑；材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
+        limit: 600
+        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑、vibe-task 过滤、材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
 
       # Server —— 允许 420-485
       - path: "src/vibe3/server/mcp.py"
