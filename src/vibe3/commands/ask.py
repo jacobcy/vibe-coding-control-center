@@ -51,18 +51,21 @@ def _sanitize_output(text: str) -> str:
 def ask(
     ctx: typer.Context,
     question: str = typer.Argument(..., help="Question about the project"),
-    timeout: int = typer.Option(180, "--timeout", "-t", help="Timeout in seconds"),
-    model: str = typer.Option("sonnet", "--model", "-m", help="Model to use"),
 ) -> None:
     """Ask a question about project knowledge and get an answer from a code agent.
 
-    This spawns a project explorer agent to answer questions about code structure,
+    This spawns an orchestra-explorer agent to answer questions about code structure,
     documentation, conventions, and other static project knowledge.
+
+    Uses the 'orchestra-explorer' agent preset from config/v3/models.json:
+    - backend: claude
+    - model: sonnet
+    - timeout: 180 seconds (hardcoded for Q&A)
 
     Examples:
         vibe3 ask "What is the structure of src/vibe3/?"
-        vibe3 ask "How does CapacityService work?" --timeout 300
-        vibe3 ask "What does HARD RULES mean?" --model opus
+        vibe3 ask "How does CapacityService work?"
+        vibe3 ask "What does HARD RULES mean?"
     """
     # Skip if subcommand is invoked
     if ctx.invoked_subcommand is not None:
@@ -111,11 +114,11 @@ def ask(
         render_result = assembler.render(recipe, runtime_context={})
         prompt = render_result.rendered_text
 
-        # Configure agent options
-        options = AgentOptions(
-            backend="claude",
-            model=model,
-            timeout_seconds=timeout,
+        # Use orchestra-explorer agent preset from models.json
+        # This will use claude backend with sonnet model
+        agent_options = AgentOptions(
+            agent="orchestra-explorer",
+            timeout_seconds=180,  # 3 minutes for Q&A
         )
 
         # Execute via CodeagentBackend
@@ -123,14 +126,15 @@ def ask(
 
         sanitized_question = _sanitize_output(question)
         logger.bind(domain="ask").info(
-            f"Executing question: {sanitized_question[:50]}..."
+            f"Executing question: {sanitized_question[:50]}... "
+            f"(agent={agent_options.agent})"
         )
 
         console.print(
             Panel.fit(
                 f"[bold blue]Question:[/bold blue] {sanitized_question}\n"
-                f"[bold blue]Model:[/bold blue] {model}\n"
-                f"[bold blue]Timeout:[/bold blue] {timeout}s",
+                f"[bold blue]Agent:[/bold blue] {agent_options.agent}\n"
+                f"[bold blue]Timeout:[/bold blue] {agent_options.timeout_seconds}s",
                 title="[bold]vibe3 ask[/bold]",
                 border_style="blue",
             )
@@ -140,11 +144,11 @@ def ask(
 
         result = backend.run(
             prompt=prompt,
-            options=options,
+            options=agent_options,
             cwd=repo_root,
-            role="explorer",
+            role="explorer",  # Role for codeagent-wrapper logging
             task=question,
-            include_global_notice=False,
+            include_global_notice=False,  # Disable CLAUDE.md injection
         )
 
         # Sanitize and display output
