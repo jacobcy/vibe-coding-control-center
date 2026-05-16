@@ -187,6 +187,112 @@ extract_pr_number(report_text):
 - 超时 3 次 → 标记 agent 为 blocked，继续处理下一个 agent
 - team-lead 自身必须先 `ToolSearch("select:SendMessage")` 再 spawn 任何 agent
 
+## @handshake_fix_executor(agent_name) → OK | TIMEOUT
+
+```
+@handshake_fix_executor(agent_name):
+  """fix-executor 专用握手协议：3轮 escalating guidance 对抗 deferred tools 模型幻觉。
+  
+  与通用 @handshake 的区别：
+  - 发送明确的 escalating 消息指导 agent 执行 ToolSearch
+  - 每轮等待 30 秒，最多 3 轮
+  - 消息内容逐步强化指令（从提示 → 强制 → 详细步骤）
+  
+  背景：PR #821 实测发现 fix-executor agent 可能因 SendMessage 是 deferred tool
+  而陷入模型幻觉（认为自己已握手但实际未发送），需要 explicit guidance 打破幻觉。"""
+  
+  for round in 1..3:
+    sleep(30)
+    $ agent-exist.sh {agent_name} | grep -q "ready_event=found"
+    if found: return OK
+    
+    // 根据轮次发送 escalating guidance
+    if round == 1:
+      SendMessage(to=agent_name, summary="握手信号未收到", message="""
+        We did not receive your handshake message.
+        
+        You may be stuck because SendMessage is a deferred tool.
+        Please confirm you have executed ToolSearch to load the SendMessage schema.
+        
+        Execute: ToolSearch(query='select:SendMessage', max_results=1)
+      """)
+    elif round == 2:
+      SendMessage(to=agent_name, summary="握手信号仍未收到", message="""
+        Still no response.
+        
+        You MUST execute the following steps:
+        1) ToolSearch(query='select:SendMessage', max_results=1)
+        2) Wait for the schema to load (look for <functions> block)
+        3) Then SendMessage(to='team-lead', message='【agent_ready】已就绪')
+      """)
+    elif round == 3:
+      SendMessage(to=agent_name, summary="FINAL attempt", message="""
+        FINAL attempt to establish handshake.
+        
+        Exact steps to execute NOW:
+        1) ToolSearch(query='select:SendMessage', max_results=1)
+        2) Wait for <functions> block containing SendMessage schema
+        3) SendMessage(to='team-lead', message='【agent_ready】已就绪')
+        
+        No response after this message → you will be marked as blocked.
+      """)
+  
+  return TIMEOUT
+```
+
+> **Escalating Guidance 策略**: 逐步强化指令（从提示 ToolSearch → 强制执行 → 详细步骤），确保 agent 理解 deferred tools 必须先加载 schema 才能调用。3 轮超时后触发 `@mark_fix_executor_blocked`。
+
+## @mark_fix_executor_blocked(agent_name) → void
+
+```
+@mark_fix_executor_blocked(agent_name):
+  """fix-executor 握手失败的 graceful degradation。
+  
+  记录错误、创建 follow-up issue、继续流程（不阻塞整个 PR 审查）。"""
+  
+  // 1. 记录错误日志
+  output("ERROR: fix-executor agent 失联，3次握手重试失败")
+  
+  // 2. 更新 Task metadata
+  TaskUpdate(phase_5_task_id, metadata={
+    handshake_status: {fix-executor: "blocked"}
+  })
+  
+  // 3. 注释 Phase 5 修复不完整
+  TaskUpdate(phase_5_task_id, description=现有描述 + " | Phase 5 修复不完整：fix-executor 握手失败")
+  
+  // 4. 创建 follow-up issue（说明需要人工修复）
+  gh issue create --title "PR #{PR_NUMBER} 需人工修复 fix-executor 握手失败项" --body="""
+    ## 背景
+    PR #{PR_NUMBER} 审查过程中发现阻塞问题需要修复，但 fix-executor agent 握手失败。
+    
+    ## 原因
+    fix-executor agent 在 3 轮 escalating handshake 重试后仍未响应。
+    可能原因：
+    - Agent 未执行 ToolSearch 加载 deferred tools schema
+    - Agent 模型幻觉（认为自己已握手但实际未发送）
+    - Agent pane 已退出或失联
+    
+    ## 需人工处理
+    以下修复项需要人工介入：
+    <Phase 4 产出的修复指令列表>
+    
+    ## 诊断命令
+    - 检查 tmux pane: `tmux capture-pane -t <pane_id> -p -S -200`
+    - 查看事件历史: `skills/vibe-review-pr/scripts/agent-event.sh fix-executor`
+    - 检查 agent 状态: `skills/vibe-review-pr/scripts/agent-exist.sh fix-executor`
+    
+    ## Related
+    - PR #{PR_NUMBER}
+    - Issue #821 (deferred tools handshake 经验)
+  """
+  
+  // 5. 设置 flag
+  fix_executor_blocked = true
+```
+
+> **Graceful Degradation 原则**: fix-executor 握手失败不阻塞整个 PR 审查流程。记录错误、创建 follow-up issue 后继续执行 Phase 5 Step 3（创建其他 follow-up issues）。
+
 ## @wait_for_report(agent_name, expected_pr_number, timeout=90, max_attempts=3) → report | TIMEOUT | RETRY
 
 ```
@@ -712,31 +818,40 @@ Phase_5():
 
   // Step 2: 修复（仅 auto-fix 模式且存在阻塞问题）
   if mode == "auto-fix" and decision == NEEDS_CHANGES:
-    // spawn + 握手
+    // spawn fix-executor
     @spawn_with_handshake("fix-executor", "pr-fix-executor")
-    if result == TIMEOUT: @stop("fix-executor 握手超时")
+    
+    // 使用 fix-executor 专用握手协议（3轮 escalating guidance）
+    handshake_result = @handshake_fix_executor("fix-executor")
+    
+    if handshake_result == TIMEOUT:
+      // 握手失败 → graceful degradation
+      @mark_fix_executor_blocked("fix-executor")
+      // 继续流程，跳过 fix-executor，进入 Step 3
+    else:
+      // 握手成功 → 分配修复任务
+      SendMessage(to="fix-executor", summary="PR #N 修复任务", message="""
+        根据 team-lead 提供的修复指令修复 PR #N。
 
-    // 分配修复任务
-    SendMessage(to="fix-executor", summary="PR #N 修复任务", message="""
-      根据 team-lead 提供的修复指令修复 PR #N。
+        读取 Phase 1 背景报告：
+          skills/vibe-review-pr/scripts/agent-report.sh context-researcher
 
-      读取 Phase 1 背景报告：
-        skills/vibe-review-pr/scripts/agent-report.sh context-researcher
+        修复指令：
+        <Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
 
-      修复指令：
-      <Phase 4 产出的具体修复点列表，逐条包含问题描述、来源 agent、修复方式>
+        职责：
+        1. 按修复指令逐条执行修复
+        2. 不要自行扩大修复范围
+        3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 修复报告\n...")
 
-      职责：
-      1. 按修复指令逐条执行修复
-      2. 不要自行扩大修复范围
-      3. 完成后用 SendMessage(to="team-lead", message="【agent_report】\n\n## 修复报告\n...")
+        脚本错误处理：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
+      """)
 
-      脚本错误处理：如脚本执行失败，立即发送【agent_blocked】+ 错误详情，停止执行。
-    """)
-
-    // 等待修复报告（修复任务耗时较长，timeout=180）
-    report = @wait_for_report("fix-executor", timeout=180)
-    if report == TIMEOUT: @stop("fix-executor 报告超时")
+      // 等待修复报告（修复任务耗时较长，timeout=180）
+      report = @wait_for_report("fix-executor", expected_pr_number=N, timeout=180)
+      if report == TIMEOUT:
+        // 报告超时（握手成功后）→ 仍然是问题
+        @stop("fix-executor 报告超时")
 
   // Step 3: 创建 follow-up issues（范围外问题）
   for issue in out_of_scope_issues:
@@ -766,6 +881,16 @@ Phase_5():
 - 仅限 `gh pr comment` 和 `gh issue create`（禁止其他 gh/git 命令）
 - 会话中途不得发送 shutdown 指令
 - **会话收尾必须询问用户**：完成 Phase 5 后必须执行 `@ask_user("继续审查下一个 PR？")`，不得直接发送 shutdown 或清理 Team
+
+### fix-executor 专用 Hard Rules
+
+- **禁止** team-lead 在 auto-fix 模式下直接编辑代码
+- **禁止** team-lead 在修复过程中查看完整 diff（可能干扰判断）
+- **禁止** 跳过握手协议或假设握手成功
+- **强制** 使用 fix-executor agent 执行所有修复操作
+- **强制** 遇到握手失败时记录并创建 follow-up issue
+- **禁止** 假设 agent 会自动执行 deferred tools
+- fix-executor 握手最多 3 次重试（每次 30 秒），3 次失败后标记 blocked 并跳过
 
 ---
 
@@ -933,6 +1058,6 @@ body_start
 | 2 | 多 agent 同一响应内并行 spawn；fresh spawn 先握手再分配任务 | 与 Phase 1 并行启动；把正式任务写进 spawn prompt |
 | 3 | 校验报告基础数据；失真报告标注作废；决定是否启用 codex；只传结构化报告给 codex | 与 Phase 2 并行；报告不合格仍调用 codex；给 codex 传 diff |
 | 4 | 收集可用报告（剔除作废）；仲裁冲突；通过 8 条质量自查 | 使用已作废报告；替缺失 agent 脑补结论 |
-| 5 | 模式决定路径；仅 auto-fix 可 spawn fix-executor；范围外问题转 follow-up；**会话收尾必须询问用户** | 把范围外技术债塞进 PR comment；把阻塞问题转 follow-up；**直接发送 shutdown 不询问用户** |
+| 5 | 模式决定路径；仅 auto-fix 可 spawn fix-executor；fix-executor 握手 3 轮 escalating 重试；范围外问题转 follow-up；**会话收尾必须询问用户** | 把范围外技术债塞进 PR comment；把阻塞问题转 follow-up；**直接发送 shutdown 不询问用户**；handshake 失败直接 @stop |
 
 > 没有 Phase 6。完成 Phase 5 后流程结束。

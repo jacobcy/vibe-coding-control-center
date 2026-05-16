@@ -29,6 +29,53 @@ SendMessage(to="team-lead", message="【agent_report】
 ...")
 ```
 
+### fix-executor escalating handshake messages
+
+fix-executor 握手使用 3 轮 escalating guidance 消息（每轮 30 秒超时）：
+
+#### Round 1 — 初步提示
+
+```
+SendMessage(to="fix-executor", summary="握手信号未收到", message="""
+We did not receive your handshake message.
+
+You may be stuck because SendMessage is a deferred tool.
+Please confirm you have executed ToolSearch to load the SendMessage schema.
+
+Execute: ToolSearch(query='select:SendMessage', max_results=1)
+""")
+```
+
+#### Round 2 — 强制指令
+
+```
+SendMessage(to="fix-executor", summary="握手信号仍未收到", message="""
+Still no response.
+
+You MUST execute the following steps:
+1) ToolSearch(query='select:SendMessage', max_results=1)
+2) Wait for the schema to load (look for <functions> block)
+3) Then SendMessage(to='team-lead', message='【agent_ready】已就绪')
+""")
+```
+
+#### Round 3 — 详细步骤 + 警告
+
+```
+SendMessage(to="fix-executor", summary="FINAL attempt", message="""
+FINAL attempt to establish handshake.
+
+Exact steps to execute NOW:
+1) ToolSearch(query='select:SendMessage', max_results=1)
+2) Wait for <functions> block containing SendMessage schema
+3) SendMessage(to='team-lead', message='【agent_ready】已就绪')
+
+No response after this message → you will be marked as blocked.
+""")
+```
+
+> **Escalating Guidance 策略**: 从提示 → 强制 → 详细步骤，确保 agent 理解 deferred tools 必须先加载 schema 才能调用。3 轮超时后触发 `@mark_fix_executor_blocked`。
+
 ## 诊断命令
 
 ### 检查 agent 存活
