@@ -57,20 +57,6 @@ uv pip install mcp
 
 ## 使用示例
 
-### orchestra_ask 工具示例
-
-```json
-// 调用示例
-{
-  "tool": "orchestra_ask",
-  "arguments": {
-    "question": "What is the structure of src/vibe3/?"
-  }
-}
-```
-
-返回：项目探索 agent 的答案（spawned sub-agent）
-
 ### orchestra_status 工具示例
 
 ```json
@@ -114,4 +100,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## 下一步
 
-配置完成后，你可以在 Claude Code 中直接调用 `orchestra_ask` 工具来询问项目相关问题，系统会自动 spawn 一个 project explorer agent 来回答。
+配置完成后，你可以使用以下方式查看 Orchestra 状态：
+
+- **MCP 工具**：`orchestra_status`、`orchestra_issue_detail`、`orchestra_dispatch_history`
+- **CLI 命令**：`vibe3 ask "问题"` 用于项目知识问答（替代已废弃的 orchestra_ask MCP 工具）
