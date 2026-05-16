@@ -47,18 +47,22 @@ class ServeStatusService:
         self._display_error_tracking()
 
     @staticmethod
-    def _clean_error_message(error_message: str, max_length: int = 60) -> str:
+    def _clean_error_message(error_message: str, max_length: int = 100) -> str:
         """Clean error message by removing TMPDIR and other noise.
 
         Args:
             error_message: Raw error message from error_log
-            max_length: Maximum length to truncate (default 60)
+            max_length: Maximum length to truncate (default 100)
 
         Returns:
             Cleaned and truncated error message
         """
+        # Remove codeagent-wrapper prefix
+        pattern = r"^codeagent-wrapper failed \(code \d+\):\s*"
+        cleaned = re.sub(pattern, "", error_message)
+
         # Remove CLAUDE_CODE_TMPDIR and everything after it
-        cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", error_message)[0].strip()
+        cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", cleaned)[0].strip()
 
         # Remove " | === Recent Errors ===" suffix
         cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
