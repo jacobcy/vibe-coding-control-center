@@ -242,9 +242,12 @@ class TestQueueOperations:
 
         coordinator._emit_dispatch_intent = emit_with_failure
 
-        await coordinator.coordinate()
+        # With dead try-except removed, publish() failures propagate.
+        # Dispatch handler now catches its own errors and writes blocked_reason.
+        with pytest.raises(RuntimeError, match="emit failed"):
+            await coordinator.coordinate()
 
-        assert call_count[0] == 2
+        assert call_count[0] == 1
 
     @pytest.mark.asyncio
     async def test_collect_failure_does_not_affect_other_roles(
