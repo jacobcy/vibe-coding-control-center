@@ -99,8 +99,8 @@ code_limits:
         limit: 420
         reason: "Manager 角色聚合，包含 flow 状态机、dispatch 协调、issue 管理"
       - path: "src/vibe3/roles/governance.py"
-        limit: 540
-        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑；材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
+        limit: 600
+        reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑、vibe-task 过滤、材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
 
       # Server —— 允许 420-485
       - path: "src/vibe3/server/mcp.py"
@@ -123,6 +123,11 @@ code_limits:
       - path: "scripts/tsu.sh"
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
+
+      # 配置系统核心模块
+      - path: "src/vibe3/config/settings.py"
+        limit: 450
+        reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开等配置加载逻辑，拆分会破坏配置系统完整性"
 
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree.py"
@@ -197,7 +202,7 @@ code_limits:
     # Milestone 1: 45,000 LOC (intermediate target)
     # Milestone 2: 40,000 LOC (stretch target)
     # Final target: 35,000 LOC (governance goal)
-    v3_python: 50000        # Python 核心代码总行数（临时提升至 50000 以审理后续 PR；后续拆出非核心代码并治理膨胀）
+    v3_python: 55000        # Python 核心代码总行数（临时提升至 55000 以审理后续 PR；后续拆出非核心代码并治理膨胀）
     warning_threshold_percent: 90  # Trigger warning at 90% of limit (Issue #625)
     last_reviewed: "2026-05-01"    # Track last governance review (Issue #625)
 

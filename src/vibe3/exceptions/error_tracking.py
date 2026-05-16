@@ -200,17 +200,20 @@ class ErrorTrackingService:
         return rows[0] > 0 if rows else False
 
     def get_api_error_count(self) -> int:
-        """Get count of recent API errors (10-minute time window).
+        """Get count of recent API errors within configured time window.
 
         Returns:
-            Count of E_API_* errors in the last 10 minutes
+            Count of E_API_* errors in the last TIME_WINDOW_MINUTES minutes
         """
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT COUNT(*) FROM error_log
                 WHERE error_code LIKE 'E_API_%'
-                  AND created_at >= datetime('now', '-10 minutes')
-                """).fetchone()
+                  AND created_at >= datetime('now', ? || ' minutes')
+                """,
+                (f"-{self.TIME_WINDOW_MINUTES}",),
+            ).fetchone()
 
         return rows[0] if rows else 0
 
@@ -277,6 +280,33 @@ class ErrorTrackingService:
                 """,
                 (f"-{self.retention_days}",),
             )
+            conn.commit()
+            return result.rowcount
+
+    def cleanup_terminal_issue_errors(self) -> int:
+        """Delete error records for issues with terminal flow status.
+
+        Uses flow_issue_links (issue_role='task') as SSOT to identify current
+        task flow for each issue, avoiding false matches on superseded flows.
+
+        Terminal states: done, aborted, stale (per _is_reusable_auto_flow
+        in flow_dispatch.py).
+
+        Returns:
+            Number of deleted records
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute("""
+                DELETE FROM error_log
+                WHERE issue_number IN (
+                    SELECT fil.issue_number
+                    FROM flow_issue_links fil
+                    INNER JOIN flow_state fs ON fs.branch = fil.branch
+                    WHERE fil.issue_role = 'task'
+                      AND fs.flow_status IN ('done', 'aborted', 'stale')
+                      AND fs.deleted_at IS NULL
+                )
+            """)
             conn.commit()
             return result.rowcount
 

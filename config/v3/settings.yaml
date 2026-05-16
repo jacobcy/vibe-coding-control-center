@@ -1,6 +1,14 @@
 # Vibe Center 配置文件
 # 用于管理代码质量限制、审核范围、质量标准等
 
+# Paths Configuration
+# ===================
+# 路径配置支持变量引用，便于安装后的全局配置覆盖
+# 安装时由 scripts/install.sh 生成 ~/.vibe/settings.yaml 覆盖全局路径
+paths:
+  # Policies 目录（包含 plan/run/review 的策略文件）
+  policies_root: ".agent/policies"
+
 # Flow 配置
 # 控制流程管理行为
 flow:
@@ -130,10 +138,10 @@ pr_scoring:
 # - Command line: Task guidance (--message option)
 review:
   # Static: Path to review policy markdown file
-  policy_file: ".agent/policies/review.md"
+  policy_file: "${paths.policies_root}/review.md"
 
   # Static: Path to tools guide markdown file
-  common_rules: ".agent/policies/common.md"
+  common_rules: "${paths.policies_root}/common.md"
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
@@ -160,10 +168,10 @@ review:
 # Prompt section order lives in config/prompts/prompt-recipes.yaml.
 plan:
   # Static: Path to plan policy markdown file
-  policy_file: ".agent/policies/plan.md"
+  policy_file: "${paths.policies_root}/plan.md"
 
   # Static: Path to tools guide markdown file
-  common_rules: ".agent/policies/common.md"
+  common_rules: "${paths.policies_root}/common.md"
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
@@ -187,10 +195,10 @@ plan:
 # Prompt section order lives in config/prompts/prompt-recipes.yaml.
 run:
   # Static: Path to run policy markdown file
-  policy_file: ".agent/policies/run.md"
+  policy_file: "${paths.policies_root}/run.md"
 
   # Static: Path to tools guide markdown file
-  common_rules: ".agent/policies/common.md"
+  common_rules: "${paths.policies_root}/common.md"
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:

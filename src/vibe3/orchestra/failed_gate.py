@@ -53,7 +53,7 @@ class FailedGate:
 
     Trigger rules:
     - E_MODEL_* → immediate trigger
-    - E_API_* (2+ in 3 ticks) → trigger
+    - E_API_* (2+ in 10 minutes) → trigger
 
     Persistence:
     - State saved to failed_gate_state table
@@ -168,11 +168,19 @@ class FailedGate:
         # Check for frequent API errors (threshold: 2+ in window)
         api_error_count = error_tracking.get_api_error_count()
 
-        if api_error_count >= 2:
-            log.error(f"API error threshold reached: {api_error_count} errors")
+        if api_error_count >= ErrorTrackingService.THRESHOLD_COUNT:
+            log.error(
+                f"API error threshold reached: {api_error_count} errors "
+                f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
+                f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
+            )
             return GateResult(
                 blocked=True,
-                reason=f"API error threshold: {api_error_count} recent errors",
+                reason=(
+                    f"API error threshold: {api_error_count} recent errors "
+                    f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
+                    f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
+                ),
             )
 
         # No threshold reached

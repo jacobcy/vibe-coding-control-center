@@ -343,13 +343,13 @@ get_deleted_flows()                      # 专门查询已删除记录
 
 ```bash
 # 查看已删除 flows
-vibe flow list-deleted
+vibe3 flow list-deleted
 
 # 恢复软删除 flow
-vibe flow restore <branch>
+vibe3 flow restore <branch>
 
 # 创建新 flow 自动覆盖已删除记录
-vibe flow create <branch>  # 自动清除 deleted_at
+vibe3 flow update <branch>  # 自动清除 deleted_at
 ```
 
 **硬删除场景**：
@@ -404,7 +404,7 @@ if flow_status == "aborted":
 - 目的：允许 issue 重新开始，同时保留审计追踪
 - Issue 可能仍在 open，需要恢复 labels
 - deleted_at 设置为删除时间戳
-- 可通过 `vibe flow restore` 恢复
+- 可通过 `vibe3 flow restore` 恢复
 
 ## 7. 典型场景流程
 
@@ -478,14 +478,14 @@ vibe check --clean-branch
   ├─ deleted_at: "2026-04-28T15:00:00"
   └─ issue label: state/blocked → state/ready
   ↓ 用户发现需要恢复
-vibe flow list-deleted
+vibe3 flow list-deleted
   └─ 显示: task/issue-999 | deleted_at: 2026-04-28T15:00:00
   ↓ 恢复软删除 flow
-vibe flow restore task/issue-999
+vibe3 flow restore task/issue-999
   ├─ deleted_at: NULL ✅
   └─ flow 记录恢复可用
   ↓ 验证恢复结果
-vibe flow show task/issue-999
+vibe3 flow show task/issue-999
   └─ Flow 显示正常，可继续操作
 ```
 

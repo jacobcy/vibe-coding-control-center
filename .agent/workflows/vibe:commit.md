@@ -30,14 +30,14 @@ tags: [workflow, vibe, git, commit, orchestration]
    - 改动分类
    - commit 分组
    - 串行多 PR 判断
-   - 何时使用 `vibe flow new <name> --branch <ref>`
-   - 何时调用 `vibe flow pr --base <ref>`
+   - 何时创建新分支并注册为 flow（`git checkout -b` + `vibe3 flow update`）
+   - 何时调用 `vibe3 flow pr --base <ref>`
 6. PR 发出后，当前 workflow 只负责把结果交回用户，并提示下一步先去 `/vibe-integrate` 收集或确认 review evidence。
-7. 只有当 review evidence 已存在，且 PR 已可 merge 或已 merged 时，才提示进入 `/vibe-done` / `vibe flow done` 收口。
+7. 只有当 review evidence 已存在，且 PR 已可 merge 或已 merged 时，才提示进入 `/vibe-done` 收口。
 
 ## Boundary
 
 - workflow 不重写 `vibe-commit` skill 的业务逻辑。
-- workflow 只负责编排，不承载复杂业务逻辑；review evidence 的判定与 `vibe flow done` 的 merge gate 由 skill / shell 真源负责。
+- workflow 只负责编排，不承载复杂业务逻辑；review evidence 的判定与 `/vibe-done` 的 merge gate 由 skill / shell 真源负责。
 - 若当前 flow 已有 PR 且用户要开始新目标，默认在当前目录创建新的逻辑 flow，不得自行新建物理 worktree。
-- `vibe flow pr` 是 shell 发布入口；`gh pr create` 不是 workflow 真源。
+- `vibe3 flow pr` 是 shell 发布入口；`gh pr create` 不是 workflow 真源。

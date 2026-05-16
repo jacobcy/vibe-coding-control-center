@@ -175,31 +175,59 @@ class HeartbeatServer:
             # Gate is OPEN (or no gate) - proceed with normal dispatch
 
             # Cleanup old error records (maintenance)
+            error_tracking = ErrorTrackingService.get_instance()
+
+            # Cleanup retention-based errors
             try:
-                error_tracking = ErrorTrackingService.get_instance()
-                deleted = error_tracking.cleanup_old_errors()
+                deleted_old = error_tracking.cleanup_old_errors()
             except Exception as exc:
                 append_orchestra_event(
                     "server",
-                    f"tick #{tick_number} cleanup failed: {exc}",
+                    f"tick #{tick_number} cleanup_old_errors failed: {exc}",
                     level="WARNING",
                 )
                 logger.bind(domain="orchestra", action="cleanup").warning(
                     f"cleanup_old_errors failed: {exc}"
                 )
             else:
-                if deleted > 0:
+                if deleted_old > 0:
                     append_orchestra_event(
                         "server",
                         (
-                            f"tick #{tick_number} cleanup: deleted {deleted} "
+                            f"tick #{tick_number} cleanup: deleted {deleted_old} "
                             "old error records"
                         ),
                         level="DEBUG",
                     )
                     logger.bind(domain="orchestra", action="cleanup").debug(
-                        f"Cleaned up {deleted} old error records "
+                        f"Cleaned up {deleted_old} old error records "
                         f"(retention={error_tracking.retention_days}d)"
+                    )
+
+            # Cleanup terminal issue errors
+            try:
+                deleted_terminal = error_tracking.cleanup_terminal_issue_errors()
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} cleanup_terminal_issue_errors failed: {exc}",
+                    level="WARNING",
+                )
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    f"cleanup_terminal_issue_errors failed: {exc}"
+                )
+            else:
+                if deleted_terminal > 0:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} cleanup: deleted {deleted_terminal} "
+                            "terminal issue error records"
+                        ),
+                        level="DEBUG",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").debug(
+                        f"Cleaned up {deleted_terminal} errors for terminal issues"
                     )
 
             tasks = []

@@ -190,6 +190,7 @@ async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None
 
     cleanup_service = MagicMock()
     cleanup_service.cleanup_old_errors.side_effect = RuntimeError("db locked")
+    cleanup_service.cleanup_terminal_issue_errors.return_value = 0
 
     from vibe3.runtime import heartbeat
 
@@ -205,7 +206,9 @@ async def test_tick_loop_continues_when_error_cleanup_fails(monkeypatch) -> None
     await server._tick_loop()
 
     assert svc.ticks == 1
-    assert any("server:tick #1 cleanup failed: db locked" == item for item in events)
+    assert any(
+        "server:tick #1 cleanup_old_errors failed: db locked" == item for item in events
+    )
 
 
 @pytest.mark.asyncio
