@@ -192,7 +192,7 @@ class ServeStatusService:
                 table.add_column("Message", style="white")
 
                 for err in recent_errors:
-                    # Format time as HH:MM:SS (convert UTC to local timezone)
+                    # Format time with age-aware display (convert UTC to local timezone)
                     time_str = err.get("created_at", "")
                     if time_str and len(time_str) >= 19:
                         try:
@@ -205,8 +205,24 @@ class ServeStatusService:
                             # Convert to system local timezone
                             local_time = utc_time.astimezone()
 
-                            # Extract HH:MM:SS
-                            time_display = local_time.strftime("%H:%M:%S")
+                            # Calculate age in calendar days
+                            now = datetime.now(timezone.utc).astimezone()
+                            age = now - local_time
+
+                            # Apply 4-tier time format based on age
+                            if age.days == 0:
+                                # Today: HH:MM:SS
+                                time_display = local_time.strftime("%H:%M:%S")
+                            elif age.days == 1:
+                                # Yesterday: 昨天 HH:MM
+                                time_display = f"昨天 {local_time.strftime('%H:%M')}"
+                            elif age.days < 7:
+                                # <7 days: X天前 HH:MM
+                                time_part = local_time.strftime("%H:%M")
+                                time_display = f"{age.days}天前 {time_part}"
+                            else:
+                                # ≥7 days: MM-DD HH:MM
+                                time_display = local_time.strftime("%m-%d %H:%M")
                         except (ValueError, TypeError):
                             # Fallback: just extract time part
                             time_display = time_str[11:19]
