@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -13,6 +12,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions.error_tracking import ErrorTrackingService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.utils.time_format import format_age_aware_time
 
 
 class ServeStatusService:
@@ -194,40 +194,7 @@ class ServeStatusService:
                 for err in recent_errors:
                     # Format time with age-aware display (convert UTC to local timezone)
                     time_str = err.get("created_at", "")
-                    if time_str and len(time_str) >= 19:
-                        try:
-                            # Parse UTC time from database
-                            utc_time = datetime.strptime(
-                                time_str[:19], "%Y-%m-%d %H:%M:%S"
-                            )
-                            utc_time = utc_time.replace(tzinfo=timezone.utc)
-
-                            # Convert to system local timezone
-                            local_time = utc_time.astimezone()
-
-                            # Calculate age in calendar days
-                            now = datetime.now(timezone.utc).astimezone()
-                            calendar_days = (now.date() - local_time.date()).days
-
-                            # Apply 4-tier time format based on age
-                            if calendar_days == 0:
-                                # Today: HH:MM:SS
-                                time_display = local_time.strftime("%H:%M:%S")
-                            elif calendar_days == 1:
-                                # Yesterday: 昨天 HH:MM
-                                time_display = f"昨天 {local_time.strftime('%H:%M')}"
-                            elif calendar_days < 7:
-                                # <7 days: X天前 HH:MM
-                                time_part = local_time.strftime("%H:%M")
-                                time_display = f"{calendar_days}天前 {time_part}"
-                            else:
-                                # ≥7 days: MM-DD HH:MM
-                                time_display = local_time.strftime("%m-%d %H:%M")
-                        except (ValueError, TypeError):
-                            # Fallback: just extract time part
-                            time_display = time_str[11:19]
-                    else:
-                        time_display = time_str
+                    time_display = format_age_aware_time(time_str)
 
                     # Format issue number (NULL for governance errors)
                     issue_num = err.get("issue_number")
