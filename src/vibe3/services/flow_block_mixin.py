@@ -7,7 +7,9 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
+from vibe3.models.issue_body import FlowStateProjection
 from vibe3.models.orchestration import IssueState
+from vibe3.services.issue_body_service import merge_projection
 from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
 
@@ -16,6 +18,35 @@ class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
     store: SQLiteClient
+
+    def _project_blocked_state(
+        self: Self,
+        issue_number: int,
+        blocked_by_issue: int | None,
+        reason: str | None,
+    ) -> None:
+        """Project blocked state to issue body managed section."""
+        client = GitHubClient()
+        current_body = client.get_issue_body(issue_number)
+        if current_body is None:
+            logger.bind(issue_number=issue_number).warning(
+                "Failed to read issue body for projection"
+            )
+            return
+
+        # Build projection
+        proj = FlowStateProjection(
+            state="blocked",
+            blocked_by=[blocked_by_issue] if blocked_by_issue else [],
+            blocked_reason=reason,
+        )
+
+        # Merge and update
+        merged = merge_projection(current_body, proj)
+        if not client.update_issue_body(issue_number, merged):
+            logger.bind(issue_number=issue_number).warning(
+                "Failed to update issue body projection"
+            )
 
     def block_flow(
         self: Self,
@@ -96,6 +127,13 @@ class FlowLifecycleMixin:
                         branch=branch,
                         issue_number=issue_number,
                     ).warning(f"Failed to add comment: {e}")
+
+            # Project blocked state to issue body
+            self._project_blocked_state(
+                issue_number,
+                blocked_by_issue=blocked_by_issue,
+                reason=reason,
+            )
 
         self.store.add_event(
             branch,
