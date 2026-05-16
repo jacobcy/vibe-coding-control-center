@@ -16,7 +16,7 @@ Orchestra MCP Server 提供以下工具和资源：
 **替代方案**：使用 `vibe3 ask` CLI 命令：
 ```bash
 vibe3 ask "What is the structure of src/vibe3/?"
-vibe3 ask "How does CapacityService work?" --timeout 300
+vibe3 ask "How does CapacityService work?"
 ```
 
 详见：Issue #47076, #43177

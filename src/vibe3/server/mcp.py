@@ -250,5 +250,5 @@ def create_mcp_server(
             )
 
     log = logger.bind(domain="orchestra")
-    log.info("MCP server created with 3 resources and 4 tools")
+    log.info("MCP server created with 3 resources and 3 tools")
     return mcp
