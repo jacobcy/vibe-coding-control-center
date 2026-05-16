@@ -12,6 +12,10 @@ from loguru import logger
 
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
+from vibe3.services.issue_body_service import (
+    FlowStateProjection,
+    merge_projection,
+)
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
     resume_issue,
@@ -351,6 +355,14 @@ class TaskResumeOperations:
                 failed_reason=None,
                 latest_actor="human:resume",
             )
+
+            # Clear blocked state from issue body projection
+            flow_data = self.flow_service.store.get_flow_state(branch)
+            if flow_data:
+                issue_number = flow_data.get("task_issue_number")
+                if issue_number:
+                    self._clear_blocked_projection(issue_number)
+
         except Exception as exc:
             # Non-blocking: reason clearing failure should not affect resume
             logger.bind(
@@ -358,3 +370,34 @@ class TaskResumeOperations:
                 action="clear_flow_reasons",
                 branch=branch,
             ).warning(f"Failed to clear flow reasons: {exc}")
+
+    def _clear_blocked_projection(self, issue_number: int) -> None:
+        """Clear blocked state from issue body projection.
+
+        Args:
+            issue_number: GitHub issue number
+        """
+        try:
+            logger.bind(
+                domain="resume",
+                action="clear_blocked_projection",
+                issue_number=issue_number,
+            ).info("Clearing blocked projection from issue body")
+
+            current_body = self.github_client.get_issue_body(issue_number)
+            if current_body is None:
+                return
+
+            # Merge with empty projection to clear managed section
+            proj = FlowStateProjection()  # Empty = active state
+            merged = merge_projection(current_body, proj)
+
+            self.github_client.update_issue_body(issue_number, merged)
+
+        except Exception as exc:
+            # Non-blocking: projection clearing failure should not affect resume
+            logger.bind(
+                domain="resume",
+                action="clear_blocked_projection",
+                issue_number=issue_number,
+            ).warning(f"Failed to clear blocked projection: {exc}")
