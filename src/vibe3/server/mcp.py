@@ -368,8 +368,10 @@ def create_mcp_server(
 
             # Execute via CodeagentBackend
             backend = CodeagentBackend()
-            logger.bind(domain="orchestra").info(
-                f"orchestra_ask: task={question!r}, "
+            # Log at DEBUG level with sanitized question to avoid leaking sensitive data
+            sanitized_question = _sanitize_output(question)
+            logger.bind(domain="orchestra").debug(
+                f"orchestra_ask: task={sanitized_question[:50]}..., "
                 f"backend={options.backend}, model={options.model}"
             )
             result = backend.run(

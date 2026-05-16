@@ -111,10 +111,18 @@ def test_orchestra_ask_rejects_dangerous_patterns():
         assert "forbidden pattern" in result_data["error"]
 
 
+@patch("vibe3.server.mcp.CodeagentBackend")
 @patch("vibe3.server.mcp.resolve_orchestra_repo_root")
-def test_orchestra_ask_allows_code_vocabulary(mock_resolve_root):
+def test_orchestra_ask_allows_code_vocabulary(mock_resolve_root, mock_backend_class):
     """Test that input validation allows common code vocabulary like delete/modify."""
     mock_resolve_root.return_value = Path("/tmp/nonexistent")
+
+    # Mock backend to avoid calling real codeagent-wrapper
+    mock_backend = MagicMock()
+    mock_result = MagicMock()
+    mock_result.stdout = "Mocked answer"
+    mock_backend.run.return_value = mock_result
+    mock_backend_class.return_value = mock_backend
 
     mock_status_service = MagicMock()
     mcp = create_mcp_server(mock_status_service)

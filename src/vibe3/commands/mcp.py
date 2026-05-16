@@ -52,7 +52,7 @@ def run() -> None:
 
     # Use FlowManager as the FlowReader implementation
     # (it implements the FlowReader protocol)
-    orchestrator = FlowManager(config, store=store)
+    orchestrator = FlowManager(config, store=store, git=git_client, github=github)
 
     # Create status service
     status_service = OrchestraStatusService(

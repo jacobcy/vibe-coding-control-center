@@ -25,8 +25,6 @@ MCP 是可选依赖，需要单独安装：
 uv pip install mcp
 ```
 
-当前状态：已安装（v1.12.3）
-
 ### 2. 添加 MCP client 配置
 
 在项目级 `.claude/settings.json` 或全局 `~/.claude/settings.json` 中添加：
