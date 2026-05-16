@@ -111,10 +111,37 @@ def _dispatch_role_intent(
             ).info(f"{role.capitalize()} dispatch skipped: {result.reason}")
             return
 
+        # Not launched, not skipped:
+        # - capacity_full / duplicate_dispatch → normal skip
+        # - worktree_unavailable / all others → blocked_reason (catch-all)
+        if result.reason_code in ("capacity_full", "duplicate_dispatch"):
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+            ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
+            return
+
+        # Blocking failure: write blocked_reason to prevent infinite retry
         logger.bind(
             domain=handler_domain,
             issue_number=issue_number,
-        ).warning(f"{role.capitalize()} dispatch not launched: {result.reason}")
+            reason_code=result.reason_code,
+        ).error(f"{role.capitalize()} dispatch blocking failure: {result.reason}")
+
+        if branch:
+            try:
+                from vibe3.services.flow_service import FlowService
+
+                FlowService().block_flow(
+                    branch=branch,
+                    reason=f"[{result.reason_code}] {result.reason}",
+                    actor=actor,
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain=handler_domain,
+                    issue_number=issue_number,
+                ).warning(f"Failed to write blocked_reason: {exc}")
 
 
 @register_handler("PlannerDispatchIntent")
