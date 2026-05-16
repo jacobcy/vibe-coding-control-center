@@ -52,6 +52,7 @@ purpose: Phase 1 基础设施层的核心文档，包含架构设计、编码标
 6. **[异常处理](06-error-handling.md)** - 异常层级、统一捕获实现指南（必读 🔴）
 7. **[命令参数标准](07-command-standards.md)** - 统一参数规范、追踪、输出格式（必读 🔴）
 8. **[命令参数快速参考](08-command-quick-ref.md)** - 核心参数速查表（推荐 📖）
+9. **[CI Simulation 使用指南](09-ci-simulation.md)** - CI 模拟模式使用场景与最佳实践（推荐 📖）
 
 ---
 
@@ -67,6 +68,7 @@ purpose: Phase 1 基础设施层的核心文档，包含架构设计、编码标
 | [06-error-handling.md](06-error-handling.md) | 异常类定义与 CLI 层统一捕获 | 🔴 必读 |
 | [07-command-standards.md](07-command-standards.md) | 统一参数规范、追踪、输出格式、交互确认 | 🔴 必读 |
 | [08-command-quick-ref.md](08-command-quick-ref.md) | 核心参数速查表 | 📖 推荐 |
+| [09-ci-simulation.md](09-ci-simulation.md) | CI 模拟模式使用场景与最佳实践 | 📖 推荐 |
 
 ---
 
@@ -145,6 +147,7 @@ Phase 1 的基础设施为 Phase 4 提供扩展能力：
 | [06-error-handling.md](06-error-handling.md) | 异常层级、统一捕获 | 🔴 必读 | VibeError、UserError、SystemError |
 | [07-command-standards.md](07-command-standards.md) | 统一参数规范 | 🔴 必读 | --trace、-v、--json、-y |
 | [08-command-quick-ref.md](08-command-quick-ref.md) | 参数速查表 | 📖 推荐 | 快速参考、常用组合 |
+| [09-ci-simulation.md](09-ci-simulation.md) | CI 模拟模式使用指南 | 📖 推荐 | VIBE_CI_SIMULATE、VIBE_CI_PARITY、GITHUB_ACTIONS |
 
 ---
 

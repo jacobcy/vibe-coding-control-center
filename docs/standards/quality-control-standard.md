@@ -357,6 +357,8 @@ GITHUB_ACTIONS=true uv run pytest tests/vibe3
 VIBE_CI_SIMULATE=1 bash scripts/hooks/pre-push.sh
 ```
 
+> **详细使用指南**: [CI Simulation 使用指南](../v3/infrastructure/09-ci-simulation.md)
+
 ---
 
 ## 三、特殊场景处理
