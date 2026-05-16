@@ -327,6 +327,52 @@ class VibeConfig(BaseModel):
         return data
 
     @classmethod
+    def _expand_config_variables(cls, config: dict) -> dict:
+        """Expand variable references like ${paths.policies_root} in config values.
+
+        Performs iterative expansion to handle nested references with cycle detection.
+        """
+        import re
+        from typing import Any, cast
+
+        def expand_value(value: Any, context: dict[str, Any]) -> Any:
+            if isinstance(value, str):
+                # Expand ${...} variable references iteratively
+                expanded = value
+                max_iterations = 10  # Prevent infinite loops
+                for _ in range(max_iterations):
+                    pattern = r"\$\{([^}]+)\}"
+
+                    def replace_var(match: re.Match[str]) -> str:
+                        var_path = match.group(1)
+                        # Navigate to referenced value
+                        current: Any = context
+                        for part in var_path.split("."):
+                            if isinstance(current, dict) and part in current:
+                                current = current[part]
+                            else:
+                                # Variable not found, keep original reference
+                                return match.group(0)
+                        return (
+                            str(current)
+                            if not isinstance(current, dict)
+                            else match.group(0)
+                        )
+
+                    new_expanded = re.sub(pattern, replace_var, expanded)
+                    if new_expanded == expanded:
+                        break  # No more changes, reached fixpoint
+                    expanded = new_expanded
+
+                return expanded
+            elif isinstance(value, dict):
+                return {k: expand_value(v, context) for k, v in value.items()}
+            else:
+                return value
+
+        return cast(dict, expand_value(config, config))
+
+    @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
         """Load configuration from YAML file."""
         import yaml  # type: ignore[import-untyped]
@@ -338,6 +384,9 @@ class VibeConfig(BaseModel):
             data = {}
 
         data = cls._load_supplementary(data)
+
+        # Expand variable references before instantiation
+        data = cls._expand_config_variables(data)
 
         return cls(**data)
 

@@ -164,7 +164,39 @@ if [[ ! -f "$INSTALL_DIR/config/keys.env" ]]; then
     chmod 600 "$INSTALL_DIR/config/keys.env"
 fi
 
-# 4.5 Sync canonical skills manifest
+# 4.5 Sync runtime assets (policies)
+log_info "Syncing runtime assets..."
+if [[ -d "$SOURCE_ROOT/.agent/policies" ]]; then
+    mkdir -p "$INSTALL_DIR/assets/policies"
+    cp -R "$SOURCE_ROOT/.agent/policies/." "$INSTALL_DIR/assets/policies/"
+    log_success "Runtime assets (policies) synced"
+else
+    log_warn "No .agent/policies directory found, skipping runtime assets sync"
+fi
+
+# 4.6 Generate global settings.yaml with path overrides
+if [[ ! -f "$INSTALL_DIR/settings.yaml" ]]; then
+    log_info "Generating global settings.yaml..."
+    cat > "$INSTALL_DIR/settings.yaml" << 'EOF'
+# Vibe Center Global Configuration
+# =================================
+# 此文件由 scripts/install.sh 自动生成，提供全局路径配置覆盖
+# 项目级配置（.vibe/settings.yaml）优先级高于此文件
+
+# Paths Configuration
+# 安装后运行时资源路径（覆盖 repo 默认的 .agent/policies）
+paths:
+  policies_root: "$HOME/.vibe/assets/policies"
+
+# 其他配置项继承自 repo 的 config/v3/settings.yaml
+EOF
+    # Replace $HOME with actual home path
+    sed -i.bak "s|\$HOME|$HOME|g" "$INSTALL_DIR/settings.yaml" && rm -f "$INSTALL_DIR/settings.yaml.bak"
+    chmod 644 "$INSTALL_DIR/settings.yaml"
+    log_success "Global settings.yaml generated"
+fi
+
+# 4.7 Sync canonical skills manifest
 if [[ -f "$SOURCE_ROOT/config/v3/skills.json" ]]; then
     log_info "Syncing canonical skills manifest..."
     cp "$SOURCE_ROOT/config/v3/skills.json" "$INSTALL_DIR/skills.json"
