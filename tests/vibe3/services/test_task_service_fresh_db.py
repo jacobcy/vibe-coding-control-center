@@ -183,6 +183,22 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
     assert ("remove", 467, "state/claimed") in label_port.calls
 
 
+def _create_ref_files(notes_dir, plan_ref, report_ref, audit_ref):
+    """Create ref files with mtimes ensuring report > audit > plan for fallback."""
+    if plan_ref:
+        f = notes_dir / "plan.md"
+        f.write_text("# Plan", encoding="utf-8")
+        os.utime(f, (1, 1))
+    if audit_ref:
+        f = notes_dir / "audit.md"
+        f.write_text("# Audit", encoding="utf-8")
+        os.utime(f, (2, 2))
+    if report_ref:
+        f = notes_dir / "report.md"
+        f.write_text("# Report", encoding="utf-8")
+        os.utime(f, (3, 3))
+
+
 def test_select_latest_ref_prefers_newer_valid_authoritative_ref(tmp_path) -> None:
     """Quick view should prefer the latest valid ref by mtime when no role is 'done'."""
     db_path = tmp_path / "fresh.db"
@@ -342,45 +358,7 @@ def test_select_latest_ref_with_state_transitions(
 
     notes_dir = tmp_path / "notes"
     notes_dir.mkdir()
-
-    # For mtime fallback scenario, we need actual files with different mtimes
-    if plan_ref and report_ref and audit_ref:
-        # All three refs exist scenario (all_done)
-        plan_file = notes_dir / "plan.md"
-        report_file = notes_dir / "report.md"
-        audit_file = notes_dir / "audit.md"
-        plan_file.write_text("# Plan", encoding="utf-8")
-        report_file.write_text("# Report", encoding="utf-8")
-        audit_file.write_text("# Audit", encoding="utf-8")
-        # Make audit most recent for reviewer priority test
-        os.utime(plan_file, (1, 1))
-        os.utime(report_file, (2, 2))
-        os.utime(audit_file, (3, 3))
-    elif plan_ref and report_ref and not audit_ref:
-        # Planner done, executor active scenario
-        plan_file = notes_dir / "plan.md"
-        report_file = notes_dir / "report.md"
-        plan_file.write_text("# Plan", encoding="utf-8")
-        report_file.write_text("# Report", encoding="utf-8")
-        os.utime(plan_file, (1, 1))
-        os.utime(report_file, (2, 2))
-    elif report_ref and audit_ref and not plan_ref:
-        # Fallback scenario with two refs - audit is older, report is newer
-        report_file = notes_dir / "report.md"
-        audit_file = notes_dir / "audit.md"
-        report_file.write_text("# Report", encoding="utf-8")
-        audit_file.write_text("# Audit", encoding="utf-8")
-        os.utime(audit_file, (1, 1))
-        os.utime(report_file, (2, 2))
-    elif plan_ref:
-        plan_file = notes_dir / "plan.md"
-        plan_file.write_text("# Plan", encoding="utf-8")
-    elif report_ref:
-        report_file = notes_dir / "report.md"
-        report_file.write_text("# Report", encoding="utf-8")
-    elif audit_ref:
-        audit_file = notes_dir / "audit.md"
-        audit_file.write_text("# Audit", encoding="utf-8")
+    _create_ref_files(notes_dir, plan_ref, report_ref, audit_ref)
 
     flow = FlowStatusResponse(
         branch="task/issue-501",
