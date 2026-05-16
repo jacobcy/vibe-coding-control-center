@@ -256,16 +256,10 @@ def status(
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
 
-        if output_format in ("json", "yaml"):
-            output_data = [f.model_dump() for f in flows]
-            if output_format == "json":
-                typer.echo(json.dumps(output_data, indent=2, default=str))
-            else:  # yaml
-                import yaml
-
-                typer.echo(
-                    yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
-                )
+        if output_format == "json":
+            typer.echo(
+                json.dumps([f.model_dump() for f in flows], indent=2, default=str)
+            )
             return
         if not flows:
             typer.echo("No active flows")

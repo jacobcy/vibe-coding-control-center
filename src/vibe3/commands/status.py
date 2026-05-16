@@ -19,13 +19,70 @@ from vibe3.models.orchestration import IssueState
 from vibe3.server.registry import _validate_pid_file
 from vibe3.services.flow_service import FlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
-from vibe3.services.status_query_service import StatusQueryService, is_auto_task_branch
+from vibe3.services.status_query_service import (
+    StatusQueryService,
+    is_auto_task_branch,
+    is_canonical_task_branch,
+)
 from vibe3.services.task_status_classifier import (
     TaskStatusBucket,
     classify_task_status,
 )
 from vibe3.ui.console import console
 from vibe3.utils.time_format import format_age_aware_time
+
+
+def _extract_blocked_reason_summary(blocked_reason: str) -> str:
+    """Extract key information from blocked_reason for status display.
+
+    Filters out verbose runtime details (TMPDIR, Recent Errors, stdin mode).
+    Preserves short status messages and error codes for quick diagnosis.
+
+    Args:
+        blocked_reason: Full blocked_reason from flow state
+
+    Returns:
+        Concise summary suitable for single-line display
+    """
+    if not blocked_reason:
+        return ""
+
+    lines = blocked_reason.strip().split("\n")
+    if not lines:
+        return ""
+
+    # Get first meaningful line
+    first_line = lines[0].strip()
+
+    # For short reasons (state unchanged, required ref missing), return as-is
+    if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
+        return first_line
+
+    # Extract error code prefix and filter out TMPDIR/Recent Errors noise
+    # E.g., "E_EXEC_NO_OUTPUT:", "codeagent-wrapper failed (code 1):"
+    import re
+
+    # Remove TMPDIR and everything after it in first line
+    cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", first_line)[0].strip()
+
+    # Remove " | === Recent Errors === | Using stdin mode" suffix
+    cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
+
+    # Remove trailing pipe separators
+    cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+
+    # Truncate to 80 chars, prefer breaking after punctuation
+    if len(cleaned) <= 80:
+        return cleaned
+
+    # Try to break after colon or period (preserve error code prefix)
+    for sep in [":", "。"]:
+        pos = cleaned.rfind(sep, 0, 80)
+        if pos > 0:
+            return cleaned[: pos + 1]
+
+    # Fallback: hard truncate
+    return cleaned[:80]
 
 
 def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
@@ -54,6 +111,49 @@ def _resolve_server_label(
     return "[dim]stopped[/]"
 
 
+def _render_task_item_details(
+    flow: FlowStatusResponse | None,
+    config: OrchestraConfig,
+    assignee: str | None = None,
+) -> None:
+    """Render shared task detail lines for task-oriented dashboard sections."""
+    flow_info = (
+        f"[dim]flow:[/] [cyan]{flow.branch}[/]"
+        if flow
+        else "[dim]flow:[/] [dim](none)[/]"
+    )
+    detail_parts = [flow_info]
+    if assignee:
+        detail_parts.append(f"[dim]assignee:[/] [cyan]{assignee}[/]")
+    console.print("             " + "  ".join(detail_parts))
+
+    if not flow:
+        return
+
+    if flow.plan_ref:
+        console.print(f"             [dim]plan:[/] [cyan]{flow.plan_ref}[/]")
+    if flow.report_ref:
+        console.print(f"             [dim]report:[/] [cyan]{flow.report_ref}[/]")
+    if flow.latest_verdict:
+        v = flow.latest_verdict
+        color = {
+            "PASS": "green",
+            "MAJOR": "yellow",
+            "BLOCK": "red",
+        }.get(v.verdict, "cyan")
+        console.print(
+            f"             [dim]verdict:[/] "
+            f"[{color}]{v.verdict}[/] [dim]({v.actor})[/]"
+        )
+    if flow.pr_number:
+        pr_ref = (
+            f"https://github.com/{config.repo}/pull/{flow.pr_number}"
+            if config.repo
+            else f"PR #{flow.pr_number}"
+        )
+        console.print(f"             [dim]PR:[/] [cyan]{pr_ref}[/]")
+
+
 def status(
     all_flows: AllOption = False,
     check: Annotated[
@@ -72,15 +172,7 @@ def status(
     ] = False,
 ) -> None:
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
-    from vibe3.commands.status_render import (
-        render_blocked_items,
-        render_completed_flows,
-        render_issue_progress,
-        render_pr_ref_items,
-        render_scene_sections,
-        render_supervisor_issues,
-    )
-
+    # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
             "Warning: --json is deprecated, use --format json instead",
@@ -91,16 +183,16 @@ def status(
         if check:
             run_full_check_shortcut()
 
+        # 1. Orchestra State (Issues & Managers)
         config = load_orchestra_config()
         orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
         snapshot_found = orch_snapshot is not None
 
         if not orch_snapshot:
+            # Fallback if server is not running
             from dataclasses import replace
 
-            from vibe3.services.flow_orchestrator_service import (
-                FlowOrchestratorService,
-            )
+            from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 
             orch_service = OrchestraStatusService(
                 config, orchestrator=FlowOrchestratorService(config)
@@ -108,11 +200,11 @@ def status(
             local_snap = orch_service.snapshot()
             orch_snapshot = replace(local_snap, server_running=False)
 
-        if output_format in ("json", "yaml"):
+        if output_format == "json":
             service = FlowService()
             flows = service.list_flows(status=None if all_flows else "active")
 
-            output_data = {
+            json_data = {
                 "orchestra": (
                     orch_snapshot.model_dump()
                     if hasattr(orch_snapshot, "model_dump")
@@ -120,19 +212,13 @@ def status(
                 ),
                 "flows": [f.model_dump() for f in flows],
             }
-
-            if output_format == "json":
-                typer.echo(json.dumps(output_data, indent=2, default=str))
-            else:  # yaml
-                import yaml
-
-                typer.echo(
-                    yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
-                )
+            typer.echo(json.dumps(json_data, indent=2, default=str))
             return
 
+        # Header
         from datetime import datetime
 
+        # Convert timestamp to UTC datetime for age-aware formatting
         ts_utc = datetime.fromtimestamp(orch_snapshot.timestamp, tz=timezone.utc)
         ts_str = format_age_aware_time(ts_utc)
         console.print(f"[bold]Orchestra Status[/] [dim]({ts_str})[/]")
@@ -143,6 +229,7 @@ def status(
             )
         )
 
+        # 1.5 Dispatch status (FailedGate + Queue)
         if orch_snapshot.dispatch_blocked:
             console.print(
                 "Dispatch: [bold red]FROZEN[/] "
@@ -161,9 +248,11 @@ def status(
             )
         console.print()
 
+        # 2. Issue Tracking (state truth + local scene)
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
         if not all_flows:
+            # Also include done flows to show PRs in the dashboard
             flows.extend(service.list_flows(status="done"))
 
         stale_flows = service.list_flows(status="stale") if not all_flows else []
@@ -174,12 +263,14 @@ def status(
             flows, queued_set, stale_flows=stale_flows
         )
 
+        # Separate supervisor issues (label: supervisor, no phase display)
         supervisor_label = config.supervisor_handoff.issue_label
         supervisor_items = [
             item
             for item in orchestrated_issues
             if supervisor_label in cast(list[str], item.get("labels", []))
         ]
+        # Remove supervisor items from task_progress to avoid duplication
         supervisor_numbers = {cast(int, item["number"]) for item in supervisor_items}
 
         task_progress_items = [
@@ -195,6 +286,8 @@ def status(
             TaskStatusBucket.OTHER: [],
         }
         for item in task_progress_items:
+            # Filter out DONE state from standard progress buckets
+            #  to keep them in PR section only
             state = cast(IssueState | None, item["state"])
             if state == IssueState.DONE:
                 continue
@@ -206,26 +299,173 @@ def status(
             )
             bucketed_items[bucket].append(item)
 
-        render_issue_progress(bucketed_items, config)
+        console.print("[bold cyan]Issue Progress:[/]")
+
+        if task_progress_items:
+            assignee_items = bucketed_items[TaskStatusBucket.ASSIGNEE_INTAKE]
+            ready_items = bucketed_items[TaskStatusBucket.READY_QUEUE]
+            ready_anomalies = bucketed_items[TaskStatusBucket.READY_ANOMALY]
+
+            console.print("  [bold]Assignee Intake:[/]")
+            if assignee_items:
+                for item in assignee_items:
+                    number = cast(int, item["number"])
+                    title = cast(str, item["title"])
+                    state = cast(IssueState, item["state"])
+                    flow = cast(FlowStatusResponse | None, item["flow"])
+                    is_queued = cast(bool, item["queued"])
+                    assignee = cast(str | None, item.get("assignee"))
+
+                    status_str = "QUEUED" if is_queued else state.value.upper()
+                    status_color = "yellow" if is_queued else "green"
+                    console.print(
+                        f"  #{number:4}  [{status_color}]{status_str:10}[/]"
+                        f"  {title[:48] + ('...' if len(title) > 48 else '')}"
+                    )
+                    _render_task_item_details(flow, config, assignee=assignee)
+            else:
+                console.print("  [dim](none)[/]")
+
+            console.print("\n  [bold]Ready Queue:[/]")
+            if ready_items:
+                for item in ready_items:
+                    number = cast(int, item["number"])
+                    title = cast(str, item["title"])
+                    flow = cast(FlowStatusResponse | None, item["flow"])
+                    assignee = cast(str | None, item.get("assignee"))
+
+                    # Queue metadata
+                    milestone = cast(str | None, item.get("milestone"))
+                    roadmap = cast(str | None, item.get("roadmap"))
+                    priority = cast(int, item.get("priority", 0))
+                    queue_rank = cast(int | None, item.get("queue_rank"))
+
+                    # Format queue metadata
+                    metadata_parts: list[str] = []
+                    if queue_rank is not None:
+                        metadata_parts.append(f"rank={queue_rank}")
+                    if milestone:
+                        metadata_parts.append(f"milestone={milestone}")
+                    if roadmap:
+                        metadata_parts.append(f"roadmap/{roadmap}")
+                    metadata_parts.append(f"priority/{priority}")
+                    metadata_str = "  ".join(metadata_parts)
+
+                    display_title = title[:48] + "..." if len(title) > 48 else title
+                    console.print(
+                        f"  #{number:4}  [cyan]READY     [/]  {display_title}"
+                    )
+                    _render_task_item_details(flow, config, assignee=assignee)
+                    console.print(f"             [dim]{metadata_str}[/]")
+            else:
+                console.print("  [dim](none)[/]")
+
+            console.print("\n  [bold]Ready Exceptions:[/]")
+            if ready_anomalies:
+                for item in ready_anomalies:
+                    number = cast(int, item["number"])
+                    title = cast(str, item["title"])
+                    flow = cast(FlowStatusResponse | None, item["flow"])
+                    assignee = cast(str | None, item.get("assignee"))
+
+                    display_title = title[:48] + "..." if len(title) > 48 else title
+                    console.print(f"  #{number:4}  [red]READY     [/]  {display_title}")
+                    _render_task_item_details(flow, config, assignee=assignee)
+                    if assignee:
+                        console.print(
+                            "             [yellow]non-manager assignee:[/] "
+                            "requires assignee-pool or roadmap intake repair"
+                        )
+                    else:
+                        console.print(
+                            "             [yellow]missing assignee:[/] "
+                            "ready queue historical debt"
+                        )
+            else:
+                console.print("  [dim](none)[/]")
+        else:
+            console.print("  [dim]No orchestration-tracked issues.[/]")
+
         console.print()
 
-        render_supervisor_issues(supervisor_items)
+        # 2.5 Supervisor Issues (no phase display)
+        console.print("[bold cyan]Supervisor Issues:[/]")
+        if supervisor_items:
+            for item in supervisor_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                state = cast(IssueState, item["state"])
+                display_title = title[:52] + "..." if len(title) > 52 else title
+                state_str = state.value.upper()
+                console.print(f"  #{number:4}  [{state_str}]  {display_title}")
+        else:
+            console.print("  [dim](none)[/]")
+
         console.print()
 
+        # NEW: Show flows with PRs (factually complete, waiting for merge)
         pr_ref_items = [
             item
             for item in task_progress_items
             if item.get("flow") and getattr(item["flow"], "pr_ref", None)
         ]
-        render_pr_ref_items(pr_ref_items)
+        console.print("[bold cyan]Flows with PRs (Merge-Ready/Done):[/]")
+        if pr_ref_items:
+            for item in pr_ref_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                flow = cast(FlowStatusResponse, item["flow"])
+                pr_url_value = getattr(flow, "pr_ref", None)
+                pr_url: str | None = str(pr_url_value) if pr_url_value else None
+
+                # Show PR URL and state
+                state = cast(IssueState, item["state"])
+                status_str = state.value.upper()
+
+                display_title = title[:48] + "..." if len(title) > 48 else title
+                console.print(f"  #{number:4}  [{status_str:10}]  {display_title}")
+                if pr_url:
+                    console.print(f"         [cyan]PR: {pr_url}[/]")
+        else:
+            console.print("  [dim](none)[/]")
 
         blocked_items = [
             item
             for item in task_progress_items
             if cast(IssueState, item["state"]) == IssueState.BLOCKED
         ]
-        render_blocked_items(blocked_items)
+        console.print("[bold cyan]Blocked Issues:[/]")
+        if blocked_items:
+            for item in blocked_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                flow = cast(FlowStatusResponse | None, item["flow"])
+                blocked_by = cast(tuple[int, ...] | None, item.get("blocked_by"))
+                blocked_reason = cast(str | None, item.get("blocked_reason"))
 
+                # Title: truncate only if needed, no forced ellipsis
+                display_title = title[:60] + ("..." if len(title) > 60 else "")
+                console.print(f"  #{number:4}  [red]BLOCKED[/]  {display_title}")
+
+                # Flow info on separate line (consistent with other sections)
+                if flow:
+                    console.print(f"         [dim]flow:[/] [cyan]{flow.branch}[/]")
+                else:
+                    console.print("         [dim]flow:[/] [dim](no flow scene)[/]")
+
+                # Blocked metadata
+                if blocked_by:
+                    blocked_by_str = ", ".join(f"#{n}" for n in blocked_by)
+                    console.print(f"         [yellow]blocked by:[/] {blocked_by_str}")
+
+                # Blocked reason: extract key information from verbose error messages
+                if blocked_reason:
+                    reason_summary = _extract_blocked_reason_summary(blocked_reason)
+                    console.print(f"         [yellow]reason:[/] {reason_summary}")
+        else:
+            console.print("  [dim](none)[/]")
+
+        # NEW: Show completed/aborted flows (no longer active)
         if all_flows:
             completed_flows = [
                 flow
@@ -233,9 +473,77 @@ def status(
                 if getattr(flow, "flow_status", "active")
                 in {"done", "aborted", "merged"}
             ]
-            render_completed_flows(completed_flows)
+            console.print("\n[bold cyan]Completed/Aborted Flows:[/]")
+            if completed_flows:
+                for flow in completed_flows:
+                    task = (
+                        f"#{flow.task_issue_number}"
+                        if flow.task_issue_number
+                        else "(no task)"
+                    )
+                    flow_status = getattr(flow, "flow_status", "active")
+                    console.print(
+                        f"  [cyan]{flow.branch:30}[/] "
+                        f"[dim]task:[/] {task:10} "
+                        f"[dim]status:[/] {flow_status}"
+                    )
+            else:
+                console.print("  [dim](none)[/]")
 
+        # 3. Local scene context (tracked flows + worktrees)
+        # Only show active/blocked/stale flows in Scenes sections
+        # done/aborted flows are shown separately in Completed/Aborted section
         worktree_map = query_service.fetch_worktree_map()
 
         if flows:
-            render_scene_sections(flows, worktree_map)
+            # Filter out done/aborted for Scenes display
+            active_flows = [
+                flow
+                for flow in flows
+                if getattr(flow, "flow_status", "active")
+                not in {"done", "aborted", "merged"}
+            ]
+            auto_flows = [
+                flow
+                for flow in active_flows
+                if is_auto_task_branch(flow.branch) and flow.branch in worktree_map
+            ]
+            manual_flows = [
+                flow for flow in active_flows if not is_auto_task_branch(flow.branch)
+            ]
+
+            console.print("\n[bold cyan]Auto Task Scenes:[/]")
+            if auto_flows:
+                for flow in auto_flows:
+                    wt = worktree_map.get(flow.branch, "(no worktree)")
+                    if is_canonical_task_branch(flow.branch, flow.task_issue_number):
+                        console.print(f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}")
+                    else:
+                        task = (
+                            f"#{flow.task_issue_number}"
+                            if flow.task_issue_number
+                            else "(no task)"
+                        )
+                        console.print(
+                            f"  [cyan]{flow.branch:30}[/] "
+                            f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
+                        )
+
+            else:
+                console.print("  [dim](none)[/]")
+
+            console.print("\n[bold cyan]Manual Scenes:[/]")
+            if manual_flows:
+                for flow in manual_flows:
+                    wt = worktree_map.get(flow.branch, "(no worktree)")
+                    task = (
+                        f"#{flow.task_issue_number}"
+                        if flow.task_issue_number
+                        else "(no task)"
+                    )
+                    console.print(
+                        f"  [cyan]{flow.branch:30}[/] "
+                        f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
+                    )
+            else:
+                console.print("  [dim](none)[/]")

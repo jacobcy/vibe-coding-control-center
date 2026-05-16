@@ -209,17 +209,8 @@ def update(
                 # Bind spec (absolute path)
                 flow_service.bind_spec(flow.branch, str(spec_path.resolve()), actor)
 
-        if output_format in ("json", "yaml"):
-            if output_format == "json":
-                typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
-            else:  # yaml
-                import yaml
-
-                typer.echo(
-                    yaml.dump(
-                        flow.model_dump(), default_flow_style=False, allow_unicode=True
-                    )
-                )
+        if output_format == "json":
+            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
             render_flow_created(flow)
 
@@ -300,20 +291,13 @@ def bind(
                 )
                 links.append(link)
 
-            if output_format in ("json", "yaml"):
-                output_data = (
-                    links[0].model_dump()
-                    if len(links) == 1
-                    else [link.model_dump() for link in links]
-                )
-                if output_format == "json":
-                    typer.echo(json.dumps(output_data, indent=2, default=str))
-                else:  # yaml
-                    import yaml
-
+            if output_format == "json":
+                if len(links) == 1:
+                    typer.echo(json.dumps(links[0].model_dump(), indent=2, default=str))
+                else:
                     typer.echo(
-                        yaml.dump(
-                            output_data, default_flow_style=False, allow_unicode=True
+                        json.dumps(
+                            [link.model_dump() for link in links], indent=2, default=str
                         )
                     )
             else:
@@ -358,15 +342,8 @@ def list_deleted(
         console.print("[yellow]No deleted flows found[/]")
         return
 
-    if output_format in ("json", "yaml"):
-        if output_format == "json":
-            typer.echo(json.dumps(deleted_flows, indent=2, default=str))
-        else:  # yaml
-            import yaml
-
-            typer.echo(
-                yaml.dump(deleted_flows, default_flow_style=False, allow_unicode=True)
-            )
+    if output_format == "json":
+        typer.echo(json.dumps(deleted_flows, indent=2, default=str))
     else:
         table = Table(title=f"Deleted Flows ({len(deleted_flows)} total)")
         table.add_column("Branch", style="cyan")
