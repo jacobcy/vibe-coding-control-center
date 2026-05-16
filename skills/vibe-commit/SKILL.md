@@ -188,11 +188,25 @@ git diff --cached --stat
 - `stash`
 - `discard`
 
+**检查临时调试文件**：
+
+在审计工作区时，需要检查根目录下是否有临时调试文件：
+
+```bash
+# 检查根目录下的临时调试文件
+ls debug_*.py debug_*.sh tmp_*.py 2>/dev/null || echo "No debug files found"
+```
+
+若发现临时调试文件（如 `debug_*.py`、`debug_*.sh`、`tmp_*.py`），应归类为 `discard`（删除），不进入 commit：
+
+- **自动删除**：使用 `rm debug_*.py debug_*.sh tmp_*.py` 清理
+- **说明原因**：向用户说明这些是临时调试文件，不应随功能代码提交
+
 执行前必须向用户说明：
 
 - 哪些文件进入当前 commit
 - 哪些内容会被 stash
-- 哪些内容会被 discard
+- 哪些内容会被 discard（包括临时调试文件）
 
 ### Step 5: Pre-commit 强制验证与格式化（强制两步流程）
 
