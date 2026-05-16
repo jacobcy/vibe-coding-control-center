@@ -33,6 +33,9 @@ tmpvibe-*
 vibe-init-test*
 **/var/folders/**/*vibe-init-test*
 
+# GitHub Copilot prompts (local only, not tracked)
+.github/prompts/
+
 # =============================================================================
 # Python
 # =============================================================================
