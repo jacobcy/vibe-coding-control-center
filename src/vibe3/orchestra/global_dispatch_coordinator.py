@@ -136,6 +136,8 @@ class GlobalDispatchCoordinator:
                     issue_number=issue_number,
                     collected_state=entry.get("collected_state"),
                     waiting_state=None,  # Reset to trigger re-dispatch
+                    retry_count=entry.get("retry_count", 0),
+                    last_attempted_at=entry.get("last_attempted_at"),
                 )
             )
 
@@ -161,6 +163,8 @@ class GlobalDispatchCoordinator:
                 "issue_number": e.issue_number,
                 "collected_state": e.collected_state,
                 "waiting_state": e.waiting_state,
+                "retry_count": e.retry_count,
+                "last_attempted_at": e.last_attempted_at,
             }
             for e in self._frozen_queue
         ]
@@ -300,6 +304,8 @@ class GlobalDispatchCoordinator:
         """
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
+            # Persist freshly collected queue after assignment
+            self._persist_queue()
             if not self._frozen_queue:
                 append_orchestra_event(
                     "dispatcher",
@@ -447,6 +453,9 @@ class GlobalDispatchCoordinator:
                 f"{dispatched_count}{reset}",
             )
 
+        # Persist queue state after dispatch mutations
+        self._persist_queue()
+
     async def _collect_frozen_queue(self) -> list[QueueEntry]:
         """Collect a new frozen queue only when the current one is empty."""
         queue: list[QueueEntry] = []
@@ -491,8 +500,6 @@ class GlobalDispatchCoordinator:
             f"GlobalDispatchCoordinator: queue collection complete, "
             f"total={len(queue)} issues",
         )
-        # Persist the freshly collected queue
-        self._persist_queue()
         return queue
 
     def _promote_progressed_entries(self) -> None:
