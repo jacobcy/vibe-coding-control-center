@@ -1,12 +1,92 @@
 """Configuration loader for Vibe Center."""
 
 import os
+import re
 from pathlib import Path
+from typing import Any, cast
 
+import yaml
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import ConfigError
+
+
+def _expand_variables(
+    config: dict[str, Any], context: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Expand variable references in configuration values.
+
+    Supports ${path.to.value} syntax for referencing other config values.
+    """
+    if context is None:
+        context = config
+
+    result: dict[str, Any] = {}
+
+    for key, value in config.items():
+        if isinstance(value, str):
+            # Expand ${...} variable references
+            pattern = r"\$\{([^}]+)\}"
+
+            def replace_var(match: re.Match[str]) -> str:
+                var_path = match.group(1)
+                # Navigate to referenced value
+                current: Any = context
+                for part in var_path.split("."):
+                    if isinstance(current, dict) and part in current:
+                        current = current[part]
+                    else:
+                        # Variable not found, keep original reference
+                        return match.group(0)
+                return str(current) if not isinstance(current, dict) else match.group(0)
+
+            result[key] = re.sub(pattern, replace_var, value)
+        elif isinstance(value, dict):
+            result[key] = _expand_variables(value, context)
+        else:
+            result[key] = value
+
+    return result
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Deep merge two dictionaries, with override taking precedence."""
+    merged: dict[str, Any] = dict(base)
+
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+
+    return merged
+
+
+def load_yaml_config(path: Path) -> dict[str, Any]:
+    """Load YAML configuration file.
+
+    Returns empty dict if file doesn't exist or is invalid.
+    """
+    if not path.exists():
+        return {}
+
+    try:
+        with path.open(encoding="utf-8") as stream:
+            raw = yaml.safe_load(stream)
+            if isinstance(raw, dict):
+                return cast(dict[str, Any], raw)
+            return {}
+    except yaml.YAMLError as exc:
+        logger.bind(domain="config", action="load", path=str(path)).warning(
+            f"Invalid YAML in config file: {exc}"
+        )
+        return {}
+    except OSError as exc:
+        logger.bind(domain="config", action="load", path=str(path)).warning(
+            f"Cannot read config file: {exc}"
+        )
+        return {}
 
 
 def find_config_file() -> Path | None:
@@ -61,6 +141,11 @@ def find_config_file() -> Path | None:
 def load_config(config_path: Path | None = None) -> VibeConfig:
     """Load configuration from file or use defaults.
 
+    Configuration layers (priority order):
+    1. Project config: .vibe/settings.yaml
+    2. Global config: ~/.vibe/settings.yaml
+    3. Repo fallback: config/v3/settings.yaml
+
     Args:
         config_path: Optional explicit path to config file.
                      If None, searches standard locations.
@@ -76,13 +161,36 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
     if config_path is None:
         config_path = find_config_file()
 
-    # Load from file if found
+    # Load with layering support
     if config_path and config_path.exists():
+        # Load the three layers
+        repo_config_path = Path("config/v3/settings.yaml")
+        global_config_path = Path.home() / ".vibe" / "settings.yaml"
+        project_config_path = Path(".vibe/settings.yaml")
+
+        # Start with repo default
+        config_data: dict[str, Any] = load_yaml_config(repo_config_path)
+
+        # Merge global config
+        if global_config_path.exists():
+            global_config = load_yaml_config(global_config_path)
+            config_data = _deep_merge(config_data, global_config)
+
+        # Merge project config
+        if project_config_path.exists():
+            project_config = load_yaml_config(project_config_path)
+            config_data = _deep_merge(config_data, project_config)
+
+        # Expand variable references
+        config_data = _expand_variables(config_data)
+
         try:
-            config = VibeConfig.from_yaml(config_path)
+            config = VibeConfig(**config_data)
             logger.info(
-                "Configuration loaded from file",
-                path=str(config_path),
+                "Configuration loaded with layering",
+                repo_config=str(repo_config_path),
+                global_config=str(global_config_path),
+                project_config=str(project_config_path),
                 code_limits_v2_shell_total_loc=config.code_limits.total_file_loc.v2_shell,
                 code_limits_v3_python_total_loc=config.code_limits.total_file_loc.v3_python,
             )
