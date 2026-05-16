@@ -38,6 +38,10 @@ case "$command" in
         source "$VIBE_LIB/doctor.sh"
         vibe_doctor "$@"
         ;;
+    init)
+        source "$VIBE_LIB/init.sh"
+        vibe_init "$@"
+        ;;
     keys)
         source "$VIBE_LIB/keys.sh"
         vibe_keys "$@"
@@ -60,6 +64,7 @@ case "$command" in
         echo ""
         echo "V2 Utilities:"
         echo "  ${GREEN}doctor${NC}   环境诊断与依赖建议"
+        echo "  ${GREEN}init${NC}     项目运行环境初始化"
         echo "  ${GREEN}keys${NC}     认证 / Key 来源检查"
         echo "  ${GREEN}skills${NC}   Skills 安装与同步状态检查"
         echo "  ${GREEN}alias${NC}    加载 Shell 快捷别名"
