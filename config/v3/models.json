@@ -64,6 +64,11 @@
       "model": "gpt-5.4",
       "yolo": true,
       "description": "Architecture design and system planning"
+    },
+    "orchestra-explorer": {
+      "backend": "claude",
+      "model": "sonnet",
+      "description": "MCP ask tool: lightweight project knowledge explorer"
     }
   }
 }
