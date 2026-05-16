@@ -170,5 +170,3 @@ prompt_text:
   notes:
     - "Owns prompt text/output contracts/retry guidance."
     - "config/v3/settings.yaml must not define these fields; loader fails fast."
-
-# Removed github_project configuration - was dead config with no consumers

@@ -27,8 +27,6 @@ class TaskBridgeModel(BaseModel):
 
     # --- Bridge 字段（本地持久化）---
     branch: str
-    project_item_id: str | None = None  # 远端 item identity
-    project_node_id: str | None = None  # 远端 node identity（GraphQL ID）
     task_issue_number: int | None = None  # 关联 issue 引用
     spec_ref: str | None = None
     plan_ref: str | None = None

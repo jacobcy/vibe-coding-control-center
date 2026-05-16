@@ -11,7 +11,6 @@ flow:
     - "master"
     - "develop"
 
-# GitHub Projects v2 配置（Task Bridge 真源）
 # AI 辅助配置
 # 用于 AI 文案辅助能力（如 pr create --ai）
 # API Key 通过环境变量配置: DEEPSEEK_API_KEY
