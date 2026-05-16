@@ -15,6 +15,7 @@ from loguru import logger
 from rich import box as _box
 
 from vibe3.commands import (
+    ask,
     check,
     flow,
     handoff,
@@ -69,6 +70,7 @@ app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(internal.app, name="internal")
 app.add_typer(mcp.app, name="mcp")
+app.add_typer(ask.app, name="ask")
 
 
 @app.command(name="status", hidden=True)
