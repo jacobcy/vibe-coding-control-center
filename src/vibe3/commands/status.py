@@ -1,6 +1,7 @@
 """Status command - unified dashboard for flows and orchestra."""
 
 import json
+from datetime import timezone
 from typing import Annotated, cast
 
 import typer
@@ -28,6 +29,7 @@ from vibe3.services.task_status_classifier import (
     classify_task_status,
 )
 from vibe3.ui.console import console
+from vibe3.utils.time_format import format_age_aware_time
 
 
 def _extract_blocked_reason_summary(blocked_reason: str) -> str:
@@ -201,9 +203,9 @@ def status(
         # Header
         from datetime import datetime
 
-        ts_str = datetime.fromtimestamp(orch_snapshot.timestamp).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        # Convert timestamp to UTC datetime for age-aware formatting
+        ts_utc = datetime.fromtimestamp(orch_snapshot.timestamp, tz=timezone.utc)
+        ts_str = format_age_aware_time(ts_utc)
         console.print(f"[bold]Orchestra Status[/] [dim]({ts_str})[/]")
         console.print(
             "Server: "
