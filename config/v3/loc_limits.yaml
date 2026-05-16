@@ -124,6 +124,11 @@ code_limits:
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
 
+      # 配置系统核心模块
+      - path: "src/vibe3/config/settings.py"
+        limit: 450
+        reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开等配置加载逻辑，拆分会破坏配置系统完整性"
+
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree.py"
         limit: 600
