@@ -283,6 +283,9 @@ class ErrorTrackingService:
     def cleanup_terminal_issue_errors(self) -> int:
         """Delete error records for issues with terminal flow status.
 
+        Uses flow_issue_links (issue_role='task') as SSOT to identify current
+        task flow for each issue, avoiding false matches on superseded flows.
+
         Terminal states: done, aborted, stale (per _is_reusable_auto_flow
         in flow_dispatch.py).
 
@@ -293,10 +296,12 @@ class ErrorTrackingService:
             result = conn.execute("""
                 DELETE FROM error_log
                 WHERE issue_number IN (
-                    SELECT CAST(substr(fs.branch, 12) AS INTEGER)
-                    FROM flow_state fs
-                    WHERE fs.flow_status IN ('done', 'aborted', 'stale')
-                      AND fs.branch LIKE 'task/issue-%'
+                    SELECT fil.issue_number
+                    FROM flow_issue_links fil
+                    INNER JOIN flow_state fs ON fs.branch = fil.branch
+                    WHERE fil.issue_role = 'task'
+                      AND fs.flow_status IN ('done', 'aborted', 'stale')
+                      AND fs.deleted_at IS NULL
                 )
             """)
             conn.commit()
