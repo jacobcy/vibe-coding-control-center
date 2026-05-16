@@ -207,19 +207,19 @@ class ServeStatusService:
 
                             # Calculate age in calendar days
                             now = datetime.now(timezone.utc).astimezone()
-                            age = now - local_time
+                            calendar_days = (now.date() - local_time.date()).days
 
                             # Apply 4-tier time format based on age
-                            if age.days == 0:
+                            if calendar_days == 0:
                                 # Today: HH:MM:SS
                                 time_display = local_time.strftime("%H:%M:%S")
-                            elif age.days == 1:
+                            elif calendar_days == 1:
                                 # Yesterday: 昨天 HH:MM
                                 time_display = f"昨天 {local_time.strftime('%H:%M')}"
-                            elif age.days < 7:
+                            elif calendar_days < 7:
                                 # <7 days: X天前 HH:MM
                                 time_part = local_time.strftime("%H:%M")
-                                time_display = f"{age.days}天前 {time_part}"
+                                time_display = f"{calendar_days}天前 {time_part}"
                             else:
                                 # ≥7 days: MM-DD HH:MM
                                 time_display = local_time.strftime("%m-%d %H:%M")
