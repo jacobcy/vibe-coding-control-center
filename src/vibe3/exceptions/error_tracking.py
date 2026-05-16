@@ -280,6 +280,28 @@ class ErrorTrackingService:
             conn.commit()
             return result.rowcount
 
+    def cleanup_terminal_issue_errors(self) -> int:
+        """Delete error records for issues with terminal flow status.
+
+        Terminal states: done, aborted, stale (per _is_reusable_auto_flow
+        in flow_dispatch.py).
+
+        Returns:
+            Number of deleted records
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute("""
+                DELETE FROM error_log
+                WHERE issue_number IN (
+                    SELECT CAST(substr(fs.branch, 12) AS INTEGER)
+                    FROM flow_state fs
+                    WHERE fs.flow_status IN ('done', 'aborted', 'stale')
+                      AND fs.branch LIKE 'task/issue-%'
+                )
+            """)
+            conn.commit()
+            return result.rowcount
+
     def get_status(self) -> dict[str, Any]:
         """Get error tracking status for display.
 
