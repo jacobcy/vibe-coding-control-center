@@ -104,7 +104,6 @@ tests/
     ├── contracts/             # Contract tests
     │   ├── check_help.sh
     │   ├── test_flow_contract.bats
-    │   ├── test_github_project_bootstrap.bats
     │   ├── test_keys_contract.bats
     │   ├── test_roadmap_contract.bats
     │   ├── test_shared_state_contracts.bats
