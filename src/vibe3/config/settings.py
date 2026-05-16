@@ -331,8 +331,10 @@ class VibeConfig(BaseModel):
         """Expand variable references like ${paths.policies_root} in config values.
 
         Performs iterative expansion to handle nested references with cycle detection.
+        Also expands ~ to home directory in path values.
         """
         import re
+        from pathlib import Path
         from typing import Any, cast
 
         def expand_value(value: Any, context: dict[str, Any]) -> Any:
@@ -363,6 +365,10 @@ class VibeConfig(BaseModel):
                     if new_expanded == expanded:
                         break  # No more changes, reached fixpoint
                     expanded = new_expanded
+
+                # Expand ~ to home directory for path values
+                if expanded.startswith("~") or "/~" in expanded:
+                    expanded = str(Path(expanded).expanduser())
 
                 return expanded
             elif isinstance(value, dict):
