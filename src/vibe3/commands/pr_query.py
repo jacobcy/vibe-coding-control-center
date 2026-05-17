@@ -107,13 +107,26 @@ def _resolve_pr_target(
             flow_service = FlowService(store=pr_svc.store)
             resolved_branch = resolve_issue_branch_input(branch, flow_service)
 
+        # Short-circuit: if resolve returned the original numeric input unchanged,
+        # no real branch was found — skip the misleading API call
+        if resolved_branch and resolved_branch.isdigit() and not pr_number:
+            return PrQueryTarget(
+                pr_number=None,
+                branch=resolved_branch,
+                current_branch=None,
+                from_flow=False,
+            )
+
         # Try to find PR for the resolved branch
         resolved_pr_number = pr_number
         if resolved_branch and not pr_number:
             try:
-                prs = pr_svc.github_client.list_prs_for_branch(resolved_branch)
+                prs = pr_svc.github_client.list_prs_for_branch(
+                    resolved_branch, state="open"
+                )
+                if not prs:
+                    prs = pr_svc.github_client.list_prs_for_branch(resolved_branch)
                 if prs:
-                    # Take the first PR (most recent)
                     resolved_pr_number = prs[0].number
             except Exception as e:
                 logger.bind(
@@ -134,7 +147,9 @@ def _resolve_pr_target(
     # Priority 2: Infer from current branch
     current_branch = pr_svc.git_client.get_current_branch()
     try:
-        prs = pr_svc.github_client.list_prs_for_branch(current_branch)
+        prs = pr_svc.github_client.list_prs_for_branch(current_branch, state="open")
+        if not prs:
+            prs = pr_svc.github_client.list_prs_for_branch(current_branch)
         resolved_pr = prs[0].number if prs else None
     except Exception as e:
         logger.bind(

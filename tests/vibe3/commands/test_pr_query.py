@@ -49,6 +49,8 @@ def test_resolve_pr_target_from_issue_number():
 def test_resolve_pr_target_branch_not_found():
     """Test friendly error when branch inference fails."""
     pr_svc = Mock()
+    # Explicitly set empty return to avoid accidental pass
+    pr_svc.github_client.list_prs_for_branch.return_value = []
 
     mock_flow_service = Mock()
     mock_flow_service.get_flow_state.return_value = None  # No flow found
