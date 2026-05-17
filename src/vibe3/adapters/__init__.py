@@ -5,6 +5,9 @@ from vibe3.config.adapter_manifest import AdapterManifest
 # Registry of known adapters
 _ADAPTERS: dict[str, AdapterManifest] = {}
 
+# Track which adapters have been loaded
+_LOADED: set[str] = set()
+
 
 def register_adapter(manifest: AdapterManifest) -> None:
     """Register an adapter manifest.
@@ -13,10 +16,13 @@ def register_adapter(manifest: AdapterManifest) -> None:
         manifest: Adapter manifest to register
     """
     _ADAPTERS[manifest.name] = manifest
+    _LOADED.add(manifest.name)
 
 
 def get_adapter(name: str) -> AdapterManifest | None:
-    """Get a registered adapter by name.
+    """Get a registered adapter by name with lazy loading.
+
+    Lazily imports built-in adapters on first access.
 
     Args:
         name: Adapter name
@@ -24,6 +30,10 @@ def get_adapter(name: str) -> AdapterManifest | None:
     Returns:
         Adapter manifest or None if not found
     """
+    # Lazy import of built-in adapters
+    if name == "vibe-center" and "vibe-center" not in _LOADED:
+        import vibe3.adapters.vibe_center  # noqa: F401
+
     return _ADAPTERS.get(name)
 
 
