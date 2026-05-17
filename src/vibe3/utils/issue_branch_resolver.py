@@ -33,11 +33,15 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
     Raises:
         UserError: When conflicts or missing flows detected
     """
-    # Step 1: Check input type
-    if branch is None or not branch.strip().isdigit():
-        return branch
+    # Step 1: Check input type and normalize
+    if branch is None:
+        return None
 
-    issue_number = int(branch.strip())
+    stripped = branch.strip()
+    if not stripped.isdigit():
+        return stripped
+
+    issue_number = int(stripped)
     store = getattr(flow_service, "store")
 
     # Step 2: Query flows with issue binding
@@ -52,7 +56,7 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
     # Step 4: Check unbound candidates (smart warning)
     unbound_candidates = []
     for candidate in iter_issue_branch_candidates(issue_number):
-        state = flow_service.get_flow_state(candidate)
+        state = store.get_flow_state(candidate)
         if state:
             unbound_candidates.append(state)
 
@@ -134,7 +138,11 @@ def _resolve_best_flow_from_candidates(
             f"Use 'vibe3 flow abort <branch>' to resolve the conflict."
         )
 
-    # Priority 3: All flows are aborted
+    # Priority 3: Single active flow among multiple non-aborted
+    if len(active) == 1:
+        return str(active[0]["branch"])
+
+    # Priority 4: All flows are aborted
     if not non_aborted and candidates:
         details = "\n  - ".join(_format_flow_details(f) for f in candidates)
         raise UserError(
