@@ -185,21 +185,22 @@ def show(
 
             projection = FlowProjection.from_flow_status(flow_status)
 
-            # Optionally fetch real-time PR status if PR exists
-            if flow_status.pr_number:
-                try:
-                    from vibe3.clients.github_client import GitHubClient
+            # Fetch real-time PR status by branch (regardless of flow_status.pr_number)
+            # For --source remote, flow_status may not have pr_number from issue-body
+            # but branch could still have an open PR
+            try:
+                from vibe3.clients.github_client import GitHubClient
 
-                    github_client = GitHubClient()
-                    prs = github_client.list_prs_for_branch(target_branch)
-                    if prs:
-                        pr = prs[0]
-                        projection.pr_number = pr.number
-                        projection.pr_status = pr.state.value
-                        projection.pr_is_draft = pr.draft
-                        projection.pr_url = pr.url
-                except Exception as e:
-                    projection.pr_fetch_error = str(e)
+                github_client = GitHubClient()
+                prs = github_client.list_prs_for_branch(target_branch)
+                if prs:
+                    pr = prs[0]
+                    projection.pr_number = pr.number
+                    projection.pr_status = pr.state.value
+                    projection.pr_is_draft = pr.draft
+                    projection.pr_url = pr.url
+            except Exception as e:
+                projection.pr_fetch_error = str(e)
 
             _render_snapshot_format(projection, flow_status, output_format)
             return
