@@ -98,3 +98,29 @@ def test_multiple_active_flows_conflict_error(
     error_message = str(exc_info.value)
     assert "Multiple active flows detected" in error_message
     assert "vibe3 flow abort" in error_message
+
+
+def test_all_aborted_flows_error(mock_flow_service: Mock, mock_store: Mock):
+    """Test error when all flows are aborted."""
+    # Arrange: All flows aborted
+    mock_store.get_flows_by_issue.return_value = [
+        {
+            "branch": "task/issue-976",
+            "flow_status": "aborted",
+            "pr_ref": None,
+        },
+        {
+            "branch": "dev/issue-976",
+            "flow_status": "aborted",
+            "pr_ref": None,
+        },
+    ]
+
+    # Act & Assert: Should raise UserError with restore hint
+    with pytest.raises(UserError) as exc_info:
+        resolve_issue_branch_input("976", mock_flow_service)
+
+    error_message = str(exc_info.value)
+    assert "All flows for issue" in error_message
+    assert "aborted" in error_message
+    assert "vibe3 flow restore" in error_message
