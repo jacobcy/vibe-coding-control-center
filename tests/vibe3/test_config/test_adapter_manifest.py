@@ -1,6 +1,7 @@
 """Tests for adapter manifest model."""
 
 import pytest
+from pydantic import ValidationError
 
 from vibe3.config.adapter_manifest import AdapterManifest, AdapterResource
 
@@ -50,5 +51,42 @@ def test_adapter_manifest_frozen():
         version="1.0.0",
         resources=[AdapterResource(type="skill", name="test", path="test.md")],
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         manifest.name = "changed"
+
+
+def test_adapter_manifest_duplicate_resources_rejected():
+    """Test that duplicate resource names within same type are rejected."""
+    with pytest.raises(ValidationError, match="Duplicate resource"):
+        AdapterManifest(
+            name="dup-test",
+            version="1.0.0",
+            resources=[
+                AdapterResource(
+                    type="skill", name="same-name", path="skills/a/SKILL.md"
+                ),
+                AdapterResource(
+                    type="skill", name="same-name", path="skills/b/SKILL.md"
+                ),
+            ],
+        )
+
+
+def test_adapter_manifest_invalid_version_rejected():
+    """Test that non-semver version strings are rejected."""
+    with pytest.raises(ValidationError, match="version"):
+        AdapterManifest(
+            name="bad-version",
+            version="not-semver",
+            resources=[],
+        )
+
+
+def test_adapter_manifest_empty_name_rejected():
+    """Test that empty name is rejected."""
+    with pytest.raises(ValidationError):
+        AdapterManifest(
+            name="",
+            version="1.0.0",
+            resources=[],
+        )
