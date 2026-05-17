@@ -105,6 +105,7 @@ def test_pr_show_missing_pr_includes_bind_hint(
     # Mock github_client to return no PR
     github_client = MagicMock()
     github_client.get_pr.return_value = None
+    github_client.list_prs_for_branch.return_value = []  # No PRs found
 
     pr_service = MagicMock()
     pr_service.git_client = git_client
