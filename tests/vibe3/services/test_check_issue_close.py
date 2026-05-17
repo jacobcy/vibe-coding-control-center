@@ -50,7 +50,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT
         assert suggestions["issue_to_close"] == issue_number
@@ -87,7 +87,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT: suggestions should NOT have issue_to_close since it was already closed
         assert suggestions["issue_to_close"] is None
@@ -120,7 +120,9 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch_done, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(
+            branch_done, "PR merged"
+        )
 
         # ASSERT: Issue should NOT be closed because other active flow exists
         assert suggestions["issue_to_close"] is None
@@ -154,7 +156,9 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch_done, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(
+            branch_done, "PR merged"
+        )
 
         # ASSERT: Issue SHOULD be closed because no other ACTIVE flows
         assert suggestions["issue_to_close"] == issue_number
@@ -180,7 +184,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT: Issue should NOT be closed because role is "related" not "task"
         assert suggestions["issue_to_close"] is None
@@ -206,7 +210,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT: Issue should NOT be closed because role is "dependency" not "task"
         assert suggestions["issue_to_close"] is None
@@ -233,7 +237,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT: Issue SHOULD be closed even though branch is not task/issue-N
         assert suggestions["issue_to_close"] == issue_number
@@ -258,7 +262,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT: Flow marked done, no issue close attempted
         assert suggestions["issue_to_close"] is None
@@ -288,7 +292,7 @@ class TestMarkFlowDoneIssueClose:
         )
 
         # ACT
-        suggestions = service._mark_flow_done(branch, "PR merged")
+        suggestions = service._flow_status_service.mark_flow_done(branch, "PR merged")
 
         # ASSERT: One of the task issues should be closed (order depends on SQLite)
         assert suggestions["issue_to_close"] in (111, 222)
