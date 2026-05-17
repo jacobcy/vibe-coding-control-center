@@ -124,3 +124,22 @@ def test_all_aborted_flows_error(mock_flow_service: Mock, mock_store: Mock):
     assert "All flows for issue" in error_message
     assert "aborted" in error_message
     assert "vibe3 flow restore" in error_message
+
+
+def test_no_binding_with_candidates_error(mock_flow_service: Mock, mock_store: Mock):
+    """Test error when no binding but unbound candidates exist."""
+    # Arrange: No flows by issue, but unbound candidate exists
+    mock_store.get_flows_by_issue.return_value = []
+    mock_flow_service.get_flow_state.return_value = {
+        "branch": "dev/issue-976",
+        "flow_status": "active",
+        "pr_ref": None,
+    }
+
+    # Act & Assert: Should raise UserError with bind hint
+    with pytest.raises(UserError) as exc_info:
+        resolve_issue_branch_input("976", mock_flow_service)
+
+    error_message = str(exc_info.value)
+    assert "without task binding" in error_message
+    assert "vibe3 flow bind" in error_message
