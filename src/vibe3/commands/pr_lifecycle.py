@@ -5,6 +5,7 @@ Merge is now handled by flow done / integrate, not pr merge.
 """
 
 import json
+import subprocess
 from typing import Annotated, List
 
 import typer
@@ -43,8 +44,12 @@ def _resolve_ready_pr_number(
 
     branch = flow_service.get_current_branch()
     # Use standard branch→PR query path
-    prs = pr_service.github_client.list_prs_for_branch(branch)
-    pr = prs[0] if prs else None
+    try:
+        prs = pr_service.github_client.list_prs_for_branch(branch)
+        pr = prs[0] if prs else None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pr = None
+
     if pr is not None:
         return pr.number
 

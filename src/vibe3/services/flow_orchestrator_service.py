@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -84,10 +85,19 @@ class FlowOrchestratorService:
             return int(flow["pr_number"])
 
         # Fallback: standard branch→PR query path
-        branch = self.issue_flow_service.canonical_branch_name(issue_number)
-        prs = self.github.list_prs_for_branch(branch)
-        if prs:
-            return prs[0].number
+        # Use flow's actual branch if exists and non-empty, otherwise canonical branch
+        if flow and flow.get("branch"):
+            branch = str(flow["branch"])
+        else:
+            branch = self.issue_flow_service.canonical_branch_name(issue_number)
+
+        try:
+            prs = self.github.list_prs_for_branch(branch)
+            if prs:
+                return prs[0].number
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # GitHub CLI not available or query failed
+            pass
 
         return None
 
@@ -212,20 +222,25 @@ class FlowOrchestratorService:
         """
         slug = slug or f"issue-{issue.number}"
         # Use branch→PR lookup for consistency (not issue→PR)
-        prs = self.github.list_prs_for_branch(branch)
-        if prs:
-            pr = prs[0]
-            if pr and (pr.state == PRState.MERGED or pr.merged_at):
-                block_manager_noop_issue(
-                    issue_number=issue.number,
-                    repo=self.config.repo,
-                    reason=(
-                        f"尝试重建 flow 但 PR #{pr.number} 已 merge。"
-                        "Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
-                    ),
-                    actor="orchestra:flow_dispatch",
-                )
-                return None
+        # Query all PR states (including merged) to detect merged PRs
+        try:
+            prs = self.github.list_prs_for_branch(branch, state="all")
+            if prs:
+                pr = prs[0]
+                if pr and (pr.state == PRState.MERGED or pr.merged_at):
+                    block_manager_noop_issue(
+                        issue_number=issue.number,
+                        repo=self.config.repo,
+                        reason=(
+                            f"尝试重建 flow 但 PR #{pr.number} 已 merge。"
+                            "Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
+                        ),
+                        actor="orchestra:flow_dispatch",
+                    )
+                    return None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # GitHub CLI not available or query failed, continue with rebuild
+            pass
 
         FlowCleanupService(git_client=self.git, store=self.store).cleanup_flow_scene(
             branch,

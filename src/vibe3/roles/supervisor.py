@@ -168,7 +168,7 @@ def build_supervisor_apply_request(
 
     return ExecutionRequest(
         role="supervisor",
-        target_branch=branch,  # <-- CHANGED: Use canonical branch
+        target_branch=branch,
         target_id=issue_number,
         execution_name=f"vibe3-supervisor-issue-{issue_number}",
         prompt=prompt,
@@ -215,7 +215,7 @@ def build_supervisor_cli_request(
 
     return ExecutionRequest(
         role="supervisor",
-        target_branch=branch,  # <-- CHANGED: Use canonical branch
+        target_branch=branch,
         target_id=issue_number,
         execution_name=f"vibe3-supervisor-issue-{issue_number}",
         prompt=prompt,

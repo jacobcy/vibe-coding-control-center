@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import sys
 from typing import Annotated
 
@@ -159,8 +160,12 @@ def register_create_command(app: typer.Typer) -> None:
             pr_service = PRService()
 
             # Use standard branch→PR query path
-            prs = pr_service.github_client.list_prs_for_branch(branch)
-            existing_pr = prs[0] if prs else None
+            try:
+                prs = pr_service.github_client.list_prs_for_branch(branch)
+                existing_pr = prs[0] if prs else None
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                existing_pr = None
+
             if existing_pr is not None:
                 pr_service.sync_pr_state_from_remote(existing_pr, actor=None)
                 _emit_pr_result(

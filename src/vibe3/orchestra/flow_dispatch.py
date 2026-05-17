@@ -4,6 +4,8 @@ This module owns issue->flow orchestration for execution-facing roles.
 It was moved out of manager/ so manager can keep shrinking toward a role shell.
 """
 
+import subprocess
+
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
@@ -213,9 +215,18 @@ class FlowManager:
             return int(flow["pr_number"])
 
         # Fallback: branch→PR standard path
-        branch = self.issue_flow_service.canonical_branch_name(issue_number)
-        prs = self.github.list_prs_for_branch(branch)
-        if prs:
-            return prs[0].number
+        # Use flow's actual branch if exists and non-empty, otherwise canonical branch
+        if flow and flow.get("branch"):
+            branch = str(flow["branch"])
+        else:
+            branch = self.issue_flow_service.canonical_branch_name(issue_number)
+
+        try:
+            prs = self.github.list_prs_for_branch(branch)
+            if prs:
+                return prs[0].number
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # GitHub CLI not available or query failed
+            pass
 
         return None
