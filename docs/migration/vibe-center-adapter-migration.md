@@ -2,7 +2,7 @@
 
 ## Overview
 
-As of PR #XXX (Issue #936), Vibe Center repository is now an explicit adapter consumer instead of relying on implicit repo-local paths.
+As of PR #982 (Issue #936), Vibe Center repository is now an explicit adapter consumer instead of relying on implicit repo-local paths.
 
 ## What Changed
 
