@@ -19,7 +19,10 @@ def _expand_variables(
 
     Supports ${path.to.value} syntax for referencing other config values.
     Performs iterative expansion to handle nested references with cycle detection.
+    Also expands ~ to home directory in path values.
     """
+    from pathlib import Path
+
     if context is None:
         context = config
 
@@ -53,6 +56,10 @@ def _expand_variables(
                 if new_expanded == expanded:
                     break  # No more changes, reached fixpoint
                 expanded = new_expanded
+
+            # Expand ~ to home directory for path values
+            if expanded.startswith("~") or "/~" in expanded:
+                expanded = str(Path(expanded).expanduser())
 
             result[key] = expanded
         elif isinstance(value, dict):
