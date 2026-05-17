@@ -44,6 +44,35 @@ def test_worktree_manager_raises_on_creation_failure_when_worktree_requested(
                 )
 
 
+def test_worktree_manager_raises_on_alignment_failure(tmp_path: Path) -> None:
+    """HIGH: Alignment failure must raise error, not return unaligned worktree."""
+    from vibe3.exceptions import SystemError
+
+    manager = WorktreeManager(config=FakeConfig(), repo_path=tmp_path)
+
+    mock_context = WorktreeContext(
+        path=tmp_path / ".worktrees" / "dev-issue-123",
+        is_temporary=False,
+        branch="dev/issue-123",
+        issue_number=123,
+    )
+
+    with patch(
+        "vibe3.environment.worktree.find_worktree_for_branch", return_value=None
+    ):
+        with patch.object(manager, "acquire_issue_worktree", return_value=mock_context):
+            # HIGH: Simulate alignment failure
+            with patch.object(manager, "align_auto_scene_to_base", return_value=False):
+                with pytest.raises(
+                    SystemError, match="Failed to align worktree to base branch"
+                ):
+                    manager.resolve_bootstrap_worktree_context(
+                        branch="dev/issue-123",
+                        issue_number=123,
+                        use_worktree=True,
+                    )
+
+
 def test_worktree_manager_can_describe_bootstrap_context(tmp_path: Path) -> None:
     """Test that resolve_bootstrap_worktree_context returns WorktreeContext."""
     manager = WorktreeManager(config=FakeConfig(), repo_path=tmp_path)

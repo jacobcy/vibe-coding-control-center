@@ -666,5 +666,16 @@ class WorktreeManager(WorktreePRMixin):
             )
 
         # Align to base for bootstrap entry
-        self.align_auto_scene_to_base(ctx.path, branch)
+        if not self.align_auto_scene_to_base(ctx.path, branch):
+            logger.bind(
+                domain="worktree",
+                issue=issue_number,
+                branch=branch,
+                worktree_path=str(ctx.path),
+            ).error("Failed to align worktree to base branch")
+            raise SystemError(
+                f"Failed to align worktree to base branch for issue #{issue_number}. "
+                f"Worktree created at {ctx.path} but alignment to {branch} failed. "
+                "Check git status and scene_base_ref configuration."
+            )
         return ctx
