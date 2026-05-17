@@ -19,6 +19,7 @@ from vibe3.ui.task_ui import (
     render_task_comments,
     render_task_show,
 )
+from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 app = typer.Typer(
     help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
@@ -85,12 +86,19 @@ def show(
         else _noop()
     )
     with ctx:
-        task_result = task_svc.show_task(target_branch)
+        # Resolve issue number from branch using standard resolver
+        resolved_branch = (
+            resolve_issue_branch_input(target_branch, task_svc.flow_service)
+            or target_branch
+        )
+        task_result = task_svc.show_task(resolved_branch)
+
         issue_number = None
         if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
-        elif target_branch.isdigit():
-            issue_number = int(target_branch)
+        elif resolved_branch.isdigit():
+            # Branch resolved to numeric issue (no flow exists)
+            issue_number = int(resolved_branch)
 
         render_task_show(task_result, output_format, full=full)
 
