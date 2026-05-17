@@ -81,6 +81,14 @@ class TestHandoffBasicCommands:
     ):
         """handoff status 436 should resolve to task/dev issue branch."""
         mock_flow_service = MagicMock()
+
+        # Mock store with flow binding
+        mock_store = MagicMock()
+        mock_store.get_flows_by_issue.return_value = [
+            {"branch": "task/issue-436", "flow_status": "active"}
+        ]
+        mock_flow_service.store = mock_store
+
         mock_flow_service.get_flow_state.side_effect = lambda branch: (
             FlowState(branch=branch, flow_slug="issue-436", flow_status="active")
             if branch == "task/issue-436"
@@ -106,7 +114,6 @@ class TestHandoffBasicCommands:
         result = runner.invoke(app, ["handoff", "status", "436"])
 
         assert result.exit_code == 0
-        mock_flow_service.get_flow_state.assert_any_call("task/issue-436")
         mock_status_service.get_handoff_status.assert_called_once_with(
             "task/issue-436", limit=5
         )
@@ -181,6 +188,14 @@ class TestHandoffBasicCommands:
         ref_file.write_text("content")
 
         mock_flow = MagicMock()
+
+        # Mock store with flow binding
+        mock_store = MagicMock()
+        mock_store.get_flows_by_issue.return_value = [
+            {"branch": "task/issue-304", "flow_status": "active"}
+        ]
+        mock_flow.store = mock_store
+
         mock_flow.get_flow_state.side_effect = lambda b: (
             {"branch": b} if b == "task/issue-304" else None
         )

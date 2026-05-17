@@ -298,18 +298,29 @@ class TestHandoffAdvancedCommands:
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
 
-        result = runner.invoke(
-            app,
-            [
-                "handoff",
-                "report",
-                "docs/reports/test-report.md",
-                "--branch",
-                "473",
-                "--actor",
-                "claude/sonnet-4.6",
-            ],
-        )
+        # Mock FlowService in branch_arg (resolver creates its own instance)
+        mock_flow_service = MagicMock()
+        mock_store = MagicMock()
+        mock_store.get_flows_by_issue.return_value = [
+            {"branch": "task/issue-473", "flow_status": "active"}
+        ]
+        mock_flow_service.store = mock_store
+
+        with patch(
+            "vibe3.utils.branch_arg.FlowService", return_value=mock_flow_service
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "handoff",
+                    "report",
+                    "docs/reports/test-report.md",
+                    "--branch",
+                    "473",
+                    "--actor",
+                    "claude/sonnet-4.6",
+                ],
+            )
 
         assert result.exit_code == 0
         assert "✓" in result.output

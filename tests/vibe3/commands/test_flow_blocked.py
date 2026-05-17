@@ -60,7 +60,18 @@ def test_flow_blocked_resolves_numeric_branch_to_canonical_task_branch() -> None
         issues=[],
     )
 
-    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+    # Mock store with flow binding
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = [
+        {"branch": "task/issue-235", "flow_status": "active"}
+    ]
+    flow_service.store = mock_store
+
+    # Patch both FlowService import locations
+    with (
+        patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service),
+        patch("vibe3.utils.branch_arg.FlowService", return_value=flow_service),
+    ):
         result = runner.invoke(
             app, ["flow", "blocked", "--branch", "235", "--task", "246"]
         )
