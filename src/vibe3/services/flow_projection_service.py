@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from vibe3.clients import SQLiteClient
@@ -27,6 +27,7 @@ class FlowProjection:
     spec_ref: str | None = None
     next_step: str | None = None
     blocked_reason: str | None = None
+    blocked_by: list[int] = field(default_factory=list)  # Dependency issue numbers
 
     # GitHub PR data
     pr_number: int | None = None
@@ -42,6 +43,10 @@ class FlowProjection:
     @classmethod
     def from_flow_status(cls, status: FlowStatusResponse) -> "FlowProjection":
         """Create projection from basic flow status."""
+        blocked_by = []
+        if status.blocked_by_issue:
+            blocked_by.append(status.blocked_by_issue)
+
         return cls(
             branch=status.branch,
             flow_slug=status.flow_slug,
@@ -51,6 +56,7 @@ class FlowProjection:
             spec_ref=status.spec_ref,
             next_step=status.next_step,
             blocked_reason=status.blocked_reason,
+            blocked_by=blocked_by,
         )
 
 

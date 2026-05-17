@@ -70,8 +70,7 @@ def test_resolver_auto_fallback_to_issue_body():
 
             assert result.branch == "dev/issue-123"
             assert result.flow_slug == "dev-issue-123"
-            # Note: "blocked" is migrated to "active" by FlowStatusResponse validator
-            assert result.flow_status == "active"
+            assert result.flow_status == "blocked"
             assert result.blocked_by_issue == 456
             assert result.blocked_reason == "Waiting for dependency"
             assert result.data_source == DataSource.ISSUE_BODY_FALLBACK

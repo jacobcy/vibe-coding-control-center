@@ -345,7 +345,8 @@ def register_query_commands(app: typer.Typer) -> None:
             # Record external events (best-effort, non-blocking)
             try:
                 if pr and pr_number:
-                    effective_branch = branch or target.current_branch
+                    # Use PR's head_branch if branch not specified
+                    effective_branch = branch or target.current_branch or pr.head_branch
                     if effective_branch:
                         _fetch_and_record_external_events(
                             pr_number=pr_number,
