@@ -23,7 +23,6 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.models.pr import PRState
 from vibe3.observability.degraded_mode import get_degraded_manager
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
