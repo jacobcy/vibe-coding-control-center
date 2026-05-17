@@ -276,8 +276,8 @@ def test_get_pr_for_issue_returns_flow_pr_without_github_call() -> None:
 
     result = service.get_pr_for_issue(123)
 
-    # GitHub API should NOT be called
-    github.get_pr_for_issue.assert_not_called()
+    # GitHub list_prs_for_branch should NOT be called (fast path from flow)
+    github.list_prs_for_branch.assert_not_called()
     assert result == 99
 
 

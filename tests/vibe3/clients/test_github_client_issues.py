@@ -138,37 +138,3 @@ def test_add_comment_passes_repo():
             if "--repo" in args and "org/repo" in args:
                 found_repo = True
         assert found_repo
-
-
-def test_get_pr_for_issue_found():
-    client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps(
-                [
-                    {
-                        "number": 123,
-                        "closingIssuesReferences": [{"number": 1}],
-                    }
-                ]
-            ),
-        )
-        assert client.get_pr_for_issue(1) == 123
-
-
-def test_get_pr_for_issue_not_found():
-    client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="[]",
-        )
-        assert client.get_pr_for_issue(1) is None
-
-
-def test_get_pr_for_issue_gh_failure():
-    client = _client()
-    with patch("vibe3.clients.github_issue_admin_ops.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stderr="error")
-        assert client.get_pr_for_issue(1) is None
