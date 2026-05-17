@@ -80,3 +80,14 @@ def test_empty_dependencies_no_source():
     truth = CoordinationTruth(dependencies=[])
     assert truth.dependencies == []
     assert truth.dependencies_source is None
+
+
+def test_is_blocked_in_serialization():
+    """Test that is_blocked appears in model_dump() output."""
+    truth = CoordinationTruth(
+        blocked_reason="Blocked",
+        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
+    )
+    dumped = truth.model_dump()
+    assert "is_blocked" in dumped
+    assert dumped["is_blocked"] is True

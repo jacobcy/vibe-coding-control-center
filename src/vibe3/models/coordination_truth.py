@@ -2,7 +2,7 @@
 
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from vibe3.models.data_source import DataSource
 
@@ -70,6 +70,7 @@ class CoordinationTruth(BaseModel):
             )
         return self
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_blocked(self) -> bool:
         """Compute blocked state from blocked_reason and blocked_by_issue."""
