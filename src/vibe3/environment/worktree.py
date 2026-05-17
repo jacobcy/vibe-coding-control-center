@@ -557,3 +557,45 @@ class WorktreeManager(WorktreePRMixin):
             branch=base_branch,
             issue_number=issue_number,
         )
+
+    def resolve_bootstrap_worktree_context(
+        self,
+        *,
+        branch: str,
+        issue_number: int,
+        use_worktree: bool,
+    ) -> WorktreeContext:
+        """Resolve worktree context for vibe-new bootstrap.
+
+        This is a read-only resource resolver that determines where bootstrap
+        should execute. It does NOT perform issue intake, flow binding, or
+        business orchestration.
+
+        Args:
+            branch: Target branch name
+            issue_number: GitHub issue number
+            use_worktree: Whether to use a physical worktree
+
+        Returns:
+            WorktreeContext describing the execution environment
+        """
+        if not use_worktree:
+            return WorktreeContext(
+                path=self.repo_path,
+                is_temporary=False,
+                branch=branch,
+                issue_number=issue_number,
+            )
+
+        existing = find_worktree_for_branch(self.repo_path, branch)
+        if existing:
+            return WorktreeContext(
+                path=existing,
+                is_temporary=False,
+                branch=branch,
+                issue_number=issue_number,
+            )
+
+        # Delegate to canonical worktree acquisition
+        ctx = self.acquire_issue_worktree(issue_number=issue_number, branch=branch)
+        return ctx

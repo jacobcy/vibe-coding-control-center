@@ -1,6 +1,63 @@
+from pathlib import Path
+from unittest.mock import patch
+
+from vibe3.environment.worktree import WorktreeManager
+from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.services.bootstrap_context_service import (
     BootstrapContextService,
 )
+
+
+class FakeConfig:
+    """Minimal config stub for WorktreeManager tests."""
+
+    pass
+
+
+def test_worktree_manager_can_describe_bootstrap_context(tmp_path: Path) -> None:
+    """Test that resolve_bootstrap_worktree_context returns WorktreeContext."""
+    manager = WorktreeManager(config=FakeConfig(), repo_path=tmp_path)
+
+    # Mock find_worktree_for_branch to return None (no existing worktree)
+    # Mock acquire_issue_worktree to return a simple context
+    mock_context = WorktreeContext(
+        path=tmp_path / ".worktrees" / "dev-issue-123",
+        is_temporary=False,
+        branch="dev/issue-123",
+        issue_number=123,
+    )
+
+    with patch(
+        "vibe3.environment.worktree.find_worktree_for_branch", return_value=None
+    ):
+        with patch.object(manager, "acquire_issue_worktree", return_value=mock_context):
+            context = manager.resolve_bootstrap_worktree_context(
+                branch="dev/issue-123",
+                issue_number=123,
+                use_worktree=True,
+            )
+
+    assert context.issue_number == 123
+    assert context.branch == "dev/issue-123"
+    assert context.is_temporary is False
+
+
+def test_worktree_manager_returns_repo_path_when_no_worktree_needed(
+    tmp_path: Path,
+) -> None:
+    """Test that resolve returns repo_path when use_worktree=False."""
+    manager = WorktreeManager(config=FakeConfig(), repo_path=tmp_path)
+
+    context = manager.resolve_bootstrap_worktree_context(
+        branch="dev/issue-123",
+        issue_number=123,
+        use_worktree=False,
+    )
+
+    assert context.path == tmp_path
+    assert context.issue_number == 123
+    assert context.branch == "dev/issue-123"
+    assert context.is_temporary is False
 
 
 def test_plan_for_new_branch_bootstrap_uses_atomic_actions() -> None:
