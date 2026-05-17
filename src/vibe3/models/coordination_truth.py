@@ -1,6 +1,8 @@
 """Coordination truth table model for remote-first reads."""
 
-from pydantic import BaseModel, Field
+from typing import Self
+
+from pydantic import BaseModel, Field, model_validator
 
 from vibe3.models.data_source import DataSource
 
@@ -51,12 +53,24 @@ class CoordinationTruth(BaseModel):
         description="Latest actor from local DB only",
     )
 
-    # Combined state
-    is_blocked: bool = Field(
-        default=False,
-        description="Blocked state inferred from blocked_reason + blocked_by_issue",
-    )
+    @model_validator(mode="after")
+    def validate_source_consistency(self) -> Self:
+        """Ensure source fields are set when corresponding values are provided."""
+        if self.blocked_reason is not None and self.blocked_reason_source is None:
+            raise ValueError(
+                "blocked_reason_source must be set when blocked_reason is provided"
+            )
+        if self.blocked_by_issue is not None and self.blocked_by_issue_source is None:
+            raise ValueError(
+                "blocked_by_issue_source must be set when blocked_by_issue is provided"
+            )
+        if self.dependencies and self.dependencies_source is None:
+            raise ValueError(
+                "dependencies_source must be set when dependencies are provided"
+            )
+        return self
 
-    def model_post_init(self, __context: object) -> None:
-        """Compute is_blocked from blocked_reason and blocked_by_issue."""
-        self.is_blocked = bool(self.blocked_reason or self.blocked_by_issue)
+    @property
+    def is_blocked(self) -> bool:
+        """Compute blocked state from blocked_reason and blocked_by_issue."""
+        return bool(self.blocked_reason or self.blocked_by_issue)

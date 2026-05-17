@@ -1,5 +1,8 @@
 """Tests for coordination truth table model."""
 
+import pytest
+from pydantic import ValidationError
+
 from vibe3.models.coordination_truth import CoordinationTruth
 from vibe3.models.data_source import DataSource
 
@@ -52,3 +55,28 @@ def test_truth_provenance():
     )
     assert truth.blocked_reason_source == DataSource.LOCAL_SQLITE
     assert truth.worktree_path == "/tmp/worktree"
+
+
+def test_source_required_for_blocked_reason():
+    """Test that blocked_reason requires blocked_reason_source."""
+    with pytest.raises(ValidationError, match="blocked_reason_source must be set"):
+        CoordinationTruth(blocked_reason="Missing source")
+
+
+def test_source_required_for_blocked_by_issue():
+    """Test that blocked_by_issue requires blocked_by_issue_source."""
+    with pytest.raises(ValidationError, match="blocked_by_issue_source must be set"):
+        CoordinationTruth(blocked_by_issue=999)
+
+
+def test_source_required_for_dependencies():
+    """Test that dependencies require dependencies_source."""
+    with pytest.raises(ValidationError, match="dependencies_source must be set"):
+        CoordinationTruth(dependencies=[123])
+
+
+def test_empty_dependencies_no_source():
+    """Test that empty dependencies list doesn't require source."""
+    truth = CoordinationTruth(dependencies=[])
+    assert truth.dependencies == []
+    assert truth.dependencies_source is None
