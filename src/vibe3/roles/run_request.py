@@ -25,6 +25,7 @@ from vibe3.roles.run_helpers import (
     RUN_BRANCH_RESOLVER,
     resolve_run_options,
 )
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_executor_issue
 
 
@@ -46,7 +47,9 @@ def build_run_request(
     if audit_ref:
         refs["audit_ref"] = audit_ref
 
-    target_branch = branch or f"task/issue-{issue.number}"
+    resolver = ConventionResolver.from_repo()
+    convention = resolver.resolve()
+    target_branch = branch or convention.branch.canonical_branch(issue.number)
     if commit_mode:
         command_args = [
             "run",

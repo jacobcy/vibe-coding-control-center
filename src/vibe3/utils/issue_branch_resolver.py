@@ -2,16 +2,15 @@
 
 from collections.abc import Iterable
 
-ISSUE_BRANCH_PATTERNS: tuple[str, ...] = (
-    "task/issue-{issue_number}",
-    "dev/issue-{issue_number}",
-)
+from vibe3.services.convention_resolver import ConventionResolver
 
 
 def iter_issue_branch_candidates(issue_number: int) -> Iterable[str]:
     """Yield supported branch candidates for an issue number."""
-    for pattern in ISSUE_BRANCH_PATTERNS:
-        yield pattern.format(issue_number=issue_number)
+    resolver = ConventionResolver.from_repo()
+    convention = resolver.resolve()
+    yield convention.branch.canonical_branch(issue_number)
+    yield convention.branch.dev_branch(issue_number)
 
 
 def resolve_issue_branch_input(branch: str | None, flow_service: object) -> str | None:

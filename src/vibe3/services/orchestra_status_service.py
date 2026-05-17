@@ -336,7 +336,11 @@ class OrchestraStatusService:
             gate_result = self._failed_gate.check()
             if gate_result.blocked:
                 dispatch_blocked = True
-                blocked_reason = "state/blocked"
+                from vibe3.services.convention_resolver import ConventionResolver
+
+                resolver = ConventionResolver.from_repo()
+                convention = resolver.resolve()
+                blocked_reason = convention.state_label(convention.blocked_label)
                 blocked_issue_number = gate_result.issue_number
                 blocked_issue_reason = gate_result.reason
 
@@ -366,7 +370,7 @@ class OrchestraStatusService:
         seen_numbers: set[int] = set()
         issues: list[dict] = []
 
-        for username in self.config.manager_usernames:
+        for username in self.config.get_manager_usernames():
             try:
                 result = self._github.list_issues(
                     state="open",

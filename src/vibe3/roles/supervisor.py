@@ -282,7 +282,7 @@ def iter_supervisor_identified_events(
 ) -> list[SupervisorIssueIdentified]:
     """Filter raw GitHub issues into supervisor observation events."""
     issue_label = config.supervisor_handoff.issue_label
-    handoff_label = config.supervisor_handoff.handoff_state_label
+    handoff_label = config.supervisor_handoff.get_handoff_state_label()
     # supervisor_file is now fixed in recipe, use canonical value
     supervisor_file = "supervisor/apply.md"
 

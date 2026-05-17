@@ -26,6 +26,7 @@ from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.prompts.manifest import PromptManifest, PromptProvider
 from vibe3.prompts.template_loader import _resolve_prompts_path
 from vibe3.roles.definitions import IssueRoleSyncSpec, TriggerableRoleDefinition
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_manager_issue
 
 MANAGER_ROLE = TriggerableRoleDefinition(
@@ -70,7 +71,9 @@ def resolve_manager_options(config: OrchestraConfig) -> Any:
 
 
 MANAGER_BRANCH_RESOLVER = build_task_flow_branch_resolver(
-    fallback_branch=lambda issue_number, _current_branch: f"task/issue-{issue_number}"
+    fallback_branch=lambda issue_number, _current_branch: ConventionResolver.from_repo()
+    .resolve()
+    .branch.canonical_branch(issue_number)
 )
 
 

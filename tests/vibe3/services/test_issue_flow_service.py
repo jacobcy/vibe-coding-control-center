@@ -2,8 +2,67 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock
 
+from vibe3.config.profile_convention import ProfileConvention
+from vibe3.models.branch_convention import BranchConvention
 from vibe3.services.issue_flow_service import IssueFlowService
+
+
+class TestIssueFlowServiceConventionInjection:
+    """Tests for ConventionResolver injection."""
+
+    def test_service_uses_convention_for_canonical_branch(self) -> None:
+        """Should use injected convention for branch generation."""
+        convention = ProfileConvention(
+            branch=BranchConvention(task_prefix="feature/", dev_prefix="dev/")
+        )
+        mock_resolver = Mock()
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(resolver=mock_resolver)
+        assert service.canonical_branch_name(123) == "feature/123"
+
+    def test_service_uses_convention_for_parsing(self) -> None:
+        """Should use injected convention for parsing."""
+        convention = ProfileConvention(
+            branch=BranchConvention(task_prefix="task/", dev_prefix="dev/")
+        )
+        mock_resolver = Mock()
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(resolver=mock_resolver)
+        assert service.parse_issue_number_any("task/456") == 456
+        assert service.parse_issue_number_any("dev/789") == 789
+
+    def test_service_uses_convention_for_is_task_branch(self) -> None:
+        """Should use convention for task branch detection."""
+        convention = ProfileConvention(
+            branch=BranchConvention(task_prefix="feature/", dev_prefix="dev/")
+        )
+        mock_resolver = Mock()
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(resolver=mock_resolver)
+        # With task_prefix="feature/", only feature/ branches are task branches
+        assert service.is_task_branch("feature/123") is True
+        assert service.is_task_branch("feature/123-extra") is True
+        assert service.is_task_branch("dev/456") is False
+
+    def test_service_uses_convention_for_is_issue_branch(self) -> None:
+        """Should use convention for issue branch detection."""
+        convention = ProfileConvention(
+            branch=BranchConvention(task_prefix="task/", dev_prefix="dev/")
+        )
+        mock_resolver = Mock()
+        mock_resolver.resolve.return_value = convention
+
+        service = IssueFlowService(resolver=mock_resolver)
+        # Both task/ and dev/ match the convention pattern
+        assert service.is_issue_branch("task/123") is True
+        assert service.is_issue_branch("dev/456") is True
+        # Other branches don't match
+        assert service.is_issue_branch("feature/test") is False
 
 
 class TestIssueFlowServiceBranchNaming:

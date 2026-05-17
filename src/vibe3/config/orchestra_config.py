@@ -140,14 +140,23 @@ class SupervisorHandoffConfig(BaseModel):
 
     enabled: bool = True
     issue_label: str = "supervisor"
-    handoff_state_label: str = "state/handoff"
+    handoff_state_label: str = Field(
+        default="",
+        description=(
+            "State label for handoff (e.g., 'state/handoff'). "
+            "Empty string uses ConventionResolver to resolve from profile."
+        ),
+    )
     interval_ticks: int = Field(
         default=4,
         description="Run supervisor scan every N heartbeat ticks (same as governance)",
     )
     prompt_template: str = Field(
-        default="orchestra.supervisor.apply",
-        description="Dotted prompts.yaml path used to render supervisor/apply prompt",
+        default="",
+        description=(
+            "Dotted prompts.yaml path used to render supervisor/apply prompt. "
+            "Empty string uses ConventionResolver to resolve from profile."
+        ),
     )
     agent: str | None = Field(
         default=None,
@@ -163,6 +172,25 @@ class SupervisorHandoffConfig(BaseModel):
         default=None,
         description="Model override (leave empty to use config/v3/models.json preset)",
     )
+
+    def get_handoff_state_label(self) -> str:
+        """Resolve handoff state label with fallback to ConventionResolver.
+
+        Returns:
+            Handoff state label (e.g., 'state/handoff').
+
+        Example:
+            >>> config = SupervisorHandoffConfig()
+            >>> config.get_handoff_state_label()
+            'state/handoff'
+        """
+        if self.handoff_state_label:
+            return self.handoff_state_label
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        return convention.state_label(convention.handoff_label)
 
 
 class OrchestraConfig(BaseModel):
@@ -210,8 +238,11 @@ class OrchestraConfig(BaseModel):
         ),
     )
     manager_usernames: list[str] = Field(
-        default_factory=lambda: ["vibe-manager-agent"],
-        description="GitHub usernames whose assignment signals manager dispatch",
+        default_factory=list,
+        description=(
+            "GitHub usernames whose assignment signals manager dispatch. "
+            "Empty list uses ConventionResolver to resolve from profile."
+        ),
     )
     polling: PollingConfig = Field(default_factory=PollingConfig)
     assignee_dispatch: AssigneeDispatchConfig = Field(
@@ -236,3 +267,41 @@ class OrchestraConfig(BaseModel):
             "remains unchanged"
         ),
     )
+
+    def get_manager_usernames(self) -> list[str]:
+        """Resolve manager usernames with fallback to ConventionResolver.
+
+        Returns:
+            List of manager usernames (e.g., ['vibe-manager-agent']).
+
+        Example:
+            >>> config = OrchestraConfig()
+            >>> config.get_manager_usernames()
+            ['vibe-manager-agent']
+        """
+        if self.manager_usernames:
+            return self.manager_usernames
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        return convention.manager_usernames
+
+    def get_supervisor_prompt(self) -> str:
+        """Resolve supervisor prompt template with fallback to ConventionResolver.
+
+        Returns:
+            Dotted prompt template path (e.g., 'orchestra.supervisor.apply').
+
+        Example:
+            >>> config = OrchestraConfig()
+            >>> config.get_supervisor_prompt()
+            'orchestra.supervisor.apply'
+        """
+        if self.supervisor_handoff.prompt_template:
+            return self.supervisor_handoff.prompt_template
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        return convention.supervisor_prompt

@@ -196,7 +196,7 @@ def _build_broader_repo_entries(
 
         assignees = normalize_assignees(item.get("assignees"))
         is_assignee_issue = any(
-            assignee in config.manager_usernames for assignee in assignees
+            assignee in config.get_manager_usernames() for assignee in assignees
         )
 
         if material_name == "roadmap-intake.md" and is_assignee_issue:
