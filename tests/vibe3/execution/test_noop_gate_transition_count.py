@@ -1,0 +1,262 @@
+"""Unit tests for transition_count logic in no-op gate."""
+
+from unittest.mock import MagicMock, patch
+
+from vibe3.execution.noop_gate import apply_unified_noop_gate
+
+
+def _make_mock_store() -> MagicMock:
+    """Create a mock SQLiteClient."""
+    store = MagicMock()
+    store.get_flow_state.return_value = {}
+    return store
+
+
+def _make_github_issue_payload(state_label: str = "state/plan") -> dict:
+    """Build a GitHub issue payload dict with given state label."""
+    labels = [{"name": state_label}] if state_label else []
+    return {"labels": labels, "state": "open"}
+
+
+class TestTransitionCount:
+    """Tests for transition_count increment and limit checking."""
+
+    def test_transition_count_incremented_on_state_change(self) -> None:
+        """transition_count is incremented when state changes."""
+        store = _make_mock_store()
+        flow_state = {"transition_count": 3}
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_not_called()
+        assert flow_state["transition_count"] == 4
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+
+    def test_transition_count_not_incremented_on_state_unchanged(self) -> None:
+        """transition_count is NOT incremented when state is unchanged."""
+        store = _make_mock_store()
+        flow_state = {"transition_count": 3}
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/plan"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_called_once()
+        assert flow_state["transition_count"] == 3  # Unchanged
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_unchanged"
+
+    def test_transition_count_hard_limit_blocks(self) -> None:
+        """Gate blocks when transition_count reaches hard limit (20)."""
+        store = _make_mock_store()
+        flow_state = {"transition_count": 19}
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/run",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_called_once()
+        call_kwargs = mock_block.call_args[1]
+        assert "transition count exceeded" in call_kwargs["reason"]
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "transition_count_exceeded"
+
+    def test_transition_count_soft_limit_warns_no_block(self) -> None:
+        """Soft limit (10) only warns, does not block."""
+        store = _make_mock_store()
+        flow_state = {"transition_count": 9}
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/run",
+                flow_state=flow_state,
+            )
+
+        # Soft limit does NOT block
+        mock_block.assert_not_called()
+        assert flow_state["transition_count"] == 10
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+
+    def test_transition_count_below_soft_limit_no_warning(self) -> None:
+        """No warning when transition_count below soft limit."""
+        store = _make_mock_store()
+        flow_state = {"transition_count": 3}
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/run",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_not_called()
+        assert flow_state["transition_count"] == 4
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+
+    def test_transition_count_none_flow_state_skips_check(self) -> None:
+        """transition_count logic is skipped when flow_state is None."""
+        store = _make_mock_store()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/run",
+                flow_state=None,
+            )
+
+        mock_block.assert_not_called()
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+
+    def test_transition_count_hard_limit_checked_before_state_change(self) -> None:
+        """Hard limit is checked BEFORE state change increment."""
+        store = _make_mock_store()
+        flow_state = {"transition_count": 19}
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/run",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_called_once()
+        # Event should be transition_count_exceeded, not state_transitioned
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "transition_count_exceeded"
+
+    def test_transition_count_defaults_to_zero_when_missing(self) -> None:
+        """transition_count defaults to 0 when missing from flow_state."""
+        store = _make_mock_store()
+        flow_state: dict[str, int] = {}  # No transition_count key
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/run",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_not_called()
+        assert flow_state["transition_count"] == 1  # 0 + 1 = 1
+        store.add_event.assert_called_once()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
