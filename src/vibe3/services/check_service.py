@@ -118,11 +118,11 @@ class CheckService(CheckRemote):
         Returns:
             CheckResult with validation status and issues.
         """
-        # Validate branch is not protected
-        if branch in self.protected_branches:
+        # Validate branch is not protected or remote
+        if branch in self.protected_branches or branch.startswith("origin/"):
             return CheckResult(
                 is_valid=False,
-                issues=[f"Branch '{branch}' is a protected branch"],
+                issues=[f"Branch '{branch}' is a protected or remote branch"],
                 branch=branch,
             )
 

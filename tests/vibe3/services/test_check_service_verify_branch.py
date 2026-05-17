@@ -1,6 +1,7 @@
 """Tests for CheckService.verify_branch single-branch verification."""
 
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -27,7 +28,6 @@ def test_verify_branch_returns_check_result(tmp_path: Path) -> None:
 
     # Setup: create a minimal flow record
     branch = "dev/test-123"
-    from datetime import datetime
 
     timestamp = datetime.now().isoformat()
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -81,18 +81,29 @@ def test_verify_branch_rejects_protected_branch(tmp_path: Path) -> None:
     # Test main branch
     result = service.verify_branch("main")
     assert result.is_valid is False
-    assert "protected branch" in result.issues[0].lower()
+    assert "protected" in result.issues[0].lower()
     assert "main" in result.issues[0]
 
     # Test master branch
     result = service.verify_branch("master")
     assert result.is_valid is False
-    assert "protected branch" in result.issues[0].lower()
+    assert "protected" in result.issues[0].lower()
 
     # Test develop branch
     result = service.verify_branch("develop")
     assert result.is_valid is False
-    assert "protected branch" in result.issues[0].lower()
+    assert "protected" in result.issues[0].lower()
+
+    # Test origin/main (remote branch)
+    result = service.verify_branch("origin/main")
+    assert result.is_valid is False
+    assert "remote" in result.issues[0].lower()
+    assert "origin/main" in result.issues[0]
+
+    # Test origin/develop (remote branch)
+    result = service.verify_branch("origin/develop")
+    assert result.is_valid is False
+    assert "remote" in result.issues[0].lower()
 
 
 def test_verify_branch_handles_merged_pr(tmp_path: Path) -> None:
@@ -119,7 +130,6 @@ def test_verify_branch_handles_merged_pr(tmp_path: Path) -> None:
 
     # Setup: create a flow record
     branch = "dev/test-merged-pr"
-    from datetime import datetime
 
     timestamp = datetime.now().isoformat()
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -177,7 +187,6 @@ def test_verify_branch_handles_closed_pr(tmp_path: Path) -> None:
 
     # Setup: create a flow record
     branch = "dev/test-closed-pr"
-    from datetime import datetime
 
     timestamp = datetime.now().isoformat()
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -239,7 +248,6 @@ def test_verify_branch_handles_missing_worktree_and_ref_files(tmp_path: Path) ->
     # Setup: create a flow record with ref files
     branch = "dev/test-missing-worktree"
     mock_git._run.return_value = f"  {branch}\n"  # Branch exists locally
-    from datetime import datetime
 
     timestamp = datetime.now().isoformat()
     with sqlite3.connect(temp_store.db_path) as conn:

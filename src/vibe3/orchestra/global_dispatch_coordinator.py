@@ -81,6 +81,7 @@ class GlobalDispatchCoordinator:
         self._owns_executor = executor is None
         self._frozen_queue: list[QueueEntry] | None = None
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
+        self._check_service: CheckService | None = None
         self._supervisor_label = config.supervisor_handoff.issue_label
 
         # Load persisted queue on init (restart recovery)
@@ -263,12 +264,13 @@ class GlobalDispatchCoordinator:
             return True
 
         # Use CheckService for unified health check
-        service = CheckService(
-            store=self._store,
-            git_client=self._flow_manager.git,
-            github_client=self._github,
-        )
-        result = service.verify_branch(branch)
+        if self._check_service is None:
+            self._check_service = CheckService(
+                store=self._store,
+                git_client=self._flow_manager.git,
+                github_client=self._github,
+            )
+        result = self._check_service.verify_branch(branch)
 
         # Get flow status to determine if dispatch should proceed
         flow_state = self._store.get_flow_state(branch)
@@ -327,6 +329,7 @@ class GlobalDispatchCoordinator:
         """
         if self._frozen_queue is None or len(self._frozen_queue) == 0:
             self._frozen_queue = await self._collect_frozen_queue()
+            self._check_service = None  # Invalidate cache when queue is rebuilt
             # Persist freshly collected queue after assignment
             self._persist_queue()
             if not self._frozen_queue:
@@ -590,6 +593,7 @@ class GlobalDispatchCoordinator:
         else:
             # All entries removed - trigger fresh collection
             self._frozen_queue = None
+            self._check_service = None  # Invalidate when queue is set to None
 
         # Persist the updated queue state
         self._persist_queue()

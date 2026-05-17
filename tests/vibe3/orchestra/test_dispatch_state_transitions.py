@@ -26,7 +26,7 @@ class TestStateTransitions:
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True
+            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_poll(state: IssueState) -> list:
@@ -72,7 +72,7 @@ class TestStateTransitions:
         capacity = make_capacity(remaining=2)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True
+            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_poll(state: IssueState) -> list:
@@ -123,7 +123,7 @@ class TestStateTransitions:
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True
+            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
         )
 
         async def mock_poll(state: IssueState) -> list:
@@ -178,7 +178,9 @@ class TestStateTransitions:
         manager_issue = make_issue(1)
         capacity = make_capacity(remaining=1)
 
-        coordinator = make_coordinator("manager", [manager_issue], capacity=capacity)
+        coordinator = make_coordinator(
+            "manager", [manager_issue], capacity=capacity, mock_health_check=True
+        )
 
         async def mock_poll(state: IssueState) -> list:
             if state == IssueState.READY:
@@ -224,7 +226,11 @@ class TestLoggingBehavior:
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
-            "planner", [planner_issue], capacity=capacity, with_branches=True
+            "planner",
+            [planner_issue],
+            capacity=capacity,
+            with_branches=True,
+            mock_health_check=True,
         )
 
         async def mock_collect() -> list[QueueEntry]:
@@ -271,7 +277,11 @@ class TestLoggingBehavior:
         capacity = make_capacity(remaining=1)
 
         coordinator = make_coordinator(
-            "planner", [planner_issue], capacity=capacity, with_branches=True
+            "planner",
+            [planner_issue],
+            capacity=capacity,
+            with_branches=True,
+            mock_health_check=True,
         )
 
         async def mock_collect() -> list[QueueEntry]:
