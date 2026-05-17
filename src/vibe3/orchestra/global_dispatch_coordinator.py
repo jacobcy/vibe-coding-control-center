@@ -235,17 +235,19 @@ class GlobalDispatchCoordinator:
     def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
         """Check issue health before dispatch using unified CheckService.
 
-        This method calls CheckService.verify_branch() to perform comprehensive
-        health checks including:
-        - Issue closed on GitHub
-        - PR merged (auto-close issue)
-        - Branch existence
-        - Flow consistency
-        - Ref file validity
+        CheckService.verify_branch() performs consistency checks including:
+        - Branch existence and flow_state validity
+        - Task issue status on GitHub
+        - PR merge status
+
+        This method then:
+        - Fails-open for transient errors (network/auth, missing flow record)
+        - Skips dispatch for genuine consistency failures (issue closed, PR merged)
+        - Skips dispatch for terminal flow states (done/aborted/stale)
 
         Returns:
-            True if issue is healthy and can be dispatched
-            False if issue should be skipped (invalid or done/aborted)
+            True if issue can be dispatched (healthy or transient error)
+            False if issue should be skipped (genuine failure or terminal state)
 
         Side effects (via CheckService):
             - Auto-closes issues with merged PRs
@@ -274,10 +276,31 @@ class GlobalDispatchCoordinator:
         )
 
         # Determine dispatch eligibility:
-        # - Return False if flow has issues (is_valid=False)
+        # - Fail-open for transient errors (network/auth) and missing flow records
+        # - Return False for genuine consistency failures (issue closed, PR merged)
         # - Return False if flow is done/aborted (terminal state)
         # - Return True if flow is healthy and active
         if not result.is_valid:
+            # Check if this is a transient/expected error that should fail-open
+            transient_errors = [
+                "Cannot verify",  # Network/auth errors
+                "No flow record",  # Missing flow_state (new issues)
+            ]
+            is_transient = any(
+                any(err.startswith(prefix) for err in result.issues)
+                for prefix in transient_errors
+            )
+
+            if is_transient:
+                # Fail-open: allow dispatch despite transient errors
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: fail-open for #{issue.number} "
+                    f"(transient error: {', '.join(result.issues)})",
+                )
+                return True
+
+            # Genuine consistency failure - skip dispatch
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: skipped #{issue.number} "
