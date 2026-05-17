@@ -204,13 +204,19 @@ def show(
             _render_snapshot_format(projection, flow_status, output_format)
             return
 
-        timeline = service.get_flow_timeline(target_branch)
-        if not timeline["state"]:
+        # Build timeline using resolver's source-aware flow_status
+        # Do NOT call service.get_flow_timeline (reads from local)
+        events_data = service.store.get_events(target_branch, limit=100)
+        from vibe3.models.flow import FlowEvent
+
+        events = [FlowEvent(**e) for e in events_data]
+
+        if not flow_status:
             logger.error(f"Flow not found: {target_branch}")
             raise typer.Exit(1)
 
         # Collect issue numbers for title fetching
-        issue_numbers = _collect_timeline_issue_numbers(timeline["state"])
+        issue_numbers = _collect_timeline_issue_numbers(flow_status)
 
         # Fetch issue titles using projection service
         issue_titles: dict[int, str] = {}
@@ -222,7 +228,7 @@ def show(
             # Apply filtering for structured output
             from vibe3.ui.flow_ui_timeline import _filter_passive_if_active_exists
 
-            filtered_events = timeline["events"]
+            filtered_events = events
             filtered_events = _filter_passive_if_active_exists(filtered_events)
             if not show_all:
                 filtered_events = [
@@ -240,7 +246,7 @@ def show(
                     and fnmatch.fnmatch(e.actor.lower(), actor_filter.lower())
                 ]
             json_data = {
-                "state": timeline["state"].model_dump(),
+                "state": flow_status.model_dump(),
                 "events": [e.model_dump() for e in filtered_events],
             }
             if output_format == "json":
@@ -254,14 +260,14 @@ def show(
         else:
             parent_branch = find_parent_branch(target_branch)
             render_flow_timeline(
-                timeline["state"],
-                timeline["events"],
+                flow_status,
+                events,
                 parent_branch=parent_branch,
                 issue_titles=issue_titles,
                 show_all=show_all,
                 actor_filter=actor_filter,
             )
-            if timeline["state"].task_issue_number is None:
+            if flow_status.task_issue_number is None:
                 hint = build_bind_task_hint()
                 console.print(f"[yellow]提示：当前 flow 还没有 task，建议 {hint}[/]")
             return
