@@ -121,6 +121,9 @@ class FlowOrchestratorService:
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
 
         if not self.git.branch_exists(branch):
+            # Ensure scene_base_ref remote is up-to-date before creating branch
+            remote = self.config.scene_base_ref.split("/")[0]
+            self.git.fetch(remote)
             self.git.create_branch_ref(
                 branch,
                 start_ref=self.config.scene_base_ref,

@@ -52,6 +52,13 @@ vibe3 internal bootstrap-flow <issue-number> \
   [--dependency <issue-number>]...
 ```
 
+**注意**：标准调用会自动 `git fetch origin` 确保基准分支最新。如果因特殊情况需要手动创建 worktree 和分支，记得先拉取最新代码：
+
+```bash
+git pull origin main
+git checkout -b dev/issue-<id>
+```
+
 这个命令会走共享底层路径，完成：
 - branch/flow bootstrap
 - task issue 绑定

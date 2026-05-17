@@ -60,7 +60,7 @@ def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     store = MagicMock()
     git = MagicMock()
     github = MagicMock()
-    git.branch_exists.return_value = True
+    git.branch_exists.return_value = False
     git.get_git_common_dir.return_value = "/tmp/repo/.git"
     store.get_flow_state.return_value = {
         "branch": "dev/issue-501",
@@ -81,6 +81,11 @@ def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
         dependency_issue_numbers=(701,),
     )
 
+    # Verify fetch was called before branch creation
+    git.fetch.assert_called_once_with("origin")
+    git.create_branch_ref.assert_called_once_with(
+        "dev/issue-501", start_ref=config.scene_base_ref
+    )
     service.task_service.link_issue.assert_any_call(
         "dev/issue-501", 501, "task", actor=None
     )
