@@ -6,6 +6,7 @@ for dependency and blocking checks during dispatch.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -94,6 +95,79 @@ class QualifyGateService:
                         f"Failed to add state/blocked: {exc}"
                     )
             return None
+
+        # Step 1.5: Check worktree health (local state validation)
+        worktree_path = flow_state.get("worktree_path")
+        if worktree_path and isinstance(worktree_path, str):
+            wt_path = Path(worktree_path)
+            if not wt_path.exists():
+                reason = f"Worktree path does not exist: {worktree_path}"
+                self._store.update_flow_state(
+                    branch,
+                    blocked_reason=reason,
+                )
+                self._store.add_event(
+                    branch,
+                    "flow_blocked",
+                    "orchestra:dispatcher",
+                    detail=reason,
+                )
+                if IssueState.BLOCKED.to_label() not in labels:
+                    try:
+                        label_port = GhIssueLabelPort(repo=self.config.repo)
+                        label_port.add_issue_label(issue.number, "state/blocked")
+                    except Exception as exc:
+                        logger.bind(domain="orchestra").warning(
+                            f"Failed to add state/blocked for #{issue.number}: {exc}"
+                        )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"qualify_gate skip #{issue.number}: {reason}",
+                )
+                return None
+            # Validate branch matches using git (works with linked worktrees)
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    cwd=str(wt_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                actual_branch = result.stdout.strip()
+                if actual_branch != branch:
+                    reason = (
+                        f"Worktree branch mismatch: expected {branch}, "
+                        f"got {actual_branch}"
+                    )
+                    self._store.update_flow_state(
+                        branch,
+                        blocked_reason=reason,
+                    )
+                    self._store.add_event(
+                        branch,
+                        "flow_blocked",
+                        "orchestra:dispatcher",
+                        detail=reason,
+                    )
+                    if IssueState.BLOCKED.to_label() not in labels:
+                        try:
+                            label_port = GhIssueLabelPort(repo=self.config.repo)
+                            label_port.add_issue_label(issue.number, "state/blocked")
+                        except Exception as exc:
+                            logger.bind(domain="orchestra").warning(
+                                f"Failed to add state/blocked for "
+                                f"#{issue.number}: {exc}"
+                            )
+                    append_orchestra_event(
+                        "dispatcher",
+                        f"qualify_gate skip #{issue.number}: {reason}",
+                    )
+                    return None
+            except Exception:
+                pass  # Can't read HEAD, skip validation (don't block on read error)
 
         # Step 2: Check dependency block
         dependencies = self._get_issue_dependencies(issue.number)

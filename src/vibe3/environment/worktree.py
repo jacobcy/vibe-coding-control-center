@@ -236,23 +236,87 @@ class WorktreeManager(WorktreePRMixin):
         self,
         issue_number: int,
         flow_branch: str,
-    ) -> tuple[Optional[Path], bool]:
-        """Resolve manager cwd using canonical worktree ownership."""
+    ) -> tuple[Path | None, bool]:
+        """Resolve manager cwd using canonical worktree record + fallback inference.
+
+        Priority:
+        1. flow_state.worktree_path (recorded) — validate path exists, branch matches
+        2. Current branch — if already on flow_branch
+        3. find_worktree_for_branch — infer from git worktree list, validate
+           branch name contains issue number
+        4. acquire_issue_worktree — create new, record worktree_path
+
+        Returns (path, is_missing). Never raises — returns (None, False) on failure
+        so caller can propagate as blocked_reason.
+        """
+        # Step 0: Try recorded worktree_path from flow_state
+        try:
+            git_common_dir = self.repo_path / ".git"
+            vibe3_dir = git_common_dir / "vibe3"
+            db_path = str(vibe3_dir / "handoff.db")
+            store = SQLiteClient(db_path=db_path)
+            flow_state = store.get_flow_state(flow_branch)
+            recorded_path = flow_state.get("worktree_path") if flow_state else None
+            if recorded_path and isinstance(recorded_path, str):
+                recorded = Path(recorded_path)
+                if recorded.exists() and self._validate_branch_matches(
+                    recorded, flow_branch
+                ):
+                    if self.align_auto_scene_to_base(recorded, flow_branch):
+                        return recorded, False
+                    return None, False
+                else:
+                    logger.bind(
+                        domain="worktree",
+                        issue=issue_number,
+                        branch=flow_branch,
+                        recorded_path=str(recorded),
+                    ).warning(
+                        "Recorded worktree_path invalid (stale or wrong branch), "
+                        "falling back to inference"
+                    )
+        except Exception as exc:
+            logger.bind(
+                domain="worktree",
+                issue=issue_number,
+                branch=flow_branch,
+            ).warning(f"Failed to read recorded worktree_path: {exc}")
+
+        # Step 1: Current branch
         if is_current_branch(self.repo_path, flow_branch):
             return self.repo_path, False
 
+        # Step 2: Find existing worktree, validate branch matches issue number
         existing = find_worktree_for_branch(self.repo_path, flow_branch)
         if existing:
+            if not self._validate_worktree_branch_for_issue(
+                existing, issue_number, flow_branch
+            ):
+                logger.bind(
+                    domain="worktree",
+                    issue=issue_number,
+                    branch=flow_branch,
+                    worktree_path=str(existing),
+                ).error("Existing worktree branch name does not match issue number")
+                return None, False
             if self.align_auto_scene_to_base(existing, flow_branch):
                 return existing, False
             return None, False
 
+        # Step 3: Create new worktree
         try:
             ctx = self.acquire_issue_worktree(issue_number, flow_branch)
+            # Record worktree path to flow_state for canonical tracking
+            self._record_worktree_path(flow_branch, str(ctx.path))
             if self.align_auto_scene_to_base(ctx.path, flow_branch):
                 return ctx.path, False
             return None, False
-        except Exception:
+        except Exception as exc:
+            logger.bind(
+                domain="worktree",
+                issue=issue_number,
+                branch=flow_branch,
+            ).error(f"Failed to create worktree: {exc}")
             return None, False
 
     def _resolve_manager_cwd(
@@ -353,6 +417,80 @@ class WorktreeManager(WorktreePRMixin):
             branch=branch,
             issue_number=issue_number,
         )
+
+    def _record_worktree_path(self, branch: str, worktree_path: str) -> None:
+        """Persist worktree path to flow_state for canonical worktree tracking."""
+        try:
+            git_common_dir = self.repo_path / ".git"
+            vibe3_dir = git_common_dir / "vibe3"
+            db_path = str(vibe3_dir / "handoff.db")
+            store = SQLiteClient(db_path=db_path)
+            store.update_flow_state(branch, worktree_path=worktree_path)
+            logger.bind(
+                domain="worktree",
+                branch=branch,
+                worktree_path=worktree_path,
+            ).debug("Recorded worktree_path to flow_state")
+        except Exception as exc:
+            logger.bind(
+                domain="worktree",
+                branch=branch,
+            ).warning(f"Failed to record worktree_path to flow_state: {exc}")
+
+    @staticmethod
+    def _validate_branch_matches(worktree_path: Path, expected_branch: str) -> bool:
+        """Check that worktree's HEAD branch matches expected branch.
+
+        Uses git rev-parse to resolve branch (works with both main repo
+        and linked worktrees where .git is a gitdir pointer).
+        """
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(worktree_path),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            actual_branch = result.stdout.strip()
+            return actual_branch == expected_branch
+        except Exception:
+            return False
+
+    @staticmethod
+    def _validate_worktree_branch_for_issue(
+        worktree_path: Path,
+        issue_number: int,
+        expected_branch: str,
+    ) -> bool:
+        """Validate that a worktree's branch name plausibly corresponds to the issue.
+
+        The branch name should contain the issue number somewhere
+        (e.g., task/issue-793, issue-793, dev/issue-793).
+
+        Uses git rev-parse to resolve branch (works with linked worktrees).
+        """
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(worktree_path),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            actual_branch = result.stdout.strip()
+            if actual_branch == expected_branch:
+                return True
+            expected_suffix = f"issue-{issue_number}"
+            if expected_suffix in actual_branch:
+                return True
+            return False
+        except Exception:
+            return False
 
     def _create_temporary_worktree(
         self,

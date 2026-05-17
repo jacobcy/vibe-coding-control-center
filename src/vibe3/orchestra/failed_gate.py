@@ -142,6 +142,7 @@ class FailedGate:
         Rules:
         - E_MODEL_* → immediate block
         - E_API_* (2+ in recent window) → block
+        - E_EXEC_* (2+ in recent window) → block
 
         Returns:
             GateResult with blocked=True if threshold reached
@@ -165,26 +166,26 @@ class FailedGate:
                 reason=f"Model configuration errors: {', '.join(model_errors)}",
             )
 
-        # Check for frequent API errors (threshold: 2+ in window)
-        api_error_count = error_tracking.get_api_error_count()
+        # Check for frequent API and EXEC errors (threshold: 2+ in window)
+        error_count = error_tracking.get_api_and_exec_error_count()
 
-        if api_error_count >= ErrorTrackingService.THRESHOLD_COUNT:
+        if error_count >= ErrorTrackingService.THRESHOLD_COUNT:
             log.error(
-                f"API error threshold reached: {api_error_count} errors "
+                f"API/Exec error threshold reached: {error_count} errors "
                 f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                 f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
             )
             return GateResult(
                 blocked=True,
                 reason=(
-                    f"API error threshold: {api_error_count} recent errors "
+                    f"API/Exec error threshold: {error_count} recent errors "
                     f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                     f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
                 ),
             )
 
         # No threshold reached
-        log.debug(f"Error threshold check passed (API errors: {api_error_count})")
+        log.debug(f"Error threshold check passed (API+Exec errors: {error_count})")
         return GateResult.open_gate()
 
     def activate(self, reason: str, error_code: str | None = None) -> None:
