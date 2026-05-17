@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
 from vibe3.models.pr import PRState
@@ -234,6 +236,64 @@ def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
     )
     mock_bootstrap.assert_called_once()
     assert result == {"branch": "task/issue-320"}
+
+
+def test_bootstrap_issue_flow_cleans_up_orphan_branch_on_failure() -> None:
+    """HIGH: Verify orphan branch deleted when bootstrap fails after creation."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    # Simulate failure after branch creation
+    service.flow_service.create_flow = MagicMock(
+        side_effect=RuntimeError("Database connection failed")
+    )
+
+    with pytest.raises(RuntimeError, match="Database connection failed"):
+        service.bootstrap_issue_flow(
+            IssueInfo(number=999, title="Bootstrap failure test"),
+            branch="dev/issue-999",
+            source="skill",
+        )
+
+    # Verify branch was created
+    git.create_branch_ref.assert_called_once()
+    # HIGH: Verify branch cleanup was attempted
+    git.delete_branch.assert_called_once_with("dev/issue-999", force=True)
+
+
+def test_bootstrap_issue_flow_preserves_existing_branch_on_failure() -> None:
+    """Existing branch should NOT be deleted on bootstrap failure."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = True  # Branch already exists
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    # Simulate failure
+    service.flow_service.create_flow = MagicMock(
+        side_effect=RuntimeError("Flow creation failed")
+    )
+
+    with pytest.raises(RuntimeError, match="Flow creation failed"):
+        service.bootstrap_issue_flow(
+            IssueInfo(number=888, title="Existing branch test"),
+            branch="dev/issue-888",
+            source="skill",
+        )
+
+    # Branch was NOT created (already existed)
+    git.create_branch_ref.assert_not_called()
+    # HIGH: Branch cleanup should NOT be attempted
+    git.delete_branch.assert_not_called()
 
 
 def test_rebuild_stale_issue_flow_returns_none_when_pr_already_merged() -> None:

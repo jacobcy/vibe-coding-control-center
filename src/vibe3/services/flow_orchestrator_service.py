@@ -119,59 +119,81 @@ class FlowOrchestratorService:
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
+        branch_created = False
 
-        if not self.git.branch_exists(branch):
-            # Ensure scene_base_ref remote is up-to-date before creating branch
-            remote = self.config.scene_base_ref.split("/")[0]
-            self.git.fetch(remote)
-            self.git.create_branch_ref(
-                branch,
-                start_ref=self.config.scene_base_ref,
-            )
-            # CRITICAL: For non-worktree mode, checkout the newly created branch
-            # Without this, user stays on current branch while flow is on dev/issue-XXX
-            if not ensure_worktree:
-                self.git.switch_branch(branch)
+        try:
+            if not self.git.branch_exists(branch):
+                # Ensure scene_base_ref remote is up-to-date before creating branch
+                remote = self.config.scene_base_ref.split("/")[0]
+                self.git.fetch(remote)
+                self.git.create_branch_ref(
+                    branch,
+                    start_ref=self.config.scene_base_ref,
+                )
+                branch_created = True
+                # For non-worktree mode, checkout the newly created branch
+                if not ensure_worktree:
+                    self.git.switch_branch(branch)
 
-        existing_state = self.store.get_flow_state(branch)
-        if reactivate_existing and existing_state:
-            flow_state = self.flow_service.reactivate_flow(
-                branch,
-                flow_slug=slug,
-                initiator=initiator,
-            )
-        else:
-            flow_state = self.flow_service.create_flow(
-                slug=slug,
-                branch=branch,
-                actor=actor,
-                initiated_by=initiator,
-                source=source,
-            )
+            existing_state = self.store.get_flow_state(branch)
+            if reactivate_existing and existing_state:
+                flow_state = self.flow_service.reactivate_flow(
+                    branch,
+                    flow_slug=slug,
+                    initiator=initiator,
+                )
+            else:
+                flow_state = self.flow_service.create_flow(
+                    slug=slug,
+                    branch=branch,
+                    actor=actor,
+                    initiated_by=initiator,
+                    source=source,
+                )
 
-        self.task_service.link_issue(branch, issue.number, "task", actor=actor)
-        for related_issue in related_issue_numbers:
-            self.task_service.link_issue(branch, related_issue, "related", actor=actor)
-        for dependency_issue in dependency_issue_numbers:
-            self.flow_service.block_flow(
-                branch,
-                blocked_by_issue=dependency_issue,
-                actor=actor,
-            )
+            self.task_service.link_issue(branch, issue.number, "task", actor=actor)
+            for related_issue in related_issue_numbers:
+                self.task_service.link_issue(
+                    branch, related_issue, "related", actor=actor
+                )
+            for dependency_issue in dependency_issue_numbers:
+                self.flow_service.block_flow(
+                    branch,
+                    blocked_by_issue=dependency_issue,
+                    actor=actor,
+                )
 
-        result = self.store.get_flow_state(branch) or flow_state.model_dump()
-        if ensure_worktree:
-            worktree_manager = WorktreeManager(
-                self.config,
-                repo_path=Path(self.git.get_git_common_dir()).parent,
-            )
-            worktree_ctx = worktree_manager.resolve_bootstrap_worktree_context(
-                branch=branch,
-                issue_number=issue.number,
-                use_worktree=True,
-            )
-            result["worktree_path"] = str(worktree_ctx.path)
-        return result
+            result = self.store.get_flow_state(branch) or flow_state.model_dump()
+            if ensure_worktree:
+                worktree_manager = WorktreeManager(
+                    self.config,
+                    repo_path=Path(self.git.get_git_common_dir()).parent,
+                )
+                worktree_ctx = worktree_manager.resolve_bootstrap_worktree_context(
+                    branch=branch,
+                    issue_number=issue.number,
+                    use_worktree=True,
+                )
+                result["worktree_path"] = str(worktree_ctx.path)
+            return result
+        except Exception as exc:
+            # HIGH: Clean up orphan branch on bootstrap failure
+            if branch_created:
+                try:
+                    logger.bind(
+                        domain="flow",
+                        branch=branch,
+                        issue=issue.number,
+                    ).warning(
+                        f"Cleaning up orphan branch after bootstrap failure: {exc}"
+                    )
+                    self.git.delete_branch(branch, force=True)
+                except Exception as cleanup_exc:
+                    logger.bind(
+                        domain="flow",
+                        branch=branch,
+                    ).error(f"Failed to cleanup orphan branch: {cleanup_exc}")
+            raise
 
     def rebuild_stale_issue_flow(
         self,
