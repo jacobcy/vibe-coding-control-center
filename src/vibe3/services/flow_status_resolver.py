@@ -153,17 +153,16 @@ class FlowStatusResolver:
 
         projection = parse_projection_with_fallback(body)
 
-        # Normalize "blocked" to "active"
-        # (blocked state inferred from blocked_by_issue fields)
-        normalized_state = projection.state
-        if normalized_state == "blocked":
-            normalized_state = "active"
+        # Directly use projection state (no normalization)
+        # Blocked state is inferred from projection's blocked_by/blocked_reason fields
+        # Remote sync semantics: respect the actual state from issue body projection
+        response_state = projection.state
 
         # Build minimal response from projection
         return FlowStatusResponse(
             branch=branch,
             flow_slug=branch.replace("/", "-"),
-            flow_status=normalized_state,  # type: ignore[arg-type]
+            flow_status=response_state,  # type: ignore[arg-type]
             blocked_by_issue=(
                 projection.blocked_by[0] if projection.blocked_by else None
             ),
