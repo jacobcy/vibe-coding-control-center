@@ -139,6 +139,9 @@ code_limits:
       - path: "src/vibe3/environment/worktree.py"
         limit: 600
         reason: "Worktree lifecycle management"
+      - path: "src/vibe3/environment/worktree_lifecycle.py"
+        limit: 500
+        reason: "Worktree creation, validation, and find-or-create core logic extracted from worktree.py for size management; contains creation methods, validation helpers, recorded path lookup, and unified worktree resolution logic"
       - path: "src/vibe3/environment/session_registry.py"
         limit: 520
         reason: "Session 生命周期聚合，包含状态对账、容量统计、活跃检查、批量查询优化（get_all_branches_with_live_sessions 性能优化避免重复查询）等紧密耦合逻辑"
