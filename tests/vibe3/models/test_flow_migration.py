@@ -21,14 +21,14 @@ class TestFlowStatusMigration:
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="active")
         assert flow.flow_status == "active"
 
-    def test_blocked_status_migrated_to_active(self):
-        """Test that 'blocked' status is migrated to 'active'.
+    def test_blocked_status_unchanged(self):
+        """Test that 'blocked' status is not modified.
 
-        Blocked/failed removed from flow_status (2026-04-28).
-        Blocked status is now inferred from IssueState.BLOCKED label.
+        Blocked restored for remote sync semantics (2026-05-17).
+        Blocked state is tracked in flow_status for remote synchronization.
         """
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="blocked")
-        assert flow.flow_status == "active"
+        assert flow.flow_status == "blocked"
 
     def test_failed_status_migrated_to_active(self):
         """Test that 'failed' status is migrated to 'active'.

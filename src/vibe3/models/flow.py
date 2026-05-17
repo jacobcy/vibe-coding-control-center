@@ -31,9 +31,9 @@ def _migrate_flow_status_value(v: str | None) -> str | None:
         return "stale"
     if v == "merged":
         return "done"
-    # Legacy "blocked" and "failed" migrated to "active"
-    # Blocked status now inferred from IssueState.BLOCKED label
-    if v in ("blocked", "failed", "waiting"):
+    # "blocked" restored for remote sync semantics
+    # Legacy "failed" and "waiting" migrated to "active"
+    if v in ("failed", "waiting"):
         return "active"
     return v
 
@@ -76,10 +76,10 @@ class FlowState(BaseModel):
     blocked_reason: str | None = None  # NEW: Block reason text (semantic clarity)
     failed_reason: str | None = None  # Deprecated: use blocked_reason instead
     next_step: str | None = None
-    flow_status: Literal["active", "done", "stale", "aborted"] = "active"
-    # Note: "blocked" and "failed" removed (2026-04-28).
-    # Blocked status is now inferred from IssueState.BLOCKED label.
-    # blocked_reason field stores the reason text.
+    flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
+    # Note: "blocked" restored for remote sync semantics.
+    # Blocked state is tracked in flow_status (not just inferred from label).
+    # "failed" removed (migrated to "active" or use blocked_reason field).
 
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
@@ -227,8 +227,10 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "done", "stale", "aborted"]
-    # Note: "blocked" and "failed" removed. Blocked inferred from issue label.
+    flow_status: Literal["active", "blocked", "done", "stale", "aborted"]
+    # Note: "blocked" restored for remote sync semantics.
+    # Blocked state is tracked in flow_status (not just inferred from label).
+    # "failed" removed (migrated to "active" or use blocked_reason field).
     task_issue_number: int | None = None
     pr_number: int | None = None
     pr_ref: str | None = None  # PR URL as proof of PR creation

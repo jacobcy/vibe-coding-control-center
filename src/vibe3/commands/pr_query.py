@@ -40,6 +40,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_local_review_summary, render_pr_details
+from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
 def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
@@ -83,19 +84,73 @@ def _resolve_pr_target(
     pr_number: int | None,
     branch: str | None,
 ) -> PrQueryTarget:
-    """Resolve explicit target or infer PR number from current flow."""
+    """Resolve explicit target or infer PR number from branch/issue.
+
+    Resolution order:
+    1. If pr_number provided → use it directly (no inference)
+    2. If branch provided → resolve branch name, then lookup PR
+    3. Otherwise → infer from current branch
+
+    Args:
+        pr_svc: PRService instance
+        pr_number: Explicit PR number (takes priority)
+        branch: Branch name or issue number (will be resolved)
+
+    Returns:
+        PrQueryTarget with resolved PR number and branch
+    """
+    # Priority 1: Explicit PR number or branch (resolve branch if needed)
     if pr_number or branch:
+        # Resolve branch if it looks like an issue number
+        resolved_branch = branch
+        if branch:
+            flow_service = FlowService(store=pr_svc.store)
+            resolved_branch = resolve_issue_branch_input(branch, flow_service)
+
+        # Short-circuit: if resolve returned the original numeric input unchanged,
+        # no real branch was found — skip the misleading API call
+        if resolved_branch and resolved_branch.isdigit() and not pr_number:
+            return PrQueryTarget(
+                pr_number=None,
+                branch=resolved_branch,
+                current_branch=None,
+                from_flow=False,
+            )
+
+        # Try to find PR for the resolved branch
+        resolved_pr_number = pr_number
+        if resolved_branch and not pr_number:
+            try:
+                prs = pr_svc.github_client.list_prs_for_branch(
+                    resolved_branch, state="open"
+                )
+                if not prs:
+                    prs = pr_svc.github_client.list_prs_for_branch(resolved_branch)
+                if prs:
+                    resolved_pr_number = prs[0].number
+            except Exception as e:
+                logger.bind(
+                    domain="pr",
+                    action="resolve_pr_target",
+                    branch=resolved_branch,
+                    error_type=type(e).__name__,
+                    error_msg=str(e),
+                ).debug(f"Failed to resolve PR from branch: {e}")
+
         return PrQueryTarget(
-            pr_number=pr_number,
-            branch=branch,
+            pr_number=resolved_pr_number,
+            branch=resolved_branch,
             current_branch=None,
             from_flow=False,
         )
 
+    # Priority 2: Infer from current branch
     current_branch = pr_svc.git_client.get_current_branch()
     try:
-        pr = pr_svc.github_client.get_pr(None, current_branch)
-        resolved_pr = pr.number if pr else None
+        prs = pr_svc.github_client.list_prs_for_branch(current_branch, state="open")
+        if not prs:
+            prs = pr_svc.github_client.list_prs_for_branch(current_branch)
+        resolved_pr = prs[0].number if prs else None
     except Exception as e:
         logger.bind(
             domain="pr",
@@ -124,7 +179,8 @@ def _fetch_pr_or_raise(
     """Load PR or raise a command-facing lookup error."""
     pr = pr_svc.get_pr(pr_number, branch)
     if not pr and pr_number is not None and current_branch:
-        pr = pr_svc.get_pr(branch=current_branch)
+        prs = pr_svc.github_client.list_prs_for_branch(current_branch)
+        pr = prs[0] if prs else None
     if not pr:
         raise LookupError("PR not found")
     return pr
@@ -345,7 +401,8 @@ def register_query_commands(app: typer.Typer) -> None:
             # Record external events (best-effort, non-blocking)
             try:
                 if pr and pr_number:
-                    effective_branch = branch or target.current_branch
+                    # Use PR's head_branch if branch not specified
+                    effective_branch = branch or target.current_branch or pr.head_branch
                     if effective_branch:
                         _fetch_and_record_external_events(
                             pr_number=pr_number,

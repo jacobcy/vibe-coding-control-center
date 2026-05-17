@@ -22,7 +22,7 @@ from vibe3.services.check_service import CheckResult, CheckService
 class ExecuteCheckResult:
     """Result of command-level check execution."""
 
-    mode: Literal["default", "init", "all", "fix", "fix_all", "clean_branch"]
+    mode: Literal["default", "init", "all", "fix", "fix_all", "clean_branch", "branch"]
     success: bool
     summary: str
     details: dict = field(default_factory=dict)
@@ -67,7 +67,7 @@ def _run_with_progress(
 def execute_check_mode(
     service: CheckService,
     mode: Literal[
-        "default", "init", "all", "fix", "fix_all", "clean_branch"
+        "default", "init", "all", "fix", "fix_all", "clean_branch", "branch"
     ] = "default",
     *,
     branch: str | None = None,
@@ -215,6 +215,37 @@ def execute_check_mode(
                 else f"Error: {fix_result.error}"
             ),
             details={"issues": verify_result.issues},
+        )
+
+    if mode == "branch":
+        if not branch:
+            typer.echo("Error: --branch requires a branch name.", err=True)
+            raise typer.Exit(code=1)
+
+        branch_result: CheckResult = service.verify_branch(branch)
+
+        if branch_result.is_valid:
+            return ExecuteCheckResult(
+                mode="branch",
+                success=True,
+                summary=f"Branch '{branch}' passed all checks",
+            )
+
+        # Try auto-fix if issues found
+        fix_result = service.auto_fix(branch_result.issues, branch=branch)
+        if fix_result.success:
+            return ExecuteCheckResult(
+                mode="branch",
+                success=True,
+                summary=f"Branch '{branch}' issues fixed",
+                details={"fixed": fix_result.applied},
+            )
+
+        return ExecuteCheckResult(
+            mode="branch",
+            success=False,
+            summary=f"Branch '{branch}' has unfixable issues",
+            details={"issues": branch_result.issues},
         )
 
     # mode == "default"

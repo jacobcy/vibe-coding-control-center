@@ -67,6 +67,7 @@ def make_coordinator() -> callable:
         config: OrchestraConfig | None = None,
         capacity: MagicMock | None = None,
         with_branches: bool = False,
+        health_check_valid: bool = True,
     ) -> GlobalDispatchCoordinator:
         if config is None:
             config = OrchestraConfig(repo="owner/repo")
@@ -103,6 +104,11 @@ def make_coordinator() -> callable:
             store=store,
             flow_manager=flow_manager,
             registry=None,
+        )
+
+        # Mock health check to bypass CheckService for queue operation tests
+        coordinator._health_check_before_dispatch = MagicMock(
+            return_value=health_check_valid
         )
 
         if ready_issues:

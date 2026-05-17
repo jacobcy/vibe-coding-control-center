@@ -27,10 +27,11 @@ def test_flow_show_hint_when_not_registered(mock_service_cls, _render_timeline) 
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
+@patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_timeline_when_registered(
-    mock_service_cls, _find_parent_branch, _render_timeline
+    mock_service_cls, _find_parent_branch, mock_resolver_cls, _render_timeline
 ) -> None:
     """flow show should show timeline if flow is already registered."""
     mock_service = MagicMock()
@@ -42,24 +43,42 @@ def test_flow_show_timeline_when_registered(
         flow_slug="registered",
         flow_status="active",
     )
+
+    # Mock resolver to return flow_status
+    mock_resolver = MagicMock()
+    mock_resolver.resolve.return_value = flow_status
+    mock_resolver_cls.return_value = mock_resolver
+
+    # Mock store to return empty events
+    mock_store = MagicMock()
+    mock_store.get_events.return_value = []
+    mock_service.store = mock_store
+
+    # Mock get_flow_status (resolver uses it internally)
     mock_service.get_flow_status.return_value = flow_status
-    mock_service.get_flow_timeline.return_value = {
-        "state": flow_status,
-        "events": [],
-    }
     mock_service_cls.return_value = mock_service
 
     result = runner.invoke(app, ["flow", "show"])
 
     assert result.exit_code == 0
-    mock_service.get_flow_timeline.assert_called_once_with(branch)
+    # Should NOT call get_flow_timeline anymore (uses resolver + store.get_events)
+    mock_service.get_flow_timeline.assert_not_called()
+    # Should call resolver.resolve with correct branch
+    mock_resolver.resolve.assert_called_once_with(
+        branch=branch,
+        source="auto",
+        issue_number=None,
+    )
+    # Should call store.get_events to get timeline events
+    mock_store.get_events.assert_called_once_with(branch, limit=100)
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
+@patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
 @patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_numeric_issue_resolves_branch(
-    mock_service_cls, _find_parent_branch, _render_timeline
+    mock_service_cls, _find_parent_branch, mock_resolver_cls, _render_timeline
 ) -> None:
     """flow show 436 should resolve to task/dev issue branch."""
     mock_service = MagicMock()
@@ -70,20 +89,38 @@ def test_flow_show_numeric_issue_resolves_branch(
         flow_status="active",
     )
 
-    # Mock store.get_flows_by_issue to return the flow
-    mock_service.store.get_flows_by_issue.return_value = [
+    # Mock store with both get_flows_by_issue and get_events
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = [
         {"branch": "task/issue-436", "flow_status": "active"}
     ]
+    mock_store.get_events.return_value = []
+    mock_service.store = mock_store
 
-    # Mock get_flow_status and get_flow_timeline
-    mock_service.get_flow_status.return_value = flow_status
-    mock_service.get_flow_timeline.return_value = {
-        "state": flow_status,
-        "events": [],
-    }
+    def get_flow_status(branch: str):
+        if branch == "task/issue-436":
+            return flow_status
+        return None
+
+    mock_service.get_flow_status.side_effect = get_flow_status
+
+    # Mock resolver to return flow_status
+    mock_resolver = MagicMock()
+    mock_resolver.resolve.return_value = flow_status
+    mock_resolver_cls.return_value = mock_resolver
+
     mock_service_cls.return_value = mock_service
 
     result = runner.invoke(app, ["flow", "show", "436"])
 
-    assert result.exit_code == 0
-    mock_service.get_flow_timeline.assert_called_once_with("task/issue-436")
+    assert (
+        result.exit_code == 0
+    ), f"Exit code: {result.exit_code}, Output: {result.output}"
+    # Should NOT call get_flow_timeline anymore (uses resolver + store.get_events)
+    mock_service.get_flow_timeline.assert_not_called()
+    # Should call resolver.resolve with resolved branch and parsed issue_number
+    mock_resolver.resolve.assert_called_once_with(
+        branch="task/issue-436",
+        source="auto",
+        issue_number=436,  # parsed from input "436"
+    )
