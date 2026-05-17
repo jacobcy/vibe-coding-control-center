@@ -213,9 +213,57 @@ class AgentConfig(BaseModel):
     timeout_seconds: int = Field(default=3600, ge=1)
 
 
-class ReviewConfig(BaseModel):
+class PolicyResolverMixin:
+    """Mixin providing policy resolution methods.
+
+    Used by ReviewConfig, PlanConfig, RunConfig to avoid DRY violation.
+    Each class must define a _policy_name attribute.
+    """
+
+    policy_file: str | None
+    common_rules: str | None
+
+    def get_policy_file(self) -> str | None:
+        """Get policy file path, using profile resolution if not set.
+
+        Returns explicit policy_file if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to policy file, or None if not available for current profile.
+        """
+        if self.policy_file is not None:
+            return self.policy_file
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        # Access _policy_name from the instance
+        policy_name = getattr(self, "_policy_name", "unknown")
+        return resolver.get_policy_path(policy_name)
+
+    def get_common_rules(self) -> str | None:
+        """Get common rules path, using profile resolution if not set.
+
+        Returns explicit common_rules if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to common rules, or None if not available for current profile.
+        """
+        if self.common_rules is not None:
+            return self.common_rules
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("common")
+
+
+class ReviewConfig(BaseModel, PolicyResolverMixin):
     """Review configuration."""
 
+    _policy_name = "review"
     policy_file: str | None = Field(
         default=None,
         description="Path to review policy (None = use profile resolution)",
@@ -229,44 +277,11 @@ class ReviewConfig(BaseModel):
     retry_task: str = Field(default="")
     review_prompt: str = Field(default="")
 
-    def get_policy_file(self) -> str | None:
-        """Get policy file path, using profile resolution if not set.
 
-        Returns explicit policy_file if set, otherwise uses ConventionResolver
-        to determine path based on current profile.
-
-        Returns:
-            Path to policy file, or None if not available for current profile.
-        """
-        if self.policy_file is not None:
-            return self.policy_file
-
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        return resolver.get_policy_path("review")
-
-    def get_common_rules(self) -> str | None:
-        """Get common rules path, using profile resolution if not set.
-
-        Returns explicit common_rules if set, otherwise uses ConventionResolver
-        to determine path based on current profile.
-
-        Returns:
-            Path to common rules, or None if not available for current profile.
-        """
-        if self.common_rules is not None:
-            return self.common_rules
-
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        return resolver.get_policy_path("common")
-
-
-class PlanConfig(BaseModel):
+class PlanConfig(BaseModel, PolicyResolverMixin):
     """Plan command configuration."""
 
+    _policy_name = "plan"
     policy_file: str | None = Field(
         default=None, description="Path to plan policy (None = use profile resolution)"
     )
@@ -279,44 +294,11 @@ class PlanConfig(BaseModel):
     retry_task: str = Field(default="")
     plan_prompt: str = Field(default="")
 
-    def get_policy_file(self) -> str | None:
-        """Get policy file path, using profile resolution if not set.
 
-        Returns explicit policy_file if set, otherwise uses ConventionResolver
-        to determine path based on current profile.
-
-        Returns:
-            Path to policy file, or None if not available for current profile.
-        """
-        if self.policy_file is not None:
-            return self.policy_file
-
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        return resolver.get_policy_path("plan")
-
-    def get_common_rules(self) -> str | None:
-        """Get common rules path, using profile resolution if not set.
-
-        Returns explicit common_rules if set, otherwise uses ConventionResolver
-        to determine path based on current profile.
-
-        Returns:
-            Path to common rules, or None if not available for current profile.
-        """
-        if self.common_rules is not None:
-            return self.common_rules
-
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        return resolver.get_policy_path("common")
-
-
-class RunConfig(BaseModel):
+class RunConfig(BaseModel, PolicyResolverMixin):
     """Run command configuration."""
 
+    _policy_name = "run"
     policy_file: str | None = Field(
         default=None, description="Path to run policy (None = use profile resolution)"
     )
@@ -329,40 +311,6 @@ class RunConfig(BaseModel):
     coding_task: str = Field(default="")
     retry_task: str = Field(default="")
     run_prompt: str = Field(default="")
-
-    def get_policy_file(self) -> str | None:
-        """Get policy file path, using profile resolution if not set.
-
-        Returns explicit policy_file if set, otherwise uses ConventionResolver
-        to determine path based on current profile.
-
-        Returns:
-            Path to policy file, or None if not available for current profile.
-        """
-        if self.policy_file is not None:
-            return self.policy_file
-
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        return resolver.get_policy_path("run")
-
-    def get_common_rules(self) -> str | None:
-        """Get common rules path, using profile resolution if not set.
-
-        Returns explicit common_rules if set, otherwise uses ConventionResolver
-        to determine path based on current profile.
-
-        Returns:
-            Path to common rules, or None if not available for current profile.
-        """
-        if self.common_rules is not None:
-            return self.common_rules
-
-        from vibe3.services.convention_resolver import ConventionResolver
-
-        resolver = ConventionResolver.from_repo()
-        return resolver.get_policy_path("common")
 
 
 class TestCoverageConfig(BaseModel):
