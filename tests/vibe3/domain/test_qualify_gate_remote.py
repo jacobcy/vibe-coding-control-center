@@ -266,7 +266,7 @@ class TestRemoteDependencies:
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
             dependencies=[],
             dependencies_source=None,
-            worktree_path="/tmp/worktree",
+            worktree_path=None,  # No worktree to avoid health check blocking
             actor="executor",
         )
 

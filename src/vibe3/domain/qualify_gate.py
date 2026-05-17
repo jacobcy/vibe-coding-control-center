@@ -107,7 +107,7 @@ class QualifyGateService:
             return None
 
         # Step 1.5: Check worktree health (local state validation)
-        worktree_path = flow_state.get("worktree_path")
+        worktree_path = truth.worktree_path
         if worktree_path and isinstance(worktree_path, str):
             wt_path = Path(worktree_path)
             if not wt_path.exists():
