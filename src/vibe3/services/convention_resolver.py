@@ -5,11 +5,17 @@ convention lookups, replacing scattered hardcoded patterns throughout
 the codebase.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.config.profile_convention import ProfileConvention
+
+if TYPE_CHECKING:
+    from vibe3.config.profile_config import ProfileConfig
 
 
 @dataclass
@@ -98,8 +104,8 @@ class ConventionResolver:
                 ):
                     logger.debug("Using Vibe Center profile defaults (detected repo)")
                     return ProfileConvention.vibe_center()
-        except Exception:
-            pass  # Ignore git errors, fall through to minimal
+        except Exception as e:
+            logger.debug(f"Git remote check failed: {e}")
 
         # Step 4: Default to minimal (portable core runtime)
         logger.debug("Using minimal profile defaults (portable)")
@@ -114,11 +120,7 @@ class ConventionResolver:
         Returns:
             Relative path or None
         """
-        from vibe3.config.profile_config import ProfileConfig
-
-        detected_profile = self.profile or self._detect_profile()
-        profile_config = ProfileConfig(profile=detected_profile)
-        return profile_config.get_policy_path(name)
+        return self._get_profile_config().get_policy_path(name)
 
     def get_skill_path(self, name: str) -> str | None:
         """Get path to a skill for current profile.
@@ -129,11 +131,7 @@ class ConventionResolver:
         Returns:
             Relative path or None
         """
-        from vibe3.config.profile_config import ProfileConfig
-
-        detected_profile = self.profile or self._detect_profile()
-        profile_config = ProfileConfig(profile=detected_profile)
-        return profile_config.get_skill_path(name)
+        return self._get_profile_config().get_skill_path(name)
 
     def get_supervisor_path(self, name: str = "apply") -> str | None:
         """Get path to supervisor template for current profile.
@@ -144,11 +142,7 @@ class ConventionResolver:
         Returns:
             Relative path or None
         """
-        from vibe3.config.profile_config import ProfileConfig
-
-        detected_profile = self.profile or self._detect_profile()
-        profile_config = ProfileConfig(profile=detected_profile)
-        return profile_config.get_supervisor_path(name)
+        return self._get_profile_config().get_supervisor_path(name)
 
     def _detect_profile(self) -> str:
         """Detect profile from repo context.
@@ -180,10 +174,23 @@ class ConventionResolver:
                     or "vibe-coding-control-center" in remote_url
                 ):
                     return "vibe-center"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Git remote check failed: {e}")
 
         return "minimal"
+
+    def _get_profile_config(self) -> ProfileConfig:
+        """Get ProfileConfig with detected profile.
+
+        Helper to reduce repeated ProfileConfig instantiation pattern.
+
+        Returns:
+            ProfileConfig instance with detected or explicit profile.
+        """
+        from vibe3.config.profile_config import ProfileConfig
+
+        detected_profile = self.profile or self._detect_profile()
+        return ProfileConfig(profile=detected_profile)
 
     @classmethod
     def from_repo(cls, profile: str | None = None) -> "ConventionResolver":
