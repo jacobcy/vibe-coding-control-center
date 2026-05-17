@@ -19,7 +19,11 @@ def test_verify_branch_returns_check_result(tmp_path: Path) -> None:
     conn.close()
     temp_store = SQLiteClient(db_path=db_path)
 
-    service = CheckService(store=temp_store, git_client=None, github_client=None)
+    # Mock GitHub client to avoid gh CLI calls in CI
+    mock_github = MagicMock()
+    mock_github.list_all_prs.return_value = []
+
+    service = CheckService(store=temp_store, git_client=None, github_client=mock_github)
 
     # Setup: create a minimal flow record
     branch = "dev/test-123"
@@ -51,7 +55,11 @@ def test_verify_branch_returns_invalid_for_missing_flow(tmp_path: Path) -> None:
     conn.close()
     temp_store = SQLiteClient(db_path=db_path)
 
-    service = CheckService(store=temp_store)
+    # Mock GitHub client to avoid gh CLI calls in CI
+    mock_github = MagicMock()
+    mock_github.list_all_prs.return_value = []
+
+    service = CheckService(store=temp_store, github_client=mock_github)
 
     result = service.verify_branch("nonexistent-branch")
 
