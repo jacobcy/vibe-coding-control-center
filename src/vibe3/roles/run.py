@@ -6,13 +6,13 @@ from __future__ import annotations
 from vibe3.roles.run_command import (
     dispatch_run_command_async,
     execute_manual_run,
+    resolve_skill_path,
 )
 from vibe3.roles.run_helpers import (
     EXECUTOR_PUBLISH_ROLE,
     EXECUTOR_ROLE,
     RUN_BRANCH_RESOLVER,
     ensure_plan_file_exists,
-    find_skill_file,
     publish_run_command_failure,
     publish_run_command_success,
     resolve_run_mode,
@@ -35,10 +35,10 @@ __all__ = [
     "dispatch_run_command_async",
     "ensure_plan_file_exists",
     "execute_manual_run",
-    "find_skill_file",
     "publish_run_command_failure",
     "publish_run_command_success",
     "resolve_run_mode",
     "resolve_run_options",
+    "resolve_skill_path",
     "validate_run_prerequisites",
 ]

@@ -116,7 +116,6 @@ class ConventionResolver:
         """
         from vibe3.config.profile_config import ProfileConfig
 
-        # Detect profile from resolver or use explicit override
         detected_profile = self.profile or self._detect_profile()
         profile_config = ProfileConfig(profile=detected_profile)
         return profile_config.get_policy_path(name)

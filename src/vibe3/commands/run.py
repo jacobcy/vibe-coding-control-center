@@ -20,10 +20,10 @@ from vibe3.exceptions import UserError
 from vibe3.roles.run import (
     ensure_plan_file_exists,
     execute_manual_run,
-    find_skill_file,
     resolve_run_mode,
     validate_run_prerequisites,
 )
+from vibe3.roles.run_command import resolve_skill_path
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.trace import enable_trace
@@ -105,15 +105,16 @@ def run_command(
         typer.echo("-> Publish mode: creating commit + PR")
 
     if skill:
-        skill_file = find_skill_file(skill)
-        if not skill_file:
+        skill_path = resolve_skill_path(skill)
+        if not skill_path:
             typer.echo(
-                f"Error: Skill '{skill}' not found (skills/{skill}/SKILL.md)",
+                f"Error: Skill '{skill}' not found "
+                "(no adapter provides it in current profile)",
                 err=True,
             )
             raise typer.Exit(1)
 
-        typer.echo(f"-> Skill: {skill_file}")
+        typer.echo(f"-> Skill: {skill_path}")
         execute_manual_run(
             config=config,
             branch=target_branch,

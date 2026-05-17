@@ -23,10 +23,32 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.prompt_meta import PromptContextMode, build_prompt_meta
 from vibe3.execution.session_service import load_session_id
 from vibe3.roles.run_helpers import (
-    find_skill_file,
     publish_run_command_failure,
     publish_run_command_success,
 )
+from vibe3.services.convention_resolver import ConventionResolver
+
+
+def resolve_skill_path(
+    skill: str, resolver: ConventionResolver | None = None
+) -> str | None:
+    """Resolve skill SKILL.md path through profile.
+
+    Args:
+        skill: Skill name
+        resolver: Optional resolver (uses from_repo() if None)
+
+    Returns:
+        Path or None if not found
+
+    Example:
+        >>> path = resolve_skill_path("vibe-commit")
+        >>> if path:
+        ...     content = Path(path).read_text()
+    """
+    if resolver is None:
+        resolver = ConventionResolver.from_repo()
+    return resolver.get_skill_path(skill)
 
 
 def dispatch_run_command_async(
@@ -81,13 +103,13 @@ def execute_manual_run(
 ) -> CodeagentResult | None:
     """Execute manual run command via role-owned facade."""
     if skill:
-        skill_file = find_skill_file(skill)
-        if not skill_file:
-            raise FileNotFoundError(
-                f"Skill '{skill}' not found (skills/{skill}/SKILL.md)"
+        skill_path = resolve_skill_path(skill)
+        if not skill_path:
+            raise ValueError(
+                f"Skill '{skill}' not found (no adapter provides it in current profile)"
             )
 
-        skill_content = skill_file.read_text(encoding="utf-8")
+        skill_content = Path(skill_path).read_text(encoding="utf-8")
         if not dry_run and not no_async:
             dispatch_run_command_async(
                 branch=branch,
