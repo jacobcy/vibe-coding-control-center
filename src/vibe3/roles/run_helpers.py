@@ -152,9 +152,17 @@ def resolve_run_mode(
 ) -> SimpleNamespace:
     """Resolve run command mode from CLI inputs and flow state."""
     if skill:
-        return SimpleNamespace(mode="skill", message=skill, plan_file=None)
+        return SimpleNamespace(
+            mode="skill", message=skill, plan_file=None, worktree_root=None, branch=None
+        )
     if plan:
-        return SimpleNamespace(mode="plan", plan_file=str(plan), message=None)
+        return SimpleNamespace(
+            mode="plan",
+            plan_file=str(plan),
+            message=None,
+            worktree_root=None,
+            branch=None,
+        )
     if instructions:
         preview = instructions[:60]
         suffix = "..." if len(instructions) > 60 else ""
@@ -162,11 +170,17 @@ def resolve_run_mode(
             mode="lightweight",
             plan_file=None,
             message=f"-> Task: {preview}{suffix}",
+            worktree_root=None,
+            branch=None,
         )
     flow = flow_service.get_flow_status(branch)
     if flow and flow.plan_ref:
         return SimpleNamespace(
-            mode="flow_plan", plan_file=str(flow.plan_ref), message=None
+            mode="flow_plan",
+            plan_file=str(flow.plan_ref),
+            message=None,
+            worktree_root=flow.worktree_root,
+            branch=branch,
         )
     raise ValueError(
         "No plan specified.\n"
@@ -177,10 +191,22 @@ def resolve_run_mode(
     )
 
 
-def ensure_plan_file_exists(plan_file: str | None) -> None:
-    """Validate that a referenced plan file exists."""
+def ensure_plan_file_exists(
+    plan_file: str | None,
+    branch: str | None = None,
+) -> None:
+    """Validate that a referenced plan file exists.
+
+    Uses the same resolution logic as ``vibe3 handoff show`` via
+    ``resolve_handoff_target`` to correctly handle worktree-relative paths.
+    """
     if not plan_file:
         return
-    if Path(plan_file).exists():
+    if Path(plan_file).is_absolute() and Path(plan_file).exists():
         return
-    raise FileNotFoundError(f"Plan file not found: {plan_file}")
+    from vibe3.utils.path_helpers import resolve_handoff_target
+
+    try:
+        resolve_handoff_target(plan_file, branch=branch)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(str(exc)) from exc

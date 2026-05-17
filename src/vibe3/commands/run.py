@@ -161,7 +161,7 @@ def run_command(
         typer.echo(f"-> Using flow plan: {plan_file}")
 
     try:
-        ensure_plan_file_exists(plan_file)
+        ensure_plan_file_exists(plan_file, branch=summary.branch or target_branch)
     except FileNotFoundError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error

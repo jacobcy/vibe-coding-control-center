@@ -109,7 +109,9 @@ def _build_plan_task_guidance(
     if spec_ref:
         spec_service = SpecRefService()
         spec_info = spec_service.parse_spec_ref(spec_ref)
-        spec_content = spec_service.get_spec_content_for_prompt(spec_info)
+        spec_content = spec_service.get_spec_content_for_prompt(
+            spec_info, branch=branch
+        )
         if spec_info.display and spec_info.display != spec_ref:
             sections.append(f"## Spec Reference\nSpec Ref: {spec_info.display}")
         if spec_content:
@@ -287,12 +289,14 @@ def resolve_spec_plan_input(
         spec_info = spec_service.parse_spec_ref(flow.spec_ref)
 
         # Validate spec_ref exists
-        is_valid, error = spec_service.validate_spec_ref(flow.spec_ref)
+        is_valid, error = spec_service.validate_spec_ref(flow.spec_ref, branch=branch)
         if not is_valid:
             raise ValueError(f"Flow spec_ref invalid: {error}")
 
         # Get spec content
-        spec_content = spec_service.get_spec_content_for_prompt(spec_info)
+        spec_content = spec_service.get_spec_content_for_prompt(
+            spec_info, branch=branch
+        )
         if not spec_content:
             raise ValueError(f"Failed to read spec content from {flow.spec_ref}")
 
