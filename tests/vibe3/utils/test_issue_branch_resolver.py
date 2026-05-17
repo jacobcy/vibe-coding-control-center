@@ -45,8 +45,12 @@ def test_resolve_issue_branch_input_no_flow_raises_error() -> None:
     Fail-fast: users must have active flow to use numeric issue references.
     """
     flow_service = MagicMock()
-    flow_service.get_flow_state.return_value = None
-    flow_service.store.get_flows_by_issue.return_value = []  # No flows found
+
+    # Mock store to return no flows
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = []
+    mock_store.get_flow_state.return_value = None  # No unbound candidates either
+    flow_service.store = mock_store
 
     with pytest.raises(UserError, match="No flow found for issue #436"):
         resolve_issue_branch_input("436", flow_service)
