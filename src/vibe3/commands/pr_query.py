@@ -36,6 +36,7 @@ from vibe3.models.pr import PRResponse
 from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.branch_resolver import resolve_branch_from_pr
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.pr_service import PRService
@@ -398,23 +399,6 @@ def register_query_commands(app: typer.Typer) -> None:
                 )
                 raise typer.Exit(1) from None
 
-            # Record external events (best-effort, non-blocking)
-            try:
-                if pr and pr_number:
-                    # Use PR's head_branch if branch not specified
-                    effective_branch = branch or target.current_branch or pr.head_branch
-                    if effective_branch:
-                        _fetch_and_record_external_events(
-                            pr_number=pr_number,
-                            branch=effective_branch,
-                            github_client=pr_svc.github_client,
-                            handoff_svc=HandoffService(store=pr_svc.store),
-                        )
-            except Exception as exc:
-                logger.bind(domain="pr", action="record_external_events").warning(
-                    f"Failed to record external events: {exc}"
-                )
-
             analysis_summary = None
             if pr_number:
                 analysis_summary = _load_pr_analysis_summary(pr_number)
@@ -425,6 +409,36 @@ def register_query_commands(app: typer.Typer) -> None:
             if local_review:
                 logger.debug(
                     f"Found local review report: {local_review.report_path.name}"
+                )
+
+            # Resolve branch from PR (compute once, reuse later)
+            resolved_branch: str | None = None
+            try:
+                if pr and pr_number:
+                    # Standard path: PR → Issue → Flow → Branch
+                    # Pass pre-fetched PR to avoid duplicate API call
+                    resolved_branch = resolve_branch_from_pr(pr_number, pr_svc, pr)
+            except Exception as exc:
+                logger.bind(domain="pr", action="resolve_branch").warning(
+                    f"Failed to resolve branch from PR: {exc}"
+                )
+
+            # Record external events (best-effort, non-blocking)
+            try:
+                if pr and pr_number:
+                    effective_branch = (
+                        branch or target.current_branch or resolved_branch
+                    )
+                    if effective_branch:
+                        _fetch_and_record_external_events(
+                            pr_number=pr_number,
+                            branch=effective_branch,
+                            github_client=pr_svc.github_client,
+                            handoff_svc=HandoffService(store=pr_svc.store),
+                        )
+            except Exception as exc:
+                logger.bind(domain="pr", action="record_external_events").warning(
+                    f"Failed to record external events: {exc}"
                 )
 
             if trace_output or json_output or yaml_output:
@@ -440,8 +454,22 @@ def register_query_commands(app: typer.Typer) -> None:
                 render_pr_details(pr)
 
                 # Show bound tasks from flow truth
-                # Use PR head_branch if no branch was resolved
-                effective_branch = branch or target.current_branch or pr.head_branch
+                # Fallback chain:
+                # resolved_branch → branch → target.current_branch → current branch
+                effective_branch = branch or target.current_branch or resolved_branch
+                if not effective_branch and pr:
+                    # Final fallback: get current branch from git
+                    # (if PR is from current worktree)
+                    try:
+                        effective_branch = pr_svc.git_client.get_current_branch()
+                    except Exception as e:
+                        logger.bind(
+                            domain="pr",
+                            action="get_current_branch",
+                            error_type=type(e).__name__,
+                            error_msg=str(e),
+                        ).debug(f"Failed to get current branch: {e}")
+
                 if effective_branch:
                     bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
                     if bound_tasks:

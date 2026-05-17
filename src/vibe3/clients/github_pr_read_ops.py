@@ -6,7 +6,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.models.pr import PRResponse, PRState
+from vibe3.models.pr import PRMetadata, PRResponse, PRState
 
 
 class PRReadMixin:
@@ -43,7 +43,8 @@ class PRReadMixin:
                     target,
                     "--json",
                     "number,title,body,state,headRefName,baseRefName,"
-                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
+                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup,"
+                    "closingIssuesReferences",
                 ],
                 capture_output=True,
                 text=True,
@@ -70,6 +71,28 @@ class PRReadMixin:
             str(status_rollup).lower() if isinstance(status_rollup, str) else None
         )
 
+        # Parse closingIssuesReferences to get task_issue
+        # Note: closingIssuesReferences is a list (not {references: [...]} object)
+        # See github_issue_admin_ops.py:get_pr_for_issue for reference
+        closing_refs = data.get("closingIssuesReferences", [])
+        task_issue = None
+        if closing_refs and isinstance(closing_refs, list):
+            # Take the first closing issue as task_issue
+            task_issue = closing_refs[0].get("number")
+
+        metadata = None
+        if task_issue:
+            metadata = PRMetadata(
+                branch=None,
+                task_issue=task_issue,
+                flow_slug=None,
+                spec_ref=None,
+                planner=None,
+                executor=None,
+                reviewer=None,
+                latest=None,
+            )
+
         return PRResponse(
             number=int(data["number"]),
             title=str(data["title"]),
@@ -85,7 +108,7 @@ class PRReadMixin:
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),
-            metadata=None,
+            metadata=metadata,
         )
 
     def list_all_prs(
