@@ -5,16 +5,16 @@ from typing import Any
 
 class SQLiteQueueRepo:
     db_path: str
-    _has_enqueued_at: bool | None = None
+    _enqueued_at_cache: dict[str, bool] = {}  # db_path -> has_enqueued_at
 
     def _check_has_enqueued_at(self, conn: sqlite3.Connection) -> bool:
-        """Check if legacy enqueued_at column exists (cached)."""
-        if self._has_enqueued_at is None:
+        """Check if legacy enqueued_at column exists (cached per db_path)."""
+        if self.db_path not in self._enqueued_at_cache:
             cursor = conn.cursor()
             cursor.execute("PRAGMA table_info(orchestra_queue)")
             columns = {row[1] for row in cursor.fetchall()}
-            self._has_enqueued_at = "enqueued_at" in columns
-        return self._has_enqueued_at
+            self._enqueued_at_cache[self.db_path] = "enqueued_at" in columns
+        return self._enqueued_at_cache[self.db_path]
 
     def save_queue_entry(
         self,

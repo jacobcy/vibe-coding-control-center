@@ -333,7 +333,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # time to last attempt time)
     if "enqueued_at" in queue_columns and "last_attempted_at" not in queue_columns:
         # SQLite doesn't support DROP COLUMN, so we add the new column
-        # and copy data. The old enqueued_at will remain but be unused.
+        # and copy data. The old enqueued_at will remain but is dual-written
+        # to satisfy its NOT NULL constraint (value not read by new code).
         cursor.execute("ALTER TABLE orchestra_queue ADD COLUMN last_attempted_at TEXT")
         cursor.execute(
             "UPDATE orchestra_queue SET last_attempted_at = enqueued_at "
