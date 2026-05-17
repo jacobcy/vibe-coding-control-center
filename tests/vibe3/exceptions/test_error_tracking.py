@@ -230,12 +230,12 @@ def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
     """record_error should work with only required parameters."""
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
-    # Call with minimal parameters (non-API error)
+    # Call with minimal parameters (non-API/non-EXEC error)
     threshold_reached, error_count = ErrorTrackingService._instance.record_error(
-        "E_EXEC_ERROR", "Test message"
+        "E_OTHER_ERROR", "Test message"
     )
 
-    # Verify return values (non-API errors don't trigger threshold)
+    # Verify return values (non-API/non-EXEC errors don't trigger threshold)
     assert threshold_reached is False
     assert error_count == 0
 
@@ -248,7 +248,7 @@ def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
             """).fetchone()
         assert row is not None
         assert row[0] == 0  # tick_id defaults to 0
-        assert row[1] == "E_EXEC_ERROR"
+        assert row[1] == "E_OTHER_ERROR"
         assert row[2] == "Test message"
         assert row[3] is None  # issue_number is NULL
         assert row[4] is None  # branch is NULL
@@ -260,10 +260,10 @@ def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
 
     # Call with tick_id only (mirrors governance_sync_runner usage)
     threshold_reached, error_count = ErrorTrackingService._instance.record_error(
-        "E_EXEC_ERROR", "Test message", tick_id=42
+        "E_OTHER_ERROR", "Test message", tick_id=42
     )
 
-    # Verify return values (non-API errors don't trigger threshold)
+    # Verify return values (non-API/non-EXEC errors don't trigger threshold)
     assert threshold_reached is False
     assert error_count == 0
 
@@ -276,7 +276,7 @@ def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
             """).fetchone()
         assert row is not None
         assert row[0] == 42  # tick_id preserved
-        assert row[1] == "E_EXEC_ERROR"
+        assert row[1] == "E_OTHER_ERROR"
         assert row[2] == "Test message"
         assert row[3] is None  # issue_number is NULL
         assert row[4] is None  # branch is NULL
