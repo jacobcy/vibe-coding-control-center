@@ -159,3 +159,96 @@ def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
     entry_601 = client.load_queue_entry(601)
     assert entry_601 is not None
     assert entry_601["collected_state"] == "second"
+
+
+def test_legacy_enqueued_at_migration(tmp_path):
+    """Simulate a legacy DB with enqueued_at NOT NULL, run init_schema,
+    then verify save_queue_entry succeeds and both columns are populated."""
+    db_path = tmp_path / "legacy.db"
+
+    # Step 1: Create a legacy-style orchestra_queue with enqueued_at NOT NULL
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS orchestra_queue ("
+            "issue_number INTEGER PRIMARY KEY, "
+            "collected_state TEXT NOT NULL, "
+            "waiting_state TEXT, "
+            "enqueued_at TEXT NOT NULL, "
+            "retry_count INTEGER NOT NULL DEFAULT 0, "
+            "updated_at TEXT NOT NULL)"
+        )
+        # Insert a legacy row that only has the old columns
+        conn.execute(
+            "INSERT INTO orchestra_queue "
+            "(issue_number, collected_state, waiting_state, "
+            "enqueued_at, retry_count, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (100, "blocked", "ready", "2026-05-16T10:00:00", 0, "2026-05-16T10:00:00"),
+        )
+
+    # Step 2: Run init_schema (triggers migration)
+    client = SQLiteClient(db_path=str(db_path))
+
+    # Step 3: Verify migration added last_attempted_at
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(orchestra_queue)")
+        columns = {row[1] for row in cursor.fetchall()}
+        assert "last_attempted_at" in columns
+
+    # Step 4: Verify legacy row has last_attempted_at migrated from enqueued_at
+    legacy_entry = client.load_queue_entry(100)
+    assert legacy_entry["last_attempted_at"] == "2026-05-16T10:00:00"
+
+    # Step 5: Verify new inserts succeed (NOT NULL constraint satisfied)
+    client.save_queue_entry(
+        issue_number=200,
+        collected_state="blocked",
+        waiting_state="review",
+        retry_count=2,
+        last_attempted_at="2026-05-17T09:00:00",
+    )
+
+    new_entry = client.load_queue_entry(200)
+    assert new_entry["issue_number"] == 200
+    assert new_entry["retry_count"] == 2
+    assert new_entry["last_attempted_at"] == "2026-05-17T09:00:00"
+    assert new_entry["enqueued_at"] == "2026-05-17T09:00:00"  # dual-written
+
+
+def test_replace_all_with_legacy_enqueued_at(tmp_path):
+    """Verify replace_all_queue_entries works on a legacy DB with enqueued_at."""
+    db_path = tmp_path / "legacy2.db"
+
+    # Create legacy schema
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS orchestra_queue ("
+            "issue_number INTEGER PRIMARY KEY, "
+            "collected_state TEXT NOT NULL, "
+            "waiting_state TEXT, "
+            "enqueued_at TEXT NOT NULL, "
+            "retry_count INTEGER NOT NULL DEFAULT 0, "
+            "updated_at TEXT NOT NULL)"
+        )
+
+    # Run migration
+    client = SQLiteClient(db_path=str(db_path))
+
+    # Replace all entries
+    entries = [
+        {
+            "issue_number": 300,
+            "collected_state": "ready",
+            "waiting_state": None,
+            "retry_count": 1,
+            "last_attempted_at": "2026-05-17T08:00:00",
+        },
+    ]
+    client.replace_all_queue_entries(entries)
+
+    loaded = client.load_queue_entry(300)
+    assert loaded["retry_count"] == 1
+    assert loaded["last_attempted_at"] == "2026-05-17T08:00:00"
+    assert loaded["enqueued_at"] == "2026-05-17T08:00:00"
