@@ -213,11 +213,70 @@ class AgentConfig(BaseModel):
     timeout_seconds: int = Field(default=3600, ge=1)
 
 
-class ReviewConfig(BaseModel):
+class PolicyResolverMixin:
+    """Mixin providing policy resolution methods.
+
+    Used by ReviewConfig, PlanConfig, RunConfig to avoid DRY violation.
+    Each class must define a _policy_name attribute and policy_file/common_rules fields.
+
+    Note: Uses duck typing for policy_file/common_rules access to avoid
+    Pydantic field interference. Subclasses must declare these as actual fields.
+    """
+
+    __slots__ = ()
+
+    def get_policy_file(self) -> str | None:
+        """Get policy file path, using profile resolution if not set.
+
+        Returns explicit policy_file if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to policy file, or None if not available for current profile.
+        """
+        # Duck typing: subclasses must declare policy_file field
+        policy_file: str | None = getattr(self, "policy_file", None)
+        if policy_file is not None:
+            return policy_file
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        # Duck typing: subclasses must declare _policy_name
+        policy_name: str = getattr(self, "_policy_name", "unknown")
+        return resolver.get_policy_path(policy_name)
+
+    def get_common_rules(self) -> str | None:
+        """Get common rules path, using profile resolution if not set.
+
+        Returns explicit common_rules if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to common rules, or None if not available for current profile.
+        """
+        # Duck typing: subclasses must declare common_rules field
+        common_rules: str | None = getattr(self, "common_rules", None)
+        if common_rules is not None:
+            return common_rules
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("common")
+
+
+class ReviewConfig(BaseModel, PolicyResolverMixin):
     """Review configuration."""
 
-    policy_file: str = Field(default=".agent/policies/review.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    _policy_name = "review"
+    policy_file: str | None = Field(
+        default=None,
+        description="Path to review policy (None = use profile resolution)",
+    )
+    common_rules: str | None = Field(
+        default=None, description="Path to common rules (None = use profile resolution)"
+    )
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     review_task: str = Field(default="")
@@ -225,11 +284,16 @@ class ReviewConfig(BaseModel):
     review_prompt: str = Field(default="")
 
 
-class PlanConfig(BaseModel):
+class PlanConfig(BaseModel, PolicyResolverMixin):
     """Plan command configuration."""
 
-    policy_file: str = Field(default=".agent/policies/plan.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    _policy_name = "plan"
+    policy_file: str | None = Field(
+        default=None, description="Path to plan policy (None = use profile resolution)"
+    )
+    common_rules: str | None = Field(
+        default=None, description="Path to common rules (None = use profile resolution)"
+    )
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     plan_task: str = Field(default="")
@@ -237,11 +301,16 @@ class PlanConfig(BaseModel):
     plan_prompt: str = Field(default="")
 
 
-class RunConfig(BaseModel):
+class RunConfig(BaseModel, PolicyResolverMixin):
     """Run command configuration."""
 
-    policy_file: str = Field(default=".agent/policies/run.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    _policy_name = "run"
+    policy_file: str | None = Field(
+        default=None, description="Path to run policy (None = use profile resolution)"
+    )
+    common_rules: str | None = Field(
+        default=None, description="Path to common rules (None = use profile resolution)"
+    )
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     run_task: str = Field(default="")
