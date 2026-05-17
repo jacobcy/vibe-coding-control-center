@@ -27,7 +27,9 @@ def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
         ) as mock_build_usecase,
     ):
         mock_pr_instance = MagicMock()
-        mock_pr_instance.get_pr.return_value = mock_pr_response  # GitHub API returns PR
+        mock_pr_instance.github_client.list_prs_for_branch.return_value = [
+            mock_pr_response
+        ]
         mock_pr_service.return_value = mock_pr_instance
 
         mock_flow_instance = MagicMock()
@@ -41,7 +43,9 @@ def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
         result = runner.invoke(app, ["ready", "--yes"])
 
         assert result.exit_code == 0
-        mock_pr_instance.get_pr.assert_called_once_with(branch="task/demo")
+        mock_pr_instance.github_client.list_prs_for_branch.assert_called_once_with(
+            "task/demo"
+        )
         mock_usecase.mark_ready.assert_called_once_with(
             pr_number=123, yes=True, requested_reviewers=None
         )
@@ -55,7 +59,7 @@ def test_pr_ready_without_arg_and_no_current_pr_shows_error():
     ):
         mock_pr_instance = MagicMock()
         mock_pr_instance.store.get_flow_state.return_value = {}
-        mock_pr_instance.get_pr.return_value = None
+        mock_pr_instance.github_client.list_prs_for_branch.return_value = []
         mock_pr_service.return_value = mock_pr_instance
 
         mock_flow_instance = MagicMock()

@@ -42,9 +42,9 @@ def _resolve_ready_pr_number(
         return pr_number
 
     branch = flow_service.get_current_branch()
-    # Try to find PR for current branch from GitHub
-    # TODO: Optimize with cache service when implemented
-    pr = pr_service.get_pr(branch=branch)
+    # Use standard branch→PR query path
+    prs = pr_service.github_client.list_prs_for_branch(branch)
+    pr = prs[0] if prs else None
     if pr is not None:
         return pr.number
 
