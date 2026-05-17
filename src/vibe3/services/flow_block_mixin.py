@@ -5,6 +5,7 @@ from typing import Self
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.issue_body import FlowStateProjection
 from vibe3.models.orchestration import IssueState

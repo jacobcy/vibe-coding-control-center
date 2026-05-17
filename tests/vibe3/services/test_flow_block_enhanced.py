@@ -44,6 +44,15 @@ def mock_flow_timeline_service():
 
 
 @pytest.fixture
+def mock_github_client():
+    """Mock GitHubClient."""
+    with patch("vibe3.services.flow_block_mixin.GitHubClient") as mock:
+        mock_instance = mock.return_value
+        mock_instance.get_issue_body.return_value = "Test issue body"
+        yield mock_instance
+
+
+@pytest.fixture
 def service(mock_store, mock_label_service, mock_flow_timeline_service):
     """Create FlowService instance with mocked dependencies."""
     service = FlowService(store=mock_store)
@@ -61,13 +70,13 @@ class TestBlockFlowEnhanced:
         mock_store,
         mock_label_service,
         mock_flow_timeline_service,
+        mock_github_client,
     ):
         """block_flow transitions issue state to BLOCKED and adds comment."""
         # Arrange
         branch = "task/issue-42"
         reason = "Waiting for dependency"
         actor = "test-actor"
-        mock_github_client.get_issue_body.return_value = "Test issue body"
 
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
@@ -133,13 +142,13 @@ class TestBlockFlowEnhanced:
         mock_store,
         mock_label_service,
         mock_flow_timeline_service,
+        mock_github_client,
     ):
         """block_flow transitions label but doesn't add comment when reason is None."""
         # Arrange
         branch = "task/issue-42"
         reason = None
         actor = "test-actor"
-        mock_github_client.get_issue_body.return_value = "Test issue body"
 
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
