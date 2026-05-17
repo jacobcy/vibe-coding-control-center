@@ -191,7 +191,7 @@ class TestBuildSupervisorApplyRequest:
         config = _make_config()
         req = build_supervisor_apply_request(config, 42, "Fix docs")
         assert req.role == "supervisor"
-        assert req.target_branch == "issue-42"
+        assert req.target_branch == "task/issue-42"
         assert req.target_id == 42
         # cwd is not set — coordinator resolves it via worktree_requirement=TEMPORARY
         assert req.cwd is None

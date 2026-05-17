@@ -57,6 +57,11 @@ class TaskService:
         self._issue_label_port = issue_label_port
         self._orchestra_config = orchestra_config
 
+    @property
+    def flow_service(self) -> FlowService:
+        """Expose the internal FlowService instance for branch resolution."""
+        return self._flow_service
+
     # ------------------------------------------------------------------
     # Core task operations
     # ------------------------------------------------------------------

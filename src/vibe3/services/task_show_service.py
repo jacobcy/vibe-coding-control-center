@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -286,9 +287,17 @@ class TaskShowService:
         return None
 
     def _build_pr_summary(self, branch: str) -> TaskPRSummary | None:
-        pr = self.github_client.get_pr(branch=branch)
-        if pr is None:
+        # Use list_prs_for_branch() to properly handle branch→PR lookup
+        try:
+            prs = self.github_client.list_prs_for_branch(branch)
+            if not prs:
+                return None
+            # Take the most recent PR if multiple exist
+            pr = prs[0]
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # GitHub CLI not available or query failed
             return None
+
         return TaskPRSummary(
             number=pr.number,
             title=pr.title,

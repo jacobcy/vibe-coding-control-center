@@ -201,11 +201,13 @@ def test_create_flow_for_issue_uses_shared_bootstrap_interface() -> None:
 
 def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
     config = load_orchestra_config()
+    github = MagicMock()
+    # No PR found via list_prs_for_branch, triggers cleanup + bootstrap
+    github.list_prs_for_branch = MagicMock(return_value=[])
     service = FlowOrchestratorService(
-        config, store=MagicMock(), git=MagicMock(), github=MagicMock()
+        config, store=MagicMock(), git=MagicMock(), github=github
     )
     issue = IssueInfo(number=320, title="Rebuild lifecycle")
-    service.get_pr_for_issue = MagicMock(return_value=None)
 
     with patch(
         "vibe3.services.flow_orchestrator_service.FlowCleanupService"
@@ -238,22 +240,25 @@ def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
     assert result == {"branch": "task/issue-320"}
 
 
-def test_get_pr_for_issue_passes_repo_to_github_fallback() -> None:
-    """HIGH: GitHub fallback must pass repo parameter to get_pr_for_issue."""
+def test_get_pr_for_issue_uses_list_prs_for_branch_fallback() -> None:
+    """HIGH: Fallback must use list_prs_for_branch (standard path)."""
     config = load_orchestra_config()
     config.repo = "owner/repo"
     store = MagicMock()
     github = MagicMock()
     service = FlowOrchestratorService(config, store=store, github=github)
 
-    # No PR in flow record, trigger GitHub fallback
+    # No PR in flow record, trigger standard branch→PR fallback
     service.get_flow_for_issue = MagicMock(return_value=None)
-    github.get_pr_for_issue = MagicMock(return_value=42)
+    # Mock PR response for list_prs_for_branch
+    mock_pr = MagicMock()
+    mock_pr.number = 42
+    github.list_prs_for_branch = MagicMock(return_value=[mock_pr])
 
     result = service.get_pr_for_issue(123)
 
-    # HIGH: Verify repo parameter was passed
-    github.get_pr_for_issue.assert_called_once_with(123, repo="owner/repo")
+    # HIGH: Verify list_prs_for_branch called (not get_pr_for_issue)
+    github.list_prs_for_branch.assert_called_once_with("task/issue-123")
     assert result == 42
 
 
@@ -271,8 +276,8 @@ def test_get_pr_for_issue_returns_flow_pr_without_github_call() -> None:
 
     result = service.get_pr_for_issue(123)
 
-    # GitHub API should NOT be called
-    github.get_pr_for_issue.assert_not_called()
+    # GitHub list_prs_for_branch should NOT be called (fast path from flow)
+    github.list_prs_for_branch.assert_not_called()
     assert result == 99
 
 

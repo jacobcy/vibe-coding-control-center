@@ -77,7 +77,7 @@ class TestFlowQuery:
         manager = FlowManager(config)
 
         with patch.object(manager, "get_flow_for_issue", return_value=None):
-            with patch.object(manager.github, "get_pr_for_issue", return_value=None):
+            with patch.object(manager.github, "list_prs_for_branch", return_value=[]):
                 pr_number = manager.get_pr_for_issue(42)
 
         assert pr_number is None
