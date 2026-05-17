@@ -60,6 +60,24 @@ def test_worktree_manager_returns_repo_path_when_no_worktree_needed(
     assert context.is_temporary is False
 
 
+def test_bootstrap_plan_references_atomic_cli_commands_only() -> None:
+    """Guard against replacing atomic bootstrap commands with monolithic command."""
+    service = BootstrapContextService()
+    plan = service.plan_vibe_new_bootstrap(
+        current_branch="main",
+        target_branch="dev/issue-123",
+        issue_number=123,
+        has_existing_flow=False,
+        has_existing_pr=False,
+        wants_worktree=False,
+    )
+
+    commands = [action.command for action in plan.actions]
+    assert any(cmd.startswith("vibe3 flow update") for cmd in commands)
+    assert any(cmd.startswith("vibe3 flow bind") for cmd in commands)
+    assert all("vibe3 new" not in cmd for cmd in commands)
+
+
 def test_plan_for_new_branch_bootstrap_uses_atomic_actions() -> None:
     service = BootstrapContextService()
 
