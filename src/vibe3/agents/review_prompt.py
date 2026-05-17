@@ -223,8 +223,14 @@ def _build_review_prompt_providers(
         return build_review_task_section(config.review.review_task)
 
     return {
-        "review.policy": lambda: build_policy_section(config.review.policy_file),
-        "common.rules": lambda: build_tools_guide_section(config.review.common_rules),
+        "review.policy": lambda: (
+            build_policy_section(policy_path)
+            if (policy_path := config.review.get_policy_file())
+            else ""
+        ),
+        "common.rules": lambda: build_tools_guide_section(
+            config.review.get_common_rules()
+        ),
         "review.snapshot_diff": lambda: build_snapshot_diff_section(
             request.structure_diff
         ),

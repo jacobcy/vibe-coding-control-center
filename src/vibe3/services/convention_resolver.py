@@ -168,3 +168,70 @@ class ConventionResolver:
             f"Creating ConventionResolver from repo context (profile={profile})"
         )
         return cls(profile=profile)
+
+    def get_policy_path(self, policy_name: str) -> str | None:
+        """Get policy file path for given policy name.
+
+        Returns the path to a policy file based on the current profile.
+        For vibe-center profile, returns repo-local .agent/policies/{policy_name}.md.
+        For minimal profile, returns None (no policies by default).
+
+        Args:
+            policy_name: Policy name (plan, run, review, common)
+
+        Returns:
+            Path to policy file, or None if not available for current profile.
+
+        Example:
+            >>> resolver = ConventionResolver(profile="vibe-center")
+            >>> resolver.get_policy_path("plan")
+            '.agent/policies/plan.md'
+        """
+        # Vibe Center profile has repo-local policies
+        if self.profile == "vibe-center" or (
+            not self.profile and self._detect_vibe_center_repo()
+        ):
+            policy_path = f".agent/policies/{policy_name}.md"
+            logger.debug(f"Using repo-local policy path: {policy_path}")
+            return policy_path
+
+        # Minimal profile has no default policies
+        logger.debug(f"No policy path for profile: {self.profile or 'minimal'}")
+        return None
+
+    def _detect_vibe_center_repo(self) -> bool:
+        """Detect if current repo is Vibe Center repo.
+
+        Temporary heuristic until .vibe/config.yaml is implemented.
+
+        Returns:
+            True if repo appears to be Vibe Center repo.
+        """
+        import os
+        import subprocess
+
+        # Check environment variable
+        env_profile = os.getenv("VIBE_PROFILE")
+        if env_profile == "vibe-center":
+            return True
+
+        # Check git remote
+        try:
+            result = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+            if result.returncode == 0:
+                remote_url = result.stdout.strip().lower()
+                if (
+                    "vibe-center" in remote_url
+                    or "vibe-coding-control-center" in remote_url
+                ):
+                    return True
+        except Exception:
+            pass
+
+        return False
