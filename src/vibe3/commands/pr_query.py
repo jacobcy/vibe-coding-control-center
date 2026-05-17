@@ -454,7 +454,22 @@ def register_query_commands(app: typer.Typer) -> None:
                 render_pr_details(pr)
 
                 # Show bound tasks from flow truth
+                # Fallback chain:
+                # resolved_branch → branch → target.current_branch → current branch
                 effective_branch = branch or target.current_branch or resolved_branch
+                if not effective_branch and pr:
+                    # Final fallback: get current branch from git
+                    # (if PR is from current worktree)
+                    try:
+                        effective_branch = pr_svc.git_client.get_current_branch()
+                    except Exception as e:
+                        logger.bind(
+                            domain="pr",
+                            action="get_current_branch",
+                            error_type=type(e).__name__,
+                            error_msg=str(e),
+                        ).debug(f"Failed to get current branch: {e}")
+
                 if effective_branch:
                     bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
                     if bound_tasks:
