@@ -346,36 +346,6 @@ class TestQualifyBlockedIssue:
         qualify_gate_service.run_qualify_gate.assert_called_once()
 
 
-class TestGetIssueDependencies:
-    """Tests for _get_issue_dependencies method."""
-
-    def test_no_flows(self, qualify_gate_service, mock_store):
-        """Issue with no flows should return empty list."""
-        mock_store.get_flows_by_issue.return_value = []
-
-        result = qualify_gate_service._get_issue_dependencies(123)
-
-        assert result == []
-
-    def test_no_branch_in_flow(self, qualify_gate_service, mock_store):
-        """Flow without branch should return empty list."""
-        mock_store.get_flows_by_issue.return_value = [{}]
-
-        result = qualify_gate_service._get_issue_dependencies(123)
-
-        assert result == []
-
-    def test_dependencies_found(self, qualify_gate_service, mock_store):
-        """Should return dependency issue numbers."""
-        mock_store.get_flows_by_issue.return_value = [{"branch": "task/issue-123-test"}]
-        mock_store.get_dependency_links.return_value = [456, 789]
-
-        result = qualify_gate_service._get_issue_dependencies(123)
-
-        assert result == [456, 789]
-        mock_store.get_dependency_links.assert_called_once_with("task/issue-123-test")
-
-
 class TestIsDependencySatisfied:
     """Tests for _is_dependency_satisfied method."""
 

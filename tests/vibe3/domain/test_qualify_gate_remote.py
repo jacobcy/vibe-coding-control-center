@@ -56,7 +56,6 @@ def sample_issue():
         title="Test Issue",
         state=IssueState.IN_PROGRESS,
         labels=["state/in-progress"],
-        assignees=["alice"],
     )
 
 
