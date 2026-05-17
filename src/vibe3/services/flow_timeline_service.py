@@ -68,6 +68,16 @@ class FlowTimelineService:
             ).debug("Timeline event recorded without comment (no issue)")
             return
 
+        # Check dedupe: skip if latest timeline comment has same event_type
+        if self._should_skip_duplicate_comment(issue_number, event_type):
+            logger.bind(
+                domain="flow",
+                action="timeline",
+                issue_number=issue_number,
+                event_type=event_type,
+            ).info("Timeline comment skipped (duplicate event_type)")
+            return
+
         # Build timeline comment
         comment_body = self._build_timeline_comment(event_type, detail)
 
@@ -110,3 +120,75 @@ class FlowTimelineService:
         display_text = display_map.get(event_type, event_type.replace("_", " ").title())
 
         return f"[flow] {display_text}\n\n{detail}"
+
+    def _should_skip_duplicate_comment(
+        self, issue_number: int, event_type: str
+    ) -> bool:
+        """Check if latest timeline comment has same event_type.
+
+        Args:
+            issue_number: GitHub issue number
+            event_type: New event type
+
+        Returns:
+            True if duplicate (should skip), False otherwise
+        """
+        import re
+
+        try:
+            issue_payload = self.github_client.view_issue(issue_number)
+            if not isinstance(issue_payload, dict):
+                return False
+
+            comments = issue_payload.get("comments")
+            if not isinstance(comments, list) or not comments:
+                return False
+
+            # Get latest comment
+            latest_comment = comments[-1]
+            if not isinstance(latest_comment, dict):
+                return False
+
+            body = str(latest_comment.get("body") or "")
+
+            # Check if latest comment has [flow] marker
+            if not body.startswith("[flow]"):
+                return False
+
+            # Get display text mapping (same as _build_timeline_comment)
+            display_map = {
+                "flow_blocked": "Flow blocked",
+                "flow_failed": "Flow failed",
+                "flow_aborted": "Flow aborted",
+                "resumed": "Flow resumed",
+                "state_transitioned": "State transitioned",
+            }
+
+            # Reverse map: display text -> event_type
+            reverse_map = {v: k for k, v in display_map.items()}
+
+            # Extract display text from comment
+            # Pattern: "[flow] {display_text}"
+            pattern = r"^\[flow\]\s+([^\n]+)"
+            match = re.match(pattern, body)
+            if not match:
+                return False
+
+            display_text = match.group(1).strip()
+
+            # Map display text back to event_type
+            latest_event_type = reverse_map.get(display_text)
+            if not latest_event_type:
+                return False
+
+            # Skip if same event_type
+            return latest_event_type == event_type
+
+        except Exception as e:
+            logger.bind(
+                domain="flow",
+                action="timeline_dedupe",
+                issue_number=issue_number,
+                error=str(e),
+            ).warning("Dedupe check failed, proceeding with comment")
+            return False
