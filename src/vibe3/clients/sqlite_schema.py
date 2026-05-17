@@ -128,6 +128,14 @@ _CREATE_ERROR_LOG_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_error_log_tick ON error_log(tick_id)",
     "CREATE INDEX IF NOT EXISTS idx_error_log_code ON error_log(error_code)",
     "CREATE INDEX IF NOT EXISTS idx_error_log_created ON error_log(created_at)",
+    (
+        "CREATE INDEX IF NOT EXISTS idx_error_log_issue_created ON "
+        "error_log(issue_number, created_at DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_error_log_branch_created ON "
+        "error_log(branch, created_at DESC)"
+    ),
 ]
 
 _CREATE_FAILED_GATE_STATE = """

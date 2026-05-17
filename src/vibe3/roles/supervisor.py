@@ -17,6 +17,7 @@ from vibe3.execution.role_contracts import (
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
+from vibe3.services.convention_resolver import ConventionResolver
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
@@ -276,6 +277,22 @@ SUPERVISOR_CLI_SYNC_SPEC = IssueRoleSyncSpec(
 )
 
 
+def get_supervisor_prompt_path(
+    resolver: ConventionResolver | None = None,
+) -> str | None:
+    """Get supervisor prompt path from profile.
+
+    Args:
+        resolver: Optional resolver (uses from_repo() if None)
+
+    Returns:
+        Path or None if profile has no supervisor
+    """
+    if resolver is None:
+        resolver = ConventionResolver.from_repo()
+    return resolver.get_supervisor_path("apply")
+
+
 def iter_supervisor_identified_events(
     config: OrchestraConfig,
     raw_issues: Iterable[dict[str, object]],
@@ -283,8 +300,15 @@ def iter_supervisor_identified_events(
     """Filter raw GitHub issues into supervisor observation events."""
     issue_label = config.supervisor_handoff.issue_label
     handoff_label = config.supervisor_handoff.get_handoff_state_label()
-    # supervisor_file is now fixed in recipe, use canonical value
-    supervisor_file = "supervisor/apply.md"
+
+    # Use profile resolution for supervisor template path
+    resolver = ConventionResolver.from_repo()
+    supervisor_file = get_supervisor_prompt_path(resolver)
+
+    if not supervisor_file:
+        # No supervisor configured for current profile (minimal, github-flow)
+        # Return empty list since these profiles don't have supervisor templates
+        return []
 
     events: list[SupervisorIssueIdentified] = []
     for item in raw_issues:

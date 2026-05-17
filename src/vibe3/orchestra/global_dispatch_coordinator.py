@@ -23,6 +23,7 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.observability.degraded_mode import get_degraded_manager
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
@@ -413,9 +414,25 @@ class GlobalDispatchCoordinator:
             # For BLOCKED issues: run qualify gate at intent time
             if issue.state == IssueState.BLOCKED:
                 target_state = self._qualify_gate.qualify_blocked_issue(issue)
+
+                # Check degraded mode immediately after qualification
+                degraded = get_degraded_manager()
+                if degraded.is_degraded():
+                    degraded_reason = degraded.get_reason()
+                    reason_value = degraded_reason.value if degraded_reason else None
+                    logger.bind(
+                        domain="orchestra",
+                        action="collect_blocked_intents",
+                        degraded_mode=True,
+                        reason=reason_value,
+                        issue_number=issue.number,
+                    ).warning(f"Qualification of #{issue.number} entered degraded mode")
+
+                # Then check target_state
                 if target_state is None:
                     self._frozen_queue.pop(index)
                     continue
+
                 role = find_role_for_state(target_state)
                 if role is None:
                     self._frozen_queue.pop(index)
