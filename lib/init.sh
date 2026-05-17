@@ -54,7 +54,6 @@ vibe_init() {
     local SKIP_CONFIRM=false
     local SKIP_LABELS=false
     local PROFILE_NAME=""
-    local LIST_PROFILES=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -63,7 +62,8 @@ vibe_init() {
                 return 0
                 ;;
             -l|--list-profiles)
-                LIST_PROFILES=true
+                list_profiles
+                return 0
                 ;;
             -p|--profile)
                 if [[ $# -lt 2 ]]; then
@@ -90,12 +90,6 @@ vibe_init() {
         esac
     done
 
-    # List profiles if requested
-    if [[ "$LIST_PROFILES" == true ]]; then
-        list_profiles
-        return 0
-    fi
-
     # Default profile if not specified
     if [[ -z "$PROFILE_NAME" ]]; then
         PROFILE_NAME="github-flow"
@@ -110,13 +104,18 @@ vibe_init() {
     fi
 
     # Get profile configuration (sets global PROFILE_CONFIG_ARRAY)
-    get_profile_config "$PROFILE_NAME"
-    if [[ $? -ne 0 ]]; then
+    if ! get_profile_config "$PROFILE_NAME"; then
         return 1
     fi
 
     # --- Pre-flight checks ---
     _log_info "Checking project environment..."
+
+    # Get profile features (needed for both pre-flight checks and execution)
+    local ENABLE_GITHUB_LABELS=$(get_profile_feature "github_labels")
+    local ENABLE_AGENT=$(get_profile_feature "agent")
+    local ENABLE_SKILLS=$(get_profile_feature "skills")
+    local ENABLE_SUPERVISOR=$(get_profile_feature "supervisor")
 
     # 1. Check git environment
     if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -135,9 +134,6 @@ vibe_init() {
     _log_success "Git repository detected: $REPO_ROOT"
 
     # 2. Check GitHub CLI (only if profile requires labels)
-    local ENABLE_GITHUB_LABELS
-    ENABLE_GITHUB_LABELS=$(get_profile_feature "" "github_labels")
-
     if [[ "$ENABLE_GITHUB_LABELS" == true && "$SKIP_LABELS" != true ]]; then
         if ! command -v gh >/dev/null 2>&1; then
             _log_warning "GitHub CLI (gh) not found"
@@ -145,12 +141,6 @@ vibe_init() {
             SKIP_LABELS=true
         fi
     fi
-
-    # Get profile features (needed for both confirmation and execution)
-    local ENABLE_GITHUB_LABELS=$(get_profile_feature "" "github_labels")
-    local ENABLE_AGENT=$(get_profile_feature "" "agent")
-    local ENABLE_SKILLS=$(get_profile_feature "" "skills")
-    local ENABLE_SUPERVISOR=$(get_profile_feature "" "supervisor")
 
     # --- Confirmation ---
     if [[ "$SKIP_CONFIRM" != true ]]; then
@@ -171,7 +161,7 @@ vibe_init() {
         fi
 
         if [[ "$ENABLE_GITHUB_LABELS" == true && "$SKIP_LABELS" != true ]]; then
-            echo "  - Create GitHub labels ($(get_profile_convention "" "labels.state_prefix")*)"
+            echo "  - Create GitHub labels ($(get_profile_convention "labels.state_prefix")*)"
         fi
 
         if [[ "$ENABLE_SUPERVISOR" == true ]]; then
@@ -225,8 +215,8 @@ vibe_init() {
     if [[ "$ENABLE_GITHUB_LABELS" == true && "$SKIP_LABELS" != true ]]; then
         _log_info "Creating GitHub labels..."
 
-        local STATE_PREFIX=$(get_profile_convention "" "labels.state_prefix")
-        local VIBE_TASK=$(get_profile_convention "" "labels.vibe_task")
+        local STATE_PREFIX=$(get_profile_convention "labels.state_prefix")
+        local VIBE_TASK=$(get_profile_convention "labels.vibe_task")
 
         # Define required labels based on profile
         local -a LABELS

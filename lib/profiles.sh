@@ -119,7 +119,7 @@ get_profile_config() {
 
 # Get profile feature value (reads from PROFILE_CONFIG_ARRAY global)
 get_profile_feature() {
-    local feature_name="$2"  # $1 is profile_config (ignored, we use global array)
+    local feature_name="$1"  # e.g., "agent"
 
     # Search in global PROFILE_CONFIG_ARRAY
     for entry in "${PROFILE_CONFIG_ARRAY[@]}"; do
@@ -136,7 +136,7 @@ get_profile_feature() {
 
 # Get profile convention value (reads from PROFILE_CONFIG_ARRAY global)
 get_profile_convention() {
-    local convention_path="$2"  # e.g., "branches.task_prefix"
+    local convention_path="$1"  # e.g., "branches.task_prefix"
 
     # Search in global PROFILE_CONFIG_ARRAY
     for entry in "${PROFILE_CONFIG_ARRAY[@]}"; do
@@ -153,15 +153,16 @@ get_profile_convention() {
 
 # Get profile path value (reads from PROFILE_CONFIG_ARRAY global)
 get_profile_path() {
-    local path_name="$2"  # e.g., "policies_root"
+    local path_name="$1"  # e.g., "policies_root"
 
     # Search in global PROFILE_CONFIG_ARRAY
     for entry in "${PROFILE_CONFIG_ARRAY[@]}"; do
         if [[ "$entry" == "paths.$path_name:"* ]]; then
             # Extract value after colon
             local value="${entry#*:}"
-            # Expand variables like ${HOME}
-            eval echo "$value"
+            # Expand ${HOME} safely using zsh parameter expansion
+            value="${value//\${HOME}/$HOME}"
+            echo "$value"
             return
         fi
     done
@@ -178,8 +179,7 @@ generate_vibe_config_yaml() {
     local repo_root="$2"
 
     # Ensure profile config is loaded in global array
-    get_profile_config "$profile_name"
-    if [[ $? -ne 0 ]]; then
+    if ! get_profile_config "$profile_name"; then
         return 1
     fi
 
@@ -194,29 +194,29 @@ generate_vibe_config_yaml() {
 profile: $profile_name
 
 features:
-  agent: $(get_profile_feature "" "agent")
-  skills: $(get_profile_feature "" "skills")
-  supervisor: $(get_profile_feature "" "supervisor")
-  github_labels: $(get_profile_feature "" "github_labels")
-  github_orchestration: $(get_profile_feature "" "github_orchestration")
+  agent: $(get_profile_feature "agent")
+  skills: $(get_profile_feature "skills")
+  supervisor: $(get_profile_feature "supervisor")
+  github_labels: $(get_profile_feature "github_labels")
+  github_orchestration: $(get_profile_feature "github_orchestration")
 
 conventions:
   branches:
-    task_prefix: $(get_profile_convention "" "branches.task_prefix")
-    dev_prefix: $(get_profile_convention "" "branches.dev_prefix")
+    task_prefix: $(get_profile_convention "branches.task_prefix")
+    dev_prefix: $(get_profile_convention "branches.dev_prefix")
   labels:
-    state_prefix: $(get_profile_convention "" "labels.state_prefix")
-    vibe_task: $(get_profile_convention "" "labels.vibe_task")
+    state_prefix: $(get_profile_convention "labels.state_prefix")
+    vibe_task: $(get_profile_convention "labels.vibe_task")
   supervisor:
-    enabled: $(get_profile_convention "" "supervisor.enabled")
-    apply_file: $(get_profile_convention "" "supervisor.apply_file")
+    enabled: $(get_profile_convention "supervisor.enabled")
+    apply_file: $(get_profile_convention "supervisor.apply_file")
   agents:
-    manager_name: $(get_profile_convention "" "agents.manager_name")
+    manager_name: $(get_profile_convention "agents.manager_name")
 
 paths:
-  policies_root: $(get_profile_path "" "policies_root")
-  prompts_root: $(get_profile_path "" "prompts_root")
-  skills_manifest: $(get_profile_path "" "skills_manifest")
+  policies_root: $(get_profile_path "policies_root")
+  prompts_root: $(get_profile_path "prompts_root")
+  skills_manifest: $(get_profile_path "skills_manifest")
 EOF
 
     return 0
