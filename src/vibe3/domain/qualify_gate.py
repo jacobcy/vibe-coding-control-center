@@ -125,13 +125,22 @@ class QualifyGateService:
                     f"qualify_gate skip #{issue.number}: {reason}",
                 )
                 return None
-            # Validate branch matches
+            # Validate branch matches using git (works with linked worktrees)
             try:
-                head_ref = (wt_path / ".git").read_text().strip()
-                if not head_ref.endswith(f"/{branch}"):
+                import subprocess
+
+                result = subprocess.run(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    cwd=str(wt_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                actual_branch = result.stdout.strip()
+                if actual_branch != branch:
                     reason = (
                         f"Worktree branch mismatch: expected {branch}, "
-                        f"got {head_ref.split('/')[-1]}"
+                        f"got {actual_branch}"
                     )
                     self._store.update_flow_state(
                         branch,

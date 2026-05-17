@@ -306,6 +306,8 @@ class WorktreeManager(WorktreePRMixin):
         # Step 3: Create new worktree
         try:
             ctx = self.acquire_issue_worktree(issue_number, flow_branch)
+            # Record worktree path to flow_state for canonical tracking
+            self._record_worktree_path(flow_branch, str(ctx.path))
             if self.align_auto_scene_to_base(ctx.path, flow_branch):
                 return ctx.path, False
             return None, False
@@ -437,11 +439,23 @@ class WorktreeManager(WorktreePRMixin):
 
     @staticmethod
     def _validate_branch_matches(worktree_path: Path, expected_branch: str) -> bool:
-        """Check that worktree's HEAD branch matches expected branch."""
+        """Check that worktree's HEAD branch matches expected branch.
+
+        Uses git rev-parse to resolve branch (works with both main repo
+        and linked worktrees where .git is a gitdir pointer).
+        """
         try:
-            head_ref = (worktree_path / ".git").read_text().strip()
-            # HEAD ref format: "ref: refs/heads/branch-name"
-            return head_ref.endswith(f"/{expected_branch}")
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(worktree_path),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            actual_branch = result.stdout.strip()
+            return actual_branch == expected_branch
         except Exception:
             return False
 
@@ -455,10 +469,20 @@ class WorktreeManager(WorktreePRMixin):
 
         The branch name should contain the issue number somewhere
         (e.g., task/issue-793, issue-793, dev/issue-793).
+
+        Uses git rev-parse to resolve branch (works with linked worktrees).
         """
         try:
-            head_ref = (worktree_path / ".git").read_text().strip()
-            actual_branch = head_ref.split("/")[-1] if "/" in head_ref else head_ref
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=str(worktree_path),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            actual_branch = result.stdout.strip()
             if actual_branch == expected_branch:
                 return True
             expected_suffix = f"issue-{issue_number}"

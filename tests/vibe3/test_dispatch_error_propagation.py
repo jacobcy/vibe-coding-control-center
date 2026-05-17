@@ -108,38 +108,38 @@ class TestResolveManagerCwd:
 
     def test_validate_branch_matches_exact_ref(self):
         """_validate_branch_matches returns True when HEAD matches expected branch."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_path = Path(tmpdir) / "repo"
-            repo_path.mkdir()
-            (repo_path / ".git").mkdir()
+        from unittest.mock import patch
 
-            config = MagicMock()
-            config.scene_base_ref = "main"
-            wm = WorktreeManager(config, repo_path)
+        config = MagicMock()
+        config.scene_base_ref = "main"
+        wm = WorktreeManager(config, Path("/repo"))
 
-            wt_path = Path(tmpdir) / "wt"
-            wt_path.mkdir(parents=True)
-            (wt_path / ".git").write_text("ref: refs/heads/task/issue-100\n")
+        wt_path = Path("/wt")
+        expected_branch = "task/issue-100"
 
-            result = wm._validate_branch_matches(wt_path, "task/issue-100")
+        # Mock subprocess.run to simulate git rev-parse output
+        mock_result = MagicMock()
+        mock_result.stdout = "task/issue-100\n"
+        with patch("subprocess.run", return_value=mock_result):
+            result = wm._validate_branch_matches(wt_path, expected_branch)
             assert result is True
 
     def test_validate_branch_matches_rejects_mismatch(self):
         """Return False when HEAD references a different branch."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_path = Path(tmpdir) / "repo"
-            repo_path.mkdir()
-            (repo_path / ".git").mkdir()
+        from unittest.mock import patch
 
-            config = MagicMock()
-            config.scene_base_ref = "main"
-            wm = WorktreeManager(config, repo_path)
+        config = MagicMock()
+        config.scene_base_ref = "main"
+        wm = WorktreeManager(config, Path("/repo"))
 
-            wt_path = Path(tmpdir) / "wt"
-            wt_path.mkdir(parents=True)
-            (wt_path / ".git").write_text("ref: refs/heads/task/issue-200\n")
+        wt_path = Path("/wt")
+        expected_branch = "task/issue-100"
 
-            result = wm._validate_branch_matches(wt_path, "task/issue-100")
+        # Mock subprocess.run to simulate different branch
+        mock_result = MagicMock()
+        mock_result.stdout = "task/issue-200\n"
+        with patch("subprocess.run", return_value=mock_result):
+            result = wm._validate_branch_matches(wt_path, expected_branch)
             assert result is False
 
 
