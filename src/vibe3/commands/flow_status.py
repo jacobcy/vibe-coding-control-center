@@ -95,6 +95,13 @@ def show(
             None,
         )
 
+        # Fallback: parse issue number from branch name when local DB missing
+        if task_issue_number is None:
+            from vibe3.services.issue_flow_service import IssueFlowService
+
+            issue_flow_service = IssueFlowService(store=service.store)
+            task_issue_number = issue_flow_service.parse_issue_number_any(target_branch)
+
         # Use resolver for source-aware read
         from vibe3.services.flow_status_resolver import FlowStatusResolver
 

@@ -72,7 +72,12 @@ class FlowStatusResolver:
 
         if source == "remote":
             if not issue_number:
-                raise ValueError("issue_number required for remote source")
+                from vibe3.exceptions import UserError
+
+                raise UserError(
+                    "Cannot use --source remote without issue number. "
+                    "Bind a task issue first: vibe3 flow bind <issue> --role task"
+                )
             return self._read_remote(branch, issue_number)
 
         # auto: local-first with remote fallback
@@ -139,16 +144,26 @@ class FlowStatusResolver:
 
         body = github_client.get_issue_body(issue_number)
         if not body:
-            raise ValueError(f"Issue body is empty for issue #{issue_number}")
+            from vibe3.exceptions import SystemError
+
+            raise SystemError(
+                f"Failed to fetch issue body for #{issue_number}. "
+                "GitHub API returned empty or None."
+            )
 
         projection = parse_projection_with_fallback(body)
 
+        # Normalize "blocked" to "active"
+        # (blocked state inferred from blocked_by_issue fields)
+        normalized_state = projection.state
+        if normalized_state == "blocked":
+            normalized_state = "active"
+
         # Build minimal response from projection
-        # Note: blocked state migrated to active by validator
         return FlowStatusResponse(
             branch=branch,
             flow_slug=branch.replace("/", "-"),
-            flow_status=projection.state,  # type: ignore[arg-type]
+            flow_status=normalized_state,  # type: ignore[arg-type]
             blocked_by_issue=(
                 projection.blocked_by[0] if projection.blocked_by else None
             ),
