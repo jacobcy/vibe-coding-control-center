@@ -78,6 +78,11 @@ class TestBlockFlowEnhanced:
         reason = "Waiting for dependency"
         actor = "test-actor"
 
+        # Mock get_issue_links to return task issue link
+        mock_store.get_issue_links.return_value = [
+            {"issue_number": 42, "issue_role": "task"}
+        ]
+
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
 
@@ -149,6 +154,11 @@ class TestBlockFlowEnhanced:
         branch = "task/issue-42"
         reason = None
         actor = "test-actor"
+
+        # Mock get_issue_links to return task issue link
+        mock_store.get_issue_links.return_value = [
+            {"issue_number": 42, "issue_role": "task"}
+        ]
 
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
