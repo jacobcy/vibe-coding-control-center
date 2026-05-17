@@ -154,9 +154,12 @@ def _build_plan_prompt_providers(
     )
 
     def plan_policy() -> str | None:
-        if not plan_config or not hasattr(plan_config, "policy_file"):
+        if not plan_config or not hasattr(plan_config, "get_policy_file"):
             return None
-        return build_plan_policy_section(plan_config.policy_file)
+        policy_path = plan_config.get_policy_file()
+        if policy_path:
+            return build_plan_policy_section(policy_path)
+        return None
 
     def plan_output_format() -> str:
         output_format = (
@@ -176,7 +179,9 @@ def _build_plan_prompt_providers(
     return {
         "plan.policy": plan_policy,
         "common.rules": lambda: build_tools_guide_section(
-            getattr(plan_config, "common_rules", None)
+            plan_config.get_common_rules()
+            if plan_config and hasattr(plan_config, "get_common_rules")
+            else None
         ),
         "plan.output_format": plan_output_format,
         "plan.retry_task": plan_retry_task,

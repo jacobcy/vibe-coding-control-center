@@ -94,9 +94,9 @@ def _build_run_prompt_providers(
         return f"## Implementation Plan\n\n{plan_content}"
 
     def run_policy() -> str | None:
-        if not run_config or not hasattr(run_config, "policy_file"):
+        if not run_config or not hasattr(run_config, "get_policy_file"):
             return None
-        policy_path = run_config.policy_file
+        policy_path = run_config.get_policy_file()
         if policy_path and Path(policy_path).exists():
             return Path(policy_path).read_text(encoding="utf-8")
         return None
@@ -117,7 +117,9 @@ def _build_run_prompt_providers(
         "run.retry_task": lambda: mode_task("retry"),
         "run.policy": run_policy,
         "common.rules": lambda: build_tools_guide_section(
-            getattr(run_config, "common_rules", None)
+            run_config.get_common_rules()
+            if run_config and hasattr(run_config, "get_common_rules")
+            else None
         ),
         "run.output_format": lambda: build_run_output_contract_section(
             getattr(run_config, "output_format", None) if run_config else None

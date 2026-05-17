@@ -216,38 +216,153 @@ class AgentConfig(BaseModel):
 class ReviewConfig(BaseModel):
     """Review configuration."""
 
-    policy_file: str = Field(default=".agent/policies/review.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    policy_file: str | None = Field(
+        default=None,
+        description="Path to review policy (None = use profile resolution)",
+    )
+    common_rules: str | None = Field(
+        default=None, description="Path to common rules (None = use profile resolution)"
+    )
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     review_task: str = Field(default="")
     retry_task: str = Field(default="")
     review_prompt: str = Field(default="")
 
+    def get_policy_file(self) -> str | None:
+        """Get policy file path, using profile resolution if not set.
+
+        Returns explicit policy_file if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to policy file, or None if not available for current profile.
+        """
+        if self.policy_file is not None:
+            return self.policy_file
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("review")
+
+    def get_common_rules(self) -> str | None:
+        """Get common rules path, using profile resolution if not set.
+
+        Returns explicit common_rules if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to common rules, or None if not available for current profile.
+        """
+        if self.common_rules is not None:
+            return self.common_rules
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("common")
+
 
 class PlanConfig(BaseModel):
     """Plan command configuration."""
 
-    policy_file: str = Field(default=".agent/policies/plan.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    policy_file: str | None = Field(
+        default=None, description="Path to plan policy (None = use profile resolution)"
+    )
+    common_rules: str | None = Field(
+        default=None, description="Path to common rules (None = use profile resolution)"
+    )
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     plan_task: str = Field(default="")
     retry_task: str = Field(default="")
     plan_prompt: str = Field(default="")
 
+    def get_policy_file(self) -> str | None:
+        """Get policy file path, using profile resolution if not set.
+
+        Returns explicit policy_file if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to policy file, or None if not available for current profile.
+        """
+        if self.policy_file is not None:
+            return self.policy_file
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("plan")
+
+    def get_common_rules(self) -> str | None:
+        """Get common rules path, using profile resolution if not set.
+
+        Returns explicit common_rules if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to common rules, or None if not available for current profile.
+        """
+        if self.common_rules is not None:
+            return self.common_rules
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("common")
+
 
 class RunConfig(BaseModel):
     """Run command configuration."""
 
-    policy_file: str = Field(default=".agent/policies/run.md")
-    common_rules: str = Field(default=".agent/policies/common.md")
+    policy_file: str | None = Field(
+        default=None, description="Path to run policy (None = use profile resolution)"
+    )
+    common_rules: str | None = Field(
+        default=None, description="Path to common rules (None = use profile resolution)"
+    )
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     run_task: str = Field(default="")
     coding_task: str = Field(default="")
     retry_task: str = Field(default="")
     run_prompt: str = Field(default="")
+
+    def get_policy_file(self) -> str | None:
+        """Get policy file path, using profile resolution if not set.
+
+        Returns explicit policy_file if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to policy file, or None if not available for current profile.
+        """
+        if self.policy_file is not None:
+            return self.policy_file
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("run")
+
+    def get_common_rules(self) -> str | None:
+        """Get common rules path, using profile resolution if not set.
+
+        Returns explicit common_rules if set, otherwise uses ConventionResolver
+        to determine path based on current profile.
+
+        Returns:
+            Path to common rules, or None if not available for current profile.
+        """
+        if self.common_rules is not None:
+            return self.common_rules
+
+        from vibe3.services.convention_resolver import ConventionResolver
+
+        resolver = ConventionResolver.from_repo()
+        return resolver.get_policy_path("common")
 
 
 class TestCoverageConfig(BaseModel):
