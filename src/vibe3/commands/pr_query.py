@@ -399,12 +399,33 @@ def register_query_commands(app: typer.Typer) -> None:
                 )
                 raise typer.Exit(1) from None
 
-            # Record external events (best-effort, non-blocking)
+            analysis_summary = None
+            if pr_number:
+                analysis_summary = _load_pr_analysis_summary(pr_number)
+                logger.debug("Successfully retrieved change analysis")
+
+            # Find local pre-push review report
+            local_review = find_latest_prepush_report()
+            if local_review:
+                logger.debug(
+                    f"Found local review report: {local_review.report_path.name}"
+                )
+
+            # Resolve branch from PR (compute once, reuse later)
+            resolved_branch: str | None = None
             try:
                 if pr and pr_number:
                     # Standard path: PR → Issue → Flow → Branch
-                    # pr_number is guaranteed non-None here
-                    resolved_branch = resolve_branch_from_pr(int(pr_number), pr_svc)
+                    # Pass pre-fetched PR to avoid duplicate API call
+                    resolved_branch = resolve_branch_from_pr(pr_number, pr_svc, pr)
+            except Exception as exc:
+                logger.bind(domain="pr", action="resolve_branch").warning(
+                    f"Failed to resolve branch from PR: {exc}"
+                )
+
+            # Record external events (best-effort, non-blocking)
+            try:
+                if pr and pr_number:
                     effective_branch = (
                         branch or target.current_branch or resolved_branch
                     )
@@ -420,18 +441,6 @@ def register_query_commands(app: typer.Typer) -> None:
                     f"Failed to record external events: {exc}"
                 )
 
-            analysis_summary = None
-            if pr_number:
-                analysis_summary = _load_pr_analysis_summary(pr_number)
-                logger.debug("Successfully retrieved change analysis")
-
-            # Find local pre-push review report
-            local_review = find_latest_prepush_report()
-            if local_review:
-                logger.debug(
-                    f"Found local review report: {local_review.report_path.name}"
-                )
-
             if trace_output or json_output or yaml_output:
                 result = _build_pr_output_payload(pr, analysis_summary, local_review)
                 output_result(
@@ -445,13 +454,7 @@ def register_query_commands(app: typer.Typer) -> None:
                 render_pr_details(pr)
 
                 # Show bound tasks from flow truth
-                effective_branch = (
-                    branch
-                    or target.current_branch
-                    or (
-                        resolve_branch_from_pr(pr_number, pr_svc) if pr_number else None
-                    )
-                )
+                effective_branch = branch or target.current_branch or resolved_branch
                 if effective_branch:
                     bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
                     if bound_tasks:

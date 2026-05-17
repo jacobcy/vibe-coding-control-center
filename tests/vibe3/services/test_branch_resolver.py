@@ -41,6 +41,40 @@ def test_resolve_branch_from_pr_via_closing_issue():
     pr_svc.store.get_flows_by_issue.assert_called_once_with(991, role="task")
 
 
+def test_resolve_branch_from_pr_with_pre_fetched_pr():
+    """Test passing pre-fetched PR to avoid duplicate API call."""
+    # Pre-fetched PR
+    pr = PRResponse(
+        number=996,
+        title="fix: test",
+        body="",
+        state=PRState.OPEN,
+        head_branch="test/issue-991",
+        base_branch="main",
+        url="https://github.com/test/pr/996",
+        draft=False,
+        is_ready=True,
+        ci_passed=False,
+        ci_status=None,
+        metadata=PRMetadata(task_issue=991),
+    )
+
+    # Mock PRService
+    pr_svc = Mock()
+
+    # Mock IssueFlowService.find_active_flow
+    flow_data = {"branch": "test/issue-991", "flow_slug": "issue_991"}
+    pr_svc.store.get_flows_by_issue.return_value = [flow_data]
+
+    # Call with pre-fetched PR
+    branch = resolve_branch_from_pr(996, pr_svc, pr)
+
+    # Verify: no API call made, used pre-fetched PR
+    assert branch == "test/issue-991"
+    pr_svc.github_client.get_pr.assert_not_called()  # Key: no duplicate API call
+    pr_svc.store.get_flows_by_issue.assert_called_once_with(991, role="task")
+
+
 def test_resolve_branch_from_pr_no_flow():
     """PR 关联 Issue 但本地无 Flow → 返回 None."""
     pr = PRResponse(
