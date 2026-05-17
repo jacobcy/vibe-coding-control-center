@@ -12,19 +12,32 @@ _log_error() { echo "${RED}❌ $1${NC}" >&2; }
 vibe_init_help() {
     echo "${BOLD}vibe init${NC} - Project Initialization"
     echo ""
-    echo "此命令负责项目运行环境初始化："
+    echo "此命令负责项目运行环境初始化，支持不同 profile："
     echo "  1. 检查 git 环境"
-    echo "  2. 创建必要的目录结构"
-    echo "  3. 创建 GitHub labels（state/* 标签）"
-    echo "  4. 复制 .claude/skills 符号链接"
-    echo "  5. 验证项目运行支持"
+    echo "  2. 根据 profile 创建必要的目录结构"
+    echo "  3. 根据 profile 创建 GitHub labels"
+    echo "  4. 根据 profile 复制 .claude/skills 符号链接"
+    echo "  5. 生成 .vibe/config.yaml 配置文件"
+    echo "  6. 验证项目运行支持"
     echo ""
     echo "Usage: ${CYAN}vibe init${NC} [options]"
     echo ""
     echo "Options:"
-    echo "  -h, --help        显示此帮助信息"
-    echo "  -y, --yes         跳过确认提示"
-    echo "  --skip-labels     跳过 GitHub labels 创建"
+    echo "  -h, --help              显示此帮助信息"
+    echo "  -p, --profile <name>    选择初始化 profile (minimal|github-flow|vibe-center)"
+    echo "  -l, --list-profiles     列出所有可用 profiles"
+    echo "  -y, --yes               跳过确认提示"
+    echo "  --skip-labels           跳过 GitHub labels 创建（仅在需要 labels 的 profile 中生效）"
+    echo ""
+    echo "Profiles:"
+    echo "  ${GREEN}minimal${NC}        - 最小运行时，不启用 GitHub orchestration"
+    echo "  ${GREEN}github-flow${NC}    - GitHub issue/PR/label 协议"
+    echo "  ${GREEN}vibe-center${NC}    - 完整 Vibe Center distribution"
+    echo ""
+    echo "Examples:"
+    echo "  ${CYAN}vibe init --profile minimal${NC}           最小初始化"
+    echo "  ${CYAN}vibe init --profile github-flow${NC}       GitHub flow 初始化"
+    echo "  ${CYAN}vibe init --profile vibe-center${NC}       Vibe Center 初始化"
     echo ""
 }
 
@@ -33,17 +46,74 @@ vibe_init() {
     # Enable strict mode for this function only
     set -euo pipefail
 
+    # Load profiles definitions - use VIBE_LIB from current repo, not global
+    local INIT_LIB_DIR="$(cd "$(dirname "${(%):-%x:A}")" && pwd)"
+    source "$INIT_LIB_DIR/profiles.sh"
+
     # Parse arguments
     local SKIP_CONFIRM=false
     local SKIP_LABELS=false
+    local PROFILE_NAME=""
+    local LIST_PROFILES=false
 
-    for arg in "$@"; do
-        case "$arg" in
-            -h|--help) vibe_init_help; return 0 ;;
-            -y|--yes) SKIP_CONFIRM=true ;;
-            --skip-labels) SKIP_LABELS=true ;;
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                vibe_init_help
+                return 0
+                ;;
+            -l|--list-profiles)
+                LIST_PROFILES=true
+                ;;
+            -p|--profile)
+                if [[ $# -lt 2 ]]; then
+                    _log_error "Missing profile name after $1"
+                    echo "Use: vibe init --profile <minimal|github-flow|vibe-center>"
+                    return 1
+                fi
+                PROFILE_NAME="$2"
+                shift 2
+                ;;
+            -y|--yes)
+                SKIP_CONFIRM=true
+                shift
+                ;;
+            --skip-labels)
+                SKIP_LABELS=true
+                shift
+                ;;
+            *)
+                _log_error "Unknown option: $1"
+                vibe_init_help
+                return 1
+                ;;
         esac
     done
+
+    # List profiles if requested
+    if [[ "$LIST_PROFILES" == true ]]; then
+        list_profiles
+        return 0
+    fi
+
+    # Default profile if not specified
+    if [[ -z "$PROFILE_NAME" ]]; then
+        PROFILE_NAME="github-flow"
+        _log_info "Using default profile: github-flow"
+        echo "   Use --profile <name> to specify a different profile"
+        echo ""
+    fi
+
+    # Validate profile
+    if ! validate_profile "$PROFILE_NAME"; then
+        return 1
+    fi
+
+    # Get profile configuration (sets global PROFILE_CONFIG_ARRAY)
+    get_profile_config "$PROFILE_NAME"
+    if [[ $? -ne 0 ]]; then
+        return 1
+    fi
 
     # --- Pre-flight checks ---
     _log_info "Checking project environment..."
@@ -64,24 +134,50 @@ vibe_init() {
 
     _log_success "Git repository detected: $REPO_ROOT"
 
-    # 2. Check GitHub CLI
-    if ! command -v gh >/dev/null 2>&1; then
-        _log_warning "GitHub CLI (gh) not found"
-        echo "   GitHub labels creation will be skipped."
-        SKIP_LABELS=true
+    # 2. Check GitHub CLI (only if profile requires labels)
+    local ENABLE_GITHUB_LABELS
+    ENABLE_GITHUB_LABELS=$(get_profile_feature "" "github_labels")
+
+    if [[ "$ENABLE_GITHUB_LABELS" == true && "$SKIP_LABELS" != true ]]; then
+        if ! command -v gh >/dev/null 2>&1; then
+            _log_warning "GitHub CLI (gh) not found"
+            echo "   GitHub labels creation will be skipped."
+            SKIP_LABELS=true
+        fi
     fi
+
+    # Get profile features (needed for both confirmation and execution)
+    local ENABLE_GITHUB_LABELS=$(get_profile_feature "" "github_labels")
+    local ENABLE_AGENT=$(get_profile_feature "" "agent")
+    local ENABLE_SKILLS=$(get_profile_feature "" "skills")
+    local ENABLE_SUPERVISOR=$(get_profile_feature "" "supervisor")
 
     # --- Confirmation ---
     if [[ "$SKIP_CONFIRM" != true ]]; then
         echo ""
-        echo "${BOLD}Project Initialization${NC}"
+        echo "${BOLD}Project Initialization - Profile: $PROFILE_NAME${NC}"
         echo ""
         echo "This will:"
-        echo "  - Create necessary directories"
-        if [[ "$SKIP_LABELS" != true ]]; then
-            echo "  - Create GitHub labels (state/* tags)"
+        echo "  - Create .vibe/config.yaml (profile: $PROFILE_NAME)"
+
+        # Show profile-specific actions (variables already defined above)
+        if [[ "$ENABLE_AGENT" == true ]]; then
+            echo "  - Create .agent/ directory structure"
         fi
-        echo "  - Setup .claude/skills symlinks"
+
+        if [[ "$ENABLE_SKILLS" == true ]]; then
+            echo "  - Create skills/ structure"
+            echo "  - Setup .claude/skills symlinks"
+        fi
+
+        if [[ "$ENABLE_GITHUB_LABELS" == true && "$SKIP_LABELS" != true ]]; then
+            echo "  - Create GitHub labels ($(get_profile_convention "" "labels.state_prefix")*)"
+        fi
+
+        if [[ "$ENABLE_SUPERVISOR" == true ]]; then
+            echo "  - Enable supervisor orchestration"
+        fi
+
         echo ""
 
         read -q "REPLY?Continue? (y/N) " || return 1
@@ -89,36 +185,69 @@ vibe_init() {
     fi
 
     # --- Main Initialization Flow ---
-    _log_info "Initializing project..."
+    _log_info "Initializing project with profile: $PROFILE_NAME..."
 
-    # 3. Create necessary directories
+    # 3. Create .vibe directory and config
+    _log_info "Creating .vibe configuration..."
+    mkdir -p "$REPO_ROOT/.vibe"
+    generate_vibe_config_yaml "$PROFILE_NAME" "$REPO_ROOT"
+    _log_success "Created: .vibe/config.yaml"
+
+    # 4. Create necessary directories (profile-dependent)
     _log_info "Creating directory structure..."
 
-    mkdir -p "$REPO_ROOT/.agent/skills"
-    mkdir -p "$REPO_ROOT/.agent/workflows"
+    # Always create basic structure
     mkdir -p "$REPO_ROOT/.claude/skills"
     mkdir -p "$REPO_ROOT/.claude/commands"
 
+    # Create .agent/ if profile requires
+    if [[ "$ENABLE_AGENT" == true ]]; then
+        mkdir -p "$REPO_ROOT/.agent/skills"
+        mkdir -p "$REPO_ROOT/.agent/workflows"
+        _log_success "Created: .agent/ directory structure"
+    fi
+
+    # Create skills/ if profile requires
+    if [[ "$ENABLE_SKILLS" == true ]]; then
+        mkdir -p "$REPO_ROOT/skills"
+        _log_success "Created: skills/ directory"
+    fi
+
+    # Create supervisor structure if profile requires
+    if [[ "$ENABLE_SUPERVISOR" == true ]]; then
+        mkdir -p "$REPO_ROOT/.agent/supervisor"
+        _log_success "Created: .agent/supervisor/ directory"
+    fi
+
     _log_success "Directory structure created"
 
-    # 4. Create GitHub labels
-    if [[ "$SKIP_LABELS" != true ]]; then
+    # 5. Create GitHub labels (profile-dependent)
+    if [[ "$ENABLE_GITHUB_LABELS" == true && "$SKIP_LABELS" != true ]]; then
         _log_info "Creating GitHub labels..."
 
-        # Define required labels (synced with scripts/sync-labels.sh)
+        local STATE_PREFIX=$(get_profile_convention "" "labels.state_prefix")
+        local VIBE_TASK=$(get_profile_convention "" "labels.vibe_task")
+
+        # Define required labels based on profile
         local -a LABELS
-        LABELS=(
-            "state/ready:Ready for manager dispatch:EEEEEE"
-            "state/claimed:已认领,待进入执行:BFDADC"
-            "state/in-progress:执行中:0052CC"
-            "state/blocked:阻塞中:D73A4A"
-            "state/handoff:待交接:FBCA04"
-            "state/review:待 review:5319E7"
-            "state/merge-ready:已满足合并条件:0E8A16"
-            "state/done:已完成:0E8A16"
-            "state/failed:Execution failed and needs recovery:B60205"
-            "vibe-task:Track issues intended for vibe roadmap/task intake:5319E7"
-        )
+
+        if [[ "$STATE_PREFIX" != "none" ]]; then
+            LABELS=(
+                "${STATE_PREFIX}ready:Ready for manager dispatch:EEEEEE"
+                "${STATE_PREFIX}claimed:已认领,待进入执行:BFDADC"
+                "${STATE_PREFIX}in-progress:执行中:0052CC"
+                "${STATE_PREFIX}blocked:阻塞中:D73A4A"
+                "${STATE_PREFIX}handoff:待交接:FBCA04"
+                "${STATE_PREFIX}review:待 review:5319E7"
+                "${STATE_PREFIX}merge-ready:已满足合并条件:0E8A16"
+                "${STATE_PREFIX}done:已完成:0E8A16"
+                "${STATE_PREFIX}failed:Execution failed and needs recovery:B60205"
+            )
+        fi
+
+        if [[ "$VIBE_TASK" != "none" ]]; then
+            LABELS+=("$VIBE_TASK:Track issues intended for vibe roadmap/task intake:5319E7")
+        fi
 
         for label_def in "${LABELS[@]}"; do
             IFS=':' read -r name description color <<< "$label_def"
@@ -138,68 +267,113 @@ vibe_init() {
         _log_success "GitHub labels created"
     fi
 
-    # 5. Setup .claude/skills symlinks
-    _log_info "Setting up .claude/skills symlinks..."
+    # 6. Setup .claude/skills symlinks (profile-dependent)
+    if [[ "$ENABLE_SKILLS" == true ]]; then
+        _log_info "Setting up .claude/skills symlinks..."
 
-    local VIBE_SKILLS_DIR="$HOME/.vibe/skills"
+        local VIBE_SKILLS_DIR="$HOME/.vibe/skills"
 
-    if [[ -d "$VIBE_SKILLS_DIR" ]]; then
-        # Use (N) glob qualifier to suppress "no matches" error
-        for skill in "$VIBE_SKILLS_DIR"/vibe-*(N); do
-            if [[ -d "$skill" ]]; then
-                local skill_name
-                skill_name="$(basename "$skill")"
-                local target_link="$REPO_ROOT/.claude/skills/$skill_name"
+        if [[ -d "$VIBE_SKILLS_DIR" ]]; then
+            # Use (N) glob qualifier to suppress "no matches" error
+            for skill in "$VIBE_SKILLS_DIR"/vibe-*(N); do
+                if [[ -d "$skill" ]]; then
+                    local skill_name
+                    skill_name="$(basename "$skill")"
+                    local target_link="$REPO_ROOT/.claude/skills/$skill_name"
 
-                if [[ ! -e "$target_link" ]]; then
-                    ln -sfn "$skill" "$target_link"
-                    _log_success "Linked skill: $skill_name"
-                else
-                    _log_info "Skill already linked: $skill_name"
+                    if [[ ! -e "$target_link" ]]; then
+                        ln -sfn "$skill" "$target_link"
+                        _log_success "Linked skill: $skill_name"
+                    else
+                        _log_info "Skill already linked: $skill_name"
+                    fi
                 fi
-            fi
-        done
+            done
 
-        # Check if any skills were processed
-        local skills_count
-        skills_count=$(find "$VIBE_SKILLS_DIR" -maxdepth 1 -name "vibe-*" -type d | wc -l)
-        if [[ "$skills_count" -eq 0 ]]; then
-            _log_warning "No vibe-* skills found in $VIBE_SKILLS_DIR"
+            # Check if any skills were processed
+            local skills_count
+            skills_count=$(find "$VIBE_SKILLS_DIR" -maxdepth 1 -name "vibe-*" -type d | wc -l)
+            if [[ "$skills_count" -eq 0 ]]; then
+                _log_warning "No vibe-* skills found in $VIBE_SKILLS_DIR"
+            fi
+        else
+            _log_warning "Global skills directory not found: $VIBE_SKILLS_DIR"
+            echo "   Run 'scripts/install.sh' first to setup global environment."
         fi
-    else
-        _log_warning "Global skills directory not found: $VIBE_SKILLS_DIR"
-        echo "   Run 'scripts/install.sh' first to setup global environment."
     fi
 
-    # 6. Verify project support
+    # 7. Verify project support
     _log_info "Verifying project support..."
 
-    # Check for essential files
+    # Check for essential files (profile-dependent)
     local -a ESSENTIAL_FILES
-    ESSENTIAL_FILES=(
-        "CLAUDE.md"
-        "AGENTS.md"
-    )
 
-    for file in "${ESSENTIAL_FILES[@]}"; do
-        if [[ -f "$REPO_ROOT/$file" ]]; then
-            _log_success "Found: $file"
-        else
-            _log_warning "Missing: $file (recommended for AI agent support)"
-        fi
-    done
+    # minimal profile doesn't require these files
+    if [[ "$PROFILE_NAME" != "minimal" ]]; then
+        ESSENTIAL_FILES=(
+            "CLAUDE.md"
+            "AGENTS.md"
+        )
 
-    # 7. Finalize
+        for file in "${ESSENTIAL_FILES[@]}"; do
+            if [[ -f "$REPO_ROOT/$file" ]]; then
+                _log_success "Found: $file"
+            else
+                _log_warning "Missing: $file (recommended for AI agent support)"
+            fi
+        done
+    fi
+
+    # vibe-center profile requires additional files
+    if [[ "$PROFILE_NAME" == "vibe-center" ]]; then
+        local -a VIBE_CENTER_FILES=(
+            "SOUL.md"
+            "STRUCTURE.md"
+        )
+
+        for file in "${VIBE_CENTER_FILES[@]}"; do
+            if [[ -f "$REPO_ROOT/$file" ]]; then
+                _log_success "Found: $file"
+            else
+                _log_warning "Missing: $file (Vibe Center governance file)"
+            fi
+        done
+    fi
+
+    # 8. Finalize
     echo ""
     _log_success "Project initialization complete!"
+    _log_success "Profile: $PROFILE_NAME"
     echo ""
+    echo "Configuration:"
+    echo "  - Config file: ${CYAN}.vibe/config.yaml${NC}"
+    echo "  - Profile: ${GREEN}$PROFILE_NAME${NC}"
+    echo ""
+
     echo "Next steps:"
-    echo "  1. Review created directories: ${CYAN}.agent/${NC} and ${CYAN}.claude/${NC}"
-    if [[ "$SKIP_LABELS" == true ]]; then
-        echo "  2. Create GitHub labels manually if needed"
-    else
-        echo "  2. Check GitHub labels: ${CYAN}gh label list | grep state/${NC}"
+    if [[ "$PROFILE_NAME" == "minimal" ]]; then
+        echo "  1. Your project is ready with minimal runtime"
+        echo "  2. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
+        echo "  3. Start using vibe commands"
+    elif [[ "$PROFILE_NAME" == "github-flow" ]]; then
+        echo "  1. Review created directories: ${CYAN}.agent/${NC} and ${CYAN}.claude/${NC}"
+        if [[ "$SKIP_LABELS" == true ]]; then
+            echo "  2. Create GitHub labels manually if needed"
+        else
+            echo "  2. Check GitHub labels: ${CYAN}gh label list | grep ${STATE_PREFIX}${NC}"
+        fi
+        echo "  3. Policies and prompts from: ${CYAN}~/.vibe/assets${NC}"
+        echo "  4. Start using vibe flow/task commands"
+    elif [[ "$PROFILE_NAME" == "vibe-center" ]]; then
+        echo "  1. Review created directories: ${CYAN}.agent/${NC}, ${CYAN}skills/${NC}, ${CYAN}.claude/${NC}"
+        if [[ "$SKIP_LABELS" == true ]]; then
+            echo "  2. Create GitHub labels manually if needed"
+        else
+            echo "  2. Check GitHub labels: ${CYAN}gh label list | grep ${STATE_PREFIX}${NC}"
+        fi
+        echo "  3. Policies and prompts from: ${CYAN}.agent/policies${NC} and ${CYAN}config/prompts${NC}"
+        echo "  4. Supervisor orchestration: ${CYAN}.agent/supervisor/${NC}"
+        echo "  5. Start using full Vibe Center capabilities"
     fi
-    echo "  3. Start using vibe commands"
     echo ""
 }
