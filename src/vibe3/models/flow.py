@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from vibe3.models.data_source import DataSource
 from vibe3.models.verdict import VerdictRecord
 
 
@@ -256,6 +257,8 @@ class FlowStatusResponse(BaseModel):
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None
     worktree_root: str | None = None  # NEW: Worktree root path for path resolution
+    # Provenance tracking
+    data_source: DataSource | None = None
 
     @field_validator("flow_status", mode="before")
     @classmethod

@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
-from vibe3.commands.command_options import ActorFilterOption, FormatOption
+from vibe3.commands.command_options import (
+    ActorFilterOption,
+    FormatOption,
+    SourceOption,
+)
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.commands.flow_status_helpers import (
     _collect_timeline_issue_numbers,
@@ -50,6 +54,7 @@ def show(
     snapshot: StatusOption = False,
     trace: TraceOption = False,
     output_format: FormatOption = "table",
+    source: SourceOption = "auto",
     show_all: Annotated[
         bool, typer.Option("--show-all", help="Show orchestra actor events")
     ] = False,
@@ -63,7 +68,7 @@ def show(
         ),
     ] = False,
 ) -> None:
-    """Show flow details."""
+    """Show flow details with source-aware reads."""
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -83,7 +88,29 @@ def show(
         else:
             target_branch = service.get_current_branch()
 
-        flow_status = service.get_flow_status(target_branch)
+        # Get task issue number for remote fallback
+        links = service.store.get_issue_links(target_branch)
+        task_issue_number = next(
+            (link["issue_number"] for link in links if link["issue_role"] == "task"),
+            None,
+        )
+
+        # Fallback: parse issue number from branch name when local DB missing
+        if task_issue_number is None:
+            from vibe3.services.issue_flow_service import IssueFlowService
+
+            issue_flow_service = IssueFlowService(store=service.store)
+            task_issue_number = issue_flow_service.parse_issue_number_any(target_branch)
+
+        # Use resolver for source-aware read
+        from vibe3.services.flow_status_resolver import FlowStatusResolver
+
+        resolver = FlowStatusResolver(store=service.store, flow_service=service)
+        flow_status = resolver.resolve(
+            branch=target_branch,
+            source=source,
+            issue_number=task_issue_number,
+        )
 
         # Handle non-registered flow or special branches
         if not flow_status or flow_status.flow_status == "aborted":
@@ -154,7 +181,7 @@ def show(
         if snapshot:
             projection_service = FlowProjectionService()
             projection = projection_service.get_projection(target_branch)
-            flow_status = service.get_flow_status(target_branch)
+            # Use flow_status from resolver (already set above)
             _render_snapshot_format(projection, flow_status, output_format)
             return
 

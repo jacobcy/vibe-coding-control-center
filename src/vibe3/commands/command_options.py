@@ -49,6 +49,11 @@ FormatOption = Annotated[
     typer.Option("--format", help="Output format: json, yaml, or table"),
 ]
 
+SourceOption = Annotated[
+    Literal["local", "remote", "auto"],
+    typer.Option("--source", help="Data source: local, remote, or auto"),
+]
+
 VerboseOption = Annotated[
     bool,
     typer.Option("--verbose", "-v", help="Show full details"),
