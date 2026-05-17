@@ -232,64 +232,85 @@ class WorktreeManager(WorktreePRMixin):
 
     # --- Manager Execution Compatibility ---
 
-    def resolve_manager_cwd(
+    def _find_or_create_worktree_for_branch(
         self,
         issue_number: int,
         flow_branch: str,
-    ) -> tuple[Path | None, bool]:
-        """Resolve manager cwd using canonical worktree record + fallback inference.
+        *,
+        check_recorded_path: bool = True,
+        check_current_branch: bool = True,
+        validate_issue_number: bool = True,
+    ) -> WorktreeContext | None:
+        """Shared core: find existing or create new worktree for branch.
+
+        This is the unified abstraction used by both orchestra (resolve_manager_cwd)
+        and skill entry (resolve_bootstrap_worktree_context).
 
         Priority:
-        1. flow_state.worktree_path (recorded) — validate path exists, branch matches
-        2. Current branch — if already on flow_branch
-        3. find_worktree_for_branch — infer from git worktree list, validate
-           branch name contains issue number
-        4. acquire_issue_worktree — create new, record worktree_path
+        1. Recorded worktree_path (if check_recorded_path) — validate path, branch
+        2. Current branch (if check_current_branch) — return repo_path
+        3. Find existing worktree — validate branch matches issue
+        4. Acquire new issue worktree — create and record
 
-        Returns (path, is_missing). Never raises — returns (None, False) on failure
-        so caller can propagate as blocked_reason.
+        Args:
+            issue_number: GitHub issue number
+            flow_branch: Git branch name (task/issue-XXX or dev/issue-XXX)
+            check_recorded_path: Whether to check flow_state.worktree_path
+            check_current_branch: Whether to check if already on flow_branch
+            validate_issue_number: Whether to validate branch contains issue number
+
+        Returns:
+            WorktreeContext if successful, None if failed
         """
-        # Step 0: Try recorded worktree_path from flow_state
-        try:
-            git_common_dir = self.repo_path / ".git"
-            vibe3_dir = git_common_dir / "vibe3"
-            db_path = str(vibe3_dir / "handoff.db")
-            store = SQLiteClient(db_path=db_path)
-            flow_state = store.get_flow_state(flow_branch)
-            recorded_path = flow_state.get("worktree_path") if flow_state else None
-            if recorded_path and isinstance(recorded_path, str):
-                recorded = Path(recorded_path)
-                if recorded.exists() and self._validate_branch_matches(
-                    recorded, flow_branch
-                ):
-                    if self.align_auto_scene_to_base(recorded, flow_branch):
-                        return recorded, False
-                    return None, False
-                else:
-                    logger.bind(
-                        domain="worktree",
-                        issue=issue_number,
-                        branch=flow_branch,
-                        recorded_path=str(recorded),
-                    ).warning(
-                        "Recorded worktree_path invalid (stale or wrong branch), "
-                        "falling back to inference"
-                    )
-        except Exception as exc:
-            logger.bind(
-                domain="worktree",
-                issue=issue_number,
+        # Step 1: Try recorded worktree_path from flow_state
+        if check_recorded_path:
+            try:
+                git_common_dir = self.repo_path / ".git"
+                vibe3_dir = git_common_dir / "vibe3"
+                db_path = str(vibe3_dir / "handoff.db")
+                store = SQLiteClient(db_path=db_path)
+                flow_state = store.get_flow_state(flow_branch)
+                recorded_path = flow_state.get("worktree_path") if flow_state else None
+                if recorded_path and isinstance(recorded_path, str):
+                    recorded = Path(recorded_path)
+                    if recorded.exists() and self._validate_branch_matches(
+                        recorded, flow_branch
+                    ):
+                        return WorktreeContext(
+                            path=recorded,
+                            is_temporary=False,
+                            branch=flow_branch,
+                            issue_number=issue_number,
+                        )
+                    else:
+                        logger.bind(
+                            domain="worktree",
+                            issue=issue_number,
+                            branch=flow_branch,
+                            recorded_path=str(recorded),
+                        ).warning(
+                            "Recorded worktree_path invalid (stale or wrong branch)"
+                        )
+            except Exception as exc:
+                logger.bind(
+                    domain="worktree",
+                    issue=issue_number,
+                    branch=flow_branch,
+                ).warning(f"Failed to read recorded worktree_path: {exc}")
+
+        # Step 2: Current branch
+        if check_current_branch and is_current_branch(self.repo_path, flow_branch):
+            return WorktreeContext(
+                path=self.repo_path,
+                is_temporary=False,
                 branch=flow_branch,
-            ).warning(f"Failed to read recorded worktree_path: {exc}")
+                issue_number=issue_number,
+            )
 
-        # Step 1: Current branch
-        if is_current_branch(self.repo_path, flow_branch):
-            return self.repo_path, False
-
-        # Step 2: Find existing worktree, validate branch matches issue number
+        # Step 3: Find existing worktree
         existing = find_worktree_for_branch(self.repo_path, flow_branch)
         if existing:
-            if not self._validate_worktree_branch_for_issue(
+            if validate_issue_number and not self._validate_worktree_branch_for_issue(
                 existing, issue_number, flow_branch
             ):
                 logger.bind(
@@ -298,26 +319,53 @@ class WorktreeManager(WorktreePRMixin):
                     branch=flow_branch,
                     worktree_path=str(existing),
                 ).error("Existing worktree branch name does not match issue number")
-                return None, False
-            if self.align_auto_scene_to_base(existing, flow_branch):
-                return existing, False
-            return None, False
+                return None
+            return WorktreeContext(
+                path=existing,
+                is_temporary=False,
+                branch=flow_branch,
+                issue_number=issue_number,
+            )
 
-        # Step 3: Create new worktree
+        # Step 4: Create new worktree
         try:
             ctx = self.acquire_issue_worktree(issue_number, flow_branch)
-            # Record worktree path to flow_state for canonical tracking
-            self._record_worktree_path(flow_branch, str(ctx.path))
-            if self.align_auto_scene_to_base(ctx.path, flow_branch):
-                return ctx.path, False
-            return None, False
+            # Record worktree path for canonical tracking
+            if check_recorded_path:
+                self._record_worktree_path(flow_branch, str(ctx.path))
+            return ctx
         except Exception as exc:
             logger.bind(
                 domain="worktree",
                 issue=issue_number,
                 branch=flow_branch,
             ).error(f"Failed to create worktree: {exc}")
+            return None
+
+    def resolve_manager_cwd(
+        self,
+        issue_number: int,
+        flow_branch: str,
+    ) -> tuple[Path | None, bool]:
+        """Resolve manager cwd for orchestra execution.
+
+        Uses shared abstraction with full validation and flow_state recording.
+        Returns (path, is_missing). Never raises — returns (None, False) on failure.
+        """
+        ctx = self._find_or_create_worktree_for_branch(
+            issue_number,
+            flow_branch,
+            check_recorded_path=True,
+            check_current_branch=True,
+            validate_issue_number=True,
+        )
+        if ctx is None:
             return None, False
+
+        # Align auto scene to base
+        if self.align_auto_scene_to_base(ctx.path, flow_branch):
+            return ctx.path, False
+        return None, False
 
     def _resolve_manager_cwd(
         self,
@@ -567,12 +615,16 @@ class WorktreeManager(WorktreePRMixin):
     ) -> WorktreeContext:
         """Resolve worktree context for vibe-new bootstrap.
 
-        This is a read-only resource resolver that determines where bootstrap
-        should execute. It does NOT perform issue intake, flow binding, or
-        business orchestration.
+        Uses shared abstraction with skill-specific behavior:
+        - Full validation for issue number
+        - Record worktree_path to flow_state
+        - Align to base branch
+
+        This ensures orchestra (task/issue-XXX) and skill (dev/issue-XXX)
+        use identical worktree resolution logic, differing only in branch prefix.
 
         Args:
-            branch: Target branch name
+            branch: Target branch name (dev/issue-XXX)
             issue_number: GitHub issue number
             use_worktree: Whether to use a physical worktree
 
@@ -580,6 +632,7 @@ class WorktreeManager(WorktreePRMixin):
             WorktreeContext describing the execution environment
         """
         if not use_worktree:
+            # Current repo path, no worktree creation
             return WorktreeContext(
                 path=self.repo_path,
                 is_temporary=False,
@@ -587,15 +640,29 @@ class WorktreeManager(WorktreePRMixin):
                 issue_number=issue_number,
             )
 
-        existing = find_worktree_for_branch(self.repo_path, branch)
-        if existing:
+        # Use shared abstraction: find existing or create new worktree
+        ctx = self._find_or_create_worktree_for_branch(
+            issue_number,
+            branch,
+            check_recorded_path=True,
+            check_current_branch=False,  # Skill entry: always ask user first
+            validate_issue_number=True,
+        )
+
+        if ctx is None:
+            # Fallback to repo_path if worktree creation failed
+            logger.bind(
+                domain="worktree",
+                issue=issue_number,
+                branch=branch,
+            ).warning("Worktree creation failed, falling back to repo_path")
             return WorktreeContext(
-                path=existing,
+                path=self.repo_path,
                 is_temporary=False,
                 branch=branch,
                 issue_number=issue_number,
             )
 
-        # Delegate to canonical worktree acquisition
-        ctx = self.acquire_issue_worktree(issue_number=issue_number, branch=branch)
+        # Align to base for bootstrap entry
+        self.align_auto_scene_to_base(ctx.path, branch)
         return ctx

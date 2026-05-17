@@ -7,7 +7,7 @@ description: Use when starting or switching to a new human-collaboration task. C
 
 从 issue 到 branch / flow / PR 创联的人机协作入口。
 
-**核心定位**：workflow selector + infra bootstrapper，通过复用现有原子能力完成准备流程，不新增大命令。
+**核心定位**：workflow selector + infra bootstrapper。
 
 ---
 
@@ -19,7 +19,6 @@ description: Use when starting or switching to a new human-collaboration task. C
 
 ```bash
 vibe3 flow show       # 当前 branch 的 flow 详情
-vibe3 task status --all  # 全局 flow / issue / PR 上下文总览
 git status            # 当前分支状态
 ```
 
@@ -37,7 +36,25 @@ git status            # 当前分支状态
 
 **重要**：如果输入是 spec / plan 而不是 issue number，不直接进入 bootstrap，先完成 issue intake。
 
-### Step 3: 提示可选 workflow
+### Step 3: 询问执行环境
+
+**询问用户**：
+```
+请选择执行环境：
+1. 当前仓库（继续在当前目录开发）
+2. 新建 worktree（独立物理环境）
+
+选择？
+```
+
+**说明**：
+- 当前仓库：适合快速迭代、已有依赖环境
+- 新建 worktree：适合并行任务、隔离依赖
+- Orchestra 使用 task/issue-XXX 前缀（自动化场景）
+- Skill 使用 dev/issue-XXX 前缀（人机合作场景）
+- 底层共享同一个 WorktreeManager 抽象
+
+### Step 4: 提示可选 workflow
 
 告知用户可选的后续 workflow：
 - `superpowers:writing-plans` → 创建实现计划
@@ -77,28 +94,26 @@ $ vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
 if has_commits_and_ready_for_pr:
     $ vibe3 pr create --agent -t "..." -b "..."
 
-# Step 7: 处理 worktree（若需要）
-if user_requests_worktree:
-    WorktreeManager.resolve_bootstrap_worktree_context(...)
+# Step 7: 处理 worktree（若用户选择新 worktree）
+if user_chose_new_worktree:
+    $ wtnew dev/issue-123  # Shell 命令，创建独立物理环境
 ```
 
 ### 原子能力清单
 
-**核心命令**（禁止替换为单一大命令）：
+**核心命令**：
 - `git checkout -b <branch>` — 创建或切换分支
 - `vibe3 flow update --actor <identity>` — 注册当前分支为 flow
 - `vibe3 flow bind <issue> --role task` — 绑定 issue 到当前 flow
 - `vibe3 snapshot save --as-baseline` — 保存开发起点 baseline
 - `vibe3 handoff append` — 记录稳定恢复点
 - `vibe3 pr create --agent` — 创联 PR draft（按需）
+- `wtnew <branch>` — 创建独立 worktree（按需，shell 命令）
 
-**资源解析接口**（仅用于物理环境）：
-- `WorktreeManager.resolve_bootstrap_worktree_context()` — 解析 worktree 上下文
-
-**重要约束**：
-- ❌ 不新增单一大总命令（复用现有原子能力）
-- ❌ 不把 `environment` 写成业务编排入口
-- ✅ 用伪代码表达"如何拼原子能力"
+**共享抽象**：
+- Orchestra 和 Skill 共享 `WorktreeManager._find_or_create_worktree_for_branch()`
+- 区别仅在 branch 前缀：task/（自动化）vs dev/（人机合作）
+- 保证无论哪个入口创建的 worktree/flow 都具有一致性
 
 ---
 
@@ -114,6 +129,7 @@ if user_requests_worktree:
 - ✅ Flow registered and task bound
 - ✅ Baseline saved
 - ✅ Handoff recorded
+- ✅ Execution environment: <current-repo or worktree-path>
 
 **Next Steps**:
 - 开始编码
@@ -157,3 +173,4 @@ vibe3 flow show
   - `flow bind` - 绑定 issue 到当前 flow
   - 不要混用其他命令尝试注册或绑定
 - 恢复已有 branch / flow 时不要再用已废弃的 `/vibe-start`，统一使用 `/vibe-continue`
+
