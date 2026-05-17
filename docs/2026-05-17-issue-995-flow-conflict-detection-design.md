@@ -264,7 +264,7 @@ Existing callers already handle `UserError`:
 Use existing `UserError` (recoverable user input errors):
 
 ```python
-from vibe3.models.exceptions import UserError
+from vibe3.exceptions import UserError
 ```
 
 All conflict scenarios raise `UserError` because:

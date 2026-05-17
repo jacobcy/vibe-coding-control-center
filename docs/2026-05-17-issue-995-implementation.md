@@ -51,7 +51,7 @@ from vibe3.utils.issue_branch_resolver import (
     _format_flow_details,
     _resolve_best_flow_from_candidates,
 )
-from vibe3.models.exceptions import UserError
+from vibe3.exceptions import UserError
 
 
 @pytest.fixture
@@ -124,7 +124,7 @@ Modify: `src/vibe3/utils/issue_branch_resolver.py`
 Add imports at top:
 ```python
 from typing import Any
-from vibe3.models.exceptions import UserError
+from vibe3.exceptions import UserError
 ```
 
 Add placeholder functions after imports:
@@ -706,7 +706,7 @@ Comment on issue with completion summary and test results.
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-05-17-issue-995-implementation.md`.
+Plan complete and saved to `docs/2026-05-17-issue-995-implementation.md`.
 
 **Two execution options:**
 

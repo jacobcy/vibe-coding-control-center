@@ -49,9 +49,7 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
 
     if candidates:
         # Step 3: Resolve with conflict detection
-        return _resolve_best_flow_from_candidates(
-            candidates, issue_number, flow_service
-        )
+        return _resolve_best_flow_from_candidates(candidates, issue_number)
 
     # Step 4: Check unbound candidates (smart warning)
     unbound_candidates = []
@@ -104,15 +102,12 @@ def _format_flow_details(flow: dict[str, Any]) -> str:
 def _resolve_best_flow_from_candidates(
     candidates: list[dict[str, Any]],
     issue_number: int,
-    flow_service: Any,
 ) -> str:
     """Select best flow or raise UserError for conflicts.
 
     Args:
         candidates: List of flow dicts from get_flows_by_issue()
         issue_number: Issue number being resolved
-        flow_service: FlowService instance for status queries
-
     Returns:
         Selected branch name
 

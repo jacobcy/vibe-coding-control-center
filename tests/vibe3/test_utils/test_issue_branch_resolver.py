@@ -1,12 +1,11 @@
 """Tests for issue_branch_resolver conflict detection."""
 
-from typing import Any  # noqa: F401
-from unittest.mock import MagicMock, Mock  # noqa: F401
+from unittest.mock import Mock
 
 import pytest
 
-from vibe3.exceptions import UserError  # noqa: F401
-from vibe3.utils.issue_branch_resolver import (  # noqa: F401
+from vibe3.exceptions import UserError
+from vibe3.utils.issue_branch_resolver import (
     _format_flow_details,
     _resolve_best_flow_from_candidates,
     resolve_issue_branch_input,
