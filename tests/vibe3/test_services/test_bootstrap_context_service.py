@@ -158,6 +158,64 @@ def test_bootstrap_plan_uses_internal_bootstrap_adapter() -> None:
     )
 
 
+def test_bootstrap_command_escapes_shell_injection_attacks() -> None:
+    """CRITICAL: Verify shlex.quote prevents command injection via branch names."""
+    import shlex
+
+    service = BootstrapContextService()
+
+    # Malicious branch name attempting shell injection
+    malicious_branch = "dev/issue-123; rm -rf /"
+
+    plan = service.plan_vibe_new_bootstrap(
+        target_branch=malicious_branch,
+        issue_number=123,
+        has_existing_pr=False,
+        wants_worktree=False,
+    )
+
+    command = plan.actions[0].command
+
+    # The branch name must be quoted to prevent injection
+    quoted_branch = shlex.quote(malicious_branch)
+    assert quoted_branch in command
+
+    # Verify the raw malicious string is NOT in the command
+    assert malicious_branch not in command
+
+    # Verify proper quoting format
+    assert f"--branch {quoted_branch}" in command
+    assert f"bootstrap-flow {shlex.quote('123')}" in command
+
+
+def test_bootstrap_command_escapes_malicious_issue_numbers() -> None:
+    """CRITICAL: Verify shlex.quote prevents injection via issue numbers."""
+    import shlex
+
+    service = BootstrapContextService()
+
+    plan = service.plan_vibe_new_bootstrap(
+        target_branch="dev/issue-123",
+        issue_number=123,
+        has_existing_pr=False,
+        wants_worktree=False,
+        related_issue_numbers=(456,),
+        dependency_issue_numbers=(789,),
+    )
+
+    command = plan.actions[0].command
+
+    # All dynamic values should be quoted
+    assert shlex.quote("123") in command
+    assert shlex.quote("456") in command
+    assert shlex.quote("789") in command
+
+    # Raw numbers should also appear (in quoted form)
+    assert "123" in command
+    assert "456" in command
+    assert "789" in command
+
+
 def test_shared_abstraction_used_by_both_orchestra_and_skill(
     tmp_path: Path,
 ) -> None:

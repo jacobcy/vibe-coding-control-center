@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -57,10 +58,12 @@ class BootstrapContextService:
         """
         actions: list[BootstrapAction] = []
         related_flags = " ".join(
-            f"--related {issue_ref}" for issue_ref in related_issue_numbers
+            f"--related {shlex.quote(str(issue_ref))}"
+            for issue_ref in related_issue_numbers
         )
         dependency_flags = " ".join(
-            f"--dependency {issue_ref}" for issue_ref in dependency_issue_numbers
+            f"--dependency {shlex.quote(str(issue_ref))}"
+            for issue_ref in dependency_issue_numbers
         )
         worktree_flag = "--worktree" if wants_worktree else ""
         extra_flags = " ".join(
@@ -69,8 +72,8 @@ class BootstrapContextService:
             if flag.strip()
         )
         command = (
-            f"vibe3 internal bootstrap-flow {issue_number} "
-            f"--branch {target_branch} --source skill"
+            f"vibe3 internal bootstrap-flow {shlex.quote(str(issue_number))} "
+            f"--branch {shlex.quote(target_branch)} --source skill"
         )
         if extra_flags:
             command = f"{command} {extra_flags}"
