@@ -98,7 +98,7 @@ def show(
         # Use resolver for source-aware read
         from vibe3.services.flow_status_resolver import FlowStatusResolver
 
-        resolver = FlowStatusResolver(store=service.store)
+        resolver = FlowStatusResolver(store=service.store, flow_service=service)
         flow_status = resolver.resolve(
             branch=target_branch,
             source=source,

@@ -27,21 +27,26 @@ class FlowStatusResolver:
     - auto: local-first, remote fallback when SQLite missing
     """
 
-    def __init__(self, store: SQLiteClient) -> None:
+    def __init__(
+        self,
+        store: SQLiteClient,
+        flow_service: FlowService | None = None,
+    ) -> None:
         """Initialize resolver with SQLite client.
 
         Args:
             store: SQLiteClient for database operations
+            flow_service: Optional FlowService instance (defaults to creating one)
         """
         self.store = store
-        self.flow_service = FlowService(store=store)
+        self.flow_service = flow_service or FlowService(store=store)
 
     def resolve(
         self,
         branch: str,
         source: Literal["local", "remote", "auto"],
         issue_number: int | None = None,
-    ) -> FlowStatusResponse:
+    ) -> FlowStatusResponse | None:
         """Resolve flow status with source strategy.
 
         Args:
@@ -50,14 +55,20 @@ class FlowStatusResolver:
             issue_number: Task issue number (required for remote fallback)
 
         Returns:
-            FlowStatusResponse with data_source field set
+            FlowStatusResponse with data_source field set,
+            or None if auto mode and not found
 
         Raises:
-            ValueError: If remote needed but no issue_number
-            UserError: If local and flow not found
+            ValueError: If remote source but no issue_number
+            UserError: If local source and flow not found
         """
         if source == "local":
-            return self._read_local(branch)
+            result = self._read_local(branch)
+            if result is None:
+                from vibe3.exceptions import UserError
+
+                raise UserError(f"Flow not found for branch '{branch}'")
+            return result
 
         if source == "remote":
             if not issue_number:
@@ -65,41 +76,36 @@ class FlowStatusResolver:
             return self._read_remote(branch, issue_number)
 
         # auto: local-first with remote fallback
-        try:
-            return self._read_local(branch)
-        except Exception as e:
-            logger.bind(
-                domain="resolver",
-                action="resolve",
-                branch=branch,
-                source=source,
-                error=str(e),
-            ).warning("Local read failed, falling back to remote")
+        result = self._read_local(branch)
+        if result is not None:
+            return result
 
-            if not issue_number:
-                raise ValueError(
-                    "issue_number required for auto fallback when local fails"
-                )
+        # Local not found, try fallback if issue_number available
+        if not issue_number:
+            # No fallback possible, return None (CLI will handle with hint)
+            return None
 
-            return self._read_remote(branch, issue_number)
+        logger.bind(
+            domain="resolver",
+            action="resolve",
+            branch=branch,
+            source=source,
+        ).warning("Local read returned None, falling back to remote")
 
-    def _read_local(self, branch: str) -> FlowStatusResponse:
+        return self._read_remote(branch, issue_number)
+
+    def _read_local(self, branch: str) -> FlowStatusResponse | None:
         """Read from local SQLite only.
 
         Args:
             branch: Branch name
 
         Returns:
-            FlowStatusResponse with LOCAL_SQLITE data_source
-
-        Raises:
-            UserError: If flow not found
+            FlowStatusResponse with LOCAL_SQLITE data_source, or None if not found
         """
         response = self.flow_service.get_flow_status(branch)
         if response is None:
-            from vibe3.exceptions import UserError
-
-            raise UserError(f"Flow not found for branch '{branch}'")
+            return None
 
         response.data_source = DataSource.LOCAL_SQLITE
         return response
