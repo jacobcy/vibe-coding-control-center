@@ -2,11 +2,13 @@ from pathlib import Path
 
 
 def test_vibe_new_skill_uses_layered_pseudocode_sections() -> None:
+    """Test that vibe-new SKILL.md has clear bootstrap structure."""
     content = Path("skills/vibe-new/SKILL.md").read_text(encoding="utf-8")
 
-    assert "Interaction Layer" in content
-    assert "Bootstrap Layer" in content
-    assert "Stop Conditions" in content
+    # Simplified structure: numbered steps instead of explicit section headers
+    assert "## 1. 先确认是否适合进入 `/vibe-new`" in content
+    assert "## 3. Bootstrap flow scene" in content
+    assert "## 停止条件" in content
 
 
 def test_vibe_new_skill_does_not_introduce_vibe3_new_command() -> None:
