@@ -40,6 +40,9 @@ code_limits:
         reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀"
 
       # Clients 聚合 —— 允许 500
+      - path: "src/vibe3/clients/sqlite_schema.py"
+        limit: 450
+        reason: "Schema DDL 与迁移聚合，包含 8 个表定义、15+ 迁移步骤，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
         limit: 500
         reason: "Git 门面聚合"
