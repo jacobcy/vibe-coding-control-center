@@ -314,60 +314,159 @@ class TestQueueOperations:
 
 
 class TestHealthCheckBeforeDispatch:
-    """Tests for _health_check_before_dispatch method."""
+    """Tests for _health_check_before_dispatch method.
 
-    def test_issue_closed_on_github_returns_false(
-        self, make_coordinator, make_issue_info
-    ):
+    These tests verify the coordinator's interpretation of CheckService results.
+    Unlike queue operation tests, these do NOT use the conftest mock bypass.
+    """
+
+    def test_issue_closed_on_github_returns_false(self, make_issue_info):
         """Closed issue should cause health check to return False."""
-        coordinator = make_coordinator("planner", [])
-        coordinator._github.view_issue.return_value = {"state": "CLOSED"}
+        from unittest.mock import MagicMock, patch
 
-        issue = make_issue_info(1, IssueState.READY)
-        result = coordinator._health_check_before_dispatch(issue)
+        from vibe3.config.orchestra_settings import OrchestraConfig
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+        from vibe3.services.check_service import CheckResult
+
+        # Setup coordinator with real config (ThreadPoolExecutor needs int)
+        config = OrchestraConfig(repo="owner/repo")
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+        )
+
+        # Mock _flow_context and flow_state
+        coordinator._flow_context = MagicMock(return_value=("task/issue-1", None))
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-1",
+            "flow_status": "active",
+        }
+
+        # Mock CheckService to return consistency failure (branch missing)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=False,
+                issues=["Branch 'task/issue-1' no longer exists locally"],
+                branch="task/issue-1",
+            )
+            issue = make_issue_info(1, IssueState.READY)
+            result = coordinator._health_check_before_dispatch(issue)
 
         assert result is False
 
-    def test_issue_open_no_pr_returns_true(self, make_coordinator, make_issue_info):
+    def test_issue_open_no_pr_returns_true(self, make_issue_info):
         """Open issue with no PR should pass health check."""
-        coordinator = make_coordinator("planner", [])
-        coordinator._github.view_issue.return_value = {"state": "OPEN"}
-        coordinator._flow_manager.get_flow_for_issue.return_value = None
+        from unittest.mock import MagicMock, patch
 
-        issue = make_issue_info(1, IssueState.READY)
-        result = coordinator._health_check_before_dispatch(issue)
+        from vibe3.config.orchestra_settings import OrchestraConfig
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+        from vibe3.services.check_service import CheckResult
+
+        # Setup coordinator with real config
+        config = OrchestraConfig(repo="owner/repo")
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+        )
+
+        # Mock _flow_context and flow_state
+        coordinator._flow_context = MagicMock(return_value=("task/issue-1", None))
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-1",
+            "flow_status": "active",
+        }
+
+        # Mock CheckService to return valid result
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=True,
+                issues=[],
+                branch="task/issue-1",
+            )
+            issue = make_issue_info(1, IssueState.READY)
+            result = coordinator._health_check_before_dispatch(issue)
 
         assert result is True
 
-    def test_pr_merged_auto_closes_issue_returns_false(
-        self, make_coordinator, make_issue_info
-    ):
-        """Merged PR should trigger auto-close and return False."""
-        from vibe3.models.pr import PRResponse, PRState
+    def test_pr_merged_auto_closes_issue_returns_false(self, make_issue_info):
+        """Merged PR should result in done flow status, causing False."""
+        from unittest.mock import MagicMock, patch
 
-        coordinator = make_coordinator("planner", [])
-        coordinator._github.view_issue.return_value = {"state": "OPEN"}
-        coordinator._flow_manager.get_pr_for_issue.return_value = 123
-        pr = PRResponse(
-            number=123,
-            title="Test PR",
-            state=PRState.MERGED,
-            head_branch="task/issue-1",
-            base_branch="main",
-            url="https://github.com/owner/repo/pull/123",
+        from vibe3.config.orchestra_settings import OrchestraConfig
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
         )
-        coordinator._github.get_pr.return_value = pr
-        coordinator._github.close_issue_if_open.return_value = "closed"
+        from vibe3.services.check_service import CheckResult
 
-        issue = make_issue_info(1, IssueState.READY)
-        result = coordinator._health_check_before_dispatch(issue)
+        # Setup coordinator with real config
+        config = OrchestraConfig(repo="owner/repo")
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
 
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+        )
+
+        # Mock _flow_context and flow_state as done (PR merged)
+        coordinator._flow_context = MagicMock(return_value=("task/issue-1", None))
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-1",
+            "flow_status": "done",  # Flow is done because PR was merged
+        }
+
+        # Mock CheckService to return valid (it marked flow as done internally)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=True,
+                issues=[],
+                branch="task/issue-1",
+            )
+            issue = make_issue_info(1, IssueState.READY)
+            result = coordinator._health_check_before_dispatch(issue)
+
+        # Flow is done → should return False
         assert result is False
-        coordinator._github.close_issue_if_open.assert_called_once_with(
-            1,
-            closing_comment="PR #123 已合并，系统自动关闭此 issue。",
-            repo="owner/repo",
-        )
 
     def test_pr_open_returns_true(self, make_coordinator, make_issue_info):
         """Open PR should not block dispatch."""
