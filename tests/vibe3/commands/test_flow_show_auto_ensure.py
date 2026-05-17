@@ -70,18 +70,13 @@ def test_flow_show_numeric_issue_resolves_branch(
         flow_status="active",
     )
 
-    def get_flow_state(branch: str):
-        if branch == "task/issue-436":
-            return {"branch": branch}
-        return None
+    # Mock store.get_flows_by_issue to return the flow
+    mock_service.store.get_flows_by_issue.return_value = [
+        {"branch": "task/issue-436", "flow_status": "active"}
+    ]
 
-    def get_flow_status(branch: str):
-        if branch == "task/issue-436":
-            return flow_status
-        return None
-
-    mock_service.get_flow_state.side_effect = get_flow_state
-    mock_service.get_flow_status.side_effect = get_flow_status
+    # Mock get_flow_status and get_flow_timeline
+    mock_service.get_flow_status.return_value = flow_status
     mock_service.get_flow_timeline.return_value = {
         "state": flow_status,
         "events": [],
