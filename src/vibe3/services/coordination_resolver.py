@@ -64,7 +64,7 @@ class CoordinationResolver:
 
         if issue_number:
             try:
-                remote_truth = self._read_remote_collaboration(branch, issue_number)
+                remote_truth = self._read_remote_collaboration(issue_number)
                 if remote_truth:
                     blocked_reason_remote = remote_truth.get("blocked_reason")
                     blocked_by_issue_remote = remote_truth.get("blocked_by_issue")
@@ -120,13 +120,11 @@ class CoordinationResolver:
 
     def _read_remote_collaboration(
         self,
-        branch: str,
         issue_number: int,
     ) -> dict | None:
         """Read collaboration fields from issue body projection.
 
         Args:
-            branch: Branch name
             issue_number: Issue number (required)
 
         Returns:

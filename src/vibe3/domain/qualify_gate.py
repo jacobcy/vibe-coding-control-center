@@ -17,6 +17,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.coordination_resolver import CoordinationResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
 
 if TYPE_CHECKING:
@@ -52,6 +53,8 @@ class QualifyGateService:
         self._flow_manager = flow_manager
         resolver = ConventionResolver.from_repo()
         self._convention = resolver.resolve()
+        # NEW: Initialize coordination resolver for remote-first reads
+        self._coordination_resolver = CoordinationResolver(store=store)
 
     def run_qualify_gate(
         self,
@@ -86,8 +89,11 @@ class QualifyGateService:
                 return trigger_state
             return None
 
-        # Step 1: Check manual block
-        blocked_reason = flow_state.get("blocked_reason")
+        # NEW: Resolve coordination truth with remote-first strategy
+        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
+
+        # Step 1: Check manual block (remote-first via truth table)
+        blocked_reason = truth.blocked_reason
         if blocked_reason and str(blocked_reason).strip():
             blocked_label = self._convention.state_label(self._convention.blocked_label)
             if blocked_label not in labels:
@@ -173,8 +179,8 @@ class QualifyGateService:
             except Exception:
                 pass  # Can't read HEAD, skip validation (don't block on read error)
 
-        # Step 2: Check dependency block
-        dependencies = self._get_issue_dependencies(issue.number)
+        # Step 2: Check dependency block (remote-first via truth table)
+        dependencies = truth.dependencies
         unresolved = []
         if dependencies:
             unresolved = [
@@ -183,7 +189,8 @@ class QualifyGateService:
 
         if unresolved:
             blocked_label = self._convention.state_label(self._convention.blocked_label)
-            if not flow_state.get("blocked_by_issue"):
+            blocked_by_issue = truth.blocked_by_issue
+            if not blocked_by_issue:
                 self._store.update_flow_state(
                     branch,
                     blocked_by_issue=unresolved[0],
@@ -208,9 +215,8 @@ class QualifyGateService:
         # Step 3: All clear — determine target and perform unblock side effects
 
         # Issue is not in blocked state: confirm trigger label (no unblock needed)
-        if IssueState.BLOCKED.to_label() not in labels and not flow_state.get(
-            "blocked_by_issue"
-        ):
+        blocked_by_issue = truth.blocked_by_issue
+        if IssueState.BLOCKED.to_label() not in labels and not blocked_by_issue:
             if trigger_state.to_label() in labels:
                 return trigger_state
             return None
@@ -220,8 +226,8 @@ class QualifyGateService:
         fs_obj = FlowState.model_validate(flow_state)
         target_label = infer_resume_label(fs_obj)
 
-        if flow_state.get("blocked_by_issue"):
-            dep_issue = flow_state.get("blocked_by_issue")
+        if blocked_by_issue:
+            dep_issue = blocked_by_issue
             source_pr = None
             if isinstance(dep_issue, int):
                 dep_flows = self._store.get_flows_by_issue(dep_issue, role="task")
