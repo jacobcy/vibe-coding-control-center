@@ -189,8 +189,10 @@ def test_plan_for_new_branch_bootstrap_uses_shared_service_interface() -> None:
         wants_worktree=False,
     )
 
+    # Updated to include snapshot_save action (HIGH fix)
     assert [action.kind for action in plan.actions] == [
         "bootstrap_flow_scene",
+        "snapshot_save",
         "pr_create_optional",
         "handoff_append",
     ]
@@ -285,8 +287,10 @@ def test_bootstrap_command_escapes_shell_injection_attacks() -> None:
     quoted_branch = shlex.quote(malicious_branch)
     assert quoted_branch in command
 
-    # Verify the raw malicious string is NOT in the command
-    assert malicious_branch not in command
+    # CRITICAL: Verify the UNQUOTED malicious string is NOT in the command
+    # (the quoted version contains the malicious string inside quotes, which is safe)
+    assert f"--branch {malicious_branch}" not in command
+    assert f"--branch {quoted_branch}" in command
 
     # Verify proper quoting format
     assert f"--branch {quoted_branch}" in command
