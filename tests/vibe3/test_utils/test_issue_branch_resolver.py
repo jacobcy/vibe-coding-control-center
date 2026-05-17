@@ -158,3 +158,29 @@ def test_no_flows_at_all_error(mock_flow_service: Mock, mock_store: Mock):
     error_message = str(exc_info.value)
     assert "No flow found" in error_message
     assert "/vibe-new" in error_message
+
+
+def test_format_flow_details_with_pr():
+    """Test _format_flow_details formats flow with PR correctly."""
+    flow = {
+        "branch": "dev/issue-976",
+        "flow_status": "active",
+        "pr_ref": "https://github.com/jacobcy/vibe-center/pull/990",
+    }
+
+    result = _format_flow_details(flow)
+
+    assert result == "dev/issue-976 (status: active, pr: #990)"
+
+
+def test_format_flow_details_without_pr():
+    """Test _format_flow_details formats flow without PR correctly."""
+    flow = {
+        "branch": "task/issue-976",
+        "flow_status": "aborted",
+        "pr_ref": None,
+    }
+
+    result = _format_flow_details(flow)
+
+    assert result == "task/issue-976 (status: aborted, pr: none)"
