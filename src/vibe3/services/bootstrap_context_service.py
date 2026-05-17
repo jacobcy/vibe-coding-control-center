@@ -4,13 +4,9 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 BootstrapActionKind = Literal[
-    "ensure_branch",
-    "flow_update",
-    "flow_bind_task",
-    "snapshot_baseline",
+    "bootstrap_flow_scene",
     "pr_create_optional",
     "handoff_append",
-    "create_worktree",
 ]
 
 
@@ -39,77 +35,57 @@ class BootstrapContextService:
     def plan_vibe_new_bootstrap(
         self,
         *,
-        current_branch: str,
         target_branch: str,
         issue_number: int,
-        has_existing_flow: bool,
         has_existing_pr: bool,
         wants_worktree: bool,
+        related_issue_numbers: tuple[int, ...] = (),
+        dependency_issue_numbers: tuple[int, ...] = (),
     ) -> BootstrapPlan:
-        """Plan atomic bootstrap actions for vibe-new entry.
+        """Plan shared bootstrap actions for vibe-new entry.
 
         Args:
-            current_branch: Current git branch
             target_branch: Target branch (dev/issue-XXX)
             issue_number: GitHub issue number
-            has_existing_flow: Whether flow already exists
             has_existing_pr: Whether PR already exists
             wants_worktree: Whether user wants new worktree
+            related_issue_numbers: Optional related issue bindings
+            dependency_issue_numbers: Optional dependency issue bindings
 
         Returns:
             BootstrapPlan with ordered actions
         """
         actions: list[BootstrapAction] = []
+        related_flags = " ".join(
+            f"--related {issue_ref}" for issue_ref in related_issue_numbers
+        )
+        dependency_flags = " ".join(
+            f"--dependency {issue_ref}" for issue_ref in dependency_issue_numbers
+        )
+        worktree_flag = "--worktree" if wants_worktree else ""
+        extra_flags = " ".join(
+            flag
+            for flag in (worktree_flag, related_flags, dependency_flags)
+            if flag.strip()
+        )
+        command = (
+            f"vibe3 internal bootstrap-flow {issue_number} "
+            f"--branch {target_branch} --source skill"
+        )
+        if extra_flags:
+            command = f"{command} {extra_flags}"
 
-        # Step 1: Ensure branch (if needed)
-        if current_branch != target_branch:
-            actions.append(
-                BootstrapAction(
-                    kind="ensure_branch",
-                    command=f"git checkout -b {target_branch}",
-                    reason="Create or switch to human-collaboration branch.",
-                )
-            )
-
-        # Step 2: Create worktree (if requested)
-        if wants_worktree:
-            actions.append(
-                BootstrapAction(
-                    kind="create_worktree",
-                    command=f"wtnew {target_branch}",
-                    reason="Create isolated worktree for parallel development.",
-                )
-            )
-
-        # Step 3: Register flow (idempotent)
-        if not has_existing_flow:
-            actions.append(
-                BootstrapAction(
-                    kind="flow_update",
-                    command="vibe3 flow update --actor <identity>",
-                    reason="Register current branch as flow scene.",
-                )
-            )
-
-        # Step 4: Bind task issue
         actions.append(
             BootstrapAction(
-                kind="flow_bind_task",
-                command=f"vibe3 flow bind {issue_number} --role task",
-                reason="Bind the task issue to current flow.",
+                kind="bootstrap_flow_scene",
+                command=command,
+                reason=(
+                    "Use the shared internal bootstrap entry so skill and "
+                    "orchestra reach the same standardized flow scene path."
+                ),
             )
         )
 
-        # Step 5: Save baseline
-        actions.append(
-            BootstrapAction(
-                kind="snapshot_baseline",
-                command="vibe3 snapshot save --as-baseline",
-                reason="Persist a branch baseline for later structural diff.",
-            )
-        )
-
-        # Step 6: Create PR draft (optional)
         if not has_existing_pr:
             actions.append(
                 BootstrapAction(
@@ -119,7 +95,6 @@ class BootstrapContextService:
                 )
             )
 
-        # Step 7: Record handoff
         actions.append(
             BootstrapAction(
                 kind="handoff_append",

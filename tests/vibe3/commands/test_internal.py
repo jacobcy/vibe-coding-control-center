@@ -1,6 +1,7 @@
 """Tests for internal commands (hidden from users)."""
 
-from unittest.mock import patch
+import json
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -45,3 +46,61 @@ def test_internal_hidden_from_help():
     result = runner.invoke(cli_app, ["--help"])
     # internal 命令应该出现在帮助信息中,但标注为 hidden
     assert "internal" not in result.stdout or "Internal" in result.stdout
+
+
+def test_internal_bootstrap_flow_dispatch() -> None:
+    """internal bootstrap-flow should call shared bootstrap service."""
+    issue_payload = {
+        "number": 123,
+        "title": "Bootstrap me",
+        "state": "OPEN",
+        "labels": [{"name": "state/claimed"}],
+        "assignees": [],
+        "comments": [],
+    }
+
+    with patch("vibe3.commands.internal.load_orchestra_config") as load_config:
+        load_config.return_value = MagicMock(repo="owner/repo")
+        with patch("vibe3.clients.sqlite_client.SQLiteClient"):
+            with patch("vibe3.clients.git_client.GitClient"):
+                with patch("vibe3.clients.github_client.GitHubClient") as github_cls:
+                    with patch(
+                        "vibe3.services.flow_orchestrator_service.FlowOrchestratorService"
+                    ) as service_cls:
+                        github = MagicMock()
+                        github.view_issue.return_value = issue_payload
+                        github_cls.return_value = github
+                        service = MagicMock()
+                        service.bootstrap_issue_flow.return_value = {
+                            "branch": "dev/issue-123",
+                            "worktree_path": "/tmp/dev-issue-123",
+                        }
+                        service_cls.return_value = service
+
+                        result = runner.invoke(
+                            cli_app,
+                            [
+                                "internal",
+                                "bootstrap-flow",
+                                "123",
+                                "--branch",
+                                "dev/issue-123",
+                                "--worktree",
+                                "--related",
+                                "456",
+                                "--dependency",
+                                "789",
+                            ],
+                        )
+
+    assert result.exit_code == 0
+    service.bootstrap_issue_flow.assert_called_once()
+    call = service.bootstrap_issue_flow.call_args
+    issue_info = call.args[0]
+    assert issue_info.number == 123
+    assert call.kwargs["branch"] == "dev/issue-123"
+    assert call.kwargs["ensure_worktree"] is True
+    assert call.kwargs["related_issue_numbers"] == (456,)
+    assert call.kwargs["dependency_issue_numbers"] == (789,)
+    payload = json.loads(result.stdout)
+    assert payload["branch"] == "dev/issue-123"

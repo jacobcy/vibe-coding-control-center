@@ -60,88 +60,83 @@ def test_worktree_manager_returns_repo_path_when_no_worktree_needed(
 
 
 def test_bootstrap_plan_references_atomic_cli_commands_only() -> None:
-    """Guard against replacing atomic bootstrap commands with monolithic command."""
+    """Guard against introducing a separate monolithic CLI command surface."""
     service = BootstrapContextService()
     plan = service.plan_vibe_new_bootstrap(
-        current_branch="main",
         target_branch="dev/issue-123",
         issue_number=123,
-        has_existing_flow=False,
         has_existing_pr=False,
         wants_worktree=False,
     )
 
     commands = [action.command for action in plan.actions]
-    assert any(cmd.startswith("vibe3 flow update") for cmd in commands)
-    assert any(cmd.startswith("vibe3 flow bind") for cmd in commands)
+    assert any(cmd.startswith("vibe3 internal bootstrap-flow ") for cmd in commands)
     assert all("vibe3 new" not in cmd for cmd in commands)
 
 
-def test_plan_for_new_branch_bootstrap_uses_atomic_actions() -> None:
+def test_plan_for_new_branch_bootstrap_uses_shared_service_interface() -> None:
     service = BootstrapContextService()
 
     plan = service.plan_vibe_new_bootstrap(
-        current_branch="main",
         target_branch="dev/issue-123",
         issue_number=123,
-        has_existing_flow=False,
         has_existing_pr=False,
         wants_worktree=False,
     )
 
     assert [action.kind for action in plan.actions] == [
-        "ensure_branch",
-        "flow_update",
-        "flow_bind_task",
-        "snapshot_baseline",
+        "bootstrap_flow_scene",
         "pr_create_optional",
         "handoff_append",
     ]
     assert plan.requires_worktree is False
 
 
-def test_plan_for_existing_branch_bootstrap_skips_branch_creation() -> None:
+def test_plan_for_existing_branch_bootstrap_without_pr_creation() -> None:
     service = BootstrapContextService()
 
     plan = service.plan_vibe_new_bootstrap(
-        current_branch="dev/issue-123",
         target_branch="dev/issue-123",
         issue_number=123,
-        has_existing_flow=False,
-        has_existing_pr=False,
+        has_existing_pr=True,
         wants_worktree=False,
     )
 
     assert [action.kind for action in plan.actions] == [
-        "flow_update",
-        "flow_bind_task",
-        "snapshot_baseline",
-        "pr_create_optional",
+        "bootstrap_flow_scene",
         "handoff_append",
     ]
 
 
-def test_plan_for_worktree_bootstrap_includes_create_worktree_action() -> None:
+def test_plan_for_worktree_bootstrap_marks_shared_worktree_request() -> None:
     service = BootstrapContextService()
 
     plan = service.plan_vibe_new_bootstrap(
-        current_branch="main",
         target_branch="dev/issue-123",
         issue_number=123,
-        has_existing_flow=False,
         has_existing_pr=False,
         wants_worktree=True,
     )
 
     assert plan.requires_worktree is True
-    # First action is ensure_branch, then create_worktree
-    action_kinds = [action.kind for action in plan.actions]
-    assert "ensure_branch" in action_kinds
-    assert "create_worktree" in action_kinds
-    # create_worktree should come after ensure_branch
-    branch_idx = action_kinds.index("ensure_branch")
-    worktree_idx = action_kinds.index("create_worktree")
-    assert worktree_idx > branch_idx
+    assert "--worktree" in plan.actions[0].command
+
+
+def test_plan_can_encode_related_and_dependency_bindings() -> None:
+    service = BootstrapContextService()
+
+    plan = service.plan_vibe_new_bootstrap(
+        target_branch="dev/issue-123",
+        issue_number=123,
+        has_existing_pr=True,
+        wants_worktree=False,
+        related_issue_numbers=(456,),
+        dependency_issue_numbers=(789,),
+    )
+
+    command = plan.actions[0].command
+    assert "--related 456" in command
+    assert "--dependency 789" in command
 
 
 def test_shared_abstraction_used_by_both_orchestra_and_skill(

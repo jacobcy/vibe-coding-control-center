@@ -13,6 +13,7 @@ from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.pr import PRState
+from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 from vibe3.services.issue_flow_service import IssueFlowService
@@ -41,6 +42,12 @@ class FlowManager:
         self.label_service = LabelService(repo=config.repo)
         self.issue_flow_service = IssueFlowService(store=self.store)
         self._registry = registry
+        self._bootstrap_service = FlowOrchestratorService(
+            config,
+            store=self.store,
+            git=self.git,
+            github=self.github,
+        )
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
         """Find the latest flow for an issue, regardless of active status.
@@ -77,23 +84,13 @@ class FlowManager:
     def _reactivate_canonical_flow(
         self, issue: IssueInfo, branch: str, slug: str
     ) -> dict:
-        from vibe3.services.signature_service import SignatureService
-
-        initiator = SignatureService.resolve_initiator(branch)
-        flow_state = self.flow_service.reactivate_flow(
-            branch,
-            flow_slug=slug,
-            initiator=initiator,
+        return self._bootstrap_service.bootstrap_issue_flow(
+            issue,
+            branch=branch,
+            slug=slug,
+            source="dispatch",
+            reactivate_existing=True,
         )
-
-        try:
-            self.task_service.link_issue(branch, issue.number, "task", actor=None)
-        except Exception as exc:
-            logger.bind(domain="orchestra").warning(
-                f"Failed to relink issue #{issue.number} to flow: {exc}"
-            )
-
-        return flow_state.model_dump()
 
     def _rebuild_stale_canonical_flow(
         self, issue: IssueInfo, branch: str, slug: str
@@ -232,28 +229,11 @@ class FlowManager:
                 f"Deferred flow creation."
             )
 
-        branch_created = False
-        if not self.git.branch_exists(branch):
-            try:
-                self.git.create_branch_ref(
-                    branch,
-                    start_ref=self.config.scene_base_ref,
-                )
-                branch_created = True
-            except Exception as exc:
-                raise RuntimeError(
-                    f"Failed to create branch '{branch}': {exc}"
-                ) from exc
-
-        from vibe3.services.signature_service import SignatureService
-
-        initiator = SignatureService.resolve_initiator(branch)
         try:
-            flow_state = self.flow_service.create_flow(
-                slug=slug,
+            result = self._bootstrap_service.bootstrap_issue_flow(
+                issue,
                 branch=branch,
-                actor=None,
-                initiated_by=initiator,
+                slug=slug,
                 source="dispatch",
             )
         except Exception as exc:
@@ -263,29 +243,12 @@ class FlowManager:
                     f"Flow created concurrently for #{issue.number}, using existing"
                 )
                 return existing
-            if branch_created:
-                try:
-                    self.git.delete_branch(branch, skip_if_worktree=True)
-                    log.info(
-                        f"Cleaned up orphan branch '{branch}' "
-                        f"after flow creation failure"
-                    )
-                except Exception as cleanup_exc:
-                    log.warning(
-                        f"Failed to clean up branch '{branch}' after "
-                        f"flow creation failure: {cleanup_exc}"
-                    )
             raise RuntimeError(
                 f"Failed to create flow for issue #{issue.number}: {exc}"
             ) from exc
 
-        try:
-            self.task_service.link_issue(branch, issue.number, "task", actor=None)
-        except Exception as exc:
-            log.warning(f"Failed to link issue #{issue.number} to flow: {exc}")
-
         log.info(f"Created flow '{slug}' on branch '{branch}'")
-        return flow_state.model_dump()
+        return result
 
     def get_pr_for_issue(self, issue_number: int) -> int | None:
         flow = self.get_flow_for_issue(issue_number)

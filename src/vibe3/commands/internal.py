@@ -1,8 +1,13 @@
 """Internal system commands for Orchestra routing (hidden from users)."""
 
+import json
 from typing import Annotated
 
 import typer
+
+from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.exceptions import UserError
+from vibe3.models.orchestration import IssueInfo
 
 app = typer.Typer(
     name="internal",
@@ -10,6 +15,24 @@ app = typer.Typer(
     hidden=True,
     no_args_is_help=True,
 )
+
+
+def _load_issue_info(issue_number: int) -> IssueInfo:
+    """Load issue context for shared internal flow bootstrap."""
+    from vibe3.clients.github_client import GitHubClient
+
+    config = load_orchestra_config()
+    github = GitHubClient()
+    payload = github.view_issue(issue_number, repo=config.repo)
+    if payload == "network_error":
+        raise UserError(f"无法读取 issue #{issue_number}，请检查 GitHub 网络或认证状态")
+    if payload is None or not isinstance(payload, dict):
+        raise UserError(f"issue #{issue_number} 不存在或当前仓库不可访问")
+
+    issue = IssueInfo.from_github_payload(payload)
+    if issue is None:
+        raise UserError(f"无法解析 issue #{issue_number} 的上下文")
+    return issue
 
 
 @app.command("manager")
@@ -88,3 +111,63 @@ def internal_governance_dispatch(
     from vibe3.services.scan_service import dispatch_governance_execution
 
     dispatch_governance_execution(material_override=material)
+
+
+@app.command("bootstrap-flow")
+def internal_bootstrap_flow(
+    issue: Annotated[int, typer.Argument(help="Issue number to bootstrap")],
+    branch: Annotated[
+        str,
+        typer.Option("--branch", help="Target flow branch"),
+    ],
+    use_worktree: Annotated[
+        bool,
+        typer.Option(
+            "--worktree",
+            help="Resolve or create worktree context for the target branch",
+        ),
+    ] = False,
+    related_issue_numbers: Annotated[
+        list[int] | None,
+        typer.Option("--related", help="Bind additional related issue number"),
+    ] = None,
+    dependency_issue_numbers: Annotated[
+        list[int] | None,
+        typer.Option("--dependency", help="Bind blocking dependency issue number"),
+    ] = None,
+    source: Annotated[
+        str,
+        typer.Option("--source", help="Bootstrap source label"),
+    ] = "skill",
+    reactivate_existing: Annotated[
+        bool,
+        typer.Option(
+            "--reactivate-existing",
+            help="Reactivate existing flow instead of creating a new one",
+        ),
+    ] = False,
+) -> None:
+    """Bootstrap a standardized flow scene through the shared service path."""
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+
+    config = load_orchestra_config()
+    store = SQLiteClient()
+    git = GitClient()
+    github = GitHubClient()
+    issue_info = _load_issue_info(issue)
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    result = service.bootstrap_issue_flow(
+        issue_info,
+        branch=branch,
+        slug=f"issue-{issue_info.number}",
+        source=source,
+        ensure_worktree=use_worktree,
+        reactivate_existing=reactivate_existing,
+        related_issue_numbers=tuple(related_issue_numbers or ()),
+        dependency_issue_numbers=tuple(dependency_issue_numbers or ()),
+    )
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False, default=str))

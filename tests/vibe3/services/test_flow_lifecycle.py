@@ -112,33 +112,28 @@ def test_reactivate_flow_preserves_initiator():
 
 
 def test_flow_manager_uses_service_for_reactivation():
-    """FlowManager should delegate to FlowService for reactivation."""
+    """FlowManager should delegate reactivation to the shared bootstrap path."""
     from vibe3.models.orchestra_config import OrchestraConfig
+    from vibe3.models.orchestration import IssueInfo
     from vibe3.orchestra.flow_dispatch import FlowManager
 
     config = OrchestraConfig(repo="test/repo")
     manager = FlowManager(config)
 
-    # Mock the flow service
-    manager.flow_service.reactivate_flow = MagicMock(
-        return_value=MagicMock(
-            model_dump=lambda: {"branch": "task/issue-999", "flow_slug": "issue-999"}
-        )
-    )
-
-    from vibe3.models.orchestration import IssueInfo
-
     issue = IssueInfo(number=999, title="Test", labels=[])
+    manager._bootstrap_service.bootstrap_issue_flow = MagicMock(
+        return_value={"branch": "task/issue-999", "flow_slug": "issue-999"}
+    )
     result = manager._reactivate_canonical_flow(issue, "task/issue-999", "issue-999")
 
-    # Verify service was called
-    manager.flow_service.reactivate_flow.assert_called_once()
-    call_kwargs = manager.flow_service.reactivate_flow.call_args[1]
-    assert call_kwargs["flow_slug"] == "issue-999"
-    # initiator is resolved by SignatureService
-    assert "initiator" in call_kwargs
+    manager._bootstrap_service.bootstrap_issue_flow.assert_called_once_with(
+        issue,
+        branch="task/issue-999",
+        slug="issue-999",
+        source="dispatch",
+        reactivate_existing=True,
+    )
 
-    # Verify result is dict (from model_dump())
     assert result["branch"] == "task/issue-999"
 
 

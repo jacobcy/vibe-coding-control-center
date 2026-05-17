@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -9,10 +10,12 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.worktree import WorktreeManager
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.signature_service import SignatureService
+from vibe3.services.task_service import TaskService
 
 if TYPE_CHECKING:
     from vibe3.config.orchestra_config import OrchestraConfig
@@ -49,6 +52,7 @@ class FlowOrchestratorService:
         self.github = GitHubClient() if github is None else github
         self.flow_service = FlowService(store=self.store, git_client=self.git)
         self.issue_flow_service = IssueFlowService(store=self.store)
+        self.task_service = TaskService(store=self.store)
 
     def snapshot(self) -> OrchestraSnapshot | None:
         """Get current orchestra snapshot."""
@@ -86,6 +90,78 @@ class FlowOrchestratorService:
         return self.store.get_active_flow_count()
 
     # Flow creation logic
+
+    def bootstrap_issue_flow(
+        self,
+        issue: IssueInfo,
+        *,
+        branch: str,
+        slug: str | None = None,
+        source: str = "dispatch",
+        actor: str | None = None,
+        initiated_by: str | None = None,
+        ensure_worktree: bool = False,
+        reactivate_existing: bool = False,
+        related_issue_numbers: tuple[int, ...] = (),
+        dependency_issue_numbers: tuple[int, ...] = (),
+    ) -> dict[str, Any]:
+        """Create or reactivate a standardized flow scene for an issue.
+
+        This is the shared bootstrap interface for both:
+        - orchestra automatic flow creation
+        - human-collaboration skill bootstrap planning
+
+        It centralizes branch preparation, flow creation/reactivation, issue binding,
+        optional worktree resolution, and compatible related/dependency linkage.
+        """
+        slug = slug or f"issue-{issue.number}"
+        initiator = initiated_by or SignatureService.resolve_initiator(branch)
+
+        if not self.git.branch_exists(branch):
+            self.git.create_branch_ref(
+                branch,
+                start_ref=self.config.scene_base_ref,
+            )
+
+        existing_state = self.store.get_flow_state(branch)
+        if reactivate_existing and existing_state:
+            flow_state = self.flow_service.reactivate_flow(
+                branch,
+                flow_slug=slug,
+                initiator=initiator,
+            )
+        else:
+            flow_state = self.flow_service.create_flow(
+                slug=slug,
+                branch=branch,
+                actor=actor,
+                initiated_by=initiator,
+                source=source,
+            )
+
+        self.task_service.link_issue(branch, issue.number, "task", actor=actor)
+        for related_issue in related_issue_numbers:
+            self.task_service.link_issue(branch, related_issue, "related", actor=actor)
+        for dependency_issue in dependency_issue_numbers:
+            self.flow_service.block_flow(
+                branch,
+                blocked_by_issue=dependency_issue,
+                actor=actor,
+            )
+
+        result = self.store.get_flow_state(branch) or flow_state.model_dump()
+        if ensure_worktree:
+            worktree_manager = WorktreeManager(
+                self.config,
+                repo_path=Path(self.git.get_git_common_dir()).parent,
+            )
+            worktree_ctx = worktree_manager.resolve_bootstrap_worktree_context(
+                branch=branch,
+                issue_number=issue.number,
+                use_worktree=True,
+            )
+            result["worktree_path"] = str(worktree_ctx.path)
+        return result
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict[str, Any] | None:
         """Create flow for issue, handling existing flows and branch creation.
@@ -135,19 +211,16 @@ class FlowOrchestratorService:
             flow_status = str(existing_canonical.get("flow_status") or "")
             # Reactivate or rebuild stale/aborted flows
             if flow_status in ("stale", "aborted"):
-                if not self.git.branch_exists(branch):
-                    log.warning(f"Branch '{branch}' missing, creating new branch")
-                    self.git.create_branch_ref(
-                        branch,
-                        start_ref=self.config.scene_base_ref,
-                    )
-
-                # Reactivate flow
                 try:
-                    self.flow_service.reactivate_flow(branch)
+                    result = self.bootstrap_issue_flow(
+                        issue,
+                        branch=branch,
+                        slug=slug,
+                        source="dispatch",
+                        reactivate_existing=True,
+                    )
                     log.info(f"Reactivated canonical flow for issue #{issue.number}")
-                    # Convert FlowStatusResponse to dict
-                    return self.store.get_flow_state(branch)
+                    return result
                 except Exception as exc:
                     log.error(f"Failed to reactivate flow: {exc}")
                     # Fall through to create new flow
@@ -155,33 +228,15 @@ class FlowOrchestratorService:
             log.info(f"Using existing canonical flow for issue #{issue.number}")
             return existing_canonical
 
-        # Create new branch if needed
-        if not self.git.branch_exists(branch):
-            try:
-                self.git.create_branch_ref(
-                    branch,
-                    start_ref=self.config.scene_base_ref,
-                )
-                log.info(f"Created branch '{branch}' for issue #{issue.number}")
-            except Exception as exc:
-                log.error(f"Failed to create branch '{branch}': {exc}")
-                raise RuntimeError(
-                    f"Failed to create branch '{branch}': {exc}"
-                ) from exc
-
-        # Create flow
-        initiator = SignatureService.resolve_initiator(branch)
         try:
-            self.flow_service.create_flow(
-                slug=slug,
+            result = self.bootstrap_issue_flow(
+                issue,
                 branch=branch,
-                actor=None,
-                initiated_by=initiator,
+                slug=slug,
                 source="dispatch",
             )
             log.success(f"Created flow for issue #{issue.number}")
-            # Convert FlowStatusResponse to dict by fetching from store
-            return self.store.get_flow_state(branch)
+            return result
         except Exception as exc:
             # Handle concurrent creation
             existing = self.store.get_flow_state(branch) or {}
