@@ -60,34 +60,43 @@ class ConventionResolver:
             >>> convention.branch.canonical_branch(123)
             'issue-123'
         """
+        # Use helper to detect profile name
+        detected = self._detect_profile()
+
+        # Map profile name to ProfileConvention
+        if detected == "vibe-center":
+            logger.debug("Using Vibe Center profile defaults")
+            return ProfileConvention.vibe_center()
+        elif detected == "minimal":
+            logger.debug("Using minimal profile defaults")
+            return ProfileConvention()
+        else:
+            # Unknown profile: warn and fallback
+            logger.warning(f"Unknown profile '{detected}', using minimal defaults")
+            return ProfileConvention()
+
+    def _detect_profile(self) -> str:
+        """Detect profile from repo context.
+
+        Single source of truth for profile detection logic, used by both
+        resolve() and _get_profile_config().
+
+        Returns:
+            Profile name (vibe-center or minimal)
+        """
         import os
         import subprocess
 
-        # Step 1: Check explicit profile override
+        # Step 1: Check explicit override
         if self.profile:
-            if self.profile == "vibe-center":
-                logger.debug("Using Vibe Center profile defaults (explicit)")
-                return ProfileConvention.vibe_center()
-            elif self.profile == "minimal":
-                logger.debug("Using minimal profile defaults (explicit)")
-                return ProfileConvention()
-            else:
-                logger.warning(
-                    f"Unknown profile '{self.profile}', using minimal defaults"
-                )
-                return ProfileConvention()
+            return self.profile
 
         # Step 2: Check environment variable
         env_profile = os.getenv("VIBE_PROFILE")
-        if env_profile == "vibe-center":
-            logger.debug("Using Vibe Center profile defaults (VIBE_PROFILE)")
-            return ProfileConvention.vibe_center()
-        elif env_profile == "minimal":
-            logger.debug("Using minimal profile defaults (VIBE_PROFILE)")
-            return ProfileConvention()
+        if env_profile:
+            return env_profile
 
         # Step 3: Check git remote to detect Vibe Center repo
-        # Temporary heuristic until .vibe/config.yaml is implemented
         try:
             result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
@@ -102,14 +111,12 @@ class ConventionResolver:
                     "vibe-center" in remote_url
                     or "vibe-coding-control-center" in remote_url
                 ):
-                    logger.debug("Using Vibe Center profile defaults (detected repo)")
-                    return ProfileConvention.vibe_center()
+                    return "vibe-center"
         except Exception as e:
             logger.debug(f"Git remote check failed: {e}")
 
-        # Step 4: Default to minimal (portable core runtime)
-        logger.debug("Using minimal profile defaults (portable)")
-        return ProfileConvention()
+        # Step 4: Default to minimal
+        return "minimal"
 
     def get_policy_path(self, name: str) -> str | None:
         """Get path to a policy file for current profile.
@@ -143,41 +150,6 @@ class ConventionResolver:
             Relative path or None
         """
         return self._get_profile_config().get_supervisor_path(name)
-
-    def _detect_profile(self) -> str:
-        """Detect profile from repo context.
-
-        Returns:
-            Profile name (vibe-center or minimal)
-        """
-        import os
-        import subprocess
-
-        # Check environment variable
-        env_profile = os.getenv("VIBE_PROFILE")
-        if env_profile:
-            return env_profile
-
-        # Check git remote to detect Vibe Center repo
-        try:
-            result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=False,
-            )
-            if result.returncode == 0:
-                remote_url = result.stdout.strip().lower()
-                if (
-                    "vibe-center" in remote_url
-                    or "vibe-coding-control-center" in remote_url
-                ):
-                    return "vibe-center"
-        except Exception as e:
-            logger.debug(f"Git remote check failed: {e}")
-
-        return "minimal"
 
     def _get_profile_config(self) -> ProfileConfig:
         """Get ProfileConfig with detected profile.
