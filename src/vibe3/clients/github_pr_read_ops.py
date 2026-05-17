@@ -72,9 +72,11 @@ class PRReadMixin:
         )
 
         # Parse closingIssuesReferences to get task_issue
-        closing_refs = data.get("closingIssuesReferences", {}).get("references", [])
+        # Note: closingIssuesReferences is a list (not {references: [...]} object)
+        # See github_issue_admin_ops.py:get_pr_for_issue for reference
+        closing_refs = data.get("closingIssuesReferences", [])
         task_issue = None
-        if closing_refs:
+        if closing_refs and isinstance(closing_refs, list):
             # Take the first closing issue as task_issue
             task_issue = closing_refs[0].get("number")
 
