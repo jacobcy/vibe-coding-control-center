@@ -80,7 +80,7 @@ Roadmap skill 必须读取以下配置：
 cat config/v3/settings.yaml | grep manager_usernames
 
 # 或使用 Python 加载
-python -c “import yaml; config = yaml.safe_load(open('config/v3/settings.yaml')); print(config.get('manager_usernames', ['vibe-manager-agent']))”
+uv run python -c "import yaml; config = yaml.safe_load(open('config/v3/settings.yaml')); print(config.get('manager_usernames', ['vibe-manager-agent']))"
 ```
 
 默认行为：
@@ -326,13 +326,10 @@ gh issue list -l "roadmap/p0"
      ```bash
      gh issue edit <number> --assignee vibe-manager-agent
      ```
-  2. 添加 intake label：
+  2. 写 intake comment：
      ```bash
-     gh issue edit <number> --add-label "roadmap/intake"
-     ```
-  3. 写 intake comment：
-     ```bash
-     gh issue comment <number> --body "[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=<bugfix|feature|refactor>."
+     gh issue comment <number> --body "[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=bugfix."
+     # scope 可选值：bugfix, feature, refactor
      ```
 
 **场景 B: 需要人类讨论**
