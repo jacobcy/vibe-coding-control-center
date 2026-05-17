@@ -102,7 +102,13 @@ class ConventionResolver:
         try:
             from pathlib import Path
 
-            config_path = Path(".vibe/config.yaml")
+            from vibe3.clients.git_client import GitClient
+
+            # Resolve relative path against repo root for CWD-independent access
+            git_client = GitClient()
+            git_common_dir = git_client.get_git_common_dir()
+            repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+            config_path = repo_root / ".vibe/config.yaml"
             if config_path.exists():
                 with config_path.open(encoding="utf-8") as f:
                     config_yaml = yaml.safe_load(f)
