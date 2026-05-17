@@ -2,7 +2,10 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from vibe3.commands.pr_query import _resolve_pr_target
+from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse, PRState
 
 
@@ -11,10 +14,15 @@ def test_resolve_pr_target_from_issue_number():
     # Setup mocks
     pr_svc = Mock()
 
-    # Mock flow_service.get_flow_state for branch inference
+    # Mock flow_service with binding-based resolution
     mock_flow_service = Mock()
-    mock_flow_state = Mock()
-    mock_flow_service.get_flow_state.return_value = mock_flow_state
+
+    # Mock store.get_flows_by_issue to return flow binding
+    mock_store = Mock()
+    mock_store.get_flows_by_issue.return_value = [
+        {"branch": "dev/issue-946", "flow_status": "active"}
+    ]
+    mock_flow_service.store = mock_store
 
     # Mock list_prs_for_branch to return a PR
     mock_pr = PRResponse(
@@ -37,30 +45,28 @@ def test_resolve_pr_target_from_issue_number():
         # Call with issue number as branch parameter
         target = _resolve_pr_target(pr_svc, pr_number=None, branch="946")
 
-    # Verify branch inference was called
-    # Should try task/issue-946 first, then dev/issue-946
-    assert mock_flow_service.get_flow_state.called
-
-    # Verify PR lookup was called with inferred branch
-    # The function should return the found PR number
+    # Verify PR lookup was called with resolved branch
     assert target.pr_number == 985
 
 
 def test_resolve_pr_target_branch_not_found():
-    """Test friendly error when branch inference fails."""
+    """Test fail-fast behavior when no flow found for issue number."""
     pr_svc = Mock()
     # Explicitly set empty return to avoid accidental pass
     pr_svc.github_client.list_prs_for_branch.return_value = []
 
     mock_flow_service = Mock()
-    mock_flow_service.get_flow_state.return_value = None  # No flow found
+
+    # Mock store.get_flows_by_issue to return empty (no binding)
+    mock_store = Mock()
+    mock_store.get_flows_by_issue.return_value = []
+    mock_store.get_flow_state.return_value = None
+    mock_flow_service.store = mock_store
 
     with patch("vibe3.commands.pr_query.FlowService", return_value=mock_flow_service):
-        target = _resolve_pr_target(pr_svc, pr_number=None, branch="999")
-
-    # Should fallback to original input
-    assert target.branch == "999"
-    assert target.pr_number is None
+        # Should raise UserError for missing flow (fail-fast behavior)
+        with pytest.raises(UserError, match="No flow found for issue #999"):
+            _resolve_pr_target(pr_svc, pr_number=None, branch="999")
 
 
 def test_resolve_pr_target_no_pr_for_branch():

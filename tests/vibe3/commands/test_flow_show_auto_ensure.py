@@ -89,17 +89,19 @@ def test_flow_show_numeric_issue_resolves_branch(
         flow_status="active",
     )
 
-    def get_flow_state(branch: str):
-        if branch == "task/issue-436":
-            return {"branch": branch}
-        return None
+    # Mock store with both get_flows_by_issue and get_events
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = [
+        {"branch": "task/issue-436", "flow_status": "active"}
+    ]
+    mock_store.get_events.return_value = []
+    mock_service.store = mock_store
 
     def get_flow_status(branch: str):
         if branch == "task/issue-436":
             return flow_status
         return None
 
-    mock_service.get_flow_state.side_effect = get_flow_state
     mock_service.get_flow_status.side_effect = get_flow_status
 
     # Mock resolver to return flow_status
@@ -107,16 +109,13 @@ def test_flow_show_numeric_issue_resolves_branch(
     mock_resolver.resolve.return_value = flow_status
     mock_resolver_cls.return_value = mock_resolver
 
-    # Mock store to return empty events
-    mock_store = MagicMock()
-    mock_store.get_events.return_value = []
-    mock_service.store = mock_store
-
     mock_service_cls.return_value = mock_service
 
     result = runner.invoke(app, ["flow", "show", "436"])
 
-    assert result.exit_code == 0
+    assert (
+        result.exit_code == 0
+    ), f"Exit code: {result.exit_code}, Output: {result.output}"
     # Should NOT call get_flow_timeline anymore (uses resolver + store.get_events)
     mock_service.get_flow_timeline.assert_not_called()
     # Should call resolver.resolve with resolved branch and parsed issue_number
