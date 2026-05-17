@@ -77,8 +77,8 @@ code_limits:
         limit: 470
         reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，已下沉 UI 和业务逻辑到 ui/ 和 services/ 层"
       - path: "src/vibe3/commands/pr_query.py"
-        limit: 450
-        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 成成、trace 输出等紧密耦合逻辑"
+        limit: 500
+        reason: "PR query 命令聚合，包含 PR 详情展示、inspect 生成、trace 输出、branch → PR 推导逻辑等紧密耦合功能"
       - path: "src/vibe3/commands/flow_manage.py"
         limit: 450
         reason: "Flow management 命令聚合，包含 update/bind/list-deleted/restore 四个完整命令，JsonOption→FormatOption 迁移增加必要的 deprecation handling blocks"
