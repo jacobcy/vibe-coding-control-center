@@ -650,17 +650,19 @@ class WorktreeManager(WorktreePRMixin):
         )
 
         if ctx is None:
-            # Fallback to repo_path if worktree creation failed
+            # CRITICAL: When use_worktree=True, creation failure must raise
+            # error. User explicitly requested worktree isolation, MUST NOT
+            # silently fallback to repo_path. Returning repo_path violates
+            # isolation requirement and confuses flow management.
             logger.bind(
                 domain="worktree",
                 issue=issue_number,
                 branch=branch,
-            ).warning("Worktree creation failed, falling back to repo_path")
-            return WorktreeContext(
-                path=self.repo_path,
-                is_temporary=False,
-                branch=branch,
-                issue_number=issue_number,
+            ).error("Worktree creation failed while use_worktree=True")
+            raise SystemError(
+                f"Failed to create worktree for issue #{issue_number} "
+                f"branch {branch}. User requested worktree isolation but "
+                "creation failed. Check git worktree status and disk space."
             )
 
         # Align to base for bootstrap entry

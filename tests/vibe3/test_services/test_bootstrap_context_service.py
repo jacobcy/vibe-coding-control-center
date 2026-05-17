@@ -1,6 +1,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.services.bootstrap_context_service import (
@@ -12,6 +14,34 @@ class FakeConfig:
     """Minimal config stub for WorktreeManager tests."""
 
     pass
+
+
+def test_worktree_manager_raises_on_creation_failure_when_worktree_requested(
+    tmp_path: Path,
+) -> None:
+    """CRITICAL: When use_worktree=True, creation failure must raise SystemError.
+
+    Previously fell back to repo_path, silently ignoring user's isolation request.
+    Now raises SystemError to prevent working on main repo without isolation.
+    """
+    from vibe3.exceptions import SystemError
+
+    manager = WorktreeManager(config=FakeConfig(), repo_path=tmp_path)
+
+    with patch(
+        "vibe3.environment.worktree.find_worktree_for_branch", return_value=None
+    ):
+        with patch.object(
+            manager,
+            "acquire_issue_worktree",
+            side_effect=RuntimeError("creation failed"),
+        ):
+            with pytest.raises(SystemError, match="Failed to create worktree"):
+                manager.resolve_bootstrap_worktree_context(
+                    branch="dev/issue-123",
+                    issue_number=123,
+                    use_worktree=True,
+                )
 
 
 def test_worktree_manager_can_describe_bootstrap_context(tmp_path: Path) -> None:
