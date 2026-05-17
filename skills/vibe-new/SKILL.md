@@ -1,253 +1,101 @@
 ---
 name: vibe-new
-description: Use when starting or switching to a new human-collaboration task. Confirm the target issue, create or switch to the corresponding dev/issue branch, register and bind the flow, and link the branch to a draft PR when appropriate. Do not use for resuming an existing branch; use vibe-continue instead.
+description: Use when starting or switching to a new human-collaboration task. Confirm the target issue, bootstrap the corresponding dev/issue flow scene, and hand off to the chosen implementation workflow. Do not use for resuming an existing branch; use vibe-continue instead.
 ---
 
-# /vibe-new - 新任务入口
+# /vibe-new
 
-从 issue 到 branch / flow / PR 创联的人机协作入口。
+从 issue 进入一个新的协作 flow。
 
-如果用户给的是 spec、计划文档或需求草案，而不是明确的 issue，`/vibe-new` 不应直接拿 spec 进入 flow；标准动作是先通过 `/vibe-issue` 查重、确认或创建可追踪的 GitHub issue，再回到 `/vibe-new` 继续 branch / flow / PR 创联。
+## 1. 先确认是否适合进入 `/vibe-new`
 
-**完成后状态**：目标 issue 已确认，`dev/issue-<id>` 分支已就绪，flow 已注册并绑定；若当前分支已具备可发 PR 的条件，PR draft 也已创联。
-
----
-
-## 核心职责
-
-1. 确认目标 issue；若当前输入只是 spec，则先通过 `/vibe-issue` 落 issue
-2. 创建或切换到人机协作分支（`dev/issue-<id>`）
-3. 注册 flow 并绑定 issue
-4. 在合适时创建 PR draft，完成 issue-branch-pr 创联
-5. 停止并等待用户开始编码
-
-**不做的事**：不写业务代码，不进入实现，不跨 worktree 调度。
-
----
-
-## 停止点
-
-完成后输出：
-
-- ✅ issue 已确认
-- ✅ branch 已切到目标 `dev/issue-<id>` 现场
-- ✅ flow 已创建/注册并绑定 issue
-- ✅ PR draft 已创联（若本轮已满足创建条件）
-- **下一步**：开始编码，完成后运行 `/vibe-commit`
-
----
-
-## 完整流程
-
-```
-/vibe-new <feature>
-  ├─ Step 1: 读取当前上下文
-  │   ├─ vibe3 flow show
-  │   ├─ vibe3 task status --all --check
-  │   └─ 检查当前 branch、flow、已绑定 issue
-  │
-  ├─ Step 2: 确认目标 issue
-  │   ├─ 用户指定 → 直接使用
-  │   ├─ 用户给的是 spec / plan / 需求草案 → 调用 /vibe-issue 查重并创建 issue
-  │   ├─ 无 issue → 调用 /vibe-issue 创建
-  │   └─ gh issue view <number> 确认内容
-  │
-  ├─ Step 3: 准备 flow
-  │   ├─ 场景A：需要新分支
-  │   │   ├─ git checkout -b dev/issue-<id>
-  │   │   ├─ vibe3 flow update
-  │   │   ├─ vibe3 flow bind <issue> --role task
-  │   │   └─ vibe3 snapshot save --as-baseline  # 保存开发起点 baseline
-  │   ├─ 场景B：已在目标分支，首次注册
-  │   │   ├─ vibe3 flow update
-  │   │   ├─ vibe3 flow bind <issue> --role task
-  │   │   └─ vibe3 snapshot save --as-baseline  # 保存开发起点 baseline
-  │   └─ 场景C：已有 flow，只需绑定新 issue
-  │       └─ vibe3 flow bind <issue> --role task
-  │
-  ├─ Step 4: 创联 PR（按需）
-  │   └─ vibe3 pr create --agent --title "..." --body "..."
-  │
-  └─ Step 5: 写入 handoff 并停止
-      └─ vibe3 handoff append "vibe-new: ready to code" --actor vibe-new --kind milestone
-```
-
----
-
-## Workflow
-
-### Step 1: 读取当前上下文
+先看当前现场：
 
 ```bash
-vibe3 flow show       # 当前 branch 的 flow 详情
-vibe3 task status --all  # 全局 flow / issue / PR 上下文总览
-```
-
-检查点：
-
-- 当前 branch 是否已有 flow？（`flow show` 能正常输出）
-- 当前 flow 是否已绑定 task issue？
-- 当前 flow 是否已有 PR？（有 PR 则不得在此 flow 继续开发新目标）
-
-若当前 flow 已有 PR 或当前目标已经变化，必须切到新 branch 进入新 flow；旧 PR 的整合与收口交给 `/vibe-integrate` / `/vibe-done`，不要把旧 flow 继续伪装成新目标。
-
-### Step 2: 确认目标 issue
-
-```bash
-# 查看 issue 内容
-gh issue view <number>
-
-# 若无 issue，调用 /vibe-issue 创建
-```
-
-补充规则：
-
-- 如果用户给的是 `spec_ref`、计划文档路径、设计稿或一段需求描述，先把它当作 issue intake 输入，而不是 flow 输入。
-- `/vibe-new` 在这种场景下应先显式切到 `/vibe-issue`：查重现有 issue，必要时用 spec 内容整理并创建新 issue。
-- 只有 issue 已存在且可追踪时，才继续创建 `dev/issue-<id>` 分支、执行 `flow update` / `flow bind`，并在后续按需创联 PR。
-- spec 的价值是帮助定义 issue 范围与验收边界，不替代 issue 在执行链中的追踪职责。
-
-### Step 3: 准备 flow
-
-**场景 A：当前在 main/无关分支，需要新建人机协作分支**
-
-```bash
-# 1. 创建新分支（人机协作统一使用 dev/issue-<id>）
-git checkout -b dev/issue-123
-
-# 2. 注册当前分支为 flow，并设置 actor 署名
-vibe3 flow update --actor <your-identity>
-
-# 3. 绑定 task issue
-vibe3 flow bind 123 --role task
-
-# 4. 保存开发起点 baseline（用于后续结构对比）
-vibe3 snapshot save --as-baseline
-```
-
-**重要**：`--actor` 参数用于记录当前操作的执行者，是 Contributors 块的数据来源。建议格式：
-- Agent: `claude/sonnet-4.6`、`gemini`、`codex`
-- Human: `jacob`、`username`
-
-**baseline 用途**：记录开发起点的代码库结构，供 `vibe3 snapshot diff` 对比分析开发过程中的结构变化（模块增删、依赖变化、LOC 增长等）。
-
-**场景 B：已经 `git checkout -b` 切到新分支，需要注册 flow**
-
-```bash
-# 注册当前分支为 flow，并设置 actor 署名
-vibe3 flow update --actor <your-identity>
-
-# 绑定 task issue
-vibe3 flow bind <issue-number> --role task
-
-# 保存开发起点 baseline
-vibe3 snapshot save --as-baseline
-```
-
-**场景 C：已有 flow，需要追加绑定更多 issue**
-
-```bash
-# 绑定关联 issue（非主任务）
-vibe3 flow bind <issue-number> --role related
-
-# 绑定依赖 issue
-vibe3 flow bind <issue-number> --role dependency
-```
-
-### Step 4: 创联 PR draft（按需）
-
-**Agent 使用 vibe3 pr create --agent**：
-
-**重要**：Agent 模式必须提供 `-t` (title) 和 `-b` (body)，不允许交互式输入。
-
-```bash
-vibe3 pr create --agent -t "feat: <feature-name>" -b "## Summary
-
-- <bullet points>
-
-## Test Plan
-
-- [ ] <test items>
-
-Closes #<issue-number>"
-```
-
-**人类用户使用 vibe3 pr create --yes**：
-
-```bash
-vibe3 pr create --yes
-```
-
-**说明**：
-- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
-- `vibe3 pr create --yes` 是人类专用入口，需要明确确认
-- Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
-- Agent 模式必须提供完整的 `-t` (title) 和 `-b` (body)，否则报错
-
-该步骤只在当前分支已经具备可发 PR 的条件时执行。PR draft 用于：
-
-- 占位（表明此分支已有开发计划）
-- 触发 CI 流水线
-- 记录开发范围（在 PR body 中关联 issue）
-
-若当前分支还没有合适的提交或 diff，不要为了占位制造空 commit；直接写 handoff，等首个有效提交后再创联 PR。
-
-### Step 5: 写入 handoff 并停止
-
-```bash
-vibe3 handoff append "vibe-new: flow ready, PR draft created" \
-  --actor vibe-new --kind milestone
-```
-
-记录格式：
-
-```markdown
-## Skill Handoff
-
-- skill: vibe-new
-- updated_at: <ISO-8601>
-- issue: <issue-number>
-- flow: <flow-slug>
-- branch: <branch-name>
-- pr: <pr-draft-number>
-- next: 开始编码，完成后运行 /vibe-commit
-```
-
-然后停止，等待用户开始编码。
-
----
-
-## 有依赖时的处理
-
-如果当前任务依赖另一个 issue 未完成：
-
-```bash
-# 完成 flow 创建后，立即标记为 blocked
-vibe3 flow blocked --task <blocking-issue-number> --reason "需要 #X 先完成"
-
-# 可安全切走处理其他任务
-git checkout <other-branch>
-
-# 依赖解除后切回来继续
-git checkout <this-branch>
 vibe3 flow show
+git status
 ```
 
----
+只在下面场景继续：
+- 已经有明确的 issue number
+- 或用户先经过 `/vibe-issue` 完成了 issue intake
 
-## 核心边界
+如果当前目标只是恢复已有 branch / flow，改用 `/vibe-continue`。
 
-- 允许：读取 flow 状态、创建/切换 branch、注册 flow、绑定 issue、按需创建 PR draft、写入 handoff
-- 不允许：修改业务代码、进入实现阶段、跨 worktree 调度、未经授权创建物理 worktree（`wtnew`、`git worktree add`）
-- 若当前 flow 已有 PR：只能为下一个目标准备新 flow，不得继续在当前 flow 堆新目标
+## 2. 询问两件事
 
-## Restrictions
+只需要确认：
+- 用当前仓库还是新建 worktree
+- 后续打算走哪条实现 workflow
 
-- 不得把 handoff 当真源，必须先核查 `vibe3 flow show` 输出
-- 不得在没有 issue 的情况下创建 flow（issue 是 flow 的规划依据）
-- 如果当前输入只是 spec / plan / 需求草案，不得跳过 `/vibe-issue` 直接建 flow
-- 正确使用 `flow update` 和 `flow bind`：
-  - `flow update --actor <identity>` - 注册当前分支为 flow（幂等操作，可重复调用），**必须设置 actor 署名**
-  - `flow bind` - 绑定 issue 到当前 flow
-  - 不要混用其他命令尝试注册或绑定
-- 恢复已有 branch / flow 时不要再用已废弃的 `/vibe-start`，统一使用 `/vibe-continue`
+可推荐但不强绑：
+- `superpowers:writing-plans`
+- `superpowers:executing-plans`
+- `openspec:ff`
+- repo-native `vibe3 plan/run/review`
+
+## 3. Bootstrap flow scene
+
+标准调用方式：
+
+```bash
+vibe3 internal bootstrap-flow <issue-number> --branch dev/issue-<id> [--worktree]
+```
+
+如果需要补充 issue 关系：
+
+```bash
+vibe3 internal bootstrap-flow <issue-number> \
+  --branch dev/issue-<id> \
+  [--worktree] \
+  [--related <issue-number>]... \
+  [--dependency <issue-number>]...
+```
+
+**注意**：标准调用会自动 `git fetch origin` 确保基准分支最新。如果因特殊情况需要手动创建 worktree 和分支，记得先拉取最新代码：
+
+```bash
+git pull origin main
+git checkout -b dev/issue-<id>
+```
+
+这个命令会走共享底层路径，完成：
+- branch/flow bootstrap
+- task issue 绑定
+- related issue 绑定
+- dependency issue 阻塞登记
+- worktree context 准备（如果传了 `--worktree`）
+
+## 4. 记录 handoff
+
+bootstrap 成功后记录稳定恢复点：
+
+```bash
+vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
+```
+
+## 5. 按需继续
+
+如果已经具备条件，可以继续：
+
+```bash
+vibe3 pr create --agent -t "..." -b "..."
+```
+
+或者停在这里，转入用户选择的实现 workflow。
+
+## 停止条件
+
+完成后应能明确说出：
+- issue 已确认
+- `dev/issue-<id>` flow 已 ready
+- 如果请求了 worktree，执行目录也已 ready
+- handoff 已记录
+- 下一步建议的 workflow 已明确
+
+## 限制
+
+- 不在 skill 层手工拼接 `flow update` / `flow bind` / `wtnew` 作为 bootstrap 真源
+- 不在没有 issue 的情况下创建 flow
+- 不进入业务实现阶段
+- 不把 handoff 当真源；先看 `vibe3 flow show`

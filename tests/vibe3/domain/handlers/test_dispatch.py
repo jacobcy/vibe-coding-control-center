@@ -37,12 +37,12 @@ class TestPlannerDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
-    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_planner_dispatch_delegates_to_role_builder(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
+        mock_load_issue: MagicMock,
         mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
@@ -52,11 +52,9 @@ class TestPlannerDispatchHandler:
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.return_value = config
 
-        # Mock GitHub issue loading
-        mock_github_cls.return_value.view_issue.return_value = {
-            "title": "Test issue",
-            "labels": [],
-        }
+        # Mock issue loading
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
 
         # Mock get_store context manager
         mock_store = MagicMock()
@@ -105,12 +103,12 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.build_run_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
-    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_executor_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
+        mock_load_issue: MagicMock,
         mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
@@ -120,10 +118,8 @@ class TestExecutorDispatchHandler:
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.return_value = config
 
-        mock_github_cls.return_value.view_issue.return_value = {
-            "title": "Test issue",
-            "labels": [],
-        }
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
 
         # Mock flow_state with plan_ref (normal implementation path)
         mock_store = MagicMock()
@@ -167,12 +163,12 @@ class TestExecutorDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.build_run_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
-    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_executor_dispatch_publish_path_from_merge_ready(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
+        mock_load_issue: MagicMock,
         mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
@@ -183,10 +179,8 @@ class TestExecutorDispatchHandler:
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.return_value = config
 
-        mock_github_cls.return_value.view_issue.return_value = {
-            "title": "Test issue",
-            "labels": [],
-        }
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
 
         mock_store = MagicMock()
         mock_store.get_flow_state.return_value = {
@@ -225,12 +219,12 @@ class TestReviewerDispatchHandler:
     @patch("vibe3.domain.handlers.dispatch.build_review_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
-    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_reviewer_dispatch_reads_flow_state(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
+        mock_load_issue: MagicMock,
         mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
@@ -240,10 +234,8 @@ class TestReviewerDispatchHandler:
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.return_value = config
 
-        mock_github_cls.return_value.view_issue.return_value = {
-            "title": "Test issue",
-            "labels": [],
-        }
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
 
         # Mock flow_state with report_ref
         mock_store = MagicMock()
@@ -289,12 +281,12 @@ class TestDispatchNotLaunched:
     @patch("vibe3.domain.handlers.dispatch.build_plan_request")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.get_store")
-    @patch("vibe3.domain.handlers.dispatch.GitHubClient")
+    @patch("vibe3.domain.handlers.dispatch.load_issue_info")
     @patch("vibe3.domain.handlers.dispatch.load_orchestra_config")
     def test_dispatch_not_launched_logs_warning(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
+        mock_load_issue: MagicMock,
         mock_get_store: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_build_request: MagicMock,
@@ -304,10 +296,8 @@ class TestDispatchNotLaunched:
         config = MagicMock(dry_run=False, repo="owner/repo")
         mock_config_cls.return_value = config
 
-        mock_github_cls.return_value.view_issue.return_value = {
-            "title": "Test issue",
-            "labels": [],
-        }
+        mock_issue = MagicMock(number=42, title="Test issue")
+        mock_load_issue.return_value = mock_issue
 
         # Mock get_store
         mock_store = MagicMock()

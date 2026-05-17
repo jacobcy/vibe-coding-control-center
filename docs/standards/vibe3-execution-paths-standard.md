@@ -217,4 +217,46 @@ Issue 476 不是为了证明 “orchestra 必须拿回 callback 结果”。
 - async wrapper 只防阻塞
 - sync shell 负责 gate/callback/handoff/lifecycle
 
+---
+
+## 7. Flow Scene Lifecycle Ownership
+
+Flow/worktree lifecycle 的所有权边界：
+
+### 7.1 Ownership 分层
+
+**FlowOrchestratorService**：
+- bootstrap (创建新 flow scene)
+- reactivate (重新激活现有 flow)
+- rebuild (cleanup + re-bootstrap for stale/aborted flows)
+- cleanup delegation (委托给 FlowCleanupService)
+
+**FlowCleanupService**：
+- 破坏性清理执行器（worktree/branch/handoff/flow record 删除）
+- 被 FlowOrchestratorService 调用，不独立决策
+
+**WorktreeManager**：
+- acquire/reuse/release 资源管理
+- 低层 executor，不参与 lifecycle 决策
+
+**FlowManager** (orchestra/flow_dispatch.py)：
+- orchestra dispatch policy only
+- capacity checks, branch selection, reusable-flow selection
+- 委托给 FlowOrchestratorService（不直接执行 lifecycle）
+
+### 7.2 执行路径所有权
+
+Orchestra 和 skill 都是不同组装器，通过相同 lifecycle primitives：
+
+- Orchestra 可能派发 public 或 internal 命令（取决于 role semantics）
+- 命令选择不定义 lifecycle truth
+- Flow/worktree lifecycle truth 位于共享 Python services
+- Skills 和 orchestra 是相同 lifecycle primitives 的不同 assembler
+
+**关键约束**：
+- FlowManager 不得直接执行 Git mutations（如 worktree removal, branch delete）
+- FlowManager 只做 policy dispatch，委托给 FlowOrchestratorService
+- Skills 调用 `vibe3 internal bootstrap-flow`，后者调用 FlowOrchestratorService
+- 所有 lifecycle 决策在 service 层，execution 层只派发
+
 是否还要进一步做结构收口，需要以独立实现和回归验证为准，而不是直接从现状文档化推导结论。

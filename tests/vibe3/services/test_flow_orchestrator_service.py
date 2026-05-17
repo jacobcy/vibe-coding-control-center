@@ -1,8 +1,12 @@
 """Tests for FlowOrchestratorService."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.models.orchestration import IssueInfo
+from vibe3.models.pr import PRState
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
@@ -51,3 +55,299 @@ def test_flow_orchestrator_snapshot_returns_none_when_unreachable() -> None:
         snapshot = service.snapshot()
 
         assert snapshot is None
+
+
+def test_bootstrap_issue_flow_checkouts_branch_in_non_worktree_mode() -> None:
+    """CRITICAL: Non-worktree mode must checkout newly created branch.
+
+    Without this, user stays on current branch while flow is on dev/issue-XXX,
+    causing git history pollution (user commits on wrong branch).
+    """
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "dev/issue-999",
+        "flow_slug": "issue-999",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-999"})
+    )
+
+    # CRITICAL: ensure_worktree=False triggers checkout
+    result = service.bootstrap_issue_flow(
+        IssueInfo(number=999, title="Checkout test"),
+        branch="dev/issue-999",
+        source="skill",
+        ensure_worktree=False,
+    )
+
+    # Verify fetch, create_branch, AND checkout were called
+    git.fetch.assert_called_once_with("origin")
+    git.create_branch_ref.assert_called_once_with(
+        "dev/issue-999", start_ref=config.scene_base_ref
+    )
+    git.switch_branch.assert_called_once_with("dev/issue-999")
+    assert result["branch"] == "dev/issue-999"
+
+
+def test_bootstrap_issue_flow_skips_checkout_in_worktree_mode() -> None:
+    """Worktree mode should NOT checkout branch (worktree handles isolation)."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "dev/issue-888",
+        "flow_slug": "issue-888",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-888"})
+    )
+
+    # Mock worktree resolution
+    with patch(
+        "vibe3.services.flow_orchestrator_service.WorktreeManager"
+    ) as worktree_cls:
+        worktree = worktree_cls.return_value
+        worktree.resolve_bootstrap_worktree_context.return_value = MagicMock(
+            path="/tmp/repo/.worktrees/dev-issue-888"
+        )
+
+        result = service.bootstrap_issue_flow(
+            IssueInfo(number=888, title="Worktree test"),
+            branch="dev/issue-888",
+            source="skill",
+            ensure_worktree=True,  # Worktree mode
+        )
+
+    # Verify fetch and create_branch were called, but checkout was NOT
+    git.fetch.assert_called_once_with("origin")
+    git.create_branch_ref.assert_called_once_with(
+        "dev/issue-888", start_ref=config.scene_base_ref
+    )
+    # CRITICAL: switch_branch should NOT be called in worktree mode
+    git.switch_branch.assert_not_called()
+    assert result["branch"] == "dev/issue-888"
+
+
+def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "dev/issue-501",
+        "flow_slug": "issue-501",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-501"})
+    )
+    service.task_service.link_issue = MagicMock()
+    service.flow_service.block_flow = MagicMock()
+
+    result = service.bootstrap_issue_flow(
+        IssueInfo(number=501, title="Bootstrap me"),
+        branch="dev/issue-501",
+        source="skill",
+        related_issue_numbers=(601,),
+        dependency_issue_numbers=(701,),
+    )
+
+    # Verify fetch was called before branch creation
+    git.fetch.assert_called_once_with("origin")
+    git.create_branch_ref.assert_called_once_with(
+        "dev/issue-501", start_ref=config.scene_base_ref
+    )
+    service.task_service.link_issue.assert_any_call(
+        "dev/issue-501", 501, "task", actor=None
+    )
+    service.task_service.link_issue.assert_any_call(
+        "dev/issue-501", 601, "related", actor=None
+    )
+    service.flow_service.block_flow.assert_called_once_with(
+        "dev/issue-501",
+        blocked_by_issue=701,
+        actor=None,
+    )
+    assert result["branch"] == "dev/issue-501"
+
+
+def test_create_flow_for_issue_uses_shared_bootstrap_interface() -> None:
+    config = load_orchestra_config()
+    service = FlowOrchestratorService(config)
+    issue = IssueInfo(number=777, title="Shared bootstrap")
+
+    with patch.object(
+        service, "bootstrap_issue_flow", return_value={"branch": "task/issue-777"}
+    ) as mock_bootstrap:
+        with patch.object(service.store, "get_flows_by_issue", return_value=[]):
+            with patch.object(service.store, "get_flow_state", return_value=None):
+                result = service.create_flow_for_issue(issue)
+
+    mock_bootstrap.assert_called_once()
+    assert result == {"branch": "task/issue-777"}
+
+
+def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
+    config = load_orchestra_config()
+    service = FlowOrchestratorService(
+        config, store=MagicMock(), git=MagicMock(), github=MagicMock()
+    )
+    issue = IssueInfo(number=320, title="Rebuild lifecycle")
+    service.get_pr_for_issue = MagicMock(return_value=None)
+
+    with patch(
+        "vibe3.services.flow_orchestrator_service.FlowCleanupService"
+    ) as cleanup_cls:
+        cleanup = cleanup_cls.return_value
+        cleanup.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": True,
+            "handoff": True,
+            "flow_record": True,
+        }
+        with patch.object(
+            service,
+            "bootstrap_issue_flow",
+            return_value={"branch": "task/issue-320"},
+        ) as mock_bootstrap:
+            result = service.rebuild_stale_issue_flow(
+                issue, branch="task/issue-320", slug="issue-320"
+            )
+
+    cleanup.cleanup_flow_scene.assert_called_once_with(
+        "task/issue-320",
+        include_remote=False,
+        terminate_sessions=False,
+        keep_flow_record=True,
+        force_delete=False,
+    )
+    mock_bootstrap.assert_called_once()
+    assert result == {"branch": "task/issue-320"}
+
+
+def test_get_pr_for_issue_passes_repo_to_github_fallback() -> None:
+    """HIGH: GitHub fallback must pass repo parameter to get_pr_for_issue."""
+    config = load_orchestra_config()
+    config.repo = "owner/repo"
+    store = MagicMock()
+    github = MagicMock()
+    service = FlowOrchestratorService(config, store=store, github=github)
+
+    # No PR in flow record, trigger GitHub fallback
+    service.get_flow_for_issue = MagicMock(return_value=None)
+    github.get_pr_for_issue = MagicMock(return_value=42)
+
+    result = service.get_pr_for_issue(123)
+
+    # HIGH: Verify repo parameter was passed
+    github.get_pr_for_issue.assert_called_once_with(123, repo="owner/repo")
+    assert result == 42
+
+
+def test_get_pr_for_issue_returns_flow_pr_without_github_call() -> None:
+    """If PR in flow record, GitHub API should not be called."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    github = MagicMock()
+    service = FlowOrchestratorService(config, store=store, github=github)
+
+    # PR already in flow record
+    service.get_flow_for_issue = MagicMock(
+        return_value={"pr_number": 99, "branch": "dev/issue-123"}
+    )
+
+    result = service.get_pr_for_issue(123)
+
+    # GitHub API should NOT be called
+    github.get_pr_for_issue.assert_not_called()
+    assert result == 99
+
+
+def test_bootstrap_issue_flow_cleans_up_orphan_branch_on_failure() -> None:
+    """HIGH: Verify orphan branch deleted when bootstrap fails after creation."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    # Simulate failure after branch creation
+    service.flow_service.create_flow = MagicMock(
+        side_effect=RuntimeError("Database connection failed")
+    )
+
+    with pytest.raises(RuntimeError, match="Database connection failed"):
+        service.bootstrap_issue_flow(
+            IssueInfo(number=999, title="Bootstrap failure test"),
+            branch="dev/issue-999",
+            source="skill",
+        )
+
+    # Verify branch was created
+    git.create_branch_ref.assert_called_once()
+    # HIGH: Verify branch cleanup was attempted
+    git.delete_branch.assert_called_once_with("dev/issue-999", force=True)
+
+
+def test_bootstrap_issue_flow_preserves_existing_branch_on_failure() -> None:
+    """Existing branch should NOT be deleted on bootstrap failure."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = True  # Branch already exists
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = None
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    # Simulate failure
+    service.flow_service.create_flow = MagicMock(
+        side_effect=RuntimeError("Flow creation failed")
+    )
+
+    with pytest.raises(RuntimeError, match="Flow creation failed"):
+        service.bootstrap_issue_flow(
+            IssueInfo(number=888, title="Existing branch test"),
+            branch="dev/issue-888",
+            source="skill",
+        )
+
+    # Branch was NOT created (already existed)
+    git.create_branch_ref.assert_not_called()
+    # HIGH: Branch cleanup should NOT be attempted
+    git.delete_branch.assert_not_called()
+
+
+def test_rebuild_stale_issue_flow_returns_none_when_pr_already_merged() -> None:
+    config = load_orchestra_config()
+    github = MagicMock()
+    github.get_pr.return_value = MagicMock(
+        state=PRState.MERGED, merged_at="2026-05-17T00:00:00Z"
+    )
+    service = FlowOrchestratorService(
+        config, store=MagicMock(), git=MagicMock(), github=github
+    )
+    issue = IssueInfo(number=321, title="Merged already")
+    service.get_pr_for_issue = MagicMock(return_value=987)
+
+    result = service.rebuild_stale_issue_flow(
+        issue, branch="task/issue-321", slug="issue-321"
+    )
+
+    assert result is None

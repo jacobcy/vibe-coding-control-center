@@ -99,3 +99,17 @@ def test_flow_bind_supports_multiple_dependency_issues(
     assert flow_service.block_flow.call_count == 2
     assert flow_service.block_flow.call_args_list[0].kwargs["blocked_by_issue"] == 248
     assert flow_service.block_flow.call_args_list[1].kwargs["blocked_by_issue"] == 249
+
+
+def test_flow_update_remains_atomic_command_surface() -> None:
+    """Guard against replacing flow bootstrap with a monolithic command."""
+    from vibe3.commands.flow_manage import update
+
+    assert callable(update)
+
+
+def test_flow_bind_remains_atomic_command_surface() -> None:
+    """Guard against replacing flow bootstrap with a monolithic command."""
+    from vibe3.commands.flow_manage import bind
+
+    assert callable(bind)

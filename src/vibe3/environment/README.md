@@ -90,3 +90,18 @@ Worktree Manager
 2. **生命周期管理**：worktree 自动回收，避免资源泄漏
 3. **并发安全**：session 注册表确保同一 worktree 不会被并发访问
 4. **路径对齐**：支持 auto-scene 对齐到 base 分支
+
+### Bootstrap 资源解析
+
+`WorktreeManager.resolve_bootstrap_worktree_context()` 提供最小资源接口，
+供 `vibe-new` bootstrap 阶段调用：
+
+**职责边界**：
+- ✅ 解析物理执行环境（worktree 或当前仓库）
+- ✅ 返回 WorktreeContext 描述
+- ❌ 不执行 issue intake、flow bind、snapshot 等业务逻辑
+- ❌ 不编排 workflow 选择
+
+**调用方**：
+- `BootstrapContextService` 通过 action plan 引用此接口
+- Skill 层负责编排，environment 层只提供资源描述

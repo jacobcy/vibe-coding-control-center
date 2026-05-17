@@ -1,8 +1,12 @@
 """Internal system commands for Orchestra routing (hidden from users)."""
 
+import json
 from typing import Annotated
 
 import typer
+
+from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.services.issue_context_loader import load_issue_info
 
 app = typer.Typer(
     name="internal",
@@ -88,3 +92,63 @@ def internal_governance_dispatch(
     from vibe3.services.scan_service import dispatch_governance_execution
 
     dispatch_governance_execution(material_override=material)
+
+
+@app.command("bootstrap-flow")
+def internal_bootstrap_flow(
+    issue: Annotated[int, typer.Argument(help="Issue number to bootstrap")],
+    branch: Annotated[
+        str,
+        typer.Option("--branch", help="Target flow branch"),
+    ],
+    use_worktree: Annotated[
+        bool,
+        typer.Option(
+            "--worktree",
+            help="Resolve or create worktree context for the target branch",
+        ),
+    ] = False,
+    related_issue_numbers: Annotated[
+        list[int] | None,
+        typer.Option("--related", help="Bind additional related issue number"),
+    ] = None,
+    dependency_issue_numbers: Annotated[
+        list[int] | None,
+        typer.Option("--dependency", help="Bind blocking dependency issue number"),
+    ] = None,
+    source: Annotated[
+        str,
+        typer.Option("--source", help="Bootstrap source label"),
+    ] = "skill",
+    reactivate_existing: Annotated[
+        bool,
+        typer.Option(
+            "--reactivate-existing",
+            help="Reactivate existing flow instead of creating a new one",
+        ),
+    ] = False,
+) -> None:
+    """Bootstrap a standardized flow scene through the shared service path."""
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+
+    config = load_orchestra_config()
+    store = SQLiteClient()
+    git = GitClient()
+    github = GitHubClient()
+    issue_info = load_issue_info(issue, config=config, github=github)
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+
+    result = service.bootstrap_issue_flow(
+        issue_info,
+        branch=branch,
+        slug=f"issue-{issue_info.number}",
+        source=source,
+        ensure_worktree=use_worktree,
+        reactivate_existing=reactivate_existing,
+        related_issue_numbers=tuple(related_issue_numbers or ()),
+        dependency_issue_numbers=tuple(dependency_issue_numbers or ()),
+    )
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False, default=str))

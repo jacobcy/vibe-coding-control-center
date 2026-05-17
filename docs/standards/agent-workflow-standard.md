@@ -151,6 +151,17 @@ codeagent-wrapper cleanup
 
 ## 三、使用场景
 
+### 3.0 vibe-new Bootstrap 流程
+
+**重要说明**：
+- `vibe-new` 不对应单一大总命令
+- Bootstrap 通过原子能力拼接完成，例如：
+  - `vibe3 flow update`
+  - `vibe3 flow bind`
+  - `vibe3 snapshot save --as-baseline`
+  - `vibe3 handoff append`
+- 若需要物理 worktree，由 `environment` 提供资源解析接口，不扩大为业务编排入口
+
 ### 3.1 新功能开发
 
 **推荐流程**：

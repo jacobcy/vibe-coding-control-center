@@ -21,11 +21,11 @@ class TestWorktreePathRecording:
             config.scene_base_ref = "main"
             wm = WorktreeManager(config, repo_path)
 
-            with patch("vibe3.environment.worktree.SQLiteClient") as mock_cls:
+            with patch("vibe3.environment.worktree_lifecycle.SQLiteClient") as mock_cls:
                 mock_store = MagicMock()
                 mock_cls.return_value = mock_store
 
-                wm._record_worktree_path("task/issue-100", "/some/path")
+                wm.lifecycle.record_worktree_path("task/issue-100", "/some/path")
                 mock_store.update_flow_state.assert_called_once_with(
                     "task/issue-100", worktree_path="/some/path"
                 )
@@ -51,9 +51,13 @@ class TestResolveManagerCwd:
             wm = WorktreeManager(config, repo_path)
 
             with (
-                patch.object(wm, "_validate_branch_matches", return_value=True),
+                patch.object(
+                    wm.lifecycle, "validate_branch_matches", return_value=True
+                ),
                 patch.object(wm, "align_auto_scene_to_base", return_value=True),
-                patch("vibe3.environment.worktree.SQLiteClient") as mock_store_cls,
+                patch(
+                    "vibe3.environment.worktree_lifecycle.SQLiteClient"
+                ) as mock_store_cls,
             ):
                 mock_store = MagicMock()
                 mock_store.get_flow_state.return_value = {
@@ -78,12 +82,15 @@ class TestResolveManagerCwd:
             wm = WorktreeManager(config, repo_path)
 
             with (
-                patch("vibe3.environment.worktree.SQLiteClient") as mock_store_cls,
                 patch(
-                    "vibe3.environment.worktree.is_current_branch", return_value=False
+                    "vibe3.environment.worktree_lifecycle.SQLiteClient"
+                ) as mock_store_cls,
+                patch(
+                    "vibe3.environment.worktree_support.is_current_branch",
+                    return_value=False,
                 ),
                 patch(
-                    "vibe3.environment.worktree.find_worktree_for_branch",
+                    "vibe3.environment.worktree_support.find_worktree_for_branch",
                     return_value=None,
                 ),
             ):
@@ -107,12 +114,8 @@ class TestResolveManagerCwd:
                         mock_acquire.assert_called_once()
 
     def test_validate_branch_matches_exact_ref(self):
-        """_validate_branch_matches returns True when HEAD matches expected branch."""
-        from unittest.mock import patch
-
-        config = MagicMock()
-        config.scene_base_ref = "main"
-        wm = WorktreeManager(config, Path("/repo"))
+        """validate_branch_matches returns True when HEAD matches expected branch."""
+        from vibe3.environment.worktree_lifecycle import WorktreeLifecycle
 
         wt_path = Path("/wt")
         expected_branch = "task/issue-100"
@@ -121,16 +124,12 @@ class TestResolveManagerCwd:
         mock_result = MagicMock()
         mock_result.stdout = "task/issue-100\n"
         with patch("subprocess.run", return_value=mock_result):
-            result = wm._validate_branch_matches(wt_path, expected_branch)
+            result = WorktreeLifecycle.validate_branch_matches(wt_path, expected_branch)
             assert result is True
 
     def test_validate_branch_matches_rejects_mismatch(self):
         """Return False when HEAD references a different branch."""
-        from unittest.mock import patch
-
-        config = MagicMock()
-        config.scene_base_ref = "main"
-        wm = WorktreeManager(config, Path("/repo"))
+        from vibe3.environment.worktree_lifecycle import WorktreeLifecycle
 
         wt_path = Path("/wt")
         expected_branch = "task/issue-100"
@@ -139,7 +138,7 @@ class TestResolveManagerCwd:
         mock_result = MagicMock()
         mock_result.stdout = "task/issue-200\n"
         with patch("subprocess.run", return_value=mock_result):
-            result = wm._validate_branch_matches(wt_path, expected_branch)
+            result = WorktreeLifecycle.validate_branch_matches(wt_path, expected_branch)
             assert result is False
 
 

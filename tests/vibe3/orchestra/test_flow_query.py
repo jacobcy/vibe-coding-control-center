@@ -1,6 +1,6 @@
 """Tests for FlowManager query operations."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -109,3 +109,52 @@ class TestFlowQuery:
                     count = manager.get_active_flow_count()
 
         assert count == 1
+
+    def test_create_flow_for_issue_delegates_bootstrap_to_shared_service(self):
+        config = OrchestraConfig(max_concurrent_flows=5)
+        registry = MagicMock()
+        manager = FlowManager(config, registry=registry)
+        issue = make_issue(320, "Bootstrap shared")
+
+        with patch.object(
+            registry,
+            "count_live_worker_sessions",
+            return_value=0,
+        ):
+            with patch.object(
+                manager._bootstrap_service,
+                "bootstrap_issue_flow",
+                return_value={"branch": "task/issue-320"},
+            ) as mock_bootstrap:
+                with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
+                    with patch.object(
+                        manager.store, "get_flow_state", return_value=None
+                    ):
+                        result = manager.create_flow_for_issue(issue)
+
+        mock_bootstrap.assert_called_once()
+        assert result == {"branch": "task/issue-320"}
+
+    def test_create_flow_for_issue_delegates_stale_rebuild_to_shared_service(
+        self,
+    ):
+        config = OrchestraConfig(max_concurrent_flows=5)
+        manager = FlowManager(config, registry=MagicMock())
+        issue = make_issue(320, "Rebuild me")
+
+        with patch.object(
+            manager._bootstrap_service,
+            "rebuild_stale_issue_flow",
+            return_value={"branch": "task/issue-320"},
+        ) as mock_rebuild:
+            with patch.object(
+                manager.store,
+                "get_flows_by_issue",
+                return_value=[{"branch": "task/issue-320", "flow_status": "stale"}],
+            ):
+                result = manager.create_flow_for_issue(issue)
+
+        mock_rebuild.assert_called_once_with(
+            issue, branch="task/issue-320", slug="issue-320"
+        )
+        assert result == {"branch": "task/issue-320"}

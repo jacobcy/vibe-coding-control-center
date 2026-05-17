@@ -6,46 +6,13 @@ import typer
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.session_service import load_session_id
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec
 from vibe3.services.actor_support import format_agent_actor
-
-
-def _load_issue_info(config: OrchestraConfig, issue_number: int) -> IssueInfo:
-    issue_payload = GitHubClient().view_issue(issue_number, repo=config.repo)
-    if not isinstance(issue_payload, dict):
-        if issue_payload == "network_error":
-            typer.echo(
-                (
-                    f"Error: Unable to load issue #{issue_number} "
-                    "(GitHub read timed out or auth/network is unavailable)."
-                ),
-                err=True,
-            )
-        else:
-            typer.echo(
-                f"Error: Unable to load issue #{issue_number}.",
-                err=True,
-            )
-        raise typer.Exit(1)
-
-    issue = IssueInfo.from_github_payload(issue_payload)
-    if issue is not None:
-        return issue
-
-    title = str(issue_payload.get("title") or f"Issue {issue_number}")
-    labels = [
-        label.get("name", "")
-        for label in issue_payload.get("labels", [])
-        if isinstance(label, dict)
-    ]
-    return IssueInfo(number=issue_number, title=title, labels=labels)
+from vibe3.services.issue_context_loader import load_issue_info
 
 
 def run_issue_role_async(
@@ -61,7 +28,7 @@ def run_issue_role_async(
     See docs/standards/vibe3-execution-paths-standard.md.
     """
     config = load_orchestra_config()
-    issue = _load_issue_info(config, issue_number)
+    issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
     current_branch = GitClient().get_current_branch()
@@ -137,7 +104,7 @@ def run_issue_role_sync(
     See docs/standards/vibe3-execution-paths-standard.md.
     """
     config = load_orchestra_config()
-    issue = _load_issue_info(config, issue_number)
+    issue = load_issue_info(issue_number, config=config)
 
     store = SQLiteClient()
     current_branch = GitClient().get_current_branch()
