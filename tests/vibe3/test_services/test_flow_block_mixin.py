@@ -11,6 +11,7 @@ def test_block_flow_calls_project_blocked_state() -> None:
 
     with (
         patch.object(service.store, "get_flow_state") as mock_get,
+        patch.object(service.store, "get_issue_links") as mock_get_links,
         patch.object(service.store, "update_flow_state"),
         patch.object(service.store, "add_event"),
         patch.object(service, "_project_blocked_state") as mock_project,
@@ -25,6 +26,9 @@ def test_block_flow_calls_project_blocked_state() -> None:
             "task_issue_number": 123,
             "latest_actor": "claude/sonnet-4.6",
         }
+
+        # Mock get_issue_links to return task issue link
+        mock_get_links.return_value = [{"issue_number": 123, "issue_role": "task"}]
 
         mock_client_inst = mock_client_cls.return_value
         mock_client_inst.add_comment.return_value = True

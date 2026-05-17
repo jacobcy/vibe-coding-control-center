@@ -9,6 +9,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.issue_body import FlowStateProjection
 from vibe3.models.orchestration import IssueState
+from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_body_service import merge_projection
 from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
@@ -104,38 +105,53 @@ class FlowLifecycleMixin:
             latest_actor=effective_actor,
         )
 
-        # Transition issue state to BLOCKED if task_issue_number exists
-        issue_number = flow_data.get("task_issue_number")
-        if issue_number:
+        # Find task issue number from flow_issue_links (migrated from legacy column)
+        task_issue_number: int | None = None
+        issue_links = self.store.get_issue_links(branch)
+        for link in issue_links:
+            if link.get("issue_role") == "task":
+                task_issue_number = link.get("issue_number")
+                if isinstance(task_issue_number, int):
+                    break
+
+        # Transition issue state to BLOCKED if task issue exists
+        if task_issue_number:
             try:
                 # Transition issue state to BLOCKED
                 LabelService().transition(
-                    issue_number, IssueState.BLOCKED, effective_actor, force=False
+                    task_issue_number, IssueState.BLOCKED, effective_actor, force=False
                 )
             except Exception as e:
                 logger.bind(
                     domain="flow",
                     action="block",
                     branch=branch,
-                    issue_number=issue_number,
+                    issue_number=task_issue_number,
                 ).warning(f"Failed to transition issue state: {e}")
 
-            # Add comment if reason is provided
+            # Add timeline comment via FlowTimelineService
             if reason:
                 try:
-                    GitHubClient().add_comment(issue_number, f"Flow blocked: {reason}")
+                    timeline_service = FlowTimelineService(store=self.store)
+                    timeline_service.record_timeline_event(
+                        branch=branch,
+                        event_type="flow_blocked",
+                        actor=effective_actor,
+                        detail=reason,
+                        issue_number=task_issue_number,
+                    )
                 except Exception as e:
                     logger.bind(
                         domain="flow",
                         action="block",
                         branch=branch,
-                        issue_number=issue_number,
-                    ).warning(f"Failed to add comment: {e}")
+                        issue_number=task_issue_number,
+                    ).warning(f"Failed to add timeline comment: {e}")
 
             # Project blocked state to issue body
             try:
                 self._project_blocked_state(
-                    issue_number,
+                    task_issue_number,
                     blocked_by_issue=blocked_by_issue,
                     reason=reason,
                 )
@@ -144,15 +160,8 @@ class FlowLifecycleMixin:
                     domain="flow",
                     action="block",
                     branch=branch,
-                    issue_number=issue_number,
+                    issue_number=task_issue_number,
                 ).warning(f"Failed to project blocked state: {e}")
-
-        self.store.add_event(
-            branch,
-            "flow_blocked",
-            effective_actor,
-            f"Flow blocked{': ' + reason if reason else ''}",
-        )
 
     def fail_flow(
         self: Self,
@@ -200,13 +209,25 @@ class FlowLifecycleMixin:
             latest_actor=effective_actor,
         )
 
-        # Record fail event (event type preserved for observability)
-        self.store.add_event(
-            branch,
-            "flow_failed",
-            effective_actor,
-            f"Flow failed: {reason}",
-        )
+        # Add timeline comment via FlowTimelineService if issue linked
+        issue_number = flow_data.get("task_issue_number")
+        if issue_number:
+            try:
+                timeline_service = FlowTimelineService(store=self.store)
+                timeline_service.record_timeline_event(
+                    branch=branch,
+                    event_type="flow_failed",
+                    actor=effective_actor,
+                    detail=reason,
+                    issue_number=issue_number,
+                )
+            except Exception as e:
+                logger.bind(
+                    domain="flow",
+                    action="fail",
+                    branch=branch,
+                    issue_number=issue_number,
+                ).warning(f"Failed to add timeline comment: {e}")
 
         logger.bind(branch=branch).success("Flow marked as failed (blocked_reason)")
 

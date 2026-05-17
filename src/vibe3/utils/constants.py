@@ -87,6 +87,7 @@ VERDICT_UNKNOWN: Final[str] = "UNKNOWN"
 # (line-start match) and filtered from human instruction streams.
 AUTOMATED_MARKERS: Final[tuple[str, ...]] = (
     "[manager]",
+    "[flow]",  # Unified flow timeline marker
     "[resume]",
     "[plan]",
     "[run]",

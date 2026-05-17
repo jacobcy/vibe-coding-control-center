@@ -31,10 +31,10 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.issue_failure_service.GitHubClient"
-            ) as mock_github_class:
-                mock_github = MagicMock()
-                mock_github_class.return_value = mock_github
+                "vibe3.services.issue_failure_service.FlowTimelineService"
+            ) as mock_timeline_class:
+                mock_timeline = MagicMock()
+                mock_timeline_class.return_value = mock_timeline
 
                 with patch(
                     "vibe3.services.issue_failure_service.LabelService"
@@ -74,10 +74,10 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.flow_block_mixin.GitHubClient"
-            ) as mock_github_class:
-                mock_github = MagicMock()
-                mock_github_class.return_value = mock_github
+                "vibe3.services.flow_block_mixin.FlowTimelineService"
+            ) as mock_timeline_class:
+                mock_timeline = MagicMock()
+                mock_timeline_class.return_value = mock_timeline
 
                 with patch(
                     "vibe3.services.flow_block_mixin.LabelService"
@@ -112,6 +112,7 @@ def test_block_flow_uses_new_fields():
         branch = "task/issue-300"
         flow_service = FlowService(store=store)
         flow_service.create_flow(slug="issue-300", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 300, "task")
 
         # Block flow with dependency issue
         flow_service.block_flow(

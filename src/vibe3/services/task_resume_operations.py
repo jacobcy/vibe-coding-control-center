@@ -12,6 +12,7 @@ from loguru import logger
 
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
+from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_body_service import (
     FlowStateProjection,
     merge_projection,
@@ -271,13 +272,55 @@ class TaskResumeOperations:
                 actor="human:resume",
                 force=True,
             )
-            self.github_client.add_comment(
-                issue_number,
-                "[resume] task scene 重置失败，已恢复为 "
-                f"state/{previous_state.value}。\n\n"
-                f"原因:{failure_reason}",
-                repo=repo,
-            )
+
+            # Add [flow] timeline comment via FlowTimelineService
+            branch: str | None = None
+            try:
+                flows = self.flow_service.store.get_flows_by_issue(
+                    issue_number, role="task"
+                )
+                if flows:
+                    branch = str(flows[0].get("branch") or "").strip()
+            except Exception:
+                pass
+
+            if branch:
+                try:
+                    timeline_service = FlowTimelineService(
+                        store=self.flow_service.store
+                    )
+                    timeline_service.record_timeline_event(
+                        branch=branch,
+                        event_type="resumed",
+                        actor="human:resume",
+                        detail=(
+                            f"Rollback to state/{previous_state.value} "
+                            f"due to scene reset failure: {failure_reason}"
+                        ),
+                        issue_number=issue_number,
+                    )
+                except Exception as exc:
+                    logger.bind(
+                        domain="resume",
+                        action="rollback_timeline",
+                        issue_number=issue_number,
+                    ).warning(f"Failed to add timeline comment: {exc}")
+            else:
+                # Fallback: flow record deleted, use direct GitHub comment
+                try:
+                    self.github_client.add_comment(
+                        issue_number,
+                        "[flow] Flow resumed\n\n"
+                        f"Rollback to state/{previous_state.value} "
+                        f"due to scene reset failure: {failure_reason}",
+                        repo=repo,
+                    )
+                except Exception as exc:
+                    logger.bind(
+                        domain="resume",
+                        action="rollback_comment",
+                        issue_number=issue_number,
+                    ).warning(f"Failed to add rollback comment: {exc}")
         except Exception as exc:
             logger.bind(
                 domain="resume",
