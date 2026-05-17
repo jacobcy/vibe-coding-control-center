@@ -305,6 +305,22 @@ class TaskResumeOperations:
                         action="rollback_timeline",
                         issue_number=issue_number,
                     ).warning(f"Failed to add timeline comment: {exc}")
+            else:
+                # Fallback: flow record deleted, use direct GitHub comment
+                try:
+                    self.github_client.add_comment(
+                        issue_number,
+                        "[flow] Flow resumed\n\n"
+                        f"Rollback to state/{previous_state.value} "
+                        f"due to scene reset failure: {failure_reason}",
+                        repo=repo,
+                    )
+                except Exception as exc:
+                    logger.bind(
+                        domain="resume",
+                        action="rollback_comment",
+                        issue_number=issue_number,
+                    ).warning(f"Failed to add rollback comment: {exc}")
         except Exception as exc:
             logger.bind(
                 domain="resume",

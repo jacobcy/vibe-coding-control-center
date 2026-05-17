@@ -112,6 +112,7 @@ def test_block_flow_uses_new_fields():
         branch = "task/issue-300"
         flow_service = FlowService(store=store)
         flow_service.create_flow(slug="issue-300", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 300, "task")
 
         # Block flow with dependency issue
         flow_service.block_flow(

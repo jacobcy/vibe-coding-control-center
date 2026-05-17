@@ -72,16 +72,6 @@ def mark_issue(
         if flows:
             branch = str(flows[0].get("branch") or "").strip()
             if branch:
-                # Write flow event for observability
-                event_type = f"{action}ed"  # "blocked" or "failed"
-                store.add_event(
-                    branch,
-                    event_type,
-                    actor,
-                    detail=reason,
-                    refs={"issue": str(issue_number), "action": action},
-                )
-
                 # Record reason as blocked_reason (unified for both block and fail)
                 store.update_flow_state(
                     branch, blocked_reason=reason, latest_actor=actor
@@ -105,6 +95,7 @@ def mark_issue(
                 actor=actor,
                 detail=reason,
                 issue_number=issue_number,
+                repo=repo,
             )
         except Exception as e:
             logger.bind(
@@ -197,19 +188,6 @@ def resume_issue(
         flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
         if flows:
             branch = str(flows[0].get("branch") or "").strip()
-            if branch:
-                # Record flow event
-                issue_flow_service.store.add_event(
-                    branch,
-                    "resumed",
-                    actor,
-                    detail=f"Resumed from {from_state} to {to_state.value}: {reason}",
-                    refs={
-                        "issue": str(issue_number),
-                        "from_state": from_state,
-                        "to_state": to_state.value,
-                    },
-                )
     except Exception as e:
         logger.bind(
             domain="flow",
@@ -228,6 +206,7 @@ def resume_issue(
                 actor=actor,
                 detail=f"Resumed from {from_state} to {to_state.value}: {reason}",
                 issue_number=issue_number,
+                repo=repo,
             )
         except Exception as e:
             logger.bind(

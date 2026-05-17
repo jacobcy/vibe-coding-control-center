@@ -45,6 +45,7 @@ class FlowTimelineService:
         actor: str,
         detail: str,
         issue_number: int | None = None,
+        repo: str | None = None,
     ) -> None:
         """Record timeline event and optionally add GitHub comment.
 
@@ -54,6 +55,7 @@ class FlowTimelineService:
             actor: Actor performing the action
             detail: Event detail/reason
             issue_number: GitHub issue number (optional, skips comment if None)
+            repo: Repository (owner/repo format, optional)
         """
         # Always record event in SQLite
         self.store.add_event(branch, event_type, actor, detail)
@@ -83,7 +85,7 @@ class FlowTimelineService:
 
         # Add comment to GitHub issue
         try:
-            self.github_client.add_comment(issue_number, comment_body)
+            self.github_client.add_comment(issue_number, comment_body, repo=repo)
             logger.bind(
                 domain="flow",
                 action="timeline",
