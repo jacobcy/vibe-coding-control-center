@@ -351,10 +351,12 @@ def _resolve_shared_artifact(
         _verify_handoff_dir_boundary(handoff_dir, git_common)
 
         current_md = handoff_dir / "current.md"
-        if not current_md.is_file():
+        if not current_md.exists():
             raise FileNotFoundError(
                 f"current.md not found for branch '{branch}': {target}"
             )
+        if not current_md.is_file():
+            raise FileNotFoundError(f"Not a file: {target}")
         return current_md
 
     # Standard shared artifact (not @current)
@@ -364,8 +366,10 @@ def _resolve_shared_artifact(
             f"Cannot resolve shared artifact without git common dir: {target}"
         )
     resolved = Path(git_common) / "vibe3" / "handoff" / key
+    if not resolved.exists():
+        raise FileNotFoundError(f"Artifact not found: {target}")
     if not resolved.is_file():
-        raise FileNotFoundError(f"Shared artifact not found: {target}")
+        raise FileNotFoundError(f"Not a file: {target}")
     return resolved
 
 
@@ -395,23 +399,31 @@ def _resolve_worktree_artifact(
         if wt_path is None:
             raise FileNotFoundError(f"No worktree found for branch '{branch}'")
         resolved = wt_path / target
-        if not resolved.is_file():
+        if not resolved.exists():
             raise FileNotFoundError(
-                f"Artifact not found in branch '{branch}' worktree: {target}"
+                f"File not found in branch '{branch}' worktree: {target}"
             )
+        if not resolved.is_file():
+            raise FileNotFoundError(f"Not a file: {target}")
         return resolved
 
     # No branch specified: try current worktree then CWD
     current_root = get_worktree_root(git_client)
     if current_root:
         resolved = Path(current_root) / target
-        if resolved.is_file():
-            return resolved
+        if resolved.exists():
+            if resolved.is_file():
+                return resolved
+            else:
+                raise FileNotFoundError(f"Not a file: {target}")
 
     # Also try CWD (handles cases where CWD differs from worktree root)
     cwd_resolved = Path.cwd() / target
-    if cwd_resolved.is_file():
-        return cwd_resolved
+    if cwd_resolved.exists():
+        if cwd_resolved.is_file():
+            return cwd_resolved
+        else:
+            raise FileNotFoundError(f"Not a file: {target}")
 
     raise FileNotFoundError(f"Artifact not found: {target}")
 
@@ -457,8 +469,10 @@ def resolve_handoff_target(
 
     # Namespace 3: absolute path → passthrough
     if target_path.is_absolute():
+        if not target_path.exists():
+            raise FileNotFoundError(f"Artifact not found: {target}")
         if not target_path.is_file():
-            raise FileNotFoundError(f"File not found: {target}")
+            raise FileNotFoundError(f"Not a file: {target}")
         return target_path
 
     # Namespace 2: relative path → worktree canonical ref
