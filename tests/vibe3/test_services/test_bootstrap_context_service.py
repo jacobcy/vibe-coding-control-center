@@ -139,6 +139,25 @@ def test_plan_can_encode_related_and_dependency_bindings() -> None:
     assert "--dependency 789" in command
 
 
+def test_bootstrap_plan_uses_internal_bootstrap_adapter() -> None:
+    service = BootstrapContextService()
+
+    plan = service.plan_vibe_new_bootstrap(
+        target_branch="dev/issue-123",
+        issue_number=123,
+        has_existing_pr=False,
+        wants_worktree=True,
+        related_issue_numbers=(456,),
+        dependency_issue_numbers=(789,),
+    )
+
+    command = plan.actions[0].command
+    assert command == (
+        "vibe3 internal bootstrap-flow 123 --branch dev/issue-123 "
+        "--source skill --worktree --related 456 --dependency 789"
+    )
+
+
 def test_shared_abstraction_used_by_both_orchestra_and_skill(
     tmp_path: Path,
 ) -> None:
