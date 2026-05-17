@@ -34,6 +34,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput
 from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.issue_failure_service import fail_planner_issue
 
 PLANNER_ROLE = TriggerableRoleDefinition(
@@ -172,7 +173,9 @@ def build_plan_request(
     actor: str = "orchestra:planner",
 ) -> ExecutionRequest:
     """Build the planner async execution request for dispatch."""
-    target_branch = branch or f"task/issue-{issue.number}"
+    resolver = ConventionResolver.from_repo()
+    convention = resolver.resolve()
+    target_branch = branch or convention.branch.canonical_branch(issue.number)
     return build_role_async_request(
         role="planner",
         config=config,

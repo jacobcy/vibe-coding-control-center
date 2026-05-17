@@ -174,6 +174,7 @@ class TestOrchestrationFacade:
                 issue_label="supervisor",
                 handoff_state_label="state/handoff",
                 interval_ticks=1,
+                get_handoff_state_label=MagicMock(return_value="state/handoff"),
             ),
         )
         mock_list_issues.return_value = [

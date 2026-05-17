@@ -16,6 +16,7 @@ from vibe3.clients.github_labels import GhIssueLabelPort
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_resume_resolver import infer_resume_label
 
 if TYPE_CHECKING:
@@ -49,6 +50,8 @@ class QualifyGateService:
         self._github = github
         self._store = store
         self._flow_manager = flow_manager
+        resolver = ConventionResolver.from_repo()
+        self._convention = resolver.resolve()
 
     def run_qualify_gate(
         self,
@@ -86,13 +89,14 @@ class QualifyGateService:
         # Step 1: Check manual block
         blocked_reason = flow_state.get("blocked_reason")
         if blocked_reason and str(blocked_reason).strip():
-            if IssueState.BLOCKED.to_label() not in labels:
+            blocked_label = self._convention.state_label(self._convention.blocked_label)
+            if blocked_label not in labels:
                 try:
                     label_port = GhIssueLabelPort(repo=self.config.repo)
-                    label_port.add_issue_label(issue.number, "state/blocked")
+                    label_port.add_issue_label(issue.number, blocked_label)
                 except Exception as exc:
                     logger.bind(domain="orchestra").warning(
-                        f"Failed to add state/blocked: {exc}"
+                        f"Failed to add {blocked_label}: {exc}"
                     )
             return None
 
@@ -178,19 +182,20 @@ class QualifyGateService:
             ]
 
         if unresolved:
+            blocked_label = self._convention.state_label(self._convention.blocked_label)
             if not flow_state.get("blocked_by_issue"):
                 self._store.update_flow_state(
                     branch,
                     blocked_by_issue=unresolved[0],
                     blocked_reason="Blocked by unresolved dependencies",
                 )
-                if IssueState.BLOCKED.to_label() not in labels:
+                if blocked_label not in labels:
                     try:
                         label_port = GhIssueLabelPort(repo=self.config.repo)
-                        label_port.add_issue_label(issue.number, "state/blocked")
+                        label_port.add_issue_label(issue.number, blocked_label)
                     except Exception as exc:
                         logger.bind(domain="orchestra").warning(
-                            f"Failed to add state/blocked for #{issue.number}: {exc}"
+                            f"Failed to add {blocked_label} for #{issue.number}: {exc}"
                         )
                 self._store.add_event(
                     branch,
@@ -249,10 +254,11 @@ class QualifyGateService:
                 refs=refs if refs else None,
             )
 
-        if IssueState.BLOCKED.to_label() in labels:
+        blocked_label = self._convention.state_label(self._convention.blocked_label)
+        if blocked_label in labels:
             try:
                 label_port = GhIssueLabelPort(repo=self.config.repo)
-                label_port.remove_issue_label(issue.number, "state/blocked")
+                label_port.remove_issue_label(issue.number, blocked_label)
                 if target_label.to_label() not in labels:
                     label_port.add_issue_label(issue.number, target_label.to_label())
             except Exception as exc:

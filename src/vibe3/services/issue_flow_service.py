@@ -1,16 +1,35 @@
 """Centralized branch naming and issue-to-flow mapping service."""
 
-import re
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from vibe3.clients.sqlite_client import SQLiteClient
 
+if TYPE_CHECKING:
+    from vibe3.services.convention_resolver import ConventionResolver
 
+
+def _default_store() -> SQLiteClient:
+    """Default factory for store."""
+    return SQLiteClient()
+
+
+def _default_resolver() -> "ConventionResolver":
+    """Default factory for resolver."""
+    from vibe3.services.convention_resolver import ConventionResolver
+
+    return ConventionResolver.from_repo()
+
+
+@dataclass
 class IssueFlowService:
     """Centralized service for task branch naming and issue-to-flow mapping.
 
+    Refactored to use ConventionResolver instead of hardcoded patterns.
+
     Provides consistent methods for:
-    - Canonical branch name generation (task/issue-N)
-    - Issue number parsing from branch names (task/issue-N and dev/issue-N)
+    - Canonical branch name generation (via convention)
+    - Issue number parsing from branch names (via convention)
     - Active flow lookup for issues
 
     This consolidates logic that was previously scattered across:
@@ -19,16 +38,8 @@ class IssueFlowService:
     - Various regex patterns in manager, orchestra, and services
     """
 
-    CANONICAL_PATTERN = re.compile(r"^task/issue-(\d+)$")
-    ISSUE_BRANCH_PATTERN = re.compile(r"^(?:task|dev)/issue-(\d+)$")
-
-    def __init__(self, store: SQLiteClient | None = None) -> None:
-        """Initialize IssueFlowService.
-
-        Args:
-            store: SQLiteClient instance for flow queries
-        """
-        self.store = SQLiteClient() if store is None else store
+    store: SQLiteClient = field(default_factory=_default_store)
+    resolver: "ConventionResolver" = field(default_factory=_default_resolver)
 
     def canonical_branch_name(self, issue_number: int) -> str:
         """Return canonical task branch name.
@@ -37,13 +48,14 @@ class IssueFlowService:
             issue_number: GitHub issue number
 
         Returns:
-            Canonical branch name (task/issue-{issue_number})
+            Canonical branch name according to convention
 
         Example:
             >>> service.canonical_branch_name(372)
             "task/issue-372"
         """
-        return f"task/issue-{issue_number}"
+        convention = self.resolver.resolve()
+        return convention.branch.canonical_branch(issue_number)
 
     def parse_issue_number(self, branch: str) -> int | None:
         """Extract issue number from canonical task branch.
@@ -62,8 +74,13 @@ class IssueFlowService:
             >>> service.parse_issue_number("task/issue-372-worktree")
             None
         """
-        match = self.CANONICAL_PATTERN.fullmatch(branch)
-        return int(match.group(1)) if match else None
+        convention = self.resolver.resolve()
+        # For strict canonical matching, check if it matches task prefix exactly
+        task_prefix = convention.branch.task_prefix
+        if not branch.startswith(task_prefix):
+            return None
+        # Delegate to convention's parsing
+        return convention.branch.parse_issue_number(branch)
 
     def parse_issue_number_any(self, branch: str) -> int | None:
         """Extract issue number from task or dev issue branch.
@@ -86,8 +103,8 @@ class IssueFlowService:
             >>> service.parse_issue_number_any("feature/my-feature")
             None
         """
-        match = self.ISSUE_BRANCH_PATTERN.fullmatch(branch)
-        return int(match.group(1)) if match else None
+        convention = self.resolver.resolve()
+        return convention.branch.parse_issue_number(branch)
 
     def is_issue_branch(self, branch: str) -> bool:
         """Check if branch is an issue branch (task/issue-N or dev/issue-N).
@@ -106,16 +123,17 @@ class IssueFlowService:
             >>> service.is_issue_branch("feature/my-feature")
             False
         """
-        return bool(self.ISSUE_BRANCH_PATTERN.fullmatch(branch))
+        convention = self.resolver.resolve()
+        return convention.branch.parse_issue_number(branch) is not None
 
     def is_task_branch(self, branch: str) -> bool:
-        """Check if branch is a task branch (starts with task/issue-).
+        """Check if branch is a task branch (starts with task prefix).
 
         Args:
             branch: Git branch name
 
         Returns:
-            True if branch starts with 'task/issue-', False otherwise
+            True if branch starts with task prefix, False otherwise
 
         Example:
             >>> service.is_task_branch("task/issue-372")
@@ -125,7 +143,8 @@ class IssueFlowService:
             >>> service.is_task_branch("dev/feature")
             False
         """
-        return branch.startswith("task/issue-")
+        convention = self.resolver.resolve()
+        return branch.startswith(convention.branch.task_prefix)
 
     def is_canonical_task_branch(
         self, branch: str, task_issue_number: int | None

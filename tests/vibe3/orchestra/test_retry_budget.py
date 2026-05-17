@@ -40,6 +40,7 @@ class TestRetryBudget:
         # Mock config
         config = MagicMock()
         config.manager_usernames = ["manager-bot"]
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
 
         # Mock github
         github = MagicMock()
@@ -118,6 +119,7 @@ class TestRetryBudget:
 
         config = MagicMock()
         config.manager_usernames = ["manager-bot"]
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
         github = MagicMock()
 
         events: list[str] = []
@@ -169,6 +171,7 @@ class TestRetryBudget:
 
         config = MagicMock()
         config.manager_usernames = ["manager-bot"]
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
         github = MagicMock()
 
         # Mock registry with no active session
@@ -231,6 +234,7 @@ class TestRetryBudget:
 
         config = MagicMock()
         config.manager_usernames = ["manager-bot"]
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
         github = MagicMock()
 
         # Mock registry with no active session
@@ -288,6 +292,7 @@ class TestRetryBudget:
 
         config = MagicMock()
         config.manager_usernames = ["manager-bot"]
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
         github = MagicMock()
 
         # Mock registry with active session

@@ -40,6 +40,7 @@ from vibe3.roles.review_helpers import (
     ReviewRunResult,
     finalize_review_output,
 )
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import fail_reviewer_issue
 
@@ -136,7 +137,9 @@ def build_issue_review_request(
     flow_state: dict[str, object] | None = None,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
-    target_branch = branch or f"task/issue-{issue.number}"
+    resolver = ConventionResolver.from_repo()
+    convention = resolver.resolve()
+    target_branch = branch or convention.branch.canonical_branch(issue.number)
     execution_name = f"vibe3-reviewer-issue-{issue.number}"
 
     if sync:

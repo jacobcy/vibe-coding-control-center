@@ -100,7 +100,7 @@ def select_ready_issues(
         if should_skip_from_queue(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=config.manager_usernames,
+            manager_usernames=config.get_manager_usernames(),
             require_manager_assignee=True,
         ):
             continue
@@ -153,7 +153,7 @@ def promote_progressed_entries(
         if should_skip_from_queue(
             issue,
             supervisor_label=supervisor_label,
-            manager_usernames=config.manager_usernames,
+            manager_usernames=config.get_manager_usernames(),
             require_manager_assignee=True,
         ):
             removed.append(entry)

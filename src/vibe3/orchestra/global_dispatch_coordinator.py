@@ -124,7 +124,7 @@ class GlobalDispatchCoordinator:
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
-                manager_usernames=self._config.manager_usernames,
+                manager_usernames=self._config.get_manager_usernames(),
                 require_manager_assignee=True,
             ):
                 invalid_issue_numbers.append(issue_number)
@@ -352,7 +352,7 @@ class GlobalDispatchCoordinator:
             if should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
-                manager_usernames=self._config.manager_usernames,
+                manager_usernames=self._config.get_manager_usernames(),
                 require_manager_assignee=True,
             ):
                 append_orchestra_event(

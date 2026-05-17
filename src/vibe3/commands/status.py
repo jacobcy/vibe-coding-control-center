@@ -202,7 +202,7 @@ def status(
             bucket = classify_task_status(
                 state,
                 cast(str | None, item.get("assignee")),
-                config.manager_usernames,
+                config.get_manager_usernames(),
             )
             bucketed_items[bucket].append(item)
 

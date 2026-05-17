@@ -69,8 +69,9 @@ def is_human_comment(comment: dict[str, Any]) -> bool:
             return False
 
         # Check manager_usernames list
-        if config.manager_usernames:
-            manager_logins = [u.lower() for u in config.manager_usernames]
+        manager_usernames = config.get_manager_usernames()
+        if manager_usernames:
+            manager_logins = [u.lower() for u in manager_usernames]
             if login in manager_logins:
                 return False
     except Exception:

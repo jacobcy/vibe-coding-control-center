@@ -75,7 +75,7 @@ class CodeagentExecutionService:
         from vibe3.config.orchestra_settings import load_orchestra_config
 
         config = load_orchestra_config()
-        handoff_label = config.supervisor_handoff.handoff_state_label
+        handoff_label = config.supervisor_handoff.get_handoff_state_label()
 
         try:
             labels_client = GhIssueLabelPort()
