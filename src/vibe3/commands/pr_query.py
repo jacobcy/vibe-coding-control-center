@@ -36,6 +36,7 @@ from vibe3.models.pr import PRResponse
 from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.branch_resolver import resolve_branch_from_pr
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.pr_service import PRService
@@ -401,8 +402,12 @@ def register_query_commands(app: typer.Typer) -> None:
             # Record external events (best-effort, non-blocking)
             try:
                 if pr and pr_number:
-                    # Use PR's head_branch if branch not specified
-                    effective_branch = branch or target.current_branch or pr.head_branch
+                    # Standard path: PR → Issue → Flow → Branch
+                    # pr_number is guaranteed non-None here
+                    resolved_branch = resolve_branch_from_pr(int(pr_number), pr_svc)
+                    effective_branch = (
+                        branch or target.current_branch or resolved_branch
+                    )
                     if effective_branch:
                         _fetch_and_record_external_events(
                             pr_number=pr_number,
@@ -440,8 +445,13 @@ def register_query_commands(app: typer.Typer) -> None:
                 render_pr_details(pr)
 
                 # Show bound tasks from flow truth
-                # Use PR head_branch if no branch was resolved
-                effective_branch = branch or target.current_branch or pr.head_branch
+                effective_branch = (
+                    branch
+                    or target.current_branch
+                    or (
+                        resolve_branch_from_pr(pr_number, pr_svc) if pr_number else None
+                    )
+                )
                 if effective_branch:
                     bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
                     if bound_tasks:
