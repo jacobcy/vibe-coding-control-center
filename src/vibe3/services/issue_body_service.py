@@ -101,18 +101,20 @@ def render_projection(proj: FlowStateProjection) -> str:
     return "\n".join(lines)
 
 
-def parse_projection_with_fallback(body: str | None) -> FlowStateProjection:
+def parse_projection_with_fallback(body: str) -> FlowStateProjection:
     """Parse flow-state projection from issue body with fallback.
 
     Args:
-        body: Full issue body text (or None if fetch failed)
+        body: Full issue body text
 
     Returns:
-        FlowStateProjection (default if body is None or parse fails)
+        FlowStateProjection (default if parse fails)
     """
-    if body is None:
+    try:
+        return parse_projection(body)
+    except ValueError:
+        # No managed section found, return empty projection (active state)
         return FlowStateProjection()
-    return parse_projection(body)
 
 
 def merge_projection(body: str, proj: FlowStateProjection) -> str:
