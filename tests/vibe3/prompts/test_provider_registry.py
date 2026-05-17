@@ -81,8 +81,8 @@ class TestBuiltinResolvers:
 
         src = PromptVariableSource(kind=VariableSourceKind.SKILL, skill="vibe-test")
         with patch(
-            "vibe3.prompts.builtin_providers.find_skill_file",
-            return_value=skill_file,
+            "vibe3.prompts.builtin_providers.resolve_skill_content",
+            return_value="# Test Skill",
         ):
             result = resolve_source(
                 src, runtime_context={}, registry=ProviderRegistry()
@@ -96,7 +96,7 @@ class TestBuiltinResolvers:
             kind=VariableSourceKind.SKILL, skill="nonexistent-skill"
         )
         with patch(
-            "vibe3.prompts.builtin_providers.find_skill_file",
+            "vibe3.prompts.builtin_providers.resolve_skill_content",
             return_value=None,
         ):
             result = resolve_source(

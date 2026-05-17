@@ -1,23 +1,30 @@
-"""Tests for pre-dispatch health checks."""
+"""Tests for pre-dispatch health checks.
 
-from unittest.mock import MagicMock
+After unification, _health_check_before_dispatch delegates to
+CheckService.verify_branch(). These tests verify the coordinator's
+interpretation of CheckService results (fail-open, skip dispatch,
+terminal state detection) rather than re-testing CheckService internals.
+"""
+
+from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.services.check_service import CheckResult
 
 
 class TestPreDispatchHealthChecks:
     """Test health checks before dispatching issues."""
 
     def test_health_check_detects_closed_issue(self) -> None:
-        """Health check should return False for closed issues."""
+        """Health check should return False for consistency failures."""
         from vibe3.orchestra.global_dispatch_coordinator import (
             GlobalDispatchCoordinator,
         )
 
         # Setup
         config = MagicMock()
-        config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
-        config.repo = "owner/repo"  # Add repo to config
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -34,39 +41,50 @@ class TestPreDispatchHealthChecks:
             flow_manager=flow_manager,
         )
 
-        # Mock issue with GitHub state CLOSED
         issue = IssueInfo(
             number=42,
             title="Test issue",
             state=IssueState.BLOCKED,
             labels=["state/blocked"],
-            github_state="CLOSED",  # NEW FIELD
+            github_state="CLOSED",
         )
 
-        # Mock GitHub client to return closed issue
-        github.view_issue.return_value = {
-            "number": 42,
-            "state": "CLOSED",
-            "title": "Test issue",
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-42", None))
+
+        # Mock flow state as active (not terminal)
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-42",
+            "flow_status": "active",
         }
 
-        # Execute
-        result = coordinator._health_check_before_dispatch(issue)
+        # Mock CheckService to return invalid result (non-transient)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=False,
+                issues=["Branch 'task/issue-42' no longer exists locally"],
+                branch="task/issue-42",
+            )
+            result = coordinator._health_check_before_dispatch(issue)
 
-        # Assert
-        assert result is False, "Health check should return False for closed issue"
-        github.view_issue.assert_called_once_with(42, repo="owner/repo")
+        # Assert - genuine consistency failure should skip dispatch
+        assert (
+            result is False
+        ), "Health check should return False for consistency failures"
 
     def test_health_check_passes_for_open_issue(self) -> None:
-        """Health check should return True for open issues without merged PR."""
+        """Health check should return True for healthy active flows."""
         from vibe3.orchestra.global_dispatch_coordinator import (
             GlobalDispatchCoordinator,
         )
 
         # Setup
         config = MagicMock()
-        config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
-        config.repo = "owner/repo"  # Add repo to config
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -91,26 +109,40 @@ class TestPreDispatchHealthChecks:
             github_state="OPEN",
         )
 
-        # Mock no PR exists
-        flow_manager.get_pr_for_issue.return_value = None
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-43", None))
 
-        # Execute
-        result = coordinator._health_check_before_dispatch(issue)
+        # Mock flow state as active
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-43",
+            "flow_status": "active",
+        }
+
+        # Mock CheckService to return valid result
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=True,
+                issues=[],
+                branch="task/issue-43",
+            )
+            result = coordinator._health_check_before_dispatch(issue)
 
         # Assert
-        assert result is True, "Health check should pass for open issue without PR"
+        assert result is True, "Health check should pass for healthy active flow"
 
     def test_health_check_closes_issue_with_merged_pr(self) -> None:
-        """Health check should close issue and return False if PR is merged."""
-        from vibe3.models.pr import PRResponse, PRState
+        """Health check should return False if flow is done (PR merged)."""
         from vibe3.orchestra.global_dispatch_coordinator import (
             GlobalDispatchCoordinator,
         )
 
         # Setup
         config = MagicMock()
-        config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
-        config.repo = "owner/repo"  # Add repo to config
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -135,45 +167,41 @@ class TestPreDispatchHealthChecks:
             github_state="OPEN",
         )
 
-        # Mock PR number retrieval
-        flow_manager.get_pr_for_issue.return_value = 123
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-44", None))
 
-        # Mock merged PR
-        github.get_pr.return_value = PRResponse(
-            number=123,
-            title="Test PR",
-            body="",
-            state=PRState.MERGED,
-            head_branch="task/issue-44",
-            base_branch="main",
-            url="https://github.com/test/test/pull/123",
-            draft=False,
-            is_ready=True,
-            ci_passed=True,
-        )
+        # Mock flow state as done (CheckService marked it done for merged PR)
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-44",
+            "flow_status": "done",
+        }
 
-        # Execute
-        result = coordinator._health_check_before_dispatch(issue)
+        # Mock CheckService to return valid (CheckService handles PR check
+        # internally and marks flow as done, then returns valid)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=True,
+                issues=[],
+                branch="task/issue-44",
+            )
+            result = coordinator._health_check_before_dispatch(issue)
 
-        # Assert
-        assert result is False, "Health check should fail for issue with merged PR"
-        github.close_issue_if_open.assert_called_once_with(
-            44,
-            closing_comment="PR #123 已合并，系统自动关闭此 issue。",
-            repo="owner/repo",
-        )
+        # Assert - flow is done, should skip dispatch
+        assert result is False, "Health check should fail for done flow"
 
     def test_health_check_passes_for_open_pr(self) -> None:
-        """Health check should pass for issue with open PR."""
-        from vibe3.models.pr import PRResponse, PRState
+        """Health check should pass for issue with open PR (still active)."""
         from vibe3.orchestra.global_dispatch_coordinator import (
             GlobalDispatchCoordinator,
         )
 
         # Setup
         config = MagicMock()
-        config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
-        config.repo = "owner/repo"  # Add repo to config
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -198,29 +226,29 @@ class TestPreDispatchHealthChecks:
             github_state="OPEN",
         )
 
-        # Mock PR number retrieval
-        flow_manager.get_pr_for_issue.return_value = 124
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-45", None))
 
-        # Mock open PR
-        github.get_pr.return_value = PRResponse(
-            number=124,
-            title="Test PR",
-            body="",
-            state=PRState.OPEN,
-            head_branch="task/issue-45",
-            base_branch="main",
-            url="https://github.com/test/test/pull/124",
-            draft=False,
-            is_ready=True,
-            ci_passed=False,
-        )
+        # Mock flow state as active
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-45",
+            "flow_status": "active",
+        }
 
-        # Execute
-        result = coordinator._health_check_before_dispatch(issue)
+        # Mock CheckService to return valid (open PR is not a failure)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=True,
+                issues=[],
+                branch="task/issue-45",
+            )
+            result = coordinator._health_check_before_dispatch(issue)
 
         # Assert
-        assert result is True, "Health check should pass for issue with open PR"
-        github.close_issue.assert_not_called()
+        assert result is True, "Health check should pass for active flow with open PR"
 
     def test_health_check_handles_network_error(self) -> None:
         """Health check should fail open on network errors."""
@@ -230,8 +258,8 @@ class TestPreDispatchHealthChecks:
 
         # Setup
         config = MagicMock()
-        config.max_concurrent_flows = 10  # Must be int for ThreadPoolExecutor
-        config.repo = "owner/repo"  # Add repo to config
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
         config.supervisor_handoff = MagicMock()
         config.supervisor_handoff.issue_label = "supervisor"
         capacity = MagicMock()
@@ -256,11 +284,26 @@ class TestPreDispatchHealthChecks:
             github_state="OPEN",
         )
 
-        # Mock network error
-        github.view_issue.side_effect = Exception("Network timeout")
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-46", None))
 
-        # Execute
-        result = coordinator._health_check_before_dispatch(issue)
+        # Mock flow state as active
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-46",
+            "flow_status": "active",
+        }
 
-        # Assert - should fail open
+        # Mock CheckService to return invalid with transient error
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=False,
+                issues=["Cannot verify task issue #46: network/auth error"],
+                branch="task/issue-46",
+            )
+            result = coordinator._health_check_before_dispatch(issue)
+
+        # Assert - should fail open on transient errors
         assert result is True, "Health check should fail open on network errors"

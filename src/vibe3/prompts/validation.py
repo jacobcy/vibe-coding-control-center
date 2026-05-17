@@ -212,21 +212,15 @@ class PromptValidationService:
                 )
 
         if kind == VariableSourceKind.SKILL:
-            from vibe3.prompts.builtin_providers import find_skill_file
+            from vibe3.prompts.builtin_providers import resolve_skill_content
 
             skill_name = source.skill or ""
-            skill_file = find_skill_file(skill_name) if skill_name else None
-            if skill_file is None:
+            skill_content = resolve_skill_content(skill_name) if skill_name else None
+            if skill_content is None:
                 return "", ValidationIssue(
                     kind="skill_not_found",
                     message=f"Skill not found for variable '{var}': {skill_name}",
                 )
-            try:
-                return skill_file.read_text(encoding="utf-8"), None
-            except OSError as exc:
-                return "", ValidationIssue(
-                    kind="skill_not_found",
-                    message=f"Cannot read skill for variable '{var}': {exc}",
-                )
+            return skill_content, None
 
         return "", None

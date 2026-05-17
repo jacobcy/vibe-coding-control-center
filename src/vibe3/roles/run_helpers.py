@@ -128,21 +128,6 @@ def publish_run_command_failure(
     )
 
 
-def find_skill_file(skill_name: str) -> Path | None:
-    """Resolve a skill file from cwd or repo root."""
-    cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
-    if cwd_candidate.exists():
-        return cwd_candidate
-    try:
-        repo_root = Path(FlowService().get_git_common_dir()).parent
-    except Exception:
-        repo_root = Path.cwd()
-    candidate = repo_root / "skills" / skill_name / "SKILL.md"
-    if candidate.exists():
-        return candidate
-    return None
-
-
 def resolve_run_mode(
     flow_service: Any,
     branch: str,
