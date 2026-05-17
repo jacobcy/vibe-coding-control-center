@@ -138,6 +138,9 @@ Verify handoff store consistency.
 
 **Options**:
 - `--fix` - Attempt auto-fix for detected issues
+- `--branch <name>` - Check a single branch instead of all active flows
+- `--init` - Scan merged PRs on GitHub and back-fill missing task_issue_number
+- `--clean-branch` - Clean residual branches for done/aborted flows
 
 **Checks**:
 - Current branch exists in flow_state
@@ -147,9 +150,18 @@ Verify handoff store consistency.
 - plan_ref / report_ref / audit_ref files exist
 - shared current.md exists for active flow
 
+**Single Branch Check**:
+Use `--branch` to check a specific branch instead of all active flows. This runs the same consistency checks as the full scan, but for a single flow:
+- Verifies issue state on GitHub
+- Checks PR merge status
+- Validates handoff files
+- Auto-fixes issues when possible
+
 ```bash
 vibe3 check
 vibe3 check --fix
+vibe3 check --branch dev/issue-123
+vibe3 check --branch task/issue-456
 ```
 
 ---
