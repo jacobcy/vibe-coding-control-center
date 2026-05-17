@@ -84,7 +84,8 @@ class FlowOrchestratorService:
             return int(flow["pr_number"])
         # Fallback to GitHub API (important for newly created PRs)
         try:
-            return self.github.get_pr_for_issue(issue_number)
+            # HIGH: Pass repo parameter to avoid missing PR in non-target repos
+            return self.github.get_pr_for_issue(issue_number, repo=self.config.repo)
         except Exception:
             return None
 

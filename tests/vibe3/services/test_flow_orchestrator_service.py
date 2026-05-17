@@ -238,6 +238,44 @@ def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
     assert result == {"branch": "task/issue-320"}
 
 
+def test_get_pr_for_issue_passes_repo_to_github_fallback() -> None:
+    """HIGH: GitHub fallback must pass repo parameter to get_pr_for_issue."""
+    config = load_orchestra_config()
+    config.repo = "owner/repo"
+    store = MagicMock()
+    github = MagicMock()
+    service = FlowOrchestratorService(config, store=store, github=github)
+
+    # No PR in flow record, trigger GitHub fallback
+    service.get_flow_for_issue = MagicMock(return_value=None)
+    github.get_pr_for_issue = MagicMock(return_value=42)
+
+    result = service.get_pr_for_issue(123)
+
+    # HIGH: Verify repo parameter was passed
+    github.get_pr_for_issue.assert_called_once_with(123, repo="owner/repo")
+    assert result == 42
+
+
+def test_get_pr_for_issue_returns_flow_pr_without_github_call() -> None:
+    """If PR in flow record, GitHub API should not be called."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    github = MagicMock()
+    service = FlowOrchestratorService(config, store=store, github=github)
+
+    # PR already in flow record
+    service.get_flow_for_issue = MagicMock(
+        return_value={"pr_number": 99, "branch": "dev/issue-123"}
+    )
+
+    result = service.get_pr_for_issue(123)
+
+    # GitHub API should NOT be called
+    github.get_pr_for_issue.assert_not_called()
+    assert result == 99
+
+
 def test_bootstrap_issue_flow_cleans_up_orphan_branch_on_failure() -> None:
     """HIGH: Verify orphan branch deleted when bootstrap fails after creation."""
     config = load_orchestra_config()
