@@ -143,3 +143,18 @@ def test_no_binding_with_candidates_error(mock_flow_service: Mock, mock_store: M
     error_message = str(exc_info.value)
     assert "without task binding" in error_message
     assert "vibe3 flow bind" in error_message
+
+
+def test_no_flows_at_all_error(mock_flow_service: Mock, mock_store: Mock):
+    """Test error when no flows exist at all."""
+    # Arrange: No flows anywhere
+    mock_store.get_flows_by_issue.return_value = []
+    mock_flow_service.get_flow_state.return_value = None
+
+    # Act & Assert: Should raise UserError with vibe-new hint
+    with pytest.raises(UserError) as exc_info:
+        resolve_issue_branch_input("976", mock_flow_service)
+
+    error_message = str(exc_info.value)
+    assert "No flow found" in error_message
+    assert "/vibe-new" in error_message
