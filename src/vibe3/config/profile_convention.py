@@ -21,14 +21,19 @@ class ProfileConvention(BaseModel):
         default_factory=BranchConvention.minimal, description="Branch naming convention"
     )
 
+    state_prefix: str = Field(
+        default="state/",
+        description="Prefix for state labels (empty string = no prefix)",
+    )
+
     handoff_label: str = Field(
         default="handoff",
-        description="Label for handoff state (without 'state/' prefix)",
+        description="Label for handoff state (without state_prefix)",
     )
 
     blocked_label: str = Field(
         default="blocked",
-        description="Label for blocked state (without 'state/' prefix)",
+        description="Label for blocked state (without state_prefix)",
     )
 
     manager_usernames: list[str] = Field(
@@ -46,6 +51,7 @@ class ProfileConvention(BaseModel):
         """Vibe Center opinionated defaults."""
         return cls(
             branch=BranchConvention.vibe_center(),
+            state_prefix="state/",
             handoff_label="handoff",
             blocked_label="blocked",
             manager_usernames=["vibe-manager-agent"],
@@ -59,6 +65,6 @@ class ProfileConvention(BaseModel):
             state: State name without prefix (e.g., "handoff", "blocked")
 
         Returns:
-            Full label (e.g., "state/handoff")
+            Full label (e.g., "state/handoff" or "handoff" if prefix disabled)
         """
-        return f"state/{state}"
+        return f"{self.state_prefix}{state}"

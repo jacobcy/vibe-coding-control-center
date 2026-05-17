@@ -95,7 +95,7 @@ class QualifyGateService:
                     label_port.add_issue_label(issue.number, blocked_label)
                 except Exception as exc:
                     logger.bind(domain="orchestra").warning(
-                        f"Failed to add state/blocked: {exc}"
+                        f"Failed to add {blocked_label}: {exc}"
                     )
             return None
 
@@ -121,7 +121,7 @@ class QualifyGateService:
                         label_port.add_issue_label(issue.number, blocked_label)
                     except Exception as exc:
                         logger.bind(domain="orchestra").warning(
-                            f"Failed to add state/blocked for #{issue.number}: {exc}"
+                            f"Failed to add {blocked_label} for #{issue.number}: {exc}"
                         )
                 self._store.add_event(
                     branch,

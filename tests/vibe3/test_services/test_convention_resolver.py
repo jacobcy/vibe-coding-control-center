@@ -1,10 +1,16 @@
 """Tests for ConventionResolver service.
 
 Tests verify that:
-1. Resolver returns correct convention defaults
-2. Convention is immutable (frozen dataclass)
-3. Convention can be used for branch/label generation
+1. Resolver returns minimal defaults when no profile specified
+2. Resolver returns vibe-center defaults when profile is specified
+3. Resolver detects Vibe Center repo via git remote
+4. Resolved convention is immutable (frozen Pydantic model)
+5. Convention can be used for branch/label generation
+6. Unknown profile falls back to minimal
 """
+
+import os
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -12,16 +18,65 @@ from pydantic import ValidationError
 from vibe3.services.convention_resolver import ConventionResolver
 
 
-def test_resolver_returns_vibe_center_defaults():
-    """Test resolver returns Vibe Center defaults for current repo."""
-    resolver = ConventionResolver.from_repo()
+def test_resolver_returns_minimal_defaults_by_default():
+    """Test resolver returns minimal defaults when no profile specified."""
+    # Mock git remote to return non-vibe-center repo
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="https://github.com/other/repo.git\n"
+        )
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        assert convention.branch.task_prefix == "issue-"
+        assert convention.manager_usernames == []
+        assert convention.state_prefix == "state/"
+
+
+def test_resolver_returns_vibe_center_when_profile_specified():
+    """Test resolver returns Vibe Center defaults when profile='vibe-center'."""
+    resolver = ConventionResolver.from_repo(profile="vibe-center")
     convention = resolver.resolve()
     assert convention.branch.task_prefix == "task/issue-"
     assert convention.manager_usernames == ["vibe-manager-agent"]
 
 
+def test_resolver_returns_minimal_when_profile_specified():
+    """Test resolver returns minimal defaults when profile='minimal'."""
+    resolver = ConventionResolver.from_repo(profile="minimal")
+    convention = resolver.resolve()
+    assert convention.branch.task_prefix == "issue-"
+    assert convention.manager_usernames == []
+
+
+def test_resolver_unknown_profile_falls_back_to_minimal():
+    """Test resolver falls back to minimal for unknown profile."""
+    resolver = ConventionResolver.from_repo(profile="unknown")
+    convention = resolver.resolve()
+    assert convention.branch.task_prefix == "issue-"
+    assert convention.manager_usernames == []
+
+
+def test_resolver_uses_vibe_profile_env_var():
+    """Test resolver respects VIBE_PROFILE environment variable."""
+    with patch.dict(os.environ, {"VIBE_PROFILE": "vibe-center"}):
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        assert convention.branch.task_prefix == "task/issue-"
+
+
+def test_resolver_detects_vibe_center_repo():
+    """Test resolver detects Vibe Center repo via git remote."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="https://github.com/jacobcy/vibe-center.git\n"
+        )
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        assert convention.branch.task_prefix == "task/issue-"
+
+
 def test_resolver_returns_immutable_convention():
-    """Test that resolved convention is immutable."""
+    """Test that resolved convention is immutable (frozen Pydantic model)."""
     resolver = ConventionResolver.from_repo()
     convention = resolver.resolve()
     with pytest.raises(ValidationError):
@@ -29,8 +84,16 @@ def test_resolver_returns_immutable_convention():
 
 
 def test_convention_used_for_branch_generation():
-    """Test convention can generate branch names."""
-    resolver = ConventionResolver.from_repo()
+    """Test vibe-center convention can generate branch names."""
+    resolver = ConventionResolver(profile="vibe-center")
     convention = resolver.resolve()
     assert convention.branch.canonical_branch(123) == "task/issue-123"
     assert convention.state_label("handoff") == "state/handoff"
+
+
+def test_convention_no_prefix_state_label():
+    """Test state_label with empty prefix."""
+    from vibe3.config.profile_convention import ProfileConvention
+
+    convention = ProfileConvention(state_prefix="")
+    assert convention.state_label("handoff") == "handoff"

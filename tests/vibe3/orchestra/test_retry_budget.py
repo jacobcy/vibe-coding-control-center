@@ -41,7 +41,6 @@ class TestRetryBudget:
         config = MagicMock()
         config.manager_usernames = ["manager-bot"]
         config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
-        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
 
         # Mock github
         github = MagicMock()
