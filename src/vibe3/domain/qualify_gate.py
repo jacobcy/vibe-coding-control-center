@@ -77,8 +77,13 @@ class QualifyGateService:
             Target IssueState if the issue passes the gate and can be dispatched,
             None if the issue is blocked and should be skipped.
         """
+        # NEW: Resolve coordination truth FIRST (remote-first strategy)
+        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
+
+        # Step 0: Check local flow state existence
         if not flow_state:
-            if IssueState.BLOCKED.to_label() in labels:
+            # Check remote projection for blocked state
+            if truth.blocked_reason or truth.blocked_by_issue:
                 append_orchestra_event(
                     "dispatcher",
                     f"qualify_gate skip #{issue.number}: "
@@ -88,9 +93,6 @@ class QualifyGateService:
             if trigger_state.to_label() in labels:
                 return trigger_state
             return None
-
-        # NEW: Resolve coordination truth with remote-first strategy
-        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
 
         # Step 1: Check manual block (remote-first via truth table)
         blocked_reason = truth.blocked_reason

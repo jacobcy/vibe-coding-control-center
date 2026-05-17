@@ -61,11 +61,14 @@ class CoordinationResolver:
         blocked_reason_remote = None
         blocked_by_issue_remote = None
         dependencies_remote = []
+        remote_success = False  # Track remote read success separately
 
         if issue_number:
             try:
                 remote_truth = self._read_remote_collaboration(issue_number)
-                if remote_truth:
+                if remote_truth is not None:
+                    # Remote read succeeded (may return empty values)
+                    remote_success = True
                     blocked_reason_remote = remote_truth.get("blocked_reason")
                     blocked_by_issue_remote = remote_truth.get("blocked_by_issue")
                     dependencies_remote = remote_truth.get("dependencies", [])
@@ -83,27 +86,41 @@ class CoordinationResolver:
         flow_state = self.store.get_flow_state(branch)
 
         # Step 3: Merge with truth table (remote > local for collaboration)
+        # Use remote values when available (even if empty), fallback only on failure
+        blocked_reason = (
+            blocked_reason_remote
+            if remote_success
+            else (flow_state.get("blocked_reason") if flow_state else None)
+        )
+        blocked_by_issue = (
+            blocked_by_issue_remote
+            if remote_success
+            else (flow_state.get("blocked_by_issue") if flow_state else None)
+        )
+        dependencies = (
+            dependencies_remote
+            if remote_success
+            else (self.store.get_dependency_links(branch))
+        )
+
         truth = CoordinationTruth(
             # Collaboration: remote-first, fallback to local
-            blocked_reason=blocked_reason_remote
-            or (flow_state.get("blocked_reason") if flow_state else None),
+            blocked_reason=blocked_reason,
             blocked_reason_source=(
                 DataSource.ISSUE_BODY_FALLBACK
-                if blocked_reason_remote
+                if remote_success
                 else DataSource.LOCAL_SQLITE if flow_state else None
             ),
-            blocked_by_issue=blocked_by_issue_remote
-            or (flow_state.get("blocked_by_issue") if flow_state else None),
+            blocked_by_issue=blocked_by_issue,
             blocked_by_issue_source=(
                 DataSource.ISSUE_BODY_FALLBACK
-                if blocked_by_issue_remote
+                if remote_success
                 else DataSource.LOCAL_SQLITE if flow_state else None
             ),
-            dependencies=dependencies_remote
-            or (self.store.get_dependency_links(branch)),
+            dependencies=dependencies,
             dependencies_source=(
                 DataSource.ISSUE_BODY_FALLBACK
-                if dependencies_remote
+                if remote_success
                 else DataSource.LOCAL_SQLITE if flow_state else None
             ),
             # Execution: local-only
@@ -112,7 +129,7 @@ class CoordinationResolver:
         )
 
         # Exit degraded mode if remote read succeeded
-        if issue_number and blocked_reason_remote is not None:
+        if remote_success:
             degraded = get_degraded_manager()
             degraded.exit_degraded_mode()
 

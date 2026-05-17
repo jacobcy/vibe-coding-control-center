@@ -392,11 +392,8 @@ class GlobalDispatchCoordinator:
             # For BLOCKED issues: run qualify gate at intent time
             if issue.state == IssueState.BLOCKED:
                 target_state = self._qualify_gate.qualify_blocked_issue(issue)
-                if target_state is None:
-                    self._frozen_queue.pop(index)
-                    continue
 
-                # Check if degraded mode entered during qualification
+                # Check degraded mode immediately after qualification
                 degraded = get_degraded_manager()
                 if degraded.is_degraded():
                     degraded_reason = degraded.get_reason()
@@ -407,9 +404,12 @@ class GlobalDispatchCoordinator:
                         degraded_mode=True,
                         reason=reason_value,
                         issue_number=issue.number,
-                    ).warning(
-                        f"Qualification of #{issue.number} entered " "degraded mode"
-                    )
+                    ).warning(f"Qualification of #{issue.number} entered degraded mode")
+
+                # Then check target_state
+                if target_state is None:
+                    self._frozen_queue.pop(index)
+                    continue
 
                 role = find_role_for_state(target_state)
                 if role is None:

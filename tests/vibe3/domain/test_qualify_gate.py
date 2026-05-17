@@ -40,13 +40,24 @@ def mock_flow_manager():
 
 @pytest.fixture
 def qualify_gate_service(mock_config, mock_github, mock_store, mock_flow_manager):
-    """Create a QualifyGateService instance."""
-    return QualifyGateService(
+    """Create a QualifyGateService instance with mocked remote collaboration."""
+    service = QualifyGateService(
         config=mock_config,
         github=mock_github,
         store=mock_store,
         flow_manager=mock_flow_manager,
     )
+    # Mock remote collaboration read to return empty (unblocked) state
+    with patch.object(
+        service._coordination_resolver,
+        "_read_remote_collaboration",
+        return_value={
+            "blocked_reason": None,
+            "blocked_by_issue": None,
+            "dependencies": [],
+        },
+    ):
+        yield service
 
 
 @pytest.fixture
