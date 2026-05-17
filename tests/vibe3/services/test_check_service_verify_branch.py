@@ -1,0 +1,253 @@
+"""Tests for CheckService.verify_branch single-branch verification."""
+
+import sqlite3
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from vibe3.clients import SQLiteClient
+from vibe3.clients.sqlite_schema import init_schema
+from vibe3.models.pr import PRResponse, PRState
+from vibe3.services.check_service import CheckService
+
+
+def test_verify_branch_returns_check_result(tmp_path: Path) -> None:
+    """verify_branch should return CheckResult for a single branch."""
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    service = CheckService(store=temp_store, git_client=None, github_client=None)
+
+    # Setup: create a minimal flow record
+    branch = "dev/test-123"
+    from datetime import datetime
+
+    timestamp = datetime.now().isoformat()
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO flow_state (branch, flow_slug, flow_status, updated_at)
+            VALUES (?, ?, 'active', ?)
+            """,
+            (branch, "test_flow", timestamp),
+        )
+
+    result = service.verify_branch(branch)
+
+    assert result.branch == branch
+    assert isinstance(result.is_valid, bool)
+    assert isinstance(result.issues, list)
+
+
+def test_verify_branch_returns_invalid_for_missing_flow(tmp_path: Path) -> None:
+    """verify_branch should return invalid result for unknown branch."""
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    service = CheckService(store=temp_store)
+
+    result = service.verify_branch("nonexistent-branch")
+
+    assert result.is_valid is False
+    assert "No flow record" in result.issues[0]
+
+
+def test_verify_branch_rejects_protected_branch(tmp_path: Path) -> None:
+    """verify_branch should reject protected branches (main, master, develop)."""
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    service = CheckService(store=temp_store)
+
+    # Test main branch
+    result = service.verify_branch("main")
+    assert result.is_valid is False
+    assert "protected branch" in result.issues[0].lower()
+    assert "main" in result.issues[0]
+
+    # Test master branch
+    result = service.verify_branch("master")
+    assert result.is_valid is False
+    assert "protected branch" in result.issues[0].lower()
+
+    # Test develop branch
+    result = service.verify_branch("develop")
+    assert result.is_valid is False
+    assert "protected branch" in result.issues[0].lower()
+
+
+def test_verify_branch_handles_merged_pr(tmp_path: Path) -> None:
+    """verify_branch should mark flow as done when PR is merged."""
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    # Mock git client
+    mock_git = MagicMock()
+    mock_git.get_git_common_dir.return_value = str(tmp_path / ".git")
+
+    # Mock GitHub client
+    mock_github = MagicMock()
+
+    service = CheckService(
+        store=temp_store,
+        git_client=mock_git,
+        github_client=mock_github,
+    )
+
+    # Setup: create a flow record
+    branch = "dev/test-merged-pr"
+    from datetime import datetime
+
+    timestamp = datetime.now().isoformat()
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO flow_state (branch, flow_slug, flow_status, updated_at)
+            VALUES (?, ?, 'active', ?)
+            """,
+            (branch, "test_flow", timestamp),
+        )
+
+    # Setup: mock merged PR
+    merged_pr = PRResponse(
+        number=42,
+        title="Test PR",
+        state=PRState.MERGED,
+        head_branch=branch,
+        base_branch="main",
+        url="https://github.com/test/test/pull/42",
+        merged_at="2024-01-01T00:00:00Z",
+    )
+    service._branch_to_pr = {branch: merged_pr}
+
+    # Mock _mark_flow_done to avoid side effects
+    with patch.object(service, "_mark_flow_done") as mock_mark_done:
+        mock_mark_done.return_value = {"issue_to_close": None}
+        result = service.verify_branch(branch)
+
+        # Should call _mark_flow_done
+        mock_mark_done.assert_called_once()
+        assert result.is_valid is True
+
+
+def test_verify_branch_handles_closed_pr(tmp_path: Path) -> None:
+    """verify_branch should mark flow as aborted when PR is closed without merge."""
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    # Mock git client
+    mock_git = MagicMock()
+    mock_git.get_git_common_dir.return_value = str(tmp_path / ".git")
+
+    # Mock GitHub client
+    mock_github = MagicMock()
+
+    service = CheckService(
+        store=temp_store,
+        git_client=mock_git,
+        github_client=mock_github,
+    )
+
+    # Setup: create a flow record
+    branch = "dev/test-closed-pr"
+    from datetime import datetime
+
+    timestamp = datetime.now().isoformat()
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO flow_state (branch, flow_slug, flow_status, updated_at)
+            VALUES (?, ?, 'active', ?)
+            """,
+            (branch, "test_flow", timestamp),
+        )
+
+    # Setup: mock closed PR (not merged)
+    closed_pr = PRResponse(
+        number=43,
+        title="Test PR",
+        state=PRState.CLOSED,
+        head_branch=branch,
+        base_branch="main",
+        url="https://github.com/test/test/pull/43",
+        merged_at=None,
+    )
+    service._branch_to_pr = {branch: closed_pr}
+
+    # Mock _mark_flow_aborted to avoid side effects
+    with patch.object(service, "_mark_flow_aborted") as mock_mark_aborted:
+        result = service.verify_branch(branch)
+
+        # Should call _mark_flow_aborted
+        mock_mark_aborted.assert_called_once()
+        assert result.is_valid is True
+
+
+def test_verify_branch_handles_missing_worktree_and_ref_files(tmp_path: Path) -> None:
+    """verify_branch should report issues for missing worktree with ref files."""
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    # Mock git client
+    mock_git = MagicMock()
+    mock_git.get_git_common_dir.return_value = str(tmp_path / ".git")
+    mock_git.find_worktree_path_for_branch.return_value = None  # No worktree
+
+    # Mock GitHub client
+    mock_github = MagicMock()
+    mock_github.list_prs_for_branch.return_value = []  # No PR
+
+    service = CheckService(
+        store=temp_store,
+        git_client=mock_git,
+        github_client=mock_github,
+    )
+
+    # Setup: create a flow record with ref files
+    branch = "dev/test-missing-worktree"
+    mock_git._run.return_value = f"  {branch}\n"  # Branch exists locally
+    from datetime import datetime
+
+    timestamp = datetime.now().isoformat()
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO flow_state (
+                branch, flow_slug, flow_status,
+                plan_ref, report_ref, updated_at
+            )
+            VALUES (?, ?, 'active', ?, ?, ?)
+            """,
+            (branch, "test_flow", "plans/test.md", "reports/test.md", timestamp),
+        )
+
+    result = service.verify_branch(branch)
+
+    # Should report issues about missing worktree and ref files
+    assert result.is_valid is False
+    assert len(result.issues) > 0
+    # Should mention ref files cannot be verified
+    assert any("cannot be verified" in issue.lower() for issue in result.issues)

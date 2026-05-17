@@ -103,6 +103,28 @@ class CheckService(CheckRemote):
 
         return self._check_branch(branch)
 
+    def verify_branch(self, branch: str) -> CheckResult:
+        """Verify a specific branch flow consistency.
+
+        Args:
+            branch: Branch name to verify.
+
+        Returns:
+            CheckResult with validation status and issues.
+        """
+        # Validate branch is not protected
+        if branch in self.protected_branches:
+            return CheckResult(
+                is_valid=False,
+                issues=[f"Branch '{branch}' is a protected branch"],
+                branch=branch,
+            )
+
+        # Batch fetch all PRs (optimization: 1 call instead of N)
+        self._initialize_pr_cache()
+
+        return self._check_branch(branch)
+
     def _has_worktree(self, branch: str) -> bool:
         try:
             return self.git_client.find_worktree_path_for_branch(branch) is not None
