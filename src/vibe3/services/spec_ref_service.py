@@ -3,7 +3,6 @@
 import json
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 from typing import cast
 
 from loguru import logger
@@ -105,11 +104,14 @@ class SpecRefService:
 
         return cast(dict, json.loads(result.stdout))
 
-    def get_spec_content_for_prompt(self, info: SpecRefInfo) -> str | None:
+    def get_spec_content_for_prompt(
+        self, info: SpecRefInfo, branch: str | None = None
+    ) -> str | None:
         """Get spec content suitable for prompt injection.
 
         Args:
             info: Parsed spec reference info
+            branch: Optional branch for worktree path resolution
 
         Returns:
             Formatted spec content or None if unavailable
@@ -125,19 +127,24 @@ class SpecRefService:
             return "\n".join(parts) if parts else None
 
         if info.kind == "file" and info.file_path:
-            path = Path(info.file_path)
-            if path.exists():
-                try:
-                    return path.read_text(encoding="utf-8")
-                except OSError:
-                    return None
+            from vibe3.utils.path_helpers import resolve_handoff_target
+
+            # Use resolve_handoff_target for correct worktree path resolution
+            try:
+                resolved_path = resolve_handoff_target(info.file_path, branch=branch)
+                return resolved_path.read_text(encoding="utf-8")
+            except (FileNotFoundError, OSError):
+                return None
         return None
 
-    def validate_spec_ref(self, spec_ref: str) -> tuple[bool, str]:
+    def validate_spec_ref(
+        self, spec_ref: str, branch: str | None = None
+    ) -> tuple[bool, str]:
         """Validate a spec reference.
 
         Args:
             spec_ref: Spec reference to validate
+            branch: Optional branch for worktree path resolution
 
         Returns:
             Tuple of (is_valid, error_message)
@@ -146,11 +153,13 @@ class SpecRefService:
         if issue_number is not None:
             return True, ""
 
-        path = Path(spec_ref)
-        if path.exists() and path.is_file():
-            return True, ""
+        from vibe3.utils.path_helpers import resolve_handoff_target
 
-        return False, f"Spec reference not found: {spec_ref}"
+        try:
+            resolve_handoff_target(spec_ref, branch=branch)
+            return True, ""
+        except FileNotFoundError:
+            return False, f"Spec reference not found: {spec_ref}"
 
     def resolve_spec_ref(self, spec_ref: str) -> str:
         """Resolve a spec reference to its canonical form.
