@@ -161,7 +161,7 @@ get_profile_path() {
             # Extract value after colon
             local value="${entry#*:}"
             # Expand ${HOME} safely using zsh parameter expansion
-            value="${value//\${HOME}/$HOME}"
+            value="${value//\$\{HOME\}/$HOME}"
             echo "$value"
             return
         fi
