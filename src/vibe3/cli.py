@@ -31,6 +31,7 @@ from vibe3.commands import (
     status,
     task,
 )
+from vibe3.commands.command_options import FormatOption
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
 from vibe3.server import app as serve
@@ -80,15 +81,24 @@ def status_command(
         bool,
         typer.Option("--check", help="显示前先运行完整 vibe3 check"),
     ] = False,
-    json_output: status.JsonOption = False,
+    output_format: FormatOption = "table",
     trace: status.TraceOption = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """[Compatibility] Redirect to task status."""
-    task.status(
+    status.status(
         all_flows=all_flows,
         check=check,
-        json_output=json_output,
+        output_format=output_format,
         trace=trace,
+        json_output=json_output,
     )
 
 

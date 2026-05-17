@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
 from vibe3.commands.command_options import (
     AllOption,
-    JsonOption,
     TraceOption,
 )
 
@@ -228,13 +227,28 @@ def status(
         bool,
         typer.Option("--check", help="显示前先运行完整 vibe3 check"),
     ] = False,
-    json_output: JsonOption = False,
+    output_format: FormatOption = "table",
     trace: TraceOption = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="[DEPRECATED] Use --format json instead",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Show dashboard of all active flows.
 
     By default only shows active flows. Use --all to include done/aborted/stale.
     """
+    # Handle deprecated --json flag
+    if json_output and output_format == "table":
+        typer.echo(
+            "Warning: --json is deprecated, use --format json instead",
+            err=True,
+        )
+        output_format = "json"
     with trace_scope(trace, "flow status", domain="flow"):
         if check:
             run_full_check_shortcut()
@@ -242,10 +256,16 @@ def status(
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
 
-        if json_output:
-            typer.echo(
-                json.dumps([f.model_dump() for f in flows], indent=2, default=str)
-            )
+        if output_format in ("json", "yaml"):
+            output_data = [f.model_dump() for f in flows]
+            if output_format == "json":
+                typer.echo(json.dumps(output_data, indent=2, default=str))
+            else:  # yaml
+                import yaml
+
+                typer.echo(
+                    yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
+                )
             return
         if not flows:
             typer.echo("No active flows")
