@@ -134,8 +134,8 @@ def _resolve_pr_target(
     # Priority 2: Infer from current branch
     current_branch = pr_svc.git_client.get_current_branch()
     try:
-        pr = pr_svc.github_client.get_pr(None, current_branch)
-        resolved_pr = pr.number if pr else None
+        prs = pr_svc.github_client.list_prs_for_branch(current_branch)
+        resolved_pr = prs[0].number if prs else None
     except Exception as e:
         logger.bind(
             domain="pr",
@@ -164,7 +164,8 @@ def _fetch_pr_or_raise(
     """Load PR or raise a command-facing lookup error."""
     pr = pr_svc.get_pr(pr_number, branch)
     if not pr and pr_number is not None and current_branch:
-        pr = pr_svc.get_pr(branch=current_branch)
+        prs = pr_svc.github_client.list_prs_for_branch(current_branch)
+        pr = prs[0] if prs else None
     if not pr:
         raise LookupError("PR not found")
     return pr
