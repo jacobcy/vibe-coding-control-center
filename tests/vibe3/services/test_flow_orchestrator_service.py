@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
+from vibe3.models.pr import PRState
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
@@ -108,3 +109,61 @@ def test_create_flow_for_issue_uses_shared_bootstrap_interface() -> None:
 
     mock_bootstrap.assert_called_once()
     assert result == {"branch": "task/issue-777"}
+
+
+def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
+    config = load_orchestra_config()
+    service = FlowOrchestratorService(
+        config, store=MagicMock(), git=MagicMock(), github=MagicMock()
+    )
+    issue = IssueInfo(number=320, title="Rebuild lifecycle")
+    service.get_pr_for_issue = MagicMock(return_value=None)
+
+    with patch(
+        "vibe3.services.flow_orchestrator_service.FlowCleanupService"
+    ) as cleanup_cls:
+        cleanup = cleanup_cls.return_value
+        cleanup.cleanup_flow_scene.return_value = {
+            "worktree": True,
+            "local_branch": True,
+            "remote_branch": True,
+            "handoff": True,
+            "flow_record": True,
+        }
+        with patch.object(
+            service,
+            "bootstrap_issue_flow",
+            return_value={"branch": "task/issue-320"},
+        ) as mock_bootstrap:
+            result = service.rebuild_stale_issue_flow(
+                issue, branch="task/issue-320", slug="issue-320"
+            )
+
+    cleanup.cleanup_flow_scene.assert_called_once_with(
+        "task/issue-320",
+        include_remote=False,
+        terminate_sessions=False,
+        keep_flow_record=True,
+        force_delete=False,
+    )
+    mock_bootstrap.assert_called_once()
+    assert result == {"branch": "task/issue-320"}
+
+
+def test_rebuild_stale_issue_flow_returns_none_when_pr_already_merged() -> None:
+    config = load_orchestra_config()
+    github = MagicMock()
+    github.get_pr.return_value = MagicMock(
+        state=PRState.MERGED, merged_at="2026-05-17T00:00:00Z"
+    )
+    service = FlowOrchestratorService(
+        config, store=MagicMock(), git=MagicMock(), github=github
+    )
+    issue = IssueInfo(number=321, title="Merged already")
+    service.get_pr_for_issue = MagicMock(return_value=987)
+
+    result = service.rebuild_stale_issue_flow(
+        issue, branch="task/issue-321", slug="issue-321"
+    )
+
+    assert result is None

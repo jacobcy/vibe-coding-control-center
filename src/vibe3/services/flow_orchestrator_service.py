@@ -11,7 +11,10 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.worktree import WorktreeManager
+from vibe3.models.pr import PRState
+from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_failure_service import block_manager_noop_issue
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 from vibe3.services.signature_service import SignatureService
@@ -162,6 +165,49 @@ class FlowOrchestratorService:
             )
             result["worktree_path"] = str(worktree_ctx.path)
         return result
+
+    def rebuild_stale_issue_flow(
+        self,
+        issue: IssueInfo,
+        *,
+        branch: str,
+        slug: str | None = None,
+        source: str = "dispatch",
+    ) -> dict[str, Any] | None:
+        """Rebuild a stale flow: cleanup then re-bootstrap.
+
+        Returns None if the issue already has a merged PR (no rebuild needed).
+        """
+        slug = slug or f"issue-{issue.number}"
+        pr_number = self.get_pr_for_issue(issue.number)
+        if pr_number:
+            pr = self.github.get_pr(pr_number=pr_number)
+            if pr and (pr.state == PRState.MERGED or pr.merged_at):
+                block_manager_noop_issue(
+                    issue_number=issue.number,
+                    repo=self.config.repo,
+                    reason=(
+                        f"尝试重建 flow 但 PR #{pr_number} 已 merge。"
+                        "Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
+                    ),
+                    actor="orchestra:flow_dispatch",
+                )
+                return None
+
+        FlowCleanupService(git_client=self.git, store=self.store).cleanup_flow_scene(
+            branch,
+            include_remote=False,
+            terminate_sessions=False,
+            keep_flow_record=True,
+            force_delete=False,
+        )
+        return self.bootstrap_issue_flow(
+            issue,
+            branch=branch,
+            slug=slug,
+            source=source,
+            reactivate_existing=True,
+        )
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict[str, Any] | None:
         """Create flow for issue, handling existing flows and branch creation.
