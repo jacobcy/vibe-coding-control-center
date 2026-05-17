@@ -17,7 +17,7 @@ app = typer.Typer(
 
 
 def _emit_check_details(
-    mode: Literal["init", "fix_all", "clean_branch"],
+    mode: Literal["init", "fix_all", "clean_branch", "branch"],
     details: dict[str, Any],
     *,
     fix_requested: bool,
@@ -55,6 +55,10 @@ def _emit_check_details(
             typer.echo(f"  Failed: {f}", err=True)
         return
 
+    if mode == "branch":
+        # Branch mode details are already in the summary
+        return
+
 
 @app.callback(invoke_without_command=True)
 def check(
@@ -81,6 +85,13 @@ def check(
             ),
         ),
     ] = False,
+    branch: Annotated[
+        str | None,
+        typer.Option(
+            "--branch",
+            help="Check a single branch instead of all active flows.",
+        ),
+    ] = None,
     no_progress: Annotated[
         bool,
         typer.Option(
@@ -104,14 +115,19 @@ def check(
 
     [green]vibe3 check --clean-branch[/green]  Clean residual branches
                          for done/aborted flows.
+
+    [green]vibe3 check --branch <name>[/green]  Verify a single branch
+                         instead of all active flows.
     """
     if trace:
         setup_logging(verbose=2)
 
     # Mutual exclusion check
-    if init and clean_branch:
+    options_count = sum([init, clean_branch, branch is not None])
+    if options_count > 1:
         typer.echo(
-            "Error: --init and --clean-branch are mutually exclusive options.",
+            "Error: --init, --clean-branch, and --branch are "
+            "mutually exclusive options.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -122,7 +138,7 @@ def check(
 
     try:
         service = CheckService()
-        mode: Literal["init", "fix_all", "clean_branch"]
+        mode: Literal["init", "fix_all", "clean_branch", "branch"]
         if init:
             mode = "init"
             typer.echo("Scanning merged PRs to back-fill task_issue_number...")
@@ -138,11 +154,13 @@ def check(
             ):
                 typer.echo("Cleanup cancelled.", err=True)
                 raise typer.Exit(code=0)
+        elif branch:
+            mode = "branch"
         else:
             mode = "fix_all"
 
         result = execute_check_mode(
-            service, mode, verbose=trace, show_progress=not no_progress
+            service, mode, branch=branch, verbose=trace, show_progress=not no_progress
         )
 
         if result.success:

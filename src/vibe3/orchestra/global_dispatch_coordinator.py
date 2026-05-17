@@ -23,7 +23,6 @@ from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.models.pr import PRState
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
@@ -36,6 +35,7 @@ from vibe3.orchestra.queue_operations import (
     select_ready_issues,
 )
 from vibe3.roles.registry import build_label_dispatch_event
+from vibe3.services.check_service import CheckService
 from vibe3.utils.label_utils import clean_old_state_labels, should_skip_from_queue
 
 if TYPE_CHECKING:
@@ -233,66 +233,65 @@ class GlobalDispatchCoordinator:
         return load_issue(issue_number, self._config, self._github)
 
     def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
-        """Check issue health before dispatch.
+        """Check issue health before dispatch using unified CheckService.
 
-        Health checks:
-        1. Issue must not be closed on GitHub
-        2. If issue has a PR, PR must not be merged
+        This method calls CheckService.verify_branch() to perform comprehensive
+        health checks including:
+        - Issue closed on GitHub
+        - PR merged (auto-close issue)
+        - Branch existence
+        - Flow consistency
+        - Ref file validity
 
         Returns:
             True if issue is healthy and can be dispatched
-            False if issue should be skipped
+            False if issue should be skipped (invalid or done/aborted)
 
-        Side effects:
-            - Closes issues with merged PRs
+        Side effects (via CheckService):
+            - Auto-closes issues with merged PRs
+            - Marks invalid flows as aborted
             - Logs health check results
         """
-        # Check 1: Issue closed on GitHub
-        try:
-            payload = self._github.view_issue(issue.number, repo=self._config.repo)
-        except Exception as e:
-            logger.bind(domain="orchestra").error(
-                f"Health check failed for #{issue.number}: {e}"
-            )
-            return True  # Fail open: dispatch if we can't verify
-        if isinstance(payload, dict) and payload.get("state") == "CLOSED":
+        # Get the canonical branch for this issue
+        branch, _ = self._flow_context(issue.number)
+
+        # If no branch exists, fail open (allow dispatch for new issues)
+        if not branch:
+            return True
+
+        # Use CheckService for unified health check
+        service = CheckService(
+            store=self._store,
+            git_client=self._flow_manager.git,
+            github_client=self._github,
+        )
+        result = service.verify_branch(branch)
+
+        # Get flow status to determine if dispatch should proceed
+        flow_state = self._store.get_flow_state(branch)
+        flow_status = (
+            flow_state.get("flow_status", "active") if flow_state else "active"
+        )
+
+        # Determine dispatch eligibility:
+        # - Return False if flow has issues (is_valid=False)
+        # - Return False if flow is done/aborted (terminal state)
+        # - Return True if flow is healthy and active
+        if not result.is_valid:
             append_orchestra_event(
                 "dispatcher",
                 f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                f"(issue is closed on GitHub)",
+                f"(health check failed: {', '.join(result.issues)})",
             )
             return False
 
-        # Check 2: PR merged (auto-close issue)
-        pr_number = self._flow_manager.get_pr_for_issue(issue.number)
-        if pr_number:
-            try:
-                pr = self._github.get_pr(pr_number=int(pr_number))
-            except Exception as e:
-                logger.bind(domain="orchestra").warning(
-                    f"Failed to check PR #{pr_number} "
-                    f"for issue #{issue.number}: {e}"
-                )
-                return True  # Fail open
-            if pr is not None and pr.state == PRState.MERGED:
-                try:
-                    self._github.close_issue_if_open(
-                        issue.number,
-                        closing_comment=(
-                            f"PR #{pr_number} 已合并，系统自动关闭此 issue。"
-                        ),
-                        repo=self._config.repo,
-                    )
-                except Exception as e:
-                    logger.bind(domain="orchestra").error(
-                        f"Failed to close issue #{issue.number} after PR merge: {e}"
-                    )
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                    f"(PR #{pr_number} merged, issue auto-closed)",
-                )
-                return False
+        if flow_status in ("done", "aborted", "stale"):
+            append_orchestra_event(
+                "dispatcher",
+                f"GlobalDispatchCoordinator: skipped #{issue.number} "
+                f"(flow is {flow_status})",
+            )
+            return False
 
         return True
 
