@@ -7,7 +7,6 @@ import pytest
 from vibe3.exceptions import UserError
 from vibe3.utils.issue_branch_resolver import (
     _format_flow_details,
-    _resolve_best_flow_from_candidates,
     resolve_issue_branch_input,
 )
 

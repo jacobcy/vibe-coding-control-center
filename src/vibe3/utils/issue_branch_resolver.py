@@ -1,6 +1,6 @@
 """Helpers for resolving issue numbers to canonical flow branches."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from vibe3.exceptions import UserError
@@ -55,7 +55,7 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
     unbound_candidates = []
     for candidate in iter_issue_branch_candidates(issue_number):
         state = store.get_flow_state(candidate)
-        if state:
+        if isinstance(state, Mapping):
             unbound_candidates.append(state)
 
     if unbound_candidates:
@@ -75,7 +75,7 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
     )
 
 
-def _format_flow_details(flow: dict[str, Any]) -> str:
+def _format_flow_details(flow: Mapping[str, Any]) -> str:
     """Format single flow details: branch (status: X, pr: Y).
 
     Args:
@@ -89,7 +89,7 @@ def _format_flow_details(flow: dict[str, Any]) -> str:
 
     # PR info: check pr_ref or derive from pr_number
     pr_ref = flow.get("pr_ref")
-    if pr_ref:
+    if isinstance(pr_ref, str) and pr_ref:
         # Extract PR number from URL (e.g., "https://github.com/.../pull/990")
         pr_number = pr_ref.split("/")[-1]
         pr_info = f"pr: #{pr_number}"

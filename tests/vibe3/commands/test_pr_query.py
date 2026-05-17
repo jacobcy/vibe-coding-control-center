@@ -60,10 +60,8 @@ def test_resolve_pr_target_branch_not_found():
     # Mock store.get_flows_by_issue to return empty (no binding)
     mock_store = Mock()
     mock_store.get_flows_by_issue.return_value = []
+    mock_store.get_flow_state.return_value = None
     mock_flow_service.store = mock_store
-
-    # Mock get_flow_state to return None (no unbound candidates)
-    mock_flow_service.get_flow_state.return_value = None
 
     with patch("vibe3.commands.pr_query.FlowService", return_value=mock_flow_service):
         # Should raise UserError for missing flow (fail-fast behavior)
