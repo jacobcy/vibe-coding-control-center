@@ -18,6 +18,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.definitions import IssueRoleSyncSpec, RoleDefinition
 from vibe3.services.convention_resolver import ConventionResolver
+from vibe3.services.issue_flow_service import IssueFlowService
 
 SUPERVISOR_IDENTIFY_ROLE = RoleDefinition(
     name="supervisor-identify",
@@ -154,6 +155,10 @@ def build_supervisor_apply_request(
     """
     import os
 
+    # Use IssueFlowService for canonical branch name
+    issue_flow_service = IssueFlowService()
+    branch = issue_flow_service.canonical_branch_name(issue_number)
+
     prompt, options, task = build_supervisor_handoff_payload(
         config,
         issue_number,
@@ -163,7 +168,7 @@ def build_supervisor_apply_request(
 
     return ExecutionRequest(
         role="supervisor",
-        target_branch=f"issue-{issue_number}",
+        target_branch=branch,  # <-- CHANGED: Use canonical branch
         target_id=issue_number,
         execution_name=f"vibe3-supervisor-issue-{issue_number}",
         prompt=prompt,
@@ -198,6 +203,10 @@ def build_supervisor_cli_request(
     """
     import os
 
+    # Use IssueFlowService for canonical branch name
+    issue_flow_service = IssueFlowService()
+    branch = issue_flow_service.canonical_branch_name(issue_number)
+
     prompt, options, task = build_supervisor_handoff_payload(
         config,
         issue_number,
@@ -206,7 +215,7 @@ def build_supervisor_cli_request(
 
     return ExecutionRequest(
         role="supervisor",
-        target_branch=f"issue-{issue_number}",
+        target_branch=branch,  # <-- CHANGED: Use canonical branch
         target_id=issue_number,
         execution_name=f"vibe3-supervisor-issue-{issue_number}",
         prompt=prompt,

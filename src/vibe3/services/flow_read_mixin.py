@@ -58,9 +58,10 @@ class FlowReadMixin:
         pr_number, pr_ready = None, False  # Default values
 
         try:
-            # Query PR by branch (pr_number not cached in flow_state yet)
-            pr = gh.get_pr(None, branch)
-            if pr:
+            # Query PR by branch using proper method
+            prs = gh.list_prs_for_branch(branch)
+            if prs:
+                pr = prs[0]  # Take most recent PR
                 pr_number = pr.number
                 pr_ready = pr.is_ready
         except Exception as e:
