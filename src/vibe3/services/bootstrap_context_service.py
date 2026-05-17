@@ -6,6 +6,7 @@ from typing import Literal
 
 BootstrapActionKind = Literal[
     "bootstrap_flow_scene",
+    "snapshot_save",
     "pr_create_optional",
     "handoff_append",
 ]
@@ -88,6 +89,19 @@ class BootstrapContextService:
                 ),
             )
         )
+
+        # HIGH: Add baseline snapshot for new flows
+        if not has_existing_pr:
+            actions.append(
+                BootstrapAction(
+                    kind="snapshot_save",
+                    command="vibe3 snapshot save --as-baseline",
+                    reason=(
+                        "Capture baseline snapshot after bootstrap to enable "
+                        "subsequent snapshot diff and structure change detection."
+                    ),
+                )
+            )
 
         if not has_existing_pr:
             actions.append(

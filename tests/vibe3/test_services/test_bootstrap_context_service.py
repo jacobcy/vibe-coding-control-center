@@ -104,6 +104,52 @@ def test_bootstrap_plan_references_atomic_cli_commands_only() -> None:
     assert all("vibe3 new" not in cmd for cmd in commands)
 
 
+def test_plan_includes_baseline_snapshot_for_new_flows() -> None:
+    """HIGH: New flows must have baseline snapshot for structure diff."""
+    service = BootstrapContextService()
+
+    plan = service.plan_vibe_new_bootstrap(
+        target_branch="dev/issue-123",
+        issue_number=123,
+        has_existing_pr=False,
+        wants_worktree=False,
+    )
+
+    action_kinds = [action.kind for action in plan.actions]
+    assert "snapshot_save" in action_kinds
+
+    # Verify order: bootstrap, snapshot, pr_create, handoff
+    assert action_kinds == [
+        "bootstrap_flow_scene",
+        "snapshot_save",
+        "pr_create_optional",
+        "handoff_append",
+    ]
+
+    # Verify snapshot command
+    snapshot_action = next(
+        action for action in plan.actions if action.kind == "snapshot_save"
+    )
+    assert snapshot_action.command == "vibe3 snapshot save --as-baseline"
+    assert "baseline" in snapshot_action.reason.lower()
+
+
+def test_plan_skips_baseline_snapshot_when_pr_exists() -> None:
+    """Existing flows (with PR) don't need baseline snapshot."""
+    service = BootstrapContextService()
+
+    plan = service.plan_vibe_new_bootstrap(
+        target_branch="dev/issue-123",
+        issue_number=123,
+        has_existing_pr=True,
+        wants_worktree=False,
+    )
+
+    action_kinds = [action.kind for action in plan.actions]
+    assert "snapshot_save" not in action_kinds
+    assert action_kinds == ["bootstrap_flow_scene", "handoff_append"]
+
+
 def test_plan_for_new_branch_bootstrap_uses_shared_service_interface() -> None:
     service = BootstrapContextService()
 
