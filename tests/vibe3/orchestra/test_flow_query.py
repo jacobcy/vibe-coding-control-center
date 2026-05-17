@@ -134,3 +134,27 @@ class TestFlowQuery:
 
         mock_bootstrap.assert_called_once()
         assert result == {"branch": "task/issue-320"}
+
+    def test_create_flow_for_issue_delegates_stale_rebuild_to_shared_service(
+        self,
+    ):
+        config = OrchestraConfig(max_concurrent_flows=5)
+        manager = FlowManager(config, registry=MagicMock())
+        issue = make_issue(320, "Rebuild me")
+
+        with patch.object(
+            manager._bootstrap_service,
+            "rebuild_stale_issue_flow",
+            return_value={"branch": "task/issue-320"},
+        ) as mock_rebuild:
+            with patch.object(
+                manager.store,
+                "get_flows_by_issue",
+                return_value=[{"branch": "task/issue-320", "flow_status": "stale"}],
+            ):
+                result = manager.create_flow_for_issue(issue)
+
+        mock_rebuild.assert_called_once_with(
+            issue, branch="task/issue-320", slug="issue-320"
+        )
+        assert result == {"branch": "task/issue-320"}
