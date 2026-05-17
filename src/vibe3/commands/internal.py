@@ -6,8 +6,7 @@ from typing import Annotated
 import typer
 
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.exceptions import UserError
-from vibe3.models.orchestration import IssueInfo
+from vibe3.services.issue_context_loader import load_issue_info
 
 app = typer.Typer(
     name="internal",
@@ -15,24 +14,6 @@ app = typer.Typer(
     hidden=True,
     no_args_is_help=True,
 )
-
-
-def _load_issue_info(issue_number: int) -> IssueInfo:
-    """Load issue context for shared internal flow bootstrap."""
-    from vibe3.clients.github_client import GitHubClient
-
-    config = load_orchestra_config()
-    github = GitHubClient()
-    payload = github.view_issue(issue_number, repo=config.repo)
-    if payload == "network_error":
-        raise UserError(f"无法读取 issue #{issue_number}，请检查 GitHub 网络或认证状态")
-    if payload is None or not isinstance(payload, dict):
-        raise UserError(f"issue #{issue_number} 不存在或当前仓库不可访问")
-
-    issue = IssueInfo.from_github_payload(payload)
-    if issue is None:
-        raise UserError(f"无法解析 issue #{issue_number} 的上下文")
-    return issue
 
 
 @app.command("manager")
@@ -157,7 +138,7 @@ def internal_bootstrap_flow(
     store = SQLiteClient()
     git = GitClient()
     github = GitHubClient()
-    issue_info = _load_issue_info(issue)
+    issue_info = load_issue_info(issue, config=config, github=github)
     service = FlowOrchestratorService(config, store=store, git=git, github=github)
 
     result = service.bootstrap_issue_flow(

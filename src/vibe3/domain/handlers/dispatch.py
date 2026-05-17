@@ -11,7 +11,6 @@ from typing import Callable
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events import (
@@ -22,36 +21,12 @@ from vibe3.domain.events import (
 from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
 from vibe3.roles.plan import build_plan_request
 from vibe3.roles.review import build_review_request
 from vibe3.roles.run import build_run_request
+from vibe3.services.issue_context_loader import load_issue_info
 
 _RequestBuilder = Callable[..., ExecutionRequest]
-
-
-def _load_issue_info(config: OrchestraConfig, issue_number: int) -> IssueInfo:
-    """Load issue info for dispatch."""
-    issue_payload = GitHubClient().view_issue(issue_number, repo=config.repo)
-    if not isinstance(issue_payload, dict):
-        return IssueInfo(
-            number=issue_number,
-            title=f"Issue {issue_number}",
-            labels=[],
-        )
-
-    issue = IssueInfo.from_github_payload(issue_payload)
-    if issue is not None:
-        return issue
-
-    title = str(issue_payload.get("title") or f"Issue {issue_number}")
-    labels = [
-        label.get("name", "")
-        for label in issue_payload.get("labels", [])
-        if isinstance(label, dict)
-    ]
-    return IssueInfo(number=issue_number, title=title, labels=labels)
 
 
 def _dispatch_role_intent(
@@ -67,7 +42,7 @@ def _dispatch_role_intent(
     config = load_orchestra_config()
 
     with get_store() as store:
-        issue = _load_issue_info(config, issue_number)
+        issue = load_issue_info(issue_number, config=config)
 
         logger.bind(
             domain=handler_domain,
