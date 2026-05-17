@@ -90,69 +90,6 @@ class FlowManager:
             reactivate_existing=True,
         )
 
-        try:
-            self.task_service.link_issue(branch, issue.number, "task", actor=None)
-        except Exception as exc:
-            logger.bind(domain="orchestra").warning(
-                f"Failed to relink issue #{issue.number} to flow: {exc}"
-            )
-
-        return flow_state.model_dump()
-
-    def _rebuild_stale_canonical_flow(
-        self, issue: IssueInfo, branch: str, slug: str
-    ) -> dict | None:
-        # Guard: Check if PR was already merged - should not rebuild
-        # Use branch→PR lookup instead of issue→PR for consistency
-        prs = self.github.list_prs_for_branch(branch)
-        if prs:
-            pr = prs[0]  # Take most recent PR
-            if pr and (pr.state == PRState.MERGED or pr.merged_at):
-                # Block issue instead of throwing exception
-                # This is a tolerable issue that requires human intervention
-                logger.bind(
-                    domain="flow_dispatch",
-                    issue=issue.number,
-                    pr=pr.number,
-                    state=pr.state.value,
-                ).warning(
-                    f"Cannot rebuild flow #{issue.number}: "
-                    f"PR #{pr.number} already merged. "
-                    "Blocking issue for human intervention."
-                )
-
-                block_manager_noop_issue(
-                    issue_number=issue.number,
-                    repo=self.config.repo,
-                    reason=(
-                        f"尝试重建 flow 但 PR #{pr.number} 已 merge。"
-                        f"Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
-                    ),
-                    actor="orchestra:flow_dispatch",
-                )
-
-                # Return None to signal dispatch should stop (issue now blocked)
-                # This allows server to continue running
-                return None
-
-        worktree_path = self.git.find_worktree_path_for_branch(branch)
-        if worktree_path is not None:
-            self.git.remove_worktree(worktree_path, force=True)
-
-        if self.git.branch_exists(branch):
-            self.git.delete_branch(
-                branch,
-                force=True,
-                skip_if_worktree=True,
-            )
-
-        if not self.git.branch_exists(branch):
-            self.git.create_branch_ref(
-                branch,
-                start_ref=self.config.scene_base_ref,
-            )
-
-        return self._reactivate_canonical_flow(issue, branch, slug)
     def get_active_flow_count(self) -> int:
         active = 0
         for flow in self.store.get_all_flows():
@@ -266,7 +203,19 @@ class FlowManager:
         return result
 
     def get_pr_for_issue(self, issue_number: int) -> int | None:
+        """Return the PR number associated with the issue's flow, or None.
+
+        Implements FlowReader protocol using standard branch→PR query path.
+        """
+        # Priority 1: from stored flow record (fast path)
         flow = self.get_flow_for_issue(issue_number)
         if flow and flow.get("pr_number"):
             return int(flow["pr_number"])
-        return self.github.get_pr_for_issue(issue_number, repo=self.config.repo)
+
+        # Fallback: branch→PR standard path
+        branch = self.issue_flow_service.canonical_branch_name(issue_number)
+        prs = self.github.list_prs_for_branch(branch)
+        if prs:
+            return prs[0].number
+
+        return None

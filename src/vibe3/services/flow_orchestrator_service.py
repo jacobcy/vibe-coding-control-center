@@ -76,18 +76,20 @@ class FlowOrchestratorService:
     def get_pr_for_issue(self, issue_number: int) -> int | None:
         """Return the PR number associated with the issue's flow, or None.
 
-        First checks the stored flow record, then falls back to GitHub API
-        if the store hasn't been updated yet.
+        First checks the stored flow record, then falls back to standard
+        branch→PR query path if the store hasn't been updated yet.
         """
         flow = self.get_flow_for_issue(issue_number)
         if flow and flow.get("pr_number"):
             return int(flow["pr_number"])
-        # Fallback to GitHub API (important for newly created PRs)
-        try:
-            # HIGH: Pass repo parameter to avoid missing PR in non-target repos
-            return self.github.get_pr_for_issue(issue_number, repo=self.config.repo)
-        except Exception:
-            return None
+
+        # Fallback: standard branch→PR query path
+        branch = self.issue_flow_service.canonical_branch_name(issue_number)
+        prs = self.github.list_prs_for_branch(branch)
+        if prs:
+            return prs[0].number
+
+        return None
 
     def get_active_flow_count(self) -> int:
         """Return the number of currently active flows."""
@@ -209,15 +211,16 @@ class FlowOrchestratorService:
         Returns None if the issue already has a merged PR (no rebuild needed).
         """
         slug = slug or f"issue-{issue.number}"
-        pr_number = self.get_pr_for_issue(issue.number)
-        if pr_number:
-            pr = self.github.get_pr(pr_number=pr_number)
+        # Use branch→PR lookup for consistency (not issue→PR)
+        prs = self.github.list_prs_for_branch(branch)
+        if prs:
+            pr = prs[0]
             if pr and (pr.state == PRState.MERGED or pr.merged_at):
                 block_manager_noop_issue(
                     issue_number=issue.number,
                     repo=self.config.repo,
                     reason=(
-                        f"尝试重建 flow 但 PR #{pr_number} 已 merge。"
+                        f"尝试重建 flow 但 PR #{pr.number} 已 merge。"
                         "Flow 应标记为 done 而非 aborted。需要人工确认 flow 状态。"
                     ),
                     actor="orchestra:flow_dispatch",
