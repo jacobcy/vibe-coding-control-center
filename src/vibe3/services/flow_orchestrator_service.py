@@ -128,6 +128,10 @@ class FlowOrchestratorService:
                 branch,
                 start_ref=self.config.scene_base_ref,
             )
+            # CRITICAL: For non-worktree mode, checkout the newly created branch
+            # Without this, user stays on current branch while flow is on dev/issue-XXX
+            if not ensure_worktree:
+                self.git.switch_branch(branch)
 
         existing_state = self.store.get_flow_state(branch)
         if reactivate_existing and existing_state:

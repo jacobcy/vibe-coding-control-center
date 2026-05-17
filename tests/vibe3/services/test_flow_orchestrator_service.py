@@ -55,6 +55,87 @@ def test_flow_orchestrator_snapshot_returns_none_when_unreachable() -> None:
         assert snapshot is None
 
 
+def test_bootstrap_issue_flow_checkouts_branch_in_non_worktree_mode() -> None:
+    """CRITICAL: Non-worktree mode must checkout newly created branch.
+
+    Without this, user stays on current branch while flow is on dev/issue-XXX,
+    causing git history pollution (user commits on wrong branch).
+    """
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "dev/issue-999",
+        "flow_slug": "issue-999",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-999"})
+    )
+
+    # CRITICAL: ensure_worktree=False triggers checkout
+    result = service.bootstrap_issue_flow(
+        IssueInfo(number=999, title="Checkout test"),
+        branch="dev/issue-999",
+        source="skill",
+        ensure_worktree=False,
+    )
+
+    # Verify fetch, create_branch, AND checkout were called
+    git.fetch.assert_called_once_with("origin")
+    git.create_branch_ref.assert_called_once_with(
+        "dev/issue-999", start_ref=config.scene_base_ref
+    )
+    git.switch_branch.assert_called_once_with("dev/issue-999")
+    assert result["branch"] == "dev/issue-999"
+
+
+def test_bootstrap_issue_flow_skips_checkout_in_worktree_mode() -> None:
+    """Worktree mode should NOT checkout branch (worktree handles isolation)."""
+    config = load_orchestra_config()
+    store = MagicMock()
+    git = MagicMock()
+    github = MagicMock()
+    git.branch_exists.return_value = False
+    git.get_git_common_dir.return_value = "/tmp/repo/.git"
+    store.get_flow_state.return_value = {
+        "branch": "dev/issue-888",
+        "flow_slug": "issue-888",
+    }
+    service = FlowOrchestratorService(config, store=store, git=git, github=github)
+    service.flow_service.create_flow = MagicMock(
+        return_value=MagicMock(model_dump=lambda: {"branch": "dev/issue-888"})
+    )
+
+    # Mock worktree resolution
+    with patch(
+        "vibe3.services.flow_orchestrator_service.WorktreeManager"
+    ) as worktree_cls:
+        worktree = worktree_cls.return_value
+        worktree.resolve_bootstrap_worktree_context.return_value = MagicMock(
+            path="/tmp/repo/.worktrees/dev-issue-888"
+        )
+
+        result = service.bootstrap_issue_flow(
+            IssueInfo(number=888, title="Worktree test"),
+            branch="dev/issue-888",
+            source="skill",
+            ensure_worktree=True,  # Worktree mode
+        )
+
+    # Verify fetch and create_branch were called, but checkout was NOT
+    git.fetch.assert_called_once_with("origin")
+    git.create_branch_ref.assert_called_once_with(
+        "dev/issue-888", start_ref=config.scene_base_ref
+    )
+    # CRITICAL: switch_branch should NOT be called in worktree mode
+    git.switch_branch.assert_not_called()
+    assert result["branch"] == "dev/issue-888"
+
+
 def test_bootstrap_issue_flow_links_task_and_related_issues() -> None:
     config = load_orchestra_config()
     store = MagicMock()
