@@ -109,7 +109,21 @@ def execute_manual_run(
                 f"Skill '{skill}' not found (no adapter provides it in current profile)"
             )
 
-        skill_content = Path(skill_path).read_text(encoding="utf-8")
+        # Resolve relative path against repo root for CWD-independent access
+        from vibe3.clients.git_client import GitClient
+
+        try:
+            git_client = GitClient()
+            git_common_dir = git_client.get_git_common_dir()
+            if git_common_dir:
+                repo_root = Path(git_common_dir).parent
+                abs_skill_path = repo_root / skill_path
+            else:
+                # Fallback to cwd-relative if not in git repo
+                abs_skill_path = Path(skill_path)
+            skill_content = abs_skill_path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise ValueError(f"Failed to read skill file '{skill_path}': {e}") from e
         if not dry_run and not no_async:
             dispatch_run_command_async(
                 branch=branch,

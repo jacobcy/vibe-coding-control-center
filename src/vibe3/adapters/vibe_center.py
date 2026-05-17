@@ -12,7 +12,25 @@ from vibe3.config.adapter_manifest import AdapterManifest, AdapterResource
 
 
 def _build_vibe_center_manifest() -> AdapterManifest:
-    """Build Vibe Center adapter manifest from actual repo resources."""
+    """Build Vibe Center adapter manifest from actual repo resources.
+
+    Uses GitClient to find repo root, ensuring correct resource discovery
+    regardless of current working directory.
+    """
+    from vibe3.clients.git_client import GitClient
+
+    # Get repo root for stable path resolution
+    try:
+        git_client = GitClient()
+        git_common_dir = git_client.get_git_common_dir()
+        if git_common_dir:
+            repo_root = Path(git_common_dir).parent
+        else:
+            # Fallback to cwd if not in git repo
+            repo_root = Path.cwd()
+    except Exception:
+        # Graceful fallback for non-git environments
+        repo_root = Path.cwd()
 
     resources: list[AdapterResource] = []
 
@@ -69,29 +87,33 @@ def _build_vibe_center_manifest() -> AdapterManifest:
     )
 
     # Skills (scan directory)
-    skills_dir = Path("skills")
+    skills_dir = repo_root / "skills"
     if skills_dir.exists():
         for skill_path in skills_dir.iterdir():
             if skill_path.is_dir():
                 skill_md = skill_path / "SKILL.md"
                 if skill_md.exists():
+                    # Store relative path for portability
+                    rel_path = skill_md.relative_to(repo_root)
                     resources.append(
                         AdapterResource(
                             type="skill",
                             name=skill_path.name,
-                            path=str(skill_md.relative_to(".")),
+                            path=str(rel_path),
                         )
                     )
 
     # Workflows (from .agent/workflows)
-    workflows_dir = Path(".agent/workflows")
+    workflows_dir = repo_root / ".agent/workflows"
     if workflows_dir.exists():
         for workflow_path in workflows_dir.glob("*.md"):
+            # Store relative path for portability
+            rel_path = workflow_path.relative_to(repo_root)
             resources.append(
                 AdapterResource(
                     type="workflow",
                     name=workflow_path.stem,
-                    path=str(workflow_path.relative_to(".")),
+                    path=str(rel_path),
                 )
             )
 
