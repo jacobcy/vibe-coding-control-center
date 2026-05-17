@@ -23,23 +23,14 @@ def test_skill_path_returns_none_for_missing():
     assert path is None
 
 
-def test_skill_path_without_resolver_uses_default():
+def test_skill_path_without_resolver_uses_default(monkeypatch):
     """Test that omitting resolver uses default from_repo().
 
     In vibe-center repo (detected via git remote), should find vibe-commit.
     In external repos, should return None (minimal profile).
     """
-    import os
-
     # Force vibe-center profile to make test deterministic
-    original_profile = os.environ.get("VIBE_PROFILE")
-    try:
-        os.environ["VIBE_PROFILE"] = "vibe-center"
-        path = resolve_skill_path("vibe-commit")
-        assert path is not None
-        assert "skills/vibe-commit/SKILL.md" in path
-    finally:
-        if original_profile is None:
-            os.environ.pop("VIBE_PROFILE", None)
-        else:
-            os.environ["VIBE_PROFILE"] = original_profile
+    monkeypatch.setenv("VIBE_PROFILE", "vibe-center")
+    path = resolve_skill_path("vibe-commit")
+    assert path is not None
+    assert "skills/vibe-commit/SKILL.md" in path

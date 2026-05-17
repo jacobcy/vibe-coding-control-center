@@ -90,3 +90,41 @@ def test_adapter_manifest_empty_name_rejected():
             version="1.0.0",
             resources=[],
         )
+
+
+def test_adapter_manifest_get_resource_lookup():
+    """Test that get_resource uses O(1) index lookup."""
+    manifest = AdapterManifest(
+        name="test-adapter",
+        version="1.0.0",
+        resources=[
+            AdapterResource(type="skill", name="skill-a", path="skills/a/SKILL.md"),
+            AdapterResource(
+                type="policy", name="policy-b", path=".agent/policies/b.md"
+            ),
+            AdapterResource(type="skill", name="skill-c", path="skills/c/SKILL.md"),
+        ],
+    )
+    # Test O(1) lookup finds correct resource
+    result = manifest.get_resource("skill", "skill-a")
+    assert result is not None
+    assert result.name == "skill-a"
+    assert result.path == "skills/a/SKILL.md"
+
+    # Test lookup finds different resource
+    result2 = manifest.get_resource("skill", "skill-c")
+    assert result2 is not None
+    assert result2.name == "skill-c"
+
+    # Test lookup for different type
+    result3 = manifest.get_resource("policy", "policy-b")
+    assert result3 is not None
+    assert result3.type == "policy"
+
+    # Test lookup returns None for missing resource
+    result4 = manifest.get_resource("skill", "nonexistent")
+    assert result4 is None
+
+    # Test lookup returns None for wrong type
+    result5 = manifest.get_resource("policy", "skill-a")
+    assert result5 is None

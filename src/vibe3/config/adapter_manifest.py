@@ -36,6 +36,13 @@ class AdapterManifest(BaseModel):
 
     model_config = {"frozen": True}
 
+    def model_post_init(self, __context: object) -> None:
+        """Build resource index for O(1) lookup after validation."""
+        self._resource_index: dict[tuple[str, str], AdapterResource] = {}
+        for r in self.resources:
+            key = (r.type, r.name)
+            self._resource_index[key] = r
+
     def get_resources_by_type(self, resource_type: str) -> list[AdapterResource]:
         """Get all resources of a specific type.
 
@@ -57,10 +64,8 @@ class AdapterManifest(BaseModel):
         Returns:
             Matching resource or None if not found
         """
-        for r in self.resources:
-            if r.type == resource_type and r.name == name:
-                return r
-        return None
+        key = (resource_type, name)
+        return self._resource_index.get(key)
 
     @field_validator("resources")
     @classmethod
