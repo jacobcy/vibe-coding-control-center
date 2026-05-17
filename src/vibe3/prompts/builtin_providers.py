@@ -11,25 +11,26 @@ from loguru import logger
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
+from vibe3.services.convention_resolver import ConventionResolver
 
 
-def find_skill_file(skill_name: str) -> Path | None:
-    """Resolve repo-local skill path without depending on run command shells."""
-    cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
-    if cwd_candidate.exists():
-        return cwd_candidate
+def resolve_skill_content(skill_name: str) -> str | None:
+    """Resolve skill SKILL.md content through profile.
 
+    Args:
+        skill_name: Skill name
+
+    Returns:
+        Skill content or None if not found
+    """
+    resolver = ConventionResolver.from_repo()
+    skill_path = resolver.get_skill_path(skill_name)
+    if skill_path is None:
+        return None
     try:
-        from vibe3.services.flow_service import FlowService
-
-        repo_root = Path(FlowService().get_git_common_dir()).parent
-    except Exception:
-        repo_root = Path.cwd()
-
-    candidate = repo_root / "skills" / skill_name / "SKILL.md"
-    if candidate.exists():
-        return candidate
-    return None
+        return Path(skill_path).read_text(encoding="utf-8")
+    except OSError:
+        return None
 
 
 def _resolve_literal(src: PromptVariableSource) -> str:
@@ -57,17 +58,11 @@ def _resolve_file(src: PromptVariableSource) -> str:
 def _resolve_skill(src: PromptVariableSource) -> str:
     if not src.skill:
         return ""
-    skill_path = find_skill_file(src.skill)
-    if skill_path is None:
+    skill_content = resolve_skill_content(src.skill)
+    if skill_content is None:
         logger.bind(domain="prompt_assembly").warning(f"Skill not found: {src.skill}")
         return ""
-    try:
-        return skill_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        logger.bind(domain="prompt_assembly").warning(
-            f"Cannot read skill {src.skill}: {exc}"
-        )
-        return ""
+    return skill_content
 
 
 def _resolve_command(src: PromptVariableSource) -> str:

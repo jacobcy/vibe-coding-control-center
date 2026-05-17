@@ -105,6 +105,48 @@ class ConventionResolver:
         logger.debug("Using minimal profile defaults (portable)")
         return ProfileConvention()
 
+    def get_policy_path(self, name: str) -> str | None:
+        """Get path to a policy file for current profile.
+
+        Args:
+            name: Policy name
+
+        Returns:
+            Relative path or None
+        """
+        from vibe3.config.profile_config import ProfileConfig
+
+        profile_config = ProfileConfig(profile=self.profile or "minimal")
+        return profile_config.get_policy_path(name)
+
+    def get_skill_path(self, name: str) -> str | None:
+        """Get path to a skill for current profile.
+
+        Args:
+            name: Skill name
+
+        Returns:
+            Relative path or None
+        """
+        from vibe3.config.profile_config import ProfileConfig
+
+        profile_config = ProfileConfig(profile=self.profile or "minimal")
+        return profile_config.get_skill_path(name)
+
+    def get_supervisor_path(self, name: str = "apply") -> str | None:
+        """Get path to supervisor template for current profile.
+
+        Args:
+            name: Template name (default: 'apply')
+
+        Returns:
+            Relative path or None
+        """
+        from vibe3.config.profile_config import ProfileConfig
+
+        profile_config = ProfileConfig(profile=self.profile or "minimal")
+        return profile_config.get_supervisor_path(name)
+
     @classmethod
     def from_repo(cls, profile: str | None = None) -> "ConventionResolver":
         """Create resolver from current repo context.
