@@ -74,7 +74,17 @@ uv run python src/vibe3/cli.py inspect commit <sha>
 
 如果历史 refs 与当前 GitHub scene 冲突，以当前 scene 为准。
 
-### 5. 跨层一致性检查（命名/文档/API 变更）
+### 5. 读取 Executor Report（如有）
+
+如果 flow 中有 `report_ref`，读取 executor 的执行报告：
+
+```bash
+uv run python src/vibe3/cli.py handoff show <report_ref>
+```
+
+使用 `handoff show` 而非直接读文件路径，以正确处理跨 worktree 路径解析。
+
+### 6. 跨层一致性检查（命名/文档/API 变更）
 
 对于涉及命名一致性、文档同步、API 签名的变更：
 - 使用 `inspect symbols` 和 `rg` 确认所有层（service/UI/command）的引用均已更新
