@@ -40,6 +40,7 @@ class SQLiteFlowStateRepo:
         "execution_started_at",
         "execution_completed_at",
         "latest_verdict",  # Latest verdict record (JSON)
+        "transition_count",  # State transition counter for no-op gate
         "deleted_at",  # Soft delete timestamp (ISO 8601 or NULL)
         "worktree_path",  # Canonical worktree path for flow execution
     }

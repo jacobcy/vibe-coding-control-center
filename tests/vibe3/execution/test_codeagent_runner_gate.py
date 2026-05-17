@@ -289,3 +289,112 @@ class TestExecuteSyncGateIntegration:
         assert result.success
         # New logic: passive recording happens because no active handoff occurred
         mock_handoff_cls.return_value.record_passive_artifact.assert_called_once()
+
+
+class TestTransitionCountFlow:
+    """Tests that transition_count flows through executor correctly."""
+
+    def test_transition_count_read_from_flow_state_and_passed_to_gate(self) -> None:
+        """Executor reads transition_count from flow_state and passes to gate."""
+        mock_store = _make_mock_store()
+        mock_store.get_flow_state.return_value = {"transition_count": 5}
+        agent_result = _make_mock_agent_result()
+
+        command = CodeagentCommand(
+            role="executor",
+            context_builder=lambda: "run prompt",
+            branch="task/issue-42",
+            issue_number=42,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:run",
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
+            ) as mock_gate,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+            service = CodeagentExecutionService()
+            result = service.execute_sync(command)
+
+        assert result.success
+        mock_gate.assert_called_once()
+        gate_kwargs = mock_gate.call_args[1]
+        assert gate_kwargs["flow_state"]["transition_count"] == 5
+
+    def test_transition_count_persisted_after_gate_pass(self) -> None:
+        """Executor persists transition_count after gate passes."""
+        mock_store = _make_mock_store()
+        mock_store.get_flow_state.return_value = {"transition_count": 0}
+        agent_result = _make_mock_agent_result()
+
+        command = CodeagentCommand(
+            role="executor",
+            context_builder=lambda: "run prompt",
+            branch="task/issue-42",
+            issue_number=42,
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.execution.codeagent_runner.CodeagentBackend") as mock_backend,
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as mock_opts,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:run",
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
+            ) as mock_gate,
+        ):
+            # Gate will increment count in flow_state
+            mock_gate.side_effect = lambda **kwargs: kwargs["flow_state"].update(
+                {"transition_count": 1}
+            )
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/review"
+            )
+            mock_backend.return_value.run.return_value = agent_result
+            mock_opts.return_value = MagicMock()
+            service = CodeagentExecutionService()
+            result = service.execute_sync(command)
+
+        assert result.success
+        mock_gate.assert_called_once()
+        # Verify persistence call
+        mock_store.update_flow_state.assert_called()
+        update_calls = mock_store.update_flow_state.call_args_list
+        # Find the call with transition_count
+        transition_call = [c for c in update_calls if "transition_count" in c[1]]
+        assert len(transition_call) > 0
+        assert transition_call[0][1]["transition_count"] == 1

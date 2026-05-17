@@ -217,6 +217,13 @@ class CodeagentExecutionService:
                     flow_state=flow_state,
                 )
 
+                # Persist transition_count after gate call
+                if flow_state and "transition_count" in flow_state:
+                    ctx.store.update_flow_state(
+                        ctx.branch,
+                        transition_count=flow_state["transition_count"],
+                    )
+
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
             # Agent is expected to close the issue, but we ensure label cleanup.
             if command.role == "supervisor" and command.issue_number is not None:
