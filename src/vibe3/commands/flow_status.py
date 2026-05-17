@@ -179,9 +179,28 @@ def show(
                     raise typer.Exit(1)
 
         if snapshot:
-            projection_service = FlowProjectionService()
-            projection = projection_service.get_projection(target_branch)
-            # Use flow_status from resolver (already set above)
+            # Use resolver's flow_status directly (already source-aware)
+            # Do NOT re-read from local via FlowProjectionService.get_projection
+            from vibe3.services.flow_projection_service import FlowProjection
+
+            projection = FlowProjection.from_flow_status(flow_status)
+
+            # Optionally fetch real-time PR status if PR exists
+            if flow_status.pr_number:
+                try:
+                    from vibe3.clients.github_client import GitHubClient
+
+                    github_client = GitHubClient()
+                    prs = github_client.list_prs_for_branch(target_branch)
+                    if prs:
+                        pr = prs[0]
+                        projection.pr_number = pr.number
+                        projection.pr_status = pr.state.value
+                        projection.pr_is_draft = pr.draft
+                        projection.pr_url = pr.url
+                except Exception as e:
+                    projection.pr_fetch_error = str(e)
+
             _render_snapshot_format(projection, flow_status, output_format)
             return
 
