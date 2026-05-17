@@ -135,12 +135,12 @@ def test_verify_branch_handles_merged_pr(tmp_path: Path) -> None:
     )
     service._branch_to_pr = {branch: merged_pr}
 
-    # Mock _mark_flow_done to avoid side effects
-    with patch.object(service, "_mark_flow_done") as mock_mark_done:
+    # Mock flow_status_service.mark_flow_done to avoid side effects
+    with patch.object(service._flow_status_service, "mark_flow_done") as mock_mark_done:
         mock_mark_done.return_value = {"issue_to_close": None}
         result = service.verify_branch(branch)
 
-        # Should call _mark_flow_done
+        # Should call mark_flow_done
         mock_mark_done.assert_called_once()
         assert result.is_valid is True
 
@@ -193,11 +193,13 @@ def test_verify_branch_handles_closed_pr(tmp_path: Path) -> None:
     )
     service._branch_to_pr = {branch: closed_pr}
 
-    # Mock _mark_flow_aborted to avoid side effects
-    with patch.object(service, "_mark_flow_aborted") as mock_mark_aborted:
+    # Mock flow_status_service.mark_flow_aborted to avoid side effects
+    with patch.object(
+        service._flow_status_service, "mark_flow_aborted"
+    ) as mock_mark_aborted:
         result = service.verify_branch(branch)
 
-        # Should call _mark_flow_aborted
+        # Should call mark_flow_aborted
         mock_mark_aborted.assert_called_once()
         assert result.is_valid is True
 

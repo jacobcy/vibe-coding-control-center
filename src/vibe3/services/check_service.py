@@ -11,7 +11,6 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
@@ -22,6 +21,7 @@ from vibe3.services.check_remote import (
     requires_handoff,
     resolve_task_issue_number,
 )
+from vibe3.services.flow_status_service import FlowStatusService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 if TYPE_CHECKING:
@@ -60,10 +60,16 @@ class CheckService(CheckRemote):
         store: SQLiteClient | None = None,
         git_client: GitClient | None = None,
         github_client: GitHubClient | None = None,
+        flow_status_service: FlowStatusService | None = None,
     ) -> None:
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
+        self._flow_status_service = flow_status_service or FlowStatusService(
+            store=self.store,
+            git_client=self.git_client,
+            github_client=self.github_client,
+        )
         self._branch_to_pr: dict[str, PRResponse] = {}
         # Load config for protected branches
         self._vibe_config = VibeConfig()
@@ -160,7 +166,7 @@ class CheckService(CheckRemote):
 
         if pr.merged_at or pr.state == PRState.MERGED:
             # Normal completion via merge → done
-            suggestions = self._mark_flow_done(
+            suggestions = self._flow_status_service.mark_flow_done(
                 branch,
                 f"PR #{pr.number} merged (detected from GitHub)",
             )
@@ -174,7 +180,7 @@ class CheckService(CheckRemote):
 
         if pr.state == PRState.CLOSED:
             # PR closed without merge → aborted (task abandoned)
-            self._mark_flow_aborted(
+            self._flow_status_service.mark_flow_aborted(
                 branch,
                 f"PR #{pr.number} closed without merge (detected from GitHub)",
             )
@@ -269,7 +275,7 @@ class CheckService(CheckRemote):
         # Semantic: Issue closed without PR = task cancelled/aborted
         cached_pr = self._branch_to_pr.get(branch)
         if task_issue_closed and (not cached_pr or cached_pr.state != PRState.OPEN):
-            self._mark_flow_aborted(
+            self._flow_status_service.mark_flow_aborted(
                 branch, f"Task issue #{task_issue} is CLOSED (no open PR found)"
             )
             return CheckResult(is_valid=True, branch=branch, issues=[])
@@ -281,7 +287,7 @@ class CheckService(CheckRemote):
             flow_status == "stale"
             and branch.startswith("task/issue-")
             and orchestration_state == IssueState.READY
-            and self._rebuild_stale_ready_flow(
+            and self._flow_status_service.rebuild_stale_ready_flow(
                 branch, task_issue=task_issue, issue_payload=issue_payload
             )
         ):
@@ -289,7 +295,7 @@ class CheckService(CheckRemote):
 
         # Handle missing local branch
         if branch_missing:
-            self._mark_flow_aborted(
+            self._flow_status_service.mark_flow_aborted(
                 branch, f"Branch '{branch}' no longer exists locally"
             )
             return CheckResult(is_valid=True, branch=branch, issues=[])
@@ -304,7 +310,7 @@ class CheckService(CheckRemote):
             try:
                 behind_count = self._count_commits_behind_main(branch)
                 if behind_count and behind_count > self.ORPHAN_FLOW_BEHIND_THRESHOLD:
-                    self._mark_flow_aborted(
+                    self._flow_status_service.mark_flow_aborted(
                         branch,
                         f"Orphaned flow '{branch}' is {behind_count} "
                         "commits behind main",
@@ -323,7 +329,7 @@ class CheckService(CheckRemote):
             and is_empty_auto_scene(flow_data)
             and not self._has_worktree(branch)
         ):
-            self._mark_flow_stale(
+            self._flow_status_service.mark_flow_stale(
                 branch, f"Issue #{task_issue} remains state/ready with no active scene"
             )
             return CheckResult(is_valid=True, branch=branch, issues=[])
@@ -383,155 +389,6 @@ class CheckService(CheckRemote):
         )
         return CheckResult(
             is_valid=is_valid, issues=issues, warnings=warnings, branch=branch
-        )
-
-    def _rebuild_stale_ready_flow(
-        self,
-        branch: str,
-        *,
-        task_issue: int | None,
-        issue_payload: dict | None,
-    ) -> bool:
-        """Rebuild stale canonical ready flow as a fresh registered task flow."""
-        issue_number = task_issue
-        if issue_number is None:
-            try:
-                issue_number = int(branch.removeprefix("task/issue-"))
-            except ValueError:
-                return False
-
-        from vibe3.models.orchestration import IssueInfo
-        from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-
-        issue = IssueInfo(
-            number=issue_number,
-            title=str((issue_payload or {}).get("title") or f"Issue {issue_number}"),
-            state=IssueState.READY,
-            labels=[IssueState.READY.to_label()],
-        )
-        orchestrator = FlowOrchestratorService(
-            load_orchestra_config(),
-            store=self.store,
-            git=self.git_client,
-            github=self.github_client,
-        )
-        orchestrator.create_flow_for_issue(issue)
-        return True
-
-    def _mark_flow_status(
-        self,
-        branch: str,
-        status: str,
-        reason: str,
-        event_type: str,
-        action: str,
-    ) -> None:
-        """Generic method to mark flow status and record event."""
-        logger.bind(
-            domain="check",
-            action=action,
-            branch=branch,
-        ).info(f"{action}: {reason}")
-        self.store.update_flow_state(branch, flow_status=status)
-        self.store.add_event(
-            branch,
-            event_type,
-            "system",
-            f"Flow auto-{status}: {reason}",
-        )
-
-    @staticmethod
-    def _is_task_branch(branch: str) -> bool:
-        """Check if branch follows the task/issue-N auto-flow pattern."""
-        return branch.startswith("task/issue-")
-
-    def _mark_flow_done(
-        self,
-        branch: str,
-        reason: str,
-    ) -> dict[str, int | None]:
-        """Mark a flow as done and record the event.
-
-        For flows with role=task issue links, auto-closes the linked GitHub issue
-        when no other active flows exist for the same issue.
-
-        Multi-flow binding protection: If the same task issue is linked to multiple
-        active flows (e.g., task/issue-123 and dev/issue-123), the issue is NOT
-        closed until all active flows are done.
-
-        Note: Branch cleanup is deferred to 'vibe3 check --clean-branch'.
-        This keeps check fast and allows code reuse.
-
-        Returns:
-            Dict with suggestions, e.g., {"issue_to_close": 123}
-            where issue_to_close is set only when auto-close was needed.
-        """
-        try:
-            from vibe3.analysis import snapshot_service
-
-            snapshot_service.save_branch_baseline(branch)
-        except Exception as e:
-            logger.warning(f"Failed to save branch baseline on auto-complete: {e}")
-
-        self._mark_flow_status(
-            branch, "done", reason, "flow_auto_completed", "auto_complete_flow"
-        )
-
-        suggestions: dict[str, int | None] = {"issue_to_close": None}
-        issue_links = self.store.get_issue_links(branch)
-        task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
-        if not task_issues:
-            return suggestions
-
-        task_issue = task_issues[0]["issue_number"]
-
-        # Multi-flow binding protection: Check if other active flows exist
-        # for the same task issue before closing.
-        all_task_flows = self.store.get_flows_by_issue(task_issue, role="task")
-        other_active_flows = [
-            f
-            for f in all_task_flows
-            if f["branch"] != branch and f.get("flow_status") == "active"
-        ]
-
-        if other_active_flows:
-            logger.bind(
-                domain="check",
-                action="auto_complete_flow",
-                branch=branch,
-                issue_number=task_issue,
-                other_active_count=len(other_active_flows),
-            ).warning(
-                f"Skipping auto-close for issue #{task_issue}: "
-                f"other active flows exist ({len(other_active_flows)}"
-            )
-            return suggestions
-
-        # Safe to close: this is the only active flow for this task issue
-        close_result = self.github_client.close_issue_if_open(
-            issue_number=task_issue,
-            closing_comment=(
-                f"PR merged. Flow '{branch}' completed. "
-                "Closed automatically by vibe check."
-            ),
-        )
-
-        # Track if issue was actually closed (vs already_closed)
-        if close_result == "closed":
-            suggestions["issue_to_close"] = task_issue
-
-        return suggestions
-
-    def _mark_flow_aborted(self, branch: str, reason: str) -> None:
-        """Mark a flow as aborted and record the event."""
-        self._mark_flow_status(
-            branch, "aborted", reason, "flow_auto_aborted", "auto_abort_flow"
-        )
-
-    def _mark_flow_stale(self, branch: str, reason: str) -> None:
-        """Mark an empty active flow as stale and record the event."""
-        self._mark_flow_status(
-            branch, "stale", reason, "flow_auto_staled", "auto_stale_flow"
         )
 
     def verify_all_flows(
