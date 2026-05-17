@@ -286,9 +286,12 @@ class TaskShowService:
         return None
 
     def _build_pr_summary(self, branch: str) -> TaskPRSummary | None:
-        pr = self.github_client.get_pr(branch=branch)
-        if pr is None:
+        # Use list_prs_for_branch() to properly handle branch→PR lookup
+        prs = self.github_client.list_prs_for_branch(branch)
+        if not prs:
             return None
+        # Take the most recent PR if multiple exist
+        pr = prs[0]
         return TaskPRSummary(
             number=pr.number,
             title=pr.title,
