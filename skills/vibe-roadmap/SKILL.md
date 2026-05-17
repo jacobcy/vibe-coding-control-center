@@ -63,7 +63,29 @@ intake gate 约束：
 - 调度器无法判断优先级时，必须要求人类讨论
 - 若涉及主 issue / sub-issue，只承接 skill/workflow 已做出的范围判断，不在 shell 层发明 parent/sub-issue 运行时逻辑
 - 所有 roadmap 管理通过 GitHub issue labels 触发，不在本地实现数据存储
-- 不负责根据当前 active / ready / blocked 现场判断“现在下一个该做谁”；这是 `vibe-orchestra` 的职责
+- 不负责根据当前 active / ready / blocked 现场判断”现在下一个该做谁”；这是 `vibe-orchestra` 的职责
+
+## 配置读取
+
+Roadmap skill 必须读取以下配置：
+
+**Manager Usernames 配置**：
+- 文件：`config/v3/settings.yaml`
+- 字段：`manager_usernames`
+- 用途：确定自动分配的目标 assignee
+
+读取方式：
+```bash
+# 查看配置（未来可使用 vibe3 config show）
+cat config/v3/settings.yaml | grep manager_usernames
+
+# 或使用 Python 加载
+python -c “import yaml; config = yaml.safe_load(open('config/v3/settings.yaml')); print(config.get('manager_usernames', ['vibe-manager-agent']))”
+```
+
+默认行为：
+- 若配置文件不存在或字段缺失，使用默认值 `[“vibe-manager-agent”]`
+- 只使用配置中的第一个 manager username
 
 边界对照：
 
@@ -72,6 +94,140 @@ intake gate 约束：
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
 - 基于当前运行现场寻找下一个值得处理的 issue：交给 `vibe-orchestra`
 - parent issue / sub-issue 的范围判断：交给 `vibe-issue` 等 skill/workflow；`vibe-roadmap` 只消费判断结果
+
+## Intake Gate 机制
+
+### 三级审查
+
+**Level 1: 基础条件**
+- 问题边界明确、验收口径清楚、无需额外产品讨论
+- 改动范围可控、依赖关系简单
+- 允许存在若干实现选项；只要目标清楚、边界稳定、可由 manager 在执行中收敛，就不算人类阻塞
+
+**Level 2: 架构一致性**
+- 依赖的模块/函数仍存在
+- 引用的 API 未废弃
+- 涉及的配置/架构未变更
+- 有明确的代码执行路径
+
+**Level 3: 生命周期检查**
+- Issue 未过时（非依赖已移除）
+- 非重复已关闭 issue
+- 不需要先关闭其他依赖 issue
+
+### 决策逻辑
+
+**优先纳入**（通过全部三级）：
+- bug fix：问题明确 + 架构仍相关 + 未过时
+- small feature：方案明确 + 范围小 + 架构一致
+- 重构类：范围明确 + 边界清晰 + 验收标准确定
+
+**建议关闭**（Level 2 或 Level 3 不通过）：
+- 依赖的模块已在其他 PR 移除
+- 引用的 API 已废弃
+- 与已关闭 issue 重复
+- 明确不适用当前架构
+
+**建议调整**（Level 1 或 Level 2 部分不通过）：
+- 范围过大 → 建议拆分
+- 架构已变更 → 建议更新内容
+- 依赖未就绪 → 建议等依赖完成后重新提出
+
+**跳过（保守等待）**：
+- issue 的目标/验收口径本身不明确
+- 需要先决定架构方向、产品策略或跨团队边界
+- 不确定是否过时
+
+## Assignee 自动分配
+
+### 配置来源
+
+Manager assignee 配置位于：
+- **配置文件**：`config/v3/settings.yaml`
+- **配置字段**：`manager_usernames`
+- **默认值**：`["vibe-manager-agent"]`
+
+### 分配规则（强制）
+
+**自动化路径**：
+- 通过三级审查 → 分配给 `vibe-manager-agent`
+- 利用 manager dispatch 机制 → 自动触发执行
+
+**使用规则**：
+- ✅ 必须使用配置中的 manager_usernames
+- ✅ 默认使用 `vibe-manager-agent`
+- ❌ 禁止使用人类用户名（如 jacobcy、alice）
+- ❌ 禁止使用示例中的 placeholder（如 @alice）
+
+### 触发机制
+
+1. Issue 通过三级审查
+2. Roadmap skill 分配 assignee: `gh issue edit <number> --assignee vibe-manager-agent`
+3. Manager dispatch 检测到 issue 分配给 manager_usernames
+4. Manager 自动启动执行链
+
+### 人机协作路径
+
+**要求人类讨论**（审查不通过）：
+- 未通过三级审查 → 写 comment 说明原因
+- 不分配 assignee
+- 标记为 `roadmap/rfc` 或 `roadmap/next`
+
+**建议关闭**（Level 2/3 不通过）：
+- 写 comment 说明关闭原因
+- 建议人类关闭 issue
+
+## 人机协作边界
+
+### 明确分工
+
+**Automation Path（自动路径）**：
+- Roadmap skill + manager dispatch
+- 三级审查通过 → 自动分配 assignee → manager 启动
+- 无需人类干预
+
+**Human-Machine Collaboration Path（人机协作路径）**：
+- Roadmap skill + human decision gate
+- 三级审查不通过 → 要求人类讨论 → 人类决定后继续
+- 需要人类确认
+
+### 决策逻辑
+
+**优先自动化**（通过三级审查）：
+- bug fix：问题明确 + 架构相关 + 未过时
+- small feature：方案明确 + 范围小
+- refactor：范围明确 + 边界清晰
+
+**要求人类讨论**（Level 1 不通过）：
+- issue 目标不明确
+- 需要架构/产品方向决策
+- 范围过大需拆分
+
+**建议关闭**（Level 2/3 不通过）：
+- 依赖已移除
+- API 已废弃
+- 重复已关闭 issue
+
+### 不要误判为需要人类讨论的情况
+
+- 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么
+- manager 可以先读代码再决定采用哪种小范围实现
+- 描述里列了若干候选方案，但这些方案不会改变系统边界，只影响落地细节
+
+## Comment Contract
+
+任何 intake 类 routing 评论必须遵循 marker 规则：
+
+- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
+- intake 决策建议用 `[governance suggest]`，因为 roadmap skill 只产出 routing 信号、不做强制结论
+- 不要把 intake 说明嵌入到自由文本中而不带 marker；缺失 marker 会被人类指令解析器误读为人类指令
+
+合规示例：
+```
+[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=bugfix.
+[governance suggest] Skipped: needs human scope confirmation before automation.
+[governance suggest] Recommend Close: dependency removed in #123, API deprecated.
+```
 
 ## 基于 Label 的 Roadmap 管理
 
@@ -159,6 +315,49 @@ gh issue list -l "roadmap/p0"
 - 确认下一版本目标
 - 重新评估待分类 Issue
 - 更新 roadmap 状态标签
+
+### Step X: Intake 判断（新增）
+
+**场景 A: 适合自动化推进**
+- 检查：运行三级审查（Level 1/2/3）
+- 决策：通过全部三级审查
+- 执行动作：
+  1. 分配 assignee：
+     ```bash
+     gh issue edit <number> --assignee vibe-manager-agent
+     ```
+  2. 添加 intake label：
+     ```bash
+     gh issue edit <number> --add-label "roadmap/intake"
+     ```
+  3. 写 intake comment：
+     ```bash
+     gh issue comment <number> --body "[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=<bugfix|feature|refactor>."
+     ```
+
+**场景 B: 需要人类讨论**
+- 检查：未通过 Level 1（目标不明确、范围过大、架构变更）
+- 决策：要求人类讨论
+- 执行动作：
+  1. 写 comment 说明原因：
+     ```bash
+     gh issue comment <number> --body "[governance suggest] Skipped: needs human scope confirmation before automation. Reason: <具体原因>."
+     ```
+  2. 不分配 assignee
+  3. 标记为待讨论：
+     ```bash
+     gh issue edit <number> --add-label "roadmap/rfc"
+     ```
+
+**场景 C: 建议关闭**
+- 检查：Level 2 或 Level 3 不通过（依赖已移除、API 已废弃、重复）
+- 决策：建议人类关闭
+- 执行动作：
+  1. 写 comment 说明关闭原因：
+     ```bash
+     gh issue comment <number> --body "[governance suggest] Recommend Close: dependency removed in #<PR>, API deprecated, duplicate of #<issue>."
+     ```
+  2. 建议人类关闭 issue（不自动关闭）
 
 ### Step 3: 应用标签和 Milestone
 
