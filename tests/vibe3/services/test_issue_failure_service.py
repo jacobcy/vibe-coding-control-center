@@ -31,10 +31,10 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.issue_failure_service.GitHubClient"
-            ) as mock_github_class:
-                mock_github = MagicMock()
-                mock_github_class.return_value = mock_github
+                "vibe3.services.issue_failure_service.FlowTimelineService"
+            ) as mock_timeline_class:
+                mock_timeline = MagicMock()
+                mock_timeline_class.return_value = mock_timeline
 
                 with patch(
                     "vibe3.services.issue_failure_service.LabelService"
@@ -74,10 +74,10 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.flow_block_mixin.GitHubClient"
-            ) as mock_github_class:
-                mock_github = MagicMock()
-                mock_github_class.return_value = mock_github
+                "vibe3.services.flow_block_mixin.FlowTimelineService"
+            ) as mock_timeline_class:
+                mock_timeline = MagicMock()
+                mock_timeline_class.return_value = mock_timeline
 
                 with patch(
                     "vibe3.services.flow_block_mixin.LabelService"
