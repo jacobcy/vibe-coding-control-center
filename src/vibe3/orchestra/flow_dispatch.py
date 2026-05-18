@@ -189,6 +189,7 @@ class FlowManager:
                 branch=branch,
                 slug=slug,
                 source="dispatch",
+                ensure_worktree=True,  # Orchestra task flows must use worktree
             )
         except Exception as exc:
             existing = self.store.get_flow_state(branch) or {}
