@@ -20,7 +20,7 @@ related_docs:
 ```
 全局层     vibe3 -v/-vv [COMMAND]
 命令组层   vibe3 flow/inspect/review/... [-h]
-子命令层   vibe3 flow new NAME [--trace] [--json] [-y]
+子命令层   vibe3 flow update [--trace] [--json] [-y]
 ```
 
 ---
@@ -35,7 +35,7 @@ related_docs:
 | （无参数） | 显示帮助 |
 
 ```bash
-vibe3 -v flow list
+vibe3 -v flow status
 vibe3 -vv inspect pr 42
 vibe3 -h
 vibe3 help
@@ -57,7 +57,7 @@ vibe3 inspect pr 42 --trace
 vibe3 inspect pr 42 --json | jq '.score'
 vibe3 inspect pr 42 --trace --json
 vibe3 review pr 42 --help
-vibe3 flow new my-feature -h
+vibe3 flow show -h
 ```
 
 ---
@@ -76,7 +76,7 @@ vibe3 flow new my-feature -h
 
 ## Handoff Commands
 
-### `vibe handoff init`
+### `vibe3 handoff init`
 
 Ensure shared handoff file exists for current branch.
 
@@ -88,23 +88,25 @@ Ensure shared handoff file exists for current branch.
 vibe3 handoff init
 ```
 
-### `vibe handoff show`
+### `vibe3 handoff show`
 
-Show shared handoff file for current branch.
+Show a handoff artifact.
 
 ```bash
 vibe3 handoff show
+vibe3 handoff show @current
+vibe3 handoff show @task-476/run-1.md
 ```
 
-### `vibe handoff append <message>`
+### `vibe3 handoff append <message>`
 
-Append a lightweight update block to shared handoff file for current branch.
+Append a lightweight update block to handoff file.
 
 ```bash
 vibe3 handoff append "Need to align event taxonomy" --actor "codex/gpt-5.4" --kind finding
 ```
 
-### `vibe handoff plan <plan_ref>`
+### `vibe3 handoff plan <plan_ref>`
 
 Record plan handoff.
 
@@ -112,7 +114,7 @@ Record plan handoff.
 vibe3 handoff plan docs/plans/feature-x.md --actor "claude/sonnet-4.6"
 ```
 
-### `vibe handoff report <report_ref>`
+### `vibe3 handoff report <report_ref>`
 
 Record report handoff.
 
@@ -120,7 +122,7 @@ Record report handoff.
 vibe3 handoff report docs/reports/review-2026-03-21.md --actor "claude/sonnet-4.6"
 ```
 
-### `vibe handoff audit <audit_ref>`
+### `vibe3 handoff audit <audit_ref>`
 
 Record audit handoff.
 
@@ -185,9 +187,9 @@ vibe3 review pr 42 --publish
 vibe3 -v review pr 42          # INFO 日志 + 审核
 
 # 查看流程
-vibe3 flow list
 vibe3 flow status
-vibe3 -vv flow new my-feature  # DEBUG 日志 + 创建
+vibe3 flow show
+vibe3 -vv flow update  # DEBUG 日志 + 更新
 ```
 
 ---

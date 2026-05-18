@@ -166,22 +166,45 @@ src/vibe3/
 | Phase 1 | Infrastructure（基础设施层） | ✅ 已完成 | 100% |
 | Phase 2 | Trace（调试追踪层） | ⏸️ 待启动 | 0% |
 | Phase 3 | Handoff（责任链层） | ✅ 已完成 | 100% |
-| Phase 4 | Orchestra（自动编排层） | ✅ 运行中 | 80% |
+| Phase 4 | Orchestra（自动编排层） | ✅ 运行中 | 持续优化 |
 
 ### 已完成
 
 - ✅ 目录结构创建（[src/vibe3/](../../src/vibe3/)）
 - ✅ Client 隔离（clients/ 包含 GitClient、GitHubClient）
 - ✅ Models 定义（models/）
-- ✅ Commands 骨架（commands/）
-- ✅ Services 骨架（services/）
+- ✅ Commands 实现（commands/）
+- ✅ Services 实现（services/）
 - ✅ UI 层（ui/）
 - ✅ Config 模块（config/）
-- ✅ **observability/** - 日志系统（logger.py, trace.py, audit.py）
-- ✅ **exceptions/** - 异常定义（VibeError 层级，error_codes, error_tracking）
-- ✅ 核心参数集集成（`--trace`, `-v`, `--json`, `-y`）
+- ✅ **observability/** - 日志系统 + degraded mode
+- ✅ **exceptions/** - VibeError 层级 + error codes + error tracking
+- ✅ 核心参数集（`--trace`, `-v`, `--json`, `-y`）
 - ✅ Handoff 责任链系统（SQLite handoff store, HandoffService）
 - ✅ Orchestra 自动编排（Manager, dispatcher, ready queue）
+
+### 现行 CLI 命令面
+
+```
+vibe3
+├── flow: update, bind, blocked, show, status, list-deleted, restore
+├── task: show, status, resume
+├── handoff: show, status, init, append, plan, report, indicate, audit, next, verdict
+├── inspect: pr, base, symbols, files, commit
+├── review: pr
+├── check
+├── plan
+├── pr
+├── scan
+├── snapshot
+├── serve
+├── mcp
+├── ask
+├── run
+└── version
+```
+
+> `task status` 是唯一 `vibe3 task` 的聚合入口；`task show` 仅展示轻量摘要。
 
 ### Phase 2 验收状态
 
@@ -194,6 +217,8 @@ Orchestra 已实现核心调度功能：
 - ✅ Driver/Tick/Async Child 架构
 - ✅ Event-driven dispatch
 - ✅ Capacity control (live worker sessions)
+- ✅ Health check + circuit breaker
+- ✅ Supervisor governance 扫描
 - 🔄 持续优化调度稳定性与恢复机制
 
 ---
@@ -202,19 +227,13 @@ Orchestra 已实现核心调度功能：
 
 ### Phase 1 执行计划
 
-详见 [execution_plan/phase_2_execution_plan.md](execution_plan/phase_2_execution_plan.md)
-
-**当前优先级**:
-1. 实现 `observability/logger.py` - Agent-Centric Logging
-2. 实现 `exceptions/` - 统一的 VibeError 层级
-3. 为所有命令添加核心参数集
-4. 提升测试覆盖率至 80%
+Phase 1 已完成，后续优先级由 Orchestra 和 supervisor issue 驱动。
 
 ### 后续阶段
 
 - Phase 2 执行计划（待制定）
-- Phase 3 执行计划（待制定）
-- Phase 4 冻结，不制定计划
+- Phase 3 已交付，无需进一步计划
+- Phase 4 持续优化，不制定独立计划
 
 ---
 
