@@ -10,6 +10,7 @@ def _make_mock_conn() -> MagicMock:
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_cursor.fetchone.return_value = (1,)  # event_id
+    mock_cursor.execute.return_value = mock_cursor  # Return same cursor for chaining
     mock_conn.cursor.return_value = mock_cursor
     mock_conn.__enter__ = MagicMock(return_value=mock_conn)
     mock_conn.__exit__ = MagicMock(return_value=False)

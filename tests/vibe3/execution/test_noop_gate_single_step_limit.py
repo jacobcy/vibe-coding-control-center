@@ -1,8 +1,10 @@
 """Integration tests for single-step transition limit in no-op gate."""
 
 import sqlite3
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+from vibe3.clients.sqlite_schema import init_schema
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 
 
@@ -14,57 +16,51 @@ def _make_github_issue_payload(state_label: str = "state/in-progress") -> dict:
 
 def test_single_step_limit_blocks_after_3_occurrences() -> None:
     """Block when the same transition pair has occurred 3+ times."""
-    # Create in-memory database with schema
+    # Create in-memory database with full schema
     db_conn = sqlite3.connect(":memory:")
-
-    # Create schema
-    db_conn.executescript("""
-        CREATE TABLE IF NOT EXISTS transition_history (
-            branch TEXT NOT NULL,
-            from_state TEXT NOT NULL,
-            to_state TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            actor TEXT,
-            event_id INTEGER
-        );
-
-        CREATE TABLE IF NOT EXISTS flow_state (
-            branch TEXT PRIMARY KEY,
-            transition_count INTEGER DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS flow_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            branch TEXT NOT NULL,
-            event_type TEXT NOT NULL,
-            actor TEXT NOT NULL,
-            detail TEXT,
-            refs TEXT,
-            created_at TEXT NOT NULL
-        );
-    """)
+    init_schema(db_conn)
 
     # Insert 3 previous (state/handoff -> state/in-progress) transitions
+    now = datetime.now().isoformat()
     db_conn.executemany(
         """
-        INSERT INTO transition_history (branch, from_state, to_state, actor)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO transition_history (branch, from_state, to_state, created_at, actor)
+        VALUES (?, ?, ?, ?, ?)
         """,
         [
-            ("task/issue-1034", "state/handoff", "state/in-progress", "executor:run1"),
-            ("task/issue-1034", "state/handoff", "state/in-progress", "executor:run2"),
-            ("task/issue-1034", "state/handoff", "state/in-progress", "executor:run3"),
+            (
+                "task/issue-1034",
+                "state/handoff",
+                "state/in-progress",
+                now,
+                "executor:run1",
+            ),
+            (
+                "task/issue-1034",
+                "state/handoff",
+                "state/in-progress",
+                now,
+                "executor:run2",
+            ),
+            (
+                "task/issue-1034",
+                "state/handoff",
+                "state/in-progress",
+                now,
+                "executor:run3",
+            ),
         ],
     )
     db_conn.commit()
 
     # Insert flow_state row with transition_count=0
+    now_dt = datetime.now().isoformat()
     db_conn.execute(
         """
-        INSERT INTO flow_state (branch, transition_count)
-        VALUES (?, ?)
+        INSERT INTO flow_state (branch, flow_slug, transition_count, updated_at)
+        VALUES (?, ?, ?, ?)
         """,
-        ("task/issue-1034", 0),
+        ("task/issue-1034", "task/issue-1034", 0, now_dt),
     )
     db_conn.commit()
 
@@ -126,53 +122,29 @@ def test_single_step_limit_blocks_after_3_occurrences() -> None:
 
 def test_single_step_limit_allows_2_occurrences() -> None:
     """Allow transition when pair has occurred less than 3 times."""
-    # Create in-memory database with schema
+    # Create in-memory database with full schema
     db_conn = sqlite3.connect(":memory:")
-
-    # Create schema
-    db_conn.executescript("""
-        CREATE TABLE IF NOT EXISTS transition_history (
-            branch TEXT NOT NULL,
-            from_state TEXT NOT NULL,
-            to_state TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            actor TEXT,
-            event_id INTEGER
-        );
-
-        CREATE TABLE IF NOT EXISTS flow_state (
-            branch TEXT PRIMARY KEY,
-            transition_count INTEGER DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS flow_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            branch TEXT NOT NULL,
-            event_type TEXT NOT NULL,
-            actor TEXT NOT NULL,
-            detail TEXT,
-            refs TEXT,
-            created_at TEXT NOT NULL
-        );
-    """)
+    init_schema(db_conn)
 
     # Insert 1 previous transition
+    now = datetime.now().isoformat()
     db_conn.execute(
         """
-        INSERT INTO transition_history (branch, from_state, to_state, actor)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO transition_history (branch, from_state, to_state, created_at, actor)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        ("task/issue-1034", "state/handoff", "state/in-progress", "executor:run1"),
+        ("task/issue-1034", "state/handoff", "state/in-progress", now, "executor:run1"),
     )
     db_conn.commit()
 
     # Insert flow_state row with transition_count=0
+    now_dt = datetime.now().isoformat()
     db_conn.execute(
         """
-        INSERT INTO flow_state (branch, transition_count)
-        VALUES (?, ?)
+        INSERT INTO flow_state (branch, flow_slug, transition_count, updated_at)
+        VALUES (?, ?, ?, ?)
         """,
-        ("task/issue-1034", 0),
+        ("task/issue-1034", "task/issue-1034", 0, now_dt),
     )
     db_conn.commit()
 
@@ -218,13 +190,22 @@ def test_single_step_limit_allows_2_occurrences() -> None:
             actor: str,
             event_id: int | None = None,
         ) -> None:
+            from datetime import datetime
+
             conn.execute(
                 """
                 INSERT INTO transition_history
-                    (branch, from_state, to_state, actor, event_id)
-                VALUES (?, ?, ?, ?, ?)
+                    (branch, from_state, to_state, created_at, actor, event_id)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (branch, from_state, to_state, actor, event_id),
+                (
+                    branch,
+                    from_state,
+                    to_state,
+                    datetime.now().isoformat(),
+                    actor,
+                    event_id,
+                ),
             )
 
         def mock_add_event(

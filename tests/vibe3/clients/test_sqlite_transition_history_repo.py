@@ -1,6 +1,7 @@
 """Unit tests for SQLiteTransitionHistoryRepo methods."""
 
 import sqlite3
+from datetime import datetime
 
 import pytest
 
@@ -32,20 +33,21 @@ class TestTransitionHistoryRepo:
         cursor = db_conn.cursor()
 
         # Insert test data: branch "test-flow" with multiple transitions
+        now = datetime.now().isoformat()
         test_transitions = [
-            ("test-flow", "state/handoff", "state/in-progress", "actor1", None),
-            ("test-flow", "state/handoff", "state/in-progress", "actor2", None),
-            ("test-flow", "state/handoff", "state/in-progress", "actor3", None),
-            ("test-flow", "state/in-progress", "state/handoff", "actor1", None),
-            ("test-flow", "state/in-progress", "state/handoff", "actor2", None),
-            ("test-flow", "state/ready", "state/claimed", "actor4", None),
+            ("test-flow", "state/handoff", "state/in-progress", now, "actor1", None),
+            ("test-flow", "state/handoff", "state/in-progress", now, "actor2", None),
+            ("test-flow", "state/handoff", "state/in-progress", now, "actor3", None),
+            ("test-flow", "state/in-progress", "state/handoff", now, "actor1", None),
+            ("test-flow", "state/in-progress", "state/handoff", now, "actor2", None),
+            ("test-flow", "state/ready", "state/claimed", now, "actor4", None),
         ]
 
         cursor.executemany(
             """
             INSERT INTO transition_history
-                (branch, from_state, to_state, actor, event_id)
-            VALUES (?, ?, ?, ?, ?)
+                (branch, from_state, to_state, created_at, actor, event_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             test_transitions,
         )

@@ -377,7 +377,7 @@ def apply_unified_noop_gate(
                     """
                     SELECT id FROM flow_events
                     WHERE branch = ? AND event_type = 'state_transitioned'
-                    ORDER BY created_at DESC LIMIT 1
+                    ORDER BY id DESC LIMIT 1
                     """,
                     (branch,),
                 ).fetchone()

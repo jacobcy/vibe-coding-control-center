@@ -169,7 +169,7 @@ _CREATE_TRANSITION_HISTORY = """
         branch TEXT NOT NULL,
         from_state TEXT NOT NULL,
         to_state TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at TEXT NOT NULL,
         actor TEXT,
         event_id INTEGER REFERENCES flow_events(id)
     )
@@ -385,6 +385,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             FROM flow_events
             WHERE event_type = 'state_transitioned'
               AND refs IS NOT NULL
+              AND json_valid(refs)
               AND json_extract(refs, '$.before_state') IS NOT NULL
               AND json_extract(refs, '$.after_state') IS NOT NULL
         """)
