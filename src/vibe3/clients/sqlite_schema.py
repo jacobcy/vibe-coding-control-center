@@ -164,6 +164,25 @@ _CREATE_ORCHESTRA_QUEUE = """
     )
 """
 
+_CREATE_TRANSITION_HISTORY = """
+    CREATE TABLE IF NOT EXISTS transition_history (
+        branch TEXT NOT NULL,
+        from_state TEXT NOT NULL,
+        to_state TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        actor TEXT,
+        event_id INTEGER REFERENCES flow_events(id)
+    )
+"""
+
+_CREATE_TRANSITION_HISTORY_INDEXES = """
+    CREATE INDEX IF NOT EXISTS idx_transition_pair
+    ON transition_history(branch, from_state, to_state);
+
+    CREATE INDEX IF NOT EXISTS idx_transition_branch_time
+    ON transition_history(branch, created_at DESC)
+"""
+
 
 _CLEAN_STALE_VERDICT_LINES_SQL = """
     UPDATE flow_events
