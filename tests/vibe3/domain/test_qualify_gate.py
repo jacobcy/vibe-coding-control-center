@@ -307,6 +307,12 @@ class TestRunQualifyGate:
 
                         assert result == IssueState.IN_PROGRESS
                         mock_store.update_flow_state.assert_called()
+                        mock_store.update_flow_state.assert_any_call(
+                            "task/issue-123-test",
+                            flow_status="active",
+                            blocked_reason=None,
+                            blocked_by_issue=None,
+                        )
                         mock_store.add_event.assert_called()
                         mock_label_port.remove_issue_label.assert_called_once_with(
                             123, "state/blocked"
@@ -364,6 +370,12 @@ class TestRunQualifyGate:
 
                     assert result == IssueState.IN_PROGRESS
                     mock_store.update_flow_state.assert_called()
+                    mock_store.update_flow_state.assert_any_call(
+                        "task/issue-123-test",
+                        flow_status="active",
+                        blocked_reason=None,
+                        blocked_by_issue=None,
+                    )
                     mock_store.add_event.assert_called()
 
 
