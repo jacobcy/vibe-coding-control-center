@@ -7,22 +7,9 @@ from vibe3.domain.events import (
     GovernanceScanStarted,
     # Flow Lifecycle
     IssueFailed,
-    IssueStateChanged,
     ManagerDispatchIntent,
 )
 from vibe3.domain.publisher import get_publisher, subscribe
-
-
-def test_flow_lifecycle_event_creation():
-    """Test creating flow lifecycle events."""
-    event = IssueStateChanged(
-        issue_number=123,
-        from_state="claimed",
-        to_state="in-progress",
-        actor="test",
-    )
-    assert event.issue_number == 123
-    assert event.from_state == "claimed"
 
 
 def test_governance_scan_started():
@@ -52,13 +39,12 @@ def test_subscribe_and_publish():
     def handler(event):  # type: ignore[no-untyped-def]
         received_events.append(event)
 
-    subscribe("IssueStateChanged", handler)
+    subscribe("IssueFailed", handler)
 
     pub = get_publisher()
-    event = IssueStateChanged(
+    event = IssueFailed(
         issue_number=999,
-        from_state="ready",
-        to_state="claimed",
+        reason="test failure",
         actor="test_publisher",
     )
     pub.publish(event)

@@ -25,7 +25,6 @@ class DomainEvent:
 from vibe3.domain.events.flow_lifecycle import (  # noqa: E402
     ExecutorDispatchIntent,
     IssueFailed,
-    IssueStateChanged,
     ManagerDispatchIntent,
     PlannerDispatchIntent,
     ReviewerDispatchIntent,
@@ -48,7 +47,6 @@ __all__ = [
     # Base
     "DomainEvent",
     # L3 Flow Lifecycle Events
-    "IssueStateChanged",
     "IssueFailed",
     # L3 Dispatch-Intent Events
     "ManagerDispatchIntent",
@@ -71,7 +69,6 @@ __all__ = [
 # Event type registry
 EVENT_TYPES = {
     # L3 Flow Lifecycle
-    "issue_state_changed": IssueStateChanged,
     "issue_failed": IssueFailed,
     # L3 Dispatch-Intent
     "manager_dispatch_intent": ManagerDispatchIntent,
