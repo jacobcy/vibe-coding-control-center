@@ -242,32 +242,6 @@ class TaskResumeUsecase:
                         progress_callback=progress_callback,
                     )
 
-                    # Publish event to notify EDA handlers of the state change
-                    try:
-                        from vibe3.domain.events.flow_lifecycle import IssueStateChanged
-                        from vibe3.domain.publisher import publish
-                        from vibe3.models.orchestration import IssueState
-
-                        # Match the target state used in reset_issue_to_ready
-                        if label_state == "ready":
-                            event_target = IssueState.READY
-                        elif label_state is not None:
-                            event_target = IssueState.HANDOFF
-                        else:
-                            event_target = IssueState.READY
-
-                        publish(
-                            IssueStateChanged(
-                                issue_number,
-                                None,
-                                event_target.value,
-                                actor="human:resume",
-                            )
-                        )
-                    except ImportError:
-                        # Gracefully handle missing EDA dependencies if in lean context
-                        pass
-
                     if resume_kind == "all":
                         self._comment_all_resume_success(
                             issue_number=issue_number,

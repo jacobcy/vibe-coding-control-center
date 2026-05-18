@@ -43,7 +43,7 @@ LOC governance uses a two-threshold system with different enforcement levels:
 
 ### Configuration Location
 
-Defined in `config/loc_limits.yaml`:
+Defined in `config/v3/loc_limits.yaml`:
 
 ```yaml
 code_limits:
@@ -64,7 +64,7 @@ Files may exceed limits with documented justification:
 
 ### How to Request Exception
 
-Add entry to `config/loc_limits.yaml`:
+Add entry to `config/v3/loc_limits.yaml`:
 
 ```yaml
 exceptions:
@@ -140,7 +140,7 @@ The `ci_block_threshold: 400` provides buffer for exceptions while maintaining t
 
 ## References
 
-- Configuration: `config/loc_limits.yaml`
+- Configuration: `config/v3/loc_limits.yaml`
 - Hook scripts: `scripts/hooks/check-per-file-loc.sh`, `check-test-file-loc.sh`
 - Parser: `scripts/hooks/loc_settings.py`
 - Governance budget: `.agent/governance.yaml`

@@ -19,7 +19,6 @@ from vibe3.domain.events import (
     GovernanceScanCompleted,
     GovernanceScanStarted,
     IssueFailed,
-    IssueStateChanged,
     # L2 Supervisor Apply Events
     SupervisorApplyCompleted,
     SupervisorApplyDelegated,
@@ -67,7 +66,6 @@ __all__ = [
     # Base
     "DomainEvent",
     # L3 Flow Lifecycle Events
-    "IssueStateChanged",
     "IssueFailed",
     # L1 Governance Events
     "GovernanceScanStarted",
