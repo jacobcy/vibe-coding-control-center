@@ -198,9 +198,10 @@ bash scripts/tools/metrics.sh
 
 ---
 
-## 4. 标准开发流程
+## 4. V2 标准开发流程
 
 > 小白入门：**每次开发功能，严格按这 5 步走。**
+> V3 用户请参考 §2.4 V3 开发入口中的 `uv run python src/vibe3/cli.py` 命令集，以及 `.agent/README.md` 中的 agent workflow 入口。
 
 ### Step 1：创建工作区
 
@@ -209,6 +210,8 @@ bash scripts/tools/metrics.sh
 bin/vibe flow start <feature-name>
 # 例如：bin/vibe flow start add-vibe-doctor
 ```
+
+> V3 不使用 `bin/vibe flow start` 创建 worktree；worktree 由 orchestra 自动创建或通过 `git worktree add` 手动管理。开发前通过 `uv run python src/vibe3/cli.py flow show` 查看当前 flow 上下文。
 
 这会：
 - 创建 `wt-claude-<feature>` 目录（git worktree）
@@ -249,11 +252,15 @@ bin/vibe flow review   # 交互式 review
 bin/vibe flow pr       # 生成 PR
 ```
 
+> V3: 使用 `gh pr create` 创建 PR，或通过 agent workflow `/vibe-commit` 自动完成提交与 PR 创建。
+
 ### Step 5：清理工作区
 
 ```bash
 bin/vibe flow done     # 合并后清理 worktree
 ```
+
+> V3: 使用 `git worktree remove` 手动清理，或由 orchestra 自动管理 worktree 生命周期。
 
 ---
 
@@ -305,6 +312,8 @@ tests/                 # bats-core 测试（≥20 个用例）
 
 ## 7. 常用命令速查
 
+### V2 (Shell)
+
 ```bash
 # 开发工作流
 bin/vibe flow start <feature>  # 创建 worktree + 分支
@@ -324,6 +333,18 @@ bin/vibe tool                  # 安装 AI 工具
 bin/vibe clean                 # 清理临时文件
 ```
 
+### V3 (Python)
+
+```bash
+uv run python src/vibe3/cli.py flow show    # 查看 flow 上下文
+uv run python src/vibe3/cli.py flow update  # 注册/更新 flow
+uv run python src/vibe3/cli.py flow bind    # 绑定 issue-flow 关系
+uv run python src/vibe3/cli.py handoff show # 查看 handoff 链路
+uv run python src/vibe3/cli.py handoff append # 追加 handoff
+uv run python src/vibe3/cli.py task status  # 总览活跃 flow 与 orchestra 状态
+uv run python src/vibe3/cli.py check        # 共享状态审计
+```
+
 ---
 
 ## 8. Vibe Center 3.0 的核心哲学
@@ -336,4 +357,4 @@ AI 不是通才，是专才。给它越大的自由度，越容易出轨。Vibe 
 2. **工具约束**：不靠提示词说"请别写太多"，靠 CI 硬拦截
 3. **可度量**：所有规则都对应可运行的检查脚本，通过/失败一目了然
 
-这套机制的详细原理见 [docs/model-spec-context.md](model-spec-context.md)。
+这套机制的详细原理见 [CLAUDE.md](CLAUDE.md) §架构分层与 [docs/standards/v3/command-standard.md](docs/standards/v3/command-standard.md) 命令规范。
