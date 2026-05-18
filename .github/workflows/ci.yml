@@ -21,7 +21,7 @@ jobs:
 
       # Setup Python environment for v3
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
 
