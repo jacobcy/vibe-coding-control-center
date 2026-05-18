@@ -117,8 +117,9 @@ class HandoffStatusService:
         live_sessions = self._get_live_sessions_for_branch(branch)
 
         # Fetch recent updates from handoff file
+        updates_limit = None if limit is None else 2
         recent_updates = self.handoff_service.storage.get_recent_updates(
-            branch, limit=2
+            branch, limit=updates_limit
         )
 
         # Resolve worktree path for the target branch

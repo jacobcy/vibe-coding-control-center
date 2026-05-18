@@ -190,6 +190,7 @@ def status(
             output = {
                 "state": result.state.model_dump(),
                 "events": [e.model_dump() for e in result.events],
+                "recent_updates": result.recent_updates,
             }
             typer.echo(json.dumps(output, indent=2, default=str))
             return
@@ -198,6 +199,7 @@ def status(
             output = {
                 "state": result.state.model_dump(),
                 "events": [e.model_dump() for e in result.events],
+                "recent_updates": result.recent_updates,
             }
             typer.echo(
                 _get_yaml().dump(output, default_flow_style=False, allow_unicode=True)

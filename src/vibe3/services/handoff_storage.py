@@ -250,13 +250,13 @@ class HandoffStorage:
         return handoff_path
 
     def get_recent_updates(
-        self, branch: str | None = None, limit: int = 2
+        self, branch: str | None = None, limit: int | None = 2
     ) -> list[dict[str, str]]:
         """Parse and return the last N updates from current.md for a branch.
 
         Args:
             branch: Target branch name (defaults to current branch)
-            limit: Maximum number of updates to return
+            limit: Maximum number of updates to return (None = all, default 2)
 
         Returns:
             List of dicts with 'timestamp', 'actor', 'kind', 'message' keys
@@ -277,11 +277,12 @@ class HandoffStorage:
         # Parse update blocks
         import re
 
-        pattern = r"### ([\d\-T:+]+) \| ([^|]+) \| (\w+)\n(.+?)(?=### |$)"
+        pattern = r"### ([\d\-T:+.]+) \| ([^|\n]+) \| (\w+)\n(.+?)(?=### |$)"
         matches = re.findall(pattern, updates_content, re.DOTALL)
 
         updates = []
-        for timestamp, actor, kind, message in matches[-limit:]:
+        selected = matches if limit is None else matches[-limit:]
+        for timestamp, actor, kind, message in selected:
             updates.append(
                 {
                     "timestamp": timestamp.strip(),
