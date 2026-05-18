@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from loguru import logger
+from starlette.concurrency import run_in_threadpool
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
@@ -126,9 +127,9 @@ def _build_server_with_launch_cwd(
     fastapi_app.state.status_service = status_service
 
     @fastapi_app.get("/status")
-    def get_status() -> OrchestraSnapshot:
+    async def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
-        return status_service.snapshot()
+        return await run_in_threadpool(status_service.snapshot)
 
     # Mount MCP server (gracefully degrades if not available)
     try:
