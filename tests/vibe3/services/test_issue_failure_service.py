@@ -132,3 +132,84 @@ def test_block_flow_uses_new_fields():
         events = store.get_events(branch)
         blocked_events = [e for e in events if e.get("event_type") == "flow_blocked"]
         assert len(blocked_events) >= 1
+
+
+def test_block_flow_writes_body_label_and_cache():
+    """Regression: block_flow(reason) writes body projection + label + local cache."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        branch = "task/issue-400"
+        flow_service = FlowService(store=store)
+        flow_service.create_flow(slug="issue-400", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 400, "task")
+
+        with patch("vibe3.services.flow_block_mixin.LabelService") as mock_label_cls:
+            mock_label = MagicMock()
+            mock_label_cls.return_value = mock_label
+
+            with patch(
+                "vibe3.services.flow_block_mixin.FlowTimelineService"
+            ) as mock_timeline_cls:
+                mock_timeline = MagicMock()
+                mock_timeline_cls.return_value = mock_timeline
+
+                flow_service.block_flow(
+                    branch,
+                    reason="Health check failed: worktree missing",
+                    actor="orchestra:dispatcher",
+                )
+
+        # Local cache
+        flow_state = store.get_flow_state(branch)
+        assert flow_state is not None
+        assert flow_state["blocked_reason"] == "Health check failed: worktree missing"
+
+        # Label transition called
+        mock_label.transition.assert_called_once()
+        # Body projection attempted (may fail without GitHub but should be called)
+        mock_timeline.record_timeline_event.assert_called_once()
+
+
+def test_fail_issue_lands_in_same_blocked_write_path():
+    """Regression: fail_issue() funnels through FlowService.block_flow()."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        branch = "task/issue-500"
+        flow_service = FlowService(store=store)
+        flow_service.create_flow(slug="issue-500", branch=branch, actor="test-user")
+        store.add_issue_link(branch, 500, "task")
+
+        with patch(
+            "vibe3.services.issue_failure_service._get_issue_flow_service"
+        ) as mock_ifs:
+            mock_issue_flow = MagicMock()
+            mock_issue_flow.store = store
+            mock_ifs.return_value = mock_issue_flow
+
+            with patch(
+                "vibe3.services.flow_block_mixin.FlowTimelineService"
+            ) as mock_timeline_cls:
+                mock_timeline = MagicMock()
+                mock_timeline_cls.return_value = mock_timeline
+
+                with patch(
+                    "vibe3.services.flow_block_mixin.LabelService"
+                ) as mock_label_cls:
+                    mock_label = MagicMock()
+                    mock_label_cls.return_value = mock_label
+
+                    fail_manager_issue(
+                        issue_number=500,
+                        reason="Manager cycle exhausted",
+                        actor="agent:manager",
+                    )
+
+        # Same local cache pattern as block_flow
+        flow_state = store.get_flow_state(branch)
+        assert flow_state is not None
+        assert flow_state["blocked_reason"] == "Manager cycle exhausted"
+        assert flow_state["flow_status"] == "blocked"

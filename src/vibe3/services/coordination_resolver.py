@@ -58,9 +58,10 @@ class CoordinationResolver:
             execution fields from local
         """
         # Step 1: Try remote read for collaboration fields
+        projection_state_remote: str | None = None
         blocked_reason_remote = None
         blocked_by_issue_remote = None
-        dependencies_remote = []
+        dependencies_remote: list[int] = []
         remote_success = False  # Track remote read success separately
 
         if issue_number:
@@ -69,6 +70,7 @@ class CoordinationResolver:
                 if remote_truth is not None:
                     # Remote read succeeded (may return empty values)
                     remote_success = True
+                    projection_state_remote = remote_truth.get("projection_state")
                     blocked_reason_remote = remote_truth.get("blocked_reason")
                     blocked_by_issue_remote = remote_truth.get("blocked_by_issue")
                     dependencies_remote = remote_truth.get("dependencies", [])
@@ -87,6 +89,20 @@ class CoordinationResolver:
 
         # Step 3: Merge with truth table (remote > local for collaboration)
         # Use remote values when available (even if empty), fallback only on failure
+        projection_state = (
+            projection_state_remote
+            if remote_success
+            else (
+                # Infer from local cache: if blocked fields present, state is blocked
+                "blocked"
+                if flow_state
+                and (
+                    flow_state.get("blocked_reason")
+                    or flow_state.get("blocked_by_issue")
+                )
+                else flow_state.get("flow_status") if flow_state else None
+            )
+        )
         blocked_reason = (
             blocked_reason_remote
             if remote_success
@@ -104,6 +120,13 @@ class CoordinationResolver:
         )
 
         truth = CoordinationTruth(
+            # Issue body projection state (remote-first)
+            projection_state=projection_state,
+            projection_state_source=(
+                DataSource.ISSUE_BODY_FALLBACK
+                if remote_success
+                else DataSource.LOCAL_SQLITE if flow_state else None
+            ),
             # Collaboration: remote-first, fallback to local
             blocked_reason=blocked_reason,
             blocked_reason_source=(
@@ -145,8 +168,8 @@ class CoordinationResolver:
             issue_number: Issue number (required)
 
         Returns:
-            Dict with blocked_reason/blocked_by_issue/dependencies from body,
-            or None if read failed
+            Dict with projection_state/blocked_reason/blocked_by_issue/dependencies
+            from body, or None if read failed
         """
         from vibe3.clients.github_client import GitHubClient
         from vibe3.services.issue_body_service import parse_projection_with_fallback
@@ -161,6 +184,7 @@ class CoordinationResolver:
             projection = parse_projection_with_fallback(body)
 
             return {
+                "projection_state": projection.state,
                 "blocked_reason": projection.blocked_reason,
                 "blocked_by_issue": (
                     projection.blocked_by[0] if projection.blocked_by else None

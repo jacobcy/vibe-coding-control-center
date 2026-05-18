@@ -139,26 +139,21 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         return load_issue(issue_number, self._config, self._github)
 
     def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
-        """Check issue health before dispatch using unified CheckService.
+        """Check structural health before dispatch.
 
-        CheckService.verify_branch() performs consistency checks including:
-        - Branch existence and flow_state validity
-        - Task issue status on GitHub
-        - PR merge status
+        SCOPE: Structural validity only. This method does NOT make blocked
+        semantic decisions — those belong in qualify-gate. It only validates:
+        - Issue closed / PR merged (terminal)
+        - Missing worktree / invalid refs
+        - Transient fail-open (network/auth errors, missing flow records)
+        - Terminal flow states (done/aborted/stale)
 
-        This method then:
-        - Fails-open for transient errors (network/auth, missing flow record)
-        - Skips dispatch for genuine consistency failures (issue closed, PR merged)
-        - Skips dispatch for terminal flow states (done/aborted/stale)
+        Blocked/unblocked truth reconciliation is handled by qualify-gate,
+        not by health check. There is no second unblock path here.
 
         Returns:
             True if issue can be dispatched (healthy or transient error)
             False if issue should be skipped (genuine failure or terminal state)
-
-        Side effects (via CheckService):
-            - Auto-closes issues with merged PRs
-            - Marks invalid flows as aborted
-            - Logs health check results
         """
         # Get the canonical branch for this issue
         branch, _ = self._flow_context(issue.number)
