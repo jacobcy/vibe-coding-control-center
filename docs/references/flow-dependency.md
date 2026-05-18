@@ -118,7 +118,7 @@ UPDATE flow_state SET
   blocked_by = '等待依赖 issue #218'  -- 或自定义 reason
 WHERE branch = 'task/my-feature';
 
--- 2. 建立依赖关系（如果指定 --by）
+-- 2. 建立依赖关系
 INSERT INTO flow_issue_links
   (branch, issue_number, issue_role, created_at)
 VALUES
