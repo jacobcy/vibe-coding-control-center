@@ -5,10 +5,24 @@ from unittest.mock import MagicMock, patch
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 
 
+def _make_mock_conn() -> MagicMock:
+    """Create a mock sqlite connection for transition_history operations."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.fetchone.return_value = (1,)  # event_id
+    mock_conn.cursor.return_value = mock_cursor
+    mock_conn.__enter__ = MagicMock(return_value=mock_conn)
+    mock_conn.__exit__ = MagicMock(return_value=False)
+    return mock_conn
+
+
 def _make_mock_store() -> MagicMock:
     """Create a mock SQLiteClient."""
     store = MagicMock()
     store.get_flow_state.return_value = {}
+    store.count_specific_pair.return_value = 0  # No previous transitions
+    store.record_transition.return_value = None  # Mock record_transition
+    store.db_path = ":memory:"  # Use in-memory database for tests
     return store
 
 
@@ -25,12 +39,14 @@ class TestTransitionCount:
         """transition_count is incremented when state changes."""
         store = _make_mock_store()
         flow_state = {"transition_count": 3}
+        mock_conn = _make_mock_conn()
 
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
             patch(
                 "vibe3.services.issue_failure_service.block_planner_noop_issue"
             ) as mock_block,
+            patch("sqlite3.connect", return_value=mock_conn),
         ):
             mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
                 "state/ready"
@@ -86,8 +102,11 @@ class TestTransitionCount:
         store = _make_mock_store()
         flow_state = {"transition_count": 19}
 
+        mock_conn = _make_mock_conn()
+
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
             patch(
                 "vibe3.services.issue_failure_service.block_executor_noop_issue"
             ) as mock_block,
@@ -117,8 +136,11 @@ class TestTransitionCount:
         store = _make_mock_store()
         flow_state = {"transition_count": 9}
 
+        mock_conn = _make_mock_conn()
+
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
             patch(
                 "vibe3.services.issue_failure_service.block_executor_noop_issue"
             ) as mock_block,
@@ -148,8 +170,11 @@ class TestTransitionCount:
         store = _make_mock_store()
         flow_state = {"transition_count": 3}
 
+        mock_conn = _make_mock_conn()
+
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
             patch(
                 "vibe3.services.issue_failure_service.block_executor_noop_issue"
             ) as mock_block,
@@ -176,9 +201,11 @@ class TestTransitionCount:
     def test_transition_count_none_flow_state_skips_check(self) -> None:
         """transition_count logic is skipped when flow_state is None."""
         store = _make_mock_store()
+        mock_conn = _make_mock_conn()
 
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
             patch(
                 "vibe3.services.issue_failure_service.block_executor_noop_issue"
             ) as mock_block,
@@ -206,8 +233,11 @@ class TestTransitionCount:
         store = _make_mock_store()
         flow_state = {"transition_count": 19}
 
+        mock_conn = _make_mock_conn()
+
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
             patch(
                 "vibe3.services.issue_failure_service.block_executor_noop_issue"
             ) as mock_block,
@@ -236,8 +266,11 @@ class TestTransitionCount:
         store = _make_mock_store()
         flow_state: dict[str, int] = {}  # No transition_count key
 
+        mock_conn = _make_mock_conn()
+
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
             patch(
                 "vibe3.services.issue_failure_service.block_executor_noop_issue"
             ) as mock_block,

@@ -7,6 +7,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.role_policy import get_role_block_function
 
 # Loop prevention constants
+SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair
 TRANSITION_LIMIT_SOFT = 10  # Standard flow limit
 TRANSITION_LIMIT_HARD = 20  # Hard limit with tolerance
 
@@ -160,6 +161,65 @@ def apply_unified_noop_gate(
         )
         return
 
+    # --- NEW: Single-step transition limit check ---
+    # Check if this specific (from_state, to_state) pair has occurred >= 3 times
+    if (
+        before_state_label
+        and after_state_label
+        and before_state_label != after_state_label
+    ):
+        import sqlite3
+
+        with sqlite3.connect(store.db_path) as conn:
+            pair_count = store.count_specific_pair(
+                conn=conn,
+                branch=branch,
+                from_state=before_state_label,
+                to_state=after_state_label,
+            )
+
+        # Check single-step limit BEFORE recording this transition
+        if pair_count >= SINGLE_STEP_LIMIT:
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"No-op gate BLOCK: single-step limit exceeded "
+                f"({before_state_label} -> {after_state_label} "
+                f"occurred {pair_count} times, limit is {SINGLE_STEP_LIMIT})"
+            )
+            store.add_event(
+                branch,
+                EVENT_TRANSITION_COUNT_EXCEEDED,
+                actor,
+                detail=(
+                    f"Single-step limit exceeded: "
+                    f"{before_state_label} -> {after_state_label} "
+                    f"occurred {pair_count} times (limit: {SINGLE_STEP_LIMIT}). "
+                    f"Possible infinite loop on this pair."
+                ),
+                refs={
+                    "from_state": str(before_state_label or ""),
+                    "to_state": str(after_state_label or ""),
+                    "pair_count": str(pair_count),
+                    "single_step_limit": str(SINGLE_STEP_LIMIT),
+                    "issue": str(issue_number),
+                },
+            )
+            _block_fn(
+                issue_number=issue_number,
+                repo=repo,
+                reason=(
+                    f"single-step limit exceeded: "
+                    f"{before_state_label} -> {after_state_label} "
+                    f"({pair_count} times >= {SINGLE_STEP_LIMIT})"
+                ),
+                actor=actor,
+            )
+            return
+
     # --- NEW: State transition count check ---
     # Check hard limit BEFORE incrementing
     if flow_state is not None:
@@ -287,6 +347,38 @@ def apply_unified_noop_gate(
             "issue": str(issue_number),
         },
     )
+
+    # Record this transition in transition_history for single-step tracking
+    if (
+        before_state_label
+        and after_state_label
+        and before_state_label != after_state_label
+    ):
+        import sqlite3
+
+        with sqlite3.connect(store.db_path) as conn:
+            # Get the event_id of the state_transitioned event we just added
+            cursor = conn.cursor()
+            row = cursor.execute(
+                """
+                SELECT id FROM flow_events
+                WHERE branch = ? AND event_type = 'state_transitioned'
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (branch,),
+            ).fetchone()
+
+            event_id = row[0] if row else None
+
+            store.record_transition(
+                conn=conn,
+                branch=branch,
+                from_state=before_state_label,
+                to_state=after_state_label,
+                actor=actor,
+                event_id=event_id,
+            )
+            conn.commit()
 
     # Increment transition count AFTER confirming state change
     if flow_state is not None and isinstance(flow_state, dict):
