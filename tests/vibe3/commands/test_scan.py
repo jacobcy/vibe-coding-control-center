@@ -333,6 +333,17 @@ def test_governance_list_mutually_exclusive_with_role():
     assert "cannot be used together" in result.output.lower()
 
 
+def test_governance_invalid_role_shows_friendly_error():
+    """Test invalid governance role shows friendly CLI error without traceback."""
+    result = runner.invoke(app, ["scan", "governance", "--role", "does-not-exist"])
+
+    assert result.exit_code != 0
+    output = _strip_ansi(result.output)
+    assert "does-not-exist" in output
+    assert "available roles" in output.lower()
+    assert "traceback" not in output.lower()
+
+
 class TestGovernanceDryRunPromptDisplay:
     """Tests for governance --dry-run prompt display."""
 

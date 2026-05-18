@@ -392,10 +392,13 @@ class TaskResumeOperations:
 
             # Clear both blocked_reason and failed_reason
             # (issue may have been in multiple blocked/failed states)
+            # Also restore flow_status to active if it was blocked
             self.flow_service.store.update_flow_state(
                 branch,
+                flow_status="active",
                 blocked_reason=None,
                 failed_reason=None,
+                blocked_by_issue=None,
                 latest_actor="human:resume",
             )
 

@@ -114,24 +114,14 @@ class QualifyGateService:
             wt_path = Path(worktree_path)
             if not wt_path.exists():
                 reason = f"Worktree path does not exist: {worktree_path}"
-                self._store.update_flow_state(
-                    branch,
-                    blocked_reason=reason,
+                # Use standard FlowService.block_flow() method
+                from vibe3.services.flow_service import FlowService
+
+                FlowService(store=self._store).block_flow(
+                    branch=branch,
+                    reason=reason,
+                    actor="orchestra:dispatcher",
                 )
-                self._store.add_event(
-                    branch,
-                    "flow_blocked",
-                    "orchestra:dispatcher",
-                    detail=reason,
-                )
-                if IssueState.BLOCKED.to_label() not in labels:
-                    try:
-                        label_port = GhIssueLabelPort(repo=self.config.repo)
-                        label_port.add_issue_label(issue.number, "state/blocked")
-                    except Exception as exc:
-                        logger.bind(domain="orchestra").warning(
-                            f"Failed to add state/blocked for #{issue.number}: {exc}"
-                        )
                 append_orchestra_event(
                     "dispatcher",
                     f"qualify_gate skip #{issue.number}: {reason}",
@@ -154,25 +144,14 @@ class QualifyGateService:
                         f"Worktree branch mismatch: expected {branch}, "
                         f"got {actual_branch}"
                     )
-                    self._store.update_flow_state(
-                        branch,
-                        blocked_reason=reason,
+                    # Use standard FlowService.block_flow() method
+                    from vibe3.services.flow_service import FlowService
+
+                    FlowService(store=self._store).block_flow(
+                        branch=branch,
+                        reason=reason,
+                        actor="orchestra:dispatcher",
                     )
-                    self._store.add_event(
-                        branch,
-                        "flow_blocked",
-                        "orchestra:dispatcher",
-                        detail=reason,
-                    )
-                    if IssueState.BLOCKED.to_label() not in labels:
-                        try:
-                            label_port = GhIssueLabelPort(repo=self.config.repo)
-                            label_port.add_issue_label(issue.number, "state/blocked")
-                        except Exception as exc:
-                            logger.bind(domain="orchestra").warning(
-                                f"Failed to add state/blocked for "
-                                f"#{issue.number}: {exc}"
-                            )
                     append_orchestra_event(
                         "dispatcher",
                         f"qualify_gate skip #{issue.number}: {reason}",
@@ -192,26 +171,32 @@ class QualifyGateService:
         if unresolved:
             blocked_label = self._convention.state_label(self._convention.blocked_label)
             blocked_by_issue = truth.blocked_by_issue
+            # Always enforce flow_status="blocked" for unresolved dependencies
             if not blocked_by_issue:
+                # First-time blocking: link dependency issue
+                from vibe3.services.flow_service import FlowService
+
+                FlowService(store=self._store).block_flow(
+                    branch=branch,
+                    reason="Blocked by unresolved dependencies",
+                    blocked_by_issue=unresolved[0],
+                    actor="orchestra:dispatcher",
+                )
+            else:
+                # Already blocked: just ensure flow_status is set correctly
                 self._store.update_flow_state(
                     branch,
-                    blocked_by_issue=unresolved[0],
-                    blocked_reason="Blocked by unresolved dependencies",
+                    flow_status="blocked",
                 )
-                if blocked_label not in labels:
-                    try:
-                        label_port = GhIssueLabelPort(repo=self.config.repo)
-                        label_port.add_issue_label(issue.number, blocked_label)
-                    except Exception as exc:
-                        logger.bind(domain="orchestra").warning(
-                            f"Failed to add {blocked_label} for #{issue.number}: {exc}"
-                        )
-                self._store.add_event(
-                    branch,
-                    "flow_blocked",
-                    "orchestra:dispatcher",
-                    detail="Blocked by unresolved dependencies",
-                )
+            # Ensure blocked label is present on GitHub
+            if blocked_label not in labels:
+                try:
+                    label_port = GhIssueLabelPort(repo=self.config.repo)
+                    label_port.add_issue_label(issue.number, blocked_label)
+                except Exception as exc:
+                    logger.bind(domain="orchestra").warning(
+                        f"Failed to add {blocked_label}: {exc}"
+                    )
             return None
 
         # Step 3: All clear — determine target and perform unblock side effects
@@ -248,9 +233,10 @@ class QualifyGateService:
             # - FlowStatus: internal state machine (active/done/stale/aborted)
             # - IssueState: external GitHub label
             #   (ready/claimed/in-progress/handoff/review)
-            # When unblocking, we clear blocked metadata
+            # When unblocking, restore flow_status to active and clear blocked metadata
             self._store.update_flow_state(
                 branch,
+                flow_status="active",
                 blocked_by_issue=None,
                 blocked_reason=None,
             )

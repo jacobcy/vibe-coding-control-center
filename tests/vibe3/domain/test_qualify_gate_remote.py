@@ -168,7 +168,7 @@ class TestRemoteDependencies:
             blocked_by_issue_source=None,
             dependencies=[456, 789],  # Remote dependencies
             dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
-            worktree_path="/tmp/worktree",
+            worktree_path=None,
             actor="executor",
         )
 
@@ -179,6 +179,13 @@ class TestRemoteDependencies:
         ):
             # Mock dependency satisfaction check (both unresolved)
             qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
+
+            # Mock store methods for FlowService.block_flow()
+            mock_store.get_flow_state.return_value = {
+                "branch": "task/issue-123-test",
+                "flow_status": "active",
+            }
+            mock_store.get_issue_links.return_value = []
 
             mock_label_port = Mock()
             with patch(
@@ -219,7 +226,7 @@ class TestRemoteDependencies:
             blocked_by_issue_source=None,
             dependencies=[456],  # Local dependencies
             dependencies_source=DataSource.LOCAL_SQLITE,
-            worktree_path="/tmp/worktree",
+            worktree_path=None,
             actor="executor",
         )
 
@@ -230,6 +237,13 @@ class TestRemoteDependencies:
         ):
             # Mock dependency satisfaction check (unresolved)
             qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
+
+            # Mock store methods for FlowService.block_flow()
+            mock_store.get_flow_state.return_value = {
+                "branch": "task/issue-123-test",
+                "flow_status": "active",
+            }
+            mock_store.get_issue_links.return_value = []
 
             mock_label_port = Mock()
             with patch(
@@ -378,6 +392,13 @@ class TestProvenanceTracking:
             return_value=mock_truth,
         ):
             qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
+
+            # Mock store methods for FlowService.block_flow()
+            qualify_gate_service._store.get_flow_state.return_value = {
+                "branch": "task/issue-123-test",
+                "flow_status": "active",
+            }
+            qualify_gate_service._store.get_issue_links.return_value = []
 
             with patch(
                 "vibe3.domain.qualify_gate.GhIssueLabelPort",

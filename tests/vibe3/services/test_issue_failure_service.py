@@ -31,13 +31,13 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.issue_failure_service.FlowTimelineService"
+                "vibe3.services.flow_block_mixin.FlowTimelineService"
             ) as mock_timeline_class:
                 mock_timeline = MagicMock()
                 mock_timeline_class.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.issue_failure_service.LabelService"
+                    "vibe3.services.flow_block_mixin.LabelService"
                 ) as mock_label_service_class:
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
@@ -48,11 +48,11 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
                         actor="agent:manager",
                     )
 
-        # Verify reason recorded in flow (not changing flow_status)
+        # Verify reason recorded in flow and flow_status set to blocked
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
         assert flow_state["blocked_reason"] == "Test manager failure"
-        assert flow_state["flow_status"] == "active"
+        assert flow_state["flow_status"] == "blocked"
 
 
 def test_block_manager_noop_issue_records_reason_and_syncs_github():
@@ -92,11 +92,11 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                         actor="agent:manager",
                     )
 
-        # Verify reason recorded in flow (not changing flow_status)
+        # Verify reason recorded in flow and flow_status set to blocked
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
         assert flow_state["blocked_reason"] == "No progress made"
-        assert flow_state["flow_status"] == "active"
+        assert flow_state["flow_status"] == "blocked"
 
 
 def test_block_flow_uses_new_fields():
