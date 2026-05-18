@@ -167,58 +167,69 @@ def apply_unified_noop_gate(
         before_state_label
         and after_state_label
         and before_state_label != after_state_label
+        and hasattr(store, "db_path")
+        and hasattr(store, "count_specific_pair")
     ):
         import sqlite3
 
-        with sqlite3.connect(store.db_path) as conn:
-            pair_count = store.count_specific_pair(
-                conn=conn,
-                branch=branch,
-                from_state=before_state_label,
-                to_state=after_state_label,
-            )
+        try:
+            with sqlite3.connect(store.db_path) as conn:
+                pair_count = store.count_specific_pair(
+                    conn=conn,
+                    branch=branch,
+                    from_state=before_state_label,
+                    to_state=after_state_label,
+                )
 
-        # Check single-step limit BEFORE recording this transition
-        if pair_count >= SINGLE_STEP_LIMIT:
+            # Check single-step limit BEFORE recording this transition
+            if pair_count >= SINGLE_STEP_LIMIT:
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(
+                    f"No-op gate BLOCK: single-step limit exceeded "
+                    f"({before_state_label} -> {after_state_label} "
+                    f"occurred {pair_count} times, limit is {SINGLE_STEP_LIMIT})"
+                )
+                store.add_event(
+                    branch,
+                    EVENT_TRANSITION_COUNT_EXCEEDED,
+                    actor,
+                    detail=(
+                        f"Single-step limit exceeded: "
+                        f"{before_state_label} -> {after_state_label} "
+                        f"occurred {pair_count} times (limit: {SINGLE_STEP_LIMIT}). "
+                        f"Possible infinite loop on this pair."
+                    ),
+                    refs={
+                        "from_state": str(before_state_label or ""),
+                        "to_state": str(after_state_label or ""),
+                        "pair_count": str(pair_count),
+                        "single_step_limit": str(SINGLE_STEP_LIMIT),
+                        "issue": str(issue_number),
+                    },
+                )
+                _block_fn(
+                    issue_number=issue_number,
+                    repo=repo,
+                    reason=(
+                        f"single-step limit exceeded: "
+                        f"{before_state_label} -> {after_state_label} "
+                        f"({pair_count} times >= {SINGLE_STEP_LIMIT})"
+                    ),
+                    actor=actor,
+                )
+                return
+        except sqlite3.Error as e:
+            # Fail-safe: log and skip single-step check on DB errors
             logger.bind(
                 domain="codeagent",
                 role=role,
                 issue_number=issue_number,
                 branch=branch,
-            ).warning(
-                f"No-op gate BLOCK: single-step limit exceeded "
-                f"({before_state_label} -> {after_state_label} "
-                f"occurred {pair_count} times, limit is {SINGLE_STEP_LIMIT})"
-            )
-            store.add_event(
-                branch,
-                EVENT_TRANSITION_COUNT_EXCEEDED,
-                actor,
-                detail=(
-                    f"Single-step limit exceeded: "
-                    f"{before_state_label} -> {after_state_label} "
-                    f"occurred {pair_count} times (limit: {SINGLE_STEP_LIMIT}). "
-                    f"Possible infinite loop on this pair."
-                ),
-                refs={
-                    "from_state": str(before_state_label or ""),
-                    "to_state": str(after_state_label or ""),
-                    "pair_count": str(pair_count),
-                    "single_step_limit": str(SINGLE_STEP_LIMIT),
-                    "issue": str(issue_number),
-                },
-            )
-            _block_fn(
-                issue_number=issue_number,
-                repo=repo,
-                reason=(
-                    f"single-step limit exceeded: "
-                    f"{before_state_label} -> {after_state_label} "
-                    f"({pair_count} times >= {SINGLE_STEP_LIMIT})"
-                ),
-                actor=actor,
-            )
-            return
+            ).warning(f"Single-step transition check skipped: database error ({e})")
 
     # --- NEW: State transition count check ---
     # Check hard limit BEFORE incrementing
@@ -353,32 +364,43 @@ def apply_unified_noop_gate(
         before_state_label
         and after_state_label
         and before_state_label != after_state_label
+        and hasattr(store, "db_path")
+        and hasattr(store, "record_transition")
     ):
         import sqlite3
 
-        with sqlite3.connect(store.db_path) as conn:
-            # Get the event_id of the state_transitioned event we just added
-            cursor = conn.cursor()
-            row = cursor.execute(
-                """
-                SELECT id FROM flow_events
-                WHERE branch = ? AND event_type = 'state_transitioned'
-                ORDER BY created_at DESC LIMIT 1
-                """,
-                (branch,),
-            ).fetchone()
+        try:
+            with sqlite3.connect(store.db_path) as conn:
+                # Get the event_id of the state_transitioned event we just added
+                cursor = conn.cursor()
+                row = cursor.execute(
+                    """
+                    SELECT id FROM flow_events
+                    WHERE branch = ? AND event_type = 'state_transitioned'
+                    ORDER BY created_at DESC LIMIT 1
+                    """,
+                    (branch,),
+                ).fetchone()
 
-            event_id = row[0] if row else None
+                event_id = row[0] if row else None
 
-            store.record_transition(
-                conn=conn,
+                store.record_transition(
+                    conn=conn,
+                    branch=branch,
+                    from_state=before_state_label,
+                    to_state=after_state_label,
+                    actor=actor,
+                    event_id=event_id,
+                )
+                conn.commit()
+        except sqlite3.Error as e:
+            # Fail-safe: log and skip recording on DB errors
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
                 branch=branch,
-                from_state=before_state_label,
-                to_state=after_state_label,
-                actor=actor,
-                event_id=event_id,
-            )
-            conn.commit()
+            ).warning(f"Transition recording skipped: database error ({e})")
 
     # Increment transition count AFTER confirming state change
     if flow_state is not None and isinstance(flow_state, dict):
