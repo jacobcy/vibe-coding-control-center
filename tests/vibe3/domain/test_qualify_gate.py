@@ -185,15 +185,28 @@ class TestRunQualifyGate:
         # Setup dependencies
         qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
 
-        mock_label_port = Mock()
+        # Mock store.get_flow_state for FlowService.block_flow()
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/issue-123-test",
+            "flow_status": "active",
+        }
+        # Mock get_issue_links for LabelService.transition
+        mock_store.get_issue_links.return_value = [
+            {"issue_number": 123, "issue_role": "task"}
+        ]
+
         with patch(
-            "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=mock_label_port
-        ):
+            "vibe3.services.flow_block_mixin.LabelService"
+        ) as mock_label_service_cls:
+            mock_label_service = Mock()
+            mock_label_service_cls.return_value = mock_label_service
+
             # NEW: Mock CoordinationResolver to return dependencies
             mock_truth = Mock()
             mock_truth.blocked_reason = None
             mock_truth.blocked_by_issue = None
             mock_truth.dependencies = [456]
+            mock_truth.worktree_path = None
 
             with patch.object(
                 qualify_gate_service._coordination_resolver,
@@ -212,11 +225,10 @@ class TestRunQualifyGate:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once()
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
-                mock_store.add_event.assert_called_once()
+                mock_store.update_flow_state.assert_called()
+                # Verify LabelService.transition was called
+                mock_label_service.transition.assert_called_once()
+                mock_store.add_event.assert_called()
 
     def test_dependency_satisfied(self, qualify_gate_service, sample_issue, mock_store):
         """Issue with satisfied dependency should pass gate."""

@@ -114,24 +114,14 @@ class QualifyGateService:
             wt_path = Path(worktree_path)
             if not wt_path.exists():
                 reason = f"Worktree path does not exist: {worktree_path}"
-                self._store.update_flow_state(
-                    branch,
-                    blocked_reason=reason,
+                # Use standard FlowService.block_flow() method
+                from vibe3.services.flow_service import FlowService
+
+                FlowService(store=self._store).block_flow(
+                    branch=branch,
+                    reason=reason,
+                    actor="orchestra:dispatcher",
                 )
-                self._store.add_event(
-                    branch,
-                    "flow_blocked",
-                    "orchestra:dispatcher",
-                    detail=reason,
-                )
-                if IssueState.BLOCKED.to_label() not in labels:
-                    try:
-                        label_port = GhIssueLabelPort(repo=self.config.repo)
-                        label_port.add_issue_label(issue.number, "state/blocked")
-                    except Exception as exc:
-                        logger.bind(domain="orchestra").warning(
-                            f"Failed to add state/blocked for #{issue.number}: {exc}"
-                        )
                 append_orchestra_event(
                     "dispatcher",
                     f"qualify_gate skip #{issue.number}: {reason}",
@@ -154,25 +144,14 @@ class QualifyGateService:
                         f"Worktree branch mismatch: expected {branch}, "
                         f"got {actual_branch}"
                     )
-                    self._store.update_flow_state(
-                        branch,
-                        blocked_reason=reason,
+                    # Use standard FlowService.block_flow() method
+                    from vibe3.services.flow_service import FlowService
+
+                    FlowService(store=self._store).block_flow(
+                        branch=branch,
+                        reason=reason,
+                        actor="orchestra:dispatcher",
                     )
-                    self._store.add_event(
-                        branch,
-                        "flow_blocked",
-                        "orchestra:dispatcher",
-                        detail=reason,
-                    )
-                    if IssueState.BLOCKED.to_label() not in labels:
-                        try:
-                            label_port = GhIssueLabelPort(repo=self.config.repo)
-                            label_port.add_issue_label(issue.number, "state/blocked")
-                        except Exception as exc:
-                            logger.bind(domain="orchestra").warning(
-                                f"Failed to add state/blocked for "
-                                f"#{issue.number}: {exc}"
-                            )
                     append_orchestra_event(
                         "dispatcher",
                         f"qualify_gate skip #{issue.number}: {reason}",
@@ -193,24 +172,14 @@ class QualifyGateService:
             blocked_label = self._convention.state_label(self._convention.blocked_label)
             blocked_by_issue = truth.blocked_by_issue
             if not blocked_by_issue:
-                self._store.update_flow_state(
-                    branch,
+                # Use standard FlowService.block_flow() method
+                from vibe3.services.flow_service import FlowService
+
+                FlowService(store=self._store).block_flow(
+                    branch=branch,
+                    reason="Blocked by unresolved dependencies",
                     blocked_by_issue=unresolved[0],
-                    blocked_reason="Blocked by unresolved dependencies",
-                )
-                if blocked_label not in labels:
-                    try:
-                        label_port = GhIssueLabelPort(repo=self.config.repo)
-                        label_port.add_issue_label(issue.number, blocked_label)
-                    except Exception as exc:
-                        logger.bind(domain="orchestra").warning(
-                            f"Failed to add {blocked_label} for #{issue.number}: {exc}"
-                        )
-                self._store.add_event(
-                    branch,
-                    "flow_blocked",
-                    "orchestra:dispatcher",
-                    detail="Blocked by unresolved dependencies",
+                    actor="orchestra:dispatcher",
                 )
             return None
 

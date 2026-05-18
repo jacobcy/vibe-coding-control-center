@@ -71,31 +71,23 @@ def mark_issue(
         flows = store.get_flows_by_issue(issue_number, role="task")
         if flows:
             branch = str(flows[0].get("branch") or "").strip()
-            if branch:
-                # Record reason as blocked_reason (unified for both block and fail)
-                store.update_flow_state(
-                    branch, blocked_reason=reason, latest_actor=actor
-                )
     except Exception as e:
         logger.bind(
             domain="flow",
             action="mark_issue",
             issue_number=issue_number,
             error=str(e),
-        ).warning(f"Flow reason recording failed for issue #{issue_number}")
+        ).warning(f"Failed to get branch for issue #{issue_number}")
 
-    # Add [flow] timeline comment via FlowTimelineService (if branch and store found)
+    # Use standard FlowService.block_flow() method
     if branch and store:
         try:
-            timeline_service = FlowTimelineService(store=store)
-            event_type = f"flow_{action}ed"  # "flow_blocked" or "flow_failed"
-            timeline_service.record_timeline_event(
+            from vibe3.services.flow_service import FlowService
+
+            FlowService(store=store).block_flow(
                 branch=branch,
-                event_type=event_type,
+                reason=reason,
                 actor=actor,
-                detail=reason,
-                issue_number=issue_number,
-                repo=repo,
             )
         except Exception as e:
             logger.bind(
@@ -103,15 +95,7 @@ def mark_issue(
                 action="mark_issue",
                 issue_number=issue_number,
                 error=str(e),
-            ).warning(f"Timeline comment failed for issue #{issue_number}")
-
-    # Transition issue state via LabelService
-    LabelService(repo=repo).confirm_issue_state(
-        issue_number,
-        IssueState.BLOCKED,
-        actor=actor,
-        force=True,
-    )
+            ).warning(f"Failed to block flow for issue #{issue_number}")
 
 
 def fail_issue(
