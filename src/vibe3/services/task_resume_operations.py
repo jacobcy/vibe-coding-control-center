@@ -16,6 +16,7 @@ from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_body_service import (
     FlowStateProjection,
     merge_projection,
+    parse_projection_with_fallback,
 )
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
@@ -420,6 +421,10 @@ class TaskResumeOperations:
     def _clear_blocked_projection(self, issue_number: int) -> None:
         """Clear blocked state from issue body projection.
 
+        Explicitly clears blocked fields (state, blocked_by, blocked_reason)
+        while preserving non-blocked projection data like dependencies.
+        Future-proof: new projection fields won't be accidentally wiped.
+
         Args:
             issue_number: GitHub issue number
         """
@@ -434,14 +439,21 @@ class TaskResumeOperations:
             if current_body is None:
                 return
 
-            # Merge with empty projection to clear managed section
-            proj = FlowStateProjection()  # Empty = active state
-            merged = merge_projection(current_body, proj)
+            # Parse existing projection to preserve non-blocked fields
+            body_projection = parse_projection_with_fallback(current_body)
+
+            # Explicitly clear blocked fields, preserve everything else
+            cleared = FlowStateProjection(
+                state="active",
+                blocked_by=[],
+                blocked_reason=None,
+                dependencies=body_projection.dependencies,
+            )
+            merged = merge_projection(current_body, cleared)
 
             self.github_client.update_issue_body(issue_number, merged)
 
         except Exception as exc:
-            # Non-blocking: projection clearing failure should not affect resume
             logger.bind(
                 domain="resume",
                 action="clear_blocked_projection",

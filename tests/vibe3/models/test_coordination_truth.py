@@ -91,3 +91,69 @@ def test_is_blocked_in_serialization():
     dumped = truth.model_dump()
     assert "is_blocked" in dumped
     assert dumped["is_blocked"] is True
+
+
+def test_blocked_from_projection_state():
+    """Test blocked state inferred from projection_state='blocked'."""
+    truth = CoordinationTruth(
+        projection_state="blocked",
+        projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+    )
+    assert truth.is_blocked is True
+    assert truth.projection_state == "blocked"
+
+
+def test_blocked_from_projection_state_without_reason():
+    """Body State: blocked without reason => still treated as blocked.
+
+    Projection inconsistency requiring alignment, but blocked truth wins.
+    """
+    truth = CoordinationTruth(
+        projection_state="blocked",
+        projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+    )
+    # Even without blocked_reason or blocked_by_issue, state=blocked means blocked
+    assert truth.is_blocked is True
+
+
+def test_blocked_from_projection_state_and_payload():
+    """Body State: blocked + reason => blocked truth."""
+    truth = CoordinationTruth(
+        projection_state="blocked",
+        projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+        blocked_reason="API design pending",
+        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
+    )
+    assert truth.is_blocked is True
+    assert truth.blocked_reason == "API design pending"
+
+
+def test_not_blocked_with_active_projection():
+    """Body State: active with no blocked payload => not blocked."""
+    truth = CoordinationTruth(
+        projection_state="active",
+        projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+    )
+    assert truth.is_blocked is False
+
+
+def test_local_fallback_blocks_on_cache():
+    """Remote read failure => local fallback with blocked cache.
+
+    When remote fails and local has blocked_reason, projection_state
+    is inferred as 'blocked' from the local cache.
+    """
+    truth = CoordinationTruth(
+        projection_state="blocked",
+        projection_state_source=DataSource.LOCAL_SQLITE,
+        blocked_reason="Health check failed",
+        blocked_reason_source=DataSource.LOCAL_SQLITE,
+    )
+    assert truth.is_blocked is True
+    assert truth.projection_state_source == DataSource.LOCAL_SQLITE
+
+
+def test_source_required_for_projection_state():
+    """Test that projection_state requires projection_state_source."""
+    with pytest.raises(ValidationError, match="projection_state_source must be set"):
+        CoordinationTruth(projection_state="blocked")
