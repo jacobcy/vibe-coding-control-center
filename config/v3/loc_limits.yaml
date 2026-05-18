@@ -222,8 +222,11 @@ code_limits:
         limit: 410
         reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"
       - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
-        limit: 425
-        reason: "Qualify gate remote-first 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支，包含 provenance tracking 验证，测试类结构清晰，拆分收益低"
+        limit: 580
+        reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
+      - path: "tests/vibe3/domain/test_qualify_gate.py"
+        limit: 450
+        reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment 等场景，共享 fixture，拆分收益低"
 
 
   total_file_loc:
