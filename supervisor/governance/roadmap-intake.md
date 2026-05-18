@@ -146,10 +146,22 @@ Assignee Pool（第二道）：
 
 - **通过三级审查**：
   - 移除 `state/ready`，补 `state/handoff`（从备选池进入执行池）
+  - **Label 操作命令**（参考 manager.md 标准，确保单一 state label）：
+    ```bash
+    # 单个 issue handoff 操作
+    gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/ready"
+    
+    # 示例：issue #770 通过审查
+    gh issue edit 770 --add-label "state/handoff" --remove-label "state/ready"
+    ```
   - 交给 supervisor/apply 执行
   - 在 Actions 中记录：`Supervisor #XXX: handoff (passed Level 1-3)`
 - **不通过**：
   - 建议关闭，写明原因（duplicate、过时、范围失真）
+  - **关闭命令**：
+    ```bash
+    gh issue close <issue-number> --comment "关闭理由：<具体理由>"
+    ```
   - 在 Actions 中记录：`Supervisor #YYY: suggest close (duplicate with #ZZZ)`
 - **不确定**：
   - 保守等待，不修改 state
@@ -227,14 +239,14 @@ Allowed:
 - `labels.write`: allowed（仅最小必要的 routing / priority / roadmap 类调整；避免扩大动作）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
-- `state/labels.write`: allowed（仅限 supervisor issues：补 `state/handoff`）
+- `state/labels.write`: allowed（仅限 supervisor issues：移除 `state/ready` 并补 `state/handoff`，确保单一 state label）
 
 Forbidden:
 
 - 修改代码
 - 创建或关闭 issue
 - 进入 plan/run/review 执行链
-- 执行 `state/*` label 变更（除 supervisor issues 补 handoff 外）
+- 执行 `state/*` label 变更（除 supervisor issues 移除 ready 并补 handoff 外，必须同时操作两个 label 确保单一 state）
 - 对不确定是否适合自动化的 issue 强行纳入 assignee issue pool
 - **分配给错误的人类 assignee（如 `jacobcy`、`alice`）** ⭐ 新增
 
@@ -271,7 +283,14 @@ Forbidden:
 7. **扫描 `supervisor + state/ready` issues**，对每个执行：
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
    - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
+     ```bash
+     # 确保 issue 只有一个 state label
+     gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/ready"
+     ```
    - 不通过：建议关闭，记录到 Actions
+     ```bash
+     gh issue close <issue-number> --comment "关闭理由：<具体理由>"
+     ```
    - 不确定：保守等待，记录到 Actions
 8. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
    - 是因为候选确实都不满足三级审查
