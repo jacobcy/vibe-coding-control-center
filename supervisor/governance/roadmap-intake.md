@@ -117,6 +117,59 @@ Assignee Pool（第二道）：
   └─ 决策：接受为重构任务 / 建议 manager 处理
 ```
 
+### Supervisor Issue Intake
+
+除了 assignee issue pool 的候选，还需扫描：
+
+- `supervisor + state/ready` issues（supervisor 备选池）
+
+**三级审查**：
+
+对 supervisor issues 执行同样的三级审查框架，但针对治理任务特点调整：
+
+**Level 1: 基础条件**
+- 治理目标明确（文档对齐、测试修补、label/comment 治理）
+- 范围可控（不涉及主代码、不扩大语义）
+- 验收标准清楚（可明确判断"完成"）
+
+**Level 2: 架构一致性**
+- 目标文档/文件仍存在
+- 引用的真源（glossary、standards、entry docs）未废弃
+- 不涉及已变更的配置/架构
+
+**Level 3: 生命周期检查**
+- 非重复（与其他 open `supervisor + state/handoff` issue 不冲突）
+- 未过时（治理目标仍有效，文档/真源关系未改变）
+- 不需要先关闭其他依赖 issue
+
+**决策与动作**：
+
+- **通过三级审查**：
+  - 补 `state/handoff`（从备选池进入执行池）
+  - 交给 supervisor/apply 执行
+  - 在 Actions 中记录：`Supervisor #XXX: handoff (passed Level 1-3)`
+- **不通过**：
+  - 建议关闭，写明原因（duplicate、过时、范围失真）
+  - 在 Actions 中记录：`Supervisor #YYY: suggest close (duplicate with #ZZZ)`
+- **不确定**：
+  - 保守等待，不修改 state
+  - 在 Actions 中记录：`Supervisor #ZZZ: waiting (unclear scope, needs human review)`
+
+**输出要求**：
+
+在原有 `Actions` 中增加 `Supervisor issues` 分段，与 `Accepted`/`Skipped` 并列：
+
+```
+Candidates: ...
+Accepted: ...
+Skipped: ...
+Supervisor issues:
+  - #770: handoff (passed Level 1-3, align stale docs)
+  - #743: suggest close (duplicate with #770)
+  - #655: waiting (unclear scope)
+Why: ...
+```
+
 ### 默认原则
 
 - **架构检查优先于标签分类**：不只是看 bug/feature 标签，要看代码架构是否仍相关
@@ -174,27 +227,31 @@ Allowed:
 - `labels.write`: allowed（仅最小必要的 routing / priority / roadmap 类调整；避免扩大动作）
 - `comment.write`: allowed（可写简短 intake 说明）
 - `flow`: read
+- `state/labels.write`: allowed（仅限 supervisor issues：补 `state/handoff`）
 
 Forbidden:
 
 - 修改代码
 - 创建或关闭 issue
 - 进入 plan/run/review 执行链
-- 执行 `state/*` label 变更
+- 执行 `state/*` label 变更（除 supervisor issues 补 handoff 外）
 - 对不确定是否适合自动化的 issue 强行纳入 assignee issue pool
 - **分配给错误的人类 assignee（如 `jacobcy`、`alice`）** ⭐ 新增
 
 ## What It Reads
 
 - broader repo issue pool 中的 open issues
+- `supervisor + state/ready` issues（supervisor 备选池）
 - issue title / body / labels / comments
 - 必要时当前 assignee issue pool 现场
 - 必要时 flow / task status，用于避免把已在主链中的对象重复纳入
+- 必要时其他 open `supervisor + state/handoff` issues（用于查重）
 
 ## What It Produces
 
 - intake decisions
 - assignee-pool additions
+- supervisor issue handoff decisions
 - skipped candidates with reasons
 - minimal routing comments
 
@@ -211,11 +268,16 @@ Forbidden:
    - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `vibe-manager-agent`，禁止使用人类用户名）
    - 如有必要补最小 routing labels
 6. 对不适合纳入的对象记录简短原因
-7. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
+7. **扫描 `supervisor + state/ready` issues**，对每个执行：
+   - 三级审查（基础条件 + 架构一致性 + 生命周期）
+   - 通过：补 `state/handoff`，记录到 Actions
+   - 不通过：建议关闭，记录到 Actions
+   - 不确定：保守等待，记录到 Actions
+8. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
    - 是因为候选确实都不满足三级审查
-   - 还是因为当前材料把“实现选择”误当成了“人类拍板”
+   - 还是因为当前材料把”实现选择”误当成了”人类拍板”
    - 若 ready queue 偏浅，优先重新检查是否存在被误判可纳入的 bounded refactor / bugfix
-8. 输出结论后停止
+9. 输出结论后停止
 
 ## Comment Contract
 
@@ -238,9 +300,18 @@ Forbidden:
 - `Candidates`
 - `Accepted`
 - `Skipped`
+- `Supervisor issues`（新增）
 - `Actions`
 - `Why`
 
+`Supervisor issues` 格式：
+```
+Supervisor issues:
+  - #XXX: handoff (passed Level 1-3, <brief reason>)
+  - #YYY: suggest close (<reason: duplicate/过时/范围失真>)
+  - #ZZZ: waiting (<reason>)
+```
+
 ## Stop Point
 
-完成 intake 判断与最小纳入动作后停止。不要进入具体实现或单 flow 管理。
+完成 intake 判断、supervisor issue 审查与最小纳入动作后停止。不要进入具体实现或单 flow 管理。

@@ -60,8 +60,8 @@ Forbidden:
 - 进入 plan/run/review 执行链
 - 修改调度配置
 - 执行 `state/*` label 变更（除以下两种场景外）：
-  - 新建 supervisor issue 时设置 `state/handoff`
-  - 对已存在的 open `supervisor` issue 补齐 `state/handoff` 以交给 `supervisor/apply`
+  - 新建 supervisor issue 时设置 `state/ready`（备选池）
+  - 对已存在的 open `supervisor` issue 补齐 `state/handoff` 以交给 `supervisor/apply`（需经 roadmap-intake 三级审查）
 - 把范围扩大到“顺手修更多文档”
 - 把明确不打算执行的 issue 留在 open 状态继续悬浮
 
@@ -137,9 +137,9 @@ Forbidden:
 默认 labels：
 
 - `supervisor`
-- `state/handoff`
+- `state/ready`
 
-若 issue 已存在且决定继续执行，直接在原 issue 上补 `state/handoff`；不要为同一批文档重复创建新的 supervisor issue。
+若 issue 已存在且经过 roadmap-intake 三级审查后决定继续执行，补 `state/handoff`；不要为同一批文档重复创建新的 supervisor issue。
 
 ## Comment Contract
 
