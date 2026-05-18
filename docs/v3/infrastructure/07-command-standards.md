@@ -27,15 +27,16 @@ Vibe 3.0 CLI 分为三层：
 ```
 vibe3                          ← 全局层（Global）
 ├── flow                       ← 命令组层（Group）
-│   ├── new
-│   ├── list
-│   └── ...
+│   ├── update
+│   ├── bind
+│   ├── blocked
+│   ├── show
+│   ├── status
+│   ├── list-deleted
+│   └── restore
 ├── inspect                    ← 命令组层（Group）
-│   ├── pr
-│   ├── metrics
 │   └── ...
 └── review                     ← 命令组层（Group）
-    ├── pr                     ← 子命令层（Subcommand）
     └── ...
 ```
 
@@ -105,7 +106,7 @@ vibe3                          ← 全局层（Global）
 
 **使用场景**:
 ```bash
-vibe3 -v flow list          # INFO 日志
+vibe3 -v flow status          # INFO 日志
 vibe3 -vv inspect pr 42     # DEBUG 日志
 ```
 
@@ -164,8 +165,7 @@ RESULT=$(vibe3 inspect base main --json)
 
 **使用场景**:
 ```bash
-vibe3 clean --yes
-vibe3 reset --yes
+vibe3 flow blocked --reason "waiting on #42" --yes
 ```
 
 ---
