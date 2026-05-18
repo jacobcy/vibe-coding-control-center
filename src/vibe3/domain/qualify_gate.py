@@ -181,6 +181,15 @@ class QualifyGateService:
                     blocked_by_issue=unresolved[0],
                     actor="orchestra:dispatcher",
                 )
+            # Ensure blocked label is present on GitHub
+            if blocked_label not in labels:
+                try:
+                    label_port = GhIssueLabelPort(repo=self.config.repo)
+                    label_port.add_issue_label(issue.number, blocked_label)
+                except Exception as exc:
+                    logger.bind(domain="orchestra").warning(
+                        f"Failed to add {blocked_label}: {exc}"
+                    )
             return None
 
         # Step 3: All clear — determine target and perform unblock side effects
