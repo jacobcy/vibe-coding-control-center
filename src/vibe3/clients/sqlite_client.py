@@ -6,6 +6,7 @@ from vibe3.clients.sqlite_event_repo import SQLiteEventRepo
 from vibe3.clients.sqlite_flow_state_repo import SQLiteFlowStateRepo
 from vibe3.clients.sqlite_queue_repo import SQLiteQueueRepo
 from vibe3.clients.sqlite_session_repo import SQLiteSessionRepo
+from vibe3.clients.sqlite_transition_history_repo import SQLiteTransitionHistoryRepo
 
 
 class SQLiteClient(
@@ -15,6 +16,7 @@ class SQLiteClient(
     SQLiteContextCacheRepo,
     SQLiteSessionRepo,
     SQLiteQueueRepo,
+    SQLiteTransitionHistoryRepo,
 ):
     """Facade preserving the existing SQLiteClient API over focused repos."""
 

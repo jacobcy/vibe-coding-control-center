@@ -350,6 +350,44 @@ def init_schema(conn: sqlite3.Connection) -> None:
         cursor.execute(index_sql)
     cursor.execute(_CREATE_FAILED_GATE_STATE)
     cursor.execute(_CREATE_ORCHESTRA_QUEUE)
+    cursor.execute(_CREATE_TRANSITION_HISTORY)
+    for stmt in _CREATE_TRANSITION_HISTORY_INDEXES.strip().split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
+
+    # Migration: populate transition_history from existing flow_events
+    # Check if transition_history already has data (avoid re-migration)
+    existing_transitions = cursor.execute(
+        "SELECT COUNT(*) FROM transition_history"
+    ).fetchone()[0]
+
+    if existing_transitions == 0:
+        # Migrate historical state_transitioned events from flow_events.refs JSON
+        before_changes = conn.total_changes
+        cursor.execute("""
+            INSERT INTO transition_history
+                (branch, from_state, to_state, created_at, actor, event_id)
+            SELECT
+                branch,
+                json_extract(refs, '$.before_state') as from_state,
+                json_extract(refs, '$.after_state') as to_state,
+                created_at,
+                actor,
+                id as event_id
+            FROM flow_events
+            WHERE event_type = 'state_transitioned'
+              AND refs IS NOT NULL
+              AND json_extract(refs, '$.before_state') IS NOT NULL
+              AND json_extract(refs, '$.after_state') IS NOT NULL
+        """)
+
+        migrated = conn.total_changes - before_changes
+        if migrated > 0:
+            logger.bind(external="sqlite", operation="migration").info(
+                f"Migrated {migrated} historical transitions from "
+                "flow_events to transition_history"
+            )
 
     # Migration: add retry_count and last_attempted_at to orchestra_queue
     queue_columns = {
