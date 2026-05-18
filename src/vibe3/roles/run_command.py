@@ -16,6 +16,7 @@ from vibe3.agents.run_prompt import (
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import SkillNotAvailableError
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
@@ -105,9 +106,7 @@ def execute_manual_run(
     if skill:
         skill_path = resolve_skill_path(skill)
         if not skill_path:
-            raise ValueError(
-                f"Skill '{skill}' not found (no adapter provides it in current profile)"
-            )
+            raise SkillNotAvailableError(skill)
 
         # Resolve relative path against repo root for CWD-independent access
         from vibe3.clients.git_client import GitClient

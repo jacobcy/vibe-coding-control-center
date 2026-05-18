@@ -70,6 +70,21 @@ class AgentPresetNotFoundError(UserError):
         self.preset_name = preset_name
 
 
+class SkillNotAvailableError(UserError):
+    """Skill not available — no adapter provides it in current profile."""
+
+    def __init__(self, skill: str) -> None:
+        """Initialize SkillNotAvailableError.
+
+        Args:
+            skill: The skill name that was not found
+        """
+        super().__init__(
+            f"Skill '{skill}' not found (no adapter provides it in current profile)"
+        )
+        self.skill = skill
+
+
 # ========== System Errors (Non-recoverable) ==========
 
 

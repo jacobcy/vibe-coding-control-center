@@ -307,6 +307,8 @@ def iter_supervisor_identified_events(
     raw_issues: Iterable[dict[str, object]],
 ) -> list[SupervisorIssueIdentified]:
     """Filter raw GitHub issues into supervisor observation events."""
+    from loguru import logger
+
     issue_label = config.supervisor_handoff.issue_label
     handoff_label = config.supervisor_handoff.get_handoff_state_label()
 
@@ -317,6 +319,10 @@ def iter_supervisor_identified_events(
     if not supervisor_file:
         # No supervisor configured for current profile (minimal, github-flow)
         # Return empty list since these profiles don't have supervisor templates
+        logger.warning(
+            "No supervisor configured for current profile — "
+            "skipping supervisor handoff events"
+        )
         return []
 
     events: list[SupervisorIssueIdentified] = []

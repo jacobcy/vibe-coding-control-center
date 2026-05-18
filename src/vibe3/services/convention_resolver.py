@@ -87,6 +87,8 @@ class ConventionResolver:
         import os
         import subprocess
 
+        import yaml
+
         # Step 1: Check explicit override
         if self.profile:
             return self.profile
@@ -96,7 +98,31 @@ class ConventionResolver:
         if env_profile:
             return env_profile
 
-        # Step 3: Check git remote to detect Vibe Center repo
+        # Step 3: Check .vibe/config.yaml for profile field
+        try:
+            from pathlib import Path
+
+            from vibe3.clients.git_client import GitClient
+            from vibe3.exceptions import GitError
+
+            # Resolve relative path against repo root for CWD-independent access
+            git_client = GitClient()
+            git_common_dir = git_client.get_git_common_dir()
+            repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+            config_path = repo_root / ".vibe/config.yaml"
+            if config_path.exists():
+                with config_path.open(encoding="utf-8") as f:
+                    config_yaml = yaml.safe_load(f)
+                    if isinstance(config_yaml, dict) and "profile" in config_yaml:
+                        return str(config_yaml["profile"])
+        except OSError as e:
+            logger.debug(f"Failed to read .vibe/config.yaml: {e}")
+        except yaml.YAMLError as e:
+            logger.debug(f"Invalid YAML in .vibe/config.yaml: {e}")
+        except GitError as e:
+            logger.debug(f"Failed to resolve git common dir for .vibe/config.yaml: {e}")
+
+        # Step 4: Check git remote to detect Vibe Center repo
         try:
             result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
@@ -115,7 +141,7 @@ class ConventionResolver:
         except Exception as e:
             logger.debug(f"Git remote check failed: {e}")
 
-        # Step 4: Default to minimal
+        # Step 5: Default to minimal
         return "minimal"
 
     def get_policy_path(self, name: str) -> str | None:

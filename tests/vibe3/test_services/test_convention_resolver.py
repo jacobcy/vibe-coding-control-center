@@ -15,16 +15,25 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from vibe3.exceptions import GitError
 from vibe3.services.convention_resolver import ConventionResolver
 
 
 def test_resolver_returns_minimal_defaults_by_default():
     """Test resolver returns minimal defaults when no profile specified."""
-    # Mock git remote to return non-vibe-center repo
-    with patch("subprocess.run") as mock_run:
+    # Mock git remote to return non-vibe-center repo and config file to not exist
+    with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists") as mock_exists,
+    ):
+        mock_git_common_dir.return_value = "/tmp/test/.git"
         mock_run.return_value = MagicMock(
             returncode=0, stdout="https://github.com/other/repo.git\n"
         )
+        mock_exists.return_value = False  # No .vibe/config.yaml
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
         assert convention.branch.task_prefix == "issue-"
@@ -66,7 +75,33 @@ def test_resolver_uses_vibe_profile_env_var():
 
 def test_resolver_detects_vibe_center_repo():
     """Test resolver detects Vibe Center repo via git remote."""
-    with patch("subprocess.run") as mock_run:
+    # Mock config file to not exist so git remote detection is tested
+    with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
+        patch("subprocess.run") as mock_run,
+        patch("pathlib.Path.exists") as mock_exists,
+    ):
+        mock_git_common_dir.return_value = "/tmp/test/.git"
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="https://github.com/jacobcy/vibe-center.git\n"
+        )
+        mock_exists.return_value = False  # No .vibe/config.yaml
+        resolver = ConventionResolver.from_repo()
+        convention = resolver.resolve()
+        assert convention.branch.task_prefix == "task/issue-"
+
+
+def test_resolver_falls_back_when_git_common_dir_lookup_fails():
+    """Test resolver fallback when git common dir lookup raises GitError."""
+    with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_git_common_dir.side_effect = GitError("rev-parse", "not a git repository")
         mock_run.return_value = MagicMock(
             returncode=0, stdout="https://github.com/jacobcy/vibe-center.git\n"
         )
