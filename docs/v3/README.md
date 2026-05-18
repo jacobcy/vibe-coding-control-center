@@ -88,8 +88,8 @@ src/vibe3/
 - [phase3-automation.md](trace/phase3-automation.md) - Phase 3 自动化
 
 **验收标准**:
-- [ ] `vibe review pr 42 --trace` 输出调用链路
-- [ ] `vibe inspect pr 42 --trace` 输出调用链路
+- [ ] `vibe3 review pr 42 --trace` 输出调用链路
+- [ ] `vibe3 inspect pr 42 --trace` 输出调用链路
 - [ ] 追踪开销 < 20%
 - [ ] 不影响命令执行结果
 
@@ -115,7 +115,7 @@ src/vibe3/
 - [ ] 每个操作记录到 SQLite handoff store
 - [ ] 每个 agent 署名（格式：`agent/model`）
 - [ ] 产物引用不复制正文
-- [ ] `vibe flow status` 显示责任链
+- [ ] `vibe3 flow status` 显示责任链
 
 ---
 
