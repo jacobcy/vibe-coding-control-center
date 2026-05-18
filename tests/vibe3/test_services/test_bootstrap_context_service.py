@@ -129,7 +129,7 @@ def test_bootstrap_plan_references_atomic_cli_commands_only() -> None:
     )
 
     commands = [action.command for action in plan.actions]
-    assert any(cmd.startswith("vibe3 internal bootstrap-flow ") for cmd in commands)
+    assert any(cmd.startswith("vibe3 internal bootstrap ") for cmd in commands)
     assert all("vibe3 new" not in cmd for cmd in commands)
 
 
@@ -260,7 +260,7 @@ def test_bootstrap_plan_uses_internal_bootstrap_adapter() -> None:
 
     command = plan.actions[0].command
     assert command == (
-        "vibe3 internal bootstrap-flow 123 --branch dev/issue-123 "
+        "vibe3 internal bootstrap 123 --branch dev/issue-123 "
         "--source skill --worktree --related 456 --dependency 789"
     )
 
@@ -294,7 +294,7 @@ def test_bootstrap_command_escapes_shell_injection_attacks() -> None:
 
     # Verify proper quoting format
     assert f"--branch {quoted_branch}" in command
-    assert f"bootstrap-flow {shlex.quote('123')}" in command
+    assert f"bootstrap {shlex.quote('123')}" in command
 
 
 def test_bootstrap_command_escapes_malicious_issue_numbers() -> None:

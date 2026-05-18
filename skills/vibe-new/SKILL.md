@@ -39,13 +39,13 @@ git status
 标准调用方式：
 
 ```bash
-vibe3 internal bootstrap-flow <issue-number> --branch dev/issue-<id> [--worktree]
+vibe3 internal bootstrap <issue-number> --branch dev/issue-<id> [--worktree]
 ```
 
 如果需要补充 issue 关系：
 
 ```bash
-vibe3 internal bootstrap-flow <issue-number> \
+vibe3 internal bootstrap <issue-number> \
   --branch dev/issue-<id> \
   [--worktree] \
   [--related <issue-number>]... \

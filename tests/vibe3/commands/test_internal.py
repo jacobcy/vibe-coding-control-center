@@ -64,8 +64,8 @@ def test_internal_hidden_from_help():
     assert "internal" not in result.stdout or "Internal" in result.stdout
 
 
-def test_internal_bootstrap_flow_dispatch() -> None:
-    """internal bootstrap-flow should call shared bootstrap service."""
+def test_internal_bootstrap_dispatch() -> None:
+    """internal bootstrap should call shared bootstrap service."""
     issue_payload = {
         "number": 123,
         "title": "Bootstrap me",
@@ -97,7 +97,7 @@ def test_internal_bootstrap_flow_dispatch() -> None:
                             cli_app,
                             [
                                 "internal",
-                                "bootstrap-flow",
+                                "bootstrap",
                                 "123",
                                 "--branch",
                                 "dev/issue-123",

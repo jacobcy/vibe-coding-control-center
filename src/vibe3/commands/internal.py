@@ -94,8 +94,8 @@ def internal_governance_dispatch(
     dispatch_governance_execution(tick_count=tick, material_override=material)
 
 
-@app.command("bootstrap-flow")
-def internal_bootstrap_flow(
+@app.command("bootstrap")
+def internal_bootstrap(
     issue: Annotated[int, typer.Argument(help="Issue number to bootstrap")],
     branch: Annotated[
         str,
