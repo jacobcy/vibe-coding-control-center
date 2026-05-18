@@ -91,7 +91,7 @@ def internal_governance_dispatch(
     """
     from vibe3.services.scan_service import dispatch_governance_execution
 
-    dispatch_governance_execution(material_override=material)
+    dispatch_governance_execution(tick_count=tick, material_override=material)
 
 
 @app.command("bootstrap-flow")

@@ -157,6 +157,7 @@ def governance(
 
     from vibe3.services.scan_service import (
         get_available_governance_materials,
+        governance_material_exists,
         list_governance_materials,
     )
 
@@ -173,13 +174,21 @@ def governance(
         list_governance_materials(console)
         return
 
+    available_materials = get_available_governance_materials()
+
+    if role is not None and not governance_material_exists(role):
+        typer.echo(
+            f"Error: governance material '{role}' does not exist.",
+            err=True,
+        )
+        if available_materials:
+            typer.echo(f"Available roles: {', '.join(available_materials)}", err=True)
+        raise typer.Exit(1)
+
     if dry_run:
         # In dry-run mode, build and display the prompt without executing
         _run_governance_scan_dry_run(material_override=role)
         return
-
-    # Get available materials for help text
-    available_materials = get_available_governance_materials()
 
     if role is None:
         # No role specified - show guidance

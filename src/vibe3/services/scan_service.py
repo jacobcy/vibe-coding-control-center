@@ -39,18 +39,21 @@ def extract_material_description(material_path: str) -> str:
     return material_path
 
 
-def dispatch_governance_execution(material_override: str | None = None) -> None:
+def dispatch_governance_execution(
+    tick_count: int = 0, material_override: str | None = None
+) -> None:
     """Execute governance scan (execution-only entry point).
 
     Entry point for internal governance command, calling execution layer directly.
 
     Args:
+        tick_count: Tick number for governance material rotation
         material_override: Optional governance role to override material rotation
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
 
     run_governance_sync(
-        tick_count=0,  # Manual scan uses tick=0 for default material selection
+        tick_count=tick_count,
         material_override=material_override,
         dry_run=False,  # Execution-only, no dry-run
         show_prompt=False,
@@ -158,6 +161,23 @@ def get_available_governance_materials() -> list[str]:
     except Exception:
         # Fallback if catalog cannot be loaded
         return []
+
+
+def governance_material_exists(material_name: str) -> bool:
+    """Check whether a governance material exists in catalog.
+
+    Accepts either short names like ``roadmap-intake`` or full material paths.
+    """
+    try:
+        from vibe3.roles.governance import (
+            _find_material_in_catalog,
+            load_governance_material_catalog,
+        )
+
+        catalog = load_governance_material_catalog()
+        return _find_material_in_catalog(catalog, material_name) is not None
+    except Exception:
+        return False
 
 
 def list_governance_materials(console: Any) -> None:
