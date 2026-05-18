@@ -307,3 +307,144 @@ class TestPreDispatchHealthChecks:
 
         # Assert - should fail open on transient errors
         assert result is True, "Health check should fail open on network errors"
+
+    def test_health_check_blocks_on_genuine_failure(self) -> None:
+        """Health check genuine failure should call FlowService.block_flow."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        # Setup
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+        )
+
+        issue = IssueInfo(
+            number=993,
+            title="Missing worktree issue",
+            state=IssueState.IN_PROGRESS,
+            labels=["state/in-progress"],
+            github_state="OPEN",
+        )
+
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-993", None))
+
+        # Mock flow state as active
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-993",
+            "flow_status": "active",
+        }
+
+        # Mock CheckService to return invalid with genuine error (no worktree)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=False,
+                issues=[
+                    "plan_ref cannot be verified: "
+                    "no worktree for branch 'task/issue-993'"
+                ],
+                branch="task/issue-993",
+            )
+
+            # Mock FlowService.block_flow to verify it's called
+            with patch(
+                "vibe3.orchestra.global_dispatch_coordinator.FlowService"
+            ) as mock_flow_service:
+                mock_flow = mock_flow_service.return_value
+                result = coordinator._health_check_before_dispatch(issue)
+
+                # Assert - block_flow should be called with correct parameters
+                mock_flow.block_flow.assert_called_once()
+                call_args = mock_flow.block_flow.call_args
+                assert call_args[1]["branch"] == "task/issue-993"
+                assert "Health check failed" in call_args[1]["reason"]
+                assert call_args[1]["actor"] == "orchestra:dispatcher"
+
+        # Assert - should return False (skip dispatch)
+        assert result is False, "Health check should return False for genuine failure"
+
+    def test_health_check_transient_error_does_not_block(self) -> None:
+        """Transient errors should fail open without calling block_flow."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        # Setup
+        config = MagicMock()
+        config.max_concurrent_flows = 10
+        config.repo = "owner/repo"
+        config.supervisor_handoff = MagicMock()
+        config.supervisor_handoff.issue_label = "supervisor"
+        capacity = MagicMock()
+        github = MagicMock()
+        store = MagicMock()
+        store.db_path = ":memory:"
+        flow_manager = MagicMock()
+
+        coordinator = GlobalDispatchCoordinator(
+            config=config,
+            capacity=capacity,
+            github=github,
+            store=store,
+            flow_manager=flow_manager,
+        )
+
+        issue = IssueInfo(
+            number=46,
+            title="Network error test",
+            state=IssueState.READY,
+            labels=["state/ready"],
+            github_state="OPEN",
+        )
+
+        # Mock _flow_context to return a branch
+        coordinator._flow_context = MagicMock(return_value=("task/issue-46", None))
+
+        # Mock flow state as active
+        store.get_flow_state.return_value = {
+            "branch": "task/issue-46",
+            "flow_status": "active",
+        }
+
+        # Mock CheckService to return invalid with transient error
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
+        ) as mock_check_service:
+            mock_service = mock_check_service.return_value
+            mock_service.verify_branch.return_value = CheckResult(
+                is_valid=False,
+                issues=["Cannot verify task issue #46: network/auth error"],
+                branch="task/issue-46",
+            )
+
+            # Mock FlowService.block_flow to ensure it's NOT called
+            with patch(
+                "vibe3.orchestra.global_dispatch_coordinator.FlowService"
+            ) as mock_flow_service:
+                mock_flow = mock_flow_service.return_value
+                result = coordinator._health_check_before_dispatch(issue)
+
+                # Assert - block_flow should NOT be called for transient errors
+                mock_flow.block_flow.assert_not_called()
+
+        # Assert - should fail open
+        assert result is True, "Health check should fail open on transient errors"

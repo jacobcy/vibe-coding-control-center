@@ -37,6 +37,7 @@ from vibe3.orchestra.queue_operations import (
 )
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
+from vibe3.services.flow_service import FlowService
 from vibe3.utils.label_utils import clean_old_state_labels, should_skip_from_queue
 
 if TYPE_CHECKING:
@@ -303,11 +304,20 @@ class GlobalDispatchCoordinator:
                 )
                 return True
 
-            # Genuine consistency failure - skip dispatch
+            # Genuine consistency failure - block and skip dispatch
+            reason = f"Health check failed: {', '.join(result.issues)}"
+            try:
+                FlowService().block_flow(
+                    branch=branch, reason=reason, actor="orchestra:dispatcher"
+                )
+            except Exception as exc:
+                logger.bind(domain="orchestra", action="health_check").warning(
+                    f"Failed to block flow for #{issue.number}: {exc}"
+                )
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: skipped #{issue.number} "
-                f"(health check failed: {', '.join(result.issues)})",
+                f"GlobalDispatchCoordinator: blocked #{issue.number} "
+                f"(health check failed: {reason})",
             )
             return False
 
