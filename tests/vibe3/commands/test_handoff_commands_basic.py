@@ -108,6 +108,7 @@ class TestHandoffBasicCommands:
         mock_status_result.events = []
         mock_status_result.latest_verdict = None
         mock_status_result.live_sessions = []
+        mock_status_result.recent_updates = []
         mock_status_service.get_handoff_status.return_value = mock_status_result
         mock_status_service_class.return_value = mock_status_service
 
@@ -115,7 +116,7 @@ class TestHandoffBasicCommands:
 
         assert result.exit_code == 0
         mock_status_service.get_handoff_status.assert_called_once_with(
-            "task/issue-436", limit=5
+            "task/issue-436", limit=2
         )
 
     def test_handoff_show_without_target_shows_help(self):
@@ -255,6 +256,7 @@ class TestHandoffBasicCommands:
             events=[],
             latest_verdict=None,
             live_sessions=[],
+            recent_updates=[],
         )
         mock_status_service.get_handoff_status.return_value = mock_status_result
         mock_handoff_status_service_class.return_value = mock_status_service
@@ -293,6 +295,7 @@ class TestHandoffBasicCommands:
             events=[],
             latest_verdict=None,
             live_sessions=[],
+            recent_updates=[],
         )
         mock_status_service.get_handoff_status.return_value = mock_status_result
         mock_handoff_status_service_class.return_value = mock_status_service
@@ -328,6 +331,7 @@ class TestHandoffBasicCommands:
             events=[],
             latest_verdict=None,
             live_sessions=[],
+            recent_updates=[],
         )
         mock_status_service.get_handoff_status.return_value = mock_status_result
         mock_handoff_status_service_class.return_value = mock_status_service

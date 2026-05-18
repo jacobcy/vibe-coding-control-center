@@ -249,6 +249,51 @@ class HandoffStorage:
         )
         return handoff_path
 
+    def get_recent_updates(
+        self, branch: str | None = None, limit: int | None = 2
+    ) -> list[dict[str, str]]:
+        """Parse and return the last N updates from current.md for a branch.
+
+        Args:
+            branch: Target branch name (defaults to current branch)
+            limit: Maximum number of updates to return (None = all, default 2)
+
+        Returns:
+            List of dicts with 'timestamp', 'actor', 'kind', 'message' keys
+        """
+        try:
+            content = self.read_current_handoff(branch)
+        except Exception:
+            return []
+
+        updates_heading = "## Updates"
+        if updates_heading not in content:
+            return []
+
+        # Extract updates section
+        updates_start = content.index(updates_heading) + len(updates_heading)
+        updates_content = content[updates_start:].strip()
+
+        # Parse update blocks
+        import re
+
+        pattern = r"### ([\d\-T:+.]+) \| ([^|\n]+) \| (\w+)\n(.+?)(?=### |$)"
+        matches = re.findall(pattern, updates_content, re.DOTALL)
+
+        updates = []
+        selected = matches if limit is None else matches[-limit:]
+        for timestamp, actor, kind, message in selected:
+            updates.append(
+                {
+                    "timestamp": timestamp.strip(),
+                    "actor": actor.strip(),
+                    "kind": kind.strip(),
+                    "message": message.strip(),
+                }
+            )
+
+        return updates
+
     def normalize_ref_value(self, ref_value: str, branch: str) -> str:
         """Normalize a reference value (path) relative to branch worktree."""
         return normalize_ref_path(ref_value, branch, self.git_client)

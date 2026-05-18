@@ -25,6 +25,7 @@ class HandoffStatusResult:
         events: List of successful handoff events
         latest_verdict: Latest verdict record if available
         live_sessions: List of truly live runtime sessions
+        recent_updates: List of recent handoff file updates (append records)
     """
 
     flow_slug: str
@@ -33,6 +34,7 @@ class HandoffStatusResult:
     events: list[FlowEvent]
     latest_verdict: VerdictRecord | None
     live_sessions: list[dict[str, Any]]
+    recent_updates: list[dict[str, str]]
 
 
 class HandoffStatusService:
@@ -114,6 +116,12 @@ class HandoffStatusService:
         # Fetch live sessions from registry
         live_sessions = self._get_live_sessions_for_branch(branch)
 
+        # Fetch recent updates from handoff file
+        updates_limit = None if limit is None else 2
+        recent_updates = self.handoff_service.storage.get_recent_updates(
+            branch, limit=updates_limit
+        )
+
         # Resolve worktree path for the target branch
         worktree_path = self.git_client.find_worktree_path_for_branch(branch)
         if worktree_path:
@@ -129,6 +137,7 @@ class HandoffStatusService:
             events=events,
             latest_verdict=latest_verdict,
             live_sessions=live_sessions,
+            recent_updates=recent_updates,
         )
 
     def _get_live_sessions_for_branch(self, branch: str) -> list[dict[str, Any]]:

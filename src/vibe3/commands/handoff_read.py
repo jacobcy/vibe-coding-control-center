@@ -179,7 +179,7 @@ def status(
 
         # Aggregate handoff status from service
         status_service = HandoffStatusService(flow_service=flow_service)
-        limit = None if show_all else 5
+        limit = None if show_all else 2
         try:
             result = status_service.get_handoff_status(target_branch, limit=limit)
         except ValueError as error:
@@ -190,6 +190,7 @@ def status(
             output = {
                 "state": result.state.model_dump(),
                 "events": [e.model_dump() for e in result.events],
+                "recent_updates": result.recent_updates,
             }
             typer.echo(json.dumps(output, indent=2, default=str))
             return
@@ -198,6 +199,7 @@ def status(
             output = {
                 "state": result.state.model_dump(),
                 "events": [e.model_dump() for e in result.events],
+                "recent_updates": result.recent_updates,
             }
             typer.echo(
                 _get_yaml().dump(output, default_flow_style=False, allow_unicode=True)
@@ -211,6 +213,19 @@ def status(
         if result.worktree_root:
             console.print(f"[dim]worktree: {result.worktree_root}[/]")
         console.print()
+
+        # Show recent updates from handoff file
+        if result.recent_updates:
+            console.print("[bold]--- Recent Handoff Updates ---[/]")
+            console.print()
+            for update in reversed(result.recent_updates):
+                timestamp = update["timestamp"][:19].replace("T", " ")
+                actor = update["actor"]
+                kind = update["kind"]
+                message = update["message"].split("\n")[0]  # First line only
+                console.print(f"[dim]{timestamp}[/]  [cyan]{kind}[/]  [dim]{actor}[/]")
+                console.print(f"  {message}")
+                console.print()
 
         # Show latest verdict at the top
         if result.latest_verdict:
@@ -250,6 +265,13 @@ def status(
             branch=target_branch,
             verbose=verbose,
         )
+        if not show_all and (result.events or result.recent_updates):
+            console.print(
+                f"[dim]Tip: use 'vibe3 handoff show @current"
+                f"{' --branch ' + target_branch if branch else ''}"
+                f"' to view full content, or 'vibe3 handoff status --all'"
+                f" to show all events.[/]"
+            )
 
 
 def register_read_commands(app: typer.Typer) -> None:
