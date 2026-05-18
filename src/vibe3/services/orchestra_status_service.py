@@ -164,7 +164,7 @@ class OrchestraStatusService:
         url = f"http://127.0.0.1:{config.port}/status"
         try:
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=1.0) as response:
+            with urllib.request.urlopen(req, timeout=3.0) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     # Reconstruct frozen dataclass
