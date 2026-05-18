@@ -41,8 +41,8 @@ code_limits:
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/sqlite_schema.py"
-        limit: 450
-        reason: "Schema DDL 与迁移聚合，包含 8 个表定义、15+ 迁移步骤，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
+        limit: 500
+        reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
         limit: 500
         reason: "Git 门面聚合"
@@ -148,6 +148,9 @@ code_limits:
       - path: "src/vibe3/execution/coordinator.py"
         limit: 450
         reason: "执行协调器聚合，包含容量控制、执行生命周期、worktree 解析错误捕获、dispatch_execution 核心流程等紧密耦合逻辑"
+      - path: "src/vibe3/execution/noop_gate.py"
+        limit: 450
+        reason: "No-op gate 聚合，包含单步转换限制检查（transition_history pair count）、全局转换计数检查、state 验证、ref 检查、GitHub API 错误处理等多层防御机制，职责单一但紧密耦合"
       - path: "src/vibe3/execution/codeagent_runner.py"
         limit: 450
         reason: "Sync execution runner 聚合，包含 supervisor label cleanup、context preparation、finalize 等紧密耦合的执行生命周期逻辑"
@@ -200,6 +203,9 @@ code_limits:
       - path: "tests/vibe3/execution/test_noop_gate_unit.py"
         limit: 450
         reason: "Noop gate 三分支语义测试，15 个测试围绕同一 gate 函数，共享 mock fixture，拆分收益低"
+      - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
+        limit: 450
+        reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
       - path: "tests/vibe3/services/test_task_resume_operations.py"
         limit: 410
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
