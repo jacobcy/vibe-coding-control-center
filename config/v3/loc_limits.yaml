@@ -227,6 +227,9 @@ code_limits:
       - path: "tests/vibe3/domain/test_qualify_gate.py"
         limit: 450
         reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment 等场景，共享 fixture，拆分收益低"
+      - path: "tests/vibe3/utils/test_path_helpers.py"
+        limit: 420
+        reason: "Path helpers 测试集，覆盖 handoff 解析、路径遍历防护、分支名安全验证等紧密耦合逻辑，5 个新增测试扩展安全覆盖"
 
 
   total_file_loc:
