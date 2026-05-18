@@ -144,6 +144,7 @@ class PRService:
         if pr:
             pr.comments = self.github_client.list_pr_comments(pr.number)
             pr.review_comments = self.github_client.list_pr_review_comments(pr.number)
+            pr.reviews = self.github_client.list_pr_reviews(pr.number)
         return pr
 
     def mark_ready(

@@ -197,6 +197,10 @@ class PRCommentPort(Protocol):
         """List review (inline) comments on a PR."""
         ...
 
+    def list_pr_reviews(self, pr_number: int) -> list[dict[str, Any]]:
+        """List reviews (summary-level reviews) on a PR."""
+        ...
+
     def create_pr_comment(self, pr_number: int, body: str) -> str:
         """Create a comment on a PR. Returns comment URL."""
         ...

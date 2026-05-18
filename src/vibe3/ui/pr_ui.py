@@ -72,8 +72,7 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.body:
         console.print("\n[bold]Description:[/]")
-        body_preview = pr.body[:200] + ("..." if len(pr.body) > 200 else "")
-        console.print(body_preview)
+        console.print(pr.body)
 
     if pr.review_comments:
         console.print("\n[bold cyan]### Review Comments[/]")
@@ -92,6 +91,25 @@ def render_pr_details(pr: PRResponse) -> None:
                 f"  [yellow]{user}[/] [dim]({created})[/] [cyan]{path}:{line}[/]"
             )
             console.print(f"    {body}")
+
+    if pr.reviews:
+        console.print("\n[bold cyan]### Reviews[/]")
+        for review in pr.reviews:
+            user = review.get("user", {}).get("login", "unknown")
+            body = review.get("body", "")
+            state = review.get("state", "COMMENTED")
+            submitted = str(review.get("submitted_at", ""))[:16].replace("T", " ")
+            state_color = {
+                "APPROVED": "green",
+                "CHANGES_REQUESTED": "red",
+                "COMMENTED": "yellow",
+            }.get(state, "dim")
+            console.print(
+                f"  [yellow]{user}[/] [dim]({submitted})[/] "
+                f"[{state_color}]{state}[/{state_color}]"
+            )
+            if body:
+                console.print(f"    {body}")
 
     if pr.comments:
         console.print("\n[bold cyan]### General Comments[/]")
