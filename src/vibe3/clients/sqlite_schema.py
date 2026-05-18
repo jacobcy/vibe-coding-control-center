@@ -37,7 +37,8 @@ _CREATE_FLOW_STATE = """
         reviewer_status TEXT,
         execution_pid INTEGER,
         execution_started_at TEXT,
-        execution_completed_at TEXT
+        execution_completed_at TEXT,
+        transition_count INTEGER DEFAULT 0
     )
 """
 
@@ -263,6 +264,15 @@ def init_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN worktree_path TEXT")
         logger.bind(external="sqlite", operation="migration").info(
             "Added worktree_path column to flow_state"
+        )
+
+    # Migration: add transition_count field for L3 no-op gate protection
+    if "transition_count" not in existing:
+        cursor.execute(
+            "ALTER TABLE flow_state ADD COLUMN transition_count INTEGER DEFAULT 0"
+        )
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added transition_count column to flow_state"
         )
 
     # Legacy compatibility: keep old column for existing databases.

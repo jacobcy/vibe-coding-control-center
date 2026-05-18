@@ -52,6 +52,7 @@ def apply_unified_noop_gate(
         EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
         EVENT_STATE_UNCHANGED,
+        EVENT_TRANSITION_COUNT_EXCEEDED,
     )
 
     # Resolve role-specific block function (used in all failure paths)
@@ -160,7 +161,7 @@ def apply_unified_noop_gate(
         return
 
     # --- NEW: State transition count check ---
-    # Increment transition count on successful state change
+    # Check hard limit BEFORE incrementing
     if flow_state is not None:
         current_count = flow_state.get("transition_count", 0)
         new_count = current_count + 1
@@ -178,7 +179,7 @@ def apply_unified_noop_gate(
             )
             store.add_event(
                 branch,
-                EVENT_STATE_UNCHANGED,
+                EVENT_TRANSITION_COUNT_EXCEEDED,
                 actor,
                 detail=(
                     f"Transition count exceeded hard limit: {new_count} >= "
@@ -200,22 +201,6 @@ def apply_unified_noop_gate(
                 actor=actor,
             )
             return
-
-        # Log warning if approaching hard limit
-        if new_count >= TRANSITION_LIMIT_SOFT:
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                f"Transition count approaching hard limit: {new_count} "
-                f"(soft: {TRANSITION_LIMIT_SOFT}, hard: {TRANSITION_LIMIT_HARD})"
-            )
-
-        # Update transition count in flow_state (to be persisted by caller)
-        if flow_state is not None and isinstance(flow_state, dict):
-            flow_state["transition_count"] = new_count
 
     # --- NEW: required_ref check ---
     # Only check ref for worker roles (planner/executor/reviewer).
@@ -302,3 +287,21 @@ def apply_unified_noop_gate(
             "issue": str(issue_number),
         },
     )
+
+    # Increment transition count AFTER confirming state change
+    if flow_state is not None and isinstance(flow_state, dict):
+        current_count = flow_state.get("transition_count", 0)
+        new_count = current_count + 1
+        flow_state["transition_count"] = new_count
+
+        # Log warning if approaching hard limit (after confirming transition)
+        if new_count >= TRANSITION_LIMIT_SOFT:
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"Transition count approaching hard limit: {new_count} "
+                f"(soft: {TRANSITION_LIMIT_SOFT}, hard: {TRANSITION_LIMIT_HARD})"
+            )

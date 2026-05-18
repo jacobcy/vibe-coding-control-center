@@ -299,3 +299,81 @@ def test_success_events_includes_legacy_handoff_run(tmp_path: Path) -> None:
 
     assert len(events) == 1
     assert events[0].event_type == "handoff_run"
+
+
+class TestHandoffFailureDetection:
+    """Tests for handoff failure record detection."""
+
+    def test_get_handoff_events_finds_blocker_kind(self, tmp_path: Path) -> None:
+        """get_handoff_events finds handoff_indicate events with blocked detail."""
+        worktree_root = tmp_path / "wt"
+        git_common = tmp_path / ".git"
+        worktree_root.mkdir()
+        git_common.mkdir()
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+        service = HandoffService(
+            store=store,
+            git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        )
+
+        # Create a handoff_indicate event with "blocked" in detail
+        store.add_event(
+            "task/issue-304",
+            "handoff_indicate",
+            "manager",
+            detail="Flow blocked due to dependency issue",
+        )
+
+        events = service.get_handoff_events("task/issue-304")
+        assert len(events) == 1
+        assert events[0].event_type == "handoff_indicate"
+        assert "blocked" in events[0].detail
+
+    def test_success_events_exclude_blocker_events(self, tmp_path: Path) -> None:
+        """get_success_handoff_events excludes non-success event types."""
+        worktree_root = tmp_path / "wt"
+        git_common = tmp_path / ".git"
+        worktree_root.mkdir()
+        git_common.mkdir()
+
+        store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+        service = HandoffService(
+            store=store,
+            git_client=_StubGitClient(worktree_root, git_common, "task/issue-304"),
+        )
+
+        # Mix of success and non-success events
+        store.add_event(
+            "task/issue-304",
+            "handoff_plan",
+            "planner",
+            detail="Plan created",
+        )
+        store.add_event(
+            "task/issue-304",
+            "state_unchanged",  # Not in _SUCCESS_HANDOFF_EVENT_TYPES
+            "executor",
+            detail="State unchanged",
+        )
+        store.add_event(
+            "task/issue-304",
+            "transition_count_exceeded",  # Not in _SUCCESS_HANDOFF_EVENT_TYPES
+            "executor",
+            detail="Loop detected",
+        )
+        store.add_event(
+            "task/issue-304",
+            "handoff_report",
+            "executor",
+            detail="Report created",
+        )
+
+        success_events = service.get_success_handoff_events("task/issue-304")
+        # Should only include handoff_plan and handoff_report
+        assert len(success_events) == 2
+        event_types = [e.event_type for e in success_events]
+        assert "handoff_plan" in event_types
+        assert "handoff_report" in event_types
+        assert "state_unchanged" not in event_types
+        assert "transition_count_exceeded" not in event_types
