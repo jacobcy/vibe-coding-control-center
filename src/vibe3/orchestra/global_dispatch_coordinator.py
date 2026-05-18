@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -31,9 +30,10 @@ from vibe3.orchestra.issue_loader import (
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.queue_operations import (
-    promote_progressed_entries,
-    select_ready_issues,
+from vibe3.orchestra.queue_operations import select_ready_issues
+from vibe3.orchestra.queue_persistence_mixin import (
+    QueueEntry,
+    QueuePersistenceMixin,
 )
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
@@ -46,18 +46,7 @@ if TYPE_CHECKING:
     from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
-@dataclass
-class QueueEntry:
-    """Frozen queue entry tracked only by issue identity and wait state."""
-
-    issue_number: int
-    collected_state: str | None = None
-    waiting_state: str | None = None
-    retry_count: int = 0
-    last_attempted_at: str | None = None
-
-
-class GlobalDispatchCoordinator:
+class GlobalDispatchCoordinator(QueuePersistenceMixin):
     """Frozen queue with state-change requeue semantics."""
 
     def __init__(
@@ -92,92 +81,6 @@ class GlobalDispatchCoordinator:
         """Shutdown the executor if we own it."""
         if self._owns_executor and self._executor:
             self._executor.shutdown(wait=True)
-
-    def _restore_queue(self) -> list[QueueEntry] | None:
-        """Load persisted queue from database on restart."""
-        try:
-            entries = self._store.load_frozen_queue()
-        except Exception as exc:
-            logger.bind(domain="global_dispatch").warning(
-                f"Failed to load persisted queue: {exc}"
-            )
-            return None
-
-        if not entries:
-            return None
-
-        restored: list[QueueEntry] = []
-        invalid_issue_numbers: list[int] = []
-
-        for entry in entries:
-            issue_number = entry["issue_number"]
-            issue = self._load_issue(issue_number)
-
-            # Skip invalid issues (not found)
-            if issue is None:
-                invalid_issue_numbers.append(issue_number)
-                continue
-
-            # Skip DONE issues
-            if issue.state == IssueState.DONE:
-                invalid_issue_numbers.append(issue_number)
-                continue
-
-            # Skip supervisor-labeled issues
-            if should_skip_from_queue(
-                issue,
-                supervisor_label=self._supervisor_label,
-                manager_usernames=self._config.get_manager_usernames(),
-                require_manager_assignee=True,
-            ):
-                invalid_issue_numbers.append(issue_number)
-                continue
-
-            # Restore entry, resetting waiting_state so they are re-dispatched
-            restored.append(
-                QueueEntry(
-                    issue_number=issue_number,
-                    collected_state=entry.get("collected_state"),
-                    waiting_state=None,  # Reset to trigger re-dispatch
-                    retry_count=entry.get("retry_count", 0),
-                    last_attempted_at=entry.get("last_attempted_at"),
-                )
-            )
-
-        # Clean up invalid entries from database
-        for issue_number in invalid_issue_numbers:
-            self._store.remove_from_frozen_queue(issue_number)
-
-        logger.bind(domain="global_dispatch").info(
-            f"Restored {len(restored)} queue entries from persistence "
-            f"(removed {len(invalid_issue_numbers)} invalid entries)"
-        )
-
-        return restored if restored else None
-
-    def _persist_queue(self) -> None:
-        """Persist current frozen queue to database."""
-        if self._frozen_queue is None:
-            self._store.clear_frozen_queue()
-            return
-
-        entries = [
-            {
-                "issue_number": e.issue_number,
-                "collected_state": e.collected_state,
-                "waiting_state": e.waiting_state,
-                "retry_count": e.retry_count,
-                "last_attempted_at": e.last_attempted_at,
-            }
-            for e in self._frozen_queue
-        ]
-        self._store.save_frozen_queue(entries)
-
-    def get_queued_issue_numbers(self) -> set[int]:
-        """Get the set of issue numbers currently in the frozen queue."""
-        if not self._frozen_queue:
-            return set()
-        return {e.issue_number for e in self._frozen_queue}
 
     async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
         """Poll GitHub for issues with a specific state label."""
@@ -508,111 +411,4 @@ class GlobalDispatchCoordinator:
             )
 
         # Persist queue state after dispatch mutations
-        self._persist_queue()
-
-    async def _collect_frozen_queue(self) -> list[QueueEntry]:
-        """Collect a new frozen queue only when the current one is empty."""
-        queue: list[QueueEntry] = []
-        seen_issue_numbers: set[int] = set()
-        append_orchestra_event(
-            "dispatcher",
-            "GlobalDispatchCoordinator: starting queue collection",
-        )
-        for state in (
-            IssueState.REVIEW,
-            IssueState.MERGE_READY,
-            IssueState.IN_PROGRESS,
-            IssueState.CLAIMED,
-            IssueState.HANDOFF,
-            IssueState.BLOCKED,
-            IssueState.READY,
-        ):
-            try:
-                issues = await self._poll_issues_by_state(state)
-                for issue in issues:
-                    if issue.number in seen_issue_numbers:
-                        continue
-                    seen_issue_numbers.add(issue.number)
-                    queue.append(
-                        QueueEntry(
-                            issue_number=issue.number,
-                            collected_state=state.value,
-                        )
-                    )
-            except Exception as exc:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: collect_ready_issues failed for "
-                    f"{state.value}: {exc}",
-                )
-                logger.bind(
-                    domain="global_dispatch",
-                    state=state.value,
-                ).error(f"poll_issues_by_state failed for {state.value}: {exc}")
-        append_orchestra_event(
-            "dispatcher",
-            f"GlobalDispatchCoordinator: queue collection complete, "
-            f"total={len(queue)} issues",
-        )
-        return queue
-
-    def _promote_progressed_entries(self) -> None:
-        """Move progressed issues to the front; remove blocked/failed from queue."""
-        if not self._frozen_queue:
-            return
-
-        # Convert QueueEntry to dict for helper function
-        queue_dicts = [
-            {
-                "issue_number": e.issue_number,
-                "collected_state": e.collected_state,
-                "waiting_state": e.waiting_state,
-                "retry_count": e.retry_count,
-                "last_attempted_at": e.last_attempted_at,
-            }
-            for e in self._frozen_queue
-        ]
-
-        promoted, retained, removed = promote_progressed_entries(
-            queue_dicts,
-            self._config,
-            self._github,
-            self._registry,
-            self._supervisor_label,
-            load_issue_func=self._load_issue,
-            max_retry_budget=self._config.max_retry_budget,
-        )
-
-        # Convert back to QueueEntry
-        promoted_entries = [
-            QueueEntry(
-                issue_number=e["issue_number"],
-                collected_state=e.get("collected_state"),
-                waiting_state=e.get("waiting_state"),
-                retry_count=e.get("retry_count", 0),
-                last_attempted_at=e.get("last_attempted_at"),
-            )
-            for e in promoted
-        ]
-
-        retained_entries = [
-            QueueEntry(
-                issue_number=e["issue_number"],
-                collected_state=e.get("collected_state"),
-                waiting_state=e.get("waiting_state"),
-                retry_count=e.get("retry_count", 0),
-                last_attempted_at=e.get("last_attempted_at"),
-            )
-            for e in retained
-        ]
-
-        # Update frozen queue
-        if promoted_entries or retained_entries:
-            self._frozen_queue = promoted_entries + retained_entries
-        else:
-            # All entries removed - trigger fresh collection
-            self._frozen_queue = None
-            self._check_service = None  # Invalidate when queue is set to None
-
-        # Persist the updated queue state
         self._persist_queue()
