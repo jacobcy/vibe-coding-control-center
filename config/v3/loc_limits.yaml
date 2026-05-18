@@ -209,6 +209,12 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
         limit: 460
         reason: "Health check failure 测试集，7 个独立测试用例验证 coordinator 对 CheckService 结果的处理逻辑，每个测试需要完整 mock setup，拆分会降低可读性"
+      - path: "tests/vibe3/commands/test_scan.py"
+        limit: 410
+        reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"
+      - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
+        limit: 425
+        reason: "Qualify gate remote-first 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支，包含 provenance tracking 验证，测试类结构清晰，拆分收益低"
 
 
   total_file_loc:
