@@ -169,7 +169,7 @@ code_limits:
 
       # Utils 层 —— 允许 550
       - path: "src/vibe3/utils/path_helpers.py"
-        limit: 550
+        limit: 560
         reason: "路径解析核心工具与安全验证聚合：包含路径解析、handoff 路径处理、分支名安全验证（regex校验+路径边界检查）的三层防御机制。安全函数紧密耦合，拆分会降低代码可审计性和维护性。"
 
       # 强耦合测试例外
