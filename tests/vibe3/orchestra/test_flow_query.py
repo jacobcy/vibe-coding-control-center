@@ -155,6 +155,6 @@ class TestFlowQuery:
                 result = manager.create_flow_for_issue(issue)
 
         mock_rebuild.assert_called_once_with(
-            issue, branch="task/issue-320", slug="issue-320"
+            issue, branch="task/issue-320", slug="issue-320", ensure_worktree=True
         )
         assert result == {"branch": "task/issue-320"}
