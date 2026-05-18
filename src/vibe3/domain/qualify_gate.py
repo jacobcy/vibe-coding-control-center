@@ -171,8 +171,9 @@ class QualifyGateService:
         if unresolved:
             blocked_label = self._convention.state_label(self._convention.blocked_label)
             blocked_by_issue = truth.blocked_by_issue
+            # Always enforce flow_status="blocked" for unresolved dependencies
             if not blocked_by_issue:
-                # Use standard FlowService.block_flow() method
+                # First-time blocking: link dependency issue
                 from vibe3.services.flow_service import FlowService
 
                 FlowService(store=self._store).block_flow(
@@ -180,6 +181,12 @@ class QualifyGateService:
                     reason="Blocked by unresolved dependencies",
                     blocked_by_issue=unresolved[0],
                     actor="orchestra:dispatcher",
+                )
+            else:
+                # Already blocked: just ensure flow_status is set correctly
+                self._store.update_flow_state(
+                    branch,
+                    flow_status="blocked",
                 )
             # Ensure blocked label is present on GitHub
             if blocked_label not in labels:

@@ -198,11 +198,13 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         # Verify: state restored to READY via resume_issue
         mock_label_instance.confirm_issue_state.assert_called_once()
 
-    # Verify: reasons cleared (blocked_reason + failed_reason for backward compat)
+    # Verify: reasons cleared and flow_status restored to active
     operations.flow_service.store.update_flow_state.assert_called_once_with(
         "task/issue-303",
+        flow_status="active",
         blocked_reason=None,
         failed_reason=None,
+        blocked_by_issue=None,
         latest_actor="human:resume",
     )
 
@@ -396,10 +398,12 @@ def test_clear_flow_reasons_clears_both_reasons() -> None:
 
     operations._clear_flow_reasons("task/issue-303", "blocked")
 
-    # Verify: both reasons cleared (failed_reason for backward compat)
+    # Verify: reasons cleared and flow_status restored to active
     operations.flow_service.store.update_flow_state.assert_called_once_with(
         "task/issue-303",
+        flow_status="active",
         blocked_reason=None,
         failed_reason=None,
+        blocked_by_issue=None,
         latest_actor="human:resume",
     )

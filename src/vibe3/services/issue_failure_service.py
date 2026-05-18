@@ -88,6 +88,8 @@ def mark_issue(
                 branch=branch,
                 reason=reason,
                 actor=actor,
+                repo=repo,
+                event_type="flow_failed" if action == "fail" else "flow_blocked",
             )
         except Exception as e:
             logger.bind(

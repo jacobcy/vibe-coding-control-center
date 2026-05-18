@@ -31,13 +31,13 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
             mock_issue_flow_service.store = store
 
             with patch(
-                "vibe3.services.issue_failure_service.FlowTimelineService"
+                "vibe3.services.flow_block_mixin.FlowTimelineService"
             ) as mock_timeline_class:
                 mock_timeline = MagicMock()
                 mock_timeline_class.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.issue_failure_service.LabelService"
+                    "vibe3.services.flow_block_mixin.LabelService"
                 ) as mock_label_service_class:
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service

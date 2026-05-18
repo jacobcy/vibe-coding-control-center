@@ -59,11 +59,21 @@ class FlowLifecycleMixin:
         reason: str | None = None,
         blocked_by_issue: int | None = None,
         actor: str | None = None,
+        repo: str | None = None,
+        event_type: str = "flow_blocked",
     ) -> None:
         """Mark flow as blocked.
 
         Sets flow_status="blocked" and writes blocked_reason/blocked_by_issue metadata.
         Also transitions GitHub issue label to BLOCKED state.
+
+        Args:
+            branch: Branch name
+            reason: Blocking reason
+            blocked_by_issue: Dependency issue number
+            actor: Actor performing the block
+            repo: Repository (defaults to current repo)
+            event_type: Event type for timeline ("flow_blocked" or "flow_failed")
         """
         logger.bind(
             domain="flow",
@@ -118,7 +128,7 @@ class FlowLifecycleMixin:
         if task_issue_number:
             try:
                 # Transition issue state to BLOCKED
-                LabelService().transition(
+                LabelService(repo=repo).transition(
                     task_issue_number, IssueState.BLOCKED, effective_actor, force=False
                 )
             except Exception as e:
@@ -135,7 +145,7 @@ class FlowLifecycleMixin:
                     timeline_service = FlowTimelineService(store=self.store)
                     timeline_service.record_timeline_event(
                         branch=branch,
-                        event_type="flow_blocked",
+                        event_type=event_type,
                         actor=effective_actor,
                         detail=reason,
                         issue_number=task_issue_number,
