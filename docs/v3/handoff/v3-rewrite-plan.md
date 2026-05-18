@@ -47,7 +47,7 @@
 
 **Inputs**: `docs/v3/handoff/02-flow-task-foundation.md`, `src/vibe3/clients/sqlite_client.py`
 **Success Criteria**:
-- [ ] Execution of `vibe3 flow new test-flow --task 101` creates handoff record in SQLite.
+- [ ] Execution of `vibe3 flow update test-flow` creates handoff record in SQLite.
 - [ ] `vibe3 flow status --json` output contains `"flow_slug": "test-flow"` with handoff metadata.
 - [ ] Unit tests for `FlowManager` pass with 100% success rate.
 

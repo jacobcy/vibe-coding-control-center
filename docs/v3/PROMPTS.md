@@ -68,7 +68,7 @@ src/vibe3/
 **实施文档**：[trace/](trace/README.md)
 
 **验收标准**：
-- [ ] `vibe review pr 42 --trace` 输出调用链路
+- [ ] `vibe3 review pr 42 --trace` 输出调用链路
 - [ ] 追踪开销 < 20%
 - [ ] 不影响命令执行结果
 
@@ -95,7 +95,7 @@ src/vibe3/
 **验收标准**：
 - [ ] 每个操作记录到 SQLite handoff store
 - [ ] 每个 agent 署名（格式：`agent/model`）
-- [ ] `vibe flow status` 显示责任链
+- [ ] `vibe3 flow status` 显示责任链
 
 ---
 
@@ -244,14 +244,14 @@ src/vibe3/
 - [ ] 测试覆盖率 >= 80%
 
 ## Phase 2 验证
-- [ ] `vibe review pr 42 --trace` 输出调用链路
+- [ ] `vibe3 review pr 42 --trace` 输出调用链路
 - [ ] 追踪开销 < 20%
 - [ ] 不影响命令执行结果
 
 ## Phase 3 验证
 - [ ] 每个操作记录到 SQLite handoff store
 - [ ] 每个 agent 署名（格式：`agent/model`）
-- [ ] `vibe flow status` 显示责任链
+- [ ] `vibe3 flow status` 显示责任链
 
 ---
 

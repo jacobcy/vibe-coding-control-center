@@ -99,7 +99,7 @@ related_docs:
 
 ### 2.2 命令集成
 
-- [ ] **`vibe3 review --branch 42 --trace`**
+- [ ] **`vibe3 review pr 42 --trace`**
   - 输出调用链路
   - 显示执行步骤
   - **预估**: 3-4 小时
@@ -299,8 +299,8 @@ Orchestra ready queue 使用三级排序：
 
 ### Phase 2 验收
 
-- [ ] `vibe review pr 42 --trace` 输出调用链路
-- [ ] `vibe inspect pr 42 --trace` 输出调用链路
+- [ ] `vibe3 review pr 42 --trace` 输出调用链路
+- [ ] `vibe3 inspect pr 42 --trace` 输出调用链路
 - [ ] 追踪开销 < 20%
 - [ ] 不影响命令执行结果
 
@@ -309,7 +309,7 @@ Orchestra ready queue 使用三级排序：
 - [ ] 每个操作记录到 SQLite handoff store
 - [ ] 每个 agent 署名
 - [ ] 产物引用不复制正文
-- [ ] `vibe flow status` 显示责任链
+- [ ] `vibe3 flow status` 显示责任链
 
 ---
 
