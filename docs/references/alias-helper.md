@@ -234,7 +234,7 @@ Agent 选项：`claude`（默认）、`codex`、`opencode`
 
 | 命令 | 功能 |
 |------|------|
-| `vibe <subcommand>` | 动态 Vibe 执行器（自动检测 local → git root → 全局） |
+| `vibe <subcommand>` | 执行代理（自动检测 local → git root → 全局） |
 | `vibe -g <subcommand>` | 强制使用全局 vibe |
 | `vc` | `vibe chat` — 打开 Vibe Chat |
 | `vsign` | `vibe sign` — 签名任务或文档 |

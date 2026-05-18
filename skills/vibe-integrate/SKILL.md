@@ -312,7 +312,7 @@ Issue 内容模板：
 - 不得借机把下一个目标混进同一个 PR
 - 不得直接改 `.git/vibe/*.json`
 - 若当前 PR 已 merged，则旧 plan 视为 terminal state；此阶段只允许补交付证据或 follow-up 链接，不得把新需求写回旧 plan
-- merge 后出现的新目标必须重新进入 `repo issue` intake，而不是继续挂在已完成 plan 下
+- merge 后出现的新目标必须重新进入 `GitHub issue` intake，而不是继续挂在已完成 plan 下
 
 ### Step 4.5: 单文件 exception 容量约束
 
