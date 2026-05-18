@@ -21,35 +21,39 @@ Following the PRD requirements, all development should follow a standardized Tes
    - Clean up code and documentation.
    - Final review and PR.
 
-## Using `vibe flow`
+## Using `vibe3 flow`
 
 To enter a new implementation flow with TDD:
 
 ```bash
-# 1. Create/switch to a new flow in the current worktree
-vibe flow new <feature-name> --agent claude
+# 1. Create a new branch for the feature (use git directly)
+git checkout -b <feature-name>
 
-# 2. Bind the current execution record when needed
-vibe flow bind <task-id>
+# 2. Register the flow for the current branch
+vibe3 flow update --name <feature-name>
 
-# 3. Define tests first (TDD Red Phase)
+# 3. Bind the issue when needed
+vibe3 flow bind <issue-number>
+
+# 4. Define tests first (TDD Red Phase)
 # run the relevant bats/unit test and confirm it fails
 
-# 4. Implement the minimum change (TDD Green Phase)
+# 5. Implement the minimum change (TDD Green Phase)
 # run the same test and confirm it passes
 
-# 5. Review code
-vibe flow review
+# 6. Review code
+# use git diff / PR review tools
 
-# 6. Create Pull Request
-vibe flow pr
+# 7. Create Pull Request (use gh directly)
+gh pr create
 
-# 7. Complete feature (after merge)
-vibe flow done
+# 8. Complete feature (after merge)
+# the flow is auto-completed on PR merge
 ```
 
 This workflow:
-- Creates or switches to a dedicated flow / branch in the current worktree
-- Keeps task binding explicit through `vibe flow bind`
+- Uses `git` directly for branch lifecycle (creation, switching)
+- Uses `vibe3 flow update` to register flow metadata for the current branch
+- Keeps task binding explicit through `vibe3 flow bind`
 - Guides you through the TDD cycle
 - Uses `wtnew` / `vnew` only when you truly need a separate physical worktree
