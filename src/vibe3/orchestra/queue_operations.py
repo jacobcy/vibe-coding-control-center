@@ -66,13 +66,9 @@ def select_ready_issues(
         if issue is None:
             continue
 
-        # BLOCKED_ROLE: collect all candidates without qualify gate.
-        # Gate runs at intent time in GlobalDispatchCoordinator.
-        # This allows blocked issues to be collected and checked for unblock conditions.
-        if role.trigger_name == "blocked":
-            selected.append(issue)
-            continue
-
+        # All roles go through Qualify Gate for body-truth alignment.
+        # Blocked issues from label are re-evaluated against body truth
+        # before retention, removal, or promotion.
         branch, flow_state = get_flow_context(
             issue.number, config, github, store, flow_manager
         )
@@ -211,14 +207,36 @@ def promote_progressed_entries(
             retained.append(entry)
             continue
 
-        # Blocked state requires human intervention - remove from queue
+        # Blocked label alone is not a terminal fact.
+        # Promote for re-evaluation — body truth alignment happens in qualify gate.
         if current_state == "blocked":
-            removed.append(entry)
+            retry_count = entry.get("retry_count", 0) + 1
+            entry["retry_count"] = retry_count
+            entry["last_attempted_at"] = datetime.now(timezone.utc).isoformat()
+
+            if retry_count >= max_retry_budget:
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    (
+                        f"GlobalDispatchCoordinator: evicted "
+                        f"#{entry['issue_number']} from queue "
+                        f"(retry budget exhausted: {retry_count}/"
+                        f"{max_retry_budget}, stuck in "
+                        f"state=blocked)"
+                    ),
+                    level="WARNING",
+                )
+                continue
+
+            entry["waiting_state"] = None
+            promoted.append(entry)
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: removed #{entry['issue_number']} "
-                f"from queue (state changed to {current_state}, "
-                f"requires human intervention)",
+                f"GlobalDispatchCoordinator: requeued "
+                f"#{entry['issue_number']} "
+                f"for body-truth re-evaluation "
+                f"(label=blocked, retry={retry_count}/{max_retry_budget})",
             )
             continue
 

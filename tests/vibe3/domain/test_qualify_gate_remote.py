@@ -403,3 +403,171 @@ class TestProvenanceTracking:
                     qualify_gate_service._coordination_resolver.resolve_coordination.return_value
                 )
                 assert truth.dependencies_source == DataSource.LOCAL_SQLITE
+
+
+class TestE2EBlockedReconciliation:
+    """End-to-end tests for production drift patterns.
+
+    Coverage:
+    - state/ready + body blocked + no local flow → blocked truth wins
+    - state/blocked + body active + local blocked cache → auto-resume
+    - #994-style mismatch → alignment, not silent drift
+    """
+
+    def test_ready_label_body_blocked_no_flow(self, mock_store, sample_issue):
+        """state/ready + body blocked + no local flow → blocked truth wins.
+
+        Reproduction of #994 drift: label says ready but body says blocked.
+        Qualify gate must trust body truth and skip dispatch.
+        """
+        config = OrchestraConfig(repo="test/repo")
+        github = Mock()
+        flow_manager = Mock()
+        qualify_gate = QualifyGateService(
+            config=config, github=github, store=mock_store, flow_manager=flow_manager
+        )
+
+        mock_truth = CoordinationTruth(
+            projection_state="blocked",
+            projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_reason="API design pending",
+            blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_by_issue=None,
+            blocked_by_issue_source=None,
+            dependencies=[],
+            dependencies_source=None,
+            worktree_path=None,
+            actor=None,
+        )
+
+        with patch.object(
+            qualify_gate._coordination_resolver,
+            "resolve_coordination",
+            return_value=mock_truth,
+        ):
+            mock_label_port = Mock()
+            with patch(
+                "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                return_value=mock_label_port,
+            ):
+                result = qualify_gate.run_qualify_gate(
+                    issue=sample_issue,
+                    branch="task/issue-994",
+                    flow_state=None,
+                    labels=["state/ready"],
+                    trigger_state=IssueState.READY,
+                )
+
+                assert result is None
+                mock_store.update_flow_state.assert_called()
+                mock_label_port.add_issue_label.assert_called_once_with(
+                    123, "state/blocked"
+                )
+
+    def test_blocked_label_body_active_with_cache(self, mock_store, sample_issue):
+        """state/blocked + body active + local blocked cache → auto-resume."""
+        config = OrchestraConfig(repo="test/repo")
+        github = Mock()
+        flow_manager = Mock()
+        qualify_gate = QualifyGateService(
+            config=config, github=github, store=mock_store, flow_manager=flow_manager
+        )
+
+        mock_truth = CoordinationTruth(
+            projection_state="active",
+            projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_reason=None,
+            blocked_reason_source=None,
+            blocked_by_issue=None,
+            blocked_by_issue_source=None,
+            dependencies=[],
+            dependencies_source=None,
+            worktree_path=None,
+            actor="executor",
+        )
+
+        flow_state = {"blocked_reason": "Health check failed"}
+
+        # After auto-resume clears local cache, get_flow_state returns None
+        # so qualify-gate returns the auto-resume target label directly
+        mock_store.get_flow_state = Mock(return_value=None)
+
+        with patch.object(
+            qualify_gate._coordination_resolver,
+            "resolve_coordination",
+            return_value=mock_truth,
+        ):
+            from vibe3.models.flow import FlowState
+
+            with patch.object(FlowState, "model_validate") as mock_validate:
+                mock_fs = Mock()
+                mock_fs.status = "active"
+                mock_validate.return_value = mock_fs
+
+                with patch(
+                    "vibe3.domain.qualify_gate.infer_resume_label",
+                    return_value=IssueState.IN_PROGRESS,
+                ):
+                    mock_label_port = Mock()
+                    with patch(
+                        "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                        return_value=mock_label_port,
+                    ):
+                        result = qualify_gate.run_qualify_gate(
+                            issue=sample_issue,
+                            branch="task/issue-123",
+                            flow_state=flow_state,
+                            labels=["state/blocked"],
+                            trigger_state=IssueState.BLOCKED,
+                        )
+
+                        assert result == IssueState.IN_PROGRESS
+
+    def test_issue_994_style_drift_alignment(self, mock_store, sample_issue):
+        """#994: local flow missing, remote body blocked, label ready.
+
+        Expected: blocked truth wins, not dispatched, state is repaired.
+        """
+        config = OrchestraConfig(repo="test/repo")
+        github = Mock()
+        flow_manager = Mock()
+        qualify_gate = QualifyGateService(
+            config=config, github=github, store=mock_store, flow_manager=flow_manager
+        )
+
+        mock_truth = CoordinationTruth(
+            projection_state="blocked",
+            projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_reason=None,
+            blocked_reason_source=None,
+            blocked_by_issue=456,
+            blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
+            dependencies=[456],
+            dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
+            worktree_path=None,
+            actor=None,
+        )
+
+        with patch.object(
+            qualify_gate._coordination_resolver,
+            "resolve_coordination",
+            return_value=mock_truth,
+        ):
+            mock_label_port = Mock()
+            with patch(
+                "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                return_value=mock_label_port,
+            ):
+                result = qualify_gate.run_qualify_gate(
+                    issue=sample_issue,
+                    branch="task/issue-994",
+                    flow_state=None,
+                    labels=["state/ready"],
+                    trigger_state=IssueState.READY,
+                )
+
+                assert result is None
+                mock_store.update_flow_state.assert_called()
+                mock_label_port.add_issue_label.assert_called_once_with(
+                    123, "state/blocked"
+                )
