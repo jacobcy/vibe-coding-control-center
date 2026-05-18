@@ -283,7 +283,12 @@ class SQLiteFlowStateRepo:
             self.soft_delete_flow(branch)
 
     def restore_flow(self, branch: str) -> None:
-        """Restore soft-deleted flow by clearing deleted_at."""
+        """Restore soft-deleted flow by clearing deleted_at.
+
+        NOTE: This restores the flow record but preserves tombstone state.
+        Restored flows will have flow_status='aborted' and cleared refs/actors/worktree.
+        Use 'vibe flow update' to reset flow_status and re-establish metadata if needed.
+        """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
