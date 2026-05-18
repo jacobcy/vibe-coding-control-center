@@ -306,19 +306,28 @@ class GlobalDispatchCoordinator:
 
             # Genuine consistency failure - block and skip dispatch
             reason = f"Health check failed: {', '.join(result.issues)}"
+            block_succeeded = False
             try:
-                FlowService().block_flow(
-                    branch=branch, reason=reason, actor="orchestra:dispatcher"
-                )
+                FlowService(
+                    store=self._store, git_client=self._flow_manager.git
+                ).block_flow(branch=branch, reason=reason, actor="orchestra:dispatcher")
+                block_succeeded = True
             except Exception as exc:
                 logger.bind(domain="orchestra", action="health_check").warning(
                     f"Failed to block flow for #{issue.number}: {exc}"
                 )
-            append_orchestra_event(
-                "dispatcher",
-                f"GlobalDispatchCoordinator: blocked #{issue.number} "
-                f"(health check failed: {reason})",
-            )
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: block_failed #{issue.number} "
+                    f"(error: {exc}, health check: {reason})",
+                )
+
+            if block_succeeded:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: blocked #{issue.number} "
+                    f"(health check failed: {reason})",
+                )
             return False
 
         if flow_status in ("done", "aborted", "stale"):

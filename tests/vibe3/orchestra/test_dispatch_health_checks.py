@@ -325,6 +325,8 @@ class TestPreDispatchHealthChecks:
         store = MagicMock()
         store.db_path = ":memory:"
         flow_manager = MagicMock()
+        git_client = MagicMock()
+        flow_manager.git = git_client
 
         coordinator = GlobalDispatchCoordinator(
             config=config,
@@ -365,12 +367,18 @@ class TestPreDispatchHealthChecks:
                 branch="task/issue-993",
             )
 
-            # Mock FlowService.block_flow to verify it's called
+            # Mock FlowService to verify constructor and block_flow call
             with patch(
                 "vibe3.orchestra.global_dispatch_coordinator.FlowService"
             ) as mock_flow_service:
                 mock_flow = mock_flow_service.return_value
                 result = coordinator._health_check_before_dispatch(issue)
+
+                # Assert - FlowService constructed with coordinator's dependencies
+                mock_flow_service.assert_called_once()
+                constructor_args = mock_flow_service.call_args
+                assert constructor_args[1]["store"] is store
+                assert constructor_args[1]["git_client"] is git_client
 
                 # Assert - block_flow should be called with correct parameters
                 mock_flow.block_flow.assert_called_once()
