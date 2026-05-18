@@ -251,7 +251,7 @@ vibe3 flow blocked [--branch <branch>] [--reason <text>] [--task <issue>]
 约束：
 
 - 目标 flow 必须已存在
-- `--branch` 与 `--pr` 互斥
+- 通过 `--branch` 指定目标 flow 分支（可选，默认当前分支）
 
 ### 7.4 `flow show`
 
