@@ -167,28 +167,54 @@ class OrchestraStatusService:
             with urllib.request.urlopen(req, timeout=3.0) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    # Reconstruct frozen dataclass
-                    entries = [
-                        IssueStatusEntry(**item)
-                        for item in data.get("active_issues", [])
-                    ]
+                    # Reconstruct frozen dataclass with proper type coercion
+                    entries = []
+                    for item in data.get("active_issues", []):
+                        # Convert state string back to IssueState enum
+                        state_value = item.get("state")
+                        state: IssueState | None = None
+                        if state_value is not None:
+                            try:
+                                state = IssueState(state_value)
+                            except ValueError:
+                                pass  # Keep None for invalid states
+
+                        entry = IssueStatusEntry(
+                            number=int(item.get("number", 0)),
+                            title=str(item.get("title", "")),
+                            state=state,
+                            assignee=item.get("assignee"),
+                            has_flow=bool(item.get("has_flow", False)),
+                            flow_branch=item.get("flow_branch"),
+                            has_worktree=bool(item.get("has_worktree", False)),
+                            worktree_path=item.get("worktree_path"),
+                            has_pr=bool(item.get("has_pr", False)),
+                            pr_number=item.get("pr_number"),
+                            blocked_by=tuple(item.get("blocked_by", [])),
+                            milestone=item.get("milestone"),
+                            roadmap=item.get("roadmap"),
+                            priority=int(item.get("priority", 0)),
+                            queue_rank=item.get("queue_rank"),
+                        )
+                        entries.append(entry)
+
                     return OrchestraSnapshot(
-                        timestamp=data.get("timestamp", 0.0),
-                        server_running=data.get("server_running", True),
+                        timestamp=float(data.get("timestamp", 0.0)),
+                        server_running=bool(data.get("server_running", True)),
                         active_issues=tuple(entries),
-                        active_flows=data.get("active_flows", 0),
-                        active_worktrees=data.get("active_worktrees", 0),
+                        active_flows=int(data.get("active_flows", 0)),
+                        active_worktrees=int(data.get("active_worktrees", 0)),
                         queued_issues=tuple(data.get("queued_issues", [])),
-                        circuit_breaker_state=data.get(
-                            "circuit_breaker_state", "closed"
+                        circuit_breaker_state=str(
+                            data.get("circuit_breaker_state", "closed")
                         ),
-                        circuit_breaker_failures=data.get(
-                            "circuit_breaker_failures", 0
+                        circuit_breaker_failures=int(
+                            data.get("circuit_breaker_failures", 0)
                         ),
                         circuit_breaker_last_failure=data.get(
                             "circuit_breaker_last_failure"
                         ),
-                        dispatch_blocked=data.get("dispatch_blocked", False),
+                        dispatch_blocked=bool(data.get("dispatch_blocked", False)),
                         blocked_reason=data.get("blocked_reason"),
                         blocked_issue_number=data.get("blocked_issue_number"),
                         blocked_issue_reason=data.get("blocked_issue_reason"),
