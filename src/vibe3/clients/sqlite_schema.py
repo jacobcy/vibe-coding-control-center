@@ -356,6 +356,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
         if stmt:
             cursor.execute(stmt)
 
+    # Migration: add refs column to flow_events (before transition_history migration)
+    event_columns = {
+        row[1] for row in cursor.execute("PRAGMA table_info(flow_events)").fetchall()
+    }
+    if "refs" not in event_columns:
+        cursor.execute("ALTER TABLE flow_events ADD COLUMN refs TEXT")
+
     # Migration: populate transition_history from existing flow_events
     # Check if transition_history already has data (avoid re-migration)
     existing_transitions = cursor.execute(
@@ -430,13 +437,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
         stmt = stmt.strip()
         if stmt:
             cursor.execute(stmt)
-
-    # Migration: add refs column to flow_events if missing
-    event_columns = {
-        row[1] for row in cursor.execute("PRAGMA table_info(flow_events)").fetchall()
-    }
-    if "refs" not in event_columns:
-        cursor.execute("ALTER TABLE flow_events ADD COLUMN refs TEXT")
 
     before_changes = conn.total_changes
     cursor.execute(_CLEAN_STALE_VERDICT_LINES_SQL)
