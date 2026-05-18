@@ -99,12 +99,12 @@ related_docs:
 
 ### 2.2 命令集成
 
-- [ ] **`vibe review pr 42 --trace`**
+- [ ] **`vibe3 review --branch 42 --trace`**
   - 输出调用链路
   - 显示执行步骤
   - **预估**: 3-4 小时
 
-- [ ] **`vibe inspect pr 42 --trace`**
+- [ ] **`vibe3 inspect pr 42 --trace`**
   - 输出调用链路
   - 显示数据流
   - **预估**: 3-4 小时

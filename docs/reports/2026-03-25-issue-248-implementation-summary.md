@@ -22,7 +22,7 @@ Successfully implemented automatic flow management with branch as the implicit a
 **Commit**: b29df47
 
 - **plan/run/review commands**: Auto-ensure flow on entry
-- **task_bridge_mixin**: Removed "please run vibe flow new" friction
+- **task_bridge_mixin**: Removed "please run `vibe3 flow update`" friction via auto-ensure
 - **Main branch guard**: All entry points protected
 
 **Tests**: 26 command tests, all passing
