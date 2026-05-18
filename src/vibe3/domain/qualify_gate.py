@@ -217,9 +217,10 @@ class QualifyGateService:
             # - FlowStatus: internal state machine (active/done/stale/aborted)
             # - IssueState: external GitHub label
             #   (ready/claimed/in-progress/handoff/review)
-            # When unblocking, we clear blocked metadata
+            # When unblocking, restore flow_status to active and clear blocked metadata
             self._store.update_flow_state(
                 branch,
+                flow_status="active",
                 blocked_by_issue=None,
                 blocked_reason=None,
             )

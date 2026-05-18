@@ -62,8 +62,8 @@ class FlowLifecycleMixin:
     ) -> None:
         """Mark flow as blocked.
 
-        Note: This only writes blocked_reason/blocked_by_issue metadata.
-        Blocked status is inferred from IssueState.BLOCKED label on issue.
+        Sets flow_status="blocked" and writes blocked_reason/blocked_by_issue metadata.
+        Also transitions GitHub issue label to BLOCKED state.
         """
         logger.bind(
             domain="flow",
@@ -96,10 +96,10 @@ class FlowLifecycleMixin:
                 actor=effective_actor,
             )
 
-        # Update flow state with blocked metadata (NOT flow_status)
-        # Blocked status inferred from IssueState.BLOCKED label
+        # Update flow state: set flow_status=blocked and blocked metadata
         self.store.update_flow_state(
             branch,
+            flow_status="blocked",
             blocked_by_issue=blocked_by_issue,
             blocked_reason=reason,
             latest_actor=effective_actor,
