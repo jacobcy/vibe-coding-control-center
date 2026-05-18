@@ -106,6 +106,7 @@ class PRResponse(BaseModel):
     metadata: Optional[PRMetadata] = Field(None, description="PR metadata")
     comments: list[dict[str, Any]] = Field(default_factory=list)
     review_comments: list[dict[str, Any]] = Field(default_factory=list)
+    reviews: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class UpdatePRRequest(BaseModel):

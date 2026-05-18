@@ -271,7 +271,9 @@ def register_query_commands(app: typer.Typer) -> None:
     @app.command()
     def show(
         pr_number: Annotated[int | None, typer.Argument(help="PR number")] = None,
-        branch: Annotated[str | None, typer.Option("-b", help="Branch name")] = None,
+        branch: Annotated[
+            str | None, typer.Option("-b", "--branch", help="Branch name")
+        ] = None,
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
