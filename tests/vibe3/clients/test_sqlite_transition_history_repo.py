@@ -81,6 +81,23 @@ class TestTransitionHistoryRepo:
 
         assert result[1]["count"] == 2
 
+    @pytest.mark.parametrize("limit", [3, 5, 10])
+    def test_get_top_transition_pairs_valid_limits(self, repo, populated_db, limit):
+        """Test with all valid Literal limit values."""
+        result = repo.get_top_transition_pairs(populated_db, "test-flow", limit=limit)
+
+        # Only 3 pairs exist in populated_db
+        assert len(result) == 3
+
+        # Verify ordering (descending by count)
+        assert result[0]["count"] == 3
+        assert result[1]["count"] == 2
+        assert result[2]["count"] == 1
+
+        # Verify descending order
+        counts = [r["count"] for r in result]
+        assert counts == sorted(counts, reverse=True)
+
     def test_count_specific_pair(self, repo, populated_db):
         """Test counting specific pair."""
         count = repo.count_specific_pair(
@@ -120,3 +137,37 @@ class TestTransitionHistoryRepo:
             """).fetchone()
 
         assert row[0] == 1
+
+    def test_record_transition_with_event_id(self, repo, db_conn):
+        """Test recording transition with event_id reference."""
+        # First insert a flow_event to get a valid event_id
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_events (branch, event_type, created_at, actor) "
+            "VALUES (?, ?, datetime('now'), ?)",
+            ("new-branch", "state_transitioned", "test-actor"),
+        )
+        db_conn.commit()
+
+        # Get the inserted event_id
+        event_id = cursor.execute(
+            "SELECT id FROM flow_events WHERE branch = ?",
+            ("new-branch",),
+        ).fetchone()[0]
+
+        repo.record_transition(
+            db_conn,
+            "new-branch",
+            "state/ready",
+            "state/claimed",
+            "test-actor",
+            event_id=event_id,
+        )
+
+        # Verify event_id was persisted
+        cursor.execute(
+            "SELECT event_id FROM transition_history "
+            "WHERE branch = ? AND event_id IS NOT NULL",
+            ("new-branch",),
+        )
+        assert cursor.fetchone()[0] == event_id
