@@ -138,14 +138,14 @@ Assignee Pool（第二道）：
 - 不涉及已变更的配置/架构
 
 **Level 3: 生命周期检查**
-- 非重复（与其他 open `supervisor + state/handoff` issue 不冲突）
+- 非重复（与其他所有 open `supervisor` issues 不冲突，包括 `state/ready` 和 `state/handoff`）
 - 未过时（治理目标仍有效，文档/真源关系未改变）
 - 不需要先关闭其他依赖 issue
 
 **决策与动作**：
 
 - **通过三级审查**：
-  - 补 `state/handoff`（从备选池进入执行池）
+  - 移除 `state/ready`，补 `state/handoff`（从备选池进入执行池）
   - 交给 supervisor/apply 执行
   - 在 Actions 中记录：`Supervisor #XXX: handoff (passed Level 1-3)`
 - **不通过**：
@@ -157,7 +157,7 @@ Assignee Pool（第二道）：
 
 **输出要求**：
 
-在原有 `Actions` 中增加 `Supervisor issues` 分段，与 `Accepted`/`Skipped` 并列：
+新增顶层 section `Supervisor issues`，与 `Accepted`/`Skipped`/`Actions` 并列：
 
 ```
 Candidates: ...
@@ -270,7 +270,7 @@ Forbidden:
 6. 对不适合纳入的对象记录简短原因
 7. **扫描 `supervisor + state/ready` issues**，对每个执行：
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
-   - 通过：补 `state/handoff`，记录到 Actions
+   - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
    - 不通过：建议关闭，记录到 Actions
    - 不确定：保守等待，记录到 Actions
 8. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
