@@ -218,7 +218,7 @@ uv run python src/vibe3/cli.py handoff append "vibe-done: flow closed" --actor v
 
 注意：handoff 没有单独的清理 / 删除命令；若需要纠正旧记录，应通过追加更正或终态说明来覆盖语义，而不是假设存在 cleanup 入口。
 
-若当前 PR 已 merged，对应旧 plan 已进入 terminal state。此阶段只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接；若出现新需求，必须创建或挂接新的 `repo issue`，不得继续塞回旧 plan。
+若当前 PR 已 merged，对应旧 plan 已进入 terminal state。此阶段只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接；若出现新需求，必须创建或挂接新的 `GitHub issue`，不得继续塞回旧 plan。
 
 ## Restrictions
 
