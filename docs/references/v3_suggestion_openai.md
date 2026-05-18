@@ -394,7 +394,7 @@ FLOW   STAGE    TASK   BRANCH                 PR
 125    review   125    flow/125-doctor        246
 126    plan     126    -                      -
 
-V3 现行方式：使用 `vibe3 flow status` 查看 flow 总览，`vibe3 task status` 查看任务总览。
+V3 现行方式：使用 `vibe3 flow status` 查看 flow 总览，`vibe3 flow show` 查看单个 flow 详情，`vibe3 task status` 查看任务总览。
 
 PR 和 branch 状态来自：
 
@@ -423,6 +423,7 @@ Recent Handoffs
 ---------------
 plan → execute
 
+V3 现行方式：当前 `vibe3 flow show` 可直接使用，参数格式为 `vibe3 flow show <flow-id>`。
 
 ⸻
 
@@ -440,6 +441,7 @@ EXECUTE
 REVIEW
   flow-125 Task #125
 
+V3 现行方式：使用 `vibe3 flow status` 查看按阶段分类的 flow 总览。
 
 ⸻
 
@@ -457,6 +459,8 @@ flow done but PR not merged
 flow plan but branch exists
 
 它不会修复，只提示。
+
+V3 现行方式：使用 `vibe3 check` 进行一致性与审计检测。
 
 ⸻
 
@@ -555,6 +559,9 @@ flow doctor
 
 就足够实用。
 
+注意：以上为 V2 风格命令的最小 MVP 建议，已被 V3 现行命令取代。
+当前 V3 命令标准见 docs/standards/v3/command-standard.md。
+
 ⸻
 
 15. 一个完整流程示例
@@ -578,6 +585,9 @@ flow handoff 124 --to review
 合并：
 
 flow done 124
+
+注意：以上为 V2 风格示例，已被 V3 现行工作流取代。
+当前标准开发工作流见 AGENTS.md 中的 /vibe-new → 编码 → /vibe-commit → /vibe-integrate → /vibe-done 流程。
 
 
 ⸻
