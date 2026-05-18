@@ -41,8 +41,8 @@ code_limits:
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/sqlite_schema.py"
-        limit: 450
-        reason: "Schema DDL 与迁移聚合，包含 8 个表定义、15+ 迁移步骤，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
+        limit: 500
+        reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
         limit: 500
         reason: "Git 门面聚合"
