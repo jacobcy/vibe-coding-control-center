@@ -20,10 +20,10 @@ from vibe3.environment.worktree_support import (
     initialize_worktree,
 )
 from vibe3.exceptions import SystemError
+from vibe3.services.status_query_service import is_auto_task_branch
 
 if TYPE_CHECKING:
     from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.services.status_query_service import is_auto_task_branch
 
 
 class WorktreeLifecycle:
