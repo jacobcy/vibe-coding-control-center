@@ -114,8 +114,10 @@ class ConventionResolver:
                     config_yaml = yaml.safe_load(f)
                     if isinstance(config_yaml, dict) and "profile" in config_yaml:
                         return str(config_yaml["profile"])
-        except Exception:
-            pass
+        except OSError as e:
+            logger.debug(f"Failed to read .vibe/config.yaml: {e}")
+        except yaml.YAMLError as e:
+            logger.debug(f"Invalid YAML in .vibe/config.yaml: {e}")
 
         # Step 4: Check git remote to detect Vibe Center repo
         try:

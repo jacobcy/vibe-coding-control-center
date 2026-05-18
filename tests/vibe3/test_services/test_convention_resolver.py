@@ -22,9 +22,13 @@ def test_resolver_returns_minimal_defaults_by_default():
     """Test resolver returns minimal defaults when no profile specified."""
     # Mock git remote to return non-vibe-center repo and config file to not exist
     with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
         patch("subprocess.run") as mock_run,
         patch("pathlib.Path.exists") as mock_exists,
     ):
+        mock_git_common_dir.return_value = "/tmp/test/.git"
         mock_run.return_value = MagicMock(
             returncode=0, stdout="https://github.com/other/repo.git\n"
         )
@@ -72,9 +76,13 @@ def test_resolver_detects_vibe_center_repo():
     """Test resolver detects Vibe Center repo via git remote."""
     # Mock config file to not exist so git remote detection is tested
     with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir"
+        ) as mock_git_common_dir,
         patch("subprocess.run") as mock_run,
         patch("pathlib.Path.exists") as mock_exists,
     ):
+        mock_git_common_dir.return_value = "/tmp/test/.git"
         mock_run.return_value = MagicMock(
             returncode=0, stdout="https://github.com/jacobcy/vibe-center.git\n"
         )
