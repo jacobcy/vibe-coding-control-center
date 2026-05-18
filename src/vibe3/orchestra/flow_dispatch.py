@@ -89,7 +89,7 @@ class FlowManager:
             branch=branch,
             slug=slug,
             source="dispatch",
-            reactivate_existing=True,
+            ensure_worktree=True,  # Orchestra task flows must use worktree
         )
 
     def get_active_flow_count(self) -> int:
@@ -158,6 +158,7 @@ class FlowManager:
                     issue,
                     branch=branch,
                     slug=slug,
+                    ensure_worktree=True,  # Orchestra task flows must use worktree
                 )
             # Guard: branch missing for aborted flow → rebuild to avoid dispatch failure
             if not self.git.branch_exists(branch):
@@ -169,6 +170,7 @@ class FlowManager:
                     issue,
                     branch=branch,
                     slug=slug,
+                    ensure_worktree=True,  # Orchestra task flows must use worktree
                 )
             log.info(f"Reactivating canonical flow for issue #{issue.number}")
             return self._reactivate_canonical_flow(issue, branch, slug)

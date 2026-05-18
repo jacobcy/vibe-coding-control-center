@@ -132,7 +132,6 @@ class FlowOrchestratorService:
         """
         slug = slug or f"issue-{issue.number}"
         initiator = initiated_by or SignatureService.resolve_initiator(branch)
-        branch_created = False
 
         try:
             if not self.git.branch_exists(branch):
@@ -143,7 +142,6 @@ class FlowOrchestratorService:
                     branch,
                     start_ref=self.config.scene_base_ref,
                 )
-                branch_created = True
                 # For non-worktree mode, checkout the newly created branch
                 if not ensure_worktree:
                     self.git.switch_branch(branch)
@@ -190,22 +188,34 @@ class FlowOrchestratorService:
                 result["worktree_path"] = str(worktree_ctx.path)
             return result
         except Exception as exc:
-            # HIGH: Clean up orphan branch on bootstrap failure
-            if branch_created:
-                try:
-                    logger.bind(
-                        domain="flow",
-                        branch=branch,
-                        issue=issue.number,
-                    ).warning(
-                        f"Cleaning up orphan branch after bootstrap failure: {exc}"
-                    )
-                    self.git.delete_branch(branch, force=True)
-                except Exception as cleanup_exc:
-                    logger.bind(
-                        domain="flow",
-                        branch=branch,
-                    ).error(f"Failed to cleanup orphan branch: {cleanup_exc}")
+            # CRITICAL: Complete cleanup on bootstrap failure
+            # When ensure_worktree=True, worktree creation happens
+            # AFTER flow_state is written, so failure must clean up
+            # both branch AND flow record
+            try:
+                logger.bind(
+                    domain="flow",
+                    branch=branch,
+                    issue=issue.number,
+                ).warning(f"Bootstrap failed, performing complete cleanup: {exc}")
+
+                # Use FlowCleanupService for comprehensive cleanup
+                cleanup = FlowCleanupService(
+                    git_client=self.git,
+                    store=self.store,
+                )
+                cleanup.cleanup_flow_scene(
+                    branch,
+                    include_remote=False,
+                    terminate_sessions=False,
+                    keep_flow_record=False,  # Delete flow record
+                    force_delete=True,  # Hard delete for bootstrap failure
+                )
+            except Exception as cleanup_exc:
+                logger.bind(
+                    domain="flow",
+                    branch=branch,
+                ).error(f"Failed cleanup after bootstrap failure: {cleanup_exc}")
             raise
 
     def rebuild_stale_issue_flow(
@@ -215,6 +225,7 @@ class FlowOrchestratorService:
         branch: str,
         slug: str | None = None,
         source: str = "dispatch",
+        ensure_worktree: bool = False,
     ) -> dict[str, Any] | None:
         """Rebuild a stale flow: cleanup then re-bootstrap.
 
@@ -254,6 +265,7 @@ class FlowOrchestratorService:
             branch=branch,
             slug=slug,
             source=source,
+            ensure_worktree=ensure_worktree,
             reactivate_existing=True,
         )
 
