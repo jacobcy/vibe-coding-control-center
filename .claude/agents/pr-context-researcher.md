@@ -109,10 +109,10 @@ SendMessage 调用前必须检查：
 
 ```python
 # 握手成功
-SendMessage(to="team-lead", message="【agent_ready】已就绪")
+SendMessage(to="team-lead", summary="握手成功", message="【agent_ready】已就绪")
 
 # 提交背景报告（显式标注 PR 编号）
-SendMessage(to="team-lead", message="""【agent_report】(PR #843)
+SendMessage(to="team-lead", summary="背景报告完成", message="""【agent_report】(PR #843)
 
 ## PR #843 背景报告
 ...
@@ -123,20 +123,20 @@ SendMessage(to="team-lead", message="""【agent_report】(PR #843)
 
 ```python
 # ❌ 握手无前缀
-SendMessage(to="team-lead", message="已就绪")
+SendMessage(to="team-lead", summary="已就绪", message="已就绪")
 
 # ❌ 报告无前缀
-SendMessage(to="team-lead", message="已完成背景调研")
+SendMessage(to="team-lead", summary="已完成背景调研", message="已完成背景调研")
 
 # ❌ 报告未标注 PR 编号
-SendMessage(to="team-lead", message="""【agent_report】
+SendMessage(to="team-lead", summary="背景报告完成", message="""【agent_report】
 
 ## PR #843 背景报告
 ...
 """)
 
 # ❌ 使用英文方括号（虽然 shell 兼容，但 prompt 要求中文）
-SendMessage(to="team-lead", message="[agent_ready] ready")
+SendMessage(to="team-lead", summary="ready", message="[agent_ready] ready")
 ```
 
 ## 项目特有工具（必须使用）
