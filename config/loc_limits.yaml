@@ -1,0 +1,16 @@
+# LOC Limits Configuration
+# See docs/standards/loc-governance.md for details
+
+code_limits:
+  single_file_loc:
+    warning_threshold: 300    # Advisory in local and CI
+    ci_block_threshold: 400   # Blocks CI, advisory in local
+
+exceptions:
+  - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
+    limit: 460
+    reason: >
+      Strongly coupled test suite for health check failure scenarios.
+      Each test needs independent mock setup to verify coordinator's
+      interpretation of CheckService results. Extracting fixtures would
+      reduce readability and make test intent less clear.
