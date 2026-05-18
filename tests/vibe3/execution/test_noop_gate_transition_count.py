@@ -1,6 +1,6 @@
 """Unit tests for transition_count logic in no-op gate."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 
@@ -293,3 +293,138 @@ class TestTransitionCount:
         store.add_event.assert_called_once()
         event_args = store.add_event.call_args
         assert event_args[0][1] == "state_transitioned"
+
+    # --- Single-step transition limit tests ---
+
+    def test_single_step_pair_two_times_passes(self) -> None:
+        """Test that a transition pair occurring 2 times does NOT block."""
+        store = _make_mock_store()
+        store.count_specific_pair = Mock(return_value=2)  # Below limit
+        store.record_transition = Mock()
+        flow_state: dict[str, int] = {}
+        mock_conn = _make_mock_conn()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_not_called()
+        store.record_transition.assert_called_once()
+
+    def test_single_step_limit_blocks_on_third_occurrence(self) -> None:
+        """Test that a transition pair occurring 3 times blocks."""
+        store = _make_mock_store()
+        store.count_specific_pair = Mock(return_value=3)  # At limit
+        store.record_transition = Mock()
+        flow_state: dict[str, int] = {}
+        mock_conn = _make_mock_conn()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_called_once()
+        store.record_transition.assert_not_called()
+
+    def test_single_step_different_pairs_counted_separately(self) -> None:
+        """Test different transition pairs have independent counts."""
+        store = _make_mock_store()
+        store.count_specific_pair = Mock(return_value=2)  # Below limit
+        store.record_transition = Mock()
+        flow_state: dict[str, int] = {}
+        mock_conn = _make_mock_conn()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_not_called()
+        store.count_specific_pair.assert_called_once()
+        call_kwargs = store.count_specific_pair.call_args[1]
+        assert call_kwargs["from_state"] == "state/plan"
+        assert call_kwargs["to_state"] == "state/ready"
+        assert call_kwargs["branch"] == "task/issue-42"
+
+    def test_single_step_transition_recorded_after_pass(self) -> None:
+        """Test that record_transition is called after a successful state change."""
+        store = _make_mock_store()
+        store.count_specific_pair = Mock(return_value=0)  # No previous occurrences
+        store.record_transition = Mock()
+        flow_state: dict[str, int] = {}
+        mock_conn = _make_mock_conn()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch("sqlite3.connect", return_value=mock_conn),
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        mock_block.assert_not_called()
+        store.record_transition.assert_called_once()
+        call_kwargs = store.record_transition.call_args[1]
+        assert call_kwargs["from_state"] == "state/plan"
+        assert call_kwargs["to_state"] == "state/ready"
+        assert call_kwargs["actor"] == "agent:plan"
+        assert call_kwargs["branch"] == "task/issue-42"
