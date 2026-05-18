@@ -271,7 +271,7 @@ class TestRunQualifyGate:
             mock_truth = Mock()
             mock_truth.is_blocked = False
             mock_truth.blocked_reason = None
-            mock_truth.blocked_by_issue = 456
+            mock_truth.blocked_by_issue = None
             mock_truth.dependencies = []
             mock_truth.worktree_path = None
 
@@ -314,6 +314,57 @@ class TestRunQualifyGate:
                         mock_label_port.add_issue_label.assert_called_once_with(
                             123, "state/in-progress"
                         )
+
+    def test_unblock_with_stale_local_cache_without_blocked_label(
+        self, qualify_gate_service, sample_issue, mock_store
+    ):
+        """Stale local blocked cache should auto-resume even without blocked label."""
+        qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
+
+        mock_truth = Mock()
+        mock_truth.is_blocked = False
+        mock_truth.blocked_reason = None
+        mock_truth.blocked_by_issue = None
+        mock_truth.dependencies = []
+        mock_truth.worktree_path = None
+
+        with patch.object(
+            qualify_gate_service._coordination_resolver,
+            "resolve_coordination",
+            return_value=mock_truth,
+        ):
+            from vibe3.models.flow import FlowState
+
+            mock_flow_state_obj = Mock()
+            mock_flow_state_obj.status = "active"
+            mock_flow_state_obj.issue_number = 123
+            mock_flow_state_obj.branch = "task/issue-123-test"
+            mock_flow_state_obj.issue_title = "Test Issue"
+
+            with patch.object(
+                FlowState, "model_validate", return_value=mock_flow_state_obj
+            ):
+                with patch(
+                    "vibe3.domain.qualify_gate.infer_resume_label",
+                    return_value=IssueState.IN_PROGRESS,
+                ):
+                    mock_store.get_flows_by_issue.return_value = []
+                    mock_store.get_flow_state.return_value = {
+                        "flow_status": "active",
+                        "issue_number": 123,
+                    }
+
+                    result = qualify_gate_service.run_qualify_gate(
+                        issue=sample_issue,
+                        branch="task/issue-123-test",
+                        flow_state={"blocked_by_issue": 456},
+                        labels=["state/in-progress"],
+                        trigger_state=IssueState.IN_PROGRESS,
+                    )
+
+                    assert result == IssueState.IN_PROGRESS
+                    mock_store.update_flow_state.assert_called()
+                    mock_store.add_event.assert_called()
 
 
 class TestQualifyBlockedIssue:

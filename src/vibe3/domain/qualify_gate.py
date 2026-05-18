@@ -217,7 +217,11 @@ class QualifyGateService:
 
         blocked_label = self._convention.state_label(self._convention.blocked_label)
         label_blocked = blocked_label in labels
-        local_blocked = bool(truth.blocked_by_issue or truth.blocked_reason)
+        local_blocked = bool(
+            flow_state.get("blocked_by_issue")
+            or flow_state.get("blocked_reason")
+            or flow_state.get("flow_status") == "blocked"
+        )
 
         return label_blocked or local_blocked
 
