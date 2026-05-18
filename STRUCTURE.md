@@ -508,7 +508,7 @@ ls ~/.vibe/
 1. 阅读 `docs/README.md` - 文档结构
 2. 阅读 `docs/standards/DOC_ORGANIZATION.md` - 详细指南
 3. 使用 `.agent/templates/` 中的模板
-4. 运行 `uv run python src/vibe3/cli.py flow start <feature>` - 启动新 flow
+4. 运行 `git checkout -b <branch>` 创建分支，然后运行 `uv run python src/vibe3/cli.py flow update` 注册 flow
 
 ### 我要理解工作流
 1. 阅读 `docs/prds/vibe-workflow-paradigm.md` - Vibe Guard 范式
@@ -519,7 +519,7 @@ ls ~/.vibe/
 ### 我要使用 V3 命令
 ```bash
 # Flow 管理
-uv run python src/vibe3/cli.py flow start <feature>
+uv run python src/vibe3/cli.py flow update
 uv run python src/vibe3/cli.py flow show
 uv run python src/vibe3/cli.py flow status
 

@@ -71,7 +71,7 @@
   - Clients ≥ 80%
   - Commands ≥ 80%
 - ✅ `run_risk_gate()` - 风险评分检查
-  - 调用 `inspect pr` 获取风险评分
+  - 调用 `vibe3 inspect base` 获取风险评分
   - 高风险PR自动阻断
 
 **已实现服务**（`src/vibe3/services/coverage_service.py`）：
@@ -110,14 +110,14 @@
 | 能力 | 实现位置 | 当前使用状态 | 潜在用途 |
 |------|---------|------------|---------|
 | **CoverageService** | `services/coverage_service.py` | ✅ PR ready使用 | 可用于pre-push |
-| **风险评分** | `inspect pr` + `pr_scoring_service.py` | ✅ PR ready使用 | 可用于pre-push |
+| **风险评分** | `vibe3 inspect base` + `pr_scoring_service.py` | ✅ PR ready使用 | 可用于pre-push |
 | **AST分析** | `services/serena_service.py` | ✅ inspect使用 | 可用于本地review |
 | **依赖图分析** | `services/dag_service.py` | ✅ inspect使用 | 可用于影响分析 |
 
 **关键发现**：
 - 🎯 **CoverageService已完整实现，可以直接用于pre-push**
 - 🎯 **风险评分已实现，可以直接用于pre-push**
-- 🎯 **本地review能力已存在（`vibe review pr`），但未集成到hooks**
+- 🎯 **本地review能力已存在（`vibe3 review --branch`），但未集成到hooks**
 
 ---
 
@@ -168,9 +168,9 @@ bash scripts/hooks/check-shell-loc.sh
 
 **职责**：
 - ✅ Lint + Type + LOC检查（复用pre-commit）
-- ✅ 本地代码审查（`vibe review pr` 或简化版）
+- ✅ 本地代码审查（`vibe3 review --branch` 或简化版）
 - ✅ 覆盖率检查（复用 `CoverageService`）
-- ✅ 风险评分检查（复用 `inspect pr`）
+- ✅ 风险评分检查（复用 `vibe3 inspect base`）
 
 **执行时间**：30-60秒
 
