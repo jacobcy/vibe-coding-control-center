@@ -131,7 +131,7 @@ def test_flow_manager_uses_service_for_reactivation():
         branch="task/issue-999",
         slug="issue-999",
         source="dispatch",
-        reactivate_existing=True,
+        ensure_worktree=True,  # Orchestra task flows must use worktree
     )
 
     assert result["branch"] == "task/issue-999"

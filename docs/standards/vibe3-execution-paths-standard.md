@@ -256,7 +256,7 @@ Orchestra 和 skill 都是不同组装器，通过相同 lifecycle primitives：
 **关键约束**：
 - FlowManager 不得直接执行 Git mutations（如 worktree removal, branch delete）
 - FlowManager 只做 policy dispatch，委托给 FlowOrchestratorService
-- Skills 调用 `vibe3 internal bootstrap-flow`，后者调用 FlowOrchestratorService
+- Skills 调用 `vibe3 internal bootstrap`，后者调用 FlowOrchestratorService
 - 所有 lifecycle 决策在 service 层，execution 层只派发
 
 是否还要进一步做结构收口，需要以独立实现和回归验证为准，而不是直接从现状文档化推导结论。

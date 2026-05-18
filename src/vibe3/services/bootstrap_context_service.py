@@ -73,7 +73,7 @@ class BootstrapContextService:
             if flag.strip()
         )
         command = (
-            f"vibe3 internal bootstrap-flow {shlex.quote(str(issue_number))} "
+            f"vibe3 internal bootstrap {shlex.quote(str(issue_number))} "
             f"--branch {shlex.quote(target_branch)} --source skill"
         )
         if extra_flags:
