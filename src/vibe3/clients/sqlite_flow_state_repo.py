@@ -216,20 +216,48 @@ class SQLiteFlowStateRepo:
             return int(count)
 
     def soft_delete_flow(self, branch: str) -> None:
-        """Soft delete flow by setting deleted_at timestamp."""
+        """Soft delete flow and normalize to tombstone state.
+
+        Sets deleted_at timestamp and clears all refs, reasons, actors,
+        and worktree metadata to prevent contradictory state where a
+        deleted flow still looks active with populated refs.
+
+        The flow_status is normalized to 'aborted' (terminal state) to
+        distinguish tombstones from active flows in audits/debugging.
+        """
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # Normalize to tombstone: clear refs/reasons/actors/worktree
             cursor.execute(
-                "UPDATE flow_state SET deleted_at = ? WHERE branch = ?",
-                (now, branch),
+                """UPDATE flow_state SET
+                    deleted_at = ?,
+                    flow_status = 'aborted',
+                    spec_ref = NULL,
+                    plan_ref = NULL,
+                    report_ref = NULL,
+                    audit_ref = NULL,
+                    indicate_ref = NULL,
+                    pr_ref = NULL,
+                    blocked_reason = NULL,
+                    failed_reason = NULL,
+                    blocked_by_issue = NULL,
+                    worktree_path = NULL,
+                    planner_actor = NULL,
+                    executor_actor = NULL,
+                    reviewer_actor = NULL,
+                    manager_actor = NULL,
+                    latest_actor = NULL,
+                    updated_at = ?
+                WHERE branch = ?""",
+                (now, now, branch),
             )
             conn.commit()
         logger.bind(
             external="sqlite",
             operation="soft_delete_flow",
             branch=branch,
-        ).info("Soft deleted flow record")
+        ).info("Soft deleted flow record and normalized to tombstone state")
 
     def hard_delete_flow(self, branch: str) -> None:
         """Hard delete flow with cascade, removing all related records."""
