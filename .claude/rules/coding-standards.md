@@ -28,11 +28,11 @@
 
 - `lib/ + bin/ + lib3/` 总行数不应超过 7000。
 - `src/` 总行数不应超过 45000。
-- 建议单文件不超过 400 行。超出文件需评审合理性，合理者可申请 `config/loc_limits.yaml` 例外。
+- 建议单文件不超过 400 行。超出文件需评审合理性，合理者可申请 `config/v3/loc_limits.yaml` 例外。
 - 超过 400 行或包含密集数据转换的非核心逻辑，应优先迁移到 `scripts/`。
 - 每个 `.sh` 文件只解决一个基础问题。
 - 不允许为了压行数写难读代码。
-- 超限文件必须在 `config/loc_limits.yaml` 的 `file_size_exceptions` 中注册并说明理由。
+- 超限文件必须在 `config/v3/loc_limits.yaml` 的 `file_size_exceptions` 中注册并说明理由。
 
 ### 函数大小（分层差异）
 

@@ -45,7 +45,7 @@ for file_path in iter_files(config.test_paths_v3_python, suffixes=(".py",), test
             print()
             print(f"   → Action: This file will block CI. Options:")
             print(f"     1. Refactor to under {config.ci_block_threshold} lines")
-            print(f"     2. Request exception in config/loc_limits.yaml")
+            print(f"     2. Request exception in config/v3/loc_limits.yaml")
         errors += 1
     elif exception is None and lines > config.warning_threshold:
         print(f"⚠️  WARNING: {rel_path} has {lines} lines")
@@ -91,7 +91,7 @@ if [ "$errors" -gt 0 ]; then
     echo ""
     echo "💡 Options:"
     echo "   1. Refactor to under $LIMIT_MAX lines"
-    echo "   2. Request exception in config/loc_limits.yaml"
+    echo "   2. Request exception in config/v3/loc_limits.yaml"
     exit 0
   fi
 elif [ "$warnings" -gt 0 ]; then
