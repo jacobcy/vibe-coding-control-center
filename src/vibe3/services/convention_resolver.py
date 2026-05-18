@@ -103,6 +103,7 @@ class ConventionResolver:
             from pathlib import Path
 
             from vibe3.clients.git_client import GitClient
+            from vibe3.exceptions import GitError
 
             # Resolve relative path against repo root for CWD-independent access
             git_client = GitClient()
@@ -118,6 +119,8 @@ class ConventionResolver:
             logger.debug(f"Failed to read .vibe/config.yaml: {e}")
         except yaml.YAMLError as e:
             logger.debug(f"Invalid YAML in .vibe/config.yaml: {e}")
+        except GitError as e:
+            logger.debug(f"Failed to resolve git common dir for .vibe/config.yaml: {e}")
 
         # Step 4: Check git remote to detect Vibe Center repo
         try:
