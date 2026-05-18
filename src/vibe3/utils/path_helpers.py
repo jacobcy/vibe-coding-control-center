@@ -365,7 +365,15 @@ def _resolve_shared_artifact(
         raise FileNotFoundError(
             f"Cannot resolve shared artifact without git common dir: {target}"
         )
+
+    # Validate key to prevent path traversal attacks
+    _validate_branch_name(key)
+
     resolved = Path(git_common) / "vibe3" / "handoff" / key
+
+    # Defense in depth — ensure resolved path stays within handoff root
+    _verify_handoff_dir_boundary(resolved, git_common)
+
     if not resolved.exists():
         raise FileNotFoundError(f"Artifact not found: {target}")
     if not resolved.is_file():
