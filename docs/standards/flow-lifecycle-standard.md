@@ -87,7 +87,7 @@ new → active → blocked → active (恢复)
 
 **清理机制**：
 
-- **被动清理**：`vibe check --clean-branch` 处理 aborted flows
+- **被动清理**：`vibe3 check --clean-branch` 处理 aborted flows
 - **主动清理**：`task resume` 人类重置权限
 - **自动清理**：FailedGate 检测并清理无效 FAILED 标签
 
@@ -95,7 +95,7 @@ new → active → blocked → active (恢复)
 
 Flow 进入终端状态（done/aborted）后：
 
-1. **等待 Check 清理**：`vibe check --clean-branch`
+1. **等待 Check 清理**：`vibe3 check --clean-branch`
 2. **物理资源回收**：删除 worktree/branch/handoff
 3. **Flow 记录处理**：
    - done: 保留记录（审计历史）
@@ -198,7 +198,7 @@ PR merged (GitHub webhook)
   ↓ Check 检测
 发现 flow.pr_ref == merged PR
   ├─ 标记 flow_status = "done"
-  └─ 等待 vibe check --clean-branch
+  └─ 等待 vibe3 check --clean-branch
 ```
 
 **清理策略**：
@@ -212,7 +212,7 @@ PR closed (GitHub webhook)
   ↓ Check 检测
 发现 flow.pr_ref == closed PR
   ├─ 标记 flow_status = "aborted"
-  └─ 等待 vibe check --clean-branch
+  └─ 等待 vibe3 check --clean-branch
 ```
 
 **清理策略**：
@@ -228,7 +228,7 @@ GitHub 原生关闭关键字（`closes #N`、`fixes #N` 在 PR body 中）与 vi
 | 机制 | 触发时机 | 控制方式 |
 |------|----------|----------|
 | GitHub 原生关键字 | PR merge 时自动触发 | PR body 中的关键字 |
-| vibe3 flow done | `vibe check` 检测到 merged PR | `close_issue_if_open` API 调用 |
+| vibe3 flow done（PR merge 后由 `vibe3 check` 触发） | `vibe3 check` 检测到 merged PR | `close_issue_if_open` API 调用 |
 
 两者**互不干扰**：
 - PR body 不会被 vibe3 修改以注入关闭关键字
@@ -276,7 +276,7 @@ Issue #123 绑定两个 flow:
 
 ### 6.1 统一清理入口
 
-所有终端状态的 flow 通过 `vibe check --clean-branch` 统一回收：
+所有终端状态的 flow 通过 `vibe3 check --clean-branch` 统一回收：
 
 ```python
 # CheckCleanupService.clean_residual_branches
@@ -342,11 +342,11 @@ get_deleted_flows()                      # 专门查询已删除记录
 **恢复流程**：
 
 ```bash
-# 查看已删除 flows
-vibe3 flow list-deleted
+# 查看已删除 flows（已废弃，不再作为公共 CLI 命令）
+# vibe3 flow list-deleted
 
-# 恢复软删除 flow
-vibe3 flow restore <branch>
+# 恢复软删除 flow（已废弃，不再作为公共 CLI 命令）
+# vibe3 flow restore <branch>
 
 # 创建新 flow 自动覆盖已删除记录
 vibe3 flow update <branch>  # 自动清除 deleted_at
@@ -404,7 +404,7 @@ if flow_status == "aborted":
 - 目的：允许 issue 重新开始，同时保留审计追踪
 - Issue 可能仍在 open，需要恢复 labels
 - deleted_at 设置为删除时间戳
-- 可通过 `vibe3 flow restore` 恢复
+- 可通过内部 `restore_flow()` API 恢复（CLI 命令已废弃）
 
 ## 7. 典型场景流程
 
@@ -425,7 +425,7 @@ Manager 提交 PR
 PR merged
   ├─ flow.flow_status: done
   └─ issue.state: closed
-  ↓ vibe check --clean-branch
+  ↓ vibe3 check --clean-branch
 清理物理资源
   ├─ worktree: deleted
   ├─ branch: deleted
@@ -461,7 +461,7 @@ Issue #789 (state/blocked)
   ↓ Flow 已被 aborted（可能是手动）
   ├─ flow.flow_status: aborted
   └─ flow 记录存在但无物理资源
-  ↓ vibe check --clean-branch
+  ↓ vibe3 check --clean-branch
 检测 aborted flow
   ├─ cleanup_flow_scene(keep_flow_record=False)
   └─ _resume_blocked_issue(task/issue-789)
@@ -473,16 +473,14 @@ Issue #789 (state/blocked)
 ```
 Issue #999 (state/blocked)
   ↓ Flow 被软删除
-vibe check --clean-branch
+vibe3 check --clean-branch
   ├─ cleanup_flow_scene(keep_flow_record=False)
   ├─ deleted_at: "2026-04-28T15:00:00"
   └─ issue label: state/blocked → state/ready
   ↓ 用户发现需要恢复
-vibe3 flow list-deleted
-  └─ 显示: task/issue-999 | deleted_at: 2026-04-28T15:00:00
-  ↓ 恢复软删除 flow
-vibe3 flow restore task/issue-999
-  ├─ deleted_at: NULL ✅
+# 通过 gh issue / flow status 确认已删除的 flow
+vibe3 flow update task/issue-999
+  ├─ deleted_at: NULL ✅（创建新 flow 自动清除 deleted_at）
   └─ flow 记录恢复可用
   ↓ 验证恢复结果
 vibe3 flow show task/issue-999

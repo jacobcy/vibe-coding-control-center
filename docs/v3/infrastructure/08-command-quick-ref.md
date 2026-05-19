@@ -19,7 +19,7 @@ related_docs:
 
 ```
 全局层     vibe3 -v/-vv [COMMAND]
-命令组层   vibe3 flow/inspect/review/... [-h]
+命令组层   vibe3 flow/handoff/... [-h]
 子命令层   vibe3 flow update [--trace] [--json] [-y]
 ```
 
@@ -36,7 +36,7 @@ related_docs:
 
 ```bash
 vibe3 -v flow status
-vibe3 -vv inspect pr 42
+vibe3 -vv flow show
 vibe3 -h
 vibe3 help
 ```
@@ -53,10 +53,10 @@ vibe3 help
 | `--help` | `-h` | 显示帮助 |
 
 ```bash
-vibe3 inspect pr 42 --trace
-vibe3 inspect pr 42 --json | jq '.score'
-vibe3 inspect pr 42 --trace --json
-vibe3 review pr 42 --help
+vibe3 flow show --trace
+vibe3 flow show --json | jq '.status'
+vibe3 flow show --trace --json
+vibe3 flow bind --help
 vibe3 flow show -h
 ```
 
@@ -134,7 +134,7 @@ vibe3 handoff audit docs/audits/security-check.md --actor "reviewer/sonnet-4.6"
 
 ## Verification Commands
 
-### `vibe check`
+### `vibe3 check`
 
 Verify handoff store consistency.
 
@@ -174,22 +174,20 @@ vibe3 check --branch task/issue-456
 # 查看帮助（任意层级）
 vibe3 -h
 vibe3 flow -h
-vibe3 inspect pr -h
-
-# 分析 PR
-vibe3 inspect pr 42
-vibe3 inspect pr 42 --json
-vibe3 inspect pr 42 --trace
-
-# 代码审核
-vibe3 review pr 42
-vibe3 review pr 42 --publish
-vibe3 -v review pr 42          # INFO 日志 + 审核
+vibe3 handoff -h
 
 # 查看流程
 vibe3 flow status
 vibe3 flow show
 vibe3 -vv flow update  # DEBUG 日志 + 更新
+
+# Handoff 协作
+vibe3 handoff show
+vibe3 handoff append "context update"
+
+# 共享状态审计
+vibe3 check
+vibe3 check --json
 ```
 
 ---

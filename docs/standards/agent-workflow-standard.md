@@ -171,7 +171,7 @@ git checkout -b feature/api-v2
 vibe3 flow update
 
 # 2. 绑定 task issue（同时绑定为 spec）
-vibe flow bind <issue_number> --role task
+vibe3 flow bind <issue_number> --role task
 
 # 3. 创建 plan
 vibe plan --branch <issue_number>

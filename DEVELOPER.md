@@ -44,7 +44,7 @@
 
 ### 2.3 验证环境
 ```bash
-bin/vibe check       # 环境诊断
+bin/vibe check       # 环境诊断（V2）
 uv run python src/vibe3/cli.py check  # V3 一致性与共享状态审计
 bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
 bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
