@@ -367,7 +367,6 @@ class OrchestraStatusService:
                 resolver = ConventionResolver.from_repo()
                 convention = resolver.resolve()
                 blocked_reason = convention.state_label(convention.blocked_label)
-                blocked_issue_number = gate_result.issue_number
                 blocked_issue_reason = gate_result.reason
 
         snapshot = OrchestraSnapshot(

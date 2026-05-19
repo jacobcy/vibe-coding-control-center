@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 
@@ -124,3 +125,25 @@ class TestSnapshotIssuePoolBoundary:
         assert snapshot.active_issues[0].assignee == "manager-bot"
         assert snapshot.active_issues[0].queue_rank == 1
         assert snapshot.active_issues[1].queue_rank == 2
+
+    def test_snapshot_handles_failed_gate_without_issue_number(self):
+        """Failed gate snapshot should not require a nonexistent issue number."""
+        github = MagicMock()
+        github.list_issues.return_value = []
+        failed_gate = MagicMock()
+        failed_gate.check.return_value = GateResult(
+            blocked=True,
+            reason="API/Exec error threshold: 3 recent errors",
+            blocked_ticks=2,
+        )
+
+        service = self._make_service(github)
+        service._failed_gate = failed_gate
+
+        snapshot = service.snapshot()
+
+        assert snapshot.dispatch_blocked is True
+        assert snapshot.blocked_issue_number is None
+        assert (
+            snapshot.blocked_issue_reason == "API/Exec error threshold: 3 recent errors"
+        )
