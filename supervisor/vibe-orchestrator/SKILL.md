@@ -106,7 +106,7 @@ input_examples:
 
 - **任务负载检查（Task Load Validation）：**
   - 在创建新任务前，先检查当前分支的任务数量
-  - 运行 `vibe task count-by-branch $(git branch --show-current)` 获取当前分支任务数
+  - 运行 `vibe3 flow status` 获取当前分支 flow 列表
   - 如果任务数 > 3，**立即阻断**并提示用户：
 
     ```
