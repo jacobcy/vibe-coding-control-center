@@ -64,9 +64,7 @@ class TestExpandVariables:
         }
         result = _expand_variables(config)
         assert result["nested"]["path"] == "/app/inner"
-        # nested.ref references nested.path which is itself a var ref;
-        # the context is the root config dict, so nested.path resolves
-        # to the original "${root}/inner" string, not the expanded value
+        assert result["nested"]["ref"] == "/app/inner/deep"
 
     def test_expand_variables_tilde_expansion(self) -> None:
         """~ prefix expanded via Path.expanduser(), but /~/ embedded is not."""
@@ -164,6 +162,7 @@ class TestLoadConfig:
             encoding="utf-8",
         )
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
 
         config = load_config(config_path=config_file)
         assert config.flow.protected_branches == ["custom-branch"]
