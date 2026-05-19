@@ -44,6 +44,7 @@ def _render_handoff_events(
         "handoff_audit": "Audit Handoff",
         "handoff_indicate": "Manager Handoff",
         "handoff_verdict": "Verdict Handoff",
+        "next_step_set": "Next Step",
     }
 
     # Filter out recorded events if handoff events exist for same kind

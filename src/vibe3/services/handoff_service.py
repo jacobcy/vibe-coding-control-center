@@ -73,6 +73,7 @@ class HandoffService:
         "handoff_verdict",
         "handoff_ci_status",
         "handoff_pr_comment",
+        "next_step_set",
     }
 
     @staticmethod
