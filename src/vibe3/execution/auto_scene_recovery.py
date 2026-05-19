@@ -103,10 +103,13 @@ class AutoSceneRecoveryService:
         branch: str,
         damage_signals: list[str],
         error_msg: str,
-    ) -> ExecutionLaunchResult:
+    ) -> ExecutionLaunchResult | None:
         from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
         from vibe3.exceptions.error_tracking import ErrorTrackingService
-        from vibe3.services.flow_cleanup_service import FlowCleanupService
+        from vibe3.services.flow_cleanup_service import (
+            FlowCleanupService,
+            LiveSessionsDetectedError,
+        )
         from vibe3.services.label_service import LabelService
 
         detail = "; ".join(damage_signals)
@@ -141,12 +144,42 @@ class AutoSceneRecoveryService:
             },
         )
 
-        cleanup_results = FlowCleanupService(store=self.store).cleanup_flow_scene(
-            branch,
-            include_remote=True,
-            terminate_sessions=True,
-            keep_flow_record=False,
-        )
+        try:
+            cleanup_results = FlowCleanupService(store=self.store).cleanup_flow_scene(
+                branch,
+                include_remote=True,
+                terminate_sessions=True,
+                keep_flow_record=False,
+            )
+        except LiveSessionsDetectedError:
+            append_orchestra_event(
+                "dispatcher",
+                (
+                    f"{request.role} auto-reset aborted for #{request.target_id}: "
+                    f"live session detected during cleanup (race condition)"
+                ),
+                level="WARNING",
+            )
+            self.store.add_event(
+                branch,
+                "auto_scene_reset_aborted",
+                recovery_actor,
+                detail=(
+                    "Auto-scene reset was aborted because a live runtime session was "
+                    "detected during the cleanup phase. This indicates a race "
+                    "condition where a session started between damage detection "
+                    "and cleanup."
+                ),
+                refs={
+                    "role": request.role,
+                    "damage_signals": detail,
+                },
+            )
+            logger.bind(
+                domain="auto_scene_recovery",
+                branch=branch,
+            ).warning("Auto-scene reset aborted due to live session race condition")
+            return None
         critical_failures = [
             step
             for step in ("worktree", "local_branch", "flow_record")
