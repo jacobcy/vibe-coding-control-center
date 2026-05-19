@@ -388,12 +388,7 @@ def test_success_events_includes_next_step_set(tmp_path: Path) -> None:
         git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
     )
 
-    store.add_event(
-        branch,
-        "next_step_set",
-        "executor",
-        detail="Next Step: Add test coverage for edge cases",
-    )
+    store.add_event(branch, "next_step_set", "executor", detail="Next step test")
     store.add_event(branch, "handoff_report", "executor", detail="report ready")
 
     events = service.get_success_handoff_events(branch)
