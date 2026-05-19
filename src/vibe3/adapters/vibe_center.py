@@ -57,16 +57,6 @@ def _build_vibe_center_manifest() -> AdapterManifest:
             AdapterResource(
                 type="supervisor", name="manager", path="supervisor/manager.md"
             ),
-            AdapterResource(
-                type="supervisor",
-                name="issue-cleanup",
-                path="supervisor/issue-cleanup.md",
-            ),
-            AdapterResource(
-                type="supervisor",
-                name="project-explorer",
-                path="supervisor/project-explorer.md",
-            ),
             # Governance templates
             AdapterResource(
                 type="supervisor",
