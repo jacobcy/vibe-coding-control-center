@@ -13,6 +13,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
+from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
@@ -57,16 +58,7 @@ class ExecutionCoordinator:
 
         # Resolve repo_path: prefer explicit request, then git common dir (main repo)
         # Using git common dir prevents creating worktrees inside current worktree
-        if request.repo_path:
-            repo_path = Path(request.repo_path)
-        else:
-            from vibe3.clients.git_client import GitClient
-
-            try:
-                git_common = GitClient().get_git_common_dir()
-                repo_path = Path(git_common).parent if git_common else Path.cwd()
-            except Exception:
-                repo_path = Path.cwd()
+        repo_path = self._resolve_repo_path(request)
 
         worktree_manager = WorktreeManager(self.config, repo_path)
         manager_cwd, _ = worktree_manager.resolve_manager_cwd(
@@ -79,6 +71,20 @@ class ExecutionCoordinator:
                 f"{request.role}:{request.target_id}"
             )
         return manager_cwd
+
+    @staticmethod
+    def _resolve_repo_path(request: ExecutionRequest) -> Path:
+        """Resolve the repository root used for worktree operations."""
+        if request.repo_path:
+            return Path(request.repo_path)
+
+        from vibe3.clients.git_client import GitClient
+
+        try:
+            git_common = GitClient().get_git_common_dir()
+            return Path(git_common).parent if git_common else Path.cwd()
+        except Exception:
+            return Path.cwd()
 
     def _acquire_temporary_worktree(self, issue_number: int) -> Path:
         """Acquire a temporary worktree for supervisor apply execution.
@@ -212,6 +218,16 @@ class ExecutionCoordinator:
             except ValueError as exc:
                 # Worktree resolution failure → blocking error for the flow
                 error_msg = str(exc)
+                auto_reset_result = AutoSceneRecoveryService(
+                    self.store
+                ).maybe_reset_damaged_scene(
+                    request,
+                    error_msg,
+                    resolve_repo_path=self._resolve_repo_path,
+                    registry=self.registry,
+                )
+                if auto_reset_result is not None:
+                    return auto_reset_result
                 append_orchestra_event(
                     "dispatcher",
                     f"{request.role} worktree unavailable for "
