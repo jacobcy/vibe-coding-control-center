@@ -70,6 +70,18 @@ def test_soft_delete_flow_normalizes_to_tombstone() -> None:
         assert deleted_flow["manager_actor"] is None
         assert deleted_flow["latest_actor"] is None
 
+        # CRITICAL: execution state fields must be cleared
+        assert deleted_flow["planner_status"] is None
+        assert deleted_flow["executor_status"] is None
+        assert deleted_flow["reviewer_status"] is None
+        assert deleted_flow["execution_pid"] is None
+        assert deleted_flow["execution_started_at"] is None
+        assert deleted_flow["execution_completed_at"] is None
+        assert deleted_flow["next_step"] is None
+
+        # CRITICAL: legacy blocked_by must be cleared
+        assert deleted_flow["blocked_by"] is None
+
 
 def test_soft_delete_flow_clears_refs_from_active_flow() -> None:
     """Test that refs are cleared when deleting active flow."""

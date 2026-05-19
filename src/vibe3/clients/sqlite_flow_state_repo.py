@@ -219,8 +219,9 @@ class SQLiteFlowStateRepo:
         """Soft delete flow and normalize to tombstone state.
 
         Sets deleted_at timestamp and clears all refs, reasons, actors,
-        and worktree metadata to prevent contradictory state where a
-        deleted flow still looks active with populated refs.
+        execution state, and worktree metadata to prevent contradictory state
+        where a deleted flow still looks active with populated refs or execution
+        status.
 
         The flow_status is normalized to 'aborted' (terminal state) to
         distinguish tombstones from active flows in audits/debugging.
@@ -228,7 +229,7 @@ class SQLiteFlowStateRepo:
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            # Normalize to tombstone: clear refs/reasons/actors/worktree
+            # Normalize to tombstone: clear refs/reasons/actors/worktree/execution-state
             cursor.execute(
                 """UPDATE flow_state SET
                     deleted_at = ?,
@@ -242,12 +243,20 @@ class SQLiteFlowStateRepo:
                     blocked_reason = NULL,
                     failed_reason = NULL,
                     blocked_by_issue = NULL,
+                    blocked_by = NULL,
                     worktree_path = NULL,
+                    next_step = NULL,
                     planner_actor = NULL,
                     executor_actor = NULL,
                     reviewer_actor = NULL,
                     manager_actor = NULL,
                     latest_actor = NULL,
+                    planner_status = NULL,
+                    executor_status = NULL,
+                    reviewer_status = NULL,
+                    execution_pid = NULL,
+                    execution_started_at = NULL,
+                    execution_completed_at = NULL,
                     updated_at = ?
                 WHERE branch = ?""",
                 (now, now, branch),

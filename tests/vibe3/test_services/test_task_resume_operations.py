@@ -126,7 +126,8 @@ def test_clear_blocked_projection_handles_none_body() -> None:
 
 
 def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
-    """Test that reset_task_scene normalizes deleted flow to tombstone."""
+    """Test that reset_task_scene calls cleanup service for tombstone creation."""
+    from unittest.mock import MagicMock
 
     git_client = GitClient()
     github_client = GitHubClient()
@@ -144,30 +145,33 @@ def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
 
     branch = "task/issue-999"
 
-    with (
-        patch.object(git_client, "find_worktree_path_for_branch", return_value=None),
-        patch.object(git_client, "branch_exists", return_value=False),
-        patch.object(git_client, "delete_branch"),
-        patch.object(flow_service.store, "update_flow_state"),
-        patch.object(flow_service.store, "get_flow_state") as mock_get,
-        patch.object(flow_service.store, "soft_delete_flow") as mock_delete,
-    ):
-        # Setup: flow with active metadata before reset
-        mock_get.return_value = {
-            "branch": branch,
-            "flow_slug": "issue_999",
-            "flow_status": "active",
-            "plan_ref": "docs/plans/test.md",
-            "report_ref": "docs/reports/test.md",
-            "worktree_path": "/tmp/worktree",
-            "blocked_reason": "Test block",
+    # Mock FlowCleanupService to make test hermetic
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_class:
+        mock_cleanup_service = MagicMock()
+        mock_cleanup_class.return_value = mock_cleanup_service
+
+        # Setup cleanup result
+        mock_cleanup_service.cleanup_flow_scene.return_value = {
+            "tmux_sessions": {"success": True, "sessions": []},
+            "worktree": {"success": True, "path": None},
+            "local_branch": {"success": True, "deleted": True},
+            "remote_branch": {"success": True, "deleted": True},
+            "handoff_files": {"success": True, "files": []},
+            "flow_record": {"success": True, "deleted": True},
         }
 
-        # Execute full rebuild reset
+        # Execute reset
         operations.reset_task_scene(branch)
 
-        # Verify soft_delete_flow called (creates tombstone)
-        mock_delete.assert_called_once_with(branch)
+        # Verify cleanup_flow_scene called with correct parameters
+        mock_cleanup_service.cleanup_flow_scene.assert_called_once_with(
+            branch,
+            include_remote=True,
+            terminate_sessions=True,
+            keep_flow_record=False,
+        )
 
-        # Note: The actual tombstone validation is in repository tests
-        # This test verifies the call path from task resume to soft_delete
+        # Note: Tombstone normalization is validated in repository tests
+        # This test verifies the call path through FlowCleanupService
