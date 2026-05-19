@@ -1,5 +1,15 @@
 
 
+---
+document_type: reference
+title: V3 Suggestion Design (OpenAI)
+status: historical-reference
+scope: v3-design-history
+author: Vibe Team
+---
+
+> **历史免责声明**：本文档是 V3 早期设计阶段的历史参考材料，记录的是 OpenAI 视角下的 suggestion 功能设计思路。当前 V3 实现已与本文描述存在差异，请勿将其作为现行实现的权威依据。现行规范见 `docs/standards/v3/` 目录。
+
 1. 系统目标
 
 该工具是一个 GitHub workflow wrapper CLI。

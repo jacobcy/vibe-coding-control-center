@@ -81,7 +81,8 @@ vibe3 flow show task/reports-unified-storage
 CREATE TABLE flow_state (
     branch TEXT PRIMARY KEY,
     flow_status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'blocked' | 'done' | 'aborted'
-    blocked_by TEXT,  -- 阻塞原因描述
+    blocked_by_issue INTEGER,  -- dependency issue number (INT)
+    blocked_reason TEXT,       -- blocking reason description
     ...
 )
 ```
@@ -91,7 +92,7 @@ CREATE TABLE flow_state (
 | 命令 | 使用场景 | 数据影响 | 建立依赖关系 |
 |------|---------|---------|------------|
 | `flow blocked --task <issue>` | Flow 执行中遇到依赖阻塞 | `flow_issue_links` + `flow_state` | ✅ 是 |
-| `handoff next_step <text>` | Agent 交接时记录阻塞状态 | 仅 `flow_state` | ❌ 否 |
+| `handoff next <text>` | Agent 交接时记录阻塞状态 | 仅 `flow_state` | ❌ 否 |
 
 > **注意**：`--task` 是主要选项。
 
@@ -106,8 +107,11 @@ CREATE TABLE flow_state (
 # 使用 --task 建立依赖
 vibe3 flow blocked --task 218
 
-# 注意：--reason 和 --task 互斥，不能同时使用
+# 使用 --reason 描述阻塞原因
 vibe3 flow blocked --reason "等待外部反馈"
+
+# --task 和 --reason 可同时使用，分别记录依赖 issue 和原因描述
+vibe3 flow blocked --task 218 --reason "等待 API 完成"
 ```
 
 **数据库变更**：
@@ -115,7 +119,8 @@ vibe3 flow blocked --reason "等待外部反馈"
 -- 1. 更新 flow 状态
 UPDATE flow_state SET
   flow_status = 'blocked',
-  blocked_by = '等待依赖 issue #218'  -- 或自定义 reason
+  blocked_by_issue = 218,
+  blocked_reason = '等待依赖 issue #218'
 WHERE branch = 'task/my-feature';
 
 -- 2. 建立依赖关系
@@ -136,7 +141,7 @@ VALUES
 - 自动更新 `flow_status` 和 `blocked_by`
 - 避免遗漏依赖关系
 
-#### 2. `vibe3 handoff next_step <message>`
+#### 2. `vibe3 handoff next <message>`
 
 **使用场景**：Agent 交接时记录下一步或阻塞状态。
 
@@ -148,9 +153,9 @@ VALUES
 
 **命令示例**：
 ```bash
-vibe3 handoff next_step "等待外部反馈" --branch task/issue-218
+vibe3 handoff next "等待外部反馈" --branch task/issue-218
 
-vibe3 handoff next_step "开始实现 API 接口" --branch task/issue-218
+vibe3 handoff next "开始实现 API 接口" --branch task/issue-218
 ```
 
 **数据库变更**：
@@ -195,7 +200,8 @@ vibe3 flow show task/my-feature
 # Dependencies: #218
 # Related Issues: #219
 # Flow Status: blocked
-# Blocked By: 等待依赖 issue #218
+# Blocked By Issue: 218
+# Blocked Reason: 等待依赖 issue #218
 ```
 
 ### 解除阻塞
@@ -219,7 +225,7 @@ vibe3 task resume
 - 需要在数据库中建立依赖关系
 - 方便后续查询和分析
 
-**使用 `handoff next_step`**：
+**使用 `handoff next`**：
 - Agent 交接时记录下一步或阻塞状态
 - 阻塞原因不一定是具体的 issue
 - 阻塞原因可能是：外部反馈、资源等待、审批流程等
@@ -233,13 +239,13 @@ vibe3 task resume
 vibe3 handoff plan docs/plans/feature-a.md --actor "claude/sonnet-4.6"
 
 # Step 2: Agent 记录下一步（可选）
-vibe3 handoff next_step "需要等待 API 完成" --branch task/my-feature
+vibe3 handoff next "需要等待 API 完成" --branch task/my-feature
 
 # Step 3: 开发者补充依赖关系
 vibe3 flow blocked --task 218
 
 # 结果：
-# - flow_state.next_step 可能被更新（如果使用了 handoff next_step）
+# - flow_state.next_step 可能被更新（如果使用了 handoff next）
 # - flow_issue_links 新增 dependency 记录
 ```
 
