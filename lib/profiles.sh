@@ -50,7 +50,7 @@ PROFILE_MINIMAL=(
     "conventions.agents.manager_name:none"
     "paths.policies_root:\${HOME}/.vibe/assets/policies"
     "paths.prompts_root:\${HOME}/.vibe/assets/prompts"
-    "paths.skills_manifest:\${HOME}/.vibe/manifests/skills.json"
+    "paths.skills_manifest:\${HOME}/.vibe/skills.json"
 )
 
 # GitHub-flow profile - GitHub issue/PR/label orchestration
@@ -70,7 +70,7 @@ PROFILE_GITHUB_FLOW=(
     "conventions.agents.manager_name:none"
     "paths.policies_root:\${HOME}/.vibe/assets/policies"
     "paths.prompts_root:\${HOME}/.vibe/assets/prompts"
-    "paths.skills_manifest:\${HOME}/.vibe/manifests/skills.json"
+    "paths.skills_manifest:\${HOME}/.vibe/skills.json"
 )
 
 # Vibe-center profile - Full Vibe Center distribution
