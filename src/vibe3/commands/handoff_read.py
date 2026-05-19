@@ -135,7 +135,10 @@ def show(
 
 
 def status(
-    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
+    branch_arg: Annotated[str | None, typer.Argument(help="Branch name")] = None,
+    branch_opt: Annotated[
+        str | None, typer.Option("--branch", help="Branch name or issue number")
+    ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -152,6 +155,7 @@ def status(
     ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
+    branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
