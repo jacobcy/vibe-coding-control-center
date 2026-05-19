@@ -7,6 +7,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task_status_classifier import TaskStatusBucket
 from vibe3.ui.console import console
+from vibe3.utils.error_message_cleaner import clean_error_message
 
 
 def _extract_blocked_reason_summary(blocked_reason: str) -> str:
@@ -26,11 +27,7 @@ def _extract_blocked_reason_summary(blocked_reason: str) -> str:
     if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
         return first_line
 
-    import re
-
-    cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", first_line)[0].strip()
-    cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
-    cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+    cleaned = clean_error_message(first_line)
 
     if len(cleaned) <= 80:
         return cleaned
