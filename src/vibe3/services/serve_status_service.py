@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
@@ -12,6 +11,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions.error_tracking import ErrorTrackingService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.orchestra.logging import orchestra_events_log_path
 from vibe3.utils.error_message_cleaner import (
     CODEAGENT_WRAPPER_RE,
     clean_error_message,
@@ -113,7 +113,7 @@ class ServeStatusService:
         Returns:
             The tick interval in seconds.
         """
-        events_log = Path("temp/logs/orchestra/events.log")
+        events_log = orchestra_events_log_path()
         if events_log.exists():
             try:
                 log_content = events_log.read_text()
@@ -124,13 +124,15 @@ class ServeStatusService:
                 )
                 if matches:
                     return int(matches[-1])
-            except Exception:
-                pass
+            except (OSError, UnicodeDecodeError, ValueError) as exc:
+                self.console.print(
+                    f"[yellow]Warning: Could not parse events.log: {exc}[/yellow]\n"
+                )
         return self.config.polling_interval
 
     def _display_recent_activity(self) -> None:
         """Display recent tick activity from events.log."""
-        events_log = Path("temp/logs/orchestra/events.log")
+        events_log = orchestra_events_log_path()
         if not events_log.exists():
             return
 
