@@ -133,6 +133,7 @@ def build_issue_async_cli_request(
     refs: dict[str, str] | None,
     worktree_requirement: WorktreeRequirement,
     repo_path: Path | None = None,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build a generic async self-invocation request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
@@ -160,6 +161,7 @@ def build_issue_async_cli_request(
         actor=actor,
         mode="async",
         worktree_requirement=worktree_requirement,
+        tick_id=tick_id,
     )
 
 
@@ -183,6 +185,7 @@ def build_issue_sync_prompt_request(
     fallback_include_global_notice: bool = True,
     extra_refs: dict[str, str] | None = None,
     dry_run_summary: dict[str, Any] | None = None,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build a generic sync prompt-based request for an issue role."""
     root = (repo_path or resolve_orchestra_repo_root()).resolve()
@@ -210,6 +213,7 @@ def build_issue_sync_prompt_request(
         fallback_include_global_notice=fallback_include_global_notice,
         dry_run_summary=dry_run_summary or {},
         worktree_requirement=worktree_requirement,
+        tick_id=tick_id,
     )
 
 

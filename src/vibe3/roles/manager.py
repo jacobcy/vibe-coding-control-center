@@ -205,6 +205,7 @@ def build_manager_request(
             actor=actor,
             dry_run=False,
             show_prompt=False,
+            tick_id=tick_id,
         )
         if request.env is None:
             request.env = env
@@ -223,6 +224,7 @@ def build_manager_request(
         refs=refs,
         worktree_requirement=MANAGER_ROLE.worktree,
         repo_path=repo_path,
+        tick_id=tick_id,
     )
     if request.env is None:
         request.env = env
@@ -241,6 +243,7 @@ def build_manager_sync_request(
     actor: str,
     dry_run: bool,
     show_prompt: bool,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the manager sync execution request using recipe-based prompt assembly."""
     _ = flow_state
@@ -321,6 +324,7 @@ def build_manager_sync_request(
         dry_run=dry_run,
         show_prompt=show_prompt,
         worktree_requirement=MANAGER_ROLE.worktree,
+        tick_id=tick_id,
     )
 
 
