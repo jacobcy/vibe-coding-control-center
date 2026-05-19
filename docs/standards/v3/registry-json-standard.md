@@ -1,7 +1,7 @@
 ---
 document_type: standard
 title: Registry JSON Standard
-status: approved
+status: archived
 scope: shared-state
 authority:
   - registry-json-schema

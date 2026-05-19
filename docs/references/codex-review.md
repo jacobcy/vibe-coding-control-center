@@ -1,7 +1,7 @@
 ---
 document_type: reference
 title: Codex Review 工程级使用体系
-status: current
+status: archived
 scope: code-review
 author: Vibe Team
 related_docs:
@@ -10,7 +10,15 @@ related_docs:
 
 # Codex Review 工程级使用体系
 
-> **当前用法说明**：在 Vibe Center 中，codex 作为外部 plugin 通过 `codex:rescue` skill 调用（见 `skills/vibe-review-pr/`）。本文档描述的 review policy 设计理念和与 Serena AST 的结合思路仍有参考价值。
+> ⚠️ **本文档已归档为历史设计参考。**
+> Vibe Center 当前采用 `vibe3 review` 命令和 `skills/vibe-review-pr/` skill 进行代码审查，不再使用 codex CLI。
+> 本文档中引用的以下文件和路径 **不存在于当前仓库**：
+> - `.codex/review-policy.md` — 不存在
+> - `.codex/impact-summary.md` — 不存在
+> - `scripts/review-with-serena.sh` — 不存在
+>
+> 文档中描述的 `codex review` CLI 工作流与当前 skill-based 方法不匹配，请勿直接执行文中的命令示例。
+> 审查标准请参考 `skills/vibe-review-pr/SKILL.md` 和 `docs/standards/github-code-review-standard.md`。
 
 ## 概述
 

@@ -24,7 +24,7 @@ related_docs:
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
 - 用户主视角 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done` 应如何推进
-- 内部桥接链 `GitHub issue -> roadmap item -> task -> flow` 应如何配合
+- 内部桥接链 `GitHub issue -> roadmap item (deprecated, 仅作规划参考) -> task -> flow` 应如何配合
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
@@ -106,14 +106,14 @@ related_docs:
 
 | 当前 Flow 状态 | 动作 | 说明 |
 |---------------|-------------------|------|
-| `active` | **拒绝新 flow** | 提示使用 `vibe3 wtnew` 创建新 worktree |
+| `active` | **拒绝新 flow** | 提示使用 `git worktree add` 创建新 worktree，或参见 [worktree-lifecycle-standard.md](worktree-lifecycle-standard.md) |
 | `blocked` | **允许切分支** | 从当前 branch 切出新 branch（下游修复流） |
 | `done/aborted/stale` | **允许新任务** | 从 `origin/main` 开始新目标 |
 | 无 flow | **允许新任务** | 从 `origin/main` 开始新目标 |
 
 ### 新 Feature 推荐路径
 
-1. **独立新 feature**: 使用 `vibe3 wtnew <name>` 创建新 worktree
+1. **独立新 feature**: 使用 `git worktree add` 创建新 worktree，或参见 [worktree-lifecycle-standard.md](worktree-lifecycle-standard.md)
 2. **下游修复流**: 先 `vibe3 flow blocked`，再切换分支并 `vibe3 flow update`
 3. **同 worktree 串行**: 使用 `/vibe-done` 收口后，通过 `/vibe-new` 开启新目标
 
@@ -265,7 +265,7 @@ closeout 约束：
 - 若该 PR 已完成且相关 follow-up 已收束，应进入 `vibe3-done` 或等价收口流程
 - 若当前 PR 已 merged，则该 PR 对应的 plan 进入 terminal state
 - merged 后只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接，不允许把新需求继续写回旧 plan
-- merged 后若出现新的 feature、补丁或治理项，必须重新进入用户主链 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done`，并按需重建内部桥接链 `GitHub issue -> roadmap item -> task -> flow`
+- merged 后若出现新的 feature、补丁或治理项，必须重新进入用户主链 `GitHub issue -> flow -> plan/spec -> commit -> PR -> done`；`roadmap item` 仅作规划参考，不作为执行必经关口
 
 ### 6.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
 
@@ -318,7 +318,7 @@ closeout 约束：
   - 负责合并后的收口编排
   - 通过 `gh issue close` 等动作完成 task / issue / flow handoff
 
-`.agent/context/task.md` 只作为 skill 之间的短期 handoff 记录，不是共享真源。
+`.agent/context/task.md`（如存在）只作为 skill 之间的短期 handoff 记录，不是共享真源。V3 优先使用 `handoff` 命令与 SQLite 存储。
 
 ## 9. Branch Protection
 
