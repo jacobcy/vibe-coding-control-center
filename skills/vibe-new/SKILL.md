@@ -7,20 +7,21 @@ description: Use when starting or switching to a new human-collaboration task. C
 
 从 issue 进入一个新的协作 flow。
 
-## 1. 先确认是否适合进入 `/vibe-new`
+## 1. 强制前置检查
 
-先看当前现场：
+进入 `/vibe-new` 前，**必须**先确认当前现场：
 
 ```bash
 vibe3 flow show
 git status
 ```
 
-只在下面场景继续：
-- 已经有明确的 issue number
-- 或用户先经过 `/vibe-issue` 完成了 issue intake
+根据检查结果决策：
+- 如果已有活跃 flow 且目标 issue 相同 → 留在当前 scope，不要重新 bootstrap
+- 如果已有活跃 flow 但需要恢复已有 branch → 改用 `/vibe-continue`
+- 如果有明确 issue number 或用户已通过 `/vibe-issue` 完成 intake → 继续
 
-如果当前目标只是恢复已有 branch / flow，改用 `/vibe-continue`。
+禁止跳过 `vibe3 flow show` 直接进入 bootstrap。
 
 ## 2. 询问两件事
 
@@ -36,28 +37,28 @@ git status
 
 ## 3. Bootstrap flow scene
 
-标准调用方式：
+**强制要求**：必须使用 `vibe3 internal bootstrap` 作为唯一 bootstrap 路径，禁止手工拼接。
 
-```bash
-vibe3 internal bootstrap <issue-number> --branch dev/issue-<id> [--worktree]
-```
-
-如果需要补充 issue 关系：
+✅ **正确做法**：
 
 ```bash
 vibe3 internal bootstrap <issue-number> \
   --branch dev/issue-<id> \
   [--worktree] \
   [--related <issue-number>]... \
-  [--dependency <issue-number>]...
+  [--dependency <issue-number>]... \
+  [--reactivate-existing]
 ```
 
-**注意**：标准调用会自动 `git fetch origin` 确保基准分支最新。如果因特殊情况需要手动创建 worktree 和分支，记得先拉取最新代码：
+❌ **禁止做法**：
+- `git checkout -b` / `git switch -c` 手工建分支
+- `vibe3 flow update` / `vibe3 flow bind` 手工组装 flow
+- `vibe3 snapshot save` 单独打快照代替 bootstrap
+- `git pull origin main && git checkout -b ...` 手工拉取建分支
 
-```bash
-git pull origin main
-git checkout -b dev/issue-<id>
-```
+**原因**：bootstrap 命令保证幂等性、统一的 actor 签名、完整的 baseline snapshot 和 flow 关系绑定。手工拼接会绕过这些契约，导致 flow 状态不一致。
+
+**如遇 bootstrap 失败**：先诊断问题（网络、权限、分支冲突），不要回退到手工拼接。
 
 这个命令会走共享底层路径，完成：
 - branch/flow bootstrap
@@ -95,7 +96,6 @@ vibe3 pr create --agent -t "..." -b "..."
 
 ## 限制
 
-- 不在 skill 层手工拼接 `flow update` / `flow bind` / `wtnew` 作为 bootstrap 真源
 - 不在没有 issue 的情况下创建 flow
 - 不进入业务实现阶段
 - 不把 handoff 当真源；先看 `vibe3 flow show`
