@@ -12,7 +12,7 @@ tags: [workflow, vibe, completion, archive]
 ## 定位
 
 - `vibe:done` 是一个 `skill-backed workflow`。
-- 它用于在 PR 已 merged，或已满足 review gate、准备由 `vibe flow done` merge + closeout 时，把结算逻辑委托给 `vibe-done` skill。
+- 它用于在 PR 已 merged，或已满足 review gate、准备收口时，把结算逻辑委托给 `vibe-done` skill。
 
 ## Steps
 
