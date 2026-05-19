@@ -14,8 +14,8 @@ Orchestra 采用**主动轮询 + 被动 webhook 混合架构**：
 - 通过 `vibe3 serve start` 启动的 heartbeat 驱动
 
 ### 被动响应（辅助）
-- **CommentReplyService**：监听 `issue_comment` events，自动回复 @vibe-manager-agent 提及
-- **WorktreeCleanupService**：监听 `pull_request` closed events，清理临时 worktrees
+- Webhook 事件处理：通过 `POST /webhook/github` 接收 GitHub 事件，验签后由 driver 进程直接路由到对应 handler
+- 所有角色（manager / planner / executor / reviewer）均通过 `GlobalDispatchCoordinator` 冻结队列统一派发，无独立的 service 模块
 
 ### 关键配置（`config/settings.yaml`）
 - `orchestra.enabled: true`
@@ -71,7 +71,7 @@ uv run python src/vibe3/cli.py serve start -v --dry-run --port 8080
 ## 4. 已知 follow-up
 
 1. 临时 worktree 回收
-   - WorktreeCleanupService 已实现 PR 关闭后自动清理
+   - PR 关闭后的 worktree 自动清理待实现
    - 追踪 issue：[#366](https://github.com/jacobcy/vibe-coding-control-center/issues/366)
 
 ## 5. 发布 agent 交付清单

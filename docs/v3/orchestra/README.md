@@ -14,6 +14,8 @@ related_docs:
   - docs/standards/glossary.md
   - src/vibe3/models/orchestration.py
   - src/vibe3/services/label_service.py
+  - src/vibe3/orchestra/global_dispatch_coordinator.py
+  - src/vibe3/orchestra/flow_dispatch.py
 ---
 
 # Task: Orchestra 调度器（MVP）
@@ -42,9 +44,9 @@ related_docs:
 - 心跳兜底：`polling_interval` 默认 900 秒。
 
 代码参考：
-- `src/vibe3/orchestra/serve.py`
-- `src/vibe3/orchestra/heartbeat.py`
-- `src/vibe3/orchestra/webhook_handler.py`
+- `docs/standards/vibe3-orchestra-runtime-standard.md` — runtime semantics
+- `docs/v3/orchestra/runtime-modes.md` — deployment modes
+- `src/vibe3/orchestra/global_dispatch_coordinator.py` — heartbeat tick driver
 
 ### 2) Issue assignee 触发 manager 执行
 
@@ -58,22 +60,23 @@ related_docs:
 - 心跳会对当前已分配 issue 做重检（依赖/flow 存在性），避免漏调度。
 
 代码参考：
-- `src/vibe3/orchestra/services/assignee_dispatch.py`
-- `src/vibe3/orchestra/dependency_checker.py`
-- `src/vibe3/orchestra/dispatcher.py`
+- `src/vibe3/orchestra/global_dispatch_coordinator.py` — frozen queue coordinator
+- `src/vibe3/orchestra/flow_dispatch.py` — flow/manager dispatch
+- `src/vibe3/orchestra/issue_loader.py` — issue loading utilities
+- `src/vibe3/domain/handlers/issue_state_dispatch.py` — ManagerDispatchIntent handler
 
 ### 3) PR reviewer 触发 review
 
 - 触发事件：`pull_request/review_requested`、`pull_request/ready_for_review`。
 - 触发条件：requested reviewer 命中 `manager_usernames`。
-- 执行动作：调度 `vibe3 review pr <pr_number>`。
+- 执行动作：通过 `GlobalDispatchCoordinator` 冻结队列派发 reviewer 角色执行。
 - 默认策略：优先复用 PR 对应已有 worktree（按 `head_branch` 匹配），不新建 worktree。
-- 可选：`pr_review_dispatch.use_worktree=true` 时改为 `vibe3 review pr <pr_number> --worktree`。
-- 可选异步：`pr_review_dispatch.async_mode=true` 时，调度为 `vibe3 review pr <pr_number> --async`（tmux 后台执行，不阻塞当前进程）。
+- 可选：配置中使用 worktree 参数时改为 `vibe3 review pr <pr_number> --worktree`。
+- 可选异步：配置异步模式时，调度为 `vibe3 review pr <pr_number> --async`（tmux 后台执行，不阻塞当前进程）。
 
 代码参考：
-- `src/vibe3/orchestra/services/pr_review_dispatch.py`
-- `src/vibe3/orchestra/dispatcher.py`
+- `src/vibe3/orchestra/global_dispatch_coordinator.py` — frozen queue coordinator（含 reviewer 派发）
+- `src/vibe3/orchestra/flow_dispatch.py` — flow 管理
 
 ## 事件到执行链路（当前真源）
 
