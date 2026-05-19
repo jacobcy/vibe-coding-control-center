@@ -377,3 +377,26 @@ class TestHandoffFailureDetection:
         assert "handoff_report" in event_types
         assert "state_unchanged" not in event_types
         assert "transition_count_exceeded" not in event_types
+
+
+def test_success_events_includes_next_step_set(tmp_path: Path) -> None:
+    """Verify next_step_set events appear in get_success_handoff_events."""
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    branch = "task/issue-894"
+    service = HandoffService(
+        store=store,
+        git_client=_StubGitClient(tmp_path / "wt", tmp_path / ".git", branch),
+    )
+
+    store.add_event(
+        branch,
+        "next_step_set",
+        "executor",
+        detail="Next Step: Add test coverage for edge cases",
+    )
+    store.add_event(branch, "handoff_report", "executor", detail="report ready")
+
+    events = service.get_success_handoff_events(branch)
+    event_types = [e.event_type for e in events]
+    assert "next_step_set" in event_types
+    assert "handoff_report" in event_types
