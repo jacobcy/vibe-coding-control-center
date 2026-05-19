@@ -174,6 +174,15 @@ else
     log_warn "No .agent/policies directory found, skipping runtime assets sync"
 fi
 
+# 4.5b Sync prompt templates
+if [[ -d "$SOURCE_ROOT/config/prompts" ]]; then
+    mkdir -p "$INSTALL_DIR/assets/prompts"
+    cp -R "$SOURCE_ROOT/config/prompts/." "$INSTALL_DIR/assets/prompts/"
+    log_success "Prompt templates synced"
+else
+    log_warn "No config/prompts directory found, skipping prompt templates sync"
+fi
+
 # 4.6 Generate global settings.yaml with path overrides
 if [[ ! -f "$INSTALL_DIR/settings.yaml" ]]; then
     log_info "Generating global settings.yaml..."
