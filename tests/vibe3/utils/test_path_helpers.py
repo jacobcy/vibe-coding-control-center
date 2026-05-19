@@ -357,3 +357,52 @@ def test_resolve_shared_artifact_allows_multiple_single_dots(
 
     result = resolve_handoff_target("@current", branch=branch, git_client=client)
     assert result == current_md
+
+
+def test_resolve_shared_artifact_rejects_path_traversal_in_key(
+    tmp_path: Path,
+) -> None:
+    """Standard shared path key with '..' should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="path traversal sequence"):
+        resolve_handoff_target("@../../../etc/passwd", git_client=client)
+
+
+def test_resolve_shared_artifact_rejects_relative_traversal_in_key(
+    tmp_path: Path,
+) -> None:
+    """Standard shared path key containing '..' should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="path traversal sequence"):
+        resolve_handoff_target("@task/issue-123/../../.env", git_client=client)
+
+
+def test_resolve_shared_artifact_rejects_empty_key(tmp_path: Path) -> None:
+    """Empty key (just '@') should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="cannot be empty"):
+        resolve_handoff_target("@", git_client=client)
+
+
+def test_resolve_shared_artifact_rejects_control_chars_in_key(
+    tmp_path: Path,
+) -> None:
+    """Key with control characters should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="invalid characters"):
+        resolve_handoff_target("@task\x00name", git_client=client)
+
+
+def test_resolve_shared_artifact_accepts_valid_key(tmp_path: Path) -> None:
+    """Valid key should resolve successfully."""
+    artifact = tmp_path / "vibe3" / "handoff" / "task-123" / "run.md"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("content")
+
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+    result = resolve_handoff_target("@task-123/run.md", git_client=client)
+    assert result == artifact

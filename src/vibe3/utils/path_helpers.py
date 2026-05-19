@@ -14,10 +14,10 @@ from vibe3.utils.git_path_client import (
 # Backward compatibility alias
 GitClientProtocol = GitPathProtocol
 
-# Branch name validation regex: alphanumeric, slash, underscore, hyphen, period
+# Branch name validation regex: alphanumeric, slash, underscore, hyphen, period, colon
 # Note: re.fullmatch() ensures the entire string matches, preventing control
 # characters like trailing newlines from being accepted
-_BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.-]+")
+_BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.:-]+")
 
 
 def _validate_branch_name(branch: str) -> None:
@@ -40,7 +40,7 @@ def _validate_branch_name(branch: str) -> None:
     if not _BRANCH_NAME_PATTERN.fullmatch(branch):
         raise ValueError(
             f"Invalid branch name {branch!r}: contains invalid characters. "
-            f"Only alphanumeric, '/', '_', '-', and '.' are allowed."
+            f"Only alphanumeric, '/', '_', '-', '.', and ':' are allowed."
         )
 
 
@@ -365,7 +365,15 @@ def _resolve_shared_artifact(
         raise FileNotFoundError(
             f"Cannot resolve shared artifact without git common dir: {target}"
         )
+
+    # Validate key to prevent path traversal attacks
+    _validate_branch_name(key)
+
     resolved = Path(git_common) / "vibe3" / "handoff" / key
+
+    # Defense in depth — ensure resolved path stays within handoff root
+    _verify_handoff_dir_boundary(resolved, git_common)
+
     if not resolved.exists():
         raise FileNotFoundError(f"Artifact not found: {target}")
     if not resolved.is_file():
