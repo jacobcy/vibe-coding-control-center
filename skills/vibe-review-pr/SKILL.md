@@ -371,6 +371,19 @@ Phase_0():
     description="写 PR comment → 可选 spawn fix-executor 修复 → 创建 follow-up issues",
     metadata={phase_order:5, depends_on_phase:4})
 
+  // Step 4a: 验证 task ID 与 Phase 顺序一致性
+  // TaskCreate 必须串行执行（每个完成后再创建下一个，不得批量并行）
+  // 原因：并行创建时 task ID 分配顺序不确定，会导致 Task #5=Phase 4 等错位
+  //
+  // 创建完成后必须输出映射表（提交前检查）:
+  //   phase_1_task_id = <返回的 ID>  // 预期: 最小 ID → Phase 1
+  //   phase_2_task_id = <返回的 ID>  // 预期: 次小 ID → Phase 2
+  //   phase_3_task_id = <返回的 ID>  // 预期: 中间 ID → Phase 3
+  //   phase_4_task_id = <返回的 ID>  // 预期: 次大 ID → Phase 4
+  //   phase_5_task_id = <返回的 ID>  // 预期: 最大 ID → Phase 5
+  //
+  // 若 ID 顺序与 Phase 顺序不一致: 以 phase_order metadata 为准，不依赖 ID 排序
+
   // Step 5: 激活 Phase 1
   TaskUpdate(phase_1_task_id, status="in_progress")
 ```
