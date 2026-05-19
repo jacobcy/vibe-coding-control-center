@@ -36,6 +36,7 @@ class TestScanCommand:
         output = _strip_ansi(result.output)
         assert "Run governance scan once" in output
         assert "--dry-run" in output
+        assert "--no-async" in output
 
     def test_scan_supervisor_help(self):
         """Test scan supervisor subcommand help."""
@@ -68,17 +69,18 @@ class TestGovernanceScan:
 
     @patch("vibe3.commands.scan._run_governance_scan")
     def test_governance_execution(self, mock_run):
-        """Test governance scan execution."""
-        result = runner.invoke(app, ["scan", "governance"])
+        """Test governance scan execution with --no-async flag."""
+        result = runner.invoke(app, ["scan", "governance", "--no-async"])
         assert result.exit_code == 0
         assert "Governance scan completed" in result.output
-        mock_run.assert_called_once_with(material_override=None)
+        mock_run.assert_called_once_with(material_override=None, no_async=True)
 
     def test_governance_scan_does_not_call_on_heartbeat_tick(self):
         """Test manual governance scan calls service layer directly.
 
         Manual scan should call dispatch_governance_execution (service layer),
         not through OrchestrationFacade heartbeat path or internal command layer.
+        Uses --no-async to test the sync path explicitly.
         """
         # Mock the service layer function that should be called
         with patch(
@@ -88,7 +90,7 @@ class TestGovernanceScan:
             with patch(
                 "vibe3.domain.orchestration_facade.OrchestrationFacade"
             ) as mock_facade:
-                runner.invoke(app, ["scan", "governance"])
+                runner.invoke(app, ["scan", "governance", "--no-async"])
 
                 # After refactor, facade should not be instantiated
                 mock_facade.assert_not_called()
@@ -96,6 +98,20 @@ class TestGovernanceScan:
                 # Service layer function should be called directly
                 assert mock_service_run.called
                 mock_service_run.assert_called_once_with(material_override=None)
+
+    @patch("vibe3.commands.scan._run_governance_scan")
+    def test_governance_async_default(self, mock_run):
+        """Test governance scan defaults to async mode."""
+        result = runner.invoke(app, ["scan", "governance"])
+        assert result.exit_code == 0
+        mock_run.assert_called_once_with(material_override=None, no_async=False)
+
+    @patch("vibe3.commands.scan._run_governance_scan")
+    def test_governance_no_async_flag(self, mock_run):
+        """Test --no-async flag routes to sync path."""
+        result = runner.invoke(app, ["scan", "governance", "--no-async"])
+        assert result.exit_code == 0
+        mock_run.assert_called_once_with(material_override=None, no_async=True)
 
 
 class TestSupervisorScan:
@@ -152,13 +168,14 @@ class TestScanIntegration:
 
         After refactor: manual governance scan no longer registers handlers
         or uses facade. It calls service layer (dispatch_governance_execution) directly.
+        Uses no_async=True to test sync path explicitly.
         """
         with patch(
             "vibe3.services.scan_service.dispatch_governance_execution"
         ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
-            _run_governance_scan()
+            _run_governance_scan(no_async=True)
 
             # Verify service layer was called (new architecture)
             mock_service.assert_called_once_with(material_override=None)
@@ -208,13 +225,14 @@ class TestFailedGateBlocking:
         After refactor: manual governance scan calls service layer directly,
         bypassing FailedGate (which is only for heartbeat automatic chain).
         FailedGate is only checked in automatic heartbeat polling, not manual scans.
+        Uses no_async=True to test sync path explicitly.
         """
         with patch(
             "vibe3.services.scan_service.dispatch_governance_execution"
         ) as mock_service:
             from vibe3.commands.scan import _run_governance_scan
 
-            _run_governance_scan()
+            _run_governance_scan(no_async=True)
 
             # Manual scan always calls service layer, ignoring FailedGate
             mock_service.assert_called_once_with(material_override=None)

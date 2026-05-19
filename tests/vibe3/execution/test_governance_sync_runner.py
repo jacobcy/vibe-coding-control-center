@@ -195,3 +195,238 @@ class TestGovernanceSyncRunner:
 
         # Should also log governance event
         mock_append_event.assert_called()
+
+
+class TestGovernanceAsyncRunner:
+    """Test governance async dispatch."""
+
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.FlowManager")
+    @patch("vibe3.execution.governance_sync_runner.load_orchestra_config")
+    def test_async_dispatches_via_coordinator(
+        self,
+        mock_load_config: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_append_event: MagicMock,
+        mock_get_store: MagicMock,
+    ) -> None:
+        """Async dispatch should create ExecutionCoordinator and call dispatch."""
+        from vibe3.execution.contracts import ExecutionLaunchResult
+        from vibe3.execution.governance_sync_runner import run_governance_async
+
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 3
+        mock_load_config.return_value = mock_config
+
+        # Mock no live governance sessions
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+
+        mock_snapshot = MagicMock()
+        mock_snapshot.circuit_breaker_state = "closed"
+
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        mock_backend = MagicMock()
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True, tmux_session="test-session-governance-0"
+        )
+
+        with (
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=mock_backend,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.OrchestraStatusService"
+            ) as mock_status_cls,
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.execution.issue_role_support.resolve_async_cli_project_root",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.roles.governance.build_governance_execution_name",
+                return_value="governance-0",
+            ),
+            patch(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            mock_status_cls.return_value.snapshot.return_value = mock_snapshot
+            run_governance_async(tick_count=0)
+
+        # Verify coordinator dispatch was called
+        mock_coordinator.dispatch_execution.assert_called_once()
+        request = mock_coordinator.dispatch_execution.call_args[0][0]
+        assert request.mode == "async"
+        assert request.role == "governance"
+        assert request.actor == "cli:governance"
+
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.FlowManager")
+    @patch("vibe3.execution.governance_sync_runner.load_orchestra_config")
+    def test_async_builds_correct_cli_cmd(
+        self,
+        mock_load_config: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_append_event: MagicMock,
+        mock_get_store: MagicMock,
+    ) -> None:
+        """Async dispatch should build correct CLI self-invocation command."""
+        from pathlib import Path
+
+        from vibe3.execution.contracts import ExecutionLaunchResult
+        from vibe3.execution.governance_sync_runner import run_governance_async
+
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 3
+        mock_load_config.return_value = mock_config
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+
+        mock_snapshot = MagicMock()
+        mock_snapshot.circuit_breaker_state = "closed"
+
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True, tmux_session="test-session"
+        )
+
+        fake_root = Path("/fake/project")
+        mock_cli_path = MagicMock()
+        mock_cli_path.__str__ = MagicMock(return_value="/fake/project/src/vibe3/cli.py")
+
+        with (
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.OrchestraStatusService"
+            ) as mock_status_cls,
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=fake_root,
+            ),
+            patch(
+                "vibe3.execution.issue_role_support.resolve_async_cli_project_root",
+                return_value=fake_root,
+            ),
+            patch(
+                "vibe3.roles.governance.build_governance_execution_name",
+                return_value="governance-0",
+            ),
+            patch(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            mock_status_cls.return_value.snapshot.return_value = mock_snapshot
+            with patch("pathlib.Path.resolve", return_value=mock_cli_path):
+                run_governance_async(tick_count=5)
+
+        request = mock_coordinator.dispatch_execution.call_args[0][0]
+        assert request.cmd is not None
+        assert request.cmd[-2] == "governance"
+        assert request.cmd[-1] == "5"
+
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.FlowManager")
+    @patch("vibe3.execution.governance_sync_runner.load_orchestra_config")
+    def test_async_with_material_override(
+        self,
+        mock_load_config: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_append_event: MagicMock,
+        mock_get_store: MagicMock,
+    ) -> None:
+        """Async dispatch includes --material when material_override is set."""
+        from pathlib import Path
+
+        from vibe3.execution.contracts import ExecutionLaunchResult
+        from vibe3.execution.governance_sync_runner import run_governance_async
+
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 3
+        mock_load_config.return_value = mock_config
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+
+        mock_snapshot = MagicMock()
+        mock_snapshot.circuit_breaker_state = "closed"
+
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True, tmux_session="test-session"
+        )
+
+        fake_root = Path("/fake/project")
+
+        with (
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.OrchestraStatusService"
+            ) as mock_status_cls,
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=fake_root,
+            ),
+            patch(
+                "vibe3.execution.issue_role_support.resolve_async_cli_project_root",
+                return_value=fake_root,
+            ),
+            patch(
+                "vibe3.roles.governance.build_governance_execution_name",
+                return_value="governance-0",
+            ),
+            patch(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            mock_status_cls.return_value.snapshot.return_value = mock_snapshot
+            run_governance_async(tick_count=0, material_override="assignee-pool")
+
+        request = mock_coordinator.dispatch_execution.call_args[0][0]
+        assert "--material" in request.cmd
+        assert "assignee-pool" in request.cmd

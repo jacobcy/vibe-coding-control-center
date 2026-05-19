@@ -7,6 +7,7 @@ import typer
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.commands.command_options import _ASYNC_OPT
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.observability import setup_logging
 
@@ -31,16 +32,25 @@ def _execute_governance_internal(material_override: str | None = None) -> None:
     dispatch_governance_execution(material_override=material_override)
 
 
-def _run_governance_scan(material_override: str | None = None) -> None:
-    """Execute governance scan once via internal dispatch.
+def _run_governance_scan(
+    material_override: str | None = None, no_async: bool = False
+) -> None:
+    """Execute governance scan once.
 
-    Calls internal_governance_dispatch directly without facade heartbeat chain.
+    Async default (no_async=False): dispatches via tmux background session.
+    Sync (no_async=True): calls internal dispatch directly.
 
     Args:
         material_override: Optional governance role to override material rotation
+        no_async: Run synchronously (blocking) instead of async tmux session
     """
-    _execute_governance_internal(material_override=material_override)
-    logger.bind(domain="orchestra").info("Governance scan completed")
+    if no_async:
+        _execute_governance_internal(material_override=material_override)
+        logger.bind(domain="orchestra").info("Governance scan completed")
+    else:
+        from vibe3.execution.governance_sync_runner import run_governance_async
+
+        run_governance_async(tick_count=0, material_override=material_override)
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
@@ -143,6 +153,7 @@ def governance(
         bool,
         typer.Option("--dry-run", help="Build and display prompt without executing"),
     ] = False,
+    no_async: _ASYNC_OPT = False,
     verbose: Annotated[
         int,
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
@@ -200,8 +211,9 @@ def governance(
             typer.echo("Use --role <role-name> to specify a particular role.")
         typer.echo("")  # Blank line for readability
 
-    _run_governance_scan(material_override=role)
-    typer.echo("Governance scan completed")
+    _run_governance_scan(material_override=role, no_async=no_async)
+    if no_async:
+        typer.echo("Governance scan completed")
 
 
 @app.command()
