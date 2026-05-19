@@ -50,8 +50,18 @@ def _resolve_server_label(
         return "[green]running[/]"
     pid, is_valid = _validate_pid_file(config.pid_file)
     if is_valid and pid is not None:
-        return "[yellow]unreachable[/]"
+        return "[green]running[/]"
     return "[dim]stopped[/]"
+
+
+def _compute_effective_server_running(
+    snapshot_running: bool, config: OrchestraConfig
+) -> bool:
+    """Unified server status: snapshot is authoritative, PID-valid is fallback."""
+    if snapshot_running:
+        return True
+    _, pid_valid = _validate_pid_file(config.pid_file)
+    return pid_valid
 
 
 def status(
@@ -91,9 +101,23 @@ def status(
         if check:
             run_full_check_shortcut()
 
+        import time
+
         config = load_orchestra_config()
         orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+        if orch_snapshot is None:
+            time.sleep(0.5)
+            orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
         snapshot_found = orch_snapshot is not None
+
+        if not orch_snapshot:
+            _, pid_alive = _validate_pid_file(config.pid_file)
+            if pid_alive:
+                import time
+
+                time.sleep(0.5)
+                orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+                snapshot_found = orch_snapshot is not None
 
         if not orch_snapshot:
             from dataclasses import replace
@@ -153,7 +177,9 @@ def status(
                     f"  [red]Issue:   #{orch_snapshot.blocked_issue_number}[/]"
                 )
             console.print(f"  [red]Reason:  {orch_snapshot.blocked_issue_reason}[/]")
-        elif not orch_snapshot.server_running:
+        elif not _compute_effective_server_running(
+            orch_snapshot.server_running, config
+        ):
             console.print("Dispatch: [dim]inactive (server stopped)[/]")
         else:
             console.print("Dispatch: [green]active[/]")
