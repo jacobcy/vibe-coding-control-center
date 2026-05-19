@@ -198,8 +198,9 @@ bash scripts/tools/metrics.sh
 
 ---
 
-## 4. V2 标准开发流程
+## 4. V2 标准开发流程（V2 Legacy，仅供参考）
 
+> ⚠️ **此流程基于已不再扩展的 V2 Shell 入口（`bin/vibe`）。V3 用户请优先参考 §2.4 V3 开发入口。**
 > 小白入门：**每次开发功能，严格按这 5 步走。**
 > V3 用户请参考 §2.4 V3 开发入口中的 `uv run python src/vibe3/cli.py` 命令集，以及 `.agent/README.md` 中的 agent workflow 入口。
 
@@ -312,10 +313,12 @@ tests/                 # bats-core 测试（≥20 个用例）
 
 ## 7. 常用命令速查
 
-### V2 (Shell)
+### V2 (Shell) — Legacy，不再扩展
+
+> ⚠️ `bin/vibe` 是 V2 Shell 入口，已稳定不再扩展。V3 用户请使用下方 V3 (Python) 命令。
 
 ```bash
-# 开发工作流
+# 开发工作流（V2，仅供参考）
 bin/vibe flow start <feature>  # 创建 worktree + 分支
 bin/vibe flow review           # Pre-PR 检查
 bin/vibe flow pr               # 创建 PR

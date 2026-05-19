@@ -1,5 +1,13 @@
 # PRD: Structure Snapshot - 代码结构快照系统
 
+> ⚠️ **V3 语义更新**：本文档为 V2 时代的 PRD 设计稿，文件名的拼写（"snapshow" 而非 "snapshot"）也是历史遗留。
+> V3 中的实际命令入口为：
+> - `vibe3 snapshot` — 项目级结构快照追踪（对应本文档的 `structure build/show/diff` 概念）
+> - `vibe3 inspect structure` — 单文件/变更分析
+>
+> 本文档保留为历史设计参考，其中描述的 CLI 命令名（`structure build/show/diff`）并非 V3 实际命令。
+> 详见 `docs/v3/v3-next-steps.md` §4 "Structure Snapshot 的位置"。
+
 1. Goal
 
 Provide a stable, hierarchical code structure snapshot for:
