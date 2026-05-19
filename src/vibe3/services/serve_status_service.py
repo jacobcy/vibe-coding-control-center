@@ -12,6 +12,10 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions.error_tracking import ErrorTrackingService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.utils.error_message_cleaner import (
+    CODEAGENT_WRAPPER_RE,
+    clean_error_message,
+)
 from vibe3.utils.time_format import format_age_aware_time
 
 
@@ -57,18 +61,9 @@ class ServeStatusService:
         Returns:
             Cleaned and truncated error message
         """
-        # Remove codeagent-wrapper prefix
-        pattern = r"^codeagent-wrapper failed \(code \d+\):\s*"
-        cleaned = re.sub(pattern, "", error_message)
-
-        # Remove CLAUDE_CODE_TMPDIR and everything after it
-        cleaned = re.split(r"\s*CLAUDE_CODE_TMPDIR:", cleaned)[0].strip()
-
-        # Remove " | === Recent Errors ===" suffix
-        cleaned = re.split(r"\s*\|\s*=== Recent Errors ===", cleaned)[0].strip()
-
-        # Remove trailing pipe separators
-        cleaned = re.sub(r"\s*\|\s*$", "", cleaned).strip()
+        # Remove codeagent-wrapper prefix, then delegate shared cleaning
+        cleaned = CODEAGENT_WRAPPER_RE.sub("", error_message)
+        cleaned = clean_error_message(cleaned)
 
         # Truncate to max_length
         return cleaned[:max_length] if len(cleaned) > max_length else cleaned
