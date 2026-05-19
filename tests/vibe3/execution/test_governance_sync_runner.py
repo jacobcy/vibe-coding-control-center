@@ -195,3 +195,116 @@ class TestGovernanceSyncRunner:
 
         # Should also log governance event
         mock_append_event.assert_called()
+
+
+class TestGovernanceAsyncRunnerSkipPaths:
+    """Test governance async skip paths: concurrent limit and circuit breaker."""
+
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.echo")
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    def test_skip_when_concurrent_governance_at_limit(
+        self,
+        mock_get_store: MagicMock,
+        mock_echo: MagicMock,
+        mock_append_event: MagicMock,
+    ) -> None:
+        """Async dispatch should be skipped when concurrent sessions >= limit."""
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 1
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = [
+            {"tmux_session": "vibe3-governance-tick-0"},
+        ]
+        mock_registry.mark_governance_sessions_done_when_tmux_gone = MagicMock()
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        with (
+            patch(
+                "vibe3.execution.governance_sync_runner.load_orchestra_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+        ):
+            from vibe3.execution.governance_sync_runner import run_governance_async
+
+            run_governance_async(tick_count=0)
+
+        mock_echo.assert_called_once()
+        assert "governance already running" in mock_echo.call_args[0][0]
+        mock_append_event.assert_called_once()
+        assert "dispatch skipped" in mock_append_event.call_args[0][0]
+
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.echo")
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    def test_skip_when_circuit_breaker_open(
+        self,
+        mock_get_store: MagicMock,
+        mock_echo: MagicMock,
+        mock_append_event: MagicMock,
+    ) -> None:
+        """Async dispatch should be skipped when circuit breaker is open."""
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 3
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry.mark_governance_sessions_done_when_tmux_gone = MagicMock()
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        mock_snapshot = MagicMock()
+        mock_snapshot.circuit_breaker_state = "open"
+        mock_status_service = MagicMock()
+        mock_status_service.snapshot.return_value = mock_snapshot
+
+        with (
+            patch(
+                "vibe3.execution.governance_sync_runner.load_orchestra_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+            patch(
+                "vibe3.orchestra.flow_dispatch.FlowManager",
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.OrchestraStatusService",
+                return_value=mock_status_service,
+            ),
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+            ),
+        ):
+            from vibe3.execution.governance_sync_runner import run_governance_async
+
+            run_governance_async(tick_count=5)
+
+        mock_echo.assert_called_once()
+        assert "circuit breaker is OPEN" in mock_echo.call_args[0][0]
+        mock_append_event.assert_called_once()
+        assert "circuit breaker OPEN" in mock_append_event.call_args[0][0]

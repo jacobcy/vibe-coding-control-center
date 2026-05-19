@@ -6,11 +6,16 @@ ensuring API errors are captured for FailedGate threshold checking.
 
 from __future__ import annotations
 
+import os
+
 from loguru import logger
 from typer import echo
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
+from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.logging import append_governance_event
 from vibe3.roles.governance import (
@@ -129,3 +134,129 @@ def run_governance_sync(
 
         # Re-raise for CLI exit code handling
         raise
+
+
+def run_governance_async(
+    *,
+    tick_count: int = 0,
+    material_override: str | None = None,
+) -> None:
+    """Run governance scan in background tmux session (async).
+
+    Builds a CLI self-invocation ExecutionRequest and dispatches via
+    ExecutionCoordinator, matching the plan/run/review async dispatch pattern.
+    Checks for concurrent governance sessions and circuit breaker before dispatching.
+
+    Args:
+        tick_count: Tick number for governance material rotation
+        material_override: Optional governance role to override material rotation
+    """
+    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.execution.coordinator import ExecutionCoordinator
+    from vibe3.execution.issue_role_support import (
+        resolve_async_cli_project_root,
+        resolve_orchestra_repo_root,
+    )
+    from vibe3.roles.governance import build_governance_execution_name
+
+    config = load_orchestra_config()
+
+    # Check for concurrent governance sessions (same dedup logic as orchestra handler)
+    with get_store() as store:
+        backend = CodeagentBackend()
+        registry = SessionRegistryService(store, backend)
+        registry.mark_governance_sessions_done_when_tmux_gone()
+        live_governance = registry.list_live_governance_sessions()
+        if len(live_governance) >= config.governance_max_concurrent:
+            session_names = ", ".join(
+                str(session.get("tmux_session") or session.get("session_name") or "?")
+                for session in live_governance[:3]
+            )
+            skip_result = ExecutionLaunchResult(
+                launched=False,
+                skipped=True,
+                reason=(
+                    "governance already running"
+                    if not session_names
+                    else f"governance already running ({session_names})"
+                ),
+                reason_code="governance_already_running",
+            )
+            append_governance_event(
+                f"governance dispatch skipped: tick={tick_count} "
+                f"reason={skip_result.reason}"
+            )
+            echo(skip_result.reason)
+            return
+
+    flow_manager = FlowManager(config)
+    status_service = OrchestraStatusService(config, orchestrator=flow_manager)
+    snapshot = status_service.snapshot()
+
+    root = resolve_orchestra_repo_root()
+
+    # Check circuit breaker before dispatching
+    if snapshot.circuit_breaker_state == "open":
+        append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
+        echo("Governance dispatch skipped: circuit breaker is OPEN")
+        return
+
+    execution_name = build_governance_execution_name(tick_count)
+
+    # Build CLI self-invocation command
+    command_root = resolve_async_cli_project_root(root)
+    cmd = [
+        "uv",
+        "run",
+        "--project",
+        str(command_root),
+        "python",
+        "-I",
+        str((command_root / "src" / "vibe3" / "cli.py").resolve()),
+        "internal",
+        "governance",
+        str(tick_count),
+    ]
+    if material_override:
+        cmd.extend(["--material", material_override])
+
+    env = dict(os.environ)
+    env["VIBE3_ASYNC_CHILD"] = "1"
+    env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+
+    request = ExecutionRequest(
+        role="governance",
+        target_branch="governance",
+        target_id=1,
+        execution_name=execution_name,
+        cmd=cmd,
+        repo_path=str(root),
+        env=env,
+        refs={"tick": str(tick_count)},
+        actor="cli:governance",
+        mode="async",
+        worktree_requirement=GOVERNANCE_GATE_CONFIG,
+    )
+
+    with get_store() as store:
+        backend = CodeagentBackend()
+        coordinator = ExecutionCoordinator(config, store, backend)
+
+        try:
+            result = coordinator.dispatch_execution(request)
+        except Exception as exc:
+            logger.exception(f"Governance scan dispatch failed: {exc}")
+            raise
+
+    if result and result.launched:
+        append_governance_event(
+            f"governance agent launched: tick={tick_count} "
+            f"session={result.tmux_session}",
+        )
+        echo(f"Governance scan dispatched in tmux session: {result.tmux_session}")
+    elif result:
+        append_governance_event(
+            f"governance dispatch skipped: tick={tick_count} "
+            f"reason={result.reason}",
+        )
+        echo(f"Governance scan skipped: {result.reason}")
