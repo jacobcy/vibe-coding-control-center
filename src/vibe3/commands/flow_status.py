@@ -47,9 +47,12 @@ StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模�
 
 
 def show(
-    branch: Annotated[
+    branch_arg: Annotated[
         str | None,
         typer.Argument(help="Branch name"),
+    ] = None,
+    branch_opt: Annotated[
+        str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,
@@ -69,6 +72,7 @@ def show(
     ] = False,
 ) -> None:
     """Show flow details with source-aware reads."""
+    branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(

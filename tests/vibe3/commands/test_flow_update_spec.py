@@ -21,7 +21,7 @@ def test_update_clear_spec_ref_with_empty_string() -> None:
         "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
     ):
         with patch("vibe3.commands.flow_manage.trace_scope"):
-            update(branch="test/branch", spec="")
+            update(branch_arg="test/branch", spec="")
 
     # Verify: spec_ref cleared with None
     mock_flow_service.store.update_flow_state.assert_called_once_with(
@@ -42,7 +42,7 @@ def test_update_with_issue_number_rejected() -> None:
     ):
         with patch("vibe3.commands.flow_manage.trace_scope"):
             with pytest.raises(typer.Exit) as exc_info:
-                update(branch="test/branch", spec="123")
+                update(branch_arg="test/branch", spec="123")
 
     # Verify: exit code 1
     assert exc_info.value.exit_code == 1
@@ -64,7 +64,7 @@ def test_update_with_valid_file_path() -> None:
                     with patch.object(
                         Path, "resolve", return_value=Path("/abs/docs/spec.md")
                     ):
-                        update(branch="test/branch", spec="docs/spec.md")
+                        update(branch_arg="test/branch", spec="docs/spec.md")
 
     # Verify: bind_spec called with absolute path
     mock_flow_service.bind_spec.assert_called_once()
@@ -83,7 +83,7 @@ def test_update_with_invalid_file_path_raises_error() -> None:
         with patch("vibe3.commands.flow_manage.trace_scope"):
             with patch.object(Path, "exists", return_value=False):
                 with pytest.raises(typer.Exit) as exc_info:
-                    update(branch="test/branch", spec="nonexistent.md")
+                    update(branch_arg="test/branch", spec="nonexistent.md")
 
     # Verify: exit code 1
     assert exc_info.value.exit_code == 1
@@ -100,7 +100,7 @@ def test_update_without_spec_does_not_modify() -> None:
         "vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service
     ):
         with patch("vibe3.commands.flow_manage.trace_scope"):
-            update(branch="test/branch", spec=None)
+            update(branch_arg="test/branch", spec=None)
 
     # Verify: bind_spec NOT called, update_flow_state NOT called for spec_ref
     mock_flow_service.bind_spec.assert_not_called()

@@ -135,7 +135,10 @@ def _ensure_branch_worktree_ownership(flow_service: FlowService, branch: str) ->
 
 
 def update(
-    branch: BranchArg = None,
+    branch_arg: BranchArg = None,
+    branch_opt: Annotated[
+        str | None, typer.Option("--branch", help="Branch name or issue number")
+    ] = None,
     name: NameOption = None,
     actor: ActorOption = None,
     spec: SpecOption = None,
@@ -151,6 +154,7 @@ def update(
     ] = False,
 ) -> None:
     """Update flow metadata (idempotent add/update)."""
+    branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -389,10 +393,21 @@ def list_deleted(
 
 
 def restore_flow(
-    branch: str,
+    branch_arg: Annotated[
+        str | None,
+        typer.Argument(help="Branch name"),
+    ] = None,
+    branch_opt: Annotated[
+        str | None, typer.Option("--branch", help="Branch name or issue number")
+    ] = None,
     trace: TraceOption = False,
 ) -> None:
     """Restore a soft-deleted flow."""
+    branch = branch_opt or branch_arg
+    if branch is None:
+        typer.echo("Error: Branch is required for flow restore", err=True)
+        raise typer.Exit(1)
+
     from vibe3.utils.branch_arg import resolve_branch_arg
 
     target_branch = resolve_branch_arg(branch)
