@@ -16,7 +16,7 @@ vibe_init_help() {
     echo "  1. 检查 git 环境"
     echo "  2. 根据 profile 创建必要的目录结构"
     echo "  3. 根据 profile 创建 GitHub labels"
-    echo "  4. 根据 profile 复制 .claude/skills 符号链接"
+    echo "  4.根据 profile 分别创建 skills/ 目录和 .claude/skills 全局符号链接"
     echo "  5. 生成 .vibe/config.yaml 配置文件"
     echo "  6. 验证项目运行支持"
     echo ""
@@ -114,7 +114,8 @@ vibe_init() {
     # Get profile features (needed for both pre-flight checks and execution)
     local ENABLE_GITHUB_LABELS=$(get_profile_feature "github_labels")
     local ENABLE_AGENT=$(get_profile_feature "agent")
-    local ENABLE_SKILLS=$(get_profile_feature "skills")
+    local ENABLE_LOCAL_SKILLS=$(get_profile_feature "local_skills")
+    local ENABLE_GLOBAL_SKILLS=$(get_profile_feature "global_skills")
     local ENABLE_SUPERVISOR=$(get_profile_feature "supervisor")
 
     # 1. Check git environment
@@ -155,8 +156,11 @@ vibe_init() {
             echo "  - Create .agent/ directory structure"
         fi
 
-        if [[ "$ENABLE_SKILLS" == true ]]; then
+        if [[ "$ENABLE_LOCAL_SKILLS" == true ]]; then
             echo "  - Create skills/ structure"
+        fi
+
+        if [[ "$ENABLE_GLOBAL_SKILLS" == true ]]; then
             echo "  - Setup .claude/skills symlinks"
         fi
 
@@ -198,7 +202,7 @@ vibe_init() {
     fi
 
     # Create skills/ if profile requires
-    if [[ "$ENABLE_SKILLS" == true ]]; then
+    if [[ "$ENABLE_LOCAL_SKILLS" == true ]]; then
         mkdir -p "$REPO_ROOT/skills"
         _log_success "Created: skills/ directory"
     fi
@@ -258,7 +262,7 @@ vibe_init() {
     fi
 
     # 6. Setup .claude/skills symlinks (profile-dependent)
-    if [[ "$ENABLE_SKILLS" == true ]]; then
+    if [[ "$ENABLE_GLOBAL_SKILLS" == true ]]; then
         _log_info "Setting up .claude/skills symlinks..."
 
         local VIBE_SKILLS_DIR="$HOME/.vibe/skills"

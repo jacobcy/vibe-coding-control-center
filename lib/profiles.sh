@@ -9,7 +9,8 @@
 # profile: <minimal|github-flow|vibe-center>
 # features:
 #   agent: <true|false>          # Whether to create .agent/ directory
-#   skills: <true|false>         # Whether to create skills/ structure
+#   local_skills: <true|false>   # Whether to create skills/ directory
+#   global_skills: <true|false>  # Whether to symlink ~/.vibe/skills → .claude/skills/
 #   supervisor: <true|false>     # Whether to enable supervisor orchestration
 #   github_labels: <true|false>  # Whether to create GitHub labels
 #   github_orchestration: <true|false>  # Whether to enable GitHub flow/PR/issue orchestration
@@ -37,7 +38,8 @@
 PROFILE_MINIMAL=(
     "profile:minimal"
     "features.agent:false"
-    "features.skills:false"
+    "features.local_skills:false"
+    "features.global_skills:false"
     "features.supervisor:false"
     "features.github_labels:false"
     "features.github_orchestration:false"
@@ -57,7 +59,8 @@ PROFILE_MINIMAL=(
 PROFILE_GITHUB_FLOW=(
     "profile:github-flow"
     "features.agent:true"
-    "features.skills:false"
+    "features.local_skills:false"
+    "features.global_skills:true"
     "features.supervisor:false"
     "features.github_labels:true"
     "features.github_orchestration:true"
@@ -77,7 +80,8 @@ PROFILE_GITHUB_FLOW=(
 PROFILE_VIBE_CENTER=(
     "profile:vibe-center"
     "features.agent:true"
-    "features.skills:true"
+    "features.local_skills:true"
+    "features.global_skills:true"
     "features.supervisor:true"
     "features.github_labels:true"
     "features.github_orchestration:true"
@@ -195,7 +199,8 @@ profile: $profile_name
 
 features:
   agent: $(get_profile_feature "agent")
-  skills: $(get_profile_feature "skills")
+  local_skills: $(get_profile_feature "local_skills")
+  global_skills: $(get_profile_feature "global_skills")
   supervisor: $(get_profile_feature "supervisor")
   github_labels: $(get_profile_feature "github_labels")
   github_orchestration: $(get_profile_feature "github_orchestration")
@@ -247,7 +252,7 @@ list_profiles() {
     echo "  ${GREEN}minimal${NC}"
     echo "    - Minimal runtime without GitHub orchestration"
     echo "    - No .agent/ directory"
-    echo "    - No skills/ structure"
+    echo "    - No local skills/ or global .claude/skills/ symlinks"
     echo "    - No GitHub labels"
     echo "    - Uses global policies/prompts from ~/.vibe/assets"
     echo ""
@@ -256,6 +261,7 @@ list_profiles() {
     echo "    - Creates .agent/ directory"
     echo "    - Creates GitHub labels (state/*)"
     echo "    - Enables GitHub flow conventions"
+    echo "    - Symlinks global ~/.vibe/skills → .claude/skills/ (no local skills/ directory)"
     echo "    - Uses global policies/prompts from ~/.vibe/assets"
     echo ""
     echo "  ${GREEN}vibe-center${NC}"
