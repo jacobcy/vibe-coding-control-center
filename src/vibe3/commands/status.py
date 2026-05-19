@@ -148,7 +148,10 @@ def status(
                 "Dispatch: [bold red]FROZEN[/] "
                 f"[dim]({orch_snapshot.blocked_reason})[/]"
             )
-            console.print(f"  [red]Issue:   #{orch_snapshot.blocked_issue_number}[/]")
+            if orch_snapshot.blocked_issue_number is not None:
+                console.print(
+                    f"  [red]Issue:   #{orch_snapshot.blocked_issue_number}[/]"
+                )
             console.print(f"  [red]Reason:  {orch_snapshot.blocked_issue_reason}[/]")
         elif not orch_snapshot.server_running:
             console.print("Dispatch: [dim]inactive (server stopped)[/]")
