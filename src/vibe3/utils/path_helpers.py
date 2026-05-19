@@ -14,7 +14,7 @@ from vibe3.utils.git_path_client import (
 # Backward compatibility alias
 GitClientProtocol = GitPathProtocol
 
-# Branch name validation regex: alphanumeric, slash, underscore, hyphen, period
+# Branch name validation regex: alphanumeric, slash, underscore, hyphen, period, colon
 # Note: re.fullmatch() ensures the entire string matches, preventing control
 # characters like trailing newlines from being accepted
 _BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.:-]+")
