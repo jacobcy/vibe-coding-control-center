@@ -282,3 +282,51 @@ def test_cleanup_terminal_preserves_issue_with_active_new_flow(
         rows = conn.execute("SELECT issue_number FROM error_log").fetchall()
         assert len(rows) == 1
         assert rows[0][0] == 100
+
+
+def test_cleanup_terminal_deletes_tombstone_issue_without_current_flow(
+    temp_store: SQLiteClient,
+) -> None:
+    """cleanup_terminal_issue_errors should delete errors for a tombstone flow
+    when the issue no longer has a current task flow link.
+
+    This matches the serve-status production scene where a soft-deleted aborted
+    flow remains in flow_state, flow_issue_links have already been cleared, and
+    old error_log rows would otherwise keep FailedGate blocked indefinitely.
+    """
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute("""
+            INSERT INTO flow_state
+                (branch, flow_slug, flow_status, deleted_at, updated_at)
+            VALUES
+                (
+                    'task/issue-42',
+                    'task-issue-42',
+                    'aborted',
+                    datetime('now'),
+                    datetime('now')
+                )
+        """)
+        conn.execute("""
+            INSERT INTO error_log
+                (tick_id, error_code, error_message, issue_number, branch)
+            VALUES
+                (
+                    1,
+                    'E_EXEC_UNKNOWN',
+                    'MagicMock <= int',
+                    42,
+                    'task/issue-42'
+                )
+        """)
+        conn.commit()
+
+    deleted = ErrorTrackingService._instance.cleanup_terminal_issue_errors()
+
+    assert deleted == 1
+
+    with sqlite3.connect(temp_store.db_path) as conn:
+        rows = conn.execute("SELECT issue_number, branch FROM error_log").fetchall()
+        assert rows == []

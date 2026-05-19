@@ -307,6 +307,9 @@ class ErrorTrackingService:
         Uses flow_issue_links (issue_role='task') as SSOT to identify current
         task flow for each issue, avoiding false matches on superseded flows.
 
+        Also cleans up orphaned errors that still point at a terminal tombstone
+        branch after the current task flow link has already been removed.
+
         Terminal states: done, aborted, stale (per _is_reusable_auto_flow
         in flow_dispatch.py).
 
@@ -315,14 +318,35 @@ class ErrorTrackingService:
         """
         with sqlite3.connect(self.db_path) as conn:
             result = conn.execute("""
-                DELETE FROM error_log
-                WHERE issue_number IN (
-                    SELECT fil.issue_number
-                    FROM flow_issue_links fil
-                    INNER JOIN flow_state fs ON fs.branch = fil.branch
-                    WHERE fil.issue_role = 'task'
-                      AND fs.flow_status IN ('done', 'aborted', 'stale')
-                      AND fs.deleted_at IS NULL
+                DELETE FROM error_log AS el
+                WHERE el.issue_number IS NOT NULL
+                  AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM flow_issue_links fil
+                        INNER JOIN flow_state fs ON fs.branch = fil.branch
+                        WHERE fil.issue_role = 'task'
+                          AND fil.issue_number = el.issue_number
+                          AND fs.flow_status IN ('done', 'aborted', 'stale')
+                          AND fs.deleted_at IS NULL
+                    )
+                    OR (
+                        NOT EXISTS (
+                            SELECT 1
+                            FROM flow_issue_links fil_current
+                            INNER JOIN flow_state fs_current
+                                ON fs_current.branch = fil_current.branch
+                            WHERE fil_current.issue_role = 'task'
+                              AND fil_current.issue_number = el.issue_number
+                              AND fs_current.deleted_at IS NULL
+                        )
+                        AND EXISTS (
+                            SELECT 1
+                            FROM flow_state fs_tomb
+                            WHERE fs_tomb.branch = el.branch
+                              AND fs_tomb.flow_status IN ('done', 'aborted', 'stale')
+                        )
+                    )
                 )
             """)
             conn.commit()
