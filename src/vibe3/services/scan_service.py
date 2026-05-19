@@ -180,6 +180,134 @@ def governance_material_exists(material_name: str) -> bool:
         return False
 
 
+def validate_governance_material_consistency(
+    adapter: Any | None = None,
+    recipes_path: Path | None = None,
+    repo_root: Path | None = None,
+) -> list[dict]:
+    """Cross-check adapter manifest, recipe catalog, and file system.
+
+    Three consistency checks:
+    1. material_catalog -> adapter: every catalog entry has an adapter resource
+    2. material_catalog -> file system: every catalog entry's file exists
+    3. adapter -> material_catalog: every governance adapter resource is in catalog
+
+    Parameters accept overrides for testability; when None, load defaults.
+
+    Returns:
+        List of dicts with keys: type, message, detail
+    """
+    from vibe3.adapters import get_adapter
+    from vibe3.prompts.manifest import PromptManifest
+
+    issues: list[dict] = []
+
+    # Load defaults when not provided
+    if adapter is None:
+        adapter = get_adapter("vibe-center")
+        if adapter is None:
+            issues.append(
+                {
+                    "type": "missing_adapter",
+                    "message": "vibe-center adapter not found",
+                    "detail": "Ensure vibe-center adapter module is importable",
+                }
+            )
+            return issues
+    if repo_root is None:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+        git_common_dir = git_client.get_git_common_dir()
+        repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+
+    # Load material catalog from prompt manifest
+    try:
+        if recipes_path is not None:
+            manifest = PromptManifest.load(recipes_path)
+        else:
+            manifest = PromptManifest.load_default()
+        recipe_def = manifest.recipe("governance.scan")
+        if not recipe_def or not recipe_def.loaded_definition:
+            issues.append(
+                {
+                    "type": "missing_recipe",
+                    "message": "governance.scan recipe not found or not loaded",
+                    "detail": "Cannot validate without recipe definition",
+                }
+            )
+            return issues
+        material_catalog = recipe_def.loaded_definition.material_catalog
+    except Exception as exc:
+        issues.append(
+            {
+                "type": "missing_recipe",
+                "message": f"Failed to load governance.scan recipe: {exc}",
+                "detail": "Cannot validate without recipe definition",
+            }
+        )
+        return issues
+
+    catalog_paths = {m.name for m in material_catalog}
+
+    # Check 1: material_catalog -> adapter
+    adapter_supervisor_paths = {
+        r.path for r in adapter.get_resources_by_type("supervisor")
+    }
+    for material in material_catalog:
+        if material.name not in adapter_supervisor_paths:
+            issues.append(
+                {
+                    "type": "missing_adapter",
+                    "message": (
+                        f"Material '{material.name}' in catalog but not"
+                        " registered in adapter"
+                    ),
+                    "detail": (
+                        f"Add AdapterResource for '{material.name}'"
+                        " to adapter manifest"
+                    ),
+                }
+            )
+
+    # Check 2: material_catalog -> file system
+    for material in material_catalog:
+        file_path = repo_root / material.name
+        if not file_path.exists():
+            issues.append(
+                {
+                    "type": "missing_file",
+                    "message": (
+                        f"Material '{material.name}' in catalog but file"
+                        f" not found at {file_path}"
+                    ),
+                    "detail": f"File does not exist at {file_path}",
+                }
+            )
+
+    # Check 3: adapter -> material_catalog
+    for resource in adapter.get_resources_by_type("supervisor"):
+        if (
+            resource.path.startswith("supervisor/governance/")
+            and resource.path not in catalog_paths
+        ):
+            issues.append(
+                {
+                    "type": "orphaned_adapter",
+                    "message": (
+                        f"Adapter has governance resource '{resource.path}'"
+                        " not in material catalog"
+                    ),
+                    "detail": (
+                        f"Add '{resource.path}' to material_catalog"
+                        " or remove from adapter manifest"
+                    ),
+                }
+            )
+
+    return issues
+
+
 def list_governance_materials(console: Any) -> None:
     """List available governance materials with descriptions.
 
