@@ -1,7 +1,7 @@
 """Tests for governance_sync_runner error tracking integration.
 
-Verifies API errors in governance sync execution path are captured
-by ErrorTrackingService for FailedGate threshold checking.
+These tests verify that API errors in the governance sync execution path
+are properly captured by ErrorTrackingService for FailedGate threshold checking.
 """
 
 from unittest.mock import MagicMock, patch
@@ -10,6 +10,8 @@ import pytest
 
 
 class TestGovernanceSyncRunner:
+    """Test governance sync runner error tracking."""
+
     @patch("vibe3.execution.governance_sync_runner.append_governance_event")
     @patch(
         "vibe3.execution.governance_sync_runner.render_governance_prompt",
@@ -38,6 +40,7 @@ class TestGovernanceSyncRunner:
         mock_render: MagicMock,
         mock_append_event: MagicMock,
     ) -> None:
+        """Dry run should print intent without executing."""
         from vibe3.execution.governance_sync_runner import run_governance_sync
 
         mock_config = MagicMock()
@@ -57,6 +60,7 @@ class TestGovernanceSyncRunner:
             session_id=None,
         )
 
+        # Dry run should not dispatch to backend
         mock_append_event.assert_not_called()
 
     @patch("vibe3.execution.governance_sync_runner.append_governance_event")
@@ -87,6 +91,7 @@ class TestGovernanceSyncRunner:
         mock_render: MagicMock,
         mock_append_event: MagicMock,
     ) -> None:
+        """Successful execution should log completion event."""
         from vibe3.execution.governance_sync_runner import run_governance_sync
 
         mock_config = MagicMock()
@@ -113,6 +118,7 @@ class TestGovernanceSyncRunner:
             session_id=None,
         )
 
+        # Should log completion event
         mock_append_event.assert_called()
         call_args = mock_append_event.call_args.args[0]
         assert "completed" in call_args or "tick=5" in call_args
@@ -145,6 +151,7 @@ class TestGovernanceSyncRunner:
         mock_render: MagicMock,
         mock_append_event: MagicMock,
     ) -> None:
+        """API error should be classified and recorded to ErrorTrackingService."""
         from vibe3.execution.governance_sync_runner import run_governance_sync
 
         mock_config = MagicMock()
@@ -158,9 +165,11 @@ class TestGovernanceSyncRunner:
         mock_status_cls.return_value = mock_status
 
         mock_backend = MagicMock()
+        # Simulate API error
         mock_backend.run.side_effect = RuntimeError("API error: rate limited")
         mock_backend_cls.return_value = mock_backend
 
+        # Patch at the source module where ErrorTrackingService is imported
         with patch(
             "vibe3.exceptions.error_tracking.ErrorTrackingService"
         ) as mock_tracking_cls:
@@ -175,11 +184,127 @@ class TestGovernanceSyncRunner:
                     session_id=None,
                 )
 
+            # Should classify and record error
             mock_tracking.record_error.assert_called_once()
             call_args = mock_tracking.record_error.call_args
+            # Check keyword arguments
             assert call_args.kwargs["error_code"] == "E_API_RATE_LIMIT"
             assert call_args.kwargs["tick_id"] == 5
             assert call_args.kwargs["issue_number"] is None
             assert call_args.kwargs["branch"] is None
 
+        # Should also log governance event
         mock_append_event.assert_called()
+
+
+class TestGovernanceAsyncRunnerSkipPaths:
+    """Test governance async skip paths: concurrent limit and circuit breaker."""
+
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.echo")
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    def test_skip_when_concurrent_governance_at_limit(
+        self,
+        mock_get_store: MagicMock,
+        mock_echo: MagicMock,
+        mock_append_event: MagicMock,
+    ) -> None:
+        """Async dispatch should be skipped when concurrent sessions >= limit."""
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 1
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = [
+            {"tmux_session": "vibe3-governance-tick-0"},
+        ]
+        mock_registry.mark_governance_sessions_done_when_tmux_gone = MagicMock()
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        with (
+            patch(
+                "vibe3.execution.governance_sync_runner.load_orchestra_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+        ):
+            from vibe3.execution.governance_sync_runner import run_governance_async
+
+            run_governance_async(tick_count=0)
+
+        mock_echo.assert_called_once()
+        assert "governance already running" in mock_echo.call_args[0][0]
+        mock_append_event.assert_called_once()
+        assert "dispatch skipped" in mock_append_event.call_args[0][0]
+
+    @patch("vibe3.execution.governance_sync_runner.append_governance_event")
+    @patch("vibe3.execution.governance_sync_runner.echo")
+    @patch("vibe3.execution.governance_sync_runner.get_store")
+    def test_skip_when_circuit_breaker_open(
+        self,
+        mock_get_store: MagicMock,
+        mock_echo: MagicMock,
+        mock_append_event: MagicMock,
+    ) -> None:
+        """Async dispatch should be skipped when circuit breaker is open."""
+        mock_config = MagicMock()
+        mock_config.governance_max_concurrent = 3
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry.mark_governance_sessions_done_when_tmux_gone = MagicMock()
+        mock_store_ctx = MagicMock()
+        mock_store_ctx.__enter__ = MagicMock(return_value=mock_store_ctx)
+        mock_store_ctx.__exit__ = MagicMock(return_value=False)
+        mock_get_store.return_value = mock_store_ctx
+
+        mock_snapshot = MagicMock()
+        mock_snapshot.circuit_breaker_state = "open"
+        mock_status_service = MagicMock()
+        mock_status_service.snapshot.return_value = mock_snapshot
+
+        with (
+            patch(
+                "vibe3.execution.governance_sync_runner.load_orchestra_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.CodeagentBackend",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.environment.session_registry.SessionRegistryService",
+                return_value=mock_registry,
+            ),
+            patch(
+                "vibe3.orchestra.flow_dispatch.FlowManager",
+            ),
+            patch(
+                "vibe3.execution.governance_sync_runner.OrchestraStatusService",
+                return_value=mock_status_service,
+            ),
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "vibe3.execution.coordinator.ExecutionCoordinator",
+            ),
+        ):
+            from vibe3.execution.governance_sync_runner import run_governance_async
+
+            run_governance_async(tick_count=5)
+
+        mock_echo.assert_called_once()
+        assert "circuit breaker is OPEN" in mock_echo.call_args[0][0]
+        mock_append_event.assert_called_once()
+        assert "circuit breaker OPEN" in mock_append_event.call_args[0][0]
