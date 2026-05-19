@@ -240,7 +240,7 @@ class TestResolveServerLabel:
         assert result == "[green]running[/]"
 
     def test_no_snapshot_server_down_pid_valid(self) -> None:
-        """No snapshot, server down, PID valid → green running (PID confirmed alive)."""
+        """No snapshot, server down, PID valid → green running."""
         result = self._call(snapshot_found=False, server_running=False, pid_valid=True)
         assert result == "[green]running[/]"
 
@@ -248,3 +248,29 @@ class TestResolveServerLabel:
         """No snapshot, server down, PID invalid → dim stopped."""
         result = self._call(snapshot_found=False, server_running=False, pid_valid=False)
         assert result == "[dim]stopped[/]"
+
+
+class TestComputeEffectiveServerRunning:
+    """Tests for _compute_effective_server_running."""
+
+    def _call(self, snapshot_running: bool, pid_valid: bool) -> bool:
+        from vibe3.commands.status import _compute_effective_server_running
+
+        config = MagicMock()
+        config.pid_file = "/tmp/vibe3.pid"
+        with patch("vibe3.commands.status._validate_pid_file") as mock_pid:
+            mock_pid.return_value = (1234, pid_valid)
+            return _compute_effective_server_running(snapshot_running, config)
+
+    def test_snapshot_running_true(self) -> None:
+        """Snapshot says running → effective True regardless of PID."""
+        assert self._call(snapshot_running=True, pid_valid=False) is True
+        assert self._call(snapshot_running=True, pid_valid=True) is True
+
+    def test_snapshot_false_pid_valid(self) -> None:
+        """Snapshot says down but PID valid → effective True (fallback)."""
+        assert self._call(snapshot_running=False, pid_valid=True) is True
+
+    def test_snapshot_false_pid_invalid(self) -> None:
+        """Snapshot says down and PID invalid → effective False."""
+        assert self._call(snapshot_running=False, pid_valid=False) is False
