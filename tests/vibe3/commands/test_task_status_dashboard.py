@@ -170,3 +170,48 @@ def test_task_status_shows_flows_with_prs(
     assert "Flows with PRs (Merge-Ready/Done):" in result.output
     assert "# 404" in result.output
     assert "PR: https://github.com/openai/vibe-center/pull/1" in result.output
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_task_status_hides_missing_blocked_issue_number(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """task status should not render '#None' when failed gate has no issue number."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+        dispatch_blocked=True,
+        blocked_reason="state/blocked",
+        blocked_issue_number=None,
+        blocked_issue_reason="API/Exec error threshold: 3 recent errors",
+    )
+
+    mock_flow_service_cls.return_value = MagicMock(list_flows=lambda status: [])
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = []
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Dispatch: FROZEN" in result.output
+    assert "Reason:  API/Exec error threshold: 3 recent errors" in result.output
+    assert "#None" not in result.output
