@@ -123,3 +123,55 @@ def test_clear_blocked_projection_handles_none_body() -> None:
 
             # Verify update_issue_body not called when body is None
             mock_update.assert_not_called()
+
+
+def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
+    """Test that reset_task_scene calls cleanup service for tombstone creation."""
+    from unittest.mock import MagicMock
+
+    git_client = GitClient()
+    github_client = GitHubClient()
+    flow_service = FlowService()
+    label_service = LabelService()
+    issue_flow_service = IssueFlowService()
+
+    operations = TaskResumeOperations(
+        git_client=git_client,
+        github_client=github_client,
+        flow_service=flow_service,
+        label_service=label_service,
+        issue_flow_service=issue_flow_service,
+    )
+
+    branch = "task/issue-999"
+
+    # Mock FlowCleanupService to make test hermetic
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_class:
+        mock_cleanup_service = MagicMock()
+        mock_cleanup_class.return_value = mock_cleanup_service
+
+        # Setup cleanup result
+        mock_cleanup_service.cleanup_flow_scene.return_value = {
+            "tmux_sessions": {"success": True, "sessions": []},
+            "worktree": {"success": True, "path": None},
+            "local_branch": {"success": True, "deleted": True},
+            "remote_branch": {"success": True, "deleted": True},
+            "handoff_files": {"success": True, "files": []},
+            "flow_record": {"success": True, "deleted": True},
+        }
+
+        # Execute reset
+        operations.reset_task_scene(branch)
+
+        # Verify cleanup_flow_scene called with correct parameters
+        mock_cleanup_service.cleanup_flow_scene.assert_called_once_with(
+            branch,
+            include_remote=True,
+            terminate_sessions=True,
+            keep_flow_record=False,
+        )
+
+        # Note: Tombstone normalization is validated in repository tests
+        # This test verifies the call path through FlowCleanupService

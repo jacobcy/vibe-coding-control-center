@@ -216,20 +216,57 @@ class SQLiteFlowStateRepo:
             return int(count)
 
     def soft_delete_flow(self, branch: str) -> None:
-        """Soft delete flow by setting deleted_at timestamp."""
+        """Soft delete flow and normalize to tombstone state.
+
+        Sets deleted_at timestamp and clears all refs, reasons, actors,
+        execution state, and worktree metadata to prevent contradictory state
+        where a deleted flow still looks active with populated refs or execution
+        status.
+
+        The flow_status is normalized to 'aborted' (terminal state) to
+        distinguish tombstones from active flows in audits/debugging.
+        """
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # Normalize to tombstone: clear refs/reasons/actors/worktree/execution-state
             cursor.execute(
-                "UPDATE flow_state SET deleted_at = ? WHERE branch = ?",
-                (now, branch),
+                """UPDATE flow_state SET
+                    deleted_at = ?,
+                    flow_status = 'aborted',
+                    spec_ref = NULL,
+                    plan_ref = NULL,
+                    report_ref = NULL,
+                    audit_ref = NULL,
+                    indicate_ref = NULL,
+                    pr_ref = NULL,
+                    blocked_reason = NULL,
+                    failed_reason = NULL,
+                    blocked_by_issue = NULL,
+                    blocked_by = NULL,
+                    worktree_path = NULL,
+                    next_step = NULL,
+                    planner_actor = NULL,
+                    executor_actor = NULL,
+                    reviewer_actor = NULL,
+                    manager_actor = NULL,
+                    latest_actor = NULL,
+                    planner_status = NULL,
+                    executor_status = NULL,
+                    reviewer_status = NULL,
+                    execution_pid = NULL,
+                    execution_started_at = NULL,
+                    execution_completed_at = NULL,
+                    updated_at = ?
+                WHERE branch = ?""",
+                (now, now, branch),
             )
             conn.commit()
         logger.bind(
             external="sqlite",
             operation="soft_delete_flow",
             branch=branch,
-        ).info("Soft deleted flow record")
+        ).info("Soft deleted flow record and normalized to tombstone state")
 
     def hard_delete_flow(self, branch: str) -> None:
         """Hard delete flow with cascade, removing all related records."""
@@ -255,7 +292,12 @@ class SQLiteFlowStateRepo:
             self.soft_delete_flow(branch)
 
     def restore_flow(self, branch: str) -> None:
-        """Restore soft-deleted flow by clearing deleted_at."""
+        """Restore soft-deleted flow by clearing deleted_at.
+
+        NOTE: This restores the flow record but preserves tombstone state.
+        Restored flows will have flow_status='aborted' and cleared refs/actors/worktree.
+        Use 'vibe flow update' to reset flow_status and re-establish metadata if needed.
+        """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
