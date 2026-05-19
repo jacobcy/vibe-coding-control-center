@@ -82,37 +82,40 @@ class TestResolveTickInterval:
 
     def test_reads_runtime_interval_from_log(self, tmp_path, monkeypatch):
         """When events.log contains [server] start tick_interval, it is used."""
-        log_dir = tmp_path / "temp" / "logs" / "orchestra"
+        log_dir = tmp_path / "orchestra"
         log_dir.mkdir(parents=True)
         log_file = log_dir / "events.log"
         log_file.write_text("[2026-05-19T10:00:00] [server] start tick_interval=30s\n")
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", str(tmp_path))
 
         service = self._make_service(polling_interval=900)
         assert service._resolve_tick_interval() == 30
 
-    def test_falls_back_when_no_log(self):
+    def test_falls_back_when_no_log(self, tmp_path, monkeypatch):
         """When events.log does not exist, config default is used."""
+        # Set empty log dir to avoid reading real events.log
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", str(tmp_path))
+
         service = self._make_service(polling_interval=900)
         assert service._resolve_tick_interval() == 900
 
     def test_falls_back_when_no_start_entry(self, tmp_path, monkeypatch):
         """When events.log exists but no [server] start line, config is used."""
-        log_dir = tmp_path / "temp" / "logs" / "orchestra"
+        log_dir = tmp_path / "orchestra"
         log_dir.mkdir(parents=True)
         log_file = log_dir / "events.log"
         log_file.write_text(
             "[2026-05-19T10:00:00] [server] tick #1 start\n"
             "[2026-05-19T10:00:00] [dispatcher] something\n"
         )
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", str(tmp_path))
 
         service = self._make_service(polling_interval=600)
         assert service._resolve_tick_interval() == 600
 
     def test_uses_most_recent_start(self, tmp_path, monkeypatch):
         """When multiple [server] start entries exist, the last one is used."""
-        log_dir = tmp_path / "temp" / "logs" / "orchestra"
+        log_dir = tmp_path / "orchestra"
         log_dir.mkdir(parents=True)
         log_file = log_dir / "events.log"
         log_file.write_text(
@@ -120,18 +123,18 @@ class TestResolveTickInterval:
             "[2026-05-19T09:00:00] [server] tick #1 completed\n"
             "[2026-05-19T10:00:00] [server] start tick_interval=30s\n"
         )
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", str(tmp_path))
 
         service = self._make_service(polling_interval=900)
         assert service._resolve_tick_interval() == 30
 
     def test_display_config_shows_runtime_interval(self, tmp_path, monkeypatch):
         """Integration: _display_config outputs runtime interval from log."""
-        log_dir = tmp_path / "temp" / "logs" / "orchestra"
+        log_dir = tmp_path / "orchestra"
         log_dir.mkdir(parents=True)
         log_file = log_dir / "events.log"
         log_file.write_text("[2026-05-19T10:00:00] [server] start tick_interval=45s\n")
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", str(tmp_path))
 
         service = self._make_service(polling_interval=900)
 
