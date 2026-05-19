@@ -50,7 +50,7 @@ def _resolve_server_label(
         return "[green]running[/]"
     pid, is_valid = _validate_pid_file(config.pid_file)
     if is_valid and pid is not None:
-        return "[yellow]unreachable[/]"
+        return "[green]running[/]"
     return "[dim]stopped[/]"
 
 
@@ -91,8 +91,13 @@ def status(
         if check:
             run_full_check_shortcut()
 
+        import time
+
         config = load_orchestra_config()
         orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+        if orch_snapshot is None:
+            time.sleep(0.5)
+            orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
         snapshot_found = orch_snapshot is not None
 
         if not orch_snapshot:

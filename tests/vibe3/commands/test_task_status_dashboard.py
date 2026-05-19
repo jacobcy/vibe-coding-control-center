@@ -215,3 +215,36 @@ def test_task_status_hides_missing_blocked_issue_number(
     assert "Dispatch: FROZEN" in result.output
     assert "Reason:  API/Exec error threshold: 3 recent errors" in result.output
     assert "#None" not in result.output
+
+
+class TestResolveServerLabel:
+    """Tests for _resolve_server_label covering all branches."""
+
+    def _call(self, snapshot_found: bool, server_running: bool, pid_valid: bool) -> str:
+        from vibe3.commands.status import _resolve_server_label
+
+        config = MagicMock()
+        config.pid_file = "/tmp/vibe3.pid"
+        with patch("vibe3.commands.status._validate_pid_file") as mock_pid:
+            mock_pid.return_value = (1234, pid_valid)
+            return _resolve_server_label(config, snapshot_found, server_running)
+
+    def test_snapshot_and_server_running(self) -> None:
+        """Both snapshot and server running → green running."""
+        result = self._call(snapshot_found=True, server_running=True, pid_valid=True)
+        assert result == "[green]running[/]"
+
+    def test_snapshot_found_server_down_pid_valid(self) -> None:
+        """Snapshot found but server down, PID valid → green running."""
+        result = self._call(snapshot_found=True, server_running=False, pid_valid=True)
+        assert result == "[green]running[/]"
+
+    def test_no_snapshot_server_down_pid_valid(self) -> None:
+        """No snapshot, server down, PID valid → green running (PID confirmed alive)."""
+        result = self._call(snapshot_found=False, server_running=False, pid_valid=True)
+        assert result == "[green]running[/]"
+
+    def test_no_snapshot_server_down_pid_invalid(self) -> None:
+        """No snapshot, server down, PID invalid → dim stopped."""
+        result = self._call(snapshot_found=False, server_running=False, pid_valid=False)
+        assert result == "[dim]stopped[/]"
