@@ -245,3 +245,32 @@ class TestValidateGovernanceMaterialConsistency:
             adapter=adapter, recipes_path=recipes_file, repo_root=tmp_path
         )
         assert issues == []
+
+    def test_missing_adapter_default_load_failure(self, tmp_path, monkeypatch):
+        """get_adapter returns None -> missing_adapter issue."""
+        monkeypatch.setattr(
+            "vibe3.adapters.get_adapter",
+            lambda name: None,
+        )
+
+        issues = validate_governance_material_consistency(repo_root=tmp_path)
+        assert len(issues) == 1
+        assert issues[0]["type"] == "missing_adapter"
+        assert "vibe-center adapter not found" in issues[0]["message"]
+
+    def test_missing_recipe_default_load_failure(self, tmp_path, monkeypatch):
+        """PromptManifest.load_default raises -> missing_recipe issue."""
+        from vibe3.prompts.manifest import PromptManifest
+
+        monkeypatch.setattr(
+            PromptManifest,
+            "load_default",
+            lambda: None,
+        )
+
+        adapter = _make_adapter([])
+        issues = validate_governance_material_consistency(
+            adapter=adapter, repo_root=tmp_path
+        )
+        assert len(issues) == 1
+        assert issues[0]["type"] == "missing_recipe"

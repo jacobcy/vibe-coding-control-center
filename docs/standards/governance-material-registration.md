@@ -65,21 +65,22 @@ AdapterResource(
 **文件**: `config/prompts/prompt-recipes.yaml`
 
 ```yaml
-governance.scan:
-  kind: template_recipe
-  template_key: orchestra.governance.plan
-  material_catalog:
-    - name: supervisor/governance/assignee-pool.md
-      source:
-        kind: file
-        path: supervisor/governance/assignee-pool.md
+recipes:
+  governance.scan:
+    kind: template_recipe
+    template_key: orchestra.governance.plan
+    material_catalog:
+      - name: supervisor/governance/assignee-pool.md
+        source:
+          kind: file
+          path: supervisor/governance/assignee-pool.md
 ```
 
 关键约束：
 
 - `material_catalog` 中每个条目的 `name` 必须与 adapter 注册中的 `path` 完全一致
 - `source.kind` 通常为 `"file"`，指向实际文件路径
-- 新添材料只需修改此 YAML，**不需要**修改 Python 代码
+- 新添材料只需修改此 YAML 和 adapter manifest，**不需要**修改 `governance.py` 等运行时 Python 代码
 
 ### 3.4 第四层：运行时加载
 
@@ -154,10 +155,10 @@ current = catalog[tick_count % len(catalog)]
 
 ### 5.2 材料覆盖（Material Override）
 
-CLI 支持 `-r` 或 `--material-override` 参数临时覆盖轮转：
+CLI 支持 `--role` 参数临时覆盖轮转：
 
 ```bash
-uv run python src/vibe3/cli.py scan governance --material-override roadmap-intake
+uv run python src/vibe3/cli.py scan governance --role roadmap-intake
 ```
 
 此模式用于调试或强制指定某一材料执行，不影响正常轮转。

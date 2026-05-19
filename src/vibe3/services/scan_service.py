@@ -187,15 +187,18 @@ def validate_governance_material_consistency(
 ) -> list[dict]:
     """Cross-check adapter manifest, recipe catalog, and file system.
 
-    Three consistency checks:
-    1. material_catalog -> adapter: every catalog entry has an adapter resource
-    2. material_catalog -> file system: every catalog entry's file exists
-    3. adapter -> material_catalog: every governance adapter resource is in catalog
+    Checks performed:
+    1. Adapter availability: vibe-center adapter must be importable
+    2. Recipe availability: governance.scan recipe must load with definition
+    3. material_catalog -> adapter: every catalog entry has an adapter resource
+    4. material_catalog -> file system: every catalog entry's file exists
+    5. adapter -> material_catalog: every governance adapter resource is in catalog
 
     Parameters accept overrides for testability; when None, load defaults.
 
     Returns:
-        List of dicts with keys: type, message, detail
+        List of dicts with keys: type, message, detail.
+        Possible types: missing_adapter, missing_recipe, missing_file, orphaned_adapter.
     """
     from vibe3.adapters import get_adapter
     from vibe3.prompts.manifest import PromptManifest
