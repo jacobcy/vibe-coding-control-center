@@ -2,6 +2,7 @@
 
 import os
 import re
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Optional
@@ -19,6 +20,7 @@ from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.execution_lifecycle import execution_prefix
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 
 
@@ -57,16 +59,7 @@ class ExecutionCoordinator:
 
         # Resolve repo_path: prefer explicit request, then git common dir (main repo)
         # Using git common dir prevents creating worktrees inside current worktree
-        if request.repo_path:
-            repo_path = Path(request.repo_path)
-        else:
-            from vibe3.clients.git_client import GitClient
-
-            try:
-                git_common = GitClient().get_git_common_dir()
-                repo_path = Path(git_common).parent if git_common else Path.cwd()
-            except Exception:
-                repo_path = Path.cwd()
+        repo_path = self._resolve_repo_path(request)
 
         worktree_manager = WorktreeManager(self.config, repo_path)
         manager_cwd, _ = worktree_manager.resolve_manager_cwd(
@@ -79,6 +72,194 @@ class ExecutionCoordinator:
                 f"{request.role}:{request.target_id}"
             )
         return manager_cwd
+
+    @staticmethod
+    def _resolve_repo_path(request: ExecutionRequest) -> Path:
+        """Resolve the repository root used for worktree operations."""
+        if request.repo_path:
+            return Path(request.repo_path)
+
+        from vibe3.clients.git_client import GitClient
+
+        try:
+            git_common = GitClient().get_git_common_dir()
+            return Path(git_common).parent if git_common else Path.cwd()
+        except Exception:
+            return Path.cwd()
+
+    @staticmethod
+    def _read_worktree_head(worktree_path: Path) -> str | None:
+        """Return the active branch name, or HEAD for detached worktrees."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=worktree_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except Exception:
+            return None
+
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip() or None
+
+    def _maybe_auto_reset_damaged_scene(
+        self,
+        request: ExecutionRequest,
+        error_msg: str,
+    ) -> ExecutionLaunchResult | None:
+        """Best-effort recovery for damaged auto task scenes.
+
+        Applies ONLY to task/issue-* branches when the scene is clearly broken
+        and there are no truly live sessions attached to the branch.
+        """
+        branch = request.target_branch
+        if (
+            request.worktree_requirement != WorktreeRequirement.PERMANENT
+            or not branch.startswith("task/issue-")
+        ):
+            return None
+
+        live_sessions = self.registry.get_truly_live_sessions_for_branch(branch)
+        if live_sessions:
+            return None
+
+        repo_path = self._resolve_repo_path(request)
+        target_path = repo_path / ".worktrees" / branch
+
+        from vibe3.environment.worktree_support import (
+            find_worktree_by_path,
+            find_worktree_for_branch,
+        )
+
+        path_exists = target_path.exists()
+        path_registered = find_worktree_by_path(repo_path, target_path)
+        branch_worktree = find_worktree_for_branch(repo_path, branch)
+        actual_head = (
+            self._read_worktree_head(target_path)
+            if path_exists and path_registered
+            else None
+        )
+
+        damage_signals: list[str] = []
+        if "already exists" in error_msg and path_exists:
+            damage_signals.append("canonical worktree path already exists")
+        if path_registered and branch_worktree is None:
+            damage_signals.append("registered worktree is not bound to target branch")
+        if actual_head == "HEAD":
+            damage_signals.append("registered worktree has detached HEAD")
+        elif actual_head and actual_head != branch:
+            damage_signals.append(f"registered worktree points at {actual_head}")
+
+        if not damage_signals:
+            return None
+
+        from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
+        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.flow_cleanup_service import FlowCleanupService
+        from vibe3.services.label_service import LabelService
+
+        detail = "; ".join(damage_signals)
+        recovery_actor = "orchestra:auto-recover"
+        recovery_reason = (
+            f"Damaged auto scene detected for {branch}: {detail}. "
+            f"Original launch error: {error_msg}"
+        )
+
+        ErrorTrackingService.get_instance(store=self.store).record_error(
+            error_code=E_EXEC_AUTO_SCENE_RESET,
+            error_message=recovery_reason,
+            tick_id=request.tick_id,
+            issue_number=request.target_id,
+            branch=branch,
+        )
+
+        append_orchestra_event(
+            "dispatcher",
+            f"{request.role} auto-reset triggered for #{request.target_id}: {detail}",
+            level="ERROR",
+        )
+        self.store.add_event(
+            branch,
+            "auto_scene_reset_triggered",
+            recovery_actor,
+            detail=recovery_reason,
+            refs={
+                "role": request.role,
+                "damage_signals": detail,
+                "original_error": error_msg,
+            },
+        )
+
+        cleanup_results = FlowCleanupService(store=self.store).cleanup_flow_scene(
+            branch,
+            include_remote=True,
+            terminate_sessions=True,
+            keep_flow_record=False,
+        )
+        critical_failures = [
+            step
+            for step in ("worktree", "local_branch", "flow_record")
+            if not cleanup_results.get(step, False)
+        ]
+        if critical_failures:
+            failed_steps = ", ".join(critical_failures)
+            append_orchestra_event(
+                "dispatcher",
+                (
+                    f"{request.role} auto-reset incomplete for #{request.target_id}: "
+                    f"{failed_steps}"
+                ),
+                level="ERROR",
+            )
+            self.store.add_event(
+                branch,
+                "auto_scene_reset_incomplete",
+                recovery_actor,
+                detail=(
+                    "Automatic auto-scene reset did not finish critical cleanup "
+                    f"steps: {failed_steps}"
+                ),
+                refs={k: str(v) for k, v in cleanup_results.items()},
+            )
+            return None
+
+        LabelService().confirm_issue_state(
+            request.target_id,
+            IssueState.READY,
+            actor=recovery_actor,
+            force=True,
+        )
+        self.store.add_event(
+            branch,
+            "auto_scene_reset_completed",
+            recovery_actor,
+            detail=(
+                f"Auto scene reset completed for issue #{request.target_id}; "
+                "issue returned to READY for clean re-dispatch"
+            ),
+            refs={k: str(v) for k, v in cleanup_results.items()},
+        )
+        append_orchestra_event(
+            "dispatcher",
+            (
+                f"{request.role} auto-reset completed for #{request.target_id}; "
+                "issue returned to ready"
+            ),
+            level="WARNING",
+        )
+        return ExecutionLaunchResult(
+            launched=False,
+            skipped=True,
+            reason=(
+                f"Auto-reset damaged scene for {branch}; "
+                "issue returned to READY for retry"
+            ),
+            reason_code="auto_scene_reset",
+        )
 
     def _acquire_temporary_worktree(self, issue_number: int) -> Path:
         """Acquire a temporary worktree for supervisor apply execution.
@@ -212,6 +393,12 @@ class ExecutionCoordinator:
             except ValueError as exc:
                 # Worktree resolution failure → blocking error for the flow
                 error_msg = str(exc)
+                auto_reset_result = self._maybe_auto_reset_damaged_scene(
+                    request,
+                    error_msg,
+                )
+                if auto_reset_result is not None:
+                    return auto_reset_result
                 append_orchestra_event(
                     "dispatcher",
                     f"{request.role} worktree unavailable for "
