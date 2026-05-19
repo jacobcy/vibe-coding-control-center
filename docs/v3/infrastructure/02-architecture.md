@@ -26,14 +26,23 @@ src/vibe3/
 ├── cli.py                    # Typer 入口
 ├── commands/                 # 命令调度层
 ├── services/                 # 业务逻辑层
-├── engine/                   # DAG + flow + state machine
-├── runtime/                  # executor + scheduler + dispatcher
+├── domain/                   # 领域事件、业务逻辑编排、状态机
+├── execution/                # 执行控制面 (Capacity, Lifecycle, Session, Agent Launch)
+├── runtime/                  # 调度器 (Heartbeat, 事件路由, Observation 翻译)
 ├── clients/                  # 外部依赖封装 (Protocol 接口)
 ├── models/                   # Pydantic 数据模型
 ├── observability/            # logging + trace + audit
 ├── exceptions/               # 异常定义
+├── server/                   # HTTP/Webhook 暴露、进程级驱动装配
+├── environment/              # 资源原语 (Worktree, Tmux)
 ├── ui/                       # 展示层 (Rich)
-└── config/                   # 配置模块
+├── config/                   # 配置模块
+├── adapters/                 # 角色适配器
+├── agents/                   # Agent 定义与实现
+├── analysis/                 # 分析工具
+├── prompts/                  # Prompt 模板
+├── roles/                    # 角色定义
+└── utils/                    # 通用工具
 ```
 
 **代码规模限制**：见 **[03-coding-standards.md](03-coding-standards.md)**

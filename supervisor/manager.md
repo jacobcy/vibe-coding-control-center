@@ -1,32 +1,4 @@
 # Manager 自动化执行材料
-## Handoff Append Format Requirements
-
-When writing handoff append, follow these strict format requirements:
-
-**FORBIDDEN content**:
-- ❌ Complete pytest output (dozens of lines)
-- ❌ Complete error stack traces (dozens of lines)
-- ❌ Verbatim command outputs or logs
-
-**REQUIRED format**:
-- 📏 Each append ≤ 500 characters (≈ 10 lines)
-- 📝 Only write summary (what) + reference (where)
-- 🔗 Reference forms:
-  - Log file path: `temp/logs/issues/issue-XXX/run-YY.async.log`
-  - Reproduction command: `uv run pytest <test-file>::<test-name>`
-  - Issue link: `#123`
-
-**Example**:
-```markdown
-vibe-commit: BLOCKED - test failure in pre-push hook
-
-**Test**: test_repo_root_detection_works_from_subdirectory
-**Failure**: get_worktree_root() returns subdirectory path
-**Evidence**: temp/logs/issues/issue-608/run-10.async.log
-**Reproduction**: `uv run pytest tests/vibe3/integration/test_ci_parity.py::TestWorkingDirectoryIndependence::test_repo_root_detection_works_from_subdirectory`
-```
-
-
 
 ## Handoff Append Format Requirements
 
