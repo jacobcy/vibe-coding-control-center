@@ -99,8 +99,34 @@ class ServeStatusService:
 
     def _display_config(self) -> None:
         """Display configuration summary."""
-        self.console.print(f"  - Tick interval: {self.config.polling_interval}s")
+        tick_interval = self._resolve_tick_interval()
+        self.console.print(f"  - Tick interval: {tick_interval}s")
         self.console.print(f"  - Max concurrent: {self.config.max_concurrent_flows}\n")
+
+    def _resolve_tick_interval(self) -> int:
+        """Resolve the runtime tick interval from events.log, falling back to config.
+
+        The server writes its actual tick_interval to events.log on startup.
+        This method extracts the most recent value from that log, falling back
+        to the static config value when the log is unavailable.
+
+        Returns:
+            The tick interval in seconds.
+        """
+        events_log = Path("temp/logs/orchestra/events.log")
+        if events_log.exists():
+            try:
+                log_content = events_log.read_text()
+                matches = re.findall(
+                    r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\] "
+                    r"\[server\] start tick_interval=(\d+)s",
+                    log_content,
+                )
+                if matches:
+                    return int(matches[-1])
+            except Exception:
+                pass
+        return self.config.polling_interval
 
     def _display_recent_activity(self) -> None:
         """Display recent tick activity from events.log."""
