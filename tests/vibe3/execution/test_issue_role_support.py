@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from vibe3.execution.issue_role_support import (
     build_issue_async_cli_request,
+    build_issue_sync_prompt_request,
     resolve_async_cli_project_root,
     resolve_orchestra_repo_root,
 )
@@ -86,3 +87,25 @@ def test_build_issue_async_cli_request_uses_debug_code_root_override(
     assert request.cmd[6] == str(WORKTREE_REPO / "src/vibe3/cli.py")
     # Worktree creation / shared state still anchor to main repo root.
     assert request.repo_path == str(MAIN_REPO)
+
+
+def test_build_issue_sync_prompt_request_with_session_does_not_pin_cwd() -> None:
+    """Retry sync requests should still let coordinator resolve the worktree cwd."""
+    issue = IssueInfo(number=431, title="Test issue", labels=[])
+
+    request = build_issue_sync_prompt_request(
+        role="manager",
+        issue=issue,
+        target_branch="task/issue-431",
+        prompt="test prompt",
+        task="test task",
+        options=object(),
+        actor="agent:manager",
+        execution_name="vibe3-manager-issue-431",
+        worktree_requirement=WorktreeRequirement.PERMANENT,
+        session_id="session-431",
+        repo_path=MAIN_REPO,
+    )
+
+    assert request.refs["session_id"] == "session-431"
+    assert request.cwd is None

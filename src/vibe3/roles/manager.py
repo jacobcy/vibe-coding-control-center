@@ -306,7 +306,7 @@ def build_manager_sync_request(
         "and stop when the current state rule requires exit."
     )
 
-    repo_root = Path.cwd() if session_id else Path(resolve_orchestra_repo_root())
+    repo_root = Path(resolve_orchestra_repo_root())
     return build_issue_sync_prompt_request(
         role="manager",
         issue=issue,
