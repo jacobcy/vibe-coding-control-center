@@ -9,8 +9,8 @@
 
 ## Technical Authority (Minimum Context)
 
-- [Architecture Design](../implementation/02-architecture.md) ( Authority on File Layers)
-- [Coding Standards](../implementation/03-coding-standards.md) (Authority on Linting/Types)
+- ~~[Architecture Design](../implementation/02-architecture.md)~~ (已不存在)
+- ~~[Coding Standards](../implementation/03-coding-standards.md)~~ (已不存在)
 - [Data Standards](../../standards/v3/handoff-store-standard.md) (Authority on Database Schema)
 - [GitHub Standards](../../standards/v3/github-remote-call-standard.md) (Authority on Remote Calls)
 
@@ -23,7 +23,7 @@
 **Inputs**: `ls -R lib3/ src/`
 **Criteria**:
 - [ ] Confirm `bin/vibe3` is executable and its path is correct.
-- [ ] List the 5 layers defined in `02-architecture.md` to confirm file access.
+- [ ] List the 5 layers defined in the current `src/vibe3/` structure to confirm file access.
 - [ ] Run `bin/vibe3 --version` to check existing entry point.
 
 ---
@@ -32,12 +32,12 @@
 
 **Objective**: Build or fix the shell-to-python dispatching layer.
 
-**Inputs**: `docs/v3/handoff/01-command-and-skeleton.md`
+**Inputs**: ~~`docs/v3/handoff/01-command-and-skeleton.md`~~ (已不存在，参考 `src/vibe3/cli.py` 和 `src/vibe3/commands/`)
 **Success Criteria**:
 - [ ] `bin/vibe3 flow --help` returns zero exit code + domain usage.
 - [ ] `bin/vibe3 task --help` returns zero exit code + domain usage.
 - [ ] `bin/vibe3 pr --help` returns zero exit code + domain usage.
-- [ ] `mypy src/vibe_core.py` returns no errors.
+- [ ] ~~`mypy src/vibe_core.py` returns no errors.~~ (已不存在，使用 `mypy src/vibe3/`)
 
 ---
 
@@ -116,7 +116,7 @@
 - [ ] Check `src/vibe3/clients/sqlite_client.py` for generic type safety and SQL injection guards.
 
 ### 3. Consistency Check
-- [ ] Cross-reference the current implementation with **[02-architecture.md](../implementation/02-architecture.md)**.
+- [ ] Cross-reference the current implementation with the actual `src/vibe3/` directory structure.
 
 ---
 **Status**: Revised for Scope Isolation and Distributed Execution (2026-03-15)
@@ -136,8 +136,8 @@
 
 ### 技术实施文档（定义"如何做"）
 - **[../implementation/README.md](../implementation/README.md)** - 技术实施索引
-- **[../implementation/02-architecture.md](../implementation/02-architecture.md)** - 架构设计 ⭐
-- **[../implementation/03-coding-standards.md](../implementation/03-coding-standards.md)** - 编码标准 ⭐
+- ~~**[../implementation/02-architecture.md](../implementation/02-architecture.md)** - 架构设计 ⭐~~ (已不存在)
+- ~~**[../implementation/03-coding-standards.md](../implementation/03-coding-standards.md)** - 编码标准 ⭐~~ (已不存在)
 - **[../implementation/05-logging.md](../implementation/05-logging.md)** - 日志系统
 - **[../implementation/06-error-handling.md](../implementation/06-error-handling.md)** - 异常处理
 
@@ -149,4 +149,4 @@
 ---
 
 **维护者**：Vibe Team
-**最后更新**：2026-03-15
+**最后更新**：2026-05-20
