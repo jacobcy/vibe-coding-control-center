@@ -45,8 +45,7 @@ def _resolve_ready_pr_number(
     branch = flow_service.get_current_branch()
     # Use standard branch→PR query path
     try:
-        prs = pr_service.github_client.list_prs_for_branch(branch)
-        pr = prs[0] if prs else None
+        pr = pr_service.get_branch_pr_status(branch)
     except (subprocess.CalledProcessError, FileNotFoundError):
         pr = None
 

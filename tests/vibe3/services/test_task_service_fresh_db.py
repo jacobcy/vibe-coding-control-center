@@ -104,6 +104,21 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
                 )
             ]
 
+        def list_all_prs(self, *, state: str = "all", limit: int = 50):
+            """Return all PRs for recent PR cache."""
+            _ = state, limit
+            return [
+                PRResponse(
+                    number=469,
+                    title="PR 469",
+                    body="",
+                    state=PRState.MERGED,
+                    head_branch="task/issue-467",
+                    base_branch="main",
+                    url="https://example.com/pr/469",
+                )
+            ]
+
         def view_issue(self, issue_number: int, repo: str | None = None):
             assert issue_number == 467
             assert repo == "owner/repo"

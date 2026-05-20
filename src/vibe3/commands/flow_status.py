@@ -24,6 +24,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
+from vibe3.services.pr_service import PRService
 from vibe3.services.task_binding_guard import build_bind_task_hint
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
@@ -193,12 +194,8 @@ def show(
             # For --source remote, flow_status may not have pr_number from issue-body
             # but branch could still have an open PR
             try:
-                from vibe3.clients.github_client import GitHubClient
-
-                github_client = GitHubClient()
-                prs = github_client.list_prs_for_branch(target_branch)
-                if prs:
-                    pr = prs[0]
+                pr = PRService(store=service.store).get_branch_pr_status(target_branch)
+                if pr:
                     projection.pr_number = pr.number
                     projection.pr_status = pr.state.value
                     projection.pr_is_draft = pr.draft

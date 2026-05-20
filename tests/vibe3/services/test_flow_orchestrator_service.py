@@ -1,12 +1,14 @@
 """Tests for FlowOrchestratorService."""
 
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueInfo
-from vibe3.models.pr import PRState
+from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
@@ -17,6 +19,32 @@ def test_flow_orchestrator_service_initialization() -> None:
     service = FlowOrchestratorService(config)
 
     assert service.config == config
+
+
+def _pr_response(
+    *,
+    number: int = 42,
+    branch: str = "task/issue-123",
+    state: PRState = PRState.OPEN,
+    draft: bool = False,
+) -> PRResponse:
+    return PRResponse(
+        number=number,
+        title=f"PR {number}",
+        body="",
+        state=state,
+        head_branch=branch,
+        base_branch="main",
+        url=f"https://example.com/pr/{number}",
+        draft=draft,
+        is_ready=not draft,
+        ci_passed=False,
+        ci_status=None,
+        created_at=None,
+        updated_at=None,
+        merged_at=None,
+        metadata=None,
+    )
 
 
 def test_flow_orchestrator_can_snapshot() -> None:
@@ -240,26 +268,36 @@ def test_rebuild_stale_issue_flow_uses_cleanup_then_bootstrap() -> None:
     assert result == {"branch": "task/issue-320"}
 
 
-def test_get_pr_for_issue_uses_list_prs_for_branch_fallback() -> None:
-    """HIGH: Fallback must use list_prs_for_branch (standard path)."""
-    config = load_orchestra_config()
-    config.repo = "owner/repo"
-    store = MagicMock()
-    github = MagicMock()
-    service = FlowOrchestratorService(config, store=store, github=github)
+def test_get_pr_for_issue_uses_branch_pr_status_fallback() -> None:
+    """HIGH: Fallback must resolve branch PR status through PRService."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir) / "repo"
+        repo_path.mkdir()
+        git_dir = repo_path / ".git"
+        (git_dir / "vibe3").mkdir(parents=True)
 
-    # No PR in flow record, trigger standard branch→PR fallback
-    service.get_flow_for_issue = MagicMock(return_value=None)
-    # Mock PR response for list_prs_for_branch
-    mock_pr = MagicMock()
-    mock_pr.number = 42
-    github.list_prs_for_branch = MagicMock(return_value=[mock_pr])
+        config = load_orchestra_config()
+        config.repo = "owner/repo"
+        store = MagicMock()
+        git = MagicMock()
+        git.get_git_common_dir.return_value = str(git_dir)
+        github = MagicMock()
+        service = FlowOrchestratorService(config, store=store, git=git, github=github)
 
-    result = service.get_pr_for_issue(123)
+        # No PR in flow record, trigger standard branch→PR fallback
+        service.get_flow_for_issue = MagicMock(return_value=None)
+        github.list_all_prs = MagicMock(return_value=[])
+        github.list_prs_for_branch = MagicMock(
+            return_value=[_pr_response(number=42, branch="task/issue-123")]
+        )
 
-    # HIGH: Verify list_prs_for_branch called (not get_pr_for_issue)
-    github.list_prs_for_branch.assert_called_once_with("task/issue-123")
-    assert result == 42
+        result = service.get_pr_for_issue(123)
+
+        github.list_all_prs.assert_called_once_with(state="all", limit=50)
+        github.list_prs_for_branch.assert_called_once_with(
+            "task/issue-123", state="all"
+        )
+        assert result == 42
 
 
 def test_get_pr_for_issue_returns_flow_pr_without_github_call() -> None:
@@ -354,19 +392,37 @@ def test_bootstrap_issue_flow_preserves_existing_branch_on_failure() -> None:
 
 
 def test_rebuild_stale_issue_flow_returns_none_when_pr_already_merged() -> None:
-    config = load_orchestra_config()
-    github = MagicMock()
-    github.get_pr.return_value = MagicMock(
-        state=PRState.MERGED, merged_at="2026-05-17T00:00:00Z"
-    )
-    service = FlowOrchestratorService(
-        config, store=MagicMock(), git=MagicMock(), github=github
-    )
-    issue = IssueInfo(number=321, title="Merged already")
-    service.get_pr_for_issue = MagicMock(return_value=987)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir) / "repo"
+        repo_path.mkdir()
+        git_dir = repo_path / ".git"
+        (git_dir / "vibe3").mkdir(parents=True)
 
-    result = service.rebuild_stale_issue_flow(
-        issue, branch="task/issue-321", slug="issue-321"
-    )
+        config = load_orchestra_config()
+        git = MagicMock()
+        git.get_git_common_dir.return_value = str(git_dir)
+        github = MagicMock()
+        github.list_all_prs = MagicMock(return_value=[])
+        github.list_prs_for_branch = MagicMock(
+            return_value=[
+                _pr_response(
+                    number=987,
+                    branch="task/issue-321",
+                    state=PRState.MERGED,
+                )
+            ]
+        )
+        github.get_pr.return_value = MagicMock(
+            state=PRState.MERGED, merged_at="2026-05-17T00:00:00Z"
+        )
+        service = FlowOrchestratorService(
+            config, store=MagicMock(), git=git, github=github
+        )
+        issue = IssueInfo(number=321, title="Merged already")
+        service.get_pr_for_issue = MagicMock(return_value=987)
 
-    assert result is None
+        result = service.rebuild_stale_issue_flow(
+            issue, branch="task/issue-321", slug="issue-321"
+        )
+
+        assert result is None

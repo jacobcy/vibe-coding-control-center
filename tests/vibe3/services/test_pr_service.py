@@ -221,28 +221,28 @@ def test_close_pr_returns_success_marker(pr_service: PRService) -> None:
 def test_pr_service_close_open_pr_for_flow(pr_service: PRService) -> None:
     """Test PRService can close open PR for a flow branch."""
     gh_instance = pr_service.github_client
-    gh_instance.list_prs_for_branch.return_value = [
-        PRResponse(
-            number=123,
-            title="Test PR",
-            body="Test body",
-            state=PRState.OPEN,
-            head_branch="feature-branch",
-            base_branch="main",
-            url="https://github.com/org/repo/pull/123",
-            draft=False,
-        )
-    ]
-    gh_instance.close_pr.return_value = True
-
-    result = pr_service.close_open_pr_for_flow(
-        branch="feature-branch", comment="Abandoning flow"
+    open_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
     )
+    gh_instance.close_pr.return_value = True
+    with patch.object(
+        pr_service,
+        "get_open_pr_for_branch",
+        return_value=open_pr,
+    ) as mock_get_open_pr:
+        result = pr_service.close_open_pr_for_flow(
+            branch="feature-branch", comment="Abandoning flow"
+        )
 
     assert result == 123  # Returns PR number
-    gh_instance.list_prs_for_branch.assert_called_once_with(
-        "feature-branch", state="open"
-    )
+    mock_get_open_pr.assert_called_once_with("feature-branch")
     gh_instance.close_pr.assert_called_once_with(123, comment="Abandoning flow")
 
 

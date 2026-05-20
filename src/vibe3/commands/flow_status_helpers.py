@@ -109,8 +109,7 @@ def _fetch_pr_map(
 ) -> dict[str, dict[str, object]]:
     """Batch fetch all PRs for flows."""
     try:
-        all_prs = projection_service.pr_service.github_client.list_all_prs(state="open")
-        branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+        branch_to_pr = projection_service.pr_service.refresh_open_pr_cache()
         return {
             flow.branch: {
                 "number": pr.number,

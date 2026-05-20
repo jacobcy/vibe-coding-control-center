@@ -69,7 +69,7 @@ def test_flow_projection_with_remote_pr_data():
         updated_at="2024-01-01T00:00:00Z",
     )
     mock_pr_service = MagicMock()
-    mock_pr_service.github_client.list_prs_for_branch.return_value = [mock_pr]
+    mock_pr_service.get_branch_pr_status.return_value = mock_pr
 
     service = FlowProjectionService(
         flow_service=mock_flow_service,
@@ -82,6 +82,7 @@ def test_flow_projection_with_remote_pr_data():
     assert projection.pr_status == "OPEN"
     assert projection.pr_is_draft is False
     assert projection.pr_url == "https://github.com/test/repo/pull/456"
+    mock_pr_service.get_branch_pr_status.assert_called_once_with("task/test-branch")
 
 
 def test_get_issue_titles_uses_actual_flow_branch():

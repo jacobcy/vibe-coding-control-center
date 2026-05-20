@@ -10,11 +10,13 @@ from typing import Any, cast
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
+from vibe3.services.pr_service import PRService
 from vibe3.utils.comment_utils import is_human_comment
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.utils.path_helpers import resolve_ref_path
@@ -287,13 +289,13 @@ class TaskShowService:
         return None
 
     def _build_pr_summary(self, branch: str) -> TaskPRSummary | None:
-        # Use list_prs_for_branch() to properly handle branch→PR lookup
         try:
-            prs = self.github_client.list_prs_for_branch(branch)
-            if not prs:
+            pr = PRService(
+                github_client=cast(GitHubClientProtocol, self.github_client),
+                store=self.store,
+            ).get_branch_pr_status(branch)
+            if not pr:
                 return None
-            # Take the most recent PR if multiple exist
-            pr = prs[0]
         except (subprocess.CalledProcessError, FileNotFoundError):
             # GitHub CLI not available or query failed
             return None

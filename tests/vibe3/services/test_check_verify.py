@@ -24,7 +24,8 @@ def mock_git_client():
     """Create a mock GitClient."""
     client = MagicMock(spec=GitClient)
     client.get_current_branch.return_value = "feature/test-branch"
-    client._run.return_value = "/path/to/.git"
+    # Return a valid git common dir for cache path calculation
+    client.get_git_common_dir.return_value = "/tmp/test/.git"
     return client
 
 
@@ -33,6 +34,7 @@ def mock_github_client():
     """Create a mock GitHubClient with safe defaults."""
     client = MagicMock(spec=GitHubClient)
     client.list_prs_for_branch.return_value = []
+    client.list_all_prs.return_value = []
     return client
 
 

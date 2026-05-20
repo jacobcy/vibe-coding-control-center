@@ -161,8 +161,7 @@ def register_create_command(app: typer.Typer) -> None:
 
             # Use standard branch→PR query path
             try:
-                prs = pr_service.github_client.list_prs_for_branch(branch)
-                existing_pr = prs[0] if prs else None
+                existing_pr = pr_service.get_open_pr_for_branch(branch)
             except (subprocess.CalledProcessError, FileNotFoundError):
                 existing_pr = None
 

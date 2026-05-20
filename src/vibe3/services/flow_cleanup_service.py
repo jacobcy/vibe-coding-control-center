@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.services.flow_service import FlowService
     from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.pr_service import PRService
 
 
 class LiveSessionsDetectedError(RuntimeError):
@@ -47,6 +48,7 @@ class FlowCleanupService:
         store: SQLiteClient | None = None,
         flow_service: FlowService | None = None,
         issue_flow_service: IssueFlowService | None = None,
+        pr_service: PRService | None = None,
     ) -> None:
         """Initialize flow cleanup service.
 
@@ -63,6 +65,7 @@ class FlowCleanupService:
         self.store = store or SQLiteClient()
         self._flow_service = flow_service
         self._issue_flow_service = issue_flow_service
+        self._pr_service = pr_service
 
     @property
     def flow_service(self) -> FlowService:
@@ -81,6 +84,18 @@ class FlowCleanupService:
 
             self._issue_flow_service = IssueFlowService(store=self.store)
         return self._issue_flow_service
+
+    @property
+    def pr_service(self) -> PRService:
+        """Lazy-initialized PR service."""
+        if self._pr_service is None:
+            from vibe3.services.pr_service import PRService
+
+            self._pr_service = PRService(
+                git_client=self.git_client,
+                store=self.store,
+            )
+        return self._pr_service
 
     def cleanup_flow_scene(
         self,
@@ -194,6 +209,14 @@ class FlowCleanupService:
         """Delete remote branch if exists."""
         try:
             if self._has_remote_branch(branch):
+                open_pr = self.pr_service.get_open_pr_for_branch(branch, refresh=True)
+                if open_pr is not None:
+                    logger.bind(
+                        domain="cleanup",
+                        branch=branch,
+                        pr_number=open_pr.number,
+                    ).info("Skipped remote branch deletion because branch has open PR")
+                    return
                 self.git_client.delete_remote_branch(branch)
                 logger.bind(domain="cleanup", branch=branch).debug(
                     "Deleted remote branch"

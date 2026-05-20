@@ -12,6 +12,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_ordering import (
@@ -259,10 +260,15 @@ class StatusQueryService:
         # Use cache service for titles (cache-first)
         branch_titles, _ = self.title_cache.get_titles_with_fallback(branches)
 
-        # Batch fetch all PRs (optimization: 1 call instead of N)
+        # Batch fetch all open PRs through the shared PRService cache path.
         try:
-            all_prs = self.github.list_all_prs(state="open")
-            branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+            from vibe3.services.pr_service import PRService
+
+            branch_to_pr = PRService(
+                github_client=cast(GitHubClientProtocol, self.github),
+                git_client=self.git,
+                store=self.store,
+            ).refresh_open_pr_cache()
         except Exception as exc:
             logger.bind(domain="status").warning(f"Failed to fetch PRs: {exc}")
             branch_to_pr = {}

@@ -236,6 +236,9 @@ code_limits:
       - path: "tests/vibe3/utils/test_path_helpers.py"
         limit: 420
         reason: "Path helpers 测试集，覆盖 handoff 解析、路径遍历防护、分支名安全验证等紧密耦合逻辑，5 个新增测试扩展安全覆盖"
+      - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
+        limit: 450
+        reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理等紧密耦合场景，共享 fixture，拆分收益低"
 
 
   total_file_loc:

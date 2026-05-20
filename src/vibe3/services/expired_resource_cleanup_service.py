@@ -10,16 +10,18 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from vibe3.clients.git_worktree_ops import remove_worktree
+from vibe3.clients.protocols import GitHubClientProtocol
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.services.pr_service import PRService
 
 
 class ExpiredResourceCleanupService:
@@ -36,10 +38,25 @@ class ExpiredResourceCleanupService:
         store: "SQLiteClient",
         git_client: "GitClient",
         github_client: "GitHubClient | None" = None,
+        pr_service: "PRService | None" = None,
     ) -> None:
         self.store = store
         self.git_client = git_client
         self._github_client = github_client
+        self._pr_service = pr_service
+
+    @property
+    def pr_service(self) -> "PRService":
+        """Lazy-initialized PR service."""
+        if self._pr_service is None:
+            from vibe3.services.pr_service import PRService
+
+            self._pr_service = PRService(
+                github_client=cast(GitHubClientProtocol | None, self._github_client),
+                git_client=self.git_client,
+                store=self.store,
+            )
+        return self._pr_service
 
     def clean_expired_agent_worktrees(self, max_age_days: int = 7) -> dict[str, object]:
         """Clean expired agent worktrees older than max_age_days.
@@ -162,13 +179,9 @@ class ExpiredResourceCleanupService:
                 "failed": [str(exc)],
             }
 
-        # Get open PRs
+        # Get open PRs via shared batch cache path
         try:
-            from vibe3.clients.github_client import GitHubClient
-
-            gh = self._github_client or GitHubClient()
-            open_prs = gh.list_all_prs(state="open")
-            pr_branches = {pr.head_branch for pr in open_prs}
+            pr_branches = set(self.pr_service.refresh_open_pr_cache())
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get open PRs: {exc}")
             return {

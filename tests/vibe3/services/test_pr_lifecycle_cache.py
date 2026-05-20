@@ -1,10 +1,12 @@
 """Tests for PR title caching during PR lifecycle."""
 
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients import SQLiteClient
+from vibe3.clients.recent_pr_cache import RecentPRCache
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 
@@ -188,3 +190,132 @@ def test_pr_create_appends_handoff_update() -> None:
             events = store.get_events("feature-branch")
             pr_events = [e for e in events if "pr" in e["event_type"].lower()]
             assert len(pr_events) > 0, "PR event should be recorded"
+
+
+def test_refresh_open_pr_cache_updates_branch_cache_entries() -> None:
+    """Batch open PR refresh should update flow_context_cache for each branch."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir) / "repo"
+        repo_path.mkdir()
+        git_dir = repo_path / ".git"
+        git_dir.mkdir()
+        (git_dir / "vibe3").mkdir()
+
+        db_path = repo_path / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("feature-one", flow_slug="one")
+        store.update_flow_state("feature-two", flow_slug="two")
+
+        open_prs = [
+            PRResponse(
+                number=101,
+                title="Feature one PR",
+                body="Body",
+                state=PRState.OPEN,
+                head_branch="feature-one",
+                base_branch="main",
+                url="https://github.com/test/pr/101",
+                draft=False,
+                is_ready=True,
+                ci_passed=False,
+                created_at=None,
+                updated_at=None,
+                merged_at=None,
+                metadata=None,
+            ),
+            PRResponse(
+                number=102,
+                title="Feature two draft",
+                body="Body",
+                state=PRState.OPEN,
+                head_branch="feature-two",
+                base_branch="main",
+                url="https://github.com/test/pr/102",
+                draft=True,
+                is_ready=False,
+                ci_passed=False,
+                created_at=None,
+                updated_at=None,
+                merged_at=None,
+                metadata=None,
+            ),
+        ]
+
+        github_client = MagicMock()
+        github_client.list_all_prs.return_value = open_prs
+        git_client = MagicMock()
+        git_client.get_git_common_dir.return_value = str(git_dir)
+
+        service = PRService(
+            github_client=github_client,
+            git_client=git_client,
+            store=store,
+        )
+        branch_to_pr = service.refresh_open_pr_cache()
+
+        assert set(branch_to_pr) == {"feature-one", "feature-two"}
+        assert branch_to_pr["feature-one"].number == 101
+        assert branch_to_pr["feature-two"].number == 102
+
+        cache_one = store.get_flow_context_cache("feature-one")
+        cache_two = store.get_flow_context_cache("feature-two")
+        assert cache_one is not None
+        assert cache_two is not None
+        assert cache_one["pr_number"] == 101
+        assert cache_one["pr_title"] == "Feature one PR"
+        assert cache_two["pr_number"] == 102
+        assert cache_two["pr_title"] == "Feature two draft"
+
+
+def test_refresh_recent_pr_cache_skips_github_when_cache_is_fresh() -> None:
+    """Recent PR cache should reuse fresh local snapshot for 10-minute window."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir) / "repo"
+        repo_path.mkdir()
+        git_dir = repo_path / ".git"
+        git_dir.mkdir()
+        (git_dir / "vibe3").mkdir()
+
+        db_path = repo_path / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+        store.update_flow_state("feature-cached", flow_slug="cached")
+
+        cache = RecentPRCache(repo_path)
+        cache._save_cache(
+            {
+                "last_sync": (
+                    datetime.now(timezone.utc) - timedelta(minutes=5)
+                ).isoformat(),
+                "prs": {
+                    "feature-cached": {
+                        "number": 303,
+                        "title": "Cached PR",
+                        "state": "OPEN",
+                        "draft": False,
+                        "url": "https://github.com/test/pr/303",
+                        "head_branch": "feature-cached",
+                        "base_branch": "main",
+                        "merged_at": None,
+                    }
+                },
+            }
+        )
+
+        github_client = MagicMock()
+        git_client = MagicMock()
+        git_client.get_git_common_dir.return_value = str(git_dir)
+
+        service = PRService(
+            github_client=github_client,
+            git_client=git_client,
+            store=store,
+        )
+        branch_to_pr = service.refresh_recent_pr_cache()
+
+        github_client.list_all_prs.assert_not_called()
+        assert branch_to_pr["feature-cached"].number == 303
+        context = store.get_flow_context_cache("feature-cached")
+        assert context is not None
+        assert context["pr_number"] == 303
+        assert context["pr_title"] == "Cached PR"

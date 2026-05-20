@@ -37,7 +37,7 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| pr_service.py | 380 | PR 主服务 |
+| pr_service.py | 380 | PR 主服务（含 batch open PR cache/query） |
 | pr_create_usecase.py | 130 | PR 创建用例 |
 | pr_ready_usecase.py | 45 | PR ready 用例 |
 | pr_scoring_service.py | 239 | PR 质量评分 |
