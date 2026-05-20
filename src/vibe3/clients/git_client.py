@@ -301,33 +301,27 @@ class GitClient:
         """
         try:
             if remote:
-                cmd = [
-                    "git",
-                    "branch",
-                    "-r",
-                    "--list",
-                    "origin/*",
-                    "--format=%(refname:short) %(committerdate:iso8601)",
-                ]
+                output = self._run(
+                    [
+                        "branch",
+                        "-r",
+                        "--list",
+                        "origin/*",
+                        "--format=%(refname:short) %(committerdate:iso8601)",
+                    ]
+                )
             else:
-                cmd = [
-                    "git",
-                    "branch",
-                    "--list",
-                    "*",
-                    "--format=%(refname:short) %(committerdate:iso8601)",
-                ]
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=str(self._cwd) if self._cwd else None,
-            )
+                output = self._run(
+                    [
+                        "branch",
+                        "--list",
+                        "*",
+                        "--format=%(refname:short) %(committerdate:iso8601)",
+                    ]
+                )
 
             branches: list[dict[str, str]] = []
-            for line in result.stdout.strip().split("\n"):
+            for line in output.strip().split("\n"):
                 if not line.strip():
                     continue
                 parts = line.strip().split(None, 1)
@@ -337,7 +331,7 @@ class GitClient:
 
             return branches
 
-        except subprocess.CalledProcessError as e:
+        except GitError as e:
             logger.error(f"Failed to get branches: {e}")
             return []
 
