@@ -214,13 +214,13 @@ related_docs:
 
 - **`active`**：flow 正常执行中，准备就绪或正在处理
 - **`blocked`**：flow 被阻塞（手动锁定或依赖未满足）。
-  - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。
-  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。
+  - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。`blocked_reason` 的存在会阻止 QualifyGate 的自动解封。
+  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。依赖关系真源为 `flow_issue_links(role='dependency')`，而非 `blocked_by_issue` 字段。
   - 判定标准：依赖项在 GitHub 上进入 `closed` 终态即视为满足。
   - 自动巡逻：Orchestra 会主动拉取该状态任务进入"资格门"校验，满足条件后自动解套并智能恢复到正确阶段。
 - **`failed`**：flow 执行失败，需要人工修复或放弃
 - **`done`**：flow 执行完成（PR 已合并）。`task/issue-N` 分支的对应 issue 会自动关闭。
-- **`stale`**：flow 长期未活动，被系统标记为休眠
+- **`stale`**：flow 长期未活动或被系统标记为休眠（例如 empty ready flow、orphaned flow）。由 governance 机制重建 ready flow 后恢复。
 - **`aborted`**：flow 被人工/自动中止（PR closed unmerged / issue 关闭 / branch 丢失）
 
 > `merged` 是历史遗留状态，已通过 `models/flow.py` 的 `_migrate_flow_status_value()` 统一规范化为 `done`。禁止在新代码中使用。
