@@ -2,12 +2,13 @@
 
 This service is separated from check_service.py to keep responsibilities clear:
 - check_service.py: Consistency verification and auto-fix
-- check_cleanup_service.py: Physical resource cleanup for terminal flows
+- check_cleanup_service.py: Terminal flow cleanup
+- expired_resource_cleanup_service.py: Expired resource cleanup
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -41,15 +42,69 @@ class CheckCleanupService:
         self.git_client = git_client
         self._github_client = github_client
 
-    def clean_residual_branches(self) -> dict[str, object]:
+    def clean_residual_branches(self) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
+
+        NEW: Also cleans expired resources:
+        - Agent worktrees (> 7 days)
+        - Remote non-protected branches (> 7 days)
+        - Local inactive branches (> 7 days)
+
+        Returns:
+            Dict with summary and details of cleaned branches.
+        """
+        from vibe3.config.settings import VibeConfig
+        from vibe3.services.expired_resource_cleanup_service import (
+            ExpiredResourceCleanupService,
+        )
+
+        # Existing: terminal flow cleanup
+        results: dict[str, Any] = self._clean_terminal_flows()
+        summary_parts = [str(results.get("summary", ""))]
+
+        # NEW: expired resource cleanup
+        config = VibeConfig.get_defaults()
+        cleanup_config = config.check_cleanup
+
+        expired_service = ExpiredResourceCleanupService(
+            store=self.store,
+            git_client=self.git_client,
+            github_client=self._github_client,
+        )
+
+        if cleanup_config.enable_agent_worktree_cleanup:
+            results["agent_worktrees"] = expired_service.clean_expired_agent_worktrees(
+                max_age_days=cleanup_config.agent_worktree_max_age_days
+            )
+            cleaned = results["agent_worktrees"].get("cleaned") or []
+            summary_parts.append(f"agent_worktrees cleaned {len(cleaned)}")
+
+        if cleanup_config.enable_remote_branch_cleanup:
+            results["remote_branches"] = expired_service.clean_expired_remote_branches(
+                max_age_days=cleanup_config.remote_branch_max_age_days
+            )
+            cleaned = results["remote_branches"].get("cleaned") or []
+            summary_parts.append(f"remote_branches cleaned {len(cleaned)}")
+
+        if cleanup_config.enable_local_branch_cleanup:
+            results["local_branches"] = expired_service.clean_expired_local_branches(
+                max_age_days=cleanup_config.local_branch_max_age_days
+            )
+            cleaned = results["local_branches"].get("cleaned") or []
+            summary_parts.append(f"local_branches cleaned {len(cleaned)}")
+
+        results["summary"] = "; ".join([p for p in summary_parts if p])
+        return results
+
+    def _clean_terminal_flows(self) -> dict[str, object]:
+        """Clean terminal flows (done/aborted).
 
         Different handling based on flow status:
         - done: Clean physical resources, keep flow record as audit history
         - aborted: Clean everything including flow record (allows issue to restart)
 
         Returns:
-            Dict with summary and details of cleaned branches.
+            Dict with summary and details of cleaned flows.
         """
         from vibe3.services.flow_cleanup_service import FlowCleanupService
 

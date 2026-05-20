@@ -138,6 +138,36 @@ class SQLiteSessionRepo(_HasConnection):
         ).debug("Listed live runtime sessions")
         return rows
 
+    def list_live_sessions_by_worktree(
+        self, worktree_path: str
+    ) -> list[dict[str, Any]]:
+        """List truly live sessions for a specific worktree path.
+
+        Args:
+            worktree_path: Absolute path to worktree directory
+
+        Returns:
+            List of session dicts with status in (starting, running)
+        """
+        query = (
+            "SELECT * FROM runtime_session "
+            "WHERE worktree_path = ? AND status IN (?, ?) "
+            "ORDER BY created_at DESC"
+        )
+        params = [worktree_path, "starting", "running"]
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="list_live_sessions_by_worktree",
+            worktree_path=worktree_path,
+            count=len(rows),
+        ).debug("Listed live sessions for worktree")
+        return rows
+
     def get_terminated_target_ids_for_role(
         self, role: str, target_ids: set[int]
     ) -> set[int]:

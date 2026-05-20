@@ -14,6 +14,7 @@ from pathlib import Path
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 from vibe3.config.orchestra_config import OrchestraConfig
+from vibe3.config.settings_check_cleanup import CheckCleanupSettings
 from vibe3.config.settings_pr import (
     FileChangeWeights,
     LineChangeWeights,
@@ -58,7 +59,8 @@ class FlowConfig(BaseModel):
 __all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
            "PRScoringWeights", "PRScoringThresholds", "LineChangeWeights",
            "FileChangeWeights", "ModuleChangeWeights", "SizeThreshold",
-           "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig"]
+           "SizeThresholds", "VibeConfig", "DocLimitsConfig", "CodeLimitsConfig",
+           "CheckCleanupSettings"]
 # fmt: on
 
 # Prompt content fields in prompts.yaml that map to VibeConfig sections.
@@ -348,6 +350,7 @@ class VibeConfig(BaseModel):
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
     orchestra: OrchestraConfig = Field(default_factory=OrchestraConfig)
+    check_cleanup: CheckCleanupSettings = Field(default_factory=CheckCleanupSettings)
 
     @classmethod
     def _load_supplementary(cls, data: dict) -> dict:

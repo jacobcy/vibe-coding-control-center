@@ -47,12 +47,79 @@ def _emit_check_details(
         cleaned = details.get("cleaned") or []
         removed_invalid = details.get("removed_invalid") or []
         failed = details.get("failed") or []
+        agent_worktrees = details.get("agent_worktrees") or {}
+        remote_branches = details.get("remote_branches") or {}
+        local_branches = details.get("local_branches") or {}
         if cleaned:
             typer.echo(f"  Cleaned: {', '.join(cleaned)}")
         if removed_invalid:
             typer.echo(f"  Removed invalid records: {', '.join(removed_invalid)}")
         for f in failed:
             typer.echo(f"  Failed: {f}", err=True)
+
+        if agent_worktrees:
+            cleaned_wt = agent_worktrees.get("cleaned") or []
+            skipped_live_wt = agent_worktrees.get("skipped_live") or []
+            failed_wt = agent_worktrees.get("failed") or []
+            if cleaned_wt:
+                typer.echo(f"  Agent worktrees cleaned: {', '.join(cleaned_wt)}")
+            if skipped_live_wt:
+                typer.echo(
+                    f"  Agent worktrees skipped (live): {', '.join(skipped_live_wt)}"
+                )
+            for f in failed_wt:
+                typer.echo(f"  Agent worktrees failed: {f}", err=True)
+
+        if remote_branches:
+            cleaned_remote = remote_branches.get("cleaned") or []
+            skipped_protected_remote = remote_branches.get("skipped_protected") or []
+            skipped_pr_remote = remote_branches.get("skipped_pr") or []
+            failed_remote = remote_branches.get("failed") or []
+            if cleaned_remote:
+                typer.echo(f"  Remote branches cleaned: {', '.join(cleaned_remote)}")
+            if skipped_protected_remote:
+                typer.echo(
+                    "  Remote branches skipped (protected): "
+                    f"{', '.join(skipped_protected_remote)}"
+                )
+            if skipped_pr_remote:
+                typer.echo(
+                    "  Remote branches skipped (open PR): "
+                    f"{', '.join(skipped_pr_remote)}"
+                )
+            for f in failed_remote:
+                typer.echo(f"  Remote branches failed: {f}", err=True)
+
+        if local_branches:
+            cleaned_local = local_branches.get("cleaned") or []
+            skipped_protected_local = local_branches.get("skipped_protected") or []
+            skipped_current_local = local_branches.get("skipped_current") or []
+            skipped_live_local = local_branches.get("skipped_live") or []
+            skipped_worktree_local = local_branches.get("skipped_worktree") or []
+            failed_local = local_branches.get("failed") or []
+            if cleaned_local:
+                typer.echo(f"  Local branches cleaned: {', '.join(cleaned_local)}")
+            if skipped_protected_local:
+                typer.echo(
+                    "  Local branches skipped (protected): "
+                    f"{', '.join(skipped_protected_local)}"
+                )
+            if skipped_current_local:
+                typer.echo(
+                    "  Local branches skipped (current): "
+                    f"{', '.join(skipped_current_local)}"
+                )
+            if skipped_live_local:
+                typer.echo(
+                    "  Local branches skipped (live): "
+                    f"{', '.join(skipped_live_local)}"
+                )
+            if skipped_worktree_local:
+                typer.echo(
+                    "  Local worktrees removed: " f"{', '.join(skipped_worktree_local)}"
+                )
+            for f in failed_local:
+                typer.echo(f"  Local branches failed: {f}", err=True)
         return
 
     if mode == "branch":
@@ -79,9 +146,9 @@ def check(
         typer.Option(
             "--clean-branch",
             help=(
-                "Check and clean residual branches for done/aborted flows. "
-                "Use this to remove local/remote branches that should have been "
-                "cleaned when the flow was marked done or aborted."
+                "Clean residual resources: terminal flows, expired "
+                "agent worktrees (>7d), and expired non-protected "
+                "branches (>7d, remote+local)."
             ),
         ),
     ] = False,

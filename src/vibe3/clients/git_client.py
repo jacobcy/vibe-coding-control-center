@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from vibe3.clients.git_branch_listing import get_all_branches_with_timestamps
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
 )
@@ -281,6 +282,12 @@ class GitClient:
     def branch_exists(self, branch_name: str) -> bool:
         """Check if branch exists (local or remote)."""
         return _branch_exists(branch_name)
+
+    def get_all_branches_with_timestamps(
+        self, remote: bool = False
+    ) -> list[dict[str, str]]:
+        """Get all branches with last commit timestamps."""
+        return get_all_branches_with_timestamps(self._run, remote=remote)
 
     def push_branch(
         self,

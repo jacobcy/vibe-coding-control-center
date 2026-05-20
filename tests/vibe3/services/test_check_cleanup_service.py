@@ -3,6 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.services.check_cleanup_service import CheckCleanupService
+from vibe3.services.expired_resource_cleanup_service import (
+    ExpiredResourceCleanupService,
+)
 
 
 def test_clean_residual_branches_filters_live_sessions_before_cleanup() -> None:
@@ -132,3 +135,138 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
             # All flows should be processed
             assert mock_process.call_count == 2
             assert result["skipped_live"] == []
+
+
+def test_clean_expired_local_branches_deletes_old() -> None:
+    """Delete local branches older than max age, excluding protected and current."""
+    from datetime import datetime, timedelta
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = ExpiredResourceCleanupService(store=store, git_client=git_client)
+
+    # Mock git_client
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    recent_date = (datetime.now() - timedelta(days=3)).strftime(
+        "%Y-%m-%d %H:%M:%S +0800"
+    )
+
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "feature-old", "timestamp": old_date},
+        {"branch": "feature-recent", "timestamp": recent_date},
+        {"branch": "main", "timestamp": old_date},  # Protected
+        {"branch": "current-branch", "timestamp": old_date},  # Current
+    ]
+
+    git_client.get_current_branch.return_value = "current-branch"
+    git_client.branch_exists.return_value = True
+
+    # Mock worktree check
+    git_client.is_branch_occupied_by_worktree.return_value = False
+    git_client.find_worktree_path_for_branch.return_value = None
+
+    result = service.clean_expired_local_branches(max_age_days=7)
+
+    # Verify: only feature-old deleted
+    assert "cleaned" in result
+    assert "feature-old" in result["cleaned"]
+    assert "main" not in result["cleaned"]
+    assert "current-branch" not in result["cleaned"]
+    assert "feature-recent" not in result["cleaned"]
+
+
+def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
+    """Remote cleanup should handle git timestamps with or without timezone colon."""
+    from datetime import datetime, timedelta, timezone
+
+    store = MagicMock()
+    git_client = MagicMock()
+    github_client = MagicMock()
+    service = ExpiredResourceCleanupService(
+        store=store, git_client=git_client, github_client=github_client
+    )
+
+    old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
+        "%Y-%m-%d %H:%M:%S +0000"
+    )
+    old_date_with_colon = old_date[:-2] + ":" + old_date[-2:]
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "origin/feature-old", "timestamp": old_date},
+        {"branch": "origin/feature-colon", "timestamp": old_date_with_colon},
+    ]
+    github_client.list_all_prs.return_value = []
+
+    result = service.clean_expired_remote_branches(max_age_days=7)
+
+    assert result["cleaned"] == ["origin/feature-old", "origin/feature-colon"]
+    git_client.delete_remote_branch.assert_any_call("feature-old")
+    git_client.delete_remote_branch.assert_any_call("feature-colon")
+
+
+def test_clean_residual_branches_integrates_all_cleanups() -> None:
+    """Should call all cleanup methods when enabled."""
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Mock all dependencies
+    store.get_all_flows.return_value = []
+    git_client.get_current_branch.return_value = "main"
+
+    with patch.object(
+        ExpiredResourceCleanupService, "clean_expired_agent_worktrees"
+    ) as mock_agent:
+        with patch.object(
+            ExpiredResourceCleanupService, "clean_expired_remote_branches"
+        ) as mock_remote:
+            with patch.object(
+                ExpiredResourceCleanupService, "clean_expired_local_branches"
+            ) as mock_local:
+                mock_agent.return_value = {"cleaned": ["agent-old"]}
+                mock_remote.return_value = {"cleaned": ["origin/feature-old"]}
+                mock_local.return_value = {"cleaned": ["feature-old"]}
+
+                result = service.clean_residual_branches()
+
+                # Verify all called
+                mock_agent.assert_called_once()
+                mock_remote.assert_called_once()
+                mock_local.assert_called_once()
+
+                # Verify results include all sections
+                assert "agent_worktrees" in result
+                assert "remote_branches" in result
+                assert "local_branches" in result
+
+                # Verify summary includes expired cleanup counts
+                summary = str(result["summary"])
+                assert "agent_worktrees cleaned 1" in summary
+                assert "remote_branches cleaned 1" in summary
+                assert "local_branches cleaned 1" in summary
+
+
+def test_clean_expired_local_branches_reports_worktree_removal() -> None:
+    """When a local branch has a worktree, record it in skipped_worktree."""
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = ExpiredResourceCleanupService(store=store, git_client=git_client)
+
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "feature-old", "timestamp": old_date},
+    ]
+    git_client.get_current_branch.return_value = "main"
+    git_client.branch_exists.return_value = True
+
+    git_client.is_branch_occupied_by_worktree.return_value = True
+    git_client.find_worktree_path_for_branch.return_value = Path("/tmp/wt")
+
+    with patch("vibe3.services.expired_resource_cleanup_service.remove_worktree") as rm:
+        result = service.clean_expired_local_branches(max_age_days=7)
+
+    rm.assert_called_once()
+    assert "feature-old" in result["skipped_worktree"]
+    assert "feature-old" in result["cleaned"]

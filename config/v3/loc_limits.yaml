@@ -47,8 +47,8 @@ code_limits:
         limit: 500
         reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
-        limit: 500
-        reason: "Git 门面聚合"
+        limit: 520
+        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理"
       - path: "src/vibe3/clients/github_pr_ops.py"
         limit: 530
         reason: "GitHub PR 操作与查询聚合（日志和错误处理对生产环境必要）"
@@ -96,6 +96,9 @@ code_limits:
       - path: "src/vibe3/services/task_service.py"
         limit: 450
         reason: "Task 服务聚合，包含状态转换、查询、resume 候选筛选逻辑"
+      - path: "src/vibe3/services/expired_resource_cleanup_service.py"
+        limit: 450
+        reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑"
 
       # Roles 层 —— 允许 350-600
       - path: "src/vibe3/roles/review.py"
@@ -138,8 +141,8 @@ code_limits:
 
       # 配置系统核心模块
       - path: "src/vibe3/config/settings.py"
-        limit: 500
-        reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开等配置加载逻辑，拆分会破坏配置系统完整性"
+        limit: 520
+        reason: "核心配置模型聚合，包含 20+ Pydantic 模型定义、supplementary loading（loc_limits + prompts）、变量展开、CheckCleanupSettings 新增配置等配置加载逻辑，拆分会破坏配置系统完整性"
 
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree.py"
