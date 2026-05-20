@@ -6,8 +6,10 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.sqlite_base import _HasConnection
 
-class SQLiteFlowStateRepo:
+
+class SQLiteFlowStateRepo(_HasConnection):
     """Flow state, issue link, and dependent-scene operations."""
 
     db_path: str
@@ -47,7 +49,7 @@ class SQLiteFlowStateRepo:
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
         """Get flow state for branch (excludes soft-deleted flows)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -75,19 +77,19 @@ class SQLiteFlowStateRepo:
         values = [kwargs[f] for f in fields]
         set_clause = ", ".join([f"{f} = ?" for f in fields])
 
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        flow_slug = kwargs.get("flow_slug", branch.replace("/", "-"))
-        cursor.execute(
-            "INSERT OR IGNORE INTO flow_state (branch, flow_slug, updated_at) "
-            "VALUES (?, ?, ?)",
-            (branch, flow_slug, kwargs["updated_at"]),
-        )
-        cursor.execute(
-            f"UPDATE flow_state SET {set_clause} WHERE branch = ?",
-            values + [branch],
-        )
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            flow_slug = kwargs.get("flow_slug", branch.replace("/", "-"))
+            cursor.execute(
+                "INSERT OR IGNORE INTO flow_state (branch, flow_slug, updated_at) "
+                "VALUES (?, ?, ?)",
+                (branch, flow_slug, kwargs["updated_at"]),
+            )
+            cursor.execute(
+                f"UPDATE flow_state SET {set_clause} WHERE branch = ?",
+                values + [branch],
+            )
         logger.bind(
             external="sqlite",
             operation="update_flow_state",
@@ -97,15 +99,15 @@ class SQLiteFlowStateRepo:
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         now = datetime.datetime.now().isoformat()
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO flow_issue_links "
-            "(branch, issue_number, issue_role, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (branch, issue_number, role, now),
-        )
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO flow_issue_links "
+                "(branch, issue_number, issue_role, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (branch, issue_number, role, now),
+            )
         logger.bind(
             external="sqlite",
             operation="add_issue_link",
@@ -121,15 +123,15 @@ class SQLiteFlowStateRepo:
         old_role: str,
         new_role: str,
     ) -> bool:
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE flow_issue_links SET issue_role = ? "
-            "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
-            (new_role, branch, issue_number, old_role),
-        )
-        conn.commit()
-        updated = cursor.rowcount > 0
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_issue_links SET issue_role = ? "
+                "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
+                (new_role, branch, issue_number, old_role),
+            )
+            updated = cursor.rowcount > 0
         logger.bind(
             external="sqlite",
             operation="update_issue_link_role",
@@ -142,7 +144,7 @@ class SQLiteFlowStateRepo:
         return bool(updated)
 
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM flow_issue_links WHERE branch = ?", (branch,))
@@ -156,7 +158,7 @@ class SQLiteFlowStateRepo:
         return links
 
     def get_dependency_links(self, branch: str) -> list[int]:
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT issue_number FROM flow_issue_links "
@@ -174,7 +176,7 @@ class SQLiteFlowStateRepo:
 
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM flow_state WHERE deleted_at IS NULL")
@@ -186,7 +188,7 @@ class SQLiteFlowStateRepo:
 
     def get_active_flow_count(self) -> int:
         """Get count of active flows (excludes soft-deleted flows)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT COUNT(*) FROM flow_state "
@@ -200,7 +202,7 @@ class SQLiteFlowStateRepo:
 
     def get_active_auto_flow_count(self) -> int:
         """Get count of active auto flows (excludes soft-deleted flows)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT COUNT(*) FROM flow_state "
@@ -227,41 +229,40 @@ class SQLiteFlowStateRepo:
         distinguish tombstones from active flows in audits/debugging.
         """
         now = datetime.datetime.now().isoformat()
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        # Normalize to tombstone: clear refs/reasons/actors/worktree/execution-state
-        cursor.execute(
-            """UPDATE flow_state SET
-                deleted_at = ?,
-                flow_status = 'aborted',
-                spec_ref = NULL,
-                plan_ref = NULL,
-                report_ref = NULL,
-                audit_ref = NULL,
-                indicate_ref = NULL,
-                pr_ref = NULL,
-                blocked_reason = NULL,
-                failed_reason = NULL,
-                blocked_by_issue = NULL,
-                blocked_by = NULL,
-                worktree_path = NULL,
-                next_step = NULL,
-                planner_actor = NULL,
-                executor_actor = NULL,
-                reviewer_actor = NULL,
-                manager_actor = NULL,
-                latest_actor = NULL,
-                planner_status = NULL,
-                executor_status = NULL,
-                reviewer_status = NULL,
-                execution_pid = NULL,
-                execution_started_at = NULL,
-                execution_completed_at = NULL,
-                updated_at = ?
-            WHERE branch = ?""",
-            (now, now, branch),
-        )
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """UPDATE flow_state SET
+                    deleted_at = ?,
+                    flow_status = 'aborted',
+                    spec_ref = NULL,
+                    plan_ref = NULL,
+                    report_ref = NULL,
+                    audit_ref = NULL,
+                    indicate_ref = NULL,
+                    pr_ref = NULL,
+                    blocked_reason = NULL,
+                    failed_reason = NULL,
+                    blocked_by_issue = NULL,
+                    blocked_by = NULL,
+                    worktree_path = NULL,
+                    next_step = NULL,
+                    planner_actor = NULL,
+                    executor_actor = NULL,
+                    reviewer_actor = NULL,
+                    manager_actor = NULL,
+                    latest_actor = NULL,
+                    planner_status = NULL,
+                    executor_status = NULL,
+                    reviewer_status = NULL,
+                    execution_pid = NULL,
+                    execution_started_at = NULL,
+                    execution_completed_at = NULL,
+                    updated_at = ?
+                WHERE branch = ?""",
+                (now, now, branch),
+            )
         logger.bind(
             external="sqlite",
             operation="soft_delete_flow",
@@ -270,14 +271,14 @@ class SQLiteFlowStateRepo:
 
     def hard_delete_flow(self, branch: str) -> None:
         """Hard delete flow with cascade, removing all related records."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
-        cursor.execute("DELETE FROM flow_events WHERE branch = ?", (branch,))
-        cursor.execute("DELETE FROM flow_issue_links WHERE branch = ?", (branch,))
-        cursor.execute("DELETE FROM flow_state WHERE branch = ?", (branch,))
-        cursor.execute("DELETE FROM flow_context_cache WHERE branch = ?", (branch,))
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_events WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_issue_links WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_state WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_context_cache WHERE branch = ?", (branch,))
         logger.bind(
             external="sqlite",
             operation="hard_delete_flow",
@@ -298,13 +299,13 @@ class SQLiteFlowStateRepo:
         Restored flows will have flow_status='aborted' and cleared refs/actors/worktree.
         Use 'vibe flow update' to reset flow_status and re-establish metadata if needed.
         """
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE flow_state SET deleted_at = NULL WHERE branch = ?",
-            (branch,),
-        )
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE flow_state SET deleted_at = NULL WHERE branch = ?",
+                (branch,),
+            )
         logger.bind(
             external="sqlite",
             operation="restore_flow",
@@ -313,7 +314,7 @@ class SQLiteFlowStateRepo:
 
     def get_deleted_flows(self) -> list[dict[str, Any]]:
         """Get all soft-deleted flows."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -328,7 +329,7 @@ class SQLiteFlowStateRepo:
 
     def get_flow_state_include_deleted(self, branch: str) -> dict[str, Any] | None:
         """Get flow state including soft-deleted flows (for recovery check)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM flow_state WHERE branch = ?", (branch,))
@@ -339,7 +340,7 @@ class SQLiteFlowStateRepo:
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
         """Get flows linked to an issue with specified role (excludes soft-deleted)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -363,7 +364,7 @@ class SQLiteFlowStateRepo:
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get dependent flows (excludes soft-deleted flows)."""
         task_issue_number: int | None = None
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -387,7 +388,7 @@ class SQLiteFlowStateRepo:
             ).debug("No task issue bound; no dependents")
             return []
 
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """

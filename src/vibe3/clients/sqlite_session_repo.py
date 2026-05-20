@@ -6,8 +6,10 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.sqlite_base import _HasConnection
 
-class SQLiteSessionRepo:
+
+class SQLiteSessionRepo(_HasConnection):
     """Runtime session CRUD operations."""
 
     db_path: str
@@ -58,14 +60,14 @@ class SQLiteSessionRepo:
         columns = ", ".join(row.keys())
         placeholders = ", ".join(["?"] * len(row))
         values = list(row.values())
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute(
-            f"INSERT INTO runtime_session ({columns}) VALUES ({placeholders})",
-            values,
-        )
-        conn.commit()
-        last_id = cursor.lastrowid
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"INSERT INTO runtime_session ({columns}) VALUES ({placeholders})",
+                values,
+            )
+            last_id = cursor.lastrowid
         if last_id is None:
             raise RuntimeError("Failed to insert runtime_session: no lastrowid")
         session_id = int(last_id)
@@ -79,7 +81,7 @@ class SQLiteSessionRepo:
         return session_id
 
     def get_runtime_session(self, session_id: int) -> dict[str, Any] | None:
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -100,13 +102,13 @@ class SQLiteSessionRepo:
         kwargs["updated_at"] = datetime.datetime.now().isoformat()
         set_clause = ", ".join([f"{f} = ?" for f in kwargs])
         values = list(kwargs.values()) + [session_id]
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute(
-            f"UPDATE runtime_session SET {set_clause} WHERE id = ?",
-            values,
-        )
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE runtime_session SET {set_clause} WHERE id = ?",
+                values,
+            )
         logger.bind(
             external="sqlite",
             operation="update_runtime_session",
@@ -123,7 +125,7 @@ class SQLiteSessionRepo:
             query += " AND role = ?"
             params.append(role)
         query += " ORDER BY created_at DESC"
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(query, params)
@@ -158,7 +160,7 @@ class SQLiteSessionRepo:
         )
         params: list[Any] = [role] + target_strs + list(terminal_statuses)
         result: set[int] = set()
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(query, params)
         for row in cursor.fetchall():

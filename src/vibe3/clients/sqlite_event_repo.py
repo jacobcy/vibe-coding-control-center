@@ -7,8 +7,10 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.sqlite_base import _HasConnection
 
-class SQLiteEventRepo:
+
+class SQLiteEventRepo(_HasConnection):
     """Flow event read/write operations."""
 
     db_path: str
@@ -23,15 +25,15 @@ class SQLiteEventRepo:
     ) -> None:
         now = datetime.datetime.now().isoformat()
         refs_json = json.dumps(refs) if refs else None
-        conn = self._get_connection()  # type: ignore[attr-defined]
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO flow_events "
-            "(branch, event_type, actor, detail, refs, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (branch, event_type, actor, detail, refs_json, now),
-        )
-        conn.commit()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO flow_events "
+                "(branch, event_type, actor, detail, refs, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (branch, event_type, actor, detail, refs_json, now),
+            )
         logger.bind(
             external="sqlite",
             operation="add_event",
@@ -52,7 +54,7 @@ class SQLiteEventRepo:
         if isinstance(normalized_branch, str) and not normalized_branch.strip():
             normalized_branch = None
 
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         conditions: list[str] = []
