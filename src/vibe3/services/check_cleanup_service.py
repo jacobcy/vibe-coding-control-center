@@ -7,12 +7,15 @@ This service is separated from check_service.py to keep responsibilities clear:
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients.git_worktree_ops import remove_worktree
+from vibe3.services.check_cleanup_expired_resources import (
+    clean_expired_agent_worktrees,
+    clean_expired_local_branches,
+    clean_expired_remote_branches,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -368,357 +371,26 @@ class CheckCleanupService:
         match = re.fullmatch(r"^task/issue-(\d+)$", branch)
         return int(match.group(1)) if match else None
 
-    def _get_agent_worktree_base(self) -> Path:
-        """Get agent worktree base directory (.claude/worktrees/)."""
-        return Path(".claude/worktrees")
-
     def _clean_expired_agent_worktrees(
         self, max_age_days: int = 7
     ) -> dict[str, object]:
-        """Clean expired agent worktrees older than max_age_days.
-
-        Safety checks:
-        - Check if worktree path has live runtime sessions
-        - Skip worktrees with active sessions to avoid disrupting running agents
-
-        Uses git worktree remove (not just rmtree) to properly clean both
-        the physical directory and the git worktree metadata.
-
-        Args:
-            max_age_days: Max age in days before cleanup (default: 7)
-
-        Returns:
-            Dict with 'cleaned' list and 'skipped_live' list
-        """
-        from datetime import datetime, timedelta
-
-        logger.bind(domain="check", action="clean_agent_worktrees").info(
-            f"Checking agent worktrees older than {max_age_days} days"
-        )
-
-        base = self._get_agent_worktree_base()
-        if not base.exists():
-            return {"cleaned": [], "skipped_live": [], "failed": []}
-
-        cutoff = datetime.now() - timedelta(days=max_age_days)
-
-        cleaned: list[str] = []
-        skipped_live: list[str] = []
-        failed: list[str] = []
-
-        # Scan agent-* worktrees
-        for worktree_dir in base.glob("agent-*"):
-            if not worktree_dir.is_dir():
-                continue
-
-            worktree_name = worktree_dir.name
-
-            try:
-                # Get last modified time
-                mtime = datetime.fromtimestamp(worktree_dir.stat().st_mtime)
-
-                # Check age
-                if mtime >= cutoff:
-                    continue
-
-                # Check if worktree path has live runtime sessions.
-                # Uses absolute path to match worktree_path stored in
-                # runtime_session table (populated by vibe3 worktree creation).
-                # Agent worktrees created by Claude Code won't have entries
-                # in this table, so they'll be processed normally.
-                worktree_abs = str(worktree_dir.resolve())
-                live_sessions = self.store.list_live_sessions_by_worktree(worktree_abs)
-                if live_sessions:
-                    skipped_live.append(worktree_name)
-                    logger.bind(
-                        domain="check",
-                        worktree=worktree_name,
-                        session_count=len(live_sessions),
-                    ).info("Skipped agent worktree with live runtime sessions")
-                    continue
-
-                # Properly remove worktree: cleans git metadata AND directory
-                remove_worktree(worktree_dir, force=True)
-                cleaned.append(worktree_name)
-                logger.bind(domain="check", worktree=worktree_name).info(
-                    "Deleted expired agent worktree"
-                )
-
-            except Exception as exc:
-                failed.append(f"{worktree_name}: {exc}")
-                logger.bind(domain="check", worktree=worktree_name).warning(
-                    f"Failed to clean agent worktree: {exc}"
-                )
-
-        return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
+        """Clean expired agent worktrees older than max_age_days."""
+        return clean_expired_agent_worktrees(self.store, max_age_days=max_age_days)
 
     def _clean_expired_remote_branches(
         self, max_age_days: int = 7
     ) -> dict[str, object]:
-        """Clean expired remote non-protected branches older than max_age_days.
-
-        Safety checks:
-        - Exclude protected branches (main, master, develop)
-        - Check for open PR (skip if has open PR)
-        - Check branch age
-
-        Args:
-            max_age_days: Max age in days before cleanup (default: 7)
-
-        Returns:
-            Dict with 'cleaned', 'skipped_protected', 'skipped_pr', 'failed' lists
-        """
-        from datetime import datetime, timedelta, timezone
-
-        logger.bind(domain="check", action="clean_remote_branches").info(
-            f"Checking remote branches older than {max_age_days} days"
+        """Clean expired remote non-protected branches older than max_age_days."""
+        return clean_expired_remote_branches(
+            self.git_client,
+            github_client=self._github_client,
+            max_age_days=max_age_days,
         )
-
-        # Load protected branches from config
-        from vibe3.config.settings import VibeConfig
-
-        config = VibeConfig.get_defaults()
-        protected = set(config.flow.protected_branches)
-
-        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
-
-        cleaned: list[str] = []
-        skipped_protected: list[str] = []
-        skipped_pr: list[str] = []
-        failed: list[str] = []
-
-        # Get all remote branches with timestamps
-        try:
-            remote_branches = self.git_client.get_all_branches_with_timestamps(
-                remote=True
-            )
-        except Exception as exc:
-            logger.bind(domain="check").error(f"Failed to get remote branches: {exc}")
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_pr": [],
-                "failed": [str(exc)],
-            }
-
-        # Get open PRs
-        try:
-            from vibe3.clients.github_client import GitHubClient
-
-            gh = self._github_client or GitHubClient()
-            open_prs = gh.list_all_prs(state="open")
-            pr_branches = {pr.head_branch for pr in open_prs}
-        except Exception as exc:
-            logger.bind(domain="check").error(f"Failed to get open PRs: {exc}")
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_pr": [],
-                "failed": ["PR check failed - cannot safely proceed with cleanup"],
-            }
-
-        # Process each branch
-        for branch_info in remote_branches:
-            branch = branch_info["branch"]
-            timestamp_str = branch_info["timestamp"]
-
-            try:
-                # Parse timestamp
-                timestamp = datetime.fromisoformat(
-                    timestamp_str.replace(" +0800", "+08:00")
-                )
-
-                # Extract branch name (remove origin/ prefix)
-                branch_name = branch.replace("origin/", "", 1)
-
-                # Skip protected branches
-                if branch_name in protected:
-                    skipped_protected.append(branch)
-                    continue
-
-                # Skip if has open PR
-                if branch_name in pr_branches:
-                    skipped_pr.append(branch)
-                    logger.bind(domain="check", branch=branch).info(
-                        "Skipped remote branch with open PR"
-                    )
-                    continue
-
-                # Check age
-                if timestamp >= cutoff:
-                    continue
-
-                # Delete remote branch
-                self.git_client.delete_remote_branch(branch_name)
-                cleaned.append(branch)
-                logger.bind(domain="check", branch=branch).info(
-                    "Deleted expired remote branch"
-                )
-
-            except Exception as exc:
-                failed.append(f"{branch}: {exc}")
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to clean remote branch: {exc}"
-                )
-
-        return {
-            "cleaned": cleaned,
-            "skipped_protected": skipped_protected,
-            "skipped_pr": skipped_pr,
-            "failed": failed,
-        }
 
     def _clean_expired_local_branches(self, max_age_days: int = 7) -> dict[str, object]:
-        """Clean expired local non-protected branches older than max_age_days.
-
-        Safety checks:
-        - Exclude protected branches (main, master, develop)
-        - Exclude current branch
-        - Check for live session
-        - Check for worktree occupation
-        - Check branch age
-
-        Args:
-            max_age_days: Max age in days before cleanup (default: 7)
-
-        Returns:
-            Dict with 'cleaned', 'skipped_protected', 'skipped_current',
-            'skipped_live', 'skipped_worktree', 'failed' lists
-        """
-        from datetime import datetime, timedelta, timezone
-
-        logger.bind(domain="check", action="clean_local_branches").info(
-            f"Checking local branches older than {max_age_days} days"
+        """Clean expired local non-protected branches older than max_age_days."""
+        return clean_expired_local_branches(
+            self.git_client,
+            get_live_branches=self._get_branches_with_live_sessions,
+            max_age_days=max_age_days,
         )
-
-        # Load protected branches from config
-        from vibe3.config.settings import VibeConfig
-
-        config = VibeConfig.get_defaults()
-        protected = set(config.flow.protected_branches)
-
-        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
-
-        cleaned: list[str] = []
-        skipped_protected: list[str] = []
-        skipped_current: list[str] = []
-        skipped_live: list[str] = []
-        skipped_worktree: list[str] = []
-        failed: list[str] = []
-
-        # Get current branch
-        try:
-            current_branch = self.git_client.get_current_branch()
-        except Exception as exc:
-            logger.bind(domain="check").error(f"Failed to get current branch: {exc}")
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_current": [],
-                "skipped_live": [],
-                "skipped_worktree": [],
-                "failed": [str(exc)],
-            }
-
-        # Get branches with live sessions
-        try:
-            branches_with_live = self._get_branches_with_live_sessions()
-        except SystemError:
-            logger.bind(domain="check").error(
-                "Failed to get live sessions, skipping local branch cleanup"
-            )
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_current": [],
-                "skipped_live": [],
-                "skipped_worktree": [],
-                "failed": ["live session query failed"],
-            }
-
-        # Get all local branches with timestamps
-        try:
-            local_branches = self.git_client.get_all_branches_with_timestamps(
-                remote=False
-            )
-        except Exception as exc:
-            logger.bind(domain="check").error(f"Failed to get local branches: {exc}")
-            return {
-                "cleaned": [],
-                "skipped_protected": [],
-                "skipped_current": [],
-                "skipped_live": [],
-                "skipped_worktree": [],
-                "failed": [str(exc)],
-            }
-
-        # Process each branch
-        for branch_info in local_branches:
-            branch = branch_info["branch"]
-            timestamp_str = branch_info["timestamp"]
-
-            try:
-                # Parse timestamp
-                timestamp = datetime.fromisoformat(
-                    timestamp_str.replace(" +0800", "+08:00")
-                )
-
-                # Skip protected branches
-                if branch in protected:
-                    skipped_protected.append(branch)
-                    continue
-
-                # Skip current branch
-                if branch == current_branch:
-                    skipped_current.append(branch)
-                    continue
-
-                # Skip if has live session
-                if branch in branches_with_live:
-                    skipped_live.append(branch)
-                    logger.bind(domain="check", branch=branch).info(
-                        "Skipped local branch with live session"
-                    )
-                    continue
-
-                # Check age
-                if timestamp >= cutoff:
-                    continue
-
-                # Check if branch exists
-                if not self.git_client.branch_exists(branch):
-                    continue
-
-                # Check if has worktree
-                if self.git_client.is_branch_occupied_by_worktree(branch):
-                    # Delete worktree first
-                    worktree_path = self.git_client.find_worktree_path_for_branch(
-                        branch
-                    )
-                    if worktree_path:
-                        remove_worktree(worktree_path, force=True)
-                        logger.bind(domain="check", branch=branch).info(
-                            f"Deleted worktree at {worktree_path}"
-                        )
-
-                # Delete local branch
-                self.git_client.delete_branch(branch, force=False)
-                cleaned.append(branch)
-                logger.bind(domain="check", branch=branch).info(
-                    "Deleted expired local branch"
-                )
-
-            except Exception as exc:
-                failed.append(f"{branch}: {exc}")
-                logger.bind(domain="check", branch=branch).warning(
-                    f"Failed to clean local branch: {exc}"
-                )
-
-        return {
-            "cleaned": cleaned,
-            "skipped_protected": skipped_protected,
-            "skipped_current": skipped_current,
-            "skipped_live": skipped_live,
-            "skipped_worktree": skipped_worktree,
-            "failed": failed,
-        }

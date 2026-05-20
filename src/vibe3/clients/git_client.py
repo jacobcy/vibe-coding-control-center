@@ -6,8 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from loguru import logger
-
+from vibe3.clients.git_branch_listing import get_all_branches_with_timestamps
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
 )
@@ -287,53 +286,8 @@ class GitClient:
     def get_all_branches_with_timestamps(
         self, remote: bool = False
     ) -> list[dict[str, str]]:
-        """Get all branches with last commit timestamps.
-
-        Args:
-            remote: If True, get remote branches (origin/*), else local branches
-
-        Returns:
-            List of dicts with 'branch' and 'timestamp' keys
-            Example: [{'branch': 'feature-1', 'timestamp': '2026-05-20 14:00:00 +0800'}]
-
-        Note:
-            Returns empty list on error (graceful degradation for cleanup operations).
-        """
-        try:
-            if remote:
-                output = self._run(
-                    [
-                        "branch",
-                        "-r",
-                        "--list",
-                        "origin/*",
-                        "--format=%(refname:short) %(committerdate:iso8601)",
-                    ]
-                )
-            else:
-                output = self._run(
-                    [
-                        "branch",
-                        "--list",
-                        "*",
-                        "--format=%(refname:short) %(committerdate:iso8601)",
-                    ]
-                )
-
-            branches: list[dict[str, str]] = []
-            for line in output.strip().split("\n"):
-                if not line.strip():
-                    continue
-                parts = line.strip().split(None, 1)
-                if len(parts) == 2:
-                    branch, timestamp = parts
-                    branches.append({"branch": branch, "timestamp": timestamp})
-
-            return branches
-
-        except GitError as e:
-            logger.error(f"Failed to get branches: {e}")
-            return []
+        """Get all branches with last commit timestamps."""
+        return get_all_branches_with_timestamps(self._run, remote=remote)
 
     def push_branch(
         self,

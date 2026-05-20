@@ -172,6 +172,31 @@ def test_clean_expired_local_branches_deletes_old() -> None:
     assert "feature-recent" not in result["cleaned"]
 
 
+def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
+    """Remote cleanup should handle git timestamps from non-+0800 environments."""
+    from datetime import datetime, timedelta, timezone
+
+    store = MagicMock()
+    git_client = MagicMock()
+    github_client = MagicMock()
+    service = CheckCleanupService(
+        store=store, git_client=git_client, github_client=github_client
+    )
+
+    old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
+        "%Y-%m-%d %H:%M:%S +0000"
+    )
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "origin/feature-old", "timestamp": old_date},
+    ]
+    github_client.list_all_prs.return_value = []
+
+    result = service._clean_expired_remote_branches(max_age_days=7)
+
+    assert result["cleaned"] == ["origin/feature-old"]
+    git_client.delete_remote_branch.assert_called_once_with("feature-old")
+
+
 def test_clean_residual_branches_integrates_all_cleanups() -> None:
     """Should call all cleanup methods when enabled."""
     store = MagicMock()
