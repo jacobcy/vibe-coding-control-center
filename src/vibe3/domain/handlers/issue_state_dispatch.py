@@ -8,6 +8,7 @@ from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.domain.events.flow_lifecycle import ManagerDispatchIntent
 from vibe3.domain.handler_registry import register_handler
+from vibe3.exceptions import CapacityDeferredError
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.manager import build_manager_request
 from vibe3.services.issue_failure_service import block_manager_noop_issue
@@ -98,12 +99,24 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
 
         from vibe3.agents.backends.codeagent import CodeagentBackend
         from vibe3.environment.session_registry import SessionRegistryService
+        from vibe3.execution.capacity_service import CapacityService
         from vibe3.execution.coordinator import ExecutionCoordinator
 
         with get_store() as store:
             backend = CodeagentBackend()
             registry = SessionRegistryService(store=store, backend=backend)
             coordinator = ExecutionCoordinator(config, store)
+
+            # Early capacity check to avoid wasteful request preparation
+            # and prevent misleading "Failed to prepare role execution request" errors
+            capacity = CapacityService(config, store, backend)
+            if not capacity.can_dispatch("manager"):
+                logger.bind(
+                    domain="issue_state_dispatch_handler",
+                    role="manager",
+                    issue_number=event.issue_number,
+                ).info("Manager dispatch queued: Capacity full")
+                return
 
             try:
                 request = await loop.run_in_executor(
@@ -116,10 +129,20 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
                     ),
                 )
 
-                if request is None:
-                    _block_for_noop("Failed to prepare role execution request")
-                    return
+            except CapacityDeferredError as exc:
+                # Capacity defer is normal — just log and return (don't block)
+                logger.bind(
+                    domain="issue_state_dispatch_handler",
+                    role="manager",
+                    issue_number=event.issue_number,
+                ).info(f"Manager dispatch deferred: {exc.message}")
+                return
 
+            if request is None:
+                _block_for_noop("Failed to prepare role execution request")
+                return
+
+            try:
                 result = await loop.run_in_executor(
                     None, lambda: coordinator.dispatch_execution(request)
                 )

@@ -34,6 +34,7 @@ class TestIssueStateDispatchHandler:
         mock_build_request.assert_not_called()
         mock_coordinator_cls.assert_not_called()
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -44,6 +45,7 @@ class TestIssueStateDispatchHandler:
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
@@ -51,6 +53,7 @@ class TestIssueStateDispatchHandler:
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
@@ -62,6 +65,11 @@ class TestIssueStateDispatchHandler:
             launched=True,
         )
         mock_coordinator_cls.return_value = mock_coordinator
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         handle_manager_dispatch_intent(
             ManagerDispatchIntent(
@@ -74,6 +82,7 @@ class TestIssueStateDispatchHandler:
 
         mock_build_request.assert_called_once()
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -84,6 +93,7 @@ class TestIssueStateDispatchHandler:
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
@@ -91,6 +101,7 @@ class TestIssueStateDispatchHandler:
         from vibe3.execution.contracts import ExecutionLaunchResult
 
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
@@ -102,6 +113,11 @@ class TestIssueStateDispatchHandler:
             launched=True,
         )
         mock_coordinator_cls.return_value = mock_coordinator
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         handle_manager_dispatch_intent(
             ManagerDispatchIntent(
@@ -214,6 +230,7 @@ class TestIssueStateDispatchHandler:
             actor="agent:manager",
         )
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
@@ -226,6 +243,7 @@ class TestIssueStateDispatchHandler:
         mock_coordinator_cls: MagicMock,
         mock_registry_cls: MagicMock,
         mock_block_issue: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
@@ -233,6 +251,11 @@ class TestIssueStateDispatchHandler:
 
         mock_config = MagicMock()
         mock_config_cls.return_value = mock_config
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         mock_build_request.return_value = None
 
@@ -256,3 +279,104 @@ class TestIssueStateDispatchHandler:
             reason="Failed to prepare role execution request",
             actor="agent:manager",
         )
+
+    @patch("vibe3.execution.capacity_service.CapacityService")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
+    def test_capacity_full_defers_without_blocking(
+        self,
+        mock_build_request: MagicMock,
+        mock_config_cls: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_registry_cls: MagicMock,
+        mock_block_issue: MagicMock,
+        mock_capacity_cls: MagicMock,
+    ) -> None:
+        """Test that capacity full defers dispatch without blocking the issue."""
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_manager_dispatch_intent,
+        )
+
+        mock_config = MagicMock()
+        mock_config_cls.return_value = mock_config
+
+        # Mock capacity service to deny dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = False
+        mock_capacity_cls.return_value = mock_capacity
+
+        mock_build_request.return_value = None
+
+        mock_coordinator = MagicMock()
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        # Provide issue_title to skip GitHub API call
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="ready",
+                issue_title="Test Issue",
+            )
+        )
+
+        # Capacity full should NOT call build_request or block_issue
+        # It should just return early (defer)
+        mock_build_request.assert_not_called()
+        mock_coordinator.dispatch_execution.assert_not_called()
+        mock_block_issue.assert_not_called()
+
+    @patch("vibe3.execution.capacity_service.CapacityService")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
+    def test_capacity_deferred_error_defers_without_blocking(
+        self,
+        mock_build_request: MagicMock,
+        mock_config_cls: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_registry_cls: MagicMock,
+        mock_block_issue: MagicMock,
+        mock_capacity_cls: MagicMock,
+    ) -> None:
+        """Test CapacityDeferredError from build_request defers without blocking."""
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_manager_dispatch_intent,
+        )
+        from vibe3.exceptions import CapacityDeferredError
+
+        mock_config = MagicMock()
+        mock_config_cls.return_value = mock_config
+
+        # Mock capacity service to allow dispatch initially
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
+
+        # Mock build_request to raise CapacityDeferredError (race condition case)
+        mock_build_request.side_effect = CapacityDeferredError(
+            "Manager capacity reached (3/3). Deferred flow creation."
+        )
+
+        mock_coordinator = MagicMock()
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        # Provide issue_title to skip GitHub API call
+        handle_manager_dispatch_intent(
+            ManagerDispatchIntent(
+                issue_number=42,
+                branch="task/issue-42",
+                trigger_state="ready",
+                issue_title="Test Issue",
+            )
+        )
+
+        # CapacityDeferredError should NOT block the issue
+        # It should just return early (defer)
+        mock_coordinator.dispatch_execution.assert_not_called()
+        mock_block_issue.assert_not_called()

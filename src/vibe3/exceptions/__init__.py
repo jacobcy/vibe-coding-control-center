@@ -193,6 +193,18 @@ class PRNotFoundError(VibeError):
 # ========== Orchestration Errors ==========
 
 
+class CapacityDeferredError(VibeError):
+    """Dispatch deferred due to capacity limits.
+
+    This is not a failure — it signals that the dispatch should be
+    retried later when capacity becomes available. Handlers should
+    treat this as a skip/defer, not a blocking failure.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, recoverable=True)
+
+
 class InvalidTransitionError(UserError):
     """Invalid state transition in orchestration state machine."""
 
