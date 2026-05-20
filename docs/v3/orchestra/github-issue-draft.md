@@ -1,7 +1,8 @@
 # Orchestra Follow-up Issue Drafts
 
-> 用途：把“本版不做但必须做”的能力拆成可执行 issue。
+> 用途：把”本版不做但必须做”的能力拆成可执行 issue。
 > 标签建议：`orchestra`, `enhancement`, `priority/medium`（按实际调整）。
+> **Status Review (2026-05-20)**: 三个 draft 仍然有效。Phase A 的候选列表/优先级/依赖决策尚未完整实现；Phase B 的 manager 多阶段编排（plan/run/review 子 agent 协同）由 manager 材料定义但尚未落地；Phase C 的可观测性有部分基础设施（observability/）但缺少决策日志结构化和队列可视化。
 
 ## Draft 1: Orchestrator 决策循环（候选列表 + 优先级 + 依赖）
 

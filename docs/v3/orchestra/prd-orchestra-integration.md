@@ -7,10 +7,9 @@ created: "2026-03-16"
 last_updated: "2026-03-29"
 related_docs:
   - docs/v3/orchestra/README.md
-  - src/vibe3/orchestra/serve.py
-  - src/vibe3/orchestra/heartbeat.py
-  - src/vibe3/orchestra/services/assignee_dispatch.py
-  - src/vibe3/orchestra/services/pr_review_dispatch.py
+  - src/vibe3/orchestra/global_dispatch_coordinator.py
+  - src/vibe3/orchestra/flow_dispatch.py
+  - src/vibe3/orchestra/failed_gate.py
 status: active
 ---
 
