@@ -257,10 +257,6 @@ bin/vibe flow pr       # 生成 PR
 
 ### Step 5：清理工作区
 
-```bash
-bin/vibe flow done     # 合并后清理 worktree
-```
-
 > V3: 使用 `git worktree remove` 手动清理，或由 orchestra 自动管理 worktree 生命周期。
 
 ---
@@ -322,7 +318,7 @@ tests/                 # bats-core 测试（≥20 个用例）
 bin/vibe flow start <feature>  # 创建 worktree + 分支
 bin/vibe flow review           # Pre-PR 检查
 bin/vibe flow pr               # 创建 PR
-bin/vibe flow done             # 清理 worktree
+# 注意：flow done 已弃用，V3 使用 git worktree remove
 
 # 质量验证（每次改代码后必跑）
 bash scripts/hooks/lint.sh           # 双层 lint

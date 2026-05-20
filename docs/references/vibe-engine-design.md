@@ -72,7 +72,7 @@ related_docs:
    - **触发**: `vibe flow review --local` （调用底层大模型进行自动化逻辑与依赖检查）或者 `vibe flow pr` (推送至云端供人类复核)。
    - **状态**: 任务处于冻结待决状态，根据 Codex/Human 的反馈决定退回 *执行* 还是前进到 *完成*。
 4. **收尾 (Completed / Closed)**
-   - **触发**: `vibe flow done` (人类敲击或 AI 代办)。
+   - **触发**: PR 合并后自动触发或手动清理 worktree。
    - **状态**: 交付收口。当前特征分支被删除，flow 历史被保留；物理目录是否清理取决于 worktree 生命周期，而不是 flow 本体。
 5. **归档 (Archived)**
    - **触发**: `vibe check`。
