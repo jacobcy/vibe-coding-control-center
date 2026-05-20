@@ -4,6 +4,7 @@ import atexit
 import sqlite3
 import threading
 from pathlib import Path
+from typing import Protocol
 
 from loguru import logger
 
@@ -16,6 +17,16 @@ from vibe3.exceptions import GitError
 _global_conn: sqlite3.Connection | None = None
 _global_db_path: str | None = None
 _global_lock = threading.Lock()
+
+
+class _HasConnection(Protocol):
+    """Protocol for repo mixins that have _get_connection method."""
+
+    db_path: str
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get database connection."""
+        ...
 
 
 def _get_global_connection(db_path: str) -> sqlite3.Connection:
