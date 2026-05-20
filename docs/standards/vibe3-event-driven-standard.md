@@ -59,7 +59,7 @@ L3  Manager / Plan / Run / Review  -- 代码开发核心，独立 worktree
 L4  Human collaboration            -- 人工协作流程
 ```
 
-**参考**: [vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md) §二
+**参考**: [vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md) — Worktree 分配与 Runtime Session
 
 ---
 

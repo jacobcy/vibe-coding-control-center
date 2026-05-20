@@ -16,7 +16,7 @@
 
 - 具体事件类型与 payload 字段
 - `state/*` 业务状态细节
-- worktree 参数和 ownership 细节
+- worktree 参数与 runtime/worktree 细节
 - 某一条 agent 链路的 prompt 文案
 - 具体实施顺序与施工计划
 
@@ -284,7 +284,7 @@ Vibe3 最终应收敛为六层。
 - 事件语义与处理规则：见 [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md)
 - runtime driver / tick / async child：见 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)
 - 状态机与 authoritative refs：见 [v3/command-standard.md](v3/command-standard.md)
-- worktree ownership：见 [vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md)
+- worktree 分配与 runtime session：见 [vibe3-worktree-ownership-standard.md](vibe3-worktree-ownership-standard.md)
 
 本文件负责回答“整体最后该长成什么样”，上述文件负责回答各分层内部的细节语义。
 

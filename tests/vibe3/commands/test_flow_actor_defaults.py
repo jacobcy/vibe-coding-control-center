@@ -45,7 +45,7 @@ def test_flow_update_idempotent(
 @patch("vibe3.commands.flow_manage.TaskService")
 @patch("vibe3.commands.flow_manage.FlowService")
 def test_flow_bind_defaults_to_task_role(flow_service_cls, task_service_cls) -> None:
-    """flow bind without --role should bind as task with system ownership."""
+    """flow bind without --role should bind as task with no explicit actor."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/set-default-flow"
     flow_service_cls.return_value = flow_service
@@ -113,3 +113,30 @@ def test_flow_bind_remains_atomic_command_surface() -> None:
     from vibe3.commands.flow_manage import bind
 
     assert callable(bind)
+
+
+@patch("vibe3.commands.flow_manage.FlowService")
+@patch("vibe3.environment.session_registry.SessionRegistryService")
+@patch("vibe3.agents.backends.codeagent.CodeagentBackend")
+def test_flow_update_blocks_when_branch_has_live_runtime_session(
+    mock_backend,
+    mock_registry_cls,
+    mock_flow_service,
+) -> None:
+    """flow update should block when branch has live runtime sessions."""
+
+    flow_service = mock_flow_service.return_value
+    flow_service.get_flow_status.return_value = MagicMock(branch="task/issue-123")
+    flow_service.ensure_flow_for_branch.return_value = MagicMock(
+        branch="task/issue-123"
+    )
+
+    registry = mock_registry_cls.return_value
+    registry.get_truly_live_sessions_for_branch.return_value = [{"id": 1}]
+
+    with patch(
+        "vibe3.utils.branch_arg.resolve_branch_arg", return_value="task/issue-123"
+    ):
+        result = runner.invoke(app, ["update"])
+
+    assert result.exit_code == 1

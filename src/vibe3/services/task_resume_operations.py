@@ -98,25 +98,21 @@ class TaskResumeOperations:
                     "or close the linked issue manually if still open."
                 )
 
-        # Verify worktree ownership before modifying flow state
+        # Guard: block resume if branch has live runtime sessions
         if isinstance(branch, str):
-            try:
-                from vibe3.utils.path_helpers import find_worktree_path_for_branch
+            from vibe3.agents.backends.codeagent import CodeagentBackend
+            from vibe3.environment.session_registry import SessionRegistryService
 
-                wt_path = worktree_path or find_worktree_path_for_branch(branch)
-                if wt_path:
-                    from vibe3.services.worktree_ownership_guard import (
-                        ensure_worktree_ownership,
-                    )
-
-                    ensure_worktree_ownership(
-                        self.flow_service.store,
-                        str(wt_path),
-                    )
-            except (ImportError, ValueError):
-                # find_worktree_path_for_branch may fail for branches without worktrees
-                # In such cases, skip ownership check (legacy behavior)
-                pass
+            backend = CodeagentBackend()
+            registry = SessionRegistryService(
+                store=self.flow_service.store, backend=backend
+            )
+            live_sessions = registry.get_truly_live_sessions_for_branch(branch)
+            if live_sessions:
+                raise UserError(
+                    f"Flow '{branch}' still has a live runtime session; "
+                    "wait for the active automation run to finish before resume."
+                )
 
         def emit_progress(step: str, status: str = "running") -> None:
             if progress_callback:

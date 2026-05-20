@@ -115,7 +115,7 @@ class FlowWriteMixin(FlowReadMixin):
             source=source,
         ).info("Creating flow")
         # Flow state actor: only set when explicitly provided.
-        # orchestra uses actor=None to signal "no agent has taken ownership yet".
+        # orchestra uses actor=None to signal "no agent has been assigned yet".
         effective_actor = (
             SignatureService.resolve_actor(explicit_actor=actor)
             if actor is not None

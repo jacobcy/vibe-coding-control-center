@@ -19,7 +19,7 @@
 - `.agent/policies/run.md` — Run 模式策略
 - `.agent/policies/review.md` — Review 模式策略
 
-角色层级与 worktree 所有权定义见 `vibe3-worktree-ownership-standard.md`。
+角色层级与 worktree 分配/runtime session 语义见 `vibe3-worktree-ownership-standard.md`。
 事件驱动语义见 `vibe3-event-driven-standard.md`。
 
 ## 2. 核心判断
@@ -57,7 +57,7 @@ Vibe3 的架构是**协作式制衡**:
         |
 Orchestra 系统层（L0）
 Progress Contract + Fallback Matrix
-强制回退真源 owner
+强制回退真源 / runtime guard
         |
 Manager（L3）状态机控制者
 可 block / claimed / review
@@ -171,7 +171,7 @@ review:
 ```
 vibe3-role-checks-and-balances-standard.md (本文件)
         |
-        +-- vibe3-worktree-ownership-standard.md  (层级定义)
+        +-- vibe3-worktree-ownership-standard.md  (层级与 runtime/worktree 语义)
         +-- vibe3-event-driven-standard.md        (事件链语义)
         +-- vibe3-state-sync-standard.md          (state/* 标签语义)
         +-- agent-workflow-standard.md            (Agent 工作流规范)

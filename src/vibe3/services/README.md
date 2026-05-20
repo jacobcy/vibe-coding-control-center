@@ -70,9 +70,8 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| check_service.py | 602 | Pre-push 检查 |
+| check_service.py | 477 | Pre-push 检查 |
 | check_cleanup_service.py | 268 | Check 清理服务 |
-| check_ownership_service.py | 89 | Check 所有权服务 |
 | check_remote.py | 165 | 远程检查辅助 |
 
 ### Issue 管理文件
@@ -106,12 +105,11 @@
 | abandon_flow_service.py | 156 | 放弃 flow 编排 |
 | base_resolution_usecase.py | 129 | base 分支解析 |
 | verdict_service.py | 184 | 裁决服务 |
-| worktree_ownership_guard.py | 177 | Worktree 所有权守卫 |
 | external_events.py | 196 | 外部事件处理 |
 | artifact_parser.py | 82 | 工件解析器 |
 | __init__.py | 5 | 模块导出 |
 
-**总计**：46 文件，10288 行
+**总计**：45 文件，10074 行
 
 ## 依赖关系
 
