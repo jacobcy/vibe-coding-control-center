@@ -414,3 +414,114 @@ class CheckCleanupService:
                 )
 
         return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
+
+    def _clean_expired_remote_branches(
+        self, max_age_days: int = 7
+    ) -> dict[str, object]:
+        """Clean expired remote non-protected branches older than max_age_days.
+
+        Safety checks:
+        - Exclude protected branches (main, master, develop)
+        - Check for open PR (skip if has open PR)
+        - Check branch age
+
+        Args:
+            max_age_days: Max age in days before cleanup (default: 7)
+
+        Returns:
+            Dict with 'cleaned', 'skipped_protected', 'skipped_pr', 'failed' lists
+        """
+        from datetime import datetime, timedelta, timezone
+
+        logger.bind(domain="check", action="clean_remote_branches").info(
+            f"Checking remote branches older than {max_age_days} days"
+        )
+
+        # Load protected branches from config
+        from vibe3.config.settings import VibeConfig
+
+        config = VibeConfig.get_defaults()
+        protected = set(config.flow.protected_branches)
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+
+        cleaned: list[str] = []
+        skipped_protected: list[str] = []
+        skipped_pr: list[str] = []
+        failed: list[str] = []
+
+        # Get all remote branches with timestamps
+        try:
+            remote_branches = self.git_client.get_all_branches_with_timestamps(
+                remote=True
+            )
+        except Exception as exc:
+            logger.bind(domain="check").error(f"Failed to get remote branches: {exc}")
+            return {
+                "cleaned": [],
+                "skipped_protected": [],
+                "skipped_pr": [],
+                "failed": [str(exc)],
+            }
+
+        # Get open PRs
+        try:
+            from vibe3.clients.github_client import GitHubClient
+
+            gh = self._github_client or GitHubClient()
+            open_prs = gh.list_all_prs(state="open")
+            pr_branches = {pr.head_branch for pr in open_prs}
+        except Exception as exc:
+            logger.bind(domain="check").warning(f"Failed to get open PRs: {exc}")
+            pr_branches = set()
+
+        # Process each branch
+        for branch_info in remote_branches:
+            branch = branch_info["branch"]
+            timestamp_str = branch_info["timestamp"]
+
+            try:
+                # Parse timestamp
+                timestamp = datetime.fromisoformat(
+                    timestamp_str.replace(" +0800", "+08:00")
+                )
+
+                # Extract branch name (remove origin/ prefix)
+                branch_name = branch.replace("origin/", "", 1)
+
+                # Skip protected branches
+                if branch_name in protected:
+                    skipped_protected.append(branch)
+                    continue
+
+                # Skip if has open PR
+                if branch_name in pr_branches:
+                    skipped_pr.append(branch)
+                    logger.bind(domain="check", branch=branch).info(
+                        "Skipped remote branch with open PR"
+                    )
+                    continue
+
+                # Check age
+                if timestamp >= cutoff:
+                    continue
+
+                # Delete remote branch
+                self.git_client.delete_remote_branch(branch_name)
+                cleaned.append(branch)
+                logger.bind(domain="check", branch=branch).info(
+                    "Deleted expired remote branch"
+                )
+
+            except Exception as exc:
+                failed.append(f"{branch}: {exc}")
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to clean remote branch: {exc}"
+                )
+
+        return {
+            "cleaned": cleaned,
+            "skipped_protected": skipped_protected,
+            "skipped_pr": skipped_pr,
+            "failed": failed,
+        }

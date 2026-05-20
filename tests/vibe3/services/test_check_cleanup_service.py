@@ -252,3 +252,37 @@ def test_clean_expired_agent_worktrees_handles_git_error() -> None:
                 assert len(result["failed"]) == 1
                 assert "agent-old123" in result["failed"][0]
                 assert "test error" in result["failed"][0]
+
+
+def test_clean_expired_remote_branches_deletes_old() -> None:
+    """Delete remote branches older than max age, excluding protected."""
+    from datetime import datetime, timedelta
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Mock git_client.get_all_branches_with_timestamps
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    recent_date = (datetime.now() - timedelta(days=3)).strftime(
+        "%Y-%m-%d %H:%M:%S +0800"
+    )
+
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "origin/feature-old", "timestamp": old_date},
+        {"branch": "origin/feature-recent", "timestamp": recent_date},
+        {"branch": "origin/main", "timestamp": old_date},  # Protected, skip
+    ]
+
+    # Mock GitHub PR check
+    github_client = MagicMock()
+    github_client.list_all_prs.return_value = []  # No open PRs
+    service._github_client = github_client
+
+    result = service._clean_expired_remote_branches(max_age_days=7)
+
+    # Verify: only feature-old deleted, feature-recent kept, main skipped
+    assert "cleaned" in result
+    assert "origin/feature-old" in result["cleaned"]
+    assert "origin/main" not in result["cleaned"]
+    assert "origin/feature-recent" not in result["cleaned"]
