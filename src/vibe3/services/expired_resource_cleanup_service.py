@@ -74,9 +74,12 @@ class ExpiredResourceCleanupService:
         Returns:
             Dict with 'cleaned' list and 'skipped_live' list
         """
+        import typer
+
         logger.bind(domain="check", action="clean_agent_worktrees").info(
             f"Checking agent worktrees older than {max_age_days} days"
         )
+        typer.echo(f"  Checking agent worktrees older than {max_age_days} days...")
 
         base = self._get_agent_worktree_base()
         if not base.exists():
@@ -117,20 +120,27 @@ class ExpiredResourceCleanupService:
                         worktree=worktree_name,
                         session_count=len(live_sessions),
                     ).info("Skipped agent worktree with live runtime sessions")
+                    typer.echo(
+                        f"    [skipped] {worktree_name} "
+                        f"(has {len(live_sessions)} live sessions)"
+                    )
                     continue
 
                 # Properly remove worktree: cleans git metadata AND directory
+                typer.echo(f"    [cleaning] {worktree_name}...")
                 remove_worktree(worktree_dir, force=True)
                 cleaned.append(worktree_name)
                 logger.bind(domain="check", worktree=worktree_name).info(
                     "Deleted expired agent worktree"
                 )
+                typer.echo(f"    [cleaned]  {worktree_name}")
 
             except Exception as exc:
                 failed.append(f"{worktree_name}: {exc}")
                 logger.bind(domain="check", worktree=worktree_name).warning(
                     f"Failed to clean agent worktree: {exc}"
                 )
+                typer.echo(f"    [failed]   {worktree_name}: {exc}", err=True)
 
         return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
 
@@ -148,9 +158,12 @@ class ExpiredResourceCleanupService:
         Returns:
             Dict with 'cleaned', 'skipped_protected', 'skipped_pr', 'failed' lists
         """
+        import typer
+
         logger.bind(domain="check", action="clean_remote_branches").info(
             f"Checking remote branches older than {max_age_days} days"
         )
+        typer.echo(f"  Checking remote branches older than {max_age_days} days...")
 
         # Load protected branches from config
         from vibe3.config.settings import VibeConfig
@@ -172,6 +185,7 @@ class ExpiredResourceCleanupService:
             )
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get remote branches: {exc}")
+            typer.echo(f"    [error] Failed to get remote branches: {exc}", err=True)
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -184,6 +198,7 @@ class ExpiredResourceCleanupService:
             pr_branches = set(self.pr_service.refresh_open_pr_cache())
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get open PRs: {exc}")
+            typer.echo(f"    [error] Failed to get open PRs: {exc}", err=True)
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -215,6 +230,7 @@ class ExpiredResourceCleanupService:
                     logger.bind(domain="check", branch=branch).info(
                         "Skipped remote branch with open PR"
                     )
+                    typer.echo(f"    [skipped] {branch} (has open PR)")
                     continue
 
                 # Check age
@@ -222,17 +238,20 @@ class ExpiredResourceCleanupService:
                     continue
 
                 # Delete remote branch
+                typer.echo(f"    [cleaning] {branch}...")
                 self.git_client.delete_remote_branch(branch_name)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired remote branch"
                 )
+                typer.echo(f"    [cleaned]  {branch}")
 
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to clean remote branch: {exc}"
                 )
+                typer.echo(f"    [failed]   {branch}: {exc}", err=True)
 
         return {
             "cleaned": cleaned,
@@ -258,9 +277,12 @@ class ExpiredResourceCleanupService:
             Dict with 'cleaned', 'skipped_protected', 'skipped_current',
             'skipped_live', 'skipped_worktree', 'failed' lists
         """
+        import typer
+
         logger.bind(domain="check", action="clean_local_branches").info(
             f"Checking local branches older than {max_age_days} days"
         )
+        typer.echo(f"  Checking local branches older than {max_age_days} days...")
 
         # Load protected branches from config
         from vibe3.config.settings import VibeConfig
@@ -282,6 +304,7 @@ class ExpiredResourceCleanupService:
             current_branch = self.git_client.get_current_branch()
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get current branch: {exc}")
+            typer.echo(f"    [error] Failed to get current branch: {exc}", err=True)
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -298,6 +321,7 @@ class ExpiredResourceCleanupService:
             logger.bind(domain="check").error(
                 "Failed to get live sessions, skipping local branch cleanup"
             )
+            typer.echo("    [error] Live session query failed, skipping", err=True)
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -314,6 +338,7 @@ class ExpiredResourceCleanupService:
             )
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get local branches: {exc}")
+            typer.echo(f"    [error] Failed to get local branches: {exc}", err=True)
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -349,6 +374,7 @@ class ExpiredResourceCleanupService:
                     logger.bind(domain="check", branch=branch).info(
                         "Skipped local branch with live session"
                     )
+                    typer.echo(f"    [skipped] {branch} (has live session)")
                     continue
 
                 # Check age
@@ -366,24 +392,32 @@ class ExpiredResourceCleanupService:
                         branch
                     )
                     if worktree_path:
+                        typer.echo(
+                            f"    [cleaning] worktree for {branch} "
+                            f"at {worktree_path}..."
+                        )
                         remove_worktree(worktree_path, force=True)
                         skipped_worktree.append(branch)
                         logger.bind(domain="check", branch=branch).info(
                             f"Deleted worktree at {worktree_path}"
                         )
+                        typer.echo(f"    [cleaned]  worktree for {branch}")
 
                 # Delete local branch
+                typer.echo(f"    [cleaning] {branch}...")
                 self.git_client.delete_branch(branch, force=False)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired local branch"
                 )
+                typer.echo(f"    [cleaned]  {branch}")
 
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to clean local branch: {exc}"
                 )
+                typer.echo(f"    [failed]   {branch}: {exc}", err=True)
 
         return {
             "cleaned": cleaned,
