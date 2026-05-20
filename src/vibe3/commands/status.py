@@ -194,6 +194,7 @@ def status(
         flows = service.list_flows(status=None if all_flows else "active")
         if not all_flows:
             flows.extend(service.list_flows(status="done"))
+            flows.extend(service.list_flows(status="blocked"))
 
         stale_flows = service.list_flows(status="stale") if not all_flows else []
 
