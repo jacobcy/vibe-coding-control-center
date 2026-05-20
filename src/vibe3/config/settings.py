@@ -378,15 +378,23 @@ class VibeConfig(BaseModel):
                     data[key] = supp[key]
 
         # Load prompt content from prompts.yaml into VibeConfig fields
-        # Try new path first, then fallback to old path
-        new_prompts_path = Path("config/prompts/prompts.yaml")
-        old_prompts_path = Path("config/prompts.yaml")
+        # Priority: paths.prompts_root (from installed settings.yaml) > repo-local paths
         prompts_path = None
+        prompts_root_str = (data.get("paths") or {}).get("prompts_root")
+        if prompts_root_str:
+            installed_prompts_path = (
+                Path(prompts_root_str).expanduser() / "prompts.yaml"
+            )
+            if installed_prompts_path.exists():
+                prompts_path = installed_prompts_path
 
-        if new_prompts_path.exists():
-            prompts_path = new_prompts_path
-        elif old_prompts_path.exists():
-            prompts_path = old_prompts_path
+        if prompts_path is None:
+            new_prompts_path = Path("config/prompts/prompts.yaml")
+            old_prompts_path = Path("config/prompts.yaml")
+            if new_prompts_path.exists():
+                prompts_path = new_prompts_path
+            elif old_prompts_path.exists():
+                prompts_path = old_prompts_path
 
         if prompts_path:
             with open(prompts_path) as f:

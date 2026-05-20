@@ -1,8 +1,10 @@
-"""Tests for VibeConfig._expand_config_variables in vibe3.config.settings."""
+"""Tests for VibeConfig._expand_config_variables and _load_supplementary."""
 
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 
 from vibe3.config.settings import VibeConfig
 
@@ -69,3 +71,51 @@ class TestExpandConfigVariables:
         # Resolves to the dict itself, which gets str()-ed? No —
         # the code returns match.group(0) when current is a dict
         assert result["ref"] == "${section}"
+
+
+class TestLoadSupplementaryPromptsRoot:
+    """Tests for prompts_root path resolution in VibeConfig._load_supplementary."""
+
+    def test_prompts_root_from_paths_config_takes_priority(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """paths.prompts_root in data overrides repo-local fallback paths."""
+        prompts_dir = tmp_path / "assets" / "prompts"
+        prompts_dir.mkdir(parents=True)
+        prompts_file = prompts_dir / "prompts.yaml"
+        # Use a valid _PROMPT_KEYS key: agent_prompt.global_notice
+        prompts_file.write_text("agent_prompt:\n  global_notice: installed-notice\n")
+
+        # Run from tmp_path so repo-local prompts paths do not exist
+        monkeypatch.chdir(tmp_path)
+        data: dict = {"paths": {"prompts_root": str(prompts_dir)}}
+
+        result = VibeConfig._load_supplementary(data)
+
+        assert result.get("agent_prompt", {}).get("global_notice") == "installed-notice"
+
+    def test_prompts_root_absent_falls_back_to_repo_local(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When paths.prompts_root is absent, no prompts merge occurs."""
+        monkeypatch.chdir(tmp_path)
+        data: dict = {}
+
+        result = VibeConfig._load_supplementary(data)
+
+        # No prompts merged — agent_prompt should not appear
+        assert "agent_prompt" not in result
+
+    def test_prompts_root_set_but_prompts_yaml_missing_falls_back(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """paths.prompts_root present but prompts.yaml missing → no merge."""
+        missing_dir = tmp_path / "missing"
+        # Do not create the directory or file
+        monkeypatch.chdir(tmp_path)
+
+        data: dict = {"paths": {"prompts_root": str(missing_dir)}}
+
+        result = VibeConfig._load_supplementary(data)
+
+        assert "agent_prompt" not in result
