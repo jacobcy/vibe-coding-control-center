@@ -461,11 +461,30 @@ class CheckCleanupService:
                 f"Found {len(detached_worktrees)} detached HEAD worktrees"
             )
 
+            # SAFETY: Get current working directory to prevent self-deletion
+            import os
+
+            current_cwd = os.getcwd()
+
             # Remove detached worktrees
             cleaned: list[str] = []
+            skipped_self: list[str] = []
             failed: list[str] = []
 
             for wt_path, head_sha in detached_worktrees:
+                # SAFETY CHECK: Never delete current working directory
+                wt_abs = os.path.abspath(wt_path)
+                if wt_abs == current_cwd:
+                    skipped_self.append(wt_path)
+                    logger.bind(
+                        domain="check",
+                        worktree=wt_path,
+                    ).warning(
+                        "Skipping detached worktree:"
+                        " it is the current working directory"
+                    )
+                    continue
+
                 try:
                     subprocess.run(
                         ["git", "worktree", "remove", "--force", wt_path],
@@ -491,7 +510,7 @@ class CheckCleanupService:
                         f"Failed to remove detached worktree: {exc}"
                     )
 
-            return {"cleaned": cleaned, "failed": failed}
+            return {"cleaned": cleaned, "skipped_self": skipped_self, "failed": failed}
 
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to scan worktrees: {exc}")

@@ -307,3 +307,44 @@ detached
         assert "/tmp/wt1" in result["cleaned"]
         assert "/tmp/wt3" in result["cleaned"]
         assert len(result["failed"]) == 0
+
+
+def test_cleanup_detached_worktrees_skips_current_cwd() -> None:
+    """Never delete current working directory even if it is a detached worktree."""
+    import os
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    current_cwd = os.getcwd()
+
+    porcelain_output = f"""worktree {current_cwd}
+HEAD abc123def456
+detached
+
+worktree /tmp/other-wt
+HEAD def456abc123
+detached
+"""
+
+    with patch("subprocess.run") as mock_run:
+        # First call: scan worktrees
+        # Second call: remove only /tmp/other-wt (not current CWD)
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout=porcelain_output),
+            MagicMock(returncode=0),
+        ]
+
+        result = service._cleanup_detached_worktrees()
+
+        # Verify: only non-CWD worktree removed
+        assert result["cleaned"] == ["/tmp/other-wt"]
+        assert current_cwd in result["skipped_self"]
+        # Verify: only one remove call (not for CWD)
+        remove_calls = [
+            c
+            for c in mock_run.call_args_list
+            if c[0][0][:3] == ["git", "worktree", "remove"]
+        ]
+        assert len(remove_calls) == 1
