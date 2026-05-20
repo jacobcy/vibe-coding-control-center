@@ -30,9 +30,7 @@ class TestPRCreateCommandAI:
                 body="",
                 model_dump=lambda: {"number": 456, "title": "Existing PR"},
             )
-            mock_service.return_value.github_client.list_prs_for_branch.return_value = [
-                existing_pr
-            ]
+            mock_service.return_value.get_open_pr_for_branch.return_value = existing_pr
 
             result = runner.invoke(app, ["pr", "create", "--json", "--yes"])
 
@@ -58,9 +56,7 @@ class TestPRCreateCommandAI:
                 head_branch="task/311",
                 base_branch="main",
             )
-            mock_service.return_value.github_client.list_prs_for_branch.return_value = [
-                existing_pr
-            ]
+            mock_service.return_value.get_open_pr_for_branch.return_value = existing_pr
 
             result = runner.invoke(app, ["pr", "create", "--yes"])
 
@@ -87,9 +83,7 @@ class TestPRCreateCommandAI:
             patch("vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"),
             patch("vibe3.commands.pr_create.PRService") as mock_service,
         ):
-            mock_service.return_value.github_client.list_prs_for_branch.return_value = (
-                []
-            )
+            mock_service.return_value.get_open_pr_for_branch.return_value = None
             mock_service.return_value.create_pr.return_value = MagicMock(
                 number=123,
                 title="Test PR",
@@ -109,8 +103,7 @@ class TestPRCreateCommandAI:
         """Test PR create with --ai when AI is disabled."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("vibe3.commands.pr_create.PRService") as mock_service:
-                github_mock = mock_service.return_value.github_client
-                github_mock.list_prs_for_branch.return_value = []
+                mock_service.return_value.get_open_pr_for_branch.return_value = None
                 mock_service.return_value.create_pr.return_value = MagicMock(
                     number=123,
                     title="Test PR",
@@ -163,8 +156,8 @@ class TestPRCreateCommandAI:
                                     "vibe3.commands.pr_create.PRService"
                                 ) as mock_service,
                             ):
-                                github_mock = mock_service.return_value.github_client
-                                github_mock.list_prs_for_branch.return_value = []
+                                pr_service = mock_service.return_value
+                                pr_service.get_open_pr_for_branch.return_value = None
                                 mock_pr = MagicMock(
                                     number=123,
                                     title="feat: ai title",
@@ -202,8 +195,8 @@ class TestPRCreateCommandAI:
                     "vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"
                 ):
                     with patch("vibe3.commands.pr_create.PRService") as mock_service:
-                        github_mock = mock_service.return_value.github_client
-                        github_mock.list_prs_for_branch.return_value = []
+                        pr_service = mock_service.return_value
+                        pr_service.get_open_pr_for_branch.return_value = None
                         # Mock collect_branch_material to return empty commits
                         with patch(
                             "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"

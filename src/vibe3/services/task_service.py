@@ -1,12 +1,13 @@
 """Task service implementation."""
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse, IssueLink
@@ -15,6 +16,7 @@ from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
+from vibe3.services.pr_service import PRService
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.task_show_service import (
     TaskCommentSummary,
@@ -361,7 +363,10 @@ class TaskService:
 
     def _get_branch_pr(self, branch: str) -> PRResponse | None:
         try:
-            prs = self.github_client.list_prs_for_branch(branch, state="all")
+            pr = PRService(
+                github_client=cast(GitHubClientProtocol, self.github_client),
+                store=self.store,
+            ).get_branch_pr_status(branch)
         except GitError as exc:
             logger.bind(
                 domain="task",
@@ -370,7 +375,7 @@ class TaskService:
                 error=str(exc),
             ).warning(f"Failed to query PRs for superseded task flow: {exc}")
             return None
-        return prs[0] if prs else None
+        return pr
 
     def _get_orchestra_config(self) -> OrchestraConfig:
         if self._orchestra_config is None:

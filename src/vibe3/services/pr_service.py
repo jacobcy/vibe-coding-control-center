@@ -1,5 +1,7 @@
 """PR service implementation."""
 
+from datetime import datetime
+from pathlib import Path
 from typing import cast
 
 from loguru import logger
@@ -8,10 +10,12 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.clients.recent_pr_cache import RecentPRCache
 from vibe3.exceptions import GitError, PRNotFoundError, UserError
 from vibe3.models.pr import (
     CreatePRRequest,
     PRResponse,
+    PRState,
     VersionBumpResponse,
 )
 from vibe3.services.pr_loc_comment_service import PRLocCommentService
@@ -51,29 +55,159 @@ class PRService:
         self.loc_comment_service = loc_comment_service or PRLocCommentService(
             self.github_client
         )
-        self._open_pr_cache: dict[str, PRResponse] = {}
+        self._recent_pr_cache_map: dict[str, PRResponse] = {}
+        self._recent_pr_cache_client: RecentPRCache | None = None
 
-    def refresh_open_pr_cache(self) -> dict[str, PRResponse]:
-        """Batch refresh open-PR cache and update branch context cache.
+    @property
+    def recent_pr_cache(self) -> RecentPRCache:
+        """Persistent recent PR cache rooted at the repository common dir."""
+        if self._recent_pr_cache_client is None:
+            try:
+                git_common_dir = self.git_client.get_git_common_dir()
+                repo_path = (
+                    Path(git_common_dir).parent if git_common_dir else Path.cwd()
+                )
+            except Exception:
+                repo_path = Path.cwd()
+            self._recent_pr_cache_client = RecentPRCache(repo_path)
+        return self._recent_pr_cache_client
 
-        Returns:
-            Mapping of head_branch -> open PR.
-        """
+    def _cache_entry_to_pr(
+        self, branch: str, data: dict[str, object]
+    ) -> PRResponse | None:
+        """Convert cached JSON data back to PRResponse."""
+        try:
+            merged_at_raw = data.get("merged_at")
+            number_raw = data.get("number")
+            if not isinstance(number_raw, int | str):
+                return None
+            merged_at = (
+                datetime.fromisoformat(merged_at_raw)
+                if isinstance(merged_at_raw, str) and merged_at_raw
+                else None
+            )
+            state_value = str(data.get("state") or PRState.CLOSED.value)
+            return PRResponse(
+                number=int(number_raw),
+                title=str(data.get("title") or ""),
+                body="",
+                state=PRState(state_value),
+                head_branch=str(data.get("head_branch") or branch),
+                base_branch=str(data.get("base_branch") or "main"),
+                url=str(data.get("url") or ""),
+                draft=bool(data.get("draft", False)),
+                is_ready=not bool(data.get("draft", False)),
+                ci_passed=False,
+                ci_status=None,
+                created_at=None,
+                updated_at=None,
+                merged_at=merged_at,
+                metadata=None,
+            )
+        except (KeyError, ValueError, TypeError):
+            return None
+
+    def _sync_branch_context_cache(self, prs: dict[str, PRResponse]) -> None:
+        """Project recent PR facts into flow_context_cache."""
         from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
-        open_prs = self.github_client.list_all_prs(state="open")
-        branch_to_pr = {pr.head_branch: pr for pr in open_prs}
-        self._open_pr_cache = branch_to_pr
-
         title_cache = IssueTitleCacheService(self.store)
-        for pr in branch_to_pr.values():
+        for pr in prs.values():
             title_cache.update_pr(
                 branch=pr.head_branch,
                 pr_number=pr.number,
                 pr_title=pr.title,
             )
 
+    def refresh_recent_pr_cache(
+        self,
+        *,
+        force: bool = False,
+        limit: int = 50,
+        max_age_minutes: int = 10,
+    ) -> dict[str, PRResponse]:
+        """Refresh recent PR cache if stale and return branch -> PR mapping."""
+        if force or not self.recent_pr_cache.is_fresh(max_age_minutes=max_age_minutes):
+            self.recent_pr_cache.sync(self.github_client, limit=limit)
+
+        cached = self.recent_pr_cache.get_all_branch_prs()
+        branch_to_pr: dict[str, PRResponse] = {}
+        for branch, data in cached.items():
+            if not isinstance(data, dict):
+                continue
+            pr = self._cache_entry_to_pr(branch, data)
+            if pr is not None:
+                branch_to_pr[branch] = pr
+
+        self._recent_pr_cache_map = branch_to_pr
+        self._sync_branch_context_cache(branch_to_pr)
         return branch_to_pr
+
+    def refresh_open_pr_cache(
+        self,
+        *,
+        force: bool = False,
+        limit: int = 50,
+        max_age_minutes: int = 10,
+    ) -> dict[str, PRResponse]:
+        """Return open/draft PRs after ensuring recent PR cache is fresh."""
+        recent = self.refresh_recent_pr_cache(
+            force=force,
+            limit=limit,
+            max_age_minutes=max_age_minutes,
+        )
+        return {branch: pr for branch, pr in recent.items() if pr.state == PRState.OPEN}
+
+    def get_branch_pr_status(
+        self,
+        branch: str,
+        *,
+        refresh: bool = True,
+        max_age_minutes: int = 10,
+        limit: int = 50,
+    ) -> PRResponse | None:
+        """Return branch PR status from recent cache, with direct fallback on miss."""
+        cache = (
+            self.refresh_recent_pr_cache(
+                force=False,
+                limit=limit,
+                max_age_minutes=max_age_minutes,
+            )
+            if refresh
+            else self._recent_pr_cache_map
+        )
+        pr = cache.get(branch)
+        if pr is not None:
+            return pr
+
+        try:
+            prs = self.github_client.list_prs_for_branch(branch, state="all")
+        except Exception:
+            return None
+        if not prs:
+            return None
+
+        pr = prs[0]
+        self.recent_pr_cache.upsert_branch_pr(
+            branch,
+            {
+                "number": pr.number,
+                "title": pr.title,
+                "state": pr.state.value,
+                "draft": pr.draft,
+                "url": pr.url,
+                "head_branch": pr.head_branch,
+                "base_branch": pr.base_branch,
+                "merged_at": (
+                    pr.merged_at.isoformat()
+                    if isinstance(pr.merged_at, datetime)
+                    else pr.merged_at
+                ),
+            },
+        )
+        self._recent_pr_cache_map[branch] = pr
+        self._sync_branch_context_cache({branch: pr})
+        return pr
 
     def get_open_pr_for_branch(
         self,
@@ -81,14 +215,11 @@ class PRService:
         *,
         refresh: bool = True,
     ) -> PRResponse | None:
-        """Return the current open PR for a branch, if any.
-
-        Args:
-            branch: Head branch name.
-            refresh: Whether to batch refresh the open-PR cache first.
-        """
-        cache = self.refresh_open_pr_cache() if refresh else self._open_pr_cache
-        return cache.get(branch)
+        """Return the current open/draft PR for a branch, if any."""
+        pr = self.get_branch_pr_status(branch, refresh=refresh)
+        if pr is not None and pr.state == PRState.OPEN:
+            return pr
+        return None
 
     def create_pr(
         self,
@@ -122,9 +253,8 @@ class PRService:
             explicit_actor=actor,
         )
 
-        existing_prs = self.github_client.list_prs_for_branch(head_branch)
-        if existing_prs:
-            existing = existing_prs[0]
+        existing = self.get_open_pr_for_branch(head_branch)
+        if existing:
             hydrated = self.github_client.get_pr(existing.number) or existing
             self._sync_pr_flow_state(hydrated, actor=effective_actor)
             return hydrated
@@ -399,12 +529,11 @@ class PRService:
             branch=branch,
         ).info("Checking for open PR to close")
 
-        prs = self.github_client.list_prs_for_branch(branch, state="open")
-        if not prs:
+        pr = self.get_open_pr_for_branch(branch)
+        if not pr:
             logger.bind(branch=branch).info("No open PR found for branch")
             return None
 
-        pr = prs[0]
         success = self.close_pr(pr.number, comment=comment)
 
         if success:

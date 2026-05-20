@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
@@ -22,6 +23,7 @@ from vibe3.services.check_remote import (
     resolve_task_issue_number,
 )
 from vibe3.services.flow_status_service import FlowStatusService
+from vibe3.services.pr_service import PRService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 if TYPE_CHECKING:
@@ -70,6 +72,11 @@ class CheckService(CheckRemote):
             git_client=self.git_client,
             github_client=self.github_client,
         )
+        self._pr_service = PRService(
+            github_client=cast(GitHubClientProtocol, self.github_client),
+            git_client=self.git_client,
+            store=self.store,
+        )
         self._branch_to_pr: dict[str, PRResponse] = {}
         # Load config for protected branches
         self._vibe_config = VibeConfig()
@@ -87,8 +94,7 @@ class CheckService(CheckRemote):
         if self._branch_to_pr:
             return  # Already initialized
         try:
-            all_prs = self.github_client.list_all_prs(state="all")
-            self._branch_to_pr = {pr.head_branch: pr for pr in all_prs}
+            self._branch_to_pr = self._pr_service.refresh_recent_pr_cache()
         except (OSError, ValueError) as exc:
             # OSError: subprocess/gh CLI failures
             # ValueError: JSON parsing errors
@@ -251,20 +257,15 @@ class CheckService(CheckRemote):
             if result:
                 return result
         else:
-            # No PR found in cache, try API as fallback
+            # No PR found in recent cache; ask PRService for branch status so
+            # all-state branch resolution still uses the shared cache path first.
             try:
-                prs = self.github_client.list_prs_for_branch(branch)
-                if not prs:
-                    # Check merged/closed to catch stale flows
-                    all_prs = self.github_client.list_prs_for_branch(
-                        branch, state="all"
-                    )
-                    prs = [p for p in all_prs if p.state != PRState.OPEN]
-
-                if prs:
-                    result = self._handle_closed_pr(branch, prs[0])
+                cached_or_remote_pr = self._pr_service.get_branch_pr_status(branch)
+                if cached_or_remote_pr:
+                    result = self._handle_closed_pr(branch, cached_or_remote_pr)
                     if result:
                         return result
+                    self._branch_to_pr[branch] = cached_or_remote_pr
             except Exception as e:
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to verify PR status from GitHub: {e}"

@@ -1,12 +1,13 @@
 """Flow read operations mixin."""
 
-from typing import Literal, Self
+from typing import Literal, Self, cast
 
 from loguru import logger
 from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
 from vibe3.utils.git_path_client import GitPathProtocol, get_git_common_dir
 
@@ -53,15 +54,17 @@ class FlowReadMixin:
             return None
 
         # Fetch PR info from GitHub (truth)
-        # TODO: Optimize with cache service when implemented
-        gh = getattr(self, "github_client", None) or GitHubClient()
         pr_number, pr_ready = None, False  # Default values
 
         try:
-            # Query PR by branch using proper method
-            prs = gh.list_prs_for_branch(branch)
-            if prs:
-                pr = prs[0]  # Take most recent PR
+            from vibe3.services.pr_service import PRService
+
+            gh = getattr(self, "github_client", None) or GitHubClient()
+            pr = PRService(
+                github_client=cast(GitHubClientProtocol, gh),
+                store=self.store,
+            ).get_branch_pr_status(branch)
+            if pr:
                 pr_number = pr.number
                 pr_ready = pr.is_ready
         except Exception as e:

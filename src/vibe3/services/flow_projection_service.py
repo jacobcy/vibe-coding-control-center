@@ -104,9 +104,8 @@ class FlowProjectionService:
 
         # Get PR data
         try:
-            prs = self.pr_service.github_client.list_prs_for_branch(branch)
-            if prs:
-                pr = prs[0]
+            pr = self.pr_service.get_branch_pr_status(branch)
+            if pr:
                 projection.pr_number = pr.number
                 projection.pr_status = pr.state.value
                 projection.pr_is_draft = pr.draft

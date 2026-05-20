@@ -27,7 +27,7 @@ def _mock_pr(number: int = 123, branch: str = "task/demo") -> PRResponse:
 def test_projection_pr_resolves_by_branch() -> None:
     """PR data is fetched by branch via projection service."""
     mock_pr_service = MagicMock()
-    mock_pr_service.github_client.list_prs_for_branch.return_value = [_mock_pr()]
+    mock_pr_service.get_branch_pr_status.return_value = _mock_pr()
     mock_flow_service = MagicMock()
 
     from vibe3.models.flow import FlowStatusResponse
@@ -47,9 +47,57 @@ def test_projection_pr_resolves_by_branch() -> None:
 
     assert projection.pr_number == 123
     assert projection.pr_status == "OPEN"
-    mock_pr_service.github_client.list_prs_for_branch.assert_called_once_with(
-        "task/demo"
+    mock_pr_service.get_branch_pr_status.assert_called_once_with("task/demo")
+
+
+@patch("vibe3.commands.flow_status._render_snapshot_format")
+@patch("vibe3.commands.flow_status.PRService")
+@patch("vibe3.services.flow_status_resolver.FlowStatusResolver")
+@patch("vibe3.commands.flow_status.FlowService")
+def test_flow_show_snapshot_uses_pr_service_branch_status(
+    mock_service_class,
+    mock_resolver_class,
+    mock_pr_service_class,
+    mock_render_snapshot,
+) -> None:
+    """flow show --snapshot should hydrate PR info via PRService."""
+    branch = "task/demo"
+    flow_status = FlowStatusResponse(
+        branch=branch,
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=123,
     )
+
+    mock_service = MagicMock()
+    mock_service.get_current_branch.return_value = branch
+    mock_store = MagicMock()
+    mock_store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 123}
+    ]
+    mock_service.store = mock_store
+    mock_service_class.return_value = mock_service
+
+    mock_resolver = MagicMock()
+    mock_resolver.resolve.return_value = flow_status
+    mock_resolver_class.return_value = mock_resolver
+
+    mock_pr_service = MagicMock()
+    mock_pr_service.get_branch_pr_status.return_value = _mock_pr(
+        number=456, branch=branch
+    )
+    mock_pr_service_class.return_value = mock_pr_service
+
+    result = runner.invoke(app, ["flow", "show", "--snapshot"])
+
+    assert result.exit_code == 0
+    mock_pr_service_class.assert_called_once_with(store=mock_store)
+    mock_pr_service.get_branch_pr_status.assert_called_once_with(branch)
+
+    projection = mock_render_snapshot.call_args.args[0]
+    assert projection.pr_number == 456
+    assert projection.pr_status == "OPEN"
+    assert projection.pr_url == "https://example.com/pr/456"
 
 
 def _make_flow_state(

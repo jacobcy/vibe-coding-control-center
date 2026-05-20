@@ -38,7 +38,7 @@ def test_resolve_pr_target_from_issue_number():
         ci_passed=False,
         ci_status=None,
     )
-    pr_svc.github_client.list_prs_for_branch.return_value = [mock_pr]
+    pr_svc.get_branch_pr_status.return_value = mock_pr
 
     # Mock FlowService constructor
     with patch("vibe3.commands.pr_query.FlowService", return_value=mock_flow_service):
@@ -46,6 +46,7 @@ def test_resolve_pr_target_from_issue_number():
         target = _resolve_pr_target(pr_svc, pr_number=None, branch="946")
 
     # Verify PR lookup was called with resolved branch
+    pr_svc.get_branch_pr_status.assert_called_once_with("dev/issue-946")
     assert target.pr_number == 985
 
 
@@ -53,7 +54,7 @@ def test_resolve_pr_target_branch_not_found():
     """Test fail-fast behavior when no flow found for issue number."""
     pr_svc = Mock()
     # Explicitly set empty return to avoid accidental pass
-    pr_svc.github_client.list_prs_for_branch.return_value = []
+    pr_svc.get_branch_pr_status.return_value = None
 
     mock_flow_service = Mock()
 
@@ -78,12 +79,13 @@ def test_resolve_pr_target_no_pr_for_branch():
     mock_flow_service.get_flow_state.return_value = mock_flow_state
 
     # No PRs for this branch
-    pr_svc.github_client.list_prs_for_branch.return_value = []
+    pr_svc.get_branch_pr_status.return_value = None
 
     with patch("vibe3.commands.pr_query.FlowService", return_value=mock_flow_service):
         target = _resolve_pr_target(pr_svc, pr_number=None, branch="dev/issue-946")
 
     # Should return branch without PR number
+    pr_svc.get_branch_pr_status.assert_called_once_with("dev/issue-946")
     assert target.branch == "dev/issue-946"
     assert target.pr_number is None
 

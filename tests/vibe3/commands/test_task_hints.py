@@ -50,7 +50,7 @@ def test_pr_create_requires_human_confirmation(
     mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
-    mock_pr_service.github_client.list_prs_for_branch.return_value = []
+    mock_pr_service.get_open_pr_for_branch.return_value = None
     mock_pr_service_cls.return_value = mock_pr_service
 
     result = runner.invoke(app, ["pr", "create", "-t", "Test PR"])
@@ -82,7 +82,7 @@ def test_pr_create_allows_yes_when_task_issue_missing(
     mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
-    mock_pr_service.github_client.list_prs_for_branch.return_value = []
+    mock_pr_service.get_open_pr_for_branch.return_value = None
     mock_pr_service.create_pr.return_value = MagicMock(model_dump=lambda: {})
     mock_pr_service_cls.return_value = mock_pr_service
 
@@ -102,15 +102,10 @@ def test_pr_show_missing_pr_includes_bind_hint(
     git_client = MagicMock()
     git_client.get_current_branch.return_value = "task/demo"
 
-    # Mock github_client to return no PR
-    github_client = MagicMock()
-    github_client.get_pr.return_value = None
-    github_client.list_prs_for_branch.return_value = []  # No PRs found
-
     pr_service = MagicMock()
     pr_service.git_client = git_client
-    pr_service.github_client = github_client
     pr_service.get_pr.return_value = None
+    pr_service.get_branch_pr_status.return_value = None
     mock_pr_service_cls.return_value = pr_service
 
     # Mock FlowService to return flow status without task_issue_number

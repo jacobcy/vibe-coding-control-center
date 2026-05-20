@@ -5,11 +5,13 @@ It was moved out of manager/ so manager can keep shrinking toward a role shell.
 """
 
 import subprocess
+from typing import cast
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -18,6 +20,7 @@ from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
+from vibe3.services.pr_service import PRService
 from vibe3.services.task_service import TaskService
 
 
@@ -225,9 +228,13 @@ class FlowManager:
             branch = self.issue_flow_service.canonical_branch_name(issue_number)
 
         try:
-            prs = self.github.list_prs_for_branch(branch)
-            if prs:
-                return prs[0].number
+            pr = PRService(
+                github_client=cast(GitHubClientProtocol, self.github),
+                git_client=self.git,
+                store=self.store,
+            ).get_branch_pr_status(branch)
+            if pr:
+                return pr.number
         except (subprocess.CalledProcessError, FileNotFoundError):
             # GitHub CLI not available or query failed
             pass
