@@ -142,18 +142,9 @@ def build_manager_request(
     flow_manager = FlowManager(config, registry=registry)
     try:
         flow = flow_manager.create_flow_for_issue(issue)
-    except RuntimeError as exc:
-        # Check if this is a capacity defer (not a blocking failure)
-        exc_msg = str(exc)
-        if "capacity reached" in exc_msg.lower() and "deferred" in exc_msg.lower():
-            # Raise as typed exception so handler can defer properly
-            raise CapacityDeferredError(exc_msg) from exc
-        # Other errors are genuine failures
-        logger.bind(
-            domain="manager",
-            issue_number=issue.number,
-        ).warning(f"create_flow_for_issue failed: {exc}")
-        return None
+    except CapacityDeferredError:
+        # Re-raise capacity defer so handler can defer properly
+        raise
     except Exception as exc:
         logger.bind(
             domain="manager",

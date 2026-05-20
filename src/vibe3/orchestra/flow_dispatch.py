@@ -183,7 +183,9 @@ class FlowManager:
         active_count = self._registry.count_live_worker_sessions(role="manager")
         if active_count >= self.config.max_concurrent_flows:
             limit = self.config.max_concurrent_flows
-            raise RuntimeError(
+            from vibe3.exceptions import CapacityDeferredError
+
+            raise CapacityDeferredError(
                 f"Manager capacity reached ({active_count}/{limit}). "
                 f"Deferred flow creation."
             )

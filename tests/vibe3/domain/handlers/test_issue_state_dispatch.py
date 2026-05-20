@@ -143,6 +143,7 @@ class TestIssueStateDispatchHandler:
             )
         )
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
@@ -157,16 +158,23 @@ class TestIssueStateDispatchHandler:
         mock_registry_cls: MagicMock,
         mock_github_client_cls: MagicMock,
         mock_block_issue: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
         )
 
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
         mock_github_client = MagicMock()
         mock_github_client.view_issue.return_value = None
         mock_github_client_cls.return_value = mock_github_client
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         handle_manager_dispatch_intent(
             ManagerDispatchIntent(
@@ -185,6 +193,7 @@ class TestIssueStateDispatchHandler:
             actor="agent:manager",
         )
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.environment.session_registry.SessionRegistryService")
@@ -199,16 +208,23 @@ class TestIssueStateDispatchHandler:
         mock_registry_cls: MagicMock,
         mock_github_client_cls: MagicMock,
         mock_block_issue: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
         )
 
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
         mock_github_client = MagicMock()
         mock_github_client.view_issue.return_value = {"id": "invalid_payload"}
         mock_github_client_cls.return_value = mock_github_client
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         handle_manager_dispatch_intent(
             ManagerDispatchIntent(

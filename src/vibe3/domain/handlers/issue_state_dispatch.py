@@ -57,66 +57,62 @@ def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
         loop = asyncio.get_running_loop()
         config = load_orchestra_config()
 
-        target_state = (
-            IssueState.READY
-            if event.trigger_state == IssueState.READY.value
-            else IssueState.HANDOFF
-        )
-
-        if event.issue_title is not None:
-            issue_info: IssueInfo | None = IssueInfo(
-                number=event.issue_number,
-                title=event.issue_title,
-                state=target_state,
-            )
-        else:
-            from vibe3.clients.github_client import GitHubClient
-
-            github_client = GitHubClient()
-            issue_data = await loop.run_in_executor(
-                None, lambda: github_client.view_issue(event.issue_number)
-            )
-
-            if issue_data is None or isinstance(issue_data, str):
-                _block_for_noop(
-                    "Failed to fetch issue details from GitHub for manager dispatch"
-                )
-                return
-
-            issue_info = IssueInfo.from_github_payload(issue_data)
-            if issue_info is None:
-                _block_for_noop(
-                    "Failed to parse issue data from GitHub"
-                    " response for manager dispatch"
-                )
-                return
-
-            issue_info.state = target_state
-
-        if issue_info is None:
-            _block_for_noop("Issue info is None, cannot dispatch manager role")
-            return
-
+        # Early capacity check BEFORE expensive work (GitHub fetch, coordinator setup)
+        # to avoid wasteful network/DB operations when system is at capacity
         from vibe3.agents.backends.codeagent import CodeagentBackend
-        from vibe3.environment.session_registry import SessionRegistryService
         from vibe3.execution.capacity_service import CapacityService
-        from vibe3.execution.coordinator import ExecutionCoordinator
 
         with get_store() as store:
             backend = CodeagentBackend()
-            registry = SessionRegistryService(store=store, backend=backend)
-            coordinator = ExecutionCoordinator(config, store)
-
-            # Early capacity check to avoid wasteful request preparation
-            # and prevent misleading "Failed to prepare role execution request" errors
             capacity = CapacityService(config, store, backend)
             if not capacity.can_dispatch("manager"):
-                logger.bind(
-                    domain="issue_state_dispatch_handler",
-                    role="manager",
-                    issue_number=event.issue_number,
-                ).info("Manager dispatch queued: Capacity full")
+                return  # CapacityService.can_dispatch already logs INFO
+
+            target_state = (
+                IssueState.READY
+                if event.trigger_state == IssueState.READY.value
+                else IssueState.HANDOFF
+            )
+
+            if event.issue_title is not None:
+                issue_info: IssueInfo | None = IssueInfo(
+                    number=event.issue_number,
+                    title=event.issue_title,
+                    state=target_state,
+                )
+            else:
+                from vibe3.clients.github_client import GitHubClient
+
+                github_client = GitHubClient()
+                issue_data = await loop.run_in_executor(
+                    None, lambda: github_client.view_issue(event.issue_number)
+                )
+
+                if issue_data is None or isinstance(issue_data, str):
+                    _block_for_noop(
+                        "Failed to fetch issue details from GitHub for manager dispatch"
+                    )
+                    return
+
+                issue_info = IssueInfo.from_github_payload(issue_data)
+                if issue_info is None:
+                    _block_for_noop(
+                        "Failed to parse issue data from GitHub"
+                        " response for manager dispatch"
+                    )
+                    return
+
+                issue_info.state = target_state
+
+            if issue_info is None:
+                _block_for_noop("Issue info is None, cannot dispatch manager role")
                 return
+
+            from vibe3.environment.session_registry import SessionRegistryService
+            from vibe3.execution.coordinator import ExecutionCoordinator
+
+            registry = SessionRegistryService(store=store, backend=backend)
+            coordinator = ExecutionCoordinator(config, store, backend=backend)
 
             try:
                 request = await loop.run_in_executor(
