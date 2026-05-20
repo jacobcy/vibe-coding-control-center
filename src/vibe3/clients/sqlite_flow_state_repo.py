@@ -6,8 +6,10 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.sqlite_base import _HasConnection
 
-class SQLiteFlowStateRepo:
+
+class SQLiteFlowStateRepo(_HasConnection):
     """Flow state, issue link, and dependent-scene operations."""
 
     db_path: str
@@ -47,7 +49,7 @@ class SQLiteFlowStateRepo:
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
         """Get flow state for branch (excludes soft-deleted flows)."""
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -75,7 +77,8 @@ class SQLiteFlowStateRepo:
         values = [kwargs[f] for f in fields]
         set_clause = ", ".join([f"{f} = ?" for f in fields])
 
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self._get_connection()
+        with conn:
             cursor = conn.cursor()
             flow_slug = kwargs.get("flow_slug", branch.replace("/", "-"))
             cursor.execute(
@@ -87,17 +90,17 @@ class SQLiteFlowStateRepo:
                 f"UPDATE flow_state SET {set_clause} WHERE branch = ?",
                 values + [branch],
             )
-            conn.commit()
-            logger.bind(
-                external="sqlite",
-                operation="update_flow_state",
-                branch=branch,
-                fields=fields,
-            ).debug("Updated flow state")
+        logger.bind(
+            external="sqlite",
+            operation="update_flow_state",
+            branch=branch,
+            fields=fields,
+        ).debug("Updated flow state")
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         now = datetime.datetime.now().isoformat()
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self._get_connection()
+        with conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT OR REPLACE INTO flow_issue_links "
@@ -105,14 +108,13 @@ class SQLiteFlowStateRepo:
                 "VALUES (?, ?, ?, ?)",
                 (branch, issue_number, role, now),
             )
-            conn.commit()
-            logger.bind(
-                external="sqlite",
-                operation="add_issue_link",
-                branch=branch,
-                issue=issue_number,
-                role=role,
-            ).debug("Added issue link")
+        logger.bind(
+            external="sqlite",
+            operation="add_issue_link",
+            branch=branch,
+            issue=issue_number,
+            role=role,
+        ).debug("Added issue link")
 
     def update_issue_link_role(
         self,
@@ -121,28 +123,28 @@ class SQLiteFlowStateRepo:
         old_role: str,
         new_role: str,
     ) -> bool:
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self._get_connection()
+        with conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE flow_issue_links SET issue_role = ? "
                 "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
                 (new_role, branch, issue_number, old_role),
             )
-            conn.commit()
             updated = cursor.rowcount > 0
-            logger.bind(
-                external="sqlite",
-                operation="update_issue_link_role",
-                branch=branch,
-                issue=issue_number,
-                old_role=old_role,
-                new_role=new_role,
-                updated=updated,
-            ).debug("Updated issue link role")
-            return updated
+        logger.bind(
+            external="sqlite",
+            operation="update_issue_link_role",
+            branch=branch,
+            issue=issue_number,
+            old_role=old_role,
+            new_role=new_role,
+            updated=updated,
+        ).debug("Updated issue link role")
+        return bool(updated)
 
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM flow_issue_links WHERE branch = ?", (branch,))
@@ -156,7 +158,7 @@ class SQLiteFlowStateRepo:
         return links
 
     def get_dependency_links(self, branch: str) -> list[int]:
-        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT issue_number FROM flow_issue_links "
@@ -174,46 +176,46 @@ class SQLiteFlowStateRepo:
 
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_state WHERE deleted_at IS NULL")
-            flows = [dict(row) for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite", operation="get_all_flows", count=len(flows)
-            ).debug("Retrieved all flows")
-            return flows
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM flow_state WHERE deleted_at IS NULL")
+        flows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite", operation="get_all_flows", count=len(flows)
+        ).debug("Retrieved all flows")
+        return flows
 
     def get_active_flow_count(self) -> int:
         """Get count of active flows (excludes soft-deleted flows)."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM flow_state "
-                "WHERE flow_status = 'active' AND deleted_at IS NULL"
-            )
-            count = cursor.fetchone()[0]
-            logger.bind(
-                external="sqlite", operation="get_active_flow_count", count=count
-            ).debug("Retrieved active flow count")
-            return int(count)
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_state "
+            "WHERE flow_status = 'active' AND deleted_at IS NULL"
+        )
+        count = cursor.fetchone()[0]
+        logger.bind(
+            external="sqlite", operation="get_active_flow_count", count=count
+        ).debug("Retrieved active flow count")
+        return int(count)
 
     def get_active_auto_flow_count(self) -> int:
         """Get count of active auto flows (excludes soft-deleted flows)."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM flow_state "
-                "WHERE flow_status = 'active' AND branch LIKE 'task/issue-%' "
-                "AND deleted_at IS NULL"
-            )
-            count = cursor.fetchone()[0]
-            logger.bind(
-                external="sqlite",
-                operation="get_active_auto_flow_count",
-                count=count,
-            ).debug("Retrieved active auto flow count")
-            return int(count)
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM flow_state "
+            "WHERE flow_status = 'active' AND branch LIKE 'task/issue-%' "
+            "AND deleted_at IS NULL"
+        )
+        count = cursor.fetchone()[0]
+        logger.bind(
+            external="sqlite",
+            operation="get_active_auto_flow_count",
+            count=count,
+        ).debug("Retrieved active auto flow count")
+        return int(count)
 
     def soft_delete_flow(self, branch: str) -> None:
         """Soft delete flow and normalize to tombstone state.
@@ -227,9 +229,9 @@ class SQLiteFlowStateRepo:
         distinguish tombstones from active flows in audits/debugging.
         """
         now = datetime.datetime.now().isoformat()
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self._get_connection()
+        with conn:
             cursor = conn.cursor()
-            # Normalize to tombstone: clear refs/reasons/actors/worktree/execution-state
             cursor.execute(
                 """UPDATE flow_state SET
                     deleted_at = ?,
@@ -261,7 +263,6 @@ class SQLiteFlowStateRepo:
                 WHERE branch = ?""",
                 (now, now, branch),
             )
-            conn.commit()
         logger.bind(
             external="sqlite",
             operation="soft_delete_flow",
@@ -270,14 +271,14 @@ class SQLiteFlowStateRepo:
 
     def hard_delete_flow(self, branch: str) -> None:
         """Hard delete flow with cascade, removing all related records."""
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self._get_connection()
+        with conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
             cursor.execute("DELETE FROM flow_events WHERE branch = ?", (branch,))
             cursor.execute("DELETE FROM flow_issue_links WHERE branch = ?", (branch,))
             cursor.execute("DELETE FROM flow_state WHERE branch = ?", (branch,))
             cursor.execute("DELETE FROM flow_context_cache WHERE branch = ?", (branch,))
-            conn.commit()
         logger.bind(
             external="sqlite",
             operation="hard_delete_flow",
@@ -298,13 +299,13 @@ class SQLiteFlowStateRepo:
         Restored flows will have flow_status='aborted' and cleared refs/actors/worktree.
         Use 'vibe flow update' to reset flow_status and re-establish metadata if needed.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        conn = self._get_connection()
+        with conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE flow_state SET deleted_at = NULL WHERE branch = ?",
                 (branch,),
             )
-            conn.commit()
         logger.bind(
             external="sqlite",
             operation="restore_flow",
@@ -313,70 +314,70 @@ class SQLiteFlowStateRepo:
 
     def get_deleted_flows(self) -> list[dict[str, Any]]:
         """Get all soft-deleted flows."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM flow_state WHERE deleted_at IS NOT NULL "
-                "ORDER BY deleted_at DESC"
-            )
-            flows = [dict(row) for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite", operation="get_deleted_flows", count=len(flows)
-            ).debug("Retrieved deleted flows")
-            return flows
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM flow_state WHERE deleted_at IS NOT NULL "
+            "ORDER BY deleted_at DESC"
+        )
+        flows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite", operation="get_deleted_flows", count=len(flows)
+        ).debug("Retrieved deleted flows")
+        return flows
 
     def get_flow_state_include_deleted(self, branch: str) -> dict[str, Any] | None:
         """Get flow state including soft-deleted flows (for recovery check)."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_state WHERE branch = ?", (branch,))
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
-            return None
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM flow_state WHERE branch = ?", (branch,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
 
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
         """Get flows linked to an issue with specified role (excludes soft-deleted)."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT f.* FROM flow_state f "
-                "JOIN flow_issue_links l ON f.branch = l.branch "
-                "WHERE l.issue_number = ? AND l.issue_role = ? "
-                "AND f.deleted_at IS NULL "
-                "ORDER BY COALESCE(f.updated_at, '') DESC, f.branch ASC",
-                (issue_number, role),
-            )
-            flows = [dict(row) for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite",
-                operation="get_flows_by_issue",
-                issue_number=issue_number,
-                role=role,
-                count=len(flows),
-            ).debug("Retrieved flows by issue")
-            return flows
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT f.* FROM flow_state f "
+            "JOIN flow_issue_links l ON f.branch = l.branch "
+            "WHERE l.issue_number = ? AND l.issue_role = ? "
+            "AND f.deleted_at IS NULL "
+            "ORDER BY COALESCE(f.updated_at, '') DESC, f.branch ASC",
+            (issue_number, role),
+        )
+        flows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_flows_by_issue",
+            issue_number=issue_number,
+            role=role,
+            count=len(flows),
+        ).debug("Retrieved flows by issue")
+        return flows
 
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get dependent flows (excludes soft-deleted flows)."""
         task_issue_number: int | None = None
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT issue_number
-                FROM flow_issue_links
-                WHERE branch = ? AND issue_role = 'task'
-                LIMIT 1
-                """,
-                (branch,),
-            )
-            row = cursor.fetchone()
-            if row and row[0] is not None:
-                task_issue_number = int(row[0])
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT issue_number
+            FROM flow_issue_links
+            WHERE branch = ? AND issue_role = 'task'
+            LIMIT 1
+            """,
+            (branch,),
+        )
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            task_issue_number = int(row[0])
 
         if task_issue_number is None:
             logger.bind(
@@ -387,26 +388,26 @@ class SQLiteFlowStateRepo:
             ).debug("No task issue bound; no dependents")
             return []
 
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT DISTINCT fil.branch
-                FROM flow_issue_links fil
-                JOIN flow_state fs ON fil.branch = fs.branch
-                WHERE fil.issue_number = ?
-                  AND fil.issue_role = 'dependency'
-                  AND fs.flow_status = 'active'
-                  AND fs.deleted_at IS NULL
-                ORDER BY fil.branch
-                """,
-                (task_issue_number,),
-            )
-            dependents = [row[0] for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite",
-                operation="get_flow_dependents",
-                branch=branch,
-                dependents_count=len(dependents),
-            ).debug("Retrieved flow dependents")
-            return dependents
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT DISTINCT fil.branch
+            FROM flow_issue_links fil
+            JOIN flow_state fs ON fil.branch = fs.branch
+            WHERE fil.issue_number = ?
+              AND fil.issue_role = 'dependency'
+              AND fs.flow_status = 'active'
+              AND fs.deleted_at IS NULL
+            ORDER BY fil.branch
+            """,
+            (task_issue_number,),
+        )
+        dependents = [row[0] for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_flow_dependents",
+            branch=branch,
+            dependents_count=len(dependents),
+        ).debug("Retrieved flow dependents")
+        return dependents
