@@ -79,9 +79,9 @@ def check(
         typer.Option(
             "--clean-branch",
             help=(
-                "Check and clean residual branches for done/aborted flows. "
-                "Use this to remove local/remote branches that should have been "
-                "cleaned when the flow was marked done or aborted."
+                "Clean residual resources: terminal flows, expired "
+                "agent worktrees (>7d), and expired non-protected "
+                "branches (>7d, remote+local)."
             ),
         ),
     ] = False,
