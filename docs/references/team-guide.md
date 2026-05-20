@@ -16,6 +16,7 @@ related_docs:
 - Codex 不再作为 teammate（通过 Agent tool 调用），而是作为外部 plugin 通过 `codex:rescue` skill 调用
 - Agent 结构已从 6-agent 更新为 5-agent（移除 codex-expert role，新增 pr-architect-reviewer）
 - 工作流程已重构为 Phase 0-5 结构，详见 SKILL.md
+- 旧版 owner session / takeover 防护已经移除，当前系统以 live runtime session 冲突保护为准
 
 ## 核心原则
 
@@ -61,12 +62,12 @@ prompt = """
 **项目特定知识**：
 - 分支命名规范：task/issue-*, dev/issue-*
 - Worktree 路径格式：.worktrees/<branch>
-- 安全边界：不同 tmux session 不能操作同一个 worktree
+- 安全边界：存在 live runtime session 的 branch 不应被并行修改
 
 **审查重点**：
 1. worktree_path 从哪里来？是否可靠？
 2. tmux session 识别是否可被伪造？
-3. takeover 是否有授权检查？
+3. live runtime session 冲突是否会阻止继续修改？
 """
 ```
 

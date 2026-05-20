@@ -219,11 +219,11 @@ Issue 476 不是为了证明 “orchestra 必须拿回 callback 结果”。
 
 ---
 
-## 7. Flow Scene Lifecycle Ownership
+## 7. Flow Scene Lifecycle Boundaries
 
-Flow/worktree lifecycle 的所有权边界：
+Flow/worktree lifecycle 的分层边界：
 
-### 7.1 Ownership 分层
+### 7.1 Lifecycle 分层
 
 **FlowOrchestratorService**：
 - bootstrap (创建新 flow scene)
@@ -244,7 +244,7 @@ Flow/worktree lifecycle 的所有权边界：
 - capacity checks, branch selection, reusable-flow selection
 - 委托给 FlowOrchestratorService（不直接执行 lifecycle）
 
-### 7.2 执行路径所有权
+### 7.2 执行路径边界
 
 Orchestra 和 skill 都是不同组装器，通过相同 lifecycle primitives：
 

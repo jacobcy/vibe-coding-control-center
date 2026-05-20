@@ -45,7 +45,7 @@ def test_flow_update_idempotent(
 @patch("vibe3.commands.flow_manage.TaskService")
 @patch("vibe3.commands.flow_manage.FlowService")
 def test_flow_bind_defaults_to_task_role(flow_service_cls, task_service_cls) -> None:
-    """flow bind without --role should bind as task with system ownership."""
+    """flow bind without --role should bind as task with no explicit actor."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/set-default-flow"
     flow_service_cls.return_value = flow_service

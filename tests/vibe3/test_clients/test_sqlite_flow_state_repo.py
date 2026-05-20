@@ -63,7 +63,7 @@ def test_soft_delete_flow_normalizes_to_tombstone() -> None:
         # CRITICAL: deleted_at must be set
         assert deleted_flow["deleted_at"] is not None
 
-        # Actor fields should be cleared (no active ownership)
+        # Actor fields should be cleared (no active runtime attribution)
         assert deleted_flow["planner_actor"] is None
         assert deleted_flow["executor_actor"] is None
         assert deleted_flow["reviewer_actor"] is None

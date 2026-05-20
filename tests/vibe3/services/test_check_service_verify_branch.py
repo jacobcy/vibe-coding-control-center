@@ -271,12 +271,12 @@ def test_verify_branch_handles_missing_worktree_and_ref_files(tmp_path: Path) ->
     assert any("cannot be verified" in issue.lower() for issue in result.issues)
 
 
-def test_verify_branch_no_longer_reports_owner_session_warnings(
+def test_verify_branch_no_longer_reports_runtime_ownership_warnings(
     tmp_path: Path,
 ) -> None:
-    """verify_branch should not report owner session warnings.
+    """verify_branch should not report removed ownership diagnostics.
 
-    After ownership removal, verify no owner session diagnostics.
+    After runtime simplification, verify no legacy owner-session diagnostics.
     """
     # Create temp store
     db_path = tmp_path / "test.db"
@@ -316,6 +316,6 @@ def test_verify_branch_no_longer_reports_owner_session_warnings(
 
     result = service.verify_branch(branch)
 
-    # Should NOT report any owner session warnings
+    # Should NOT report any removed owner-session warnings
     assert all("owner session" not in issue for issue in result.issues)
     assert all("owner session" not in warning for warning in result.warnings)
