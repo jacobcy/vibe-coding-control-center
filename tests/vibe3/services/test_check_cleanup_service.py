@@ -182,7 +182,7 @@ def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
     store = MagicMock()
     git_client = MagicMock()
     github_client = MagicMock()
-    service = CheckCleanupService(
+    service = ExpiredResourceCleanupService(
         store=store, git_client=git_client, github_client=github_client
     )
 
@@ -196,7 +196,7 @@ def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
     ]
     github_client.list_all_prs.return_value = []
 
-    result = service._clean_expired_remote_branches(max_age_days=7)
+    result = service.clean_expired_remote_branches(max_age_days=7)
 
     assert result["cleaned"] == ["origin/feature-old", "origin/feature-colon"]
     git_client.delete_remote_branch.assert_any_call("feature-old")
