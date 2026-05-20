@@ -291,22 +291,20 @@ HEAD def456abc123
 detached
 """
 
-    with patch("subprocess.run") as mock_run:
-        # First call: scan worktrees
-        # Second call: remove worktree
-        mock_run.side_effect = [
-            MagicMock(returncode=0, stdout=porcelain_output),
-            MagicMock(returncode=0),
-            MagicMock(returncode=0),
-        ]
+    # Mock git client methods
+    git_client._run.return_value = porcelain_output
+    git_client.get_worktree_root.return_value = "/tmp/current"
+    store.get_all_flows.return_value = [
+        {"branch": "HEAD", "flow_status": "aborted"},
+    ]
 
-        result = service._cleanup_detached_worktrees()
+    result = service._cleanup_detached_worktrees()
 
-        # Verify: 2 detached worktrees removed
-        assert len(result["cleaned"]) == 2
-        assert "/tmp/wt1" in result["cleaned"]
-        assert "/tmp/wt3" in result["cleaned"]
-        assert len(result["failed"]) == 0
+    # Verify: 2 detached worktrees removed
+    assert len(result["cleaned"]) == 2
+    assert "/tmp/wt1" in result["cleaned"]
+    assert "/tmp/wt3" in result["cleaned"]
+    assert len(result["failed"]) == 0
 
 
 def test_cleanup_detached_worktrees_skips_current_cwd() -> None:
@@ -328,23 +326,22 @@ HEAD def456abc123
 detached
 """
 
-    with patch("subprocess.run") as mock_run:
-        # First call: scan worktrees
-        # Second call: remove only /tmp/other-wt (not current CWD)
-        mock_run.side_effect = [
-            MagicMock(returncode=0, stdout=porcelain_output),
-            MagicMock(returncode=0),
-        ]
+    # Mock git client methods
+    git_client._run.return_value = porcelain_output
+    git_client.get_worktree_root.return_value = current_cwd
+    store.get_all_flows.return_value = [
+        {"branch": "HEAD", "flow_status": "aborted"},
+    ]
 
-        result = service._cleanup_detached_worktrees()
+    result = service._cleanup_detached_worktrees()
 
-        # Verify: only non-CWD worktree removed
-        assert result["cleaned"] == ["/tmp/other-wt"]
-        assert current_cwd in result["skipped_self"]
-        # Verify: only one remove call (not for CWD)
-        remove_calls = [
-            c
-            for c in mock_run.call_args_list
-            if c[0][0][:3] == ["git", "worktree", "remove"]
-        ]
-        assert len(remove_calls) == 1
+    # Verify: only non-CWD worktree removed
+    assert result["cleaned"] == ["/tmp/other-wt"]
+    assert current_cwd in result["skipped_self"]
+    # Verify: only one remove call (not for CWD)
+    remove_calls = [
+        c
+        for c in git_client._run.call_args_list
+        if c[0][0][:2] == ["worktree", "remove"]
+    ]
+    assert len(remove_calls) == 1

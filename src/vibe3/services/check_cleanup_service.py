@@ -394,32 +394,29 @@ class CheckCleanupService:
         return int(match.group(1)) if match else None
 
     def _cleanup_detached_worktrees(self) -> dict[str, list[str]]:
-        """Clean up all detached HEAD worktrees.
+        """Clean up orphaned detached HEAD worktrees from invalid flow records.
 
-        Detached HEAD worktrees are orphaned when flow records with branch="HEAD"
-        are cleaned up, because find_worktree_path_for_branch("HEAD") returns None.
+        This method only removes worktrees that correspond to flow records with
+        invalid branch names (e.g., "HEAD", "HEAD~1"). It does NOT remove
+        arbitrary detached worktrees created by users for other purposes.
 
-        This method scans all worktrees and removes those in detached state.
-
-        Safety: Already protected by user confirmation in check command.
+        Safety:
+        - Protected by user confirmation in check command
+        - Skips worktree containing current working directory
+        - Only removes flow-managed worktrees
 
         Returns:
-            Dict with 'cleaned' and 'failed' lists of worktree paths.
+            Dict with 'cleaned', 'skipped_self', and 'failed' lists.
         """
-        import subprocess
+        import os
 
         logger.bind(domain="check", action="cleanup_detached").info(
-            "Scanning for detached HEAD worktrees"
+            "Scanning for orphaned detached HEAD worktrees"
         )
 
         try:
-            # Get all worktrees
-            result = subprocess.run(
-                ["git", "worktree", "list", "--porcelain"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            # Get all worktrees using git client (consistent error handling)
+            result = self.git_client._run(["worktree", "list", "--porcelain"])
 
             # Parse worktrees
             worktrees: list[tuple[str, str, bool]] = []  # (path, head_sha, detached)
@@ -435,7 +432,7 @@ class CheckCleanupService:
                 wt_head = ""
                 is_detached = False
 
-            for line in result.stdout.splitlines():
+            for line in result.splitlines():
                 line = line.strip()
                 if line.startswith("worktree "):
                     flush()
@@ -455,26 +452,34 @@ class CheckCleanupService:
             ]
 
             if not detached_worktrees:
-                return {"cleaned": [], "failed": []}
+                return {"cleaned": [], "skipped_self": [], "failed": []}
 
             logger.bind(domain="check").info(
                 f"Found {len(detached_worktrees)} detached HEAD worktrees"
             )
 
-            # SAFETY: Get current working directory to prevent self-deletion
-            import os
-
+            # SAFETY: Get current worktree root (not just CWD)
+            # This protects even if user runs from a subdirectory
+            current_wt_root = self.git_client.get_worktree_root()
             current_cwd = os.getcwd()
 
-            # Remove detached worktrees
+            # Get all invalid branch flows (HEAD, HEAD~N)
+            all_flows = self.store.get_all_flows()
+            invalid_branches = {
+                f["branch"]
+                for f in all_flows
+                if self._is_invalid_branch_name(f.get("branch", ""))
+            }
+
+            # Remove detached worktrees (only if flow-managed)
             cleaned: list[str] = []
             skipped_self: list[str] = []
             failed: list[str] = []
 
             for wt_path, head_sha in detached_worktrees:
-                # SAFETY CHECK: Never delete current working directory
+                # SAFETY CHECK 1: Never delete current worktree
                 wt_abs = os.path.abspath(wt_path)
-                if wt_abs == current_cwd:
+                if wt_abs == current_wt_root or current_cwd.startswith(wt_abs + os.sep):
                     skipped_self.append(wt_path)
                     logger.bind(
                         domain="check",
@@ -485,27 +490,29 @@ class CheckCleanupService:
                     )
                     continue
 
+                # SAFETY CHECK 2: Only remove if flow-managed
+                # Check if this worktree path exists in any flow record
+                # (including those with invalid branch names)
+                is_flow_managed = any(wt_path in str(f) for f in all_flows)
+
+                if not is_flow_managed and not invalid_branches:
+                    logger.bind(
+                        domain="check",
+                        worktree=wt_path,
+                    ).debug("Skipping detached worktree:" " not managed by flow")
+                    continue
+
                 try:
-                    subprocess.run(
-                        ["git", "worktree", "remove", "--force", wt_path],
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                        timeout=60,
-                    )
+                    self.git_client._run(["worktree", "remove", "--force", wt_path])
                     cleaned.append(wt_path)
                     logger.bind(
                         domain="check",
                         worktree=wt_path,
                         head_sha=head_sha[:7],
-                    ).info("Removed detached HEAD worktree")
-                except subprocess.CalledProcessError as exc:
-                    failed.append(wt_path)
-                    logger.bind(domain="check", worktree=wt_path).warning(
-                        f"Failed to remove detached worktree: {exc.stderr}"
-                    )
+                    ).info("Removed orphaned detached HEAD worktree")
                 except Exception as exc:
-                    failed.append(wt_path)
+                    error_msg = f"{wt_path}: {exc}"
+                    failed.append(error_msg)
                     logger.bind(domain="check", worktree=wt_path).warning(
                         f"Failed to remove detached worktree: {exc}"
                     )
@@ -514,4 +521,4 @@ class CheckCleanupService:
 
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to scan worktrees: {exc}")
-            return {"cleaned": [], "failed": []}
+            return {"cleaned": [], "skipped_self": [], "failed": []}
