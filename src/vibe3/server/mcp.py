@@ -25,6 +25,8 @@ def _serialize_snapshot(snapshot: "OrchestraSnapshot") -> dict:
         "circuit_breaker_state": snapshot.circuit_breaker_state,
         "circuit_breaker_failures": snapshot.circuit_breaker_failures,
         "circuit_breaker_last_failure": snapshot.circuit_breaker_last_failure,
+        "polling_interval": snapshot.polling_interval,
+        "port": snapshot.port,
         "active_issues": [
             {
                 "number": entry.number,

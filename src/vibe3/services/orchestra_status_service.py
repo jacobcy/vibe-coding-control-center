@@ -66,6 +66,8 @@ class OrchestraSnapshot:
     blocked_reason: str | None = None
     blocked_issue_number: int | None = None
     blocked_issue_reason: str | None = None
+    polling_interval: int = 900  # matches OrchestraConfig default
+    port: int = 8080  # matches OrchestraConfig default
 
 
 def format_issue_summary_line(entry: IssueStatusEntry) -> str:
@@ -218,6 +220,8 @@ class OrchestraStatusService:
                         blocked_reason=data.get("blocked_reason"),
                         blocked_issue_number=data.get("blocked_issue_number"),
                         blocked_issue_reason=data.get("blocked_issue_reason"),
+                        polling_interval=int(data.get("polling_interval", 900)),
+                        port=int(data.get("port", 8080)),
                     )
                 return None
         except (URLError, ConnectionError, Exception):
@@ -383,6 +387,8 @@ class OrchestraStatusService:
             blocked_reason=blocked_reason,
             blocked_issue_number=blocked_issue_number,
             blocked_issue_reason=blocked_issue_reason,
+            polling_interval=self.config.polling_interval,
+            port=self.config.port,
         )
 
         log.debug(

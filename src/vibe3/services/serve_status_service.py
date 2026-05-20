@@ -99,7 +99,21 @@ class ServeStatusService:
 
     def _display_config(self) -> None:
         """Display configuration summary."""
-        self.console.print(f"  - Tick interval: {self.config.polling_interval}s")
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        # Try to get runtime values from live server
+        polling_interval = self.config.polling_interval
+        live = OrchestraStatusService.fetch_live_snapshot(self.config)
+        if live is not None:
+            polling_interval = live.polling_interval
+
+        if polling_interval != self.config.polling_interval:
+            self.console.print(
+                f"  - Tick interval: {polling_interval}s "
+                f"[dim](override, config: {self.config.polling_interval}s)[/dim]"
+            )
+        else:
+            self.console.print(f"  - Tick interval: {polling_interval}s")
         self.console.print(f"  - Max concurrent: {self.config.max_concurrent_flows}\n")
 
     def _display_recent_activity(self) -> None:
