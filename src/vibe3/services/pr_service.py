@@ -168,6 +168,7 @@ class PRService:
         refresh: bool = True,
         max_age_minutes: int = 10,
         limit: int = 50,
+        repo: str | None = None,
     ) -> PRResponse | None:
         """Return branch PR status from recent cache, with direct fallback on miss."""
         cache = (
@@ -184,7 +185,7 @@ class PRService:
             return pr
 
         try:
-            prs = self.github_client.list_prs_for_branch(branch, state="all")
+            prs = self.github_client.list_prs_for_branch(branch, state="all", repo=repo)
         except Exception:
             return None
         if not prs:

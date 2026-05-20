@@ -1,5 +1,6 @@
 """Task service implementation."""
 
+import subprocess
 from typing import Any, Literal, cast
 
 from loguru import logger
@@ -9,7 +10,6 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
@@ -367,7 +367,7 @@ class TaskService:
                 github_client=cast(GitHubClientProtocol, self.github_client),
                 store=self.store,
             ).get_branch_pr_status(branch)
-        except GitError as exc:
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
             logger.bind(
                 domain="task",
                 action="get_branch_pr",
