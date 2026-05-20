@@ -3,6 +3,9 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
@@ -407,3 +410,32 @@ def test_clear_flow_reasons_clears_both_reasons() -> None:
         blocked_by_issue=None,
         latest_actor="human:resume",
     )
+
+
+def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> None:
+    """reset_issue_to_ready should block when branch has live runtime session."""
+    operations = _make_operations()
+    mock_flow = MagicMock()
+    mock_flow.branch = "task/issue-303"
+    operations.label_service.get_state.return_value = IssueState.BLOCKED
+
+    with (
+        patch(
+            "vibe3.environment.session_registry.SessionRegistryService"
+        ) as mock_registry_cls,
+        patch("vibe3.agents.backends.codeagent.CodeagentBackend"),
+    ):
+        mock_registry_instance = MagicMock()
+        mock_registry_instance.get_truly_live_sessions_for_branch.return_value = [
+            {"id": 1}
+        ]
+        mock_registry_cls.return_value = mock_registry_instance
+
+        with pytest.raises(UserError, match="live runtime session"):
+            operations.reset_issue_to_ready(
+                issue_number=303,
+                resume_kind="blocked",
+                flow=mock_flow,
+                repo=None,
+                reason="test",
+            )
