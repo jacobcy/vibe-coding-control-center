@@ -67,8 +67,8 @@ def check_worktree_ownership(
             return [
                 f"ORPHANED_OWNERSHIP: Worktree for branch '{branch}' is claimed "
                 f"by dead session '{owner_tmux_session}'. "
-                "Inspect the live runtime session and wait for it to finish "
-                "before retrying."
+                "The owning session has ended. Clear the stale runtime session record "
+                "to reclaim this worktree."
             ], []
 
         # Check if current session matches owner (only if in tmux)

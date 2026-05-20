@@ -79,6 +79,20 @@ class TestEnsureWorktreeOwnership:
         # Should not raise
         ensure_worktree_ownership(mock_store, "/path/to/worktree")
 
+    def test_passes_outside_tmux_with_owner(self) -> None:
+        """Outside tmux, ownership check is skipped even if an owner exists."""
+        mock_store = MagicMock()
+        mock_store.get_worktree_owner_session.return_value = {
+            "id": 1,
+            "tmux_session": "vibe3-executor-issue-42",
+            "session_name": "manager-123",
+        }
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("tmux not found")
+            # Should not raise even though worktree has an owner
+            ensure_worktree_ownership(mock_store, "/path/to/worktree")
+
     def test_passes_when_tmux_matches(self) -> None:
         """Matching tmux session passes."""
         mock_store = MagicMock()
