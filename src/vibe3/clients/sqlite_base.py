@@ -2,7 +2,9 @@
 
 import atexit
 import sqlite3
+import threading
 from pathlib import Path
+from typing import Protocol
 
 from loguru import logger
 
@@ -14,6 +16,17 @@ from vibe3.exceptions import GitError
 # Shared across all SQLiteClient instances
 _global_conn: sqlite3.Connection | None = None
 _global_db_path: str | None = None
+_global_lock = threading.Lock()
+
+
+class _HasConnection(Protocol):
+    """Protocol for repo mixins that have _get_connection method."""
+
+    db_path: str
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get database connection."""
+        ...
 
 
 def _get_global_connection(db_path: str) -> sqlite3.Connection:
@@ -21,18 +34,21 @@ def _get_global_connection(db_path: str) -> sqlite3.Connection:
 
     Uses a single global connection shared by all SQLiteClient instances
     to avoid FD exhaustion from repeated open/close on every operation.
+
+    Thread-safe: Uses threading.Lock and check_same_thread=False.
     """
     global _global_conn, _global_db_path
 
-    # Reopen if path changed or connection is None
-    if _global_conn is None or _global_db_path != db_path:
-        if _global_conn is not None:
-            try:
-                _global_conn.close()
-            except Exception:
-                pass
-        _global_conn = sqlite3.connect(db_path)
-        _global_db_path = db_path
+    with _global_lock:
+        # Reopen if path changed or connection is None
+        if _global_conn is None or _global_db_path != db_path:
+            if _global_conn is not None:
+                try:
+                    _global_conn.close()
+                except Exception:
+                    pass
+            _global_conn = sqlite3.connect(db_path, check_same_thread=False)
+            _global_db_path = db_path
 
     return _global_conn
 
@@ -78,9 +94,18 @@ class SQLiteClientBase:
         )
 
     def _init_db(self) -> None:
-        """Initialize schema using a one-off connection."""
-        with sqlite3.connect(self.db_path) as conn:
-            init_schema(conn)
+        """Initialize schema using singleton connection (thread-safe)."""
+        conn = _get_global_connection(self.db_path)
+        with _global_lock:
+            # Check if schema already initialized (thread-safe check)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name='schema_meta'"
+            )
+            if cursor.fetchone() is None:
+                # Schema not initialized yet, do it now (protected by lock)
+                init_schema(conn)
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get the global singleton connection for this database."""

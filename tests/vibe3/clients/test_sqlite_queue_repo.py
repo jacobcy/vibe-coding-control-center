@@ -252,3 +252,41 @@ def test_replace_all_with_legacy_enqueued_at(tmp_path):
     assert loaded["retry_count"] == 1
     assert loaded["last_attempted_at"] == "2026-05-17T08:00:00"
     assert loaded["enqueued_at"] == "2026-05-17T08:00:00"
+
+
+def test_queue_entry_persists_across_connections(tmp_path):
+    """Queue writes should be committed for other connections to observe."""
+    db_path = tmp_path / "persist.db"
+    client = SQLiteClient(db_path=str(db_path))
+
+    client.save_queue_entry(777, collected_state="persisted")
+
+    with sqlite3.connect(str(db_path)) as conn:
+        row = conn.execute(
+            "SELECT collected_state FROM orchestra_queue WHERE issue_number = ?",
+            (777,),
+        ).fetchone()
+
+    assert row is not None
+    assert row[0] == "persisted"
+
+
+def test_queue_operations_persist_across_connections(tmp_path):
+    """Queue delete/replace should be committed for other connections to observe."""
+    db_path = tmp_path / "persist_ops.db"
+    client = SQLiteClient(db_path=str(db_path))
+
+    client.save_queue_entry(1, collected_state="one")
+    client.save_queue_entry(2, collected_state="two")
+    client.remove_queue_entry(1)
+    client.replace_all_queue_entries(
+        [{"issue_number": 3, "collected_state": "three", "retry_count": 0}]
+    )
+
+    with sqlite3.connect(str(db_path)) as conn:
+        rows = conn.execute(
+            "SELECT issue_number, collected_state "
+            "FROM orchestra_queue ORDER BY issue_number"
+        ).fetchall()
+
+    assert rows == [(3, "three")]
