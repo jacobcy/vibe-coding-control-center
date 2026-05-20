@@ -105,14 +105,14 @@ check_pane_exists() {
   # Search all tmux sessions for one matching the agent pattern.
   # Session naming convention: vibe3-{agent_type}-* or vibe3-{agent_name}-*
   local session
-  for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null); do
-    if [[ "$session" == *"${agent_type}"* ]] || [[ "$session" == *"${agent_name}"* ]]; then
+  while IFS= read -r session; do
+    if [[ "$session" == vibe3-"${agent_type}"-* ]] || [[ "$session" == vibe3-"${agent_name}"-* ]]; then
       # Session found — verify it's alive (has at least one pane with a running command)
       if tmux list-panes -t "$session" -F '#{pane_current_command}' 2>/dev/null | grep -q .; then
         return 0
       fi
     fi
-  done
+  done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
 
   return 1
 }
