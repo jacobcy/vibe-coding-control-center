@@ -25,19 +25,28 @@ def _extract_blocked_reason_summary(blocked_reason: str) -> str:
 
     first_line = lines[0].strip()
     if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
-        return first_line
+        result = first_line
+    else:
+        cleaned = clean_error_message(first_line)
 
-    cleaned = clean_error_message(first_line)
+        if len(cleaned) <= 80:
+            result = cleaned
+        else:
+            # Try to find a sentence boundary
+            for sep in ["。", "."]:
+                pos = cleaned.rfind(sep, 0, 80)
+                if pos > 0:
+                    result = cleaned[: pos + 1]
+                    break
+            else:
+                # No sentence boundary found, just truncate
+                result = cleaned[:80]
 
-    if len(cleaned) <= 80:
-        return cleaned
+    # Don't end with colon - it looks awkward in "reason: xxx:" format
+    if result.endswith(":"):
+        result = result[:-1]
 
-    for sep in [":", "。"]:
-        pos = cleaned.rfind(sep, 0, 80)
-        if pos > 0:
-            return cleaned[: pos + 1]
-
-    return cleaned[:80]
+    return result
 
 
 def _render_task_item_details(
@@ -207,7 +216,7 @@ def render_pr_ref_items(pr_ref_items: list[dict[str, object]]) -> None:
 
 def render_blocked_items(blocked_items: list[dict[str, object]]) -> None:
     """Render Blocked Issues section."""
-    console.print("[bold cyan]Blocked Issues:[/]")
+    console.print("\n[bold cyan]Blocked Issues:[/]")
     if blocked_items:
         for item in blocked_items:
             number = cast(int, item["number"])
