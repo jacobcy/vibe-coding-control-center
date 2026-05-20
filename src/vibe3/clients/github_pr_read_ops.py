@@ -6,7 +6,7 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.models.pr import PRMetadata, PRResponse, PRState
+from vibe3.models.pr import CICheck, PRMetadata, PRResponse, PRState
 
 
 class PRReadMixin:
@@ -65,11 +65,32 @@ class PRReadMixin:
         is_ready = not bool(data.get("isDraft", True))
 
         # Determine ci_passed: check statusCheckRollup
-        status_rollup = data.get("statusCheckRollup")
-        ci_passed = status_rollup == "SUCCESS" if status_rollup else False
-        ci_status = (
-            str(status_rollup).lower() if isinstance(status_rollup, str) else None
-        )
+        status_checks = data.get("statusCheckRollup")
+        ci_status: str | None
+        ci_passed: bool
+        if status_checks and isinstance(status_checks, list):
+            # Determine overall CI status from check list
+            conclusions = [
+                c.get("conclusion", "")
+                for c in status_checks
+                if c.get("status") == "COMPLETED"
+            ]
+            pending = any(c.get("status") != "COMPLETED" for c in status_checks)
+            if pending:
+                ci_status = "pending"
+                ci_passed = False
+            elif all(c == "SUCCESS" for c in conclusions):
+                ci_status = "success"
+                ci_passed = True
+            elif any(c == "FAILURE" for c in conclusions):
+                ci_status = "failure"
+                ci_passed = False
+            else:
+                ci_status = conclusions[0].lower() if conclusions else None
+                ci_passed = False
+        else:
+            ci_passed = False
+            ci_status = None
 
         # Parse closingIssuesReferences to get task_issue
         # Note: closingIssuesReferences is a list (not {references: [...]} object)
@@ -93,6 +114,22 @@ class PRReadMixin:
                 latest=None,
             )
 
+        # Fetch CI check details via gh pr checks
+        ci_checks: list[CICheck] = []
+        try:
+            checks_result = subprocess.run(
+                ["gh", "pr", "checks", target, "--json", "name,state,bucket,link"],
+                capture_output=True,
+                text=True,
+            )
+            if checks_result.returncode == 0:
+                checks_data = json.loads(checks_result.stdout)
+                ci_checks = [CICheck(**c) for c in checks_data if isinstance(c, dict)]
+        except Exception:
+            logger.bind(external="github", target=target).debug(
+                "Failed to fetch CI checks"
+            )
+
         return PRResponse(
             number=int(data["number"]),
             title=str(data["title"]),
@@ -109,6 +146,7 @@ class PRReadMixin:
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),
             metadata=metadata,
+            ci_checks=ci_checks,
         )
 
     def list_all_prs(
