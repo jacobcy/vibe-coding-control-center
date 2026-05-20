@@ -1,8 +1,10 @@
-# Vibe3 Worktree Ownership Standard
+# Vibe3 Worktree Runtime Standard
 
-> **文档定位**：定义 vibe3 各执行层的 worktree 所有权语义，以及路径自动解析规则。
+> **文档定位**：定义 vibe3 各执行层的 worktree 分配、runtime session、执行路径与清理边界。
 > **适用范围**：所有涉及 agent dispatch、codeagent-wrapper 调用、worktree 管理的代码路径。
-> **权威性**：本文件是 worktree 所有权与调度语义的唯一权威来源。实现细节以代码为准，架构意图以本文件为准。
+> **权威性**：本文件是 worktree 分配与调度语义的唯一权威来源。实现细节以代码为准，架构意图以本文件为准。
+
+> **历史说明**：历史上此文件承载 worktree ownership 语义；当前版本只定义 worktree 分配、runtime session、执行路径与清理边界。
 
 ---
 
@@ -100,7 +102,7 @@ StateLabelDispatchService.on_tick()
 
 ---
 
-## 三、Worktree 所有权表
+## 三、Worktree 分配表
 
 | 层级 | 执行主体 | Dispatch 来源 | Worktree 需求 | 传递方式 | --worktree 使用 |
 |------|---------|-------------|-------------|---------|---------------|
@@ -132,7 +134,7 @@ StateLabelDispatchService.on_tick()
 
 Worktree 必须在 dispatch 前完成分配，不得在 codeagent-wrapper 内部动态创建（当 cwd 已提供时）。
 
-### 5.2 所有权边界
+### 5.2 分配边界
 
 Worktree 的创建者负责其生命周期管理（创建、绑定 flow、清理）。WorktreeManager 是 L3 链路的唯一合法分配者。
 

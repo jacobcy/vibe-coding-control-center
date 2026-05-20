@@ -1,4 +1,4 @@
-"""Worktree management for environment isolation."""
+"""Worktree management for environment isolation and runtime path resolution."""
 
 from __future__ import annotations
 
@@ -27,7 +27,8 @@ class WorktreeManager(WorktreePRMixin):
     """Unified manager for issue worktrees (L3) and temporary worktrees (L2).
 
     This manager is the SINGLE AUTHORITY for worktree allocation in vibe3.
-    It enforces the ownership semantics defined in vibe3-worktree-ownership-standard.md.
+    It enforces the runtime session semantics defined in
+    vibe3-worktree-ownership-standard.md.
 
     Key responsibilities:
     - Issue worktrees (L3): Long-lived worktrees bound to flow branches
