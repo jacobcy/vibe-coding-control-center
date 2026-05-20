@@ -132,3 +132,40 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
             # All flows should be processed
             assert mock_process.call_count == 2
             assert result["skipped_live"] == []
+
+
+def test_clean_expired_agent_worktrees_deletes_old_dirs() -> None:
+    """Should delete agent worktrees older than max age."""
+    import os
+    import tempfile
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Create temp agent worktree directory
+    with tempfile.TemporaryDirectory() as tmpdir:
+        old_worktree = Path(tmpdir) / "agent-old123"
+        old_worktree.mkdir()
+        old_time = datetime.now() - timedelta(days=10)
+        os.utime(old_worktree, (old_time.timestamp(), old_time.timestamp()))
+
+        recent_worktree = Path(tmpdir) / "agent-recent456"
+        recent_worktree.mkdir()
+
+        with patch.object(
+            service, "_get_agent_worktree_base", return_value=Path(tmpdir)
+        ):
+            with patch.object(
+                service, "_get_branches_with_live_sessions", return_value=set()
+            ):
+                result = service._clean_expired_agent_worktrees(max_age_days=7)
+
+                # Verify old worktree deleted, recent kept
+                assert not old_worktree.exists()
+                assert recent_worktree.exists()
+                assert "cleaned" in result
+                assert len(result["cleaned"]) == 1
+                assert "agent-old123" in result["cleaned"]

@@ -7,6 +7,7 @@ This service is separated from check_service.py to keep responsibilities clear:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -327,3 +328,90 @@ class CheckCleanupService:
 
         match = re.fullmatch(r"^task/issue-(\d+)$", branch)
         return int(match.group(1)) if match else None
+
+    def _get_agent_worktree_base(self) -> Path:
+        """Get agent worktree base directory (.claude/worktrees/)."""
+        return Path(".claude/worktrees")
+
+    def _clean_expired_agent_worktrees(
+        self, max_age_days: int = 7
+    ) -> dict[str, object]:
+        """Clean expired agent worktrees older than max_age_days.
+
+        Safety checks:
+        - Skip if has live runtime session
+        - Delete physical directory only
+
+        Args:
+            max_age_days: Max age in days before cleanup (default: 7)
+
+        Returns:
+            Dict with 'cleaned' list and 'skipped_live' list
+        """
+        import shutil
+        from datetime import datetime, timedelta
+
+        logger.bind(domain="check", action="clean_agent_worktrees").info(
+            f"Checking agent worktrees older than {max_age_days} days"
+        )
+
+        base = self._get_agent_worktree_base()
+        if not base.exists():
+            return {"cleaned": [], "skipped_live": [], "failed": []}
+
+        cutoff = datetime.now() - timedelta(days=max_age_days)
+
+        cleaned: list[str] = []
+        skipped_live: list[str] = []
+        failed: list[str] = []
+
+        # Get live session branches
+        try:
+            branches_with_live = self._get_branches_with_live_sessions()
+        except SystemError:
+            logger.bind(domain="check").error(
+                "Failed to get live sessions, skipping agent worktree cleanup"
+            )
+            return {
+                "cleaned": [],
+                "skipped_live": [],
+                "failed": ["live session query failed"],
+            }
+
+        # Scan agent-* worktrees
+        for worktree_dir in base.glob("agent-*"):
+            if not worktree_dir.is_dir():
+                continue
+
+            worktree_name = worktree_dir.name
+
+            try:
+                # Get last modified time
+                mtime = datetime.fromtimestamp(worktree_dir.stat().st_mtime)
+
+                # Check age
+                if mtime >= cutoff:
+                    continue
+
+                # Check live session (defensive: check worktree name in branch list)
+                if any(worktree_name in branch for branch in branches_with_live):
+                    skipped_live.append(worktree_name)
+                    logger.bind(domain="check", worktree=worktree_name).info(
+                        "Skipped agent worktree with live session"
+                    )
+                    continue
+
+                # Delete directory
+                shutil.rmtree(worktree_dir)
+                cleaned.append(worktree_name)
+                logger.bind(domain="check", worktree=worktree_name).info(
+                    "Deleted expired agent worktree"
+                )
+
+            except Exception as exc:
+                failed.append(f"{worktree_name}: {exc}")
+                logger.bind(domain="check", worktree=worktree_name).warning(
+                    f"Failed to clean agent worktree: {exc}"
+                )
+
+        return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
