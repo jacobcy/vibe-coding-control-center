@@ -25,8 +25,8 @@ BranchArg = Annotated[
 IssueArg = Annotated[
     str,
     typer.Argument(
-        metavar="<task-id>",
-        help="Issue reference or <task-id> to bind as task/related/dependency",
+        metavar="<issue-ref>",
+        help="Issue reference(s) to bind as task/related/dependency",
     ),
 ]
 TaskTailArg = Annotated[
@@ -242,7 +242,7 @@ def bind(
         ),
     ] = False,
 ) -> None:
-    """Bind an issue to a flow branch. (Usage: vibe flow bind <task-id>)"""
+    """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -278,9 +278,8 @@ def bind(
                     # Multi-ref compatibility remains ordered and per-ref:
                     # each dependency delegates to `block_flow()` in sequence,
                     # while the outward CLI output is synthesized from IssueLink.
-                    # Because blocked state stores a singular `blocked_by_issue`,
-                    # the effective primary blocker after multi-ref delegation is
-                    # the last dependency ref processed here.
+                    # With blocked_by accumulation fix, all dependency refs are
+                    # now accumulated in the issue body's blocked_by field.
                     flow_service.block_flow(
                         target_branch, blocked_by_issue=issue_number, actor=None
                     )

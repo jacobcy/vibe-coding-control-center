@@ -79,3 +79,81 @@ def test_project_blocked_state_updates_issue_body() -> None:
         assert "- **State**: blocked" in merged_body
         assert "#456" in merged_body
         assert "API design pending" in merged_body
+
+
+def test_project_blocked_state_accumulates_blockers() -> None:
+    """Test that _project_blocked_state accumulates multiple blockers."""
+    service = FlowService()
+
+    # Mock issue body with existing blocked_by #100
+    existing_body = """User content
+
+<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked by**: #100
+
+<!-- vibe3-flow-state-end -->"""
+
+    with patch("vibe3.services.flow_block_mixin.GitHubClient") as mock_client_cls:
+        mock_client = mock_client_cls.return_value
+        mock_client.get_issue_body.return_value = existing_body
+        mock_client.update_issue_body.return_value = True
+
+        # Execute: add new blocker #200
+        service._project_blocked_state(
+            issue_number=123,
+            blocked_by_issue=200,
+            reason="Another dependency",
+        )
+
+        # Verify update_issue_body called
+        mock_client.update_issue_body.assert_called_once()
+        call_args = mock_client.update_issue_body.call_args
+        merged_body = call_args[0][1]
+
+        # Verify both #100 and #200 are present (accumulated)
+        assert "#100" in merged_body
+        assert "#200" in merged_body
+        assert "Another dependency" in merged_body
+
+
+def test_project_blocked_state_idempotent_for_duplicate() -> None:
+    """Test that _project_blocked_state is idempotent for duplicate blockers."""
+    service = FlowService()
+
+    # Mock issue body with existing blocked_by #100
+    existing_body = """User content
+
+<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked by**: #100
+
+<!-- vibe3-flow-state-end -->"""
+
+    with patch("vibe3.services.flow_block_mixin.GitHubClient") as mock_client_cls:
+        mock_client = mock_client_cls.return_value
+        mock_client.get_issue_body.return_value = existing_body
+        mock_client.update_issue_body.return_value = True
+
+        # Execute: add same blocker #100 again
+        service._project_blocked_state(
+            issue_number=123,
+            blocked_by_issue=100,
+            reason="Same dependency",
+        )
+
+        # Verify update_issue_body called
+        mock_client.update_issue_body.assert_called_once()
+        call_args = mock_client.update_issue_body.call_args
+        merged_body = call_args[0][1]
+
+        # Verify #100 appears only once (deduplicated)
+        # Count occurrences of #100
+        count = merged_body.count("#100")
+        assert count == 1, f"Expected #100 to appear once, but found {count} times"
