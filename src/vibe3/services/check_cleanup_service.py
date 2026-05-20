@@ -60,6 +60,7 @@ class CheckCleanupService:
 
         # Existing: terminal flow cleanup
         results = self._clean_terminal_flows()
+        summary_parts = [str(results.get("summary", ""))]
 
         # NEW: expired resource cleanup
         config = VibeConfig.get_defaults()
@@ -75,17 +76,24 @@ class CheckCleanupService:
             results["agent_worktrees"] = expired_service.clean_expired_agent_worktrees(
                 max_age_days=cleanup_config.agent_worktree_max_age_days
             )
+            cleaned = results["agent_worktrees"].get("cleaned") or []
+            summary_parts.append(f"agent_worktrees cleaned {len(cleaned)}")
 
         if cleanup_config.enable_remote_branch_cleanup:
             results["remote_branches"] = expired_service.clean_expired_remote_branches(
                 max_age_days=cleanup_config.remote_branch_max_age_days
             )
+            cleaned = results["remote_branches"].get("cleaned") or []
+            summary_parts.append(f"remote_branches cleaned {len(cleaned)}")
 
         if cleanup_config.enable_local_branch_cleanup:
             results["local_branches"] = expired_service.clean_expired_local_branches(
                 max_age_days=cleanup_config.local_branch_max_age_days
             )
+            cleaned = results["local_branches"].get("cleaned") or []
+            summary_parts.append(f"local_branches cleaned {len(cleaned)}")
 
+        results["summary"] = "; ".join([p for p in summary_parts if p])
         return results
 
     def _clean_terminal_flows(self) -> dict[str, object]:

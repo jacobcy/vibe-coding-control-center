@@ -354,6 +354,7 @@ class ExpiredResourceCleanupService:
                     )
                     if worktree_path:
                         remove_worktree(worktree_path, force=True)
+                        skipped_worktree.append(branch)
                         logger.bind(domain="check", branch=branch).info(
                             f"Deleted worktree at {worktree_path}"
                         )

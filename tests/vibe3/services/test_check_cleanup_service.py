@@ -237,3 +237,36 @@ def test_clean_residual_branches_integrates_all_cleanups() -> None:
                 assert "agent_worktrees" in result
                 assert "remote_branches" in result
                 assert "local_branches" in result
+
+                # Verify summary includes expired cleanup counts
+                summary = str(result["summary"])
+                assert "agent_worktrees cleaned 1" in summary
+                assert "remote_branches cleaned 1" in summary
+                assert "local_branches cleaned 1" in summary
+
+
+def test_clean_expired_local_branches_reports_worktree_removal() -> None:
+    """When a local branch has a worktree, record it in skipped_worktree."""
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = ExpiredResourceCleanupService(store=store, git_client=git_client)
+
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "feature-old", "timestamp": old_date},
+    ]
+    git_client.get_current_branch.return_value = "main"
+    git_client.branch_exists.return_value = True
+
+    git_client.is_branch_occupied_by_worktree.return_value = True
+    git_client.find_worktree_path_for_branch.return_value = Path("/tmp/wt")
+
+    with patch("vibe3.services.expired_resource_cleanup_service.remove_worktree") as rm:
+        result = service.clean_expired_local_branches(max_age_days=7)
+
+    rm.assert_called_once()
+    assert "feature-old" in result["skipped_worktree"]
+    assert "feature-old" in result["cleaned"]
