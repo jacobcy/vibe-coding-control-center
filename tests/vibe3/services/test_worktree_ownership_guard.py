@@ -130,12 +130,3 @@ class TestEnsureWorktreeOwnership:
             error_msg = str(exc_info.value)
             assert "vibe3 task resume --takeover" not in error_msg
             assert "Wait for that session to finish" in error_msg
-
-
-class TestTakeoverWorktree:  # pyright: ignore[reportUnusedClass]
-    """Tests for takeover_worktree.
-
-    This class is intentionally empty - takeover functionality has been removed.
-    """
-
-    pass
