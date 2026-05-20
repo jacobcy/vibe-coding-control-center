@@ -35,7 +35,7 @@ related_docs:
 | 后端 | 最适用场景 | 默认模型 |
 |------|-----------|---------|
 | **Codex** | 深度代码分析、大规模重构、算法优化 | gpt-5.2 |
-| **Claude** | 快速功能实现、文档生成、Prompt 工程 | claude-sonnet-4.5 |
+| **Claude** | 快速功能实现、文档生成、Prompt 工程 | claude-sonnet-4-6 |
 | **Gemini** | UI 组件搭建、设计系统实现 | gemini-3-pro-preview |
 | **OpenCode** | 代码探索、快速原型 | opencode/grok-code |
 
@@ -113,8 +113,8 @@ cat /private/tmp/claude-501/<workdir>/<session_id>/tasks/<task_id>.output | tail
 > **说明**：Agent 预设通过 `config/v3/settings.yaml` 的 `agent_config` 字段配置，用户通过 `vibe3 run` 间接使用。
 
 **可用预设**（定义在 `~/.codeagent/models.json`）：
-- `oracle`: 深度推理（Claude Opus 4.5）
-- `librarian`: 文档管理（Claude Sonnet 4.5）
+- `oracle`: 深度推理（Claude Opus 4.7）
+- `librarian`: 文档管理（Claude Sonnet 4.6）
 - `explore`: 代码探索（OpenCode）
 - `develop`: 开发实现（Codex + 高推理）
 - `frontend-ui-ux-engineer`: 前端开发（Gemini Pro）
@@ -295,7 +295,7 @@ EOF
   "agents": {
     "oracle": {
       "backend": "claude",
-      "model": "claude-opus-4-5-20251101",
+      "model": "claude-opus-4-7",
       "yolo": true
     }
   }
@@ -383,5 +383,6 @@ export CODEAGENT_MAX_PARALLEL_WORKERS=8
 
 ## 更新历史
 
+- 2026-05-20：更新模型名称到当前版本（Claude Opus 4.7 / Sonnet 4.6）
 - 2026-05-15：重构为内部实现文档，更新为 `vibe3 run` 用法
 - 2026-03-17：初始版本，基于 codeagent-wrapper 当前功能编写

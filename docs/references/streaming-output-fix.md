@@ -3,11 +3,16 @@ title: codeagent-wrapper 流式输出修复
 author: AI Agent
 created: 2026-04-21
 purpose: 修复 Vibe3 async_launcher 的流式输出问题，使 tmux 模式能看到实时输出
+document_type: reference
+status: historical-reference
+scope: streaming-fix-history
 related_docs:
   - codeagent-wrapper-guide.md
   - ../v3/architecture/async-execution.md
 tags: [streaming, tmux, buffering, realtime]
 ---
+
+> **历史免责声明**：本文档记录的是 2026-04-21 针对 `async_launcher.py` 流式输出缓冲问题的一次性修复方案。该修复方案可能已被后续代码变更集成、替代或取代。请勿将其作为现行实现的权威依据，仅供历史参考。当前 async_launcher 实现见 `src/vibe3/agents/backends/async_launcher.py`。
 
 # codeagent-wrapper 流式输出修复
 
