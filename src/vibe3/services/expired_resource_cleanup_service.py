@@ -8,6 +8,7 @@ This service is separated from check_cleanup_service.py to keep responsibilities
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -56,8 +57,6 @@ class ExpiredResourceCleanupService:
         Returns:
             Dict with 'cleaned' list and 'skipped_live' list
         """
-        from datetime import datetime, timedelta
-
         logger.bind(domain="check", action="clean_agent_worktrees").info(
             f"Checking agent worktrees older than {max_age_days} days"
         )
@@ -132,8 +131,6 @@ class ExpiredResourceCleanupService:
         Returns:
             Dict with 'cleaned', 'skipped_protected', 'skipped_pr', 'failed' lists
         """
-        from datetime import datetime, timedelta, timezone
-
         logger.bind(domain="check", action="clean_remote_branches").info(
             f"Checking remote branches older than {max_age_days} days"
         )
@@ -248,8 +245,6 @@ class ExpiredResourceCleanupService:
             Dict with 'cleaned', 'skipped_protected', 'skipped_current',
             'skipped_live', 'skipped_worktree', 'failed' lists
         """
-        from datetime import datetime, timedelta, timezone
-
         logger.bind(domain="check", action="clean_local_branches").info(
             f"Checking local branches older than {max_age_days} days"
         )
@@ -390,10 +385,8 @@ class ExpiredResourceCleanupService:
         return Path(".claude/worktrees")
 
     @staticmethod
-    def _parse_git_iso8601_timestamp(timestamp_str: str):
+    def _parse_git_iso8601_timestamp(timestamp_str: str) -> datetime:
         """Parse git iso8601 timestamp from `%(committerdate:iso8601)` format."""
-        from datetime import datetime
-
         return datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S %z")
 
     def _get_branches_with_live_sessions(self) -> set[str]:
