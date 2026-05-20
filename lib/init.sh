@@ -41,6 +41,59 @@ vibe_init_help() {
     echo ""
 }
 
+# --- Template Generation Function ---
+_generate_claude_md() {
+    local profile_name="$1"
+    local repo_root="$2"
+    local output_file="$repo_root/CLAUDE.md"
+
+    if [[ "$profile_name" == "minimal" ]]; then
+        cat > "$output_file" <<'EOF'
+# Project Context
+
+This project uses vibe3 for development workflow automation.
+
+## Available Commands
+
+- `vibe init` - Initialize project configuration
+- `vibe flow` - Execute development workflows
+
+## Profile: minimal
+
+Minimal runtime without GitHub orchestration.
+
+## Reference
+
+- Policies and prompts: `~/.vibe/`
+EOF
+    elif [[ "$profile_name" == "github-flow" ]]; then
+        cat > "$output_file" <<'EOF'
+# Project Context
+
+This project uses vibe3 for development workflow automation with GitHub integration.
+
+## Available Commands
+
+- `vibe init` - Initialize project configuration
+- `vibe flow` - Execute development workflows
+- `vibe task` - Manage development tasks
+
+## Profile: github-flow
+
+GitHub issue/PR/label orchestration enabled.
+
+## Branch Conventions
+
+- `task/issue-<id>` - Automated task branches
+- `dev/issue-<id>` - Development branches
+
+## Reference
+
+- Policies and prompts: `~/.vibe/`
+EOF
+    fi
+}
+
 # --- Main Function ---
 vibe_init() {
     # Enable strict mode for this function only
@@ -320,11 +373,29 @@ vibe_init() {
     _log_info "Verifying project support..."
 
     # Check for essential files (profile-dependent)
-    local -a ESSENTIAL_FILES
-
-    # minimal profile doesn't require these files
-    if [[ "$PROFILE_NAME" != "minimal" ]]; then
-        ESSENTIAL_FILES=(
+    if [[ "$PROFILE_NAME" == "minimal" ]]; then
+        # minimal: check and generate CLAUDE.md
+        if [[ -f "$REPO_ROOT/CLAUDE.md" ]]; then
+            _log_success "Found: CLAUDE.md"
+        else
+            _generate_claude_md "$PROFILE_NAME" "$REPO_ROOT"
+            _log_success "Generated: CLAUDE.md (minimal template)"
+        fi
+    elif [[ "$PROFILE_NAME" == "github-flow" ]]; then
+        # github-flow: check and generate CLAUDE.md, warn for AGENTS.md
+        for file in "CLAUDE.md" "AGENTS.md"; do
+            if [[ -f "$REPO_ROOT/$file" ]]; then
+                _log_success "Found: $file"
+            elif [[ "$file" == "CLAUDE.md" ]]; then
+                _generate_claude_md "$PROFILE_NAME" "$REPO_ROOT"
+                _log_success "Generated: CLAUDE.md (github-flow template)"
+            else
+                _log_warning "Missing: $file (recommended for AI agent support)"
+            fi
+        done
+    else
+        # vibe-center and other profiles: check and warn, no auto-generation
+        local -a ESSENTIAL_FILES=(
             "CLAUDE.md"
             "AGENTS.md"
         )
@@ -336,22 +407,22 @@ vibe_init() {
                 _log_warning "Missing: $file (recommended for AI agent support)"
             fi
         done
-    fi
 
-    # vibe-center profile requires additional files
-    if [[ "$PROFILE_NAME" == "vibe-center" ]]; then
-        local -a VIBE_CENTER_FILES=(
-            "SOUL.md"
-            "STRUCTURE.md"
-        )
+        # vibe-center profile requires additional files
+        if [[ "$PROFILE_NAME" == "vibe-center" ]]; then
+            local -a VIBE_CENTER_FILES=(
+                "SOUL.md"
+                "STRUCTURE.md"
+            )
 
-        for file in "${VIBE_CENTER_FILES[@]}"; do
-            if [[ -f "$REPO_ROOT/$file" ]]; then
-                _log_success "Found: $file"
-            else
-                _log_warning "Missing: $file (Vibe Center governance file)"
-            fi
-        done
+            for file in "${VIBE_CENTER_FILES[@]}"; do
+                if [[ -f "$REPO_ROOT/$file" ]]; then
+                    _log_success "Found: $file"
+                else
+                    _log_warning "Missing: $file (Vibe Center governance file)"
+                fi
+            done
+        fi
     fi
 
     # 8. Finalize
