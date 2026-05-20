@@ -277,7 +277,17 @@ def _render_timeline(
         )
         # Skip detail rendering for handoff_verdict (verdict shown in refs)
         if event.detail and event.event_type != "handoff_verdict":
-            console.print(f"  {event.detail}")
+            # Fix legacy events with "by unknown" by extracting author from refs
+            detail = event.detail
+            if (
+                event.event_type == "handoff_pr_comment"
+                and " by unknown:" in detail
+                and event.refs
+            ):
+                author = event.refs.get("author")
+                if author and author != "unknown":
+                    detail = detail.replace(" by unknown:", f" by {author}:")
+            console.print(f"  {detail}")
         _render_event_refs(event, worktree_root, branch)
         console.print()
 

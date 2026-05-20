@@ -149,11 +149,12 @@ class ExternalEventRecorder:
 
         # Record each new comment
         for comment_type, comment_id, comment_data in all_comments:
-            author = comment_data.get("author", {})
+            # GitHub API returns "user.login" not "author.login"
+            user_data = comment_data.get("user", {})
             author_login = (
-                author.get("login", "unknown")
-                if isinstance(author, dict)
-                else str(author)
+                user_data.get("login", "unknown")
+                if isinstance(user_data, dict)
+                else "unknown"
             )
             body = comment_data.get("body", "")
             created_at = comment_data.get("createdAt") or comment_data.get(
