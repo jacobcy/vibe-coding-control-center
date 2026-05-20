@@ -15,7 +15,11 @@ _RECENT_ERRORS_RE = re.compile(r"\s*\|\s*=== Recent Errors ===")
 _TRAILING_PIPE_RE = re.compile(r"\s*\|\s*$")
 
 # Precompiled constant for codeagent-wrapper prefix (used by callers before delegation)
+# Note: ^ anchor ensures this only matches at line start (for backward compatibility)
 CODEAGENT_WRAPPER_RE = re.compile(r"^codeagent-wrapper failed \(code \d+\):\s*")
+
+# Non-anchored version for removing prefix anywhere in the line
+CODEAGENT_WRAPPER_ANYWHERE_RE = re.compile(r"codeagent-wrapper failed \(code \d+\):\s*")
 
 
 def clean_error_message(message: str) -> str:

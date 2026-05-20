@@ -141,6 +141,12 @@ def classify_error(error_output: str) -> str:
     if "no output" in output_lower or "completed without agent_message" in output_lower:
         return E_EXEC_NO_OUTPUT
 
+    # Capacity control - normal skip (not an error)
+    if "tmux session" in output_lower and "already exists" in output_lower:
+        from vibe3.exceptions.error_codes import E_CAPACITY_SKIP
+
+        return E_CAPACITY_SKIP
+
     # Fallback with warning for unclassified errors
     logger.bind(
         domain="error_tracking",
