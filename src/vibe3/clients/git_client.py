@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from loguru import logger
+
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
 )
@@ -281,6 +283,63 @@ class GitClient:
     def branch_exists(self, branch_name: str) -> bool:
         """Check if branch exists (local or remote)."""
         return _branch_exists(branch_name)
+
+    def get_all_branches_with_timestamps(
+        self, remote: bool = False
+    ) -> list[dict[str, str]]:
+        """Get all branches with last commit timestamps.
+
+        Args:
+            remote: If True, get remote branches (origin/*), else local branches
+
+        Returns:
+            List of dicts with 'branch' and 'timestamp' keys
+            Example: [{'branch': 'feature-1', 'timestamp': '2026-05-20 14:00:00 +0800'}]
+
+        Note:
+            Returns empty list on error (graceful degradation for cleanup operations).
+        """
+        try:
+            if remote:
+                cmd = [
+                    "git",
+                    "branch",
+                    "-r",
+                    "--list",
+                    "origin/*",
+                    "--format=%(refname:short) %(committerdate:iso8601)",
+                ]
+            else:
+                cmd = [
+                    "git",
+                    "branch",
+                    "--list",
+                    "*",
+                    "--format=%(refname:short) %(committerdate:iso8601)",
+                ]
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=str(self._cwd) if self._cwd else None,
+            )
+
+            branches: list[dict[str, str]] = []
+            for line in result.stdout.strip().split("\n"):
+                if not line.strip():
+                    continue
+                parts = line.strip().split(None, 1)
+                if len(parts) == 2:
+                    branch, timestamp = parts
+                    branches.append({"branch": branch, "timestamp": timestamp})
+
+            return branches
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to get branches: {e}")
+            return []
 
     def push_branch(
         self,
