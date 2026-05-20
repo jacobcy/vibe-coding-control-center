@@ -51,7 +51,8 @@ vibe init --profile minimal --yes
 **Verify**:
 - [ ] `.vibe/config.yaml` exists and contains `profile: minimal`
 - [ ] `.vibe/config.yaml` has `features.agent: false`
-- [ ] `.vibe/config.yaml` has `features.skills: false`
+- [ ] `.vibe/config.yaml` has `features.local_skills: false`
+- [ ] `.vibe/config.yaml` has `features.global_skills: false`
 - [ ] `.vibe/config.yaml` has `features.github_labels: false`
 - [ ] `.vibe/config.yaml` has `paths.policies_root` pointing to `~/.vibe/assets/policies`
 - [ ] No `.agent/` directory created
@@ -86,7 +87,8 @@ vibe init --profile github-flow --yes --skip-labels
 **Verify**:
 - [ ] `.vibe/config.yaml` exists and contains `profile: github-flow`
 - [ ] `.vibe/config.yaml` has `features.agent: true`
-- [ ] `.vibe/config.yaml` has `features.skills: false`
+- [ ] `.vibe/config.yaml` has `features.local_skills: false`
+- [ ] `.vibe/config.yaml` has `features.global_skills: true`
 - [ ] `.vibe/config.yaml` has `features.github_labels: true`
 - [ ] `.vibe/config.yaml` has `paths.policies_root` pointing to `~/.vibe/assets/policies`
 - [ ] `.agent/` directory created
