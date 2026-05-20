@@ -83,6 +83,7 @@ class TestManagerHandlerIssueFetching:
     (i.e., events that don't carry the title).
     """
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
@@ -93,13 +94,21 @@ class TestManagerHandlerIssueFetching:
         mock_github_cls: MagicMock,
         mock_block_noop: MagicMock,
         mock_build_request: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns None (slow path)."""
-        mock_config_cls.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
+        mock_config_cls.return_value = mock_config
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = None
         mock_github_cls.return_value = mock_github
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         # No issue_title triggers slow path
         event = _make_event(issue_title=None)
@@ -109,6 +118,7 @@ class TestManagerHandlerIssueFetching:
         mock_build_request.assert_not_called()
         mock_block_noop.assert_called_once()
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
@@ -119,13 +129,21 @@ class TestManagerHandlerIssueFetching:
         mock_github_cls: MagicMock,
         mock_block_noop: MagicMock,
         mock_build_request: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns network error."""
-        mock_config_cls.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
+        mock_config_cls.return_value = mock_config
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = "network_error"
         mock_github_cls.return_value = mock_github
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         event = _make_event(issue_title=None)
         handle_manager_dispatch_intent(event)
@@ -133,6 +151,7 @@ class TestManagerHandlerIssueFetching:
         mock_build_request.assert_not_called()
         mock_block_noop.assert_called_once()
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.block_manager_noop_issue")
     @patch("vibe3.clients.github_client.GitHubClient")
@@ -143,13 +162,21 @@ class TestManagerHandlerIssueFetching:
         mock_github_cls: MagicMock,
         mock_block_noop: MagicMock,
         mock_build_request: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         """Handler should skip dispatch when from_github_payload returns None."""
-        mock_config_cls.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
+        mock_config_cls.return_value = mock_config
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = _make_github_response()
         mock_github_cls.return_value = mock_github
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         event = _make_event(issue_title=None)
 
@@ -166,6 +193,7 @@ class TestManagerHandlerIssueFetching:
 class TestManagerHandlerDispatch:
     """Test manager role service dispatch via fast path (issue_title present)."""
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -174,9 +202,11 @@ class TestManagerHandlerDispatch:
         mock_config_cls: MagicMock,
         mock_build_request: MagicMock,
         mock_coordinator_cls: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         """Handler should dispatch manager with correct IssueInfo via fast path."""
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
@@ -188,6 +218,11 @@ class TestManagerHandlerDispatch:
             launched=True, reason=None
         )
         mock_coordinator_cls.return_value = mock_coordinator
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         # Provide issue_title to use the fast path
         event = _make_event(issue_title="Test issue")

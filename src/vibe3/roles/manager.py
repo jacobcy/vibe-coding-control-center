@@ -11,6 +11,7 @@ from loguru import logger
 
 from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.exceptions import CapacityDeferredError
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.execution_role_policy import ExecutionRolePolicyService
 from vibe3.execution.issue_role_support import (
@@ -141,6 +142,9 @@ def build_manager_request(
     flow_manager = FlowManager(config, registry=registry)
     try:
         flow = flow_manager.create_flow_for_issue(issue)
+    except CapacityDeferredError:
+        # Re-raise capacity defer so handler can defer properly
+        raise
     except Exception as exc:
         logger.bind(
             domain="manager",
