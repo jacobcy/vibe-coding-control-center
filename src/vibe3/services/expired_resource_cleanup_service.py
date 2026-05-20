@@ -74,8 +74,13 @@ class ExpiredResourceCleanupService:
         Returns:
             Dict with 'cleaned' list and 'skipped_live' list
         """
+        import typer
+
         logger.bind(domain="check", action="clean_agent_worktrees").info(
             f"Checking agent worktrees older than {max_age_days} days"
+        )
+        typer.echo(
+            f"  [dim]Checking agent worktrees older than {max_age_days} days...[/]"
         )
 
         base = self._get_agent_worktree_base()
@@ -117,19 +122,28 @@ class ExpiredResourceCleanupService:
                         worktree=worktree_name,
                         session_count=len(live_sessions),
                     ).info("Skipped agent worktree with live runtime sessions")
+                    typer.echo(
+                        f"    [cyan][skipped][/cyan] {worktree_name} "
+                        f"[dim](has {len(live_sessions)} live sessions)[/]"
+                    )
                     continue
 
                 # Properly remove worktree: cleans git metadata AND directory
+                typer.echo(f"    [yellow][cleaning][/yellow] {worktree_name}...")
                 remove_worktree(worktree_dir, force=True)
                 cleaned.append(worktree_name)
                 logger.bind(domain="check", worktree=worktree_name).info(
                     "Deleted expired agent worktree"
                 )
+                typer.echo(f"    [green][cleaned][/green]  {worktree_name}")
 
             except Exception as exc:
                 failed.append(f"{worktree_name}: {exc}")
                 logger.bind(domain="check", worktree=worktree_name).warning(
                     f"Failed to clean agent worktree: {exc}"
+                )
+                typer.echo(
+                    f"    [red][failed][/red]   {worktree_name}: {exc}", err=True
                 )
 
         return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
@@ -148,8 +162,13 @@ class ExpiredResourceCleanupService:
         Returns:
             Dict with 'cleaned', 'skipped_protected', 'skipped_pr', 'failed' lists
         """
+        import typer
+
         logger.bind(domain="check", action="clean_remote_branches").info(
             f"Checking remote branches older than {max_age_days} days"
+        )
+        typer.echo(
+            f"  [dim]Checking remote branches older than {max_age_days} days...[/]"
         )
 
         # Load protected branches from config
@@ -172,6 +191,10 @@ class ExpiredResourceCleanupService:
             )
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get remote branches: {exc}")
+            typer.echo(
+                f"    [red][error][/red] Failed to get remote branches: {exc}",
+                err=True,
+            )
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -184,6 +207,9 @@ class ExpiredResourceCleanupService:
             pr_branches = set(self.pr_service.refresh_open_pr_cache())
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get open PRs: {exc}")
+            typer.echo(
+                f"    [red][error][/red] Failed to get open PRs: {exc}", err=True
+            )
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -215,6 +241,9 @@ class ExpiredResourceCleanupService:
                     logger.bind(domain="check", branch=branch).info(
                         "Skipped remote branch with open PR"
                     )
+                    typer.echo(
+                        f"    [cyan][skipped][/cyan] {branch} [dim](has open PR)[/]"
+                    )
                     continue
 
                 # Check age
@@ -222,17 +251,20 @@ class ExpiredResourceCleanupService:
                     continue
 
                 # Delete remote branch
+                typer.echo(f"    [yellow][cleaning][/yellow] {branch}...")
                 self.git_client.delete_remote_branch(branch_name)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired remote branch"
                 )
+                typer.echo(f"    [green][cleaned][/green]  {branch}")
 
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to clean remote branch: {exc}"
                 )
+                typer.echo(f"    [red][failed][/red]   {branch}: {exc}", err=True)
 
         return {
             "cleaned": cleaned,
@@ -258,8 +290,13 @@ class ExpiredResourceCleanupService:
             Dict with 'cleaned', 'skipped_protected', 'skipped_current',
             'skipped_live', 'skipped_worktree', 'failed' lists
         """
+        import typer
+
         logger.bind(domain="check", action="clean_local_branches").info(
             f"Checking local branches older than {max_age_days} days"
+        )
+        typer.echo(
+            f"  [dim]Checking local branches older than {max_age_days} days...[/]"
         )
 
         # Load protected branches from config
@@ -282,6 +319,10 @@ class ExpiredResourceCleanupService:
             current_branch = self.git_client.get_current_branch()
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get current branch: {exc}")
+            typer.echo(
+                f"    [red][error][/red] Failed to get current branch: {exc}",
+                err=True,
+            )
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -297,6 +338,10 @@ class ExpiredResourceCleanupService:
         except SystemError:
             logger.bind(domain="check").error(
                 "Failed to get live sessions, skipping local branch cleanup"
+            )
+            typer.echo(
+                "    [red][error][/red] Live session query failed, skipping",
+                err=True,
             )
             return {
                 "cleaned": [],
@@ -314,6 +359,10 @@ class ExpiredResourceCleanupService:
             )
         except Exception as exc:
             logger.bind(domain="check").error(f"Failed to get local branches: {exc}")
+            typer.echo(
+                f"    [red][error][/red] Failed to get local branches: {exc}",
+                err=True,
+            )
             return {
                 "cleaned": [],
                 "skipped_protected": [],
@@ -349,6 +398,10 @@ class ExpiredResourceCleanupService:
                     logger.bind(domain="check", branch=branch).info(
                         "Skipped local branch with live session"
                     )
+                    typer.echo(
+                        f"    [cyan][skipped][/cyan] {branch} "
+                        f"[dim](has live session)[/]"
+                    )
                     continue
 
                 # Check age
@@ -366,24 +419,34 @@ class ExpiredResourceCleanupService:
                         branch
                     )
                     if worktree_path:
+                        typer.echo(
+                            f"    [yellow][cleaning][/yellow] worktree for {branch} "
+                            f"[dim]at {worktree_path}...[/]"
+                        )
                         remove_worktree(worktree_path, force=True)
                         skipped_worktree.append(branch)
                         logger.bind(domain="check", branch=branch).info(
                             f"Deleted worktree at {worktree_path}"
                         )
+                        typer.echo(
+                            f"    [green][cleaned][/green]  worktree for {branch}"
+                        )
 
                 # Delete local branch
+                typer.echo(f"    [yellow][cleaning][/yellow] {branch}...")
                 self.git_client.delete_branch(branch, force=False)
                 cleaned.append(branch)
                 logger.bind(domain="check", branch=branch).info(
                     "Deleted expired local branch"
                 )
+                typer.echo(f"    [green][cleaned][/green]  {branch}")
 
             except Exception as exc:
                 failed.append(f"{branch}: {exc}")
                 logger.bind(domain="check", branch=branch).warning(
                     f"Failed to clean local branch: {exc}"
                 )
+                typer.echo(f"    [red][failed][/red]   {branch}: {exc}", err=True)
 
         return {
             "cleaned": cleaned,

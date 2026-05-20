@@ -75,7 +75,7 @@ class TestCheckCommand:
 
         assert result.exit_code == 0
         assert "Scanning merged PRs to back-fill task_issue_number" in result.output
-        assert "Unresolvable (1 branches" in result.output
+        assert "[yellow]Unresolvable[/yellow] (1 branches" in result.output
         assert "task/no-linked-issue" in result.output
 
     @patch("vibe3.commands.check.CheckService")
@@ -96,4 +96,4 @@ class TestCheckCommand:
             result = runner.invoke(app, ["check"])
 
         assert result.exit_code == 0
-        assert "Fixed: 3 flows" in result.output
+        assert "[green]Fixed[/green]: 3 flows" in result.output

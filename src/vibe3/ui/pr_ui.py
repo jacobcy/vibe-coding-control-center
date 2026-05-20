@@ -114,7 +114,8 @@ def render_pr_details(pr: PRResponse) -> None:
     if pr.comments:
         console.print("\n[bold cyan]### General Comments[/]")
         for comment in pr.comments:
-            user = comment.get("author", {}).get("login", "unknown")
+            # GitHub API returns "user.login" not "author.login"
+            user = comment.get("user", {}).get("login", "unknown")
             body = comment.get("body", "")
             created = str(comment.get("createdAt", ""))[:16].replace("T", " ")
             console.print(f"  [yellow]{user}[/] [dim]({created})[/]")

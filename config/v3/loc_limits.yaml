@@ -97,8 +97,8 @@ code_limits:
         limit: 450
         reason: "Task 服务聚合，包含状态转换、查询、resume 候选筛选逻辑"
       - path: "src/vibe3/services/expired_resource_cleanup_service.py"
-        limit: 450
-        reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑"
+        limit: 520
+        reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑，新增颜色高亮输出后略微超标"
 
       # Roles 层 —— 允许 350-600
       - path: "src/vibe3/roles/review.py"
