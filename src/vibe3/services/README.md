@@ -70,9 +70,8 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| check_service.py | 602 | Pre-push 检查 |
+| check_service.py | 477 | Pre-push 检查 |
 | check_cleanup_service.py | 268 | Check 清理服务 |
-| check_ownership_service.py | 89 | Check 所有权服务 |
 | check_remote.py | 165 | 远程检查辅助 |
 
 ### Issue 管理文件
@@ -111,7 +110,7 @@
 | artifact_parser.py | 82 | 工件解析器 |
 | __init__.py | 5 | 模块导出 |
 
-**总计**：46 文件，10288 行
+**总计**：45 文件，10074 行
 
 ## 依赖关系
 

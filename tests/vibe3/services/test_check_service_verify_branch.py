@@ -269,3 +269,53 @@ def test_verify_branch_handles_missing_worktree_and_ref_files(tmp_path: Path) ->
     assert len(result.issues) > 0
     # Should mention ref files cannot be verified
     assert any("cannot be verified" in issue.lower() for issue in result.issues)
+
+
+def test_verify_branch_no_longer_reports_owner_session_warnings(
+    tmp_path: Path,
+) -> None:
+    """verify_branch should not report owner session warnings.
+
+    After ownership removal, verify no owner session diagnostics.
+    """
+    # Create temp store
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    init_schema(conn)
+    conn.close()
+    temp_store = SQLiteClient(db_path=db_path)
+
+    # Mock git client
+    mock_git = MagicMock()
+    mock_git.get_git_common_dir.return_value = str(tmp_path / ".git")
+    mock_git.find_worktree_path_for_branch.return_value = None  # No worktree
+
+    # Mock GitHub client
+    mock_github = MagicMock()
+    mock_github.list_all_prs.return_value = []
+
+    service = CheckService(
+        store=temp_store,
+        git_client=mock_git,
+        github_client=mock_github,
+    )
+
+    # Setup: create a flow record
+    branch = "task/issue-321"
+    mock_git._run.return_value = f"  {branch}\n"  # Branch exists locally
+
+    timestamp = datetime.now().isoformat()
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO flow_state (branch, flow_slug, flow_status, updated_at)
+            VALUES (?, ?, 'active', ?)
+            """,
+            (branch, "test_flow", timestamp),
+        )
+
+    result = service.verify_branch(branch)
+
+    # Should NOT report any owner session warnings
+    assert all("owner session" not in issue for issue in result.issues)
+    assert all("owner session" not in warning for warning in result.warnings)
