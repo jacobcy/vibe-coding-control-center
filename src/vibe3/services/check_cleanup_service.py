@@ -47,12 +47,49 @@ class CheckCleanupService:
     def clean_residual_branches(self) -> dict[str, object]:
         """Check and clean residual branches for terminal flows.
 
+        NEW: Also cleans expired resources:
+        - Agent worktrees (> 7 days)
+        - Remote non-protected branches (> 7 days)
+        - Local inactive branches (> 7 days)
+
+        Returns:
+            Dict with summary and details of cleaned branches.
+        """
+        from vibe3.config.settings import VibeConfig
+
+        # Existing: terminal flow cleanup
+        results = self._clean_terminal_flows()
+
+        # NEW: expired resource cleanup
+        config = VibeConfig.get_defaults()
+        cleanup_config = config.check_cleanup
+
+        if cleanup_config.enable_agent_worktree_cleanup:
+            results["agent_worktrees"] = self._clean_expired_agent_worktrees(
+                max_age_days=cleanup_config.agent_worktree_max_age_days
+            )
+
+        if cleanup_config.enable_remote_branch_cleanup:
+            results["remote_branches"] = self._clean_expired_remote_branches(
+                max_age_days=cleanup_config.remote_branch_max_age_days
+            )
+
+        if cleanup_config.enable_local_branch_cleanup:
+            results["local_branches"] = self._clean_expired_local_branches(
+                max_age_days=cleanup_config.local_branch_max_age_days
+            )
+
+        return results
+
+    def _clean_terminal_flows(self) -> dict[str, object]:
+        """Clean terminal flows (done/aborted).
+
         Different handling based on flow status:
         - done: Clean physical resources, keep flow record as audit history
         - aborted: Clean everything including flow record (allows issue to restart)
 
         Returns:
-            Dict with summary and details of cleaned branches.
+            Dict with summary and details of cleaned flows.
         """
         from vibe3.services.flow_cleanup_service import FlowCleanupService
 
