@@ -305,8 +305,9 @@ class FlowCleanupService:
                     f"Skipping cleanup for '{branch}': {len(live_sessions)} live "
                     "sessions found (detected in defensive layer 2). "
                     "This indicates a race condition where sessions started "
-                    "after pre-filter query. Use 'vibe3 task resume --takeover' "
-                    "if you really want to force cleanup."
+                    "after pre-filter query. "
+                    "Active runtime sessions are still present; stop cleanup "
+                    "and investigate before retrying."
                 )
                 logger.bind(domain="cleanup", branch=branch).warning(message)
                 raise LiveSessionsDetectedError(message)

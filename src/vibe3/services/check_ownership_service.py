@@ -67,8 +67,8 @@ def check_worktree_ownership(
             return [
                 f"ORPHANED_OWNERSHIP: Worktree for branch '{branch}' is claimed "
                 f"by dead session '{owner_tmux_session}'. "
-                "Use 'vibe3 task resume --takeover' to take over ownership, "
-                "or manually investigate if the session should still be active."
+                "The owning session has ended. Clear the stale runtime session record "
+                "to reclaim this worktree."
             ], []
 
         # Check if current session matches owner (only if in tmux)
@@ -80,7 +80,8 @@ def check_worktree_ownership(
                 f"Session mismatch: Worktree for branch '{branch}' is owned by "
                 f"session '{owner_tmux_session}', but current session is "
                 f"'{current_session_id}'. "
-                "Use 'vibe3 task resume --takeover' to take over if authorized."
+                "Inspect the live runtime session and wait for it to finish "
+                "before retrying."
             ], []
 
         return [], []  # Ownership is consistent

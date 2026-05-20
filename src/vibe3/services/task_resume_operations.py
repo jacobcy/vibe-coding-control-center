@@ -63,7 +63,6 @@ class TaskResumeOperations:
         reason: str,
         worktree_path: str | None = None,
         label_state: str | None = None,
-        allow_takeover: bool = False,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state.
@@ -77,7 +76,6 @@ class TaskResumeOperations:
             worktree_path: Optional worktree path (for optimization)
             label_state: Optional state to restore (None=delete worktree,
                 empty/"handoff"=restore to handoff, "ready"=restore to ready)
-            allow_takeover: If True, allow taking over worktree ownership
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,
                     status: str) -> None
@@ -114,8 +112,6 @@ class TaskResumeOperations:
                     ensure_worktree_ownership(
                         self.flow_service.store,
                         str(wt_path),
-                        allow_takeover=allow_takeover,
-                        takeover_reason=reason or "task resume",
                     )
             except (ImportError, ValueError):
                 # find_worktree_path_for_branch may fail for branches without worktrees

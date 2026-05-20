@@ -59,9 +59,6 @@ def get_worktree_owner(
 def ensure_worktree_ownership(
     store: SQLiteClient,
     worktree_path: str,
-    *,
-    allow_takeover: bool = False,
-    takeover_reason: str = "",
 ) -> None:
     """Validate that the current session owns this worktree.
 
@@ -73,11 +70,9 @@ def ensure_worktree_ownership(
     Args:
         store: SQLite client instance.
         worktree_path: Absolute path to the worktree directory.
-        allow_takeover: If True, allow taking over ownership.
-        takeover_reason: Reason for takeover (for audit logging).
 
     Raises:
-        WorktreeOwnerMismatchError: When session mismatch and takeover not allowed.
+        WorktreeOwnerMismatchError: When session mismatch.
     """
     current_session_id = get_current_session_id()
 
@@ -105,15 +100,6 @@ def ensure_worktree_ownership(
         return  # Current session owns it
 
     # Mismatch: current session doesn't own the worktree
-    if allow_takeover:
-        takeover_worktree(
-            store,
-            worktree_path,
-            current_session_id,
-            takeover_reason,
-        )
-        return
-
     # Build actionable error message
     current_branch = store.get_flow_state(worktree_path.split("/")[-1])
     branch_hint = ""
@@ -126,52 +112,7 @@ def ensure_worktree_ownership(
         f"  Worktree: {worktree_path}{branch_hint}\n"
         f"  Current session: {current_session_id}\n"
         f"  Owner session: {owner_tmux_session} ({owner_session_name})\n\n"
-        f"This worktree is in use by another session. Options:\n"
-        f"  1. Wait for the other session to complete and release the worktree\n"
-        f"  2. Use `vibe3 task resume --takeover` to explicitly take over\n"
-        f"  3. Switch to a different worktree: `vibe3 task resume <issue>`"
+        "This worktree appears to be in use by another tmux session. "
+        "Wait for that session to finish or inspect the runtime session registry "
+        "before continuing."
     )
-
-
-def takeover_worktree(
-    store: SQLiteClient,
-    worktree_path: str,
-    new_owner_id: str,
-    reason: str,
-) -> None:
-    """Log a worktree takeover event and update session binding.
-
-    Args:
-        store: SQLite client instance.
-        worktree_path: Absolute path to the worktree directory.
-        new_owner_id: The tmux session ID taking ownership.
-        reason: Reason for takeover (for audit logging).
-    """
-    from vibe3.services.signature_service import SignatureService
-
-    # Get the branch name from worktree path (last component)
-    branch = worktree_path.split("/")[-1]
-    actor = SignatureService.get_worktree_actor()
-
-    # Log the takeover event
-    store.add_event(
-        branch,
-        "worktree_takeover",
-        actor,
-        detail=f"Worktree takeover: {reason}" if reason else "Worktree takeover",
-        refs={
-            "new_owner_id": new_owner_id,
-            "worktree_path": worktree_path,
-        },
-    )
-
-    # Update the owning session's tmux_session field
-    # Find the most recent live session for this worktree and update it
-    owner_session = store.get_worktree_owner_session(worktree_path)
-    if owner_session:
-        session_id = owner_session.get("id")
-        if session_id:
-            store.update_runtime_session(
-                session_id,
-                tmux_session=new_owner_id,
-            )
