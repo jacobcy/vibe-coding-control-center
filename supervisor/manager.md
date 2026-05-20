@@ -137,6 +137,28 @@ Note: If you also need to leave a handoff note for downstream agents, use `vibe3
 - **最小系统原则**：行为判断与推进决策由 agent 自己负责；Orchestra / flow / handoff 只负责观测、记录、展示和最小兜底。系统可以验证是否产生了预期 refs/artifacts，并在没有任何可观察进展时执行 no-op 防守（如进入 `blocked`），但系统不是业务结论的 owner，不替你决定应该 `retry`、`merge-ready` 还是 `blocked`
 - **循环保护原则**：关闭、退回、blocked 都是合法结论。**唯一不可接受的是无 PR 产出的工作循环**。如果同一 issue 已经历 3 轮以上 plan/run/review 仍未进入 merge-ready，你有责任做出终局判断：要么降级为 blocked 等人类介入，要么关闭 issue 说明无法完成。不得继续无意义地重试。
 
+#### 循环检测验证方法
+
+你可以通过 `transition_history` 表客观验证 transition pair 循环次数，不依赖主观统计：
+
+```bash
+# 查询单步 transition 循环（出现 >= 3 次的 pair）
+sqlite3 .git/vibe3/vibe.db "
+  SELECT from_state, to_state, COUNT(*) as count
+  FROM transition_history
+  WHERE branch='task/issue-<number>'
+  GROUP BY from_state, to_state
+  HAVING count >= 3
+"
+```
+
+**判定规则**：
+- 若查询返回结果，说明某个 transition pair 已达到循环上限
+- 立即执行 `vibe3 flow blocked --reason "循环达到上限：<from_state> -> <to_state> 重复 <count> 次"`
+- 添加 issue comment 说明循环历史（列出查询结果）
+- 不再继续派发 executor，等待人类介入
+- `exit()`
+
 ## Progress Contract
 
 | 当前状态 | 预期进展 | Fallback 目标 (若无进展) |
