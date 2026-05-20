@@ -96,3 +96,26 @@ def test_default_db_path_fails_fast_on_invalid_git_common_dir(tmp_path, monkeypa
         SQLiteClient()
 
     assert not (repo_root / "vibe3").exists()
+
+
+def test_default_db_path_reopens_closed_singleton_connection(tmp_path, monkeypatch):
+    """Default-path client should recover if a previous caller closed the singleton."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    shared_git_dir = tmp_path / "shared" / ".git"
+    shared_git_dir.mkdir(parents=True)
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        "vibe3.clients.sqlite_base.GitClient.get_git_common_dir",
+        lambda self: str(shared_git_dir),
+    )
+
+    first = SQLiteClient()
+    first._get_connection().close()
+
+    second = SQLiteClient()
+    second.update_flow_state("task/reopen", flow_slug="reopen", flow_status="active")
+
+    state = second.get_flow_state("task/reopen")
+    assert state is not None
+    assert state["branch"] == "task/reopen"

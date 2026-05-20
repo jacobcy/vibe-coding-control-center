@@ -29,6 +29,15 @@ class _HasConnection(Protocol):
         ...
 
 
+def _is_connection_usable(conn: sqlite3.Connection) -> bool:
+    """Return whether a sqlite connection is still open and usable."""
+    try:
+        conn.execute("SELECT 1")
+    except sqlite3.ProgrammingError:
+        return False
+    return True
+
+
 def _get_global_connection(db_path: str) -> sqlite3.Connection:
     """Get or create the module-level singleton database connection.
 
@@ -40,8 +49,13 @@ def _get_global_connection(db_path: str) -> sqlite3.Connection:
     global _global_conn, _global_db_path
 
     with _global_lock:
-        # Reopen if path changed or connection is None
-        if _global_conn is None or _global_db_path != db_path:
+        # Reopen if path changed, connection is missing, or a previous caller
+        # closed the module-level singleton directly.
+        if (
+            _global_conn is None
+            or _global_db_path != db_path
+            or not _is_connection_usable(_global_conn)
+        ):
             if _global_conn is not None:
                 try:
                     _global_conn.close()
