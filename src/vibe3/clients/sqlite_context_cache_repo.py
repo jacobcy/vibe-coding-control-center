@@ -1,7 +1,6 @@
 """SQLite repository methods for flow context cache persistence."""
 
 import datetime
-import sqlite3
 from typing import Any
 
 from loguru import logger
@@ -50,17 +49,19 @@ class SQLiteContextCacheRepo(_HasConnection):
 
     def get_flow_context_cache(self, branch: str) -> dict[str, Any] | None:
         conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM flow_context_cache WHERE branch = ?", (branch,))
         row = cursor.fetchone()
         if row:
+            # Convert row to dict using cursor.description (thread-safe)
+            columns = [col[0] for col in cursor.description]
+            result = dict(zip(columns, row))
             logger.bind(
                 external="sqlite",
                 operation="get_flow_context_cache",
                 branch=branch,
             ).debug("Retrieved flow context cache")
-            return dict(row)
+            return result
         return None
 
     def delete_flow_context_cache(self, branch: str) -> None:
