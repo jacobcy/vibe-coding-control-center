@@ -14,10 +14,6 @@ from vibe3.commands.common import trace_scope
 from vibe3.models.flow import IssueLink
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
-from vibe3.services.worktree_ownership_guard import (
-    WorktreeOwnerMismatchError,
-    ensure_worktree_ownership,
-)
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_flow_created
 
@@ -117,21 +113,23 @@ def _resolve_bind_branch(flow_service: FlowService, branch: str | None) -> str:
     return branch
 
 
-def _ensure_branch_worktree_ownership(flow_service: FlowService, branch: str) -> None:
-    """Verify current session owns the worktree for branch, when one exists."""
-    try:
-        from vibe3.utils.path_helpers import find_worktree_path_for_branch
+def _ensure_branch_has_no_live_runtime_session(
+    flow_service: FlowService, branch: str
+) -> None:
+    """Block flow mutations when branch has live runtime sessions."""
+    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.environment.session_registry import SessionRegistryService
 
-        wt_path = find_worktree_path_for_branch(branch)
-        if wt_path:
-            ensure_worktree_ownership(flow_service.store, str(wt_path))
-    except (ImportError, ValueError):
-        # find_worktree_path_for_branch may fail for branches without worktrees.
-        # In such cases, skip ownership check to preserve legacy behavior.
-        pass
-    except WorktreeOwnerMismatchError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1) from e
+    backend = CodeagentBackend()
+    registry = SessionRegistryService(store=flow_service.store, backend=backend)
+    live = registry.get_truly_live_sessions_for_branch(branch)
+    if live:
+        typer.echo(
+            f"Error: branch '{branch}' still has live runtime sessions; "
+            "wait for the current automation run to finish before mutating flow state.",
+            err=True,
+        )
+        raise typer.Exit(1)
 
 
 def update(
@@ -168,7 +166,7 @@ def update(
 
     flow_service = FlowService()
     with trace_scope(trace, "flow update", branch=target_branch):
-        _ensure_branch_worktree_ownership(flow_service, target_branch)
+        _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
 
         # Register/Ensure flow
         flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
@@ -266,7 +264,7 @@ def bind(
             flow_service = FlowService()
             task_service = TaskService()
             target_branch = _resolve_bind_branch(flow_service, branch)
-            _ensure_branch_worktree_ownership(flow_service, target_branch)
+            _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
 
             links = []
             for ref in refs:
