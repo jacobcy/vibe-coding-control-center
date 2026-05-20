@@ -166,6 +166,7 @@ class TestManagerHandlerIssueFetching:
 class TestManagerHandlerDispatch:
     """Test manager role service dispatch via fast path (issue_title present)."""
 
+    @patch("vibe3.execution.capacity_service.CapacityService")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.issue_state_dispatch.build_manager_request")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
@@ -174,9 +175,11 @@ class TestManagerHandlerDispatch:
         mock_config_cls: MagicMock,
         mock_build_request: MagicMock,
         mock_coordinator_cls: MagicMock,
+        mock_capacity_cls: MagicMock,
     ) -> None:
         """Handler should dispatch manager with correct IssueInfo via fast path."""
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
         mock_config_cls.return_value = mock_config
 
         mock_request = MagicMock()
@@ -188,6 +191,11 @@ class TestManagerHandlerDispatch:
             launched=True, reason=None
         )
         mock_coordinator_cls.return_value = mock_coordinator
+
+        # Mock capacity service to allow dispatch
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
 
         # Provide issue_title to use the fast path
         event = _make_event(issue_title="Test issue")
