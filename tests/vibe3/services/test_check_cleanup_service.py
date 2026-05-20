@@ -286,3 +286,75 @@ def test_clean_expired_remote_branches_deletes_old() -> None:
     assert "origin/feature-old" in result["cleaned"]
     assert "origin/main" not in result["cleaned"]
     assert "origin/feature-recent" not in result["cleaned"]
+
+
+def test_clean_expired_remote_branches_skips_open_pr() -> None:
+    """Branch with open PR should be skipped, not deleted."""
+    from datetime import datetime, timedelta
+
+    from vibe3.models.pr import PRResponse, PRState
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Mock old branch with open PR
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "origin/feature-old-with-pr", "timestamp": old_date},
+    ]
+
+    # Mock open PR for this branch
+    github_client = MagicMock()
+    github_client.list_all_prs.return_value = [
+        PRResponse(
+            number=123,
+            title="Test PR",
+            body="",
+            state=PRState.OPEN,
+            head_branch="feature-old-with-pr",
+            base_branch="main",
+            url="https://github.com/test/pr/123",
+            draft=False,
+        )
+    ]
+    service._github_client = github_client
+
+    result = service._clean_expired_remote_branches(max_age_days=7)
+
+    # Verify: branch skipped due to open PR
+    assert result["cleaned"] == []
+    assert "origin/feature-old-with-pr" in result["skipped_pr"]
+    git_client.delete_remote_branch.assert_not_called()
+
+
+def test_clean_expired_remote_branches_fails_on_pr_check_error() -> None:
+    """PR check failure should abort safely, not delete any branches."""
+    from datetime import datetime, timedelta
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Mock old branch
+    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+
+    git_client.get_all_branches_with_timestamps.return_value = [
+        {"branch": "origin/feature-old", "timestamp": old_date},
+    ]
+
+    # Mock PR check failure
+    github_client = MagicMock()
+    github_client.list_all_prs.side_effect = Exception("GitHub API error")
+    service._github_client = github_client
+
+    result = service._clean_expired_remote_branches(max_age_days=7)
+
+    # Verify: no branches deleted, operation aborted safely
+    assert result["cleaned"] == []
+    assert result["skipped_protected"] == []
+    assert result["skipped_pr"] == []
+    assert len(result["failed"]) == 1
+    assert "PR check failed" in result["failed"][0]
+    git_client.delete_remote_branch.assert_not_called()

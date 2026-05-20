@@ -472,8 +472,13 @@ class CheckCleanupService:
             open_prs = gh.list_all_prs(state="open")
             pr_branches = {pr.head_branch for pr in open_prs}
         except Exception as exc:
-            logger.bind(domain="check").warning(f"Failed to get open PRs: {exc}")
-            pr_branches = set()
+            logger.bind(domain="check").error(f"Failed to get open PRs: {exc}")
+            return {
+                "cleaned": [],
+                "skipped_protected": [],
+                "skipped_pr": [],
+                "failed": ["PR check failed - cannot safely proceed with cleanup"],
+            }
 
         # Process each branch
         for branch_info in remote_branches:
