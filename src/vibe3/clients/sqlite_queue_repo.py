@@ -61,6 +61,7 @@ class SQLiteQueueRepo:
                     updated_at,
                 ),
             )
+        conn.commit()
 
     def load_queue_entry(self, issue_number: int) -> dict[str, Any] | None:
         conn = self._get_connection()  # type: ignore[attr-defined]
@@ -86,6 +87,7 @@ class SQLiteQueueRepo:
             "DELETE FROM orchestra_queue WHERE issue_number = ?",
             (issue_number,),
         )
+        conn.commit()
 
     def replace_all_queue_entries(self, entries: list[dict[str, Any]]) -> None:
         """DELETE all + INSERT batch in single transaction."""
@@ -126,6 +128,7 @@ class SQLiteQueueRepo:
                         now,
                     ),
                 )
+        conn.commit()
 
     # Frozen queue compatibility methods (alias for orchestra_queue operations)
     def save_frozen_queue(self, entries: list[dict[str, Any]]) -> None:
