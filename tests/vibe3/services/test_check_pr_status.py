@@ -27,7 +27,8 @@ class TestPRStatusDetection:
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
-        git_client.get_git_common_dir.return_value = tmp_path
+        # Return tmp_path/.git so that parent calculation gives tmp_path
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
 
         # Mock GitHub client to return merged PR
         github_client = MagicMock(spec=GitHubClient)
@@ -44,6 +45,7 @@ class TestPRStatusDetection:
             ci_passed=True,
         )
         github_client.list_prs_for_branch.return_value = [merged_pr]
+        github_client.list_all_prs.return_value = [merged_pr]
 
         # Create handoff file to avoid missing file warning
         from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -77,7 +79,8 @@ class TestPRStatusDetection:
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
-        git_client.get_git_common_dir.return_value = tmp_path
+        # Return tmp_path/.git so that parent calculation gives tmp_path
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
 
         # Mock GitHub client to return closed PR (not merged)
         github_client = MagicMock(spec=GitHubClient)
@@ -93,6 +96,7 @@ class TestPRStatusDetection:
             ci_passed=True,
         )
         github_client.list_prs_for_branch.return_value = [closed_pr]
+        github_client.list_all_prs.return_value = [closed_pr]
 
         # Create handoff file
         from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -126,7 +130,8 @@ class TestPRStatusDetection:
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
-        git_client.get_git_common_dir.return_value = tmp_path
+        # Return tmp_path/.git so that parent calculation gives tmp_path
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
 
         # Mock GitHub client to return open PR
         github_client = MagicMock(spec=GitHubClient)
@@ -142,6 +147,7 @@ class TestPRStatusDetection:
             ci_passed=True,
         )
         github_client.list_prs_for_branch.return_value = [open_pr]
+        github_client.list_all_prs.return_value = [open_pr]
 
         # Create handoff file
         from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -174,11 +180,13 @@ class TestPRStatusDetection:
 
         git_client = MagicMock(spec=GitClient)
         git_client.get_current_branch.return_value = "task/my-feature"
-        git_client.get_git_common_dir.return_value = tmp_path
+        # Return tmp_path/.git so that parent calculation gives tmp_path
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
 
         # Mock GitHub client to return empty PR list
         github_client = MagicMock(spec=GitHubClient)
         github_client.list_prs_for_branch.return_value = []
+        github_client.list_all_prs.return_value = []
 
         # Create handoff file
         from vibe3.utils.git_helpers import get_branch_handoff_dir

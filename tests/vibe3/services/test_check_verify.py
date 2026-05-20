@@ -33,6 +33,7 @@ def mock_github_client():
     """Create a mock GitHubClient with safe defaults."""
     client = MagicMock(spec=GitHubClient)
     client.list_prs_for_branch.return_value = []
+    client.list_all_prs.return_value = []
     return client
 
 
