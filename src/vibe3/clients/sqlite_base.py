@@ -1,5 +1,6 @@
 """Shared SQLite client bootstrap and connection helpers."""
 
+import atexit
 import sqlite3
 from pathlib import Path
 
@@ -8,6 +9,46 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.exceptions import GitError
+
+# Module-level singleton connection to avoid FD exhaustion
+# Shared across all SQLiteClient instances
+_global_conn: sqlite3.Connection | None = None
+_global_db_path: str | None = None
+
+
+def _get_global_connection(db_path: str) -> sqlite3.Connection:
+    """Get or create the module-level singleton database connection.
+
+    Uses a single global connection shared by all SQLiteClient instances
+    to avoid FD exhaustion from repeated open/close on every operation.
+    """
+    global _global_conn, _global_db_path
+
+    # Reopen if path changed or connection is None
+    if _global_conn is None or _global_db_path != db_path:
+        if _global_conn is not None:
+            try:
+                _global_conn.close()
+            except Exception:
+                pass
+        _global_conn = sqlite3.connect(db_path)
+        _global_db_path = db_path
+        # Register cleanup on exit
+        atexit.register(_close_global_connection)
+
+    return _global_conn
+
+
+def _close_global_connection() -> None:
+    """Close the global singleton connection."""
+    global _global_conn, _global_db_path
+    if _global_conn is not None:
+        try:
+            _global_conn.close()
+        except Exception:
+            pass
+        _global_conn = None
+        _global_db_path = None
 
 
 class SQLiteClientBase:
@@ -36,5 +77,10 @@ class SQLiteClientBase:
         )
 
     def _init_db(self) -> None:
+        """Initialize schema using a one-off connection."""
         with sqlite3.connect(self.db_path) as conn:
             init_schema(conn)
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get the global singleton connection for this database."""
+        return _get_global_connection(self.db_path)

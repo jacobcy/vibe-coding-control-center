@@ -47,20 +47,20 @@ class SQLiteFlowStateRepo:
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
         """Get flow state for branch (excludes soft-deleted flows)."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM flow_state WHERE branch = ? AND deleted_at IS NULL",
-                (branch,),
-            )
-            row = cursor.fetchone()
-            if row:
-                logger.bind(
-                    external="sqlite", operation="get_flow_state", branch=branch
-                ).debug("Retrieved flow state")
-                return dict(row)
-            return None
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM flow_state WHERE branch = ? AND deleted_at IS NULL",
+            (branch,),
+        )
+        row = cursor.fetchone()
+        if row:
+            logger.bind(
+                external="sqlite", operation="get_flow_state", branch=branch
+            ).debug("Retrieved flow state")
+            return dict(row)
+        return None
 
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
         """Update flow state fields. Raises ValueError for invalid fields."""
@@ -142,35 +142,35 @@ class SQLiteFlowStateRepo:
             return updated
 
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_issue_links WHERE branch = ?", (branch,))
-            links = [dict(row) for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite",
-                operation="get_issue_links",
-                branch=branch,
-                count=len(links),
-            ).debug("Retrieved issue links")
-            return links
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM flow_issue_links WHERE branch = ?", (branch,))
+        links = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_issue_links",
+            branch=branch,
+            count=len(links),
+        ).debug("Retrieved issue links")
+        return links
 
     def get_dependency_links(self, branch: str) -> list[int]:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT issue_number FROM flow_issue_links "
-                "WHERE branch = ? AND issue_role = 'dependency'",
-                (branch,),
-            )
-            deps = [row[0] for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite",
-                operation="get_dependency_links",
-                branch=branch,
-                count=len(deps),
-            ).debug("Retrieved dependency links")
-            return deps
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT issue_number FROM flow_issue_links "
+            "WHERE branch = ? AND issue_role = 'dependency'",
+            (branch,),
+        )
+        deps = [row[0] for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_dependency_links",
+            branch=branch,
+            count=len(deps),
+        ).debug("Retrieved dependency links")
+        return deps
 
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
