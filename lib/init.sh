@@ -139,6 +139,12 @@ vibe_init() {
             _log_warning "GitHub CLI (gh) not found"
             echo "   GitHub labels creation will be skipped."
             SKIP_LABELS=true
+        elif ! git remote get-url origin >/dev/null 2>&1; then
+            _log_warning "No GitHub remote found"
+            echo "   GitHub labels creation will be skipped."
+            _log_info "Add a remote with: git remote add origin <url>"
+            _log_info "Then re-run: vibe init --profile github-flow"
+            SKIP_LABELS=true
         fi
     fi
 
