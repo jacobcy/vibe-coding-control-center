@@ -77,6 +77,20 @@ def _close_events_log() -> None:
 atexit.register(_close_events_log)
 
 
+def _ensure_events_handle(repo_root: Path | None = None) -> IO[str]:
+    """Ensure the persistent events handle is open and pointing at the right path."""
+    global _events_handle, _events_path
+    target_path = orchestra_events_log_path(repo_root)
+    if _events_handle is None or _events_path != target_path:
+        if _events_handle is not None:
+            try:
+                _events_handle.close()
+            except Exception:
+                pass
+        _events_handle, _events_path = _open_events_log(repo_root)
+    return _events_handle
+
+
 def append_orchestra_event(
     component: str,
     message: str,
@@ -104,25 +118,14 @@ def append_orchestra_event(
     if levels.get(level.upper(), 1) < levels.get(current_level, 1):
         return orchestra_events_log_path(repo_root)
 
-    # Get target path and check if we need to reopen
-    target_path = orchestra_events_log_path(repo_root)
-    global _events_handle, _events_path
-
-    # Reopen if handle is None or path changed (different repo_root)
-    if _events_handle is None or _events_path != target_path:
-        if _events_handle is not None:
-            try:
-                _events_handle.close()
-            except Exception:
-                pass
-        _events_handle, _events_path = _open_events_log(repo_root)
-
+    handle = _ensure_events_handle(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
     if not message:
-        _events_handle.write("\n")
+        handle.write("\n")
     else:
-        _events_handle.write(f"[{timestamp}] [{component}] {message}\n")
-    _events_handle.flush()
+        handle.write(f"[{timestamp}] [{component}] {message}\n")
+    handle.flush()
+    assert _events_path is not None
     return _events_path
 
 
@@ -142,22 +145,11 @@ def append_orchestra_run_separator(
     if os.environ.get("VIBE3_ORCHESTRA_EVENT_LOG") != "1":
         return orchestra_events_log_path(repo_root)
 
-    # Reuse append_orchestra_event logic for consistent path handling
-    # (includes path change detection and handle management)
-    target_path = orchestra_events_log_path(repo_root)
-    global _events_handle, _events_path
-
-    if _events_handle is None or _events_path != target_path:
-        if _events_handle is not None:
-            try:
-                _events_handle.close()
-            except Exception:
-                pass
-        _events_handle, _events_path = _open_events_log(repo_root)
-
+    handle = _ensure_events_handle(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
-    _events_handle.write(f"\n========== {title} @ {timestamp} ==========\n")
-    _events_handle.flush()
+    handle.write(f"\n========== {title} @ {timestamp} ==========\n")
+    handle.flush()
+    assert _events_path is not None
     return _events_path
 
 

@@ -33,8 +33,6 @@ def _get_global_connection(db_path: str) -> sqlite3.Connection:
                 pass
         _global_conn = sqlite3.connect(db_path)
         _global_db_path = db_path
-        # Register cleanup on exit
-        atexit.register(_close_global_connection)
 
     return _global_conn
 
@@ -49,6 +47,9 @@ def _close_global_connection() -> None:
             pass
         _global_conn = None
         _global_db_path = None
+
+
+atexit.register(_close_global_connection)
 
 
 class SQLiteClientBase:
