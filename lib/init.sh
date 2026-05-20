@@ -18,7 +18,7 @@ vibe_init_help() {
     echo "  3. 根据 profile 创建 GitHub labels"
     echo "  4.根据 profile 分别创建 skills/ 目录和 .claude/skills 全局符号链接"
     echo "  5. 生成 .vibe/config.yaml 配置文件"
-    echo "  6. 验证项目运行支持"
+    echo "  6. 验证项目运行支持（minimal/github-flow 自动生成 CLAUDE.md 模板；vibe-center 保留 AGENTS.md 检查）"
     echo ""
     echo "Usage: ${CYAN}vibe init${NC} [options]"
     echo ""
@@ -56,7 +56,7 @@ This project uses vibe3 for development workflow automation.
 ## Available Commands
 
 - `vibe init` - Initialize project configuration
-- `vibe flow` - Execute development workflows
+- `vibe3 flow` - Execute development workflows
 
 ## Profile: minimal
 
@@ -75,8 +75,8 @@ This project uses vibe3 for development workflow automation with GitHub integrat
 ## Available Commands
 
 - `vibe init` - Initialize project configuration
-- `vibe flow` - Execute development workflows
-- `vibe task` - Manage development tasks
+- `vibe3 flow` - Execute development workflows
+- `vibe3 task` - Manage development tasks
 
 ## Profile: github-flow
 
@@ -374,7 +374,10 @@ vibe_init() {
 
     # Check for essential files (profile-dependent)
     if [[ "$PROFILE_NAME" == "minimal" ]]; then
-        # minimal: check and generate CLAUDE.md
+        # minimal: auto-generate CLAUDE.md when absent.
+        # Intentional behavior change: minimal profile no longer warns about missing AGENTS.md.
+        # AGENTS.md is a vibe-center convention; minimal profile uses CLAUDE.md as the sole
+        # AI agent context file. AGENTS.md is not required and not checked for this profile.
         if [[ -f "$REPO_ROOT/CLAUDE.md" ]]; then
             _log_success "Found: CLAUDE.md"
         else
