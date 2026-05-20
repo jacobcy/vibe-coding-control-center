@@ -9,6 +9,8 @@ independently. It is intentionally branch-oriented because most callers need
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -50,9 +52,30 @@ class RecentPRCache:
         return {"last_sync": None, "prs": {}}
 
     def _save_cache(self, data: dict[str, Any]) -> None:
+        """Save cache atomically using temp file + rename.
+
+        This prevents cache corruption if the process is interrupted mid-write
+        or if multiple commands write concurrently.
+        """
         self._ensure_dir()
-        with open(self.cache_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        # Write to temp file in the same directory
+        temp_fd, temp_path = tempfile.mkstemp(
+            dir=self.cache_file.parent,
+            prefix=".recent_prs.tmp.",
+            suffix=".json",
+        )
+        try:
+            with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            # Atomic rename (POSIX) or replace (cross-platform fallback)
+            Path(temp_path).replace(self.cache_file)
+        except Exception:
+            # Clean up temp file on error
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise
 
     def is_fresh(self, max_age_minutes: int = 10) -> bool:
         """Whether the recent PR snapshot is still fresh enough to reuse."""

@@ -140,6 +140,9 @@ class PRService:
                 branch_to_pr[branch] = pr
 
         self._recent_pr_cache_map = branch_to_pr
+        # Always sync to ensure flow_context_cache has latest PR info
+        # (flow_context_cache may be empty on first access even when recent
+        # PR cache is fresh)
         self._sync_branch_context_cache(branch_to_pr)
         return branch_to_pr
 
