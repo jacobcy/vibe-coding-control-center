@@ -9,6 +9,7 @@ Note: Dispatch queue filtering tests moved to test_global_dispatch_coordinator.p
 after StateLabelDispatchService deletion in issue-462 refactoring.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -146,6 +147,64 @@ manager:
         )
 
         assert "SUPERVISOR CONTENT" not in (request.prompt or "")
+
+    def test_retry_resume_uses_main_repo_root_not_current_cwd(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """Retry manager requests should keep orchestration anchored to main repo."""
+        from vibe3.prompts import manifest
+
+        recipes_path = tmp_path / "prompt-recipes.yaml"
+        recipes_path.write_text(
+            """
+recipes:
+  manager.default:
+    kind: section_recipe
+    variants:
+      first.bootstrap:
+        sections:
+          - key: manager.target
+      retry.resume:
+        sections:
+          - manager.retry_task
+""",
+            encoding="utf-8",
+        )
+
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(
+            """
+manager:
+  target: "target section"
+  retry_task: "retry task"
+""",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(manifest, "DEFAULT_PROMPT_RECIPES_PATH", recipes_path)
+        monkeypatch.setattr(
+            "vibe3.roles.manager._resolve_prompts_path", lambda: prompts_path
+        )
+        monkeypatch.setattr(
+            "vibe3.roles.manager.resolve_orchestra_repo_root",
+            lambda: Path("/test/repos/vibe-center/main"),
+        )
+
+        config = OrchestraConfig(assignee_dispatch=AssigneeDispatchConfig())
+
+        request = build_manager_sync_request(
+            config=config,
+            issue=IssueInfo(number=661, title="Config cleanup"),
+            branch="task/issue-661",
+            flow_state=None,
+            session_id="session-1",
+            options=object(),
+            actor="test",
+            dry_run=False,
+            show_prompt=False,
+        )
+
+        assert request.repo_path == "/test/repos/vibe-center/main"
 
 
 class TestManagerBlockedToHandoffTransitionBlocked:

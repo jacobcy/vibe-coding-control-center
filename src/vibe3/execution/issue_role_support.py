@@ -198,7 +198,9 @@ def build_issue_sync_prompt_request(
         execution_name=execution_name,
         prompt=prompt,
         options=options,
-        cwd=str(Path.cwd()) if session_id else None,
+        # Keep sync issue-role requests worktree-agnostic so the coordinator can
+        # resolve the correct permanent worktree from target_branch.
+        cwd=None,
         repo_path=str(root),
         refs=refs,
         actor=actor,
