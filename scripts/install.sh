@@ -193,9 +193,10 @@ if [[ ! -f "$INSTALL_DIR/settings.yaml" ]]; then
 # 项目级配置（.vibe/settings.yaml）优先级高于此文件
 
 # Paths Configuration
-# 安装后运行时资源路径（覆盖 repo 默认的 .agent/policies）
+# 安装后运行时资源路径（覆盖 repo 默认的 .agent/policies 和 config/prompts）
 paths:
   policies_root: "$HOME/.vibe/assets/policies"
+  prompts_root: "$HOME/.vibe/assets/prompts"
 
 # 其他配置项继承自 repo 的 config/v3/settings.yaml
 EOF
