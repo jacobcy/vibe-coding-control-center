@@ -187,10 +187,9 @@ class ExpiredResourceCleanupService:
             timestamp_str = branch_info["timestamp"]
 
             try:
-                # Parse timestamp
-                timestamp = datetime.fromisoformat(
-                    timestamp_str.replace(" +0800", "+08:00")
-                )
+                # Parse timestamp from git "%(committerdate:iso8601)" format:
+                # "YYYY-MM-DD HH:MM:SS +ZZZZ"
+                timestamp = self._parse_git_iso8601_timestamp(timestamp_str)
 
                 # Extract branch name (remove origin/ prefix)
                 branch_name = branch.replace("origin/", "", 1)
@@ -322,10 +321,9 @@ class ExpiredResourceCleanupService:
             timestamp_str = branch_info["timestamp"]
 
             try:
-                # Parse timestamp
-                timestamp = datetime.fromisoformat(
-                    timestamp_str.replace(" +0800", "+08:00")
-                )
+                # Parse timestamp from git "%(committerdate:iso8601)" format:
+                # "YYYY-MM-DD HH:MM:SS +ZZZZ"
+                timestamp = self._parse_git_iso8601_timestamp(timestamp_str)
 
                 # Skip protected branches
                 if branch in protected:
@@ -390,6 +388,13 @@ class ExpiredResourceCleanupService:
     def _get_agent_worktree_base(self) -> Path:
         """Get agent worktree base directory (.claude/worktrees/)."""
         return Path(".claude/worktrees")
+
+    @staticmethod
+    def _parse_git_iso8601_timestamp(timestamp_str: str):
+        """Parse git iso8601 timestamp from `%(committerdate:iso8601)` format."""
+        from datetime import datetime
+
+        return datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S %z")
 
     def _get_branches_with_live_sessions(self) -> set[str]:
         """Batch query all live sessions and return branches with active sessions.
