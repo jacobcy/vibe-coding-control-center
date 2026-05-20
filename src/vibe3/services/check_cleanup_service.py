@@ -173,12 +173,22 @@ class CheckCleanupService:
         if failed:
             summary += f", failed {len(failed)}"
 
+        # Clean orphan detached HEAD worktrees
+        detached_results = self._cleanup_detached_worktrees()
+        detached_cleaned = detached_results.get("cleaned", [])
+        detached_failed = detached_results.get("failed", [])
+
+        if detached_cleaned:
+            summary += f", cleaned {len(detached_cleaned)} detached worktrees"
+        if detached_failed:
+            summary += f", failed {len(detached_failed)} detached worktrees"
+
         return {
             "summary": summary,
             "cleaned": cleaned,
             "kept_records": kept_records,
             "removed_invalid": removed_invalid,
-            "failed": failed,
+            "failed": failed + detached_failed,
             "skipped_live": skipped_live,
             "total_flows_checked": len(terminal_flows),
         }
@@ -382,3 +392,107 @@ class CheckCleanupService:
 
         match = re.fullmatch(r"^task/issue-(\d+)$", branch)
         return int(match.group(1)) if match else None
+
+    def _cleanup_detached_worktrees(self) -> dict[str, list[str]]:
+        """Clean up all detached HEAD worktrees.
+
+        Detached HEAD worktrees are orphaned when flow records with branch="HEAD"
+        are cleaned up, because find_worktree_path_for_branch("HEAD") returns None.
+
+        This method scans all worktrees and removes those in detached state.
+
+        Safety: Already protected by user confirmation in check command.
+
+        Returns:
+            Dict with 'cleaned' and 'failed' lists of worktree paths.
+        """
+        import subprocess
+
+        logger.bind(domain="check", action="cleanup_detached").info(
+            "Scanning for detached HEAD worktrees"
+        )
+
+        try:
+            # Get all worktrees
+            result = subprocess.run(
+                ["git", "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            # Parse worktrees
+            worktrees: list[tuple[str, str, bool]] = []  # (path, head_sha, detached)
+            wt_path = ""
+            wt_head = ""
+            is_detached = False
+
+            def flush() -> None:
+                nonlocal wt_path, wt_head, is_detached
+                if wt_path:
+                    worktrees.append((wt_path, wt_head, is_detached))
+                wt_path = ""
+                wt_head = ""
+                is_detached = False
+
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("worktree "):
+                    flush()
+                    wt_path = line.split(" ", 1)[1]
+                elif line.startswith("HEAD "):
+                    wt_head = line.split(" ", 1)[1]
+                elif line == "detached":
+                    is_detached = True
+                elif not line:
+                    flush()
+
+            flush()
+
+            # Filter detached worktrees
+            detached_worktrees = [
+                (path, head_sha) for path, head_sha, detached in worktrees if detached
+            ]
+
+            if not detached_worktrees:
+                return {"cleaned": [], "failed": []}
+
+            logger.bind(domain="check").info(
+                f"Found {len(detached_worktrees)} detached HEAD worktrees"
+            )
+
+            # Remove detached worktrees
+            cleaned: list[str] = []
+            failed: list[str] = []
+
+            for wt_path, head_sha in detached_worktrees:
+                try:
+                    subprocess.run(
+                        ["git", "worktree", "remove", "--force", wt_path],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=60,
+                    )
+                    cleaned.append(wt_path)
+                    logger.bind(
+                        domain="check",
+                        worktree=wt_path,
+                        head_sha=head_sha[:7],
+                    ).info("Removed detached HEAD worktree")
+                except subprocess.CalledProcessError as exc:
+                    failed.append(wt_path)
+                    logger.bind(domain="check", worktree=wt_path).warning(
+                        f"Failed to remove detached worktree: {exc.stderr}"
+                    )
+                except Exception as exc:
+                    failed.append(wt_path)
+                    logger.bind(domain="check", worktree=wt_path).warning(
+                        f"Failed to remove detached worktree: {exc}"
+                    )
+
+            return {"cleaned": cleaned, "failed": failed}
+
+        except Exception as exc:
+            logger.bind(domain="check").error(f"Failed to scan worktrees: {exc}")
+            return {"cleaned": [], "failed": []}

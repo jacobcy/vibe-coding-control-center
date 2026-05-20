@@ -270,3 +270,40 @@ def test_clean_expired_local_branches_reports_worktree_removal() -> None:
     rm.assert_called_once()
     assert "feature-old" in result["skipped_worktree"]
     assert "feature-old" in result["cleaned"]
+
+
+def test_cleanup_detached_worktrees_removes_orphaned_worktrees() -> None:
+    """Detached HEAD worktrees should be removed during cleanup."""
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    # Mock git worktree list --porcelain output
+    porcelain_output = """worktree /tmp/wt1
+HEAD abc123def456
+detached
+
+worktree /tmp/wt2
+branch refs/heads/main
+
+worktree /tmp/wt3
+HEAD def456abc123
+detached
+"""
+
+    with patch("subprocess.run") as mock_run:
+        # First call: scan worktrees
+        # Second call: remove worktree
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout=porcelain_output),
+            MagicMock(returncode=0),
+            MagicMock(returncode=0),
+        ]
+
+        result = service._cleanup_detached_worktrees()
+
+        # Verify: 2 detached worktrees removed
+        assert len(result["cleaned"]) == 2
+        assert "/tmp/wt1" in result["cleaned"]
+        assert "/tmp/wt3" in result["cleaned"]
+        assert len(result["failed"]) == 0
