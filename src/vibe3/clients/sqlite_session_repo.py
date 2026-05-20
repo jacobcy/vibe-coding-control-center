@@ -58,17 +58,17 @@ class SQLiteSessionRepo:
         columns = ", ".join(row.keys())
         placeholders = ", ".join(["?"] * len(row))
         values = list(row.values())
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"INSERT INTO runtime_session ({columns}) VALUES ({placeholders})",
-                values,
-            )
-            conn.commit()
-            last_id = cursor.lastrowid
-            if last_id is None:
-                raise RuntimeError("Failed to insert runtime_session: no lastrowid")
-            session_id = int(last_id)
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        cursor = conn.cursor()
+        cursor.execute(
+            f"INSERT INTO runtime_session ({columns}) VALUES ({placeholders})",
+            values,
+        )
+        conn.commit()
+        last_id = cursor.lastrowid
+        if last_id is None:
+            raise RuntimeError("Failed to insert runtime_session: no lastrowid")
+        session_id = int(last_id)
         logger.bind(
             external="sqlite",
             operation="create_runtime_session",
@@ -79,17 +79,17 @@ class SQLiteSessionRepo:
         return session_id
 
     def get_runtime_session(self, session_id: int) -> dict[str, Any] | None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM runtime_session WHERE id = ?",
-                (session_id,),
-            )
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
-            return None
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM runtime_session WHERE id = ?",
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
 
     def update_runtime_session(self, session_id: int, **kwargs: Any) -> None:
         invalid = set(kwargs.keys()) - self.VALID_RUNTIME_SESSION_FIELDS
@@ -100,13 +100,13 @@ class SQLiteSessionRepo:
         kwargs["updated_at"] = datetime.datetime.now().isoformat()
         set_clause = ", ".join([f"{f} = ?" for f in kwargs])
         values = list(kwargs.values()) + [session_id]
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"UPDATE runtime_session SET {set_clause} WHERE id = ?",
-                values,
-            )
-            conn.commit()
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE runtime_session SET {set_clause} WHERE id = ?",
+            values,
+        )
+        conn.commit()
         logger.bind(
             external="sqlite",
             operation="update_runtime_session",
@@ -123,11 +123,11 @@ class SQLiteSessionRepo:
             query += " AND role = ?"
             params.append(role)
         query += " ORDER BY created_at DESC"
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            rows = [dict(row) for row in cursor.fetchall()]
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        rows = [dict(row) for row in cursor.fetchall()]
         logger.bind(
             external="sqlite",
             operation="list_live_runtime_sessions",
@@ -158,14 +158,14 @@ class SQLiteSessionRepo:
         )
         params: list[Any] = [role] + target_strs + list(terminal_statuses)
         result: set[int] = set()
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            for row in cursor.fetchall():
-                raw = row[0]
-                if raw is not None:
-                    try:
-                        result.add(int(raw))
-                    except (ValueError, TypeError):
-                        pass
+        conn = self._get_connection()  # type: ignore[attr-defined]
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        for row in cursor.fetchall():
+            raw = row[0]
+            if raw is not None:
+                try:
+                    result.add(int(raw))
+                except (ValueError, TypeError):
+                    pass
         return result
