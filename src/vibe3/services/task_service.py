@@ -1,6 +1,5 @@
 """Task service implementation."""
 
-import subprocess
 from typing import Any, Literal, cast
 
 from loguru import logger
@@ -367,7 +366,7 @@ class TaskService:
                 github_client=cast(GitHubClientProtocol, self.github_client),
                 store=self.store,
             ).get_branch_pr_status(branch)
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        except Exception as exc:
             logger.bind(
                 domain="task",
                 action="get_branch_pr",
