@@ -8,37 +8,23 @@ _log_success() { echo "${GREEN}✅ $1${NC}"; }
 _log_warning() { echo "${YELLOW}⚠️  $1${NC}"; }
 _log_error() { echo "${RED}❌ $1${NC}" >&2; }
 
-# --- Help Function ---
-vibe_init_help() {
-    echo "${BOLD}vibe init${NC} - Project Initialization"
-    echo ""
-    echo "此命令负责项目运行环境初始化，支持不同 profile："
-    echo "  1. 检查 git 环境"
-    echo "  2. 根据 profile 创建必要的目录结构"
-    echo "  3. 根据 profile 创建 GitHub labels"
-    echo "  4.根据 profile 分别创建 skills/ 目录和 .claude/skills 全局符号链接"
-    echo "  5. 生成 .vibe/config.yaml 配置文件"
-    echo "  6. 验证项目运行支持"
-    echo ""
-    echo "Usage: ${CYAN}vibe init${NC} [options]"
-    echo ""
-    echo "Options:"
-    echo "  -h, --help              显示此帮助信息"
-    echo "  -p, --profile <name>    选择初始化 profile (minimal|github-flow|vibe-center)"
-    echo "  -l, --list-profiles     列出所有可用 profiles"
-    echo "  -y, --yes               跳过确认提示"
-    echo "  --skip-labels           跳过 GitHub labels 创建（仅在需要 labels 的 profile 中生效）"
-    echo ""
-    echo "Profiles:"
-    echo "  ${GREEN}minimal${NC}        - 最小运行时，不启用 GitHub orchestration"
-    echo "  ${GREEN}github-flow${NC}    - GitHub issue/PR/label 协议"
-    echo "  ${GREEN}vibe-center${NC}    - 完整 Vibe Center distribution"
-    echo ""
-    echo "Examples:"
-    echo "  ${CYAN}vibe init --profile minimal${NC}           最小初始化"
-    echo "  ${CYAN}vibe init --profile github-flow${NC}       GitHub flow 初始化"
-    echo "  ${CYAN}vibe init --profile vibe-center${NC}       Vibe Center 初始化"
-    echo ""
+# --- Help Function (sourced from init_help.sh) ---
+source "$(cd "$(dirname "${(%):-%x:A}")" && pwd)/init_help.sh"
+# --- Template Generation Function ---
+_generate_claude_md() {
+    local profile_name="$1"
+    local repo_root="$2"
+    local output_file="$repo_root/CLAUDE.md"
+
+    local template_dir
+    template_dir="$(cd "$(dirname "${(%):-%x:A}")" && pwd)/templates/claude_md"
+    local template_file="$template_dir/${profile_name}.md"
+
+    if [[ -f "$template_file" ]]; then
+        cp "$template_file" "$output_file"
+    else
+        _log_warning "Template not found: $template_file (skipping CLAUDE.md generation)"
+    fi
 }
 
 # --- Main Function ---
@@ -320,11 +306,32 @@ vibe_init() {
     _log_info "Verifying project support..."
 
     # Check for essential files (profile-dependent)
-    local -a ESSENTIAL_FILES
-
-    # minimal profile doesn't require these files
-    if [[ "$PROFILE_NAME" != "minimal" ]]; then
-        ESSENTIAL_FILES=(
+    if [[ "$PROFILE_NAME" == "minimal" ]]; then
+        # minimal: auto-generate CLAUDE.md when absent.
+        # Intentional behavior change: minimal profile no longer warns about missing AGENTS.md.
+        # AGENTS.md is a vibe-center convention; minimal profile uses CLAUDE.md as the sole
+        # AI agent context file. AGENTS.md is not required and not checked for this profile.
+        if [[ -f "$REPO_ROOT/CLAUDE.md" ]]; then
+            _log_success "Found: CLAUDE.md"
+        else
+            _generate_claude_md "$PROFILE_NAME" "$REPO_ROOT"
+            _log_success "Generated: CLAUDE.md (minimal template)"
+        fi
+    elif [[ "$PROFILE_NAME" == "github-flow" ]]; then
+        # github-flow: check and generate CLAUDE.md, warn for AGENTS.md
+        for file in "CLAUDE.md" "AGENTS.md"; do
+            if [[ -f "$REPO_ROOT/$file" ]]; then
+                _log_success "Found: $file"
+            elif [[ "$file" == "CLAUDE.md" ]]; then
+                _generate_claude_md "$PROFILE_NAME" "$REPO_ROOT"
+                _log_success "Generated: CLAUDE.md (github-flow template)"
+            else
+                _log_warning "Missing: $file (recommended for AI agent support)"
+            fi
+        done
+    else
+        # vibe-center and other profiles: check and warn, no auto-generation
+        local -a ESSENTIAL_FILES=(
             "CLAUDE.md"
             "AGENTS.md"
         )
@@ -336,22 +343,22 @@ vibe_init() {
                 _log_warning "Missing: $file (recommended for AI agent support)"
             fi
         done
-    fi
 
-    # vibe-center profile requires additional files
-    if [[ "$PROFILE_NAME" == "vibe-center" ]]; then
-        local -a VIBE_CENTER_FILES=(
-            "SOUL.md"
-            "STRUCTURE.md"
-        )
+        # vibe-center profile requires additional files
+        if [[ "$PROFILE_NAME" == "vibe-center" ]]; then
+            local -a VIBE_CENTER_FILES=(
+                "SOUL.md"
+                "STRUCTURE.md"
+            )
 
-        for file in "${VIBE_CENTER_FILES[@]}"; do
-            if [[ -f "$REPO_ROOT/$file" ]]; then
-                _log_success "Found: $file"
-            else
-                _log_warning "Missing: $file (Vibe Center governance file)"
-            fi
-        done
+            for file in "${VIBE_CENTER_FILES[@]}"; do
+                if [[ -f "$REPO_ROOT/$file" ]]; then
+                    _log_success "Found: $file"
+                else
+                    _log_warning "Missing: $file (Vibe Center governance file)"
+                fi
+            done
+        fi
     fi
 
     # 8. Finalize
