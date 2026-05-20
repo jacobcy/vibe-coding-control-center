@@ -119,12 +119,12 @@ class TestPRShowBoundTask:
         mock_pr.review_comments = []
         mock_pr.comments = [
             {
-                "author": {"login": "alice"},
+                "user": {"login": "alice"},
                 "body": "Great work on this PR!",
                 "createdAt": "2026-05-06T10:30:00Z",
             },
             {
-                "author": {"login": "bob"},
+                "user": {"login": "bob"},
                 "body": "Please add more tests.",
                 "createdAt": "2026-05-06T11:00:00Z",
             },
