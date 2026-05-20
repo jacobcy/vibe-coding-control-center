@@ -48,7 +48,19 @@ src/vibe3/
 │   └── audit.py              # 审计系统
 ├── exceptions/               # 异常定义 ✅ 已实现
 ├── ui/                       # 展示层（Rich）
-└── config/                   # 配置模块
+├── config/                   # 配置模块
+├── adapters/                 # 适配器层（role 集成）
+├── agents/                   # Agent 定义
+├── analysis/                 # 代码分析
+├── domain/                   # 领域事件、发布器、Handler（事件驱动架构核心）
+├── environment/              # Worktree/Session 管理
+├── execution/                # 执行控制（容量、生命周期、Session）
+├── orchestra/                # Orchestra 服务器和调度
+├── prompts/                  # 提示词模板
+├── roles/                    # Manager/Planner/Executor/Reviewer 角色
+├── runtime/                  # 心跳、事件路由
+├── server/                   # HTTP/Webhook 服务器
+└── utils/                    # 共享工具函数
 ```
 
 **实施文档**: [infrastructure/](infrastructure/README.md)
@@ -283,5 +295,5 @@ Phase 1 已完成，后续优先级由 Orchestra 和 supervisor issue 驱动。
 ---
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-17
+**最后更新**: 2026-05-20
 **设计总依据**: [PROMPTS.md](PROMPTS.md)

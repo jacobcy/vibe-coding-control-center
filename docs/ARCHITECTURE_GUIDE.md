@@ -129,7 +129,7 @@ def register_dispatch_handlers() -> None:
    - ✅ 事件定义：`src/vibe3/domain/events/*.py`
    - ✅ 事件注册：`src/vibe3/domain/events/__init__.py`
    - ✅ Handler 注册：`src/vibe3/domain/handlers/*.py`
-   - ✅ 事件发射：`src/vibe3/orchestra/services/*.py`
+   - ✅ 事件发射：`src/vibe3/domain/publisher.py`, `src/vibe3/domain/__init__.py`, `src/vibe3/roles/run_helpers.py`
 
 3. **测试验证**：
    ```bash
