@@ -8,7 +8,7 @@ This service is separated from check_service.py to keep responsibilities clear:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -42,7 +42,7 @@ class CheckCleanupService:
         self.git_client = git_client
         self._github_client = github_client
 
-    def clean_residual_branches(self) -> dict[str, object]:
+    def clean_residual_branches(self) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
 
         NEW: Also cleans expired resources:
@@ -59,7 +59,7 @@ class CheckCleanupService:
         )
 
         # Existing: terminal flow cleanup
-        results = self._clean_terminal_flows()
+        results: dict[str, Any] = self._clean_terminal_flows()
         summary_parts = [str(results.get("summary", ""))]
 
         # NEW: expired resource cleanup
