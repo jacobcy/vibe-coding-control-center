@@ -1,0 +1,342 @@
+"""Handoff target resolution utilities.
+
+This module handles the resolution of handoff targets into absolute file paths.
+
+Three namespaces are supported:
+
+1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+   The ``@`` is stripped and the remainder is joined to the handoff dir.
+   Special case: ``@current`` with ``--branch`` resolves to per-branch current.md.
+   Special case: ``@plan/@report/@audit`` resolve from flow_state refs.
+
+2. ``relative/path`` → canonical worktree ref.
+   Resolved against the target branch's worktree root (or current worktree
+   when ``branch`` is None).
+
+3. ``/abs/path`` → absolute path passthrough (debug fallback).
+"""
+
+import re
+from pathlib import Path
+
+from vibe3.utils.git_path_client import (
+    GitPathProtocol,
+    _get_git_client,
+    find_worktree_path_for_branch,
+    get_git_common_dir,
+    get_worktree_root,
+)
+
+# Branch name validation regex: alphanumeric, slash, underscore, hyphen, period, colon
+# Note: re.fullmatch() ensures the entire string matches, preventing control
+# characters like trailing newlines from being accepted
+_BRANCH_NAME_PATTERN = re.compile(r"[a-zA-Z0-9/_.:-]+")
+_SHARED_HANDOFF_PREFIX = "vibe3/handoff/"
+
+
+def _validate_branch_name(branch: str) -> None:
+    """Validate branch name to prevent path traversal attacks.
+
+    Args:
+        branch: Branch name to validate
+
+    Raises:
+        ValueError: If branch name is invalid (contains .., control chars, or empty)
+    """
+    if not branch or not branch.strip():
+        raise ValueError("Invalid branch name: branch cannot be empty or whitespace")
+
+    if ".." in branch:
+        raise ValueError(
+            f"Invalid branch name {branch!r}: contains path traversal sequence '..'"
+        )
+
+    if not _BRANCH_NAME_PATTERN.fullmatch(branch):
+        raise ValueError(
+            f"Invalid branch name {branch!r}: contains invalid characters. "
+            f"Only alphanumeric, '/', '_', '-', '.', and ':' are allowed."
+        )
+
+
+def _verify_handoff_dir_boundary(handoff_dir: Path, git_common: str) -> None:
+    """Verify that resolved handoff directory stays within handoff root.
+
+    Args:
+        handoff_dir: Resolved handoff directory path
+        git_common: Git common directory path (.git/)
+
+    Raises:
+        ValueError: If resolved path is outside handoff root
+    """
+    handoff_root = Path(git_common) / "vibe3" / "handoff"
+    resolved_handoff = handoff_dir.resolve()
+    resolved_root = handoff_root.resolve()
+
+    try:
+        resolved_handoff.relative_to(resolved_root)
+    except ValueError:
+        raise ValueError(
+            f"Security violation: resolved handoff directory {resolved_handoff} "
+            f"escapes handoff root {resolved_root}"
+        )
+
+
+def _resolve_shared_artifact(
+    target: str,
+    branch: str | None = None,
+    git_client: GitPathProtocol | None = None,
+) -> Path:
+    """Resolve @prefix shared artifact path.
+
+    Args:
+        target: Target string with @ prefix (e.g., "@current", "@task-xxx/run.md")
+        branch: Optional branch for per-branch artifact resolution (e.g., @current)
+        git_client: Git client for path resolution
+
+    Returns:
+        Absolute path to the shared artifact
+
+    Raises:
+        FileNotFoundError: If git common dir unavailable or artifact not found
+    """
+    git_client = _get_git_client(git_client)
+    key = target[1:]  # Strip @ prefix
+
+    # Special handling for @current (per-branch artifact)
+    if key == "current":
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        if not branch:
+            # Try to get current branch if not specified
+            try:
+                branch = git_client.get_current_branch()
+            except Exception:
+                raise FileNotFoundError(
+                    f"Cannot resolve @current without branch specification: {target}"
+                )
+
+        # Validate branch name to prevent path traversal attacks
+        _validate_branch_name(branch)
+
+        # Resolve @current to per-branch current.md
+        git_common = get_git_common_dir(git_client)
+        if not git_common:
+            raise FileNotFoundError(
+                f"Cannot resolve shared artifact without git common dir: {target}"
+            )
+
+        handoff_dir = get_branch_handoff_dir(git_common, branch)
+
+        # Verify resolved path stays within handoff root (defense in depth)
+        _verify_handoff_dir_boundary(handoff_dir, git_common)
+
+        current_md = handoff_dir / "current.md"
+        if not current_md.exists():
+            raise FileNotFoundError(
+                f"current.md not found for branch '{branch}': {target}"
+            )
+        if not current_md.is_file():
+            raise FileNotFoundError(f"Not a file: {target}")
+        return current_md
+
+    # Special handling for @plan/@report/@audit aliases
+    if key in ("plan", "report", "audit"):
+        return _resolve_artifact_alias(key, f"{key}_ref", branch, git_client)
+
+    # Standard shared artifact (not @current, @plan, @report, or @audit)
+    git_common = get_git_common_dir(git_client)
+    if not git_common:
+        raise FileNotFoundError(
+            f"Cannot resolve shared artifact without git common dir: {target}"
+        )
+
+    # Validate key to prevent path traversal attacks
+    _validate_branch_name(key)
+
+    resolved = Path(git_common) / "vibe3" / "handoff" / key
+
+    # Defense in depth — ensure resolved path stays within handoff root
+    _verify_handoff_dir_boundary(resolved, git_common)
+
+    if not resolved.exists():
+        raise FileNotFoundError(f"Artifact not found: {target}")
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Not a file: {target}")
+    return resolved
+
+
+def _resolve_artifact_alias(
+    alias: str,
+    ref_field: str,
+    branch: str | None,
+    git_client: GitPathProtocol,
+) -> Path:
+    """Resolve @plan/@report/@audit alias from flow_state.
+
+    Args:
+        alias: Alias name (plan, report, or audit)
+        ref_field: Field name in flow_state (plan_ref, report_ref, or audit_ref)
+        branch: Optional branch name
+        git_client: Git client for path resolution
+
+    Returns:
+        Absolute path to the artifact
+
+    Raises:
+        FileNotFoundError: If flow not found or ref field not set
+        ValueError: If ref value is self-referential (would cause infinite recursion)
+    """
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+    if not branch:
+        branch = git_client.get_current_branch()
+        if not branch:
+            raise FileNotFoundError(
+                f"Cannot resolve @{alias} without branch: no current branch"
+            )
+
+    _validate_branch_name(branch)
+
+    store = SQLiteClient()
+    flow = store.get_flow_state(branch)
+    if not flow:
+        raise FileNotFoundError(f"No flow found for branch '{branch}'")
+
+    ref_value = flow.get(ref_field)
+    if not ref_value:
+        raise FileNotFoundError(f"No {ref_field} recorded for branch '{branch}'")
+
+    # Guard against self-referential alias values (e.g., plan_ref='@plan')
+    # which would cause infinite recursion via resolve_handoff_target
+    if ref_value in ("@plan", "@report", "@audit", "@current"):
+        raise ValueError(
+            f"Invalid {ref_field}: self-referential alias {ref_value!r} "
+            f"would cause infinite recursion"
+        )
+
+    return resolve_handoff_target(ref_value, branch, git_client)
+
+
+def _resolve_worktree_artifact(
+    target: str,
+    branch: str | None,
+    git_client: GitPathProtocol,
+) -> Path:
+    """Resolve worktree-relative artifact path.
+
+    Args:
+        target: Relative path to artifact
+        branch: Optional branch name for strict worktree resolution
+        git_client: Git client for path resolution
+
+    Returns:
+        Absolute path to the artifact
+
+    Raises:
+        FileNotFoundError: If artifact not found in any worktree context
+    """
+    if branch:
+        # Strict mode: when branch is explicitly given, only resolve within
+        # that branch's worktree. Never fall back to current worktree or CWD,
+        # as that would silently return a file from the wrong flow.
+        wt_path = find_worktree_path_for_branch(branch, git_client)
+        if wt_path is None:
+            raise FileNotFoundError(f"No worktree found for branch '{branch}'")
+        resolved = wt_path / target
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"File not found in branch '{branch}' worktree: {target}"
+            )
+        if not resolved.is_file():
+            raise FileNotFoundError(f"Not a file: {target}")
+        return resolved
+
+    # No branch specified: try current worktree then CWD
+    current_root = get_worktree_root(git_client)
+    if current_root:
+        resolved = Path(current_root) / target
+        if resolved.exists():
+            if resolved.is_file():
+                return resolved
+            else:
+                raise FileNotFoundError(f"Not a file: {target}")
+
+    # Also try CWD (handles cases where CWD differs from worktree root)
+    cwd_resolved = Path.cwd() / target
+    if cwd_resolved.exists():
+        if cwd_resolved.is_file():
+            return cwd_resolved
+        else:
+            raise FileNotFoundError(f"Not a file: {target}")
+
+    raise FileNotFoundError(f"Artifact not found: {target}")
+
+
+def resolve_handoff_target(
+    target: str,
+    branch: str | None = None,
+    git_client: GitPathProtocol | None = None,
+) -> Path:
+    """Resolve a handoff show target into an absolute file path.
+
+    Three namespaces:
+
+    1. ``@prefix/key`` → shared handoff artifact under ``.git/vibe3/handoff/``.
+       The ``@`` is stripped and the remainder is joined to the handoff dir.
+       Special cases requiring branch context (explicit or current):
+       - ``@current`` → per-branch current.md
+       - ``@plan/@report/@audit`` → resolved from flow_state refs
+       Other shared artifacts (``@task-xxx/run.md``) ignore branch.
+
+    2. ``relative/path`` → canonical worktree ref.
+       Resolved against the target branch's worktree root (or current worktree
+       when ``branch`` is None).
+
+    3. ``/abs/path`` → absolute path passthrough (debug fallback).
+
+    Raises:
+        FileNotFoundError: If the resolved path does not exist.
+    """
+    git_client = _get_git_client(git_client)
+
+    # Namespace 1: @ prefix → shared handoff store
+    if target.startswith("@"):
+        return _resolve_shared_artifact(target, branch, git_client)
+
+    # Namespace 1.5: vibe3/handoff/ prefix → shared handoff store (no @ needed)
+    # This handles refs stored by record_passive_artifact that don't have @ prefix
+    if target.startswith(_SHARED_HANDOFF_PREFIX):
+        # Convert vibe3/handoff/task-xxx/run.md → @task-xxx/run.md
+        return _resolve_shared_artifact(
+            "@" + target[len(_SHARED_HANDOFF_PREFIX) :], branch, git_client
+        )
+
+    target_path = Path(target)
+
+    # Namespace 3: absolute path → passthrough
+    if target_path.is_absolute():
+        if not target_path.exists():
+            raise FileNotFoundError(f"Artifact not found: {target}")
+        if not target_path.is_file():
+            raise FileNotFoundError(f"Not a file: {target}")
+        return target_path
+
+    # Namespace 2: relative path → worktree canonical ref
+    return _resolve_worktree_artifact(target, branch, git_client)
+
+
+def is_shared_handoff_ref(ref_value: str) -> bool:
+    """Return True if the stored ref points to a shared handoff artifact."""
+    return ref_value.startswith(_SHARED_HANDOFF_PREFIX)
+
+
+def to_display_target(ref_value: str) -> str:
+    """Convert a stored ref value to a display target for ``handoff show``.
+
+    ``vibe3/handoff/task-xxx/run.md`` → ``@task-xxx/run.md``
+    Other relative paths → returned as-is (canonical worktree ref).
+    Absolute paths → returned as-is.
+    """
+    if ref_value.startswith(_SHARED_HANDOFF_PREFIX):
+        return "@" + ref_value[len(_SHARED_HANDOFF_PREFIX) :]
+    return ref_value

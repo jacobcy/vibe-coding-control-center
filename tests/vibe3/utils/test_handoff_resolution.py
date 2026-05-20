@@ -1,0 +1,158 @@
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from vibe3.utils.handoff_resolution import resolve_handoff_target
+
+
+def _make_git_client(git_common: str, worktree_root: str) -> MagicMock:
+    client = MagicMock()
+    client.get_git_common_dir.return_value = git_common
+    client.get_worktree_root.return_value = worktree_root
+    client.find_worktree_path_for_branch.return_value = None
+    return client
+
+
+# --- resolve_handoff_target ---
+
+
+def test_resolve_handoff_target_shared_artifact(tmp_path: Path) -> None:
+    """@key resolves to git_common/vibe3/handoff/<key>."""
+    artifact = tmp_path / "vibe3" / "handoff" / "task-123" / "run.md"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("content")
+
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+    result = resolve_handoff_target("@task-123/run.md", git_client=client)
+    assert result == artifact
+
+
+def test_resolve_handoff_target_shared_artifact_not_found(tmp_path: Path) -> None:
+    """@key raises FileNotFoundError when artifact is missing."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+    with pytest.raises(FileNotFoundError):
+        resolve_handoff_target("@missing/run.md", git_client=client)
+
+
+def test_resolve_handoff_target_absolute_path(tmp_path: Path) -> None:
+    """Absolute path is returned directly (debug fallback)."""
+    target_file = tmp_path / "file.md"
+    target_file.write_text("content")
+
+    client = _make_git_client(str(tmp_path), str(tmp_path))
+    result = resolve_handoff_target(str(target_file), git_client=client)
+    assert result == target_file
+
+
+def test_resolve_handoff_target_canonical_ref_current_worktree(
+    tmp_path: Path,
+) -> None:
+    """Relative path resolves to current worktree when no branch given."""
+    ref_file = tmp_path / "docs" / "report.md"
+    ref_file.parent.mkdir(parents=True)
+    ref_file.write_text("content")
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    result = resolve_handoff_target("docs/report.md", git_client=client)
+    assert result == ref_file
+
+
+def test_resolve_handoff_target_canonical_ref_with_branch(tmp_path: Path) -> None:
+    """Relative path resolves to branch worktree when --branch given."""
+    branch_wt = tmp_path / "wt-branch"
+    ref_file = branch_wt / "docs" / "report.md"
+    ref_file.parent.mkdir(parents=True)
+    ref_file.write_text("content")
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path / "wt-main"))
+    client.find_worktree_path_for_branch.return_value = branch_wt
+    result = resolve_handoff_target(
+        "docs/report.md", branch="task/issue-99", git_client=client
+    )
+    assert result == ref_file
+
+
+def test_resolve_handoff_target_not_found_raises(tmp_path: Path) -> None:
+    """Unresolvable target raises FileNotFoundError."""
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path / "wt"))
+    with pytest.raises(FileNotFoundError):
+        resolve_handoff_target("docs/nonexistent.md", git_client=client)
+
+
+def test_resolve_handoff_target_branch_strict_no_fallback(tmp_path: Path) -> None:
+    """When --branch given, file missing from branch worktree → error."""
+    branch_wt = tmp_path / "wt-branch"
+    branch_wt.mkdir()
+    # File exists in CWD but NOT in branch worktree
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "report.md").write_text("wrong-flow-content")
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    client.find_worktree_path_for_branch.return_value = branch_wt
+
+    with pytest.raises(FileNotFoundError, match="File not found in branch"):
+        resolve_handoff_target(
+            "docs/report.md", branch="task/issue-99", git_client=client
+        )
+
+
+def test_resolve_handoff_target_branch_no_worktree_raises(tmp_path: Path) -> None:
+    """When --branch given but worktree missing → error."""
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path / "wt"))
+    client.find_worktree_path_for_branch.return_value = None
+
+    with pytest.raises(FileNotFoundError, match="No worktree found for branch"):
+        resolve_handoff_target(
+            "docs/report.md", branch="task/issue-99", git_client=client
+        )
+
+
+# --- Security Tests: Path Traversal Prevention ---
+
+
+def test_resolve_shared_artifact_rejects_path_traversal_dot_dot(
+    tmp_path: Path,
+) -> None:
+    """Branch name with '..' should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="path traversal sequence"):
+        resolve_handoff_target(
+            "@current", branch="../../../etc/passwd", git_client=client
+        )
+
+
+def test_resolve_shared_artifact_rejects_relative_traversal(tmp_path: Path) -> None:
+    """Branch name containing '..' anywhere should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="path traversal sequence"):
+        resolve_handoff_target(
+            "@current", branch="task/../../etc/passwd", git_client=client
+        )
+
+
+def test_resolve_shared_artifact_rejects_trailing_newline(
+    tmp_path: Path,
+) -> None:
+    """Branch name with trailing newline should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="invalid characters"):
+        resolve_handoff_target("@current", branch="task-123\n", git_client=client)
+
+
+def test_resolve_shared_artifact_rejects_control_chars(tmp_path: Path) -> None:
+    """Branch name with control characters should be rejected."""
+    client = _make_git_client(str(tmp_path), str(tmp_path / "wt"))
+
+    with pytest.raises(ValueError, match="invalid characters"):
+        resolve_handoff_target("@current", branch="task\x00-123", git_client=client)
+
+
+def test_resolve_shared_artifact_accepts_valid_branch(tmp_path: Path) -> None:
+    """Valid branch names should be accepted."""
+    artifact = tmp_path / "vibe3" / "handoff" / "task-123" / "current.md"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("content")

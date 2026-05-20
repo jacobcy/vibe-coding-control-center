@@ -65,11 +65,17 @@ Show a handoff artifact by target reference.
 
 Target formats:
   @key               Shared artifact key (e.g. @task-476/run-1.md)
-  relative/path      Canonical worktree ref; requires --branch <branch>
+  @plan              Flow plan ref (resolved from flow_state.plan_ref)
+  @report            Flow report ref (resolved from flow_state.report_ref)
+  @audit             Flow audit ref (resolved from flow_state.audit_ref)
+  relative/path      Canonical worktree ref; defaults to current worktree,
+                     use --branch for strict resolution
   /abs/path          Absolute filesystem path (debug fallback)
 
 Examples:
   vibe3 handoff show @task-476/run-1.md
+  vibe3 handoff show @plan --branch task/issue-822
+  vibe3 handoff show @plan
   vibe3 handoff show --branch task/issue-476 docs/reports/audit.md
   vibe3 handoff show /abs/path/to/artifact.md
 
