@@ -374,30 +374,3 @@ class CheckCleanupService:
 
         match = re.fullmatch(r"^task/issue-(\d+)$", branch)
         return int(match.group(1)) if match else None
-<<<<<<< HEAD
-
-    def _clean_expired_agent_worktrees(
-        self, max_age_days: int = 7
-    ) -> dict[str, object]:
-        """Clean expired agent worktrees older than max_age_days."""
-        return clean_expired_agent_worktrees(self.store, max_age_days=max_age_days)
-
-    def _clean_expired_remote_branches(
-        self, max_age_days: int = 7
-    ) -> dict[str, object]:
-        """Clean expired remote non-protected branches older than max_age_days."""
-        return clean_expired_remote_branches(
-            self.git_client,
-            github_client=self._github_client,
-            max_age_days=max_age_days,
-        )
-
-    def _clean_expired_local_branches(self, max_age_days: int = 7) -> dict[str, object]:
-        """Clean expired local non-protected branches older than max_age_days."""
-        return clean_expired_local_branches(
-            self.git_client,
-            get_live_branches=self._get_branches_with_live_sessions,
-            max_age_days=max_age_days,
-        )
-=======
->>>>>>> 30d83386 (refactor(check): split expired resource cleanup into separate service and update loc_limits)
