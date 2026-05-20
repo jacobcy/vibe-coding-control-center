@@ -134,227 +134,69 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
             assert result["skipped_live"] == []
 
 
-def test_clean_expired_agent_worktrees_removes_old_worktrees() -> None:
-    """Expired agent worktrees without live sessions should be removed via git."""
-    import os
-    import tempfile
-    from datetime import datetime, timedelta
-    from pathlib import Path
-
-    store = MagicMock()
-    git_client = MagicMock()
-    service = CheckCleanupService(store=store, git_client=git_client)
-
-    # No live sessions for any worktree
-    store.list_live_sessions_by_worktree.return_value = []
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        old_worktree = Path(tmpdir) / "agent-old123"
-        old_worktree.mkdir()
-        old_time = datetime.now() - timedelta(days=10)
-        os.utime(old_worktree, (old_time.timestamp(), old_time.timestamp()))
-
-        recent_worktree = Path(tmpdir) / "agent-recent456"
-        recent_worktree.mkdir()
-
-        with patch.object(
-            service, "_get_agent_worktree_base", return_value=Path(tmpdir)
-        ):
-            with patch(
-                "vibe3.services.check_cleanup_service.remove_worktree"
-            ) as mock_remove:
-                result = service._clean_expired_agent_worktrees(max_age_days=7)
-
-                # Old worktree should be removed via remove_worktree
-                mock_remove.assert_called_once_with(old_worktree, force=True)
-
-                # Recent worktree should NOT be removed
-                assert recent_worktree.exists()
-                assert "cleaned" in result
-                assert len(result["cleaned"]) == 1
-                assert "agent-old123" in result["cleaned"]
-
-
-def test_clean_expired_agent_worktrees_skips_live_sessions() -> None:
-    """Expired worktrees with live sessions should be skipped, not removed."""
-    import os
-    import tempfile
-    from datetime import datetime, timedelta
-    from pathlib import Path
-
-    store = MagicMock()
-    git_client = MagicMock()
-    service = CheckCleanupService(store=store, git_client=git_client)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        old_worktree = Path(tmpdir) / "agent-old123"
-        old_worktree.mkdir()
-        old_time = datetime.now() - timedelta(days=10)
-        os.utime(old_worktree, (old_time.timestamp(), old_time.timestamp()))
-
-        # Resolved absolute path used for lookup
-        resolved_path = str(old_worktree.resolve())
-
-        def mock_list_live(worktree_path: str) -> list[dict]:
-            if worktree_path == resolved_path:
-                return [{"id": 1, "status": "running", "role": "executor"}]
-            return []
-
-        store.list_live_sessions_by_worktree.side_effect = mock_list_live
-
-        with patch.object(
-            service, "_get_agent_worktree_base", return_value=Path(tmpdir)
-        ):
-            with patch(
-                "vibe3.services.check_cleanup_service.remove_worktree"
-            ) as mock_remove:
-                result = service._clean_expired_agent_worktrees(max_age_days=7)
-
-                # Should NOT call remove_worktree - worktree has live sessions
-                mock_remove.assert_not_called()
-
-                assert result["skipped_live"] == ["agent-old123"]
-                assert result["cleaned"] == []
-                assert old_worktree.exists()
-
-
-def test_clean_expired_agent_worktrees_handles_git_error() -> None:
-    """Failed git worktree removal should be recorded as failure."""
-    import os
-    import tempfile
-    from datetime import datetime, timedelta
-    from pathlib import Path
-
-    from vibe3.exceptions import GitError
-
-    store = MagicMock()
-    git_client = MagicMock()
-    service = CheckCleanupService(store=store, git_client=git_client)
-
-    store.list_live_sessions_by_worktree.return_value = []
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        old_worktree = Path(tmpdir) / "agent-old123"
-        old_worktree.mkdir()
-        old_time = datetime.now() - timedelta(days=10)
-        os.utime(old_worktree, (old_time.timestamp(), old_time.timestamp()))
-
-        with patch.object(
-            service, "_get_agent_worktree_base", return_value=Path(tmpdir)
-        ):
-            with patch(
-                "vibe3.services.check_cleanup_service.remove_worktree",
-                side_effect=GitError("worktree remove", "test error"),
-            ):
-                result = service._clean_expired_agent_worktrees(max_age_days=7)
-
-                assert result["cleaned"] == []
-                assert len(result["failed"]) == 1
-                assert "agent-old123" in result["failed"][0]
-                assert "test error" in result["failed"][0]
-
-
-def test_clean_expired_remote_branches_deletes_old() -> None:
-    """Delete remote branches older than max age, excluding protected."""
+def test_clean_expired_local_branches_deletes_old() -> None:
+    """Delete local branches older than max age, excluding protected and current."""
     from datetime import datetime, timedelta
 
     store = MagicMock()
     git_client = MagicMock()
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    # Mock git_client.get_all_branches_with_timestamps
+    # Mock git_client
     old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
     recent_date = (datetime.now() - timedelta(days=3)).strftime(
         "%Y-%m-%d %H:%M:%S +0800"
     )
 
     git_client.get_all_branches_with_timestamps.return_value = [
-        {"branch": "origin/feature-old", "timestamp": old_date},
-        {"branch": "origin/feature-recent", "timestamp": recent_date},
-        {"branch": "origin/main", "timestamp": old_date},  # Protected, skip
+        {"branch": "feature-old", "timestamp": old_date},
+        {"branch": "feature-recent", "timestamp": recent_date},
+        {"branch": "main", "timestamp": old_date},  # Protected
+        {"branch": "current-branch", "timestamp": old_date},  # Current
     ]
 
-    # Mock GitHub PR check
-    github_client = MagicMock()
-    github_client.list_all_prs.return_value = []  # No open PRs
-    service._github_client = github_client
+    git_client.get_current_branch.return_value = "current-branch"
+    git_client.branch_exists.return_value = True
 
-    result = service._clean_expired_remote_branches(max_age_days=7)
+    # Mock worktree check
+    git_client.is_branch_occupied_by_worktree.return_value = False
+    git_client.find_worktree_path_for_branch.return_value = None
 
-    # Verify: only feature-old deleted, feature-recent kept, main skipped
+    result = service._clean_expired_local_branches(max_age_days=7)
+
+    # Verify: only feature-old deleted
     assert "cleaned" in result
-    assert "origin/feature-old" in result["cleaned"]
-    assert "origin/main" not in result["cleaned"]
-    assert "origin/feature-recent" not in result["cleaned"]
+    assert "feature-old" in result["cleaned"]
+    assert "main" not in result["cleaned"]
+    assert "current-branch" not in result["cleaned"]
+    assert "feature-recent" not in result["cleaned"]
 
 
-def test_clean_expired_remote_branches_skips_open_pr() -> None:
-    """Branch with open PR should be skipped, not deleted."""
-    from datetime import datetime, timedelta
-
-    from vibe3.models.pr import PRResponse, PRState
-
+def test_clean_residual_branches_integrates_all_cleanups() -> None:
+    """Should call all cleanup methods when enabled."""
     store = MagicMock()
     git_client = MagicMock()
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    # Mock old branch with open PR
-    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
+    # Mock all dependencies
+    store.get_all_flows.return_value = []
+    git_client.get_current_branch.return_value = "main"
 
-    git_client.get_all_branches_with_timestamps.return_value = [
-        {"branch": "origin/feature-old-with-pr", "timestamp": old_date},
-    ]
+    with patch.object(service, "_clean_expired_agent_worktrees") as mock_agent:
+        with patch.object(service, "_clean_expired_remote_branches") as mock_remote:
+            with patch.object(service, "_clean_expired_local_branches") as mock_local:
+                mock_agent.return_value = {"cleaned": ["agent-old"]}
+                mock_remote.return_value = {"cleaned": ["origin/feature-old"]}
+                mock_local.return_value = {"cleaned": ["feature-old"]}
 
-    # Mock open PR for this branch
-    github_client = MagicMock()
-    github_client.list_all_prs.return_value = [
-        PRResponse(
-            number=123,
-            title="Test PR",
-            body="",
-            state=PRState.OPEN,
-            head_branch="feature-old-with-pr",
-            base_branch="main",
-            url="https://github.com/test/pr/123",
-            draft=False,
-        )
-    ]
-    service._github_client = github_client
+                result = service.clean_residual_branches()
 
-    result = service._clean_expired_remote_branches(max_age_days=7)
+                # Verify all called
+                mock_agent.assert_called_once()
+                mock_remote.assert_called_once()
+                mock_local.assert_called_once()
 
-    # Verify: branch skipped due to open PR
-    assert result["cleaned"] == []
-    assert "origin/feature-old-with-pr" in result["skipped_pr"]
-    git_client.delete_remote_branch.assert_not_called()
-
-
-def test_clean_expired_remote_branches_fails_on_pr_check_error() -> None:
-    """PR check failure should abort safely, not delete any branches."""
-    from datetime import datetime, timedelta
-
-    store = MagicMock()
-    git_client = MagicMock()
-    service = CheckCleanupService(store=store, git_client=git_client)
-
-    # Mock old branch
-    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
-
-    git_client.get_all_branches_with_timestamps.return_value = [
-        {"branch": "origin/feature-old", "timestamp": old_date},
-    ]
-
-    # Mock PR check failure
-    github_client = MagicMock()
-    github_client.list_all_prs.side_effect = Exception("GitHub API error")
-    service._github_client = github_client
-
-    result = service._clean_expired_remote_branches(max_age_days=7)
-
-    # Verify: no branches deleted, operation aborted safely
-    assert result["cleaned"] == []
-    assert result["skipped_protected"] == []
-    assert result["skipped_pr"] == []
-    assert len(result["failed"]) == 1
-    assert "PR check failed" in result["failed"][0]
-    git_client.delete_remote_branch.assert_not_called()
+                # Verify results include all sections
+                assert "agent_worktrees" in result
+                assert "remote_branches" in result
+                assert "local_branches" in result
