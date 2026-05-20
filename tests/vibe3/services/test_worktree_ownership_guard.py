@@ -11,7 +11,6 @@ from vibe3.services.worktree_ownership_guard import (
     ensure_worktree_ownership,
     get_current_session_id,
     get_worktree_owner,
-    takeover_worktree,
 )
 
 
@@ -113,8 +112,8 @@ class TestEnsureWorktreeOwnership:
             assert "Current session: vibe3-executor-issue-99" in str(exc_info.value)
             assert "Owner session: vibe3-executor-issue-42" in str(exc_info.value)
 
-    def test_raises_with_actionable_message(self) -> None:
-        """Error message includes takeover instructions."""
+    def test_raises_with_clean_message_no_takeover(self) -> None:
+        """Error message does not suggest takeover, only waiting."""
         mock_store = MagicMock()
         mock_store.get_worktree_owner_session.return_value = {
             "id": 1,
@@ -129,81 +128,14 @@ class TestEnsureWorktreeOwnership:
                 ensure_worktree_ownership(mock_store, "/path/to/worktree")
 
             error_msg = str(exc_info.value)
-            assert "vibe3 task resume --takeover" in error_msg
-
-    def test_passes_outside_tmux(self) -> None:
-        """Outside tmux (direct user), always passes."""
-        mock_store = MagicMock()
-        mock_store.get_worktree_owner_session.return_value = {
-            "id": 1,
-            "tmux_session": "vibe3-executor-issue-42",
-            "session_name": "manager-123",
-        }
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = FileNotFoundError("tmux not found")
-            # Should not raise
-            ensure_worktree_ownership(mock_store, "/path/to/worktree")
-
-    def test_allows_takeover_when_requested(self) -> None:
-        """When allow_takeover=True, takeover is performed."""
-        mock_store = MagicMock()
-        mock_store.get_worktree_owner_session.return_value = {
-            "id": 1,
-            "tmux_session": "vibe3-executor-issue-42",
-            "session_name": "manager-123",
-        }
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value.stdout = "vibe3-executor-issue-99\n"
-            with patch(
-                "vibe3.services.worktree_ownership_guard.takeover_worktree"
-            ) as mock_takeover:
-                # Should not raise
-                ensure_worktree_ownership(
-                    mock_store,
-                    "/path/to/worktree",
-                    allow_takeover=True,
-                    takeover_reason="test",
-                )
-
-                # Verify takeover was called
-                mock_takeover.assert_called_once_with(
-                    mock_store,
-                    "/path/to/worktree",
-                    "vibe3-executor-issue-99",
-                    "test",
-                )
+            assert "vibe3 task resume --takeover" not in error_msg
+            assert "Wait for that session to finish" in error_msg
 
 
-class TestTakeoverWorktree:
-    """Tests for takeover_worktree."""
+class TestTakeoverWorktree:  # pyright: ignore[reportUnusedClass]
+    """Tests for takeover_worktree.
 
-    def test_logs_event_and_updates_owner(self) -> None:
-        """Takeover creates event and updates session binding."""
-        mock_store = MagicMock()
-        mock_store.get_worktree_owner_session.return_value = {
-            "id": 1,
-            "tmux_session": "vibe3-executor-issue-42",
-            "session_name": "manager-123",
-        }
+    This class is intentionally empty - takeover functionality has been removed.
+    """
 
-        with patch("vibe3.services.signature_service.SignatureService") as mock_sig:
-            mock_sig.get_worktree_actor.return_value = "test-actor"
-
-            takeover_worktree(
-                mock_store,
-                "/path/to/worktree",
-                "vibe3-executor-issue-99",
-                "test takeover",
-            )
-
-            # Verify event was logged
-            mock_store.add_event.assert_called_once()
-            call_args = mock_store.add_event.call_args
-            assert call_args[0][1] == "worktree_takeover"
-
-            # Verify session was updated
-            mock_store.update_runtime_session.assert_called_once_with(
-                1, tmux_session="vibe3-executor-issue-99"
-            )
+    pass
