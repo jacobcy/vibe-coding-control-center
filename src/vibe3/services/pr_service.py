@@ -51,6 +51,44 @@ class PRService:
         self.loc_comment_service = loc_comment_service or PRLocCommentService(
             self.github_client
         )
+        self._open_pr_cache: dict[str, PRResponse] = {}
+
+    def refresh_open_pr_cache(self) -> dict[str, PRResponse]:
+        """Batch refresh open-PR cache and update branch context cache.
+
+        Returns:
+            Mapping of head_branch -> open PR.
+        """
+        from vibe3.services.issue_title_cache_service import IssueTitleCacheService
+
+        open_prs = self.github_client.list_all_prs(state="open")
+        branch_to_pr = {pr.head_branch: pr for pr in open_prs}
+        self._open_pr_cache = branch_to_pr
+
+        title_cache = IssueTitleCacheService(self.store)
+        for pr in branch_to_pr.values():
+            title_cache.update_pr(
+                branch=pr.head_branch,
+                pr_number=pr.number,
+                pr_title=pr.title,
+            )
+
+        return branch_to_pr
+
+    def get_open_pr_for_branch(
+        self,
+        branch: str,
+        *,
+        refresh: bool = True,
+    ) -> PRResponse | None:
+        """Return the current open PR for a branch, if any.
+
+        Args:
+            branch: Head branch name.
+            refresh: Whether to batch refresh the open-PR cache first.
+        """
+        cache = self.refresh_open_pr_cache() if refresh else self._open_pr_cache
+        return cache.get(branch)
 
     def create_pr(
         self,

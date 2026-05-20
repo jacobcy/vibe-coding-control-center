@@ -188,3 +188,67 @@ def test_pr_create_appends_handoff_update() -> None:
             events = store.get_events("feature-branch")
             pr_events = [e for e in events if "pr" in e["event_type"].lower()]
             assert len(pr_events) > 0, "PR event should be recorded"
+
+
+def test_refresh_open_pr_cache_updates_branch_cache_entries() -> None:
+    """Batch open PR refresh should update flow_context_cache for each branch."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("feature-one", flow_slug="one")
+        store.update_flow_state("feature-two", flow_slug="two")
+
+        open_prs = [
+            PRResponse(
+                number=101,
+                title="Feature one PR",
+                body="Body",
+                state=PRState.OPEN,
+                head_branch="feature-one",
+                base_branch="main",
+                url="https://github.com/test/pr/101",
+                draft=False,
+                is_ready=True,
+                ci_passed=False,
+                created_at=None,
+                updated_at=None,
+                merged_at=None,
+                metadata=None,
+            ),
+            PRResponse(
+                number=102,
+                title="Feature two draft",
+                body="Body",
+                state=PRState.OPEN,
+                head_branch="feature-two",
+                base_branch="main",
+                url="https://github.com/test/pr/102",
+                draft=True,
+                is_ready=False,
+                ci_passed=False,
+                created_at=None,
+                updated_at=None,
+                merged_at=None,
+                metadata=None,
+            ),
+        ]
+
+        github_client = MagicMock()
+        github_client.list_all_prs.return_value = open_prs
+
+        service = PRService(github_client=github_client, store=store)
+        branch_to_pr = service.refresh_open_pr_cache()
+
+        assert set(branch_to_pr) == {"feature-one", "feature-two"}
+        assert branch_to_pr["feature-one"].number == 101
+        assert branch_to_pr["feature-two"].number == 102
+
+        cache_one = store.get_flow_context_cache("feature-one")
+        cache_two = store.get_flow_context_cache("feature-two")
+        assert cache_one is not None
+        assert cache_two is not None
+        assert cache_one["pr_number"] == 101
+        assert cache_one["pr_title"] == "Feature one PR"
+        assert cache_two["pr_number"] == 102
+        assert cache_two["pr_title"] == "Feature two draft"

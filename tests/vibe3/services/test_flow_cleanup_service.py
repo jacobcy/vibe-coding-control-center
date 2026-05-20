@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.flow_cleanup_service import (
     FlowCleanupService,
     LiveSessionsDetectedError,
@@ -57,3 +58,40 @@ def test_cleanup_flow_scene_aborts_when_live_sessions_exist() -> None:
         delete_remote_branch.assert_not_called()
         clear_handoff.assert_not_called()
         handle_flow_record.assert_not_called()
+
+
+def test_delete_remote_branch_skips_when_open_pr_exists() -> None:
+    """Remote branch deletion must be skipped when branch still has an open PR."""
+    service = FlowCleanupService(
+        git_client=MagicMock(),
+        store=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+    service.git_client.delete_remote_branch = MagicMock()
+    service._pr_service = MagicMock()
+
+    open_pr = PRResponse(
+        number=321,
+        title="Keep remote branch",
+        body="Body",
+        state=PRState.OPEN,
+        head_branch="task/issue-321",
+        base_branch="main",
+        url="https://github.com/test/pr/321",
+        draft=False,
+        is_ready=True,
+        ci_passed=False,
+        created_at=None,
+        updated_at=None,
+        merged_at=None,
+        metadata=None,
+    )
+
+    results = {"remote_branch": True}
+
+    with patch.object(service, "_has_remote_branch", return_value=True):
+        service._pr_service.get_open_pr_for_branch.return_value = open_pr
+        service._delete_remote_branch("task/issue-321", results)
+
+    service.git_client.delete_remote_branch.assert_not_called()
+    assert results["remote_branch"] is True
