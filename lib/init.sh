@@ -8,89 +8,22 @@ _log_success() { echo "${GREEN}✅ $1${NC}"; }
 _log_warning() { echo "${YELLOW}⚠️  $1${NC}"; }
 _log_error() { echo "${RED}❌ $1${NC}" >&2; }
 
-# --- Help Function ---
-vibe_init_help() {
-    echo "${BOLD}vibe init${NC} - Project Initialization"
-    echo ""
-    echo "此命令负责项目运行环境初始化，支持不同 profile："
-    echo "  1. 检查 git 环境"
-    echo "  2. 根据 profile 创建必要的目录结构"
-    echo "  3. 根据 profile 创建 GitHub labels"
-    echo "  4.根据 profile 分别创建 skills/ 目录和 .claude/skills 全局符号链接"
-    echo "  5. 生成 .vibe/config.yaml 配置文件"
-    echo "  6. 验证项目运行支持（minimal/github-flow 自动生成 CLAUDE.md 模板；vibe-center 保留 AGENTS.md 检查）"
-    echo ""
-    echo "Usage: ${CYAN}vibe init${NC} [options]"
-    echo ""
-    echo "Options:"
-    echo "  -h, --help              显示此帮助信息"
-    echo "  -p, --profile <name>    选择初始化 profile (minimal|github-flow|vibe-center)"
-    echo "  -l, --list-profiles     列出所有可用 profiles"
-    echo "  -y, --yes               跳过确认提示"
-    echo "  --skip-labels           跳过 GitHub labels 创建（仅在需要 labels 的 profile 中生效）"
-    echo ""
-    echo "Profiles:"
-    echo "  ${GREEN}minimal${NC}        - 最小运行时，不启用 GitHub orchestration"
-    echo "  ${GREEN}github-flow${NC}    - GitHub issue/PR/label 协议"
-    echo "  ${GREEN}vibe-center${NC}    - 完整 Vibe Center distribution"
-    echo ""
-    echo "Examples:"
-    echo "  ${CYAN}vibe init --profile minimal${NC}           最小初始化"
-    echo "  ${CYAN}vibe init --profile github-flow${NC}       GitHub flow 初始化"
-    echo "  ${CYAN}vibe init --profile vibe-center${NC}       Vibe Center 初始化"
-    echo ""
-}
-
+# --- Help Function (sourced from init_help.sh) ---
+source "$(cd "$(dirname "${(%):-%x:A}")" && pwd)/init_help.sh"
 # --- Template Generation Function ---
 _generate_claude_md() {
     local profile_name="$1"
     local repo_root="$2"
     local output_file="$repo_root/CLAUDE.md"
 
-    if [[ "$profile_name" == "minimal" ]]; then
-        cat > "$output_file" <<'EOF'
-# Project Context
+    local template_dir
+    template_dir="$(cd "$(dirname "${(%):-%x:A}")" && pwd)/templates/claude_md"
+    local template_file="$template_dir/${profile_name}.md"
 
-This project uses vibe3 for development workflow automation.
-
-## Available Commands
-
-- `vibe init` - Initialize project configuration
-- `vibe3 flow` - Execute development workflows
-
-## Profile: minimal
-
-Minimal runtime without GitHub orchestration.
-
-## Reference
-
-- Policies and prompts: `~/.vibe/`
-EOF
-    elif [[ "$profile_name" == "github-flow" ]]; then
-        cat > "$output_file" <<'EOF'
-# Project Context
-
-This project uses vibe3 for development workflow automation with GitHub integration.
-
-## Available Commands
-
-- `vibe init` - Initialize project configuration
-- `vibe3 flow` - Execute development workflows
-- `vibe3 task` - Manage development tasks
-
-## Profile: github-flow
-
-GitHub issue/PR/label orchestration enabled.
-
-## Branch Conventions
-
-- `task/issue-<id>` - Automated task branches
-- `dev/issue-<id>` - Development branches
-
-## Reference
-
-- Policies and prompts: `~/.vibe/`
-EOF
+    if [[ -f "$template_file" ]]; then
+        cp "$template_file" "$output_file"
+    else
+        _log_warning "Template not found: $template_file (skipping CLAUDE.md generation)"
     fi
 }
 

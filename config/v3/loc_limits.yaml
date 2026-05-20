@@ -129,6 +129,9 @@ code_limits:
       - path: "lib/keys_support.sh"
         limit: 500
         reason: "Keys 工具函数集合（trim、plugin scope hint 等），职责单一但函数较多"
+      - path: "lib/init.sh"
+        limit: 500
+        reason: "项目初始化入口聚合，包含 profile 初始化、目录创建、GitHub labels 创建、CLAUDE.md 模板生成等紧密耦合逻辑，内嵌模板文本膨胀导致超标"
       - path: "scripts/tsu.sh"
         limit: 900
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
