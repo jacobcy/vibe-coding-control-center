@@ -2,7 +2,8 @@
 
 This service is separated from check_service.py to keep responsibilities clear:
 - check_service.py: Consistency verification and auto-fix
-- check_cleanup_service.py: Physical resource cleanup for terminal flows
+- check_cleanup_service.py: Terminal flow cleanup
+- expired_resource_cleanup_service.py: Expired resource cleanup
 """
 
 from __future__ import annotations
@@ -10,12 +11,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from loguru import logger
-
-from vibe3.services.check_cleanup_expired_resources import (
-    clean_expired_agent_worktrees,
-    clean_expired_local_branches,
-    clean_expired_remote_branches,
-)
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -59,6 +54,9 @@ class CheckCleanupService:
             Dict with summary and details of cleaned branches.
         """
         from vibe3.config.settings import VibeConfig
+        from vibe3.services.expired_resource_cleanup_service import (
+            ExpiredResourceCleanupService,
+        )
 
         # Existing: terminal flow cleanup
         results = self._clean_terminal_flows()
@@ -67,18 +65,24 @@ class CheckCleanupService:
         config = VibeConfig.get_defaults()
         cleanup_config = config.check_cleanup
 
+        expired_service = ExpiredResourceCleanupService(
+            store=self.store,
+            git_client=self.git_client,
+            github_client=self._github_client,
+        )
+
         if cleanup_config.enable_agent_worktree_cleanup:
-            results["agent_worktrees"] = self._clean_expired_agent_worktrees(
+            results["agent_worktrees"] = expired_service.clean_expired_agent_worktrees(
                 max_age_days=cleanup_config.agent_worktree_max_age_days
             )
 
         if cleanup_config.enable_remote_branch_cleanup:
-            results["remote_branches"] = self._clean_expired_remote_branches(
+            results["remote_branches"] = expired_service.clean_expired_remote_branches(
                 max_age_days=cleanup_config.remote_branch_max_age_days
             )
 
         if cleanup_config.enable_local_branch_cleanup:
-            results["local_branches"] = self._clean_expired_local_branches(
+            results["local_branches"] = expired_service.clean_expired_local_branches(
                 max_age_days=cleanup_config.local_branch_max_age_days
             )
 
@@ -370,6 +374,7 @@ class CheckCleanupService:
 
         match = re.fullmatch(r"^task/issue-(\d+)$", branch)
         return int(match.group(1)) if match else None
+<<<<<<< HEAD
 
     def _clean_expired_agent_worktrees(
         self, max_age_days: int = 7
@@ -394,3 +399,5 @@ class CheckCleanupService:
             get_live_branches=self._get_branches_with_live_sessions,
             max_age_days=max_age_days,
         )
+=======
+>>>>>>> 30d83386 (refactor(check): split expired resource cleanup into separate service and update loc_limits)

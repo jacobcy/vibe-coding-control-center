@@ -3,6 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.services.check_cleanup_service import CheckCleanupService
+from vibe3.services.expired_resource_cleanup_service import (
+    ExpiredResourceCleanupService,
+)
 
 
 def test_clean_residual_branches_filters_live_sessions_before_cleanup() -> None:
@@ -140,7 +143,7 @@ def test_clean_expired_local_branches_deletes_old() -> None:
 
     store = MagicMock()
     git_client = MagicMock()
-    service = CheckCleanupService(store=store, git_client=git_client)
+    service = ExpiredResourceCleanupService(store=store, git_client=git_client)
 
     # Mock git_client
     old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
@@ -162,7 +165,7 @@ def test_clean_expired_local_branches_deletes_old() -> None:
     git_client.is_branch_occupied_by_worktree.return_value = False
     git_client.find_worktree_path_for_branch.return_value = None
 
-    result = service._clean_expired_local_branches(max_age_days=7)
+    result = service.clean_expired_local_branches(max_age_days=7)
 
     # Verify: only feature-old deleted
     assert "cleaned" in result
@@ -210,9 +213,15 @@ def test_clean_residual_branches_integrates_all_cleanups() -> None:
     store.get_all_flows.return_value = []
     git_client.get_current_branch.return_value = "main"
 
-    with patch.object(service, "_clean_expired_agent_worktrees") as mock_agent:
-        with patch.object(service, "_clean_expired_remote_branches") as mock_remote:
-            with patch.object(service, "_clean_expired_local_branches") as mock_local:
+    with patch.object(
+        ExpiredResourceCleanupService, "clean_expired_agent_worktrees"
+    ) as mock_agent:
+        with patch.object(
+            ExpiredResourceCleanupService, "clean_expired_remote_branches"
+        ) as mock_remote:
+            with patch.object(
+                ExpiredResourceCleanupService, "clean_expired_local_branches"
+            ) as mock_local:
                 mock_agent.return_value = {"cleaned": ["agent-old"]}
                 mock_remote.return_value = {"cleaned": ["origin/feature-old"]}
                 mock_local.return_value = {"cleaned": ["feature-old"]}
