@@ -173,7 +173,7 @@ def test_clean_expired_local_branches_deletes_old() -> None:
 
 
 def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
-    """Remote cleanup should handle git timestamps from non-+0800 environments."""
+    """Remote cleanup should handle git timestamps with or without timezone colon."""
     from datetime import datetime, timedelta, timezone
 
     store = MagicMock()
@@ -186,15 +186,18 @@ def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
     old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
         "%Y-%m-%d %H:%M:%S +0000"
     )
+    old_date_with_colon = old_date[:-2] + ":" + old_date[-2:]
     git_client.get_all_branches_with_timestamps.return_value = [
         {"branch": "origin/feature-old", "timestamp": old_date},
+        {"branch": "origin/feature-colon", "timestamp": old_date_with_colon},
     ]
     github_client.list_all_prs.return_value = []
 
     result = service._clean_expired_remote_branches(max_age_days=7)
 
-    assert result["cleaned"] == ["origin/feature-old"]
-    git_client.delete_remote_branch.assert_called_once_with("feature-old")
+    assert result["cleaned"] == ["origin/feature-old", "origin/feature-colon"]
+    git_client.delete_remote_branch.assert_any_call("feature-old")
+    git_client.delete_remote_branch.assert_any_call("feature-colon")
 
 
 def test_clean_residual_branches_integrates_all_cleanups() -> None:

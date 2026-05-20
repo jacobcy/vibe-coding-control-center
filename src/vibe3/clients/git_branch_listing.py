@@ -40,7 +40,5 @@ def get_all_branches_with_timestamps(
         if len(parts) != 2:
             continue
         branch, timestamp = parts
-        if branch.endswith("/HEAD"):
-            continue
         branches.append({"branch": branch, "timestamp": timestamp})
     return branches

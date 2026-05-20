@@ -233,7 +233,7 @@ def clean_expired_local_branches(
 
 
 def _parse_git_timestamp(timestamp_str: str) -> datetime:
-    normalized = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", timestamp_str.strip())
+    normalized = re.sub(r"([+-]\d{2}):?(\d{2})$", r"\1:\2", timestamp_str.strip())
     return datetime.fromisoformat(normalized)
 
 
