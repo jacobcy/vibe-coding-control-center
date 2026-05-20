@@ -530,3 +530,158 @@ class CheckCleanupService:
             "skipped_pr": skipped_pr,
             "failed": failed,
         }
+
+    def _clean_expired_local_branches(self, max_age_days: int = 7) -> dict[str, object]:
+        """Clean expired local non-protected branches older than max_age_days.
+
+        Safety checks:
+        - Exclude protected branches (main, master, develop)
+        - Exclude current branch
+        - Check for live session
+        - Check for worktree occupation
+        - Check branch age
+
+        Args:
+            max_age_days: Max age in days before cleanup (default: 7)
+
+        Returns:
+            Dict with 'cleaned', 'skipped_protected', 'skipped_current',
+            'skipped_live', 'skipped_worktree', 'failed' lists
+        """
+        from datetime import datetime, timedelta, timezone
+
+        logger.bind(domain="check", action="clean_local_branches").info(
+            f"Checking local branches older than {max_age_days} days"
+        )
+
+        # Load protected branches from config
+        from vibe3.config.settings import VibeConfig
+
+        config = VibeConfig.get_defaults()
+        protected = set(config.flow.protected_branches)
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+
+        cleaned: list[str] = []
+        skipped_protected: list[str] = []
+        skipped_current: list[str] = []
+        skipped_live: list[str] = []
+        skipped_worktree: list[str] = []
+        failed: list[str] = []
+
+        # Get current branch
+        try:
+            current_branch = self.git_client.get_current_branch()
+        except Exception as exc:
+            logger.bind(domain="check").error(f"Failed to get current branch: {exc}")
+            return {
+                "cleaned": [],
+                "skipped_protected": [],
+                "skipped_current": [],
+                "skipped_live": [],
+                "skipped_worktree": [],
+                "failed": [str(exc)],
+            }
+
+        # Get branches with live sessions
+        try:
+            branches_with_live = self._get_branches_with_live_sessions()
+        except SystemError:
+            logger.bind(domain="check").error(
+                "Failed to get live sessions, skipping local branch cleanup"
+            )
+            return {
+                "cleaned": [],
+                "skipped_protected": [],
+                "skipped_current": [],
+                "skipped_live": [],
+                "skipped_worktree": [],
+                "failed": ["live session query failed"],
+            }
+
+        # Get all local branches with timestamps
+        try:
+            local_branches = self.git_client.get_all_branches_with_timestamps(
+                remote=False
+            )
+        except Exception as exc:
+            logger.bind(domain="check").error(f"Failed to get local branches: {exc}")
+            return {
+                "cleaned": [],
+                "skipped_protected": [],
+                "skipped_current": [],
+                "skipped_live": [],
+                "skipped_worktree": [],
+                "failed": [str(exc)],
+            }
+
+        # Process each branch
+        for branch_info in local_branches:
+            branch = branch_info["branch"]
+            timestamp_str = branch_info["timestamp"]
+
+            try:
+                # Parse timestamp
+                timestamp = datetime.fromisoformat(
+                    timestamp_str.replace(" +0800", "+08:00")
+                )
+
+                # Skip protected branches
+                if branch in protected:
+                    skipped_protected.append(branch)
+                    continue
+
+                # Skip current branch
+                if branch == current_branch:
+                    skipped_current.append(branch)
+                    continue
+
+                # Skip if has live session
+                if branch in branches_with_live:
+                    skipped_live.append(branch)
+                    logger.bind(domain="check", branch=branch).info(
+                        "Skipped local branch with live session"
+                    )
+                    continue
+
+                # Check age
+                if timestamp >= cutoff:
+                    continue
+
+                # Check if branch exists
+                if not self.git_client.branch_exists(branch):
+                    continue
+
+                # Check if has worktree
+                if self.git_client.is_branch_occupied_by_worktree(branch):
+                    # Delete worktree first
+                    worktree_path = self.git_client.find_worktree_path_for_branch(
+                        branch
+                    )
+                    if worktree_path:
+                        remove_worktree(worktree_path, force=True)
+                        logger.bind(domain="check", branch=branch).info(
+                            f"Deleted worktree at {worktree_path}"
+                        )
+
+                # Delete local branch
+                self.git_client.delete_branch(branch, force=False)
+                cleaned.append(branch)
+                logger.bind(domain="check", branch=branch).info(
+                    "Deleted expired local branch"
+                )
+
+            except Exception as exc:
+                failed.append(f"{branch}: {exc}")
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to clean local branch: {exc}"
+                )
+
+        return {
+            "cleaned": cleaned,
+            "skipped_protected": skipped_protected,
+            "skipped_current": skipped_current,
+            "skipped_live": skipped_live,
+            "skipped_worktree": skipped_worktree,
+            "failed": failed,
+        }
