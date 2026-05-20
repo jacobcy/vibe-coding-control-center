@@ -38,7 +38,11 @@ from vibe3.orchestra.queue_persistence_mixin import (
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.label_utils import clean_old_state_labels, should_skip_from_queue
+from vibe3.utils.label_utils import (
+    clean_old_state_labels,
+    normalize_labels,
+    should_skip_from_queue,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -94,6 +98,33 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 label=state.to_label(),
             ),
         )
+
+        # BLOCKED bypass: skip qualify gate so falsely-unblocked issues
+        # enter the queue.  Qualification is deferred to
+        # qualify_blocked_issue() at dispatch time (coordinate()).
+        if state == IssueState.BLOCKED:
+            selected: list[IssueInfo] = []
+            for item in raw_issues:
+                labels = normalize_labels(item.get("labels"))
+                if not any(lbl.startswith("state/") for lbl in labels):
+                    continue
+                issue = IssueInfo.from_github_payload(item)
+                if issue is None:
+                    continue
+                if should_skip_from_queue(
+                    issue,
+                    supervisor_label=self._supervisor_label,
+                    manager_usernames=self._config.get_manager_usernames(),
+                    require_manager_assignee=True,
+                ):
+                    continue
+                selected.append(issue)
+            append_orchestra_event(
+                "dispatcher",
+                f"poll_issues_by_state({state.value}): "
+                f"{len(selected)} ready issues (bypassed qualify gate)",
+            )
+            return selected
 
         ready = select_ready_issues(
             raw_issues,

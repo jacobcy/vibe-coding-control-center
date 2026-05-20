@@ -211,6 +211,66 @@ class TestStateTransitions:
 
         assert len(emit_calls) == 1
 
+    @pytest.mark.asyncio
+    async def test_falsely_blocked_issue_dispatches_after_qualify(
+        self,
+        make_capacity,
+        make_coordinator,
+        make_issue_info,
+    ) -> None:
+        """Falsely-blocked issue is dispatched after qualify_blocked_issue (#1125)."""
+        capacity = make_capacity(remaining=1)
+
+        coordinator = make_coordinator(
+            "manager",
+            [],
+            capacity=capacity,
+            mock_health_check=True,
+        )
+
+        # Create raw payload for falsely-blocked issue
+        # (label says blocked, but qualify gate determines it should be ready)
+        raw_payload = {
+            "number": 100,
+            "title": "Falsely Blocked Issue",
+            "labels": [{"name": "state/blocked"}],
+            "assignees": [{"login": "manager-bot"}],
+            "html_url": "https://github.com/owner/repo/issues/100",
+        }
+
+        def mock_list_issues(**kwargs):
+            if kwargs.get("label") == "state/blocked":
+                return [raw_payload]
+            return []
+
+        coordinator._github.list_issues = mock_list_issues
+
+        # Mock qualify_blocked_issue to return READY (unblocked)
+        def mock_qualify(issue) -> IssueState | None:
+            assert issue.number == 100
+            return IssueState.READY
+
+        coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+
+        # Mock _load_issue to return the issue with BLOCKED label
+        coordinator._load_issue = lambda issue_number: make_issue_info(
+            issue_number,
+            IssueState.BLOCKED,
+            labels=["state/blocked"],
+        )
+
+        emit_calls = []
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id=0: emit_calls.append((role, issue))
+        )
+
+        await coordinator.coordinate()
+
+        # Falsely-blocked issue should be dispatched to manager role
+        assert len(emit_calls) == 1
+        assert emit_calls[0][1].number == 100
+        assert emit_calls[0][0].registry_role == "manager"
+
 
 class TestLoggingBehavior:
     @pytest.mark.asyncio
