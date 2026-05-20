@@ -47,25 +47,31 @@ def governance_dry_run_dir(repo_root: Path | None = None) -> Path:
 # Module-level persistent file handle for events.log
 # Avoids opening/closing on every tick, preventing FD exhaustion
 _events_handle: IO[str] | None = None
+_events_path: Path | None = None  # Track current log path to detect repo_root changes
 
 
-def _open_events_log(repo_root: Path | None = None) -> IO[str]:
-    """Open events.log in append mode, creating parent dirs if needed."""
+def _open_events_log(repo_root: Path | None = None) -> tuple[IO[str], Path]:
+    """Open events.log in append mode, creating parent dirs if needed.
+
+    Returns:
+        Tuple of (file handle, resolved path) to enable path tracking
+    """
     path = orchestra_events_log_path(repo_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = path.open("a", encoding="utf-8")
-    return handle
+    return handle, path
 
 
 def _close_events_log() -> None:
     """Close the persistent events log handle."""
-    global _events_handle
+    global _events_handle, _events_path
     if _events_handle is not None:
         try:
             _events_handle.close()
         except Exception:
             pass
         _events_handle = None
+        _events_path = None
 
 
 atexit.register(_close_events_log)
@@ -85,6 +91,9 @@ def append_orchestra_event(
 
     Uses a module-level persistent file handle to avoid FD exhaustion
     from repeated open/close on every heartbeat tick.
+
+    Returns:
+        Path to the events.log file (consistent return type)
     """
     if os.environ.get("VIBE3_ORCHESTRA_EVENT_LOG") != "1":
         return orchestra_events_log_path(repo_root)
@@ -95,9 +104,18 @@ def append_orchestra_event(
     if levels.get(level.upper(), 1) < levels.get(current_level, 1):
         return orchestra_events_log_path(repo_root)
 
-    global _events_handle
-    if _events_handle is None:
-        _events_handle = _open_events_log(repo_root)
+    # Get target path and check if we need to reopen
+    target_path = orchestra_events_log_path(repo_root)
+    global _events_handle, _events_path
+
+    # Reopen if handle is None or path changed (different repo_root)
+    if _events_handle is None or _events_path != target_path:
+        if _events_handle is not None:
+            try:
+                _events_handle.close()
+            except Exception:
+                pass
+        _events_handle, _events_path = _open_events_log(repo_root)
 
     timestamp = datetime.now().isoformat(timespec="seconds")
     if not message:
@@ -105,7 +123,7 @@ def append_orchestra_event(
     else:
         _events_handle.write(f"[{timestamp}] [{component}] {message}\n")
     _events_handle.flush()
-    return _events_handle.name  # type: ignore[return-value]
+    return _events_path
 
 
 def append_orchestra_run_separator(
@@ -117,18 +135,30 @@ def append_orchestra_run_separator(
 
     Uses append mode to keep previous runs instead of overwriting.
     Uses the persistent file handle to avoid FD exhaustion.
+
+    Returns:
+        Path to the events.log file (consistent return type)
     """
     if os.environ.get("VIBE3_ORCHESTRA_EVENT_LOG") != "1":
         return orchestra_events_log_path(repo_root)
 
-    global _events_handle
-    if _events_handle is None:
-        _events_handle = _open_events_log(repo_root)
+    # Reuse append_orchestra_event logic for consistent path handling
+    # (includes path change detection and handle management)
+    target_path = orchestra_events_log_path(repo_root)
+    global _events_handle, _events_path
+
+    if _events_handle is None or _events_path != target_path:
+        if _events_handle is not None:
+            try:
+                _events_handle.close()
+            except Exception:
+                pass
+        _events_handle, _events_path = _open_events_log(repo_root)
 
     timestamp = datetime.now().isoformat(timespec="seconds")
     _events_handle.write(f"\n========== {title} @ {timestamp} ==========\n")
     _events_handle.flush()
-    return _events_handle.name  # type: ignore[return-value]
+    return _events_path
 
 
 def append_governance_event(message: str, *, repo_root: Path | None = None) -> Path:
