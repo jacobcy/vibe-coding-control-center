@@ -337,3 +337,100 @@ class TestQueueOperations:
         await coordinator.coordinate()
 
         assert len(emit_calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_blocked_issues_collected_without_qualify_gate(
+        self, make_capacity, make_coordinator, make_issue_info
+    ) -> None:
+        """BLOCKED issues bypass qualify gate during collection (#1125)."""
+        capacity = make_capacity(remaining=2)
+
+        coordinator = make_coordinator(
+            "manager",
+            [],  # No issues from standard poll path
+            capacity=capacity,
+            mock_health_check=True,
+        )
+
+        # Create raw GitHub payloads for BLOCKED issues
+        raw_payloads = [
+            {
+                "number": 100,
+                "title": "Issue 100",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "html_url": "https://github.com/owner/repo/issues/100",
+            },
+            {
+                "number": 101,
+                "title": "Issue 101",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "html_url": "https://github.com/owner/repo/issues/101",
+            },
+            # Supervisor-labeled issue should be filtered out
+            {
+                "number": 102,
+                "title": "Issue 102",
+                "labels": [{"name": "supervisor"}, {"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "html_url": "https://github.com/owner/repo/issues/102",
+            },
+        ]
+
+        # Mock GitHub API to return raw payloads for BLOCKED state
+        def mock_list_issues(**kwargs):
+            if kwargs.get("label") == "state/blocked":
+                return raw_payloads
+            return []
+
+        coordinator._github.list_issues = mock_list_issues
+
+        # Directly test _poll_issues_by_state for BLOCKED state
+        blocked_issues = await coordinator._poll_issues_by_state(IssueState.BLOCKED)
+
+        # Should return 2 issues (100 and 101), filtering out supervisor-labeled 102
+        assert len(blocked_issues) == 2
+        assert {issue.number for issue in blocked_issues} == {100, 101}
+
+        # Verify both issues have BLOCKED state
+        for issue in blocked_issues:
+            assert issue.state == IssueState.BLOCKED
+
+    @pytest.mark.asyncio
+    async def test_blocked_supervisor_issues_excluded_from_collection(
+        self, make_capacity, make_coordinator, make_issue_info
+    ) -> None:
+        """Supervisor-labeled BLOCKED issues are excluded during collection."""
+        capacity = make_capacity(remaining=1)
+
+        coordinator = make_coordinator(
+            "manager",
+            [],
+            capacity=capacity,
+            mock_health_check=True,
+        )
+
+        # Create raw payload with supervisor label
+        raw_payloads = [
+            {
+                "number": 102,
+                "title": "Issue 102",
+                "labels": [{"name": "supervisor"}, {"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "html_url": "https://github.com/owner/repo/issues/102",
+            }
+        ]
+
+        def mock_list_issues(**kwargs):
+            if kwargs.get("label") == "state/blocked":
+                return raw_payloads
+            return []
+
+        coordinator._github.list_issues = mock_list_issues
+
+        # Directly test _poll_issues_by_state for BLOCKED state
+        blocked_issues = await coordinator._poll_issues_by_state(IssueState.BLOCKED)
+
+        # Supervisor issue should be filtered out during collection
+        assert len(blocked_issues) == 0
