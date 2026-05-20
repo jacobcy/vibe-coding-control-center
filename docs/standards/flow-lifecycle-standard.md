@@ -176,7 +176,8 @@ def block_flow(
 def mark_flow_aborted(self, branch: str, reason: str) -> None
 ```
 
-- **终端状态**：flow 记录软删除（`deleted_at` 设定）
+- **终端状态**：flow 状态标记为 `aborted`
+- **软删除**：由下游 `vibe3 check --clean-branch` → `cleanup_flow_scene` → `soft_delete_flow()` 处理
 - **事件类型**：`flow_auto_aborted`
 - **GitHub label 处理**：⚠️ 当前实现未显式处理 task issue label 变更（实现缺口）
 - **恢复**：下一轮 collect 不会重新拾取（issue 已 closed）；若 issue 重新打开，由 health check 处理
@@ -208,13 +209,15 @@ def mark_flow_stale(self, branch: str, reason: str) -> None
 
 QualifyGate 通过 `CoordinationTruth.is_blocked` 判断阻塞状态，其真源为 issue body projection 而非仅本地 DB。
 
-**恢复判定顺序**：
+**决策流程**：
 
-1. **检查 `blocked_reason`** — 若存在，保持 blocked（手动阻塞优先级最高）
-2. **检查 `blocked_by_issue`** — 若存在且 issue body 中仍有阻塞信息，保持 blocked
-3. **检查 dependency links** — 若所有依赖 issue 在 GitHub 上已 closed，自动解封
+1. **`resolve_coordination`** — 合并 remote issue body + local DB 出 `CoordinationTruth`
+2. **`is_blocked` 综合判断** — 任一为真即 blocked：`projection_state == 'blocked'` OR `blocked_reason` OR `blocked_by_issue`
+3. **若 blocked** → `_align_blocked_state` 并跳过（不继续后续检查）
+4. **若 NOT blocked 但 local/label stale** → `_auto_resume_blocked`（清除 local blocked 缓存，移除 label）
+5. **通过后运行 `_check_dependencies`** — 结构检查（非恢复判定）
 
-**自动解封副作用**：
+**自动解封副作用**（由 `_auto_resume_blocked` 执行）：
 
 - 清除 `blocked_by_issue`、`blocked_reason`
 - 写入 `flow_unblocked` 事件
