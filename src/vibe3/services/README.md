@@ -105,7 +105,6 @@
 | abandon_flow_service.py | 156 | 放弃 flow 编排 |
 | base_resolution_usecase.py | 129 | base 分支解析 |
 | verdict_service.py | 184 | 裁决服务 |
-| worktree_ownership_guard.py | 177 | Worktree 所有权守卫 |
 | external_events.py | 196 | 外部事件处理 |
 | artifact_parser.py | 82 | 工件解析器 |
 | __init__.py | 5 | 模块导出 |
