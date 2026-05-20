@@ -134,8 +134,8 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
             assert result["skipped_live"] == []
 
 
-def test_clean_expired_agent_worktrees_deletes_old_dirs() -> None:
-    """Should delete agent worktrees older than max age."""
+def test_clean_expired_agent_worktrees_removes_old_worktrees() -> None:
+    """Expired agent worktrees without live sessions should be removed via git."""
     import os
     import tempfile
     from datetime import datetime, timedelta
@@ -145,7 +145,9 @@ def test_clean_expired_agent_worktrees_deletes_old_dirs() -> None:
     git_client = MagicMock()
     service = CheckCleanupService(store=store, git_client=git_client)
 
-    # Create temp agent worktree directory
+    # No live sessions for any worktree
+    store.list_live_sessions_by_worktree.return_value = []
+
     with tempfile.TemporaryDirectory() as tmpdir:
         old_worktree = Path(tmpdir) / "agent-old123"
         old_worktree.mkdir()
@@ -158,14 +160,95 @@ def test_clean_expired_agent_worktrees_deletes_old_dirs() -> None:
         with patch.object(
             service, "_get_agent_worktree_base", return_value=Path(tmpdir)
         ):
-            with patch.object(
-                service, "_get_branches_with_live_sessions", return_value=set()
-            ):
+            with patch(
+                "vibe3.services.check_cleanup_service.remove_worktree"
+            ) as mock_remove:
                 result = service._clean_expired_agent_worktrees(max_age_days=7)
 
-                # Verify old worktree deleted, recent kept
-                assert not old_worktree.exists()
+                # Old worktree should be removed via remove_worktree
+                mock_remove.assert_called_once_with(old_worktree, force=True)
+
+                # Recent worktree should NOT be removed
                 assert recent_worktree.exists()
                 assert "cleaned" in result
                 assert len(result["cleaned"]) == 1
                 assert "agent-old123" in result["cleaned"]
+
+
+def test_clean_expired_agent_worktrees_skips_live_sessions() -> None:
+    """Expired worktrees with live sessions should be skipped, not removed."""
+    import os
+    import tempfile
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        old_worktree = Path(tmpdir) / "agent-old123"
+        old_worktree.mkdir()
+        old_time = datetime.now() - timedelta(days=10)
+        os.utime(old_worktree, (old_time.timestamp(), old_time.timestamp()))
+
+        # Resolved absolute path used for lookup
+        resolved_path = str(old_worktree.resolve())
+
+        def mock_list_live(worktree_path: str) -> list[dict]:
+            if worktree_path == resolved_path:
+                return [{"id": 1, "status": "running", "role": "executor"}]
+            return []
+
+        store.list_live_sessions_by_worktree.side_effect = mock_list_live
+
+        with patch.object(
+            service, "_get_agent_worktree_base", return_value=Path(tmpdir)
+        ):
+            with patch(
+                "vibe3.services.check_cleanup_service.remove_worktree"
+            ) as mock_remove:
+                result = service._clean_expired_agent_worktrees(max_age_days=7)
+
+                # Should NOT call remove_worktree - worktree has live sessions
+                mock_remove.assert_not_called()
+
+                assert result["skipped_live"] == ["agent-old123"]
+                assert result["cleaned"] == []
+                assert old_worktree.exists()
+
+
+def test_clean_expired_agent_worktrees_handles_git_error() -> None:
+    """Failed git worktree removal should be recorded as failure."""
+    import os
+    import tempfile
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    from vibe3.exceptions import GitError
+
+    store = MagicMock()
+    git_client = MagicMock()
+    service = CheckCleanupService(store=store, git_client=git_client)
+
+    store.list_live_sessions_by_worktree.return_value = []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        old_worktree = Path(tmpdir) / "agent-old123"
+        old_worktree.mkdir()
+        old_time = datetime.now() - timedelta(days=10)
+        os.utime(old_worktree, (old_time.timestamp(), old_time.timestamp()))
+
+        with patch.object(
+            service, "_get_agent_worktree_base", return_value=Path(tmpdir)
+        ):
+            with patch(
+                "vibe3.services.check_cleanup_service.remove_worktree",
+                side_effect=GitError("worktree remove", "test error"),
+            ):
+                result = service._clean_expired_agent_worktrees(max_age_days=7)
+
+                assert result["cleaned"] == []
+                assert len(result["failed"]) == 1
+                assert "agent-old123" in result["failed"][0]
+                assert "test error" in result["failed"][0]

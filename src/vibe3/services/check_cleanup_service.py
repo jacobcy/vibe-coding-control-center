@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.clients.git_worktree_ops import remove_worktree
+
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
@@ -339,8 +341,11 @@ class CheckCleanupService:
         """Clean expired agent worktrees older than max_age_days.
 
         Safety checks:
-        - Skip if has live runtime session
-        - Delete physical directory only
+        - Check if worktree path has live runtime sessions
+        - Skip worktrees with active sessions to avoid disrupting running agents
+
+        Uses git worktree remove (not just rmtree) to properly clean both
+        the physical directory and the git worktree metadata.
 
         Args:
             max_age_days: Max age in days before cleanup (default: 7)
@@ -348,7 +353,6 @@ class CheckCleanupService:
         Returns:
             Dict with 'cleaned' list and 'skipped_live' list
         """
-        import shutil
         from datetime import datetime, timedelta
 
         logger.bind(domain="check", action="clean_agent_worktrees").info(
@@ -365,19 +369,6 @@ class CheckCleanupService:
         skipped_live: list[str] = []
         failed: list[str] = []
 
-        # Get live session branches
-        try:
-            branches_with_live = self._get_branches_with_live_sessions()
-        except SystemError:
-            logger.bind(domain="check").error(
-                "Failed to get live sessions, skipping agent worktree cleanup"
-            )
-            return {
-                "cleaned": [],
-                "skipped_live": [],
-                "failed": ["live session query failed"],
-            }
-
         # Scan agent-* worktrees
         for worktree_dir in base.glob("agent-*"):
             if not worktree_dir.is_dir():
@@ -393,16 +384,24 @@ class CheckCleanupService:
                 if mtime >= cutoff:
                     continue
 
-                # Check live session (defensive: check worktree name in branch list)
-                if any(worktree_name in branch for branch in branches_with_live):
+                # Check if worktree path has live runtime sessions.
+                # Uses absolute path to match worktree_path stored in
+                # runtime_session table (populated by vibe3 worktree creation).
+                # Agent worktrees created by Claude Code won't have entries
+                # in this table, so they'll be processed normally.
+                worktree_abs = str(worktree_dir.resolve())
+                live_sessions = self.store.list_live_sessions_by_worktree(worktree_abs)
+                if live_sessions:
                     skipped_live.append(worktree_name)
-                    logger.bind(domain="check", worktree=worktree_name).info(
-                        "Skipped agent worktree with live session"
-                    )
+                    logger.bind(
+                        domain="check",
+                        worktree=worktree_name,
+                        session_count=len(live_sessions),
+                    ).info("Skipped agent worktree with live runtime sessions")
                     continue
 
-                # Delete directory
-                shutil.rmtree(worktree_dir)
+                # Properly remove worktree: cleans git metadata AND directory
+                remove_worktree(worktree_dir, force=True)
                 cleaned.append(worktree_name)
                 logger.bind(domain="check", worktree=worktree_name).info(
                     "Deleted expired agent worktree"
