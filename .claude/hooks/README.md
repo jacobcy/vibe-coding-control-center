@@ -8,7 +8,7 @@
 
 - hook 脚本到 `~/.claude/hooks/`（Claude 使用）
 - hook 脚本到 `~/.codex/hooks/`（Codex 使用）
-- Codex hook 配置到 `~/.codex/hooks.json`
+- 仓库模板 `.claude/hooks/codex-hooks.json` 同步到 `~/.codex/hooks.json`
 
 如果需要手动更新 hooks：
 
@@ -20,7 +20,7 @@ chmod +x ~/.claude/hooks/*.sh
 # Codex
 cp -R .claude/hooks/. ~/.codex/hooks/
 chmod +x ~/.codex/hooks/*.sh
-cp .codex/hooks.json ~/.codex/hooks.json
+cp .claude/hooks/codex-hooks.json ~/.codex/hooks.json
 ```
 
 ## Hooks 说明
@@ -181,6 +181,6 @@ echo '{"tool_input":{"file_path":"config/.env"}}' | ~/.codex/hooks/protect-files
 ## 相关文档
 
 - [Claude Code Hooks 官方文档](https://docs.anthropic.com/claude-code/hooks)
-- Codex hook 配置：`.codex/hooks.json`
+- Codex hook 模板：`.claude/hooks/codex-hooks.json`
 - 项目配置文件：`../config/settings.yaml`
 - 密钥模板：`../config/keys.template.env`

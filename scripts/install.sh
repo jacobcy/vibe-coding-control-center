@@ -231,14 +231,14 @@ else
     log_warn "No .claude/hooks directory found, skipping Claude/Codex hook script sync"
 fi
 
-if [[ -f "$SOURCE_ROOT/.codex/hooks.json" ]]; then
+if [[ -f "$SOURCE_ROOT/.claude/hooks/codex-hooks.json" ]]; then
     log_info "Syncing Codex hook config..."
     mkdir -p "$HOME/.codex"
-    cp "$SOURCE_ROOT/.codex/hooks.json" "$HOME/.codex/hooks.json"
+    cp "$SOURCE_ROOT/.claude/hooks/codex-hooks.json" "$HOME/.codex/hooks.json"
     chmod 644 "$HOME/.codex/hooks.json"
     log_success "Codex hook config synced"
 else
-    log_warn "No .codex/hooks.json found, skipping Codex hook config sync"
+    log_warn "No Codex hook config template found, skipping Codex hook config sync"
 fi
 
 # 5. Bootstrap loader.sh
