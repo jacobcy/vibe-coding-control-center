@@ -194,3 +194,12 @@ def test_warning_registry():
     assert contract.severity == ErrorSeverity.WARNING
     assert contract.gate_action == "ignore"
     assert contract.counts_toward_threshold is False
+
+
+def test_unregistered_error_code():
+    """Test that unregistered error codes raise KeyError."""
+    import pytest
+
+    with pytest.raises(KeyError) as exc_info:
+        get_error_handling_contract("E_UNREGISTERED_CODE")
+    assert "E_UNREGISTERED_CODE" in str(exc_info.value)
