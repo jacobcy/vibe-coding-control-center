@@ -175,6 +175,28 @@ class HeartbeatServer:
 
             # Gate is OPEN (or no gate) - proceed with normal dispatch
 
+            # NEW: Check if all issues are blocked
+            if (
+                hasattr(self, "_coordinator")
+                and self._coordinator is not None
+                and self._failed_gate is not None
+                and self._coordinator.get_all_blocked_status()
+            ):
+                # All non-close issues are blocked - stop heartbeat
+                self._failed_gate.activate(
+                    reason="all non-close issues are blocked",
+                    error_code="ALL_BLOCKED",
+                )
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} stopped: all issues blocked",
+                )
+                logger.bind(domain="orchestra", action="tick").warning(
+                    "All non-close issues are blocked, stopping heartbeat"
+                )
+                self.stop()
+                return
+
             # Cleanup old error records (maintenance)
             error_tracking = ErrorTrackingService.get_instance()
 

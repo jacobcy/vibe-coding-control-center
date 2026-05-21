@@ -51,6 +51,9 @@ if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.roles.definitions import TriggerableRoleDefinition
 
+# Hard limit to prevent extreme tick duration in edge cases
+MAX_INTENTS_PER_TICK = 10
+
 
 class GlobalDispatchCoordinator(QueuePersistenceMixin):
     """Frozen queue with state-change requeue semantics."""
@@ -320,14 +323,17 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
             )
             return 0
 
+        # Apply hard limit: cap dispatches per tick regardless of capacity
+        max_intents = min(available_slots, MAX_INTENTS_PER_TICK)
+
         dispatched_count = 0
         index = 0
         while index < len(self._frozen_queue):
-            if dispatched_count >= available_slots:
+            if dispatched_count >= max_intents:
                 append_orchestra_event(
                     "dispatcher",
                     f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
-                    f"skipped remaining (capacity full)",
+                    f"skipped remaining (capacity or hard limit reached)",
                 )
                 return dispatched_count
 
@@ -496,3 +502,15 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
 
         # Step 5: Persist queue state
         self._persist_queue()
+
+    def get_all_blocked_status(self) -> bool:
+        """Check if all non-close issues in frozen_queue are blocked.
+
+        Returns:
+            True if queue is non-empty and all entries have collected_state="blocked"
+            False if queue is empty, None, or contains any non-blocked entries
+        """
+        if not self._frozen_queue:
+            return False
+
+        return all(entry.collected_state == "blocked" for entry in self._frozen_queue)
