@@ -17,6 +17,8 @@ def find_available_port(
     - (start_port, False) if start_port is available
     - (next_port, True) if start_port is occupied but another port is found
     Raises typer.Exit(1) if no port in range is available.
+
+    If max_port is None, only checks start_port (no auto-discovery).
     """
     # Validate port range configuration
     if max_port is not None and max_port < start_port:
@@ -27,10 +29,34 @@ def find_available_port(
         )
         raise typer.Exit(1)
 
+    # If max_port is None, only check start_port (backward-compatible behavior)
     if max_port is None:
-        max_port = start_port + 10
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(("0.0.0.0", start_port))
+                return (start_port, False)
+            except OSError as e:
+                if e.errno in (48, 98):  # Address-in-use error
+                    typer.echo(
+                        f"\n[bold red]Error:[/] Port {start_port} is already in use.",
+                        err=True,
+                    )
+                    typer.echo(
+                        "Check if another Orchestra service is running on this port.",
+                        err=True,
+                    )
+                    typer.echo(
+                        "Use [bold]vibe3 serve stop[/] or specify [bold]--port[/].\n",
+                        err=True,
+                    )
+                    raise typer.Exit(1)
+                raise
 
-    for port in range(start_port, max_port + 1):
+    # Cap max_port at 65535 to avoid OverflowError
+    effective_max_port = min(max_port, 65535)
+
+    for port in range(start_port, effective_max_port + 1):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -45,7 +71,7 @@ def find_available_port(
     # All ports in range are occupied
     typer.echo(
         f"\n[bold red]Error:[/] All ports from {start_port}"
-        f" to {max_port} are already in use.",
+        f" to {effective_max_port} are already in use.",
         err=True,
     )
     typer.echo(
