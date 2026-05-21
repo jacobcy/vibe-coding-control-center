@@ -15,7 +15,9 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions.error_codes import is_api_error, is_exec_error, is_model_error
+from vibe3.exceptions.error_classification import get_error_handling_contract
+from vibe3.exceptions.error_codes import is_api_error, is_model_error
+from vibe3.exceptions.error_severity import ErrorSeverity
 
 
 class ErrorTrackingService:
@@ -118,6 +120,7 @@ class ErrorTrackingService:
         tick_id: int = 0,
         issue_number: int | None = None,
         branch: str | None = None,
+        severity: ErrorSeverity | None = None,
     ) -> tuple[bool, int]:
         """Record error and check if threshold reached.
 
@@ -127,35 +130,49 @@ class ErrorTrackingService:
             tick_id: Tick ID (defaults to 0)
             issue_number: Optional linked issue
             branch: Optional linked branch
+            severity: Optional severity level. If None, inferred from error registry.
 
         Returns:
             (threshold_reached: bool, error_count_in_window: int)
         """
+        # Infer severity from registry if not provided
+        if severity is None:
+            contract = get_error_handling_contract(error_code)
+            severity = contract.severity
+
         # Persist to error_log table
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """
                 INSERT INTO error_log
-                (tick_id, error_code, error_message, issue_number, branch)
-                VALUES (?, ?, ?, ?, ?)
+                (tick_id, error_code, error_message, severity, issue_number, branch)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (tick_id, error_code, error_message, issue_number, branch),
+                (
+                    tick_id,
+                    error_code,
+                    error_message,
+                    severity.value,
+                    issue_number,
+                    branch,
+                ),
             )
 
         logger.bind(
             domain="error_tracking",
             error_code=error_code,
+            severity=severity.value,
             tick=tick_id,
         ).info("Error recorded to error_log")
 
-        # Track API errors AND execution errors for threshold
-        if not is_api_error(error_code) and not is_exec_error(error_code):
-            # Model config errors → immediate threshold (but handled separately)
-            # Other errors → no threshold
+        # Track ERROR-severity errors for threshold
+        if severity != ErrorSeverity.ERROR:
+            # CRITICAL errors → immediate gate (handled separately)
+            # WARNING errors → no gate activation
             return False, 0
 
-        # Count API and exec errors in recent window
-        error_count = self.get_api_and_exec_error_count()
+        # Count ERROR-severity errors in recent window
+        error_count = self.get_threshold_error_count()
 
         # Check threshold
         threshold_reached = error_count >= self.THRESHOLD_COUNT
@@ -164,9 +181,10 @@ class ErrorTrackingService:
             logger.bind(
                 domain="error_tracking",
                 error_code=error_code,
+                severity=severity.value,
                 window_count=error_count,
                 threshold=self.THRESHOLD_COUNT,
-            ).error("API/EXEC error threshold reached")
+            ).error("ERROR-severity threshold reached")
 
         return threshold_reached, error_count
 
@@ -220,6 +238,10 @@ class ErrorTrackingService:
     def get_api_and_exec_error_count(self) -> int:
         """Get count of E_API_* and E_EXEC_* errors within time window.
 
+        .. deprecated::
+            Use :meth:`get_threshold_error_count` instead, which counts by
+            severity rather than error code prefix.
+
         Returns:
             Number of API/exec errors in the sliding window.
         """
@@ -231,6 +253,46 @@ class ErrorTrackingService:
                   AND created_at >= datetime('now', ? || ' minutes')
                 """,
                 (f"-{self.TIME_WINDOW_MINUTES}",),
+            ).fetchone()
+
+        return rows[0] if rows else 0
+
+    def get_threshold_error_count(self) -> int:
+        """Get count of ERROR-severity errors within time window.
+
+        Counts by severity level rather than error code prefix, providing
+        accurate threshold detection for all ERROR-severity errors regardless
+        of their code classification.
+
+        Returns:
+            Number of ERROR-severity errors in the sliding window.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT COUNT(*) FROM error_log
+                WHERE severity = ?
+                  AND created_at >= datetime('now', ? || ' minutes')
+                """,
+                (ErrorSeverity.ERROR.value, f"-{self.TIME_WINDOW_MINUTES}"),
+            ).fetchone()
+
+        return rows[0] if rows else 0
+
+    def get_warning_count(self) -> int:
+        """Get count of WARNING-severity errors within time window.
+
+        Returns:
+            Number of WARNING-severity errors in the sliding window.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT COUNT(*) FROM error_log
+                WHERE severity = ?
+                  AND created_at >= datetime('now', ? || ' minutes')
+                """,
+                (ErrorSeverity.WARNING.value, f"-{self.TIME_WINDOW_MINUTES}"),
             ).fetchone()
 
         return rows[0] if rows else 0

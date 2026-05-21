@@ -33,6 +33,11 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
 
 def test_failed_gate_open(temp_store: SQLiteClient) -> None:
     """Gate should be open when no errors are recorded."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
     gate = FailedGate(store=temp_store)
     result = gate.check()
 
@@ -58,7 +63,7 @@ def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
 
 
 def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
-    """Gate should block when API error threshold is reached."""
+    """Gate should block when ERROR-severity error threshold is reached."""
     from vibe3.exceptions.error_tracking import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
@@ -74,7 +79,7 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     result = gate.check()
 
     assert result.blocked
-    assert "API/Exec error threshold" in (result.reason or "")
+    assert "ERROR-severity threshold" in (result.reason or "")
 
 
 def test_failed_gate_clear(temp_store: SQLiteClient) -> None:

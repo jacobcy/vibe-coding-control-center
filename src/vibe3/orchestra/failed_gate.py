@@ -166,19 +166,19 @@ class FailedGate:
                 reason=f"Model configuration errors: {', '.join(model_errors)}",
             )
 
-        # Check for frequent API and EXEC errors (threshold: 2+ in window)
-        error_count = error_tracking.get_api_and_exec_error_count()
+        # Check for frequent ERROR-severity errors (threshold: 2+ in window)
+        error_count = error_tracking.get_threshold_error_count()
 
         if error_count >= ErrorTrackingService.THRESHOLD_COUNT:
             log.error(
-                f"API/Exec error threshold reached: {error_count} errors "
+                f"ERROR-severity threshold reached: {error_count} errors "
                 f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                 f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
             )
             return GateResult(
                 blocked=True,
                 reason=(
-                    f"API/Exec error threshold: {error_count} recent errors "
+                    f"ERROR-severity threshold: {error_count} recent errors "
                     f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                     f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
                 ),
