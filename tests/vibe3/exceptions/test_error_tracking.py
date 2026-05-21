@@ -446,3 +446,71 @@ def test_threshold_count_respects_time_window(temp_store: SQLiteClient) -> None:
     # Count should only include recent error
     count = ErrorTrackingService._instance.get_threshold_error_count()
     assert count == 1
+
+
+def test_migration_backfills_severity_column(tmp_path: Path) -> None:
+    """Migration should add severity column and backfill from error registry."""
+    from vibe3.clients.sqlite_schema import init_schema
+
+    # Create database WITHOUT severity column
+    db_path = tmp_path / "migration_test.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create error_log table without severity column (pre-migration schema)
+    cursor.execute("""
+        CREATE TABLE error_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tick_id INTEGER NOT NULL,
+            error_code TEXT NOT NULL,
+            error_message TEXT NOT NULL,
+            issue_number INTEGER,
+            branch TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # Insert error records with known error codes
+    cursor.execute("""
+        INSERT INTO error_log (tick_id, error_code, error_message)
+        VALUES (1, 'E_MODEL_NOT_FOUND', 'Model not found')
+    """)
+    cursor.execute("""
+        INSERT INTO error_log (tick_id, error_code, error_message)
+        VALUES (2, 'E_API_RATE_LIMIT', 'Rate limit')
+    """)
+    cursor.execute("""
+        INSERT INTO error_log (tick_id, error_code, error_message)
+        VALUES (3, 'E_EXEC_NO_OUTPUT', 'No output')
+    """)
+    conn.commit()
+
+    # Verify severity column does NOT exist
+    columns_before = {
+        row[1] for row in cursor.execute("PRAGMA table_info(error_log)").fetchall()
+    }
+    assert "severity" not in columns_before
+
+    # Run init_schema() which should add severity column and backfill
+    init_schema(conn)
+
+    # Verify severity column exists
+    columns_after = {
+        row[1] for row in cursor.execute("PRAGMA table_info(error_log)").fetchall()
+    }
+    assert "severity" in columns_after
+
+    # Verify severity values are populated from error registry
+    rows = cursor.execute("""
+        SELECT error_code, severity FROM error_log ORDER BY tick_id
+    """).fetchall()
+
+    assert len(rows) == 3
+    # E_MODEL_NOT_FOUND → CRITICAL
+    assert rows[0] == ("E_MODEL_NOT_FOUND", "CRITICAL")
+    # E_API_RATE_LIMIT → ERROR
+    assert rows[1] == ("E_API_RATE_LIMIT", "ERROR")
+    # E_EXEC_NO_OUTPUT → WARNING
+    assert rows[2] == ("E_EXEC_NO_OUTPUT", "WARNING")
+
+    conn.close()
