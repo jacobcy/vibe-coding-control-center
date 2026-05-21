@@ -217,6 +217,30 @@ elif [[ -f "$SOURCE_ROOT/config/skills.json" ]]; then
     chmod 644 "$INSTALL_DIR/skills.json"
 fi
 
+# 4.8 Sync Claude/Codex hook assets
+if [[ -d "$SOURCE_ROOT/.claude/hooks" ]]; then
+    log_info "Syncing Claude/Codex hook scripts..."
+    mkdir -p "$HOME/.claude/hooks"
+    mkdir -p "$HOME/.codex/hooks"
+    cp -R "$SOURCE_ROOT/.claude/hooks/." "$HOME/.claude/hooks/"
+    cp -R "$SOURCE_ROOT/.claude/hooks/." "$HOME/.codex/hooks/"
+    chmod +x "$HOME/.claude/hooks/"*.sh
+    chmod +x "$HOME/.codex/hooks/"*.sh
+    log_success "Claude/Codex hook scripts synced"
+else
+    log_warn "No .claude/hooks directory found, skipping Claude/Codex hook script sync"
+fi
+
+if [[ -f "$SOURCE_ROOT/.codex/hooks.json" ]]; then
+    log_info "Syncing Codex hook config..."
+    mkdir -p "$HOME/.codex"
+    cp "$SOURCE_ROOT/.codex/hooks.json" "$HOME/.codex/hooks.json"
+    chmod 644 "$HOME/.codex/hooks.json"
+    log_success "Codex hook config synced"
+else
+    log_warn "No .codex/hooks.json found, skipping Codex hook config sync"
+fi
+
 # 5. Bootstrap loader.sh
 LOADER_DST="$INSTALL_DIR/loader.sh"
 log_info "Installing loader at $LOADER_DST..."

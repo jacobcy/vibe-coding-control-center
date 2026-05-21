@@ -134,7 +134,6 @@ openspec/
 .agents/
 .github/prompts/
 .codex/skills/
-.codex/config.toml
 .gemini/
 .opencode/
 .copilot/

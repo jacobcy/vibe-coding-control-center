@@ -1,17 +1,26 @@
-# Claude Code Hooks
+# Claude/Codex Hooks
 
-本项目提供 Claude Code hooks，用于增强安全性和防止误操作。
+本项目提供一套共享 hook 脚本，供 Claude Code 与 Codex 使用，用于增强安全性和防止误操作。
 
 ## 安装
 
-hooks 会在 `scripts/install.sh` 安装时自动同步到 `~/.claude/hooks/` 目录。
+`scripts/install.sh` 会同步以下内容：
+
+- hook 脚本到 `~/.claude/hooks/`（Claude 使用）
+- hook 脚本到 `~/.codex/hooks/`（Codex 使用）
+- Codex hook 配置到 `~/.codex/hooks.json`
 
 如果需要手动更新 hooks：
 
 ```bash
-# 从项目同步到全局
+# Claude
 cp -R .claude/hooks/. ~/.claude/hooks/
 chmod +x ~/.claude/hooks/*.sh
+
+# Codex
+cp -R .claude/hooks/. ~/.codex/hooks/
+chmod +x ~/.codex/hooks/*.sh
+cp .codex/hooks.json ~/.codex/hooks.json
 ```
 
 ## Hooks 说明
@@ -51,6 +60,8 @@ chmod +x ~/.claude/hooks/*.sh
 
 **行为**：发出警告，但不阻塞操作（exit 0）
 
+**当前状态**：Codex 默认已接入 `Write|Edit` hook 链。
+
 ### block-destructive.sh
 
 **作用**：阻止破坏性命令执行
@@ -62,6 +73,25 @@ chmod +x ~/.claude/hooks/*.sh
 - `DROP TABLE` 或 `TRUNCATE TABLE`
 
 **行为**：阻塞操作（exit 2）
+
+### rtk-rewrite.sh
+
+**作用**：在执行 Bash 工具前，尝试将命令重写为 `rtk` 等价命令以节省 token。
+
+**依赖**：
+- `jq`
+- `rtk >= 0.23.0`
+
+**行为**：
+- 找到可重写命令时，返回更新后的命令
+- 未找到等价命令时直接放行
+- 依赖缺失时仅警告，不阻塞操作
+
+### SessionStart hook
+
+**作用**：在 `compact` 事件后打印当前项目的分支和最近一次提交，帮助恢复上下文。
+
+**行为**：只输出提示信息，不阻塞操作。
 
 ## 自定义配置
 
@@ -85,10 +115,18 @@ if echo "$NEW_TEXT" | grep -qiE '(API_KEY|SECRET|TOKEN)...\s*[=:]\s*["\x27]?[A-Z
 
 ### 禁用特定 hook
 
-删除对应的 `.sh` 文件：
+Claude:
 
 ```bash
 rm ~/.claude/hooks/protect-files.sh
+```
+
+Codex:
+
+推荐直接编辑 `~/.codex/hooks.json`，移除对应条目；仅删除 `.sh` 文件会留下失效配置。
+
+```bash
+$EDITOR ~/.codex/hooks.json
 ```
 
 ## 开发新 Hook
@@ -134,8 +172,15 @@ echo '{"tool_input":{"file_path":"config/keys.template.env"}}' | ~/.claude/hooks
 # 应返回 exit 0（允许）
 ```
 
+```bash
+# 测试 Codex protect-files.sh
+echo '{"tool_input":{"file_path":"config/.env"}}' | ~/.codex/hooks/protect-files.sh
+# 应返回 exit 2 并打印错误信息
+```
+
 ## 相关文档
 
 - [Claude Code Hooks 官方文档](https://docs.anthropic.com/claude-code/hooks)
-- [项目配置文件](../config/settings.yaml)
-- [密钥模板](../config/keys.template.env)
+- Codex hook 配置：`.codex/hooks.json`
+- 项目配置文件：`../config/settings.yaml`
+- 密钥模板：`../config/keys.template.env`

@@ -1,0 +1,43 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.codex/hooks/block-destructive.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.codex/hooks/rtk-rewrite.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.codex/hooks/protect-files.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.codex/hooks/detect-secrets.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'DIR=\"${CLAUDE_PROJECT_DIR:-.}\"; echo \"[context] Post-compaction reminder: Current branch: $(git -C \"$DIR\" branch --show-current 2>/dev/null || echo unknown). Last commit: $(git -C \"$DIR\" log --oneline -1 2>/dev/null || echo none).\"'"
+          }
+        ]
+      }
+    ]
+  }
+}
