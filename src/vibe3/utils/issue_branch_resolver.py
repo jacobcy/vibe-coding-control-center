@@ -71,7 +71,8 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
     # Step 5: No flows at all
     raise UserError(
         f"No flow found for issue #{issue_number}. "
-        f"Use '/vibe-new issue {issue_number}' to create a flow."
+        f"Use '/vibe-new issue {issue_number}' to create a flow.\n"
+        f"提示：如果是 PR 号，请使用 --pr {issue_number}"
     )
 
 
