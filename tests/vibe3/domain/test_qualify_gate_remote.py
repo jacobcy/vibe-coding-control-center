@@ -28,6 +28,11 @@ def mock_store():
     """Create a mock SQLite client."""
     store = Mock()
     store.db_path = ":memory:"
+    store.get_flow_state = Mock(return_value=None)
+    store.get_dependency_links = Mock(return_value=[])
+    store.get_issue_links = Mock(return_value=[])
+    store.update_flow_state = Mock()
+    store.add_event = Mock()
     return store
 
 
@@ -83,12 +88,10 @@ class TestRemoteBlockedReason:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
-            with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
-            ):
-                # Use non-empty flow_state to avoid early return
+            with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
+                mock_fs_instance = Mock()
+                mock_flow_service.return_value = mock_fs_instance
+
                 flow_state = {"status": "active"}
 
                 result = qualify_gate_service.run_qualify_gate(
@@ -101,9 +104,9 @@ class TestRemoteBlockedReason:
 
                 # Verify blocked by remote reason
                 assert result is None
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # FlowService.block_flow should be called
+                mock_flow_service.assert_called_once_with(store=mock_store)
+                mock_fs_instance.block_flow.assert_called_once()
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -131,11 +134,10 @@ class TestRemoteBlockedReason:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
-            with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
-            ):
+            with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
+                mock_fs_instance = Mock()
+                mock_flow_service.return_value = mock_fs_instance
+
                 flow_state = {"status": "active"}
 
                 result = qualify_gate_service.run_qualify_gate(
@@ -148,9 +150,9 @@ class TestRemoteBlockedReason:
 
                 # Verify still blocked by local reason
                 assert result is None
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # FlowService.block_flow should be called
+                mock_flow_service.assert_called_once_with(store=mock_store)
+                mock_fs_instance.block_flow.assert_called_once()
 
 
 class TestRemoteDependencies:
@@ -291,11 +293,10 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
-            with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
-            ):
+            with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
+                mock_fs_instance = Mock()
+                mock_flow_service.return_value = mock_fs_instance
+
                 flow_state = {"status": "active"}
 
                 result = qualify_gate_service.run_qualify_gate(
@@ -308,12 +309,9 @@ class TestRemoteDependencies:
 
                 # Body truth blocked → gate should skip (return None)
                 assert result is None
-                # Should align local cache to blocked
-                mock_store.update_flow_state.assert_called()
-                # Should add blocked label if not present
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # FlowService.block_flow should be called
+                mock_flow_service.assert_called_once_with(store=mock_store)
+                mock_fs_instance.block_flow.assert_called_once()
 
 
 class TestProvenanceTracking:
@@ -337,10 +335,7 @@ class TestProvenanceTracking:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=Mock(),
-            ):
+            with patch("vibe3.domain.qualify_gate.FlowService"):
                 flow_state = {"status": "active"}
 
                 qualify_gate_service.run_qualify_gate(
@@ -445,11 +440,10 @@ class TestE2EBlockedReconciliation:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
-            with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
-            ):
+            with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
+                mock_fs_instance = Mock()
+                mock_flow_service.return_value = mock_fs_instance
+
                 result = qualify_gate.run_qualify_gate(
                     issue=sample_issue,
                     branch="task/issue-994",
@@ -459,10 +453,9 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called()
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # FlowService.block_flow should be called
+                mock_flow_service.assert_called_once_with(store=mock_store)
+                mock_fs_instance.block_flow.assert_called_once()
 
     def test_blocked_label_body_active_with_cache(self, mock_store, sample_issue):
         """state/blocked + body active + local blocked cache → auto-resume."""
@@ -553,11 +546,10 @@ class TestE2EBlockedReconciliation:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
-            with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
-            ):
+            with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
+                mock_fs_instance = Mock()
+                mock_flow_service.return_value = mock_fs_instance
+
                 result = qualify_gate.run_qualify_gate(
                     issue=sample_issue,
                     branch="task/issue-994",
@@ -567,7 +559,6 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called()
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # FlowService.block_flow should be called
+                mock_flow_service.assert_called_once_with(store=mock_store)
+                mock_fs_instance.block_flow.assert_called_once()
