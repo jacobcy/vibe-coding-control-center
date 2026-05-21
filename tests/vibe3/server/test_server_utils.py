@@ -65,3 +65,11 @@ def test_find_available_port_uses_default_range_when_max_port_is_none() -> None:
 
         # Should have tried 11 ports (8080-8090 inclusive)
         assert mock_sock.bind.call_count == 11
+
+
+def test_find_available_port_validates_inverted_range() -> None:
+    """Test that find_available_port raises typer.Exit(1) when max_port < start_port."""
+    with pytest.raises(typer.Exit) as exc_info:
+        find_available_port(8080, max_port=8070)
+
+    assert exc_info.value.exit_code == 1
