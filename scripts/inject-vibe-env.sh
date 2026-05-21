@@ -2,7 +2,8 @@
 # Inject environment variables into a running tmux session
 #
 # Modes:
-#   1. Default mode: Inject specific VIBE_* variables (listed in DEFAULT_VIBE_VARS) from ~/.zshrc
+#   1. Default mode: Inject specific VIBE_* variables from ~/.zshrc
+#      (see DEFAULT_VIBE_VARS for the exact list)
 #   2. Command mode: Inject only variables specified as KEY=VALUE arguments
 #
 # Usage:
@@ -10,11 +11,12 @@
 #   ./inject-vibe-env.sh <session-name> KEY=VALUE [KEY=VALUE ...]
 #
 # Examples:
-#   # Inject default VIBE vars (VIBE_BACKEND_SUPERVISOR, VIBE_MODEL_SUPERVISOR, etc.)
+#   # Inject default VIBE vars
 #   ./inject-vibe-env.sh vibe3-orchestra-serve
 #
 #   # Inject only specific variables (ignores ~/.zshrc)
-#   ./inject-vibe-env.sh vibe3-orchestra-serve VIBE_BACKEND_SUPERVISOR=gemini
+#   ./inject-vibe-env.sh vibe3-orchestra-serve \
+#       VIBE_BACKEND_SUPERVISOR=gemini
 #
 #   # Inject multiple variables
 #   ./inject-vibe-env.sh vibe3-orchestra-serve DEBUG=true VIBE_BACKEND=gemini
