@@ -252,6 +252,9 @@ code_limits:
       - path: "tests/vibe3/services/test_flow_orchestrator_service.py"
         limit: 450
         reason: "Flow orchestrator 服务测试集，覆盖 dispatch 协调、frozen queue 管理、issue 状态处理等紧密耦合场景，共享 fixture，拆分收益低"
+      - path: "tests/vibe3/exceptions/test_error_tracking.py"
+        limit: 520
+        reason: "Error tracking 测试集，新增 6 个 severity-aware 测试、migration backfill 测试、兼容性测试，覆盖 severity 分类、threshold 计数、时间窗口逻辑"
 
 
   total_file_loc:
