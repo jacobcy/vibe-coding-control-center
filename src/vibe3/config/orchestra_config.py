@@ -254,7 +254,8 @@ class OrchestraConfig(BaseModel):
         le=65535,
         description=(
             "Maximum port for auto-discovery range. "
-            "If None, defaults to port + 10 (max 10 ports to scan)."
+            "If None, port must be available (no auto-discovery, backward-compatible). "
+            "If set, enables auto-discovery from port to port_range_max."
         ),
     )
     bot_username: str | None = Field(
