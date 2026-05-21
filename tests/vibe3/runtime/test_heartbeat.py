@@ -271,3 +271,126 @@ def test_no_shutdown_callback_cleanup_still_runs() -> None:
     """_cleanup() without a registered callback should not raise."""
     server = HeartbeatServer(_config())
     server._cleanup()  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
+    """Cleanup should trigger on tick number that is a multiple of interval_ticks."""
+    from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        expired_resource_cleanup=ExpiredResourceCleanupConfig(interval_ticks=2),
+    )
+    server = HeartbeatServer(config)
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+    cleanup_calls: list[int] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    async def _sleep_once(_seconds: float) -> None:
+        if len(cleanup_calls) >= 3:  # Run at least 3 ticks
+            server.stop()
+
+    async def _mock_cleanup(tick_number: int) -> None:
+        cleanup_calls.append(tick_number)
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup)
+    server._running = True
+
+    await server._tick_loop()
+
+    # Should trigger on tick #2 (2 % 2 == 0), not on #1 or #3
+    assert 2 in cleanup_calls, f"Expected cleanup on tick #2, got: {cleanup_calls}"
+    assert (
+        1 not in cleanup_calls
+    ), f"Should not cleanup on tick #1, got: {cleanup_calls}"
+    assert (
+        3 not in cleanup_calls
+    ), f"Should not cleanup on tick #3, got: {cleanup_calls}"
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -> None:
+    """Cleanup failure should not prevent service dispatch."""
+    from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        expired_resource_cleanup=ExpiredResourceCleanupConfig(interval_ticks=1),
+    )
+    server = HeartbeatServer(config)
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str, **kwargs) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            server.stop()
+
+    async def _mock_cleanup_failure(tick_number: int) -> None:
+        raise RuntimeError("cleanup failed")
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup_failure)
+    server._running = True
+
+    await server._tick_loop()
+
+    # Service should still be ticked despite cleanup failure
+    assert svc.ticks == 1, f"Expected 1 tick, got: {svc.ticks}"
+    # Should have error event
+    assert any(
+        "cleanup failed" in item for item in events
+    ), f"Expected cleanup error, got: {events}"
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_skip_cleanup_when_disabled(monkeypatch) -> None:
+    """Cleanup should not run when disabled in config."""
+    from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+
+    config = OrchestraConfig(
+        polling_interval=1,
+        max_concurrent_flows=3,
+        expired_resource_cleanup=ExpiredResourceCleanupConfig(enabled=False),
+    )
+    server = HeartbeatServer(config)
+    svc = _MockService()
+    server.register(svc)
+
+    cleanup_calls: list[int] = []
+
+    async def _sleep_once(_seconds: float) -> None:
+        if len(cleanup_calls) >= 2:
+            server.stop()
+
+    async def _mock_cleanup(tick_number: int) -> None:
+        cleanup_calls.append(tick_number)
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup)
+    server._running = True
+
+    await server._tick_loop()
+
+    # Should not call cleanup when disabled
+    assert (
+        len(cleanup_calls) == 0
+    ), f"Expected no cleanup calls when disabled, got: {cleanup_calls}"

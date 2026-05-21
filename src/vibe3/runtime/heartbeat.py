@@ -230,6 +230,24 @@ class HeartbeatServer:
                         f"Cleaned up {deleted_terminal} errors for terminal issues"
                     )
 
+            # Cleanup expired resources (worktrees, branches)
+            if (
+                self.config.expired_resource_cleanup.enabled
+                and tick_number % self.config.expired_resource_cleanup.interval_ticks
+                == 0
+            ):
+                try:
+                    await self._cleanup_expired_resources(tick_number)
+                except Exception as exc:
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} expired resource cleanup failed: {exc}",
+                        level="WARNING",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").warning(
+                        f"Expired resource cleanup failed: {exc}"
+                    )
+
             tasks = []
             tick_services: list[str] = []
             for svc in self._services:
@@ -276,6 +294,126 @@ class HeartbeatServer:
                 )
                 logger.bind(domain="orchestra").error(
                     f"Tick error in {type(service).__name__}: {exc}"
+                )
+
+    async def _cleanup_expired_resources(self, tick_number: int) -> None:
+        """Cleanup expired worktrees and branches (runs every N ticks)."""
+        # Delay imports to avoid circular dependencies
+        from vibe3.clients.git_client import GitClient
+        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.services.expired_resource_cleanup_service import (
+            ExpiredResourceCleanupService,
+        )
+
+        config = self.config.expired_resource_cleanup
+
+        # Initialize services
+        store = SQLiteClient()
+        git_client = GitClient()
+        github_client: GitHubClient | None = None
+
+        # Only initialize GitHub client if remote branch cleanup is enabled
+        if config.enable_remote_branch_cleanup:
+            try:
+                github_client = GitHubClient()
+            except Exception as exc:
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    "Failed to initialize GitHub client, "
+                    f"skipping remote branch cleanup: {exc}"
+                )
+
+        service = ExpiredResourceCleanupService(
+            store=store,
+            git_client=git_client,
+            github_client=github_client,
+        )
+
+        # Cleanup worktrees
+        if config.enable_worktree_cleanup:
+            try:
+                result = await asyncio.to_thread(
+                    service.clean_expired_agent_worktrees,
+                    config.max_age_days,
+                )
+                cleaned = result.get("cleaned", [])
+                if cleaned and isinstance(cleaned, list) and len(cleaned) > 0:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} cleanup: cleaned "
+                            f"{len(cleaned)} expired worktrees"
+                        ),
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").info(
+                        f"Cleaned {len(cleaned)} expired worktrees"
+                    )
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} worktree cleanup failed: {exc}",
+                    level="WARNING",
+                )
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    f"Worktree cleanup failed: {exc}"
+                )
+
+        # Cleanup local branches
+        if config.enable_local_branch_cleanup:
+            try:
+                result = await asyncio.to_thread(
+                    service.clean_expired_local_branches,
+                    config.max_age_days,
+                )
+                cleaned = result.get("cleaned", [])
+                if cleaned and isinstance(cleaned, list) and len(cleaned) > 0:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} cleanup: cleaned "
+                            f"{len(cleaned)} expired local branches"
+                        ),
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").info(
+                        f"Cleaned {len(cleaned)} expired local branches"
+                    )
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} local branch cleanup failed: {exc}",
+                    level="WARNING",
+                )
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    f"Local branch cleanup failed: {exc}"
+                )
+
+        # Cleanup remote branches (only if GitHub client available)
+        if config.enable_remote_branch_cleanup and github_client is not None:
+            try:
+                result = await asyncio.to_thread(
+                    service.clean_expired_remote_branches,
+                    config.max_age_days,
+                )
+                cleaned = result.get("cleaned", [])
+                if cleaned and isinstance(cleaned, list) and len(cleaned) > 0:
+                    append_orchestra_event(
+                        "server",
+                        (
+                            f"tick #{tick_number} cleanup: cleaned "
+                            f"{len(cleaned)} expired remote branches"
+                        ),
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").info(
+                        f"Cleaned {len(cleaned)} expired remote branches"
+                    )
+            except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick #{tick_number} remote branch cleanup failed: {exc}",
+                    level="WARNING",
+                )
+                logger.bind(domain="orchestra", action="cleanup").warning(
+                    f"Remote branch cleanup failed: {exc}"
                 )
 
     async def _idle_loop(self) -> None:
