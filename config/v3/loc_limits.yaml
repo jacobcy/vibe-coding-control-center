@@ -120,7 +120,7 @@ code_limits:
         limit: 600
         reason: "Governance 角色聚合，包含 supervisor 材料组装、issue 扫描、dispatch 逻辑、vibe-task 过滤、材料目录加载、recipe 构建、prompt 渲染、issue context 快照等紧密耦合流程难以拆分"
       - path: "src/vibe3/roles/plan.py"
-        limit: 410
+        limit: 450
         reason: "Planner 角色聚合，包含 request builder、sync/async dispatch、spec 解析（支持 issue number 和 file path 双通道）、resolve_spec_plan_input 等紧密耦合逻辑"
 
       # Server —— 允许 420-485

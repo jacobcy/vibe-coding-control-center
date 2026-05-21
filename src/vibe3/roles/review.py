@@ -135,6 +135,7 @@ def build_issue_review_request(
     dry_run: bool = False,
     show_prompt: bool = False,
     flow_state: dict[str, object] | None = None,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Consolidated factory for issue review requests (async and sync)."""
     resolver = ConventionResolver.from_repo()
@@ -203,6 +204,7 @@ def build_issue_review_request(
             extra_refs=refs,
             dry_run_summary=dry_run_summary,
             worktree_requirement=REVIEWER_ROLE.worktree,
+            tick_id=tick_id,
         )
 
     async_refs: dict[str, str] = {"issue_number": str(issue.number)}
@@ -220,6 +222,7 @@ def build_issue_review_request(
         refs=async_refs,
         worktree_requirement=REVIEWER_ROLE.worktree,
         repo_path=repo_path,
+        tick_id=tick_id,
     )
 
 
