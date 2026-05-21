@@ -259,7 +259,7 @@ def start(
         if was_auto_discovered:
             typer.echo(
                 f"  Port auto-discovered: {effective_port}"
-                f" (default {requested_port} was occupied)"
+                f" (requested port {requested_port} was occupied)"
             )
         if ts:
             ts_ok, ts_msg = _setup_tailscale_webhook(config.port)
