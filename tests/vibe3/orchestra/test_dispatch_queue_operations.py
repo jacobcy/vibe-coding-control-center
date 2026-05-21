@@ -425,3 +425,220 @@ class TestActiveIssueParsing:
             ]
         )
         assert coordinator._get_active_issue_numbers() == {99}
+
+
+class TestScanDispatchableStates:
+    """Unit tests for _scan_dispatchable_states().
+
+    The stateless coordinator polls GitHub once per dispatchable state per
+    tick and folds the results into a single candidate list. These tests
+    exercise the parts that are normally stubbed by TestStatelessDispatch:
+    label parsing, duplicate suppression, qualify_gate routing, and
+    skip-filter integration.
+    """
+
+    @staticmethod
+    def _make_payload(
+        number: int, state_label: str, assignees: tuple[str, ...] = ("manager-bot",)
+    ) -> dict:
+        return {
+            "number": number,
+            "title": f"Issue {number}",
+            "labels": [{"name": state_label}],
+            "assignees": [{"login": login} for login in assignees],
+        }
+
+    def _make_coordinator(self, *, list_issues_side_effect, qualify_target=None):
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        mock_github = MagicMock()
+        mock_github.list_issues.side_effect = list_issues_side_effect
+
+        mock_config = MagicMock()
+        mock_config.repo = "test/repo"
+        mock_config.max_concurrent_flows = 2
+        mock_config.get_manager_usernames.return_value = ["manager-bot"]
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
+
+        coordinator = GlobalDispatchCoordinator(
+            config=mock_config,
+            capacity=MagicMock(),
+            github=mock_github,
+            store=MagicMock(),
+            flow_manager=MagicMock(),
+            registry=MagicMock(),
+        )
+
+        # Stub flow_context to return a synthetic branch (avoids touching git)
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context",
+            return_value=("task/issue-x", None),
+        ):
+            # Stub qualify_gate: by default echo the scanned state (passes through)
+            coordinator._qualify_gate = MagicMock()
+            if qualify_target == "ECHO":
+                coordinator._qualify_gate.run_qualify_gate.side_effect = (
+                    lambda issue, branch, flow_state, labels, state: state
+                )
+            else:
+                coordinator._qualify_gate.run_qualify_gate.return_value = qualify_target
+            return coordinator
+
+    @pytest.mark.asyncio
+    async def test_skips_issues_without_state_label(self) -> None:
+        """Issues missing any state/* label are dropped (defensive filter)."""
+        from vibe3.models.orchestration import IssueState
+
+        def list_issues(**kwargs):
+            if kwargs.get("label") == IssueState.READY.to_label():
+                return [
+                    # valid: has state/ready
+                    self._make_payload(1, "state/ready"),
+                    # invalid: no state/* label at all
+                    {
+                        "number": 2,
+                        "title": "Issue 2",
+                        "labels": [{"name": "type/bug"}],
+                        "assignees": [{"login": "manager-bot"}],
+                    },
+                ]
+            return []
+
+        coordinator = self._make_coordinator(
+            list_issues_side_effect=list_issues, qualify_target="ECHO"
+        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context",
+            return_value=("task/issue-x", None),
+        ):
+            candidates = await coordinator._scan_dispatchable_states()
+
+        assert {c.number for c in candidates} == {1}
+
+    @pytest.mark.asyncio
+    async def test_suppresses_duplicate_issues_across_states(self) -> None:
+        """An issue carrying multiple state/* labels is only emitted once."""
+        from vibe3.models.orchestration import IssueState
+
+        # Issue 7 appears under both REVIEW and CLAIMED queries; the first
+        # state encountered (REVIEW per coordinator's iteration order) wins.
+        def list_issues(**kwargs):
+            label = kwargs.get("label")
+            if label == IssueState.REVIEW.to_label():
+                return [self._make_payload(7, "state/review")]
+            if label == IssueState.CLAIMED.to_label():
+                return [self._make_payload(7, "state/claimed")]
+            return []
+
+        coordinator = self._make_coordinator(
+            list_issues_side_effect=list_issues, qualify_target="ECHO"
+        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context",
+            return_value=("task/issue-7", None),
+        ):
+            candidates = await coordinator._scan_dispatchable_states()
+
+        assert len(candidates) == 1
+        assert candidates[0].number == 7
+
+    @pytest.mark.asyncio
+    async def test_blocked_issues_bypass_qualify_gate_at_scan_time(self) -> None:
+        """BLOCKED issues skip qualify_gate during scan (deferred to dispatch)."""
+        from vibe3.models.orchestration import IssueState
+
+        def list_issues(**kwargs):
+            if kwargs.get("label") == IssueState.BLOCKED.to_label():
+                return [self._make_payload(11, "state/blocked")]
+            return []
+
+        coordinator = self._make_coordinator(
+            list_issues_side_effect=list_issues,
+            qualify_target=None,  # would filter if called
+        )
+        candidates = await coordinator._scan_dispatchable_states()
+
+        assert {c.number for c in candidates} == {11}
+        coordinator._qualify_gate.run_qualify_gate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_blocked_issues_filtered_when_qualify_gate_disagrees(
+        self,
+    ) -> None:
+        """Non-BLOCKED issues are dropped if qualify_gate retargets or rejects."""
+        from vibe3.models.orchestration import IssueState
+
+        def list_issues(**kwargs):
+            if kwargs.get("label") == IssueState.READY.to_label():
+                return [
+                    self._make_payload(20, "state/ready"),
+                    self._make_payload(21, "state/ready"),
+                ]
+            return []
+
+        coordinator = self._make_coordinator(
+            list_issues_side_effect=list_issues,
+            qualify_target=None,  # reject everything
+        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context",
+            return_value=("task/issue-x", None),
+        ):
+            candidates = await coordinator._scan_dispatchable_states()
+
+        assert candidates == []
+
+    @pytest.mark.asyncio
+    async def test_assignee_missing_filters_candidate(self) -> None:
+        """Issues without the required manager assignee are filtered."""
+        from vibe3.models.orchestration import IssueState
+
+        def list_issues(**kwargs):
+            if kwargs.get("label") == IssueState.READY.to_label():
+                return [
+                    # has manager-bot assignee → kept
+                    self._make_payload(30, "state/ready"),
+                    # no manager assignee → dropped by should_skip_from_queue
+                    self._make_payload(31, "state/ready", assignees=("random-user",)),
+                ]
+            return []
+
+        coordinator = self._make_coordinator(
+            list_issues_side_effect=list_issues, qualify_target="ECHO"
+        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context",
+            return_value=("task/issue-x", None),
+        ):
+            candidates = await coordinator._scan_dispatchable_states()
+
+        assert {c.number for c in candidates} == {30}
+
+    @pytest.mark.asyncio
+    async def test_per_state_exception_does_not_abort_scan(self) -> None:
+        """If one state query fails, other states still contribute candidates."""
+        from vibe3.models.orchestration import IssueState
+
+        def list_issues(**kwargs):
+            label = kwargs.get("label")
+            if label == IssueState.REVIEW.to_label():
+                raise RuntimeError("simulated GitHub API failure")
+            if label == IssueState.READY.to_label():
+                return [self._make_payload(42, "state/ready")]
+            return []
+
+        coordinator = self._make_coordinator(
+            list_issues_side_effect=list_issues, qualify_target="ECHO"
+        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context",
+            return_value=("task/issue-x", None),
+        ):
+            candidates = await coordinator._scan_dispatchable_states()
+
+        # READY survives even though REVIEW raised
+        assert {c.number for c in candidates} == {42}
