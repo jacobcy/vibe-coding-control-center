@@ -1,11 +1,13 @@
 from pathlib import Path
 
-from vibe3.utils.path_helpers import (
+from vibe3.utils.handoff_resolution import (
     is_shared_handoff_ref,
+    to_display_target,
+)
+from vibe3.utils.path_helpers import (
     ref_to_handoff_cmd,
     resolve_ref_path,
     sanitize_event_detail_paths,
-    to_display_target,
 )
 
 
