@@ -42,6 +42,14 @@ def show(
         str | None,
         typer.Argument(help="Issue number (auto-resolves to task branch if exists)"),
     ] = None,
+    branch_opt: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
+    pr_opt: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve branch from"),
+    ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     output_format: FormatOption = "table",
     full: Annotated[
@@ -72,7 +80,10 @@ def show(
     task_svc = TaskService()
 
     try:
-        target_branch = task_svc.resolve_branch(issue)
+        # Pass branch_opt and issue separately for conflict detection
+        target_branch = task_svc.resolve_branch(
+            branch_opt, pr_number=pr_opt, position_arg=issue
+        )
     except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error

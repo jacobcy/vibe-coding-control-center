@@ -1,24 +1,30 @@
 # Claude Code 技能清单（准确版）
 
-生成时间: 2026-03-18
+生成时间: 2026-05-21
 
 ## 系统架构
 
-您有**两个独立的技能系统**：
+您有**三个独立的技能系统**：
 
-### 1. Everything Claude Code (ECC) 系统
+### 1. Repository-Local Skills (Vibe Center)
+- **目录**: `skills/`
+- **定位**: 项目特有的自动化流程、治理与协作技能
+- **状态**: 核心运行时技能
+- **技能数**: 22 个
+
+### 2. Everything Claude Code (ECC) 系统
 - **目录**: `~/.claude/skills/`
 - **定位**: 全面的技能和规则集合
 - **状态**: 活跃维护
 - **技能数**: 37 个
 
-### 2. Superpowers 系统
+### 3. Superpowers 系统
 - **目录**: `~/.agents/skills/`
 - **定位**: 基础代理工作流框架
 - **状态**: 活跃（不是"旧版"或"已弃用"）
 - **技能数**: 18 个
 
-**重要**: 这两个系统是**互补的**，不是替代关系。Superpowers 关注工作流程，ECC 关注技术实现。
+**重要**: 这三个系统是**互补的**，不是替代关系。Vibe Skills 关注本项目 V3 运行时的自动化，Superpowers 关注通用工作流程，ECC 关注通用技术实现。
 
 ---
 
@@ -26,9 +32,10 @@
 
 ```
 Skills:
-  1. ~/.claude/skills/    ← ECC 技能（优先）
-  2. .claude/skills/      ← 项目级覆盖
-  3. ~/.agents/skills/    ← Superpowers 技能
+  1. skills/              ← Vibe 本地技能（本项目最高优先级）
+  2. ~/.claude/skills/    ← ECC 技能
+  3. .claude/skills/      ← 项目级覆盖
+  4. ~/.agents/skills/    ← Superpowers 技能
 
 Agents:
   1. ~/.claude/agents/    ← ECC 代理
@@ -38,6 +45,54 @@ Rules:
   1. ~/.claude/rules/     ← ECC 规则
   2. .claude/rules/       ← 项目级规则
 ```
+
+---
+
+## Vibe 本地技能 (skills/)
+
+### 开发与协作 (7 个)
+
+| Skill | 功能描述 |
+|-------|---------|
+| `vibe-new` | 启动新任务，绑定 issue，同步 flow 现场 |
+| `vibe-continue` | 恢复现有任务，加载 handoff 上下文 |
+| `vibe-commit` | 提交代码，处理 pre-commit 格式化，创建/更新 PR |
+| `vibe-integrate` | 评估 PR 状态，处理合并冲突与依赖 |
+| `vibe-done` | 完成任务，关闭 issue，清理现场 |
+| `vibe-save` | 保存当前 session 上下文，记录 handoff |
+| `vibe-closeout` | 执行 flow 终端清理（由 manager 调度） |
+
+### 治理与巡检 (8 个)
+
+| Skill | 功能描述 |
+|-------|---------|
+| `vibe-check` | 审计 task-flow 状态，同步 metadata，修复同步错误 |
+| `vibe-orchestra` | Issue 池治理，心跳调度，分配任务 |
+| `vibe-roadmap` | 路线图规划，版本目标管理，Issue 分组 |
+| `vibe-issue` | 创建、修补或去重 GitHub Issue |
+| `vibe-rules` | 治理项目规则文件，防止冗余或冲突 |
+| `vibe-skill-audit` | 审查与更新项目本地技能定义 |
+| `vibe-redundancy-audit` | 发现业务逻辑或代码中的冗余实现 |
+| `vibe-skills-manager` | 管理跨项目与本地技能的同步与加载 |
+
+### 评审与引导 (4 个)
+
+| Skill | 功能描述 |
+|-------|---------|
+| `vibe-review-code` | 源码实现结构化评审 |
+| `vibe-review-docs` | 文档质量、变更日志与语义一致性评审 |
+| `vibe-review-pr` | 综合 PR 评审（支持多代理协作模式） |
+| `vibe-onboard` | 安装后的入门引导与系统检查 |
+
+### 调试与监控 (3 个)
+
+| Skill | 功能描述 |
+|-------|---------|
+| `vibe-instruction` | 项目元指令，提供架构与命令概览 |
+| `vibe-debug-serve` | 调试 vibe3 serve (orchestra) 运行时 |
+| `vibe-task` | 跨工作区任务流状态查询与切换建议 |
+
+**Vibe 总计**: 22 个技能
 
 ---
 
@@ -261,6 +316,7 @@ Rules:
 
 ### 按系统统计
 
+- **Vibe 技能**: 22 个 (Repository-Local)
 - **ECC 技能**: 37 个
 - **Superpowers 技能**: 18 个
 - **ECC 规则**: 14 个文件
@@ -268,7 +324,7 @@ Rules:
 
 ### 总计
 
-- **技能总数**: 55 个（37 ECC + 18 Superpowers）
+- **技能总数**: 77 个（22 Vibe + 37 ECC + 18 Superpowers）
 - **代理总数**: 29 个（ECC）
 - **规则总数**: 14 个文件
 

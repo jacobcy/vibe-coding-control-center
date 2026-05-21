@@ -20,6 +20,7 @@ from vibe3.services.handoff_status_service import HandoffStatusService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import render_handoff_detail
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.utils.pr_branch_resolver import resolve_command_branch
 
 
 def _format_relative_time(timestamp: datetime, now: datetime | None = None) -> str:
@@ -145,6 +146,10 @@ def status(
     branch_opt: Annotated[
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
+    pr_opt: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve branch from"),
+    ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -161,7 +166,6 @@ def status(
     ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
-    branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -171,21 +175,21 @@ def status(
         output_format = "json"
 
     with trace_scope(trace, "handoff status", domain="handoff"):
-        logger.bind(command="handoff status", branch=branch).info(
+        flow_service = FlowService()
+        try:
+            target_branch = resolve_command_branch(
+                branch_opt=branch_opt,
+                pr_opt=pr_opt,
+                position_arg=branch_arg,
+                flow_service=flow_service,
+            )
+        except (UserError, SystemError) as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
+        logger.bind(command="handoff status", branch=target_branch).info(
             "Showing handoff details"
         )
-
-        flow_service = FlowService()
-        if branch:
-            try:
-                target_branch = (
-                    resolve_issue_branch_input(branch, flow_service) or branch
-                )
-            except (UserError, SystemError) as error:
-                typer.echo(f"Error: {error}", err=True)
-                raise typer.Exit(1) from error
-        else:
-            target_branch = flow_service.get_current_branch()
 
         # Aggregate handoff status from service
         status_service = HandoffStatusService(flow_service=flow_service)
@@ -282,8 +286,8 @@ def status(
             if target_branch != current_branch:
                 tip_cmd += f" --branch {target_branch}"
             console.print(
-                f"[dim]Tip: use '{tip_cmd}' "
-                "to view full handoff content (including non-event updates).[/]"
+                f"[dim]Tip: use '{tip_cmd}' to view full handoff content, "
+                "or 'vibe3 handoff status --all' to show all events.[/]"
             )
 
 

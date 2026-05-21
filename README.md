@@ -39,27 +39,25 @@ V3 是当前的本地运行时与协作主系统，核心能力包括：
 ## 快速开始
 
 ```bash
-# 1. 先看 V3 运行时状态
+# 1. 查看 V3 运行时与 Flow 状态 (这是 Agent 的首选入口)
 uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py flow show
 
-# 2. 全局安装；会同步基础文件，并自动对当前项目补跑一次 init
-zsh scripts/install.sh
+# 2. 如果是首次使用或环境变更，执行初始化
+# 这会同步基础文件并初始化本地 worktree (symlinks, hooks, etc.)
+zsh scripts/init.sh
 
-# 3. 重新加载 shell
-source ~/.zshrc   # 或你的实际 shell rc
+# 3. 如果需要全局安装 Vibe 工具链 (vibe2 shell aliases)
+zsh scripts/install.sh && source ~/.zshrc
 
-# 4. 启动 Claude / Codex / Gemini 等工具后，优先用引导式入口
+# 4. 启动 Agent 后，优先使用引导技能
 /vibe-onboard
 
-# 5. 或手工检查
-vibe doctor
-vibe keys check
+# 5. 检查密钥与环境
+uv run python src/vibe3/cli.py status --verbose
+vibe keys check  # (需 source ~/.zshrc)
 
-# 6. 手动编辑密钥文件
-$EDITOR ~/.vibe/keys.env
-
-# 7. 检查 skills / 能力体系
-vibe skills check
+# 6. 管理技能体系
 /vibe-skills-manager
 ```
 

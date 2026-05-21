@@ -29,7 +29,10 @@ def test_serve_start_preflight_blocked() -> None:
                 # Mock _validate_pid_file to say no process running
                 with patch("vibe3.server.app._validate_pid_file") as mock_pid:
                     mock_pid.return_value = (None, False)
-                    with patch("vibe3.server.app.ensure_port_available"):
+                    with patch(
+                        "vibe3.server.app.find_available_port",
+                        lambda port, max_port: (port, False),
+                    ):
                         result = runner.invoke(app, ["start"])
 
             assert result.exit_code == 1
