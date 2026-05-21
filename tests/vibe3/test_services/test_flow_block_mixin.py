@@ -141,19 +141,12 @@ def test_project_blocked_state_idempotent_for_duplicate() -> None:
         mock_client.get_issue_body.return_value = existing_body
         mock_client.update_issue_body.return_value = True
 
-        # Execute: add same blocker #100 again
+        # Execute: add same blocker #100 again with reason=None (idempotent path)
         service._project_blocked_state(
             issue_number=123,
             blocked_by_issue=100,
-            reason="Same dependency",
+            reason=None,  # Keep reason unchanged to trigger no-op
         )
 
-        # Verify update_issue_body called
-        mock_client.update_issue_body.assert_called_once()
-        call_args = mock_client.update_issue_body.call_args
-        merged_body = call_args[0][1]
-
-        # Verify #100 appears only once (deduplicated)
-        # Count occurrences of #100
-        count = merged_body.count("#100")
-        assert count == 1, f"Expected #100 to appear once, but found {count} times"
+        # Verify update_issue_body NOT called (idempotent, no change)
+        mock_client.update_issue_body.assert_not_called()

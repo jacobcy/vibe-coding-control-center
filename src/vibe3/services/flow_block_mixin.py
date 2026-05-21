@@ -40,10 +40,11 @@ class FlowLifecycleMixin:
         existing_deps = set(current_proj.blocked_by)
 
         # Merge new blocker (deduplicate)
-        if blocked_by_issue:
+        # When blocked_by_issue is None, clear dependencies (reason-only block)
+        if blocked_by_issue is not None:
             new_blocked_by = sorted(existing_deps | {blocked_by_issue})
         else:
-            new_blocked_by = sorted(existing_deps)
+            new_blocked_by = []
 
         # Build projection with merged blocked_by
         proj = FlowStateProjection(
