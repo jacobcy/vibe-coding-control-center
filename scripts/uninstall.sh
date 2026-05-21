@@ -8,12 +8,16 @@ INSTALL_DIR="$HOME/.vibe"
 SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 [[ -f "$SOURCE_ROOT/lib/utils.sh" ]] && source "$SOURCE_ROOT/lib/utils.sh" || { echo "error: missing lib/utils.sh"; exit 1; }
 
+# Directories synced during install (must match install.sh line 147)
+SYNC_DIRS="bin lib lib3 config scripts alias src skills"
+
 # --- Help ---
 _usage() {
     echo "${BOLD}Vibe Coding Control Center - Uninstaller${NC}"
     echo ""
     echo "此脚本负责完全移除 Vibe 的全局分发环境："
-    echo "  1. 彻底清理环境：删除 ${CYAN}~/.vibe${NC} 目录下的所有文件"
+    echo "  1. 彻底清理环境：删除 ${CYAN}~/.vibe${NC} 目录及所有同步组件"
+    echo "     同步组件包括：bin, lib, lib3, config, scripts, alias, src, skills"
     echo "  2. 撤销配置注入：移除 ${CYAN}.zshrc/.bashrc${NC} 中的加载器条目"
     echo "  3. 可选保留用户数据（${CYAN}--keep-data${NC}）"
     echo ""
@@ -68,9 +72,11 @@ if [[ "$SKIP_CONFIRM" != true ]]; then
         echo "   - $INSTALL_DIR/skills.json"
     else
         log_warning "All user data will be removed, including:"
-        echo "   - Configuration files"
-        echo "   - Policies and assets"
-        echo "   - User keys and skills config"
+        echo "   - Configuration files (config/)"
+        echo "   - Policies and assets (assets/)"
+        echo "   - User keys (config/keys.env)"
+        echo "   - Skills config (skills.json)"
+        echo "   - All synced directories (bin, lib, lib3, scripts, alias, src, skills)"
     fi
     echo ""
 
@@ -96,14 +102,23 @@ if [[ "$KEEP_DATA" == true ]]; then
     fi
 fi
 
-# 1. Remove Installation Directory
+# 1. Explicitly remove synced directories
+log_info "Removing synced directories..."
+for dir in $SYNC_DIRS; do
+    if [[ -d "$INSTALL_DIR/$dir" ]]; then
+        rm -rf "$INSTALL_DIR/$dir"
+        log_success "Removed $INSTALL_DIR/$dir"
+    fi
+done
+
+# 2. Remove Installation Directory (safety net for any remaining files)
 log_info "Removing installation directory..."
 if [[ -d "$INSTALL_DIR" ]]; then
     rm -rf "$INSTALL_DIR"
     log_success "Removed $INSTALL_DIR"
 fi
 
-# 2. Restore user data if preserved
+# 3. Restore user data if preserved
 if [[ "$KEEP_DATA" == true ]] && [[ -n "$TEMP_BACKUP" ]]; then
     log_info "Restoring user data to $INSTALL_DIR..."
 
@@ -123,7 +138,7 @@ if [[ "$KEEP_DATA" == true ]] && [[ -n "$TEMP_BACKUP" ]]; then
     rm -rf "$TEMP_BACKUP"
 fi
 
-# 3. Remove Shell Integration
+# 4. Remove Shell Integration
 log_info "Cleaning shell configuration files..."
 
 _clean_rc_file() {
@@ -167,7 +182,7 @@ _clean_rc_file "$HOME/.zshrc"
 _clean_rc_file "$HOME/.bashrc"
 _clean_rc_file "$HOME/.bash_profile"
 
-# 4. Finalize
+# 5. Finalize
 echo ""
 log_success "Uninstall complete!"
 echo ""

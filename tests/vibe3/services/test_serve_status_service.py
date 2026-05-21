@@ -1,5 +1,7 @@
 """Tests for ServeStatusService."""
 
+from unittest.mock import MagicMock, patch
+
 from vibe3.services.serve_status_service import ServeStatusService
 
 
@@ -66,3 +68,105 @@ class TestCleanErrorMessage:
             "CLAUDE_CODE_TMPDIR: /tmp/path | === Recent Errors ==="
         )
         assert result == "actual error"
+
+
+class TestDisplayConfig:
+    """Test cases for _display_config method."""
+
+    @patch(
+        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+    )
+    def test_display_config_uses_live_snapshot_when_server_running(
+        self, mock_fetch_live_snapshot
+    ):
+        """When server is running, display shows runtime value from live snapshot."""
+        from vibe3.services.orchestra_status_service import OrchestraSnapshot
+
+        # Setup config with static value 60
+        config = MagicMock()
+        config.polling_interval = 60
+        config.max_concurrent_flows = 3
+        config.port = 8080
+
+        # Mock live snapshot with runtime override 30
+        live_snapshot = OrchestraSnapshot(
+            timestamp=1234567890.0,
+            server_running=True,
+            active_issues=(),
+            active_flows=0,
+            active_worktrees=0,
+            polling_interval=30,
+            port=8080,
+        )
+        mock_fetch_live_snapshot.return_value = live_snapshot
+
+        service = ServeStatusService(config)
+        service.console = MagicMock()
+
+        service._display_config()
+
+        # Should show runtime value 30 with override indicator
+        printed = [str(call.args[0]) for call in service.console.print.call_args_list]
+        assert any(
+            "30s" in msg and "(override" in msg and "60s" in msg for msg in printed
+        )
+
+    @patch(
+        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+    )
+    def test_display_config_falls_back_to_static_when_server_down(
+        self, mock_fetch_live_snapshot
+    ):
+        """When server is unreachable, display shows static config value."""
+        config = MagicMock()
+        config.polling_interval = 60
+        config.max_concurrent_flows = 3
+        config.port = 8080
+
+        # Server unreachable
+        mock_fetch_live_snapshot.return_value = None
+
+        service = ServeStatusService(config)
+        service.console = MagicMock()
+
+        service._display_config()
+
+        # Should show static config value without override indicator
+        printed = [str(call.args[0]) for call in service.console.print.call_args_list]
+        assert any("60s" in msg and "(override" not in msg for msg in printed)
+
+    @patch(
+        "vibe3.services.orchestra_status_service.OrchestraStatusService.fetch_live_snapshot"
+    )
+    def test_display_config_no_override_indicator_when_values_match(
+        self, mock_fetch_live_snapshot
+    ):
+        """When live snapshot matches config, no override indicator is shown."""
+        from vibe3.services.orchestra_status_service import OrchestraSnapshot
+
+        config = MagicMock()
+        config.polling_interval = 60
+        config.max_concurrent_flows = 3
+        config.port = 8080
+
+        # Live snapshot has same value as config
+        live_snapshot = OrchestraSnapshot(
+            timestamp=1234567890.0,
+            server_running=True,
+            active_issues=(),
+            active_flows=0,
+            active_worktrees=0,
+            polling_interval=60,
+            port=8080,
+        )
+        mock_fetch_live_snapshot.return_value = live_snapshot
+
+        service = ServeStatusService(config)
+        service.console = MagicMock()
+
+        service._display_config()
+
+        # Should show value without override indicator
+        printed = [str(call.args[0]) for call in service.console.print.call_args_list]
+        assert any("60s" in msg for msg in printed)
+        assert not any("(override" in msg for msg in printed)

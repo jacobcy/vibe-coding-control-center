@@ -9,6 +9,15 @@ from pydantic import BaseModel, Field
 from vibe3.utils.actor_utils import normalize_actor
 
 
+class CICheck(BaseModel):
+    """CI check details."""
+
+    name: str
+    state: str  # SUCCESS, FAILURE, PENDING, etc.
+    bucket: str  # pass, fail, pending, skipping, cancel
+    link: str
+
+
 class PRState(str, Enum):
     """PR state."""
 
@@ -104,6 +113,9 @@ class PRResponse(BaseModel):
     updated_at: Optional[datetime] = Field(None, description="Updated at")
     merged_at: Optional[datetime] = Field(None, description="Merged at")
     metadata: Optional[PRMetadata] = Field(None, description="PR metadata")
+    ci_checks: list[CICheck] = Field(
+        default_factory=list, description="CI check details"
+    )
     comments: list[dict[str, Any]] = Field(default_factory=list)
     review_comments: list[dict[str, Any]] = Field(default_factory=list)
     reviews: list[dict[str, Any]] = Field(default_factory=list)

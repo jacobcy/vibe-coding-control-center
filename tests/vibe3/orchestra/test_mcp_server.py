@@ -39,6 +39,8 @@ class MockOrchestraSnapshot:
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None
+    polling_interval: int = 900
+    port: int = 8080
 
 
 class MockIssueState:

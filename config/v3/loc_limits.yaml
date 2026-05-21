@@ -179,8 +179,8 @@ code_limits:
         limit: 470
         reason: "Async launcher 工具类，包含 tmux 会话管理、日志路径分配、Codex 噪声过滤、wrapper 脚本启动四个高内聚模块"
       - path: "src/vibe3/services/orchestra_status_service.py"
-        limit: 510
-        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、pr_number 类型强制转换防御逻辑等紧密耦合逻辑，职责单一但方法较多"
+        limit: 520
+        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑，职责单一但方法较多"
 
       # Utils 层 —— 允许 550
       - path: "src/vibe3/utils/path_helpers.py"

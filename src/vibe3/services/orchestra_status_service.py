@@ -68,6 +68,8 @@ class OrchestraSnapshot:
     blocked_reason: str | None = None
     blocked_issue_number: int | None = None
     blocked_issue_reason: str | None = None
+    polling_interval: int = OrchestraConfig.model_fields["polling_interval"].default
+    port: int = OrchestraConfig.model_fields["port"].default
 
 
 def format_issue_summary_line(entry: IssueStatusEntry) -> str:
@@ -220,9 +222,16 @@ class OrchestraStatusService:
                         blocked_reason=data.get("blocked_reason"),
                         blocked_issue_number=data.get("blocked_issue_number"),
                         blocked_issue_reason=data.get("blocked_issue_reason"),
+                        polling_interval=int(
+                            data.get("polling_interval", config.polling_interval)
+                        ),
+                        port=int(data.get("port", config.port)),
                     )
                 return None
-        except (URLError, ConnectionError, Exception):
+        except (URLError, TimeoutError, ConnectionError, ValueError, TypeError):
+            logger.bind(domain="orchestra").debug(
+                "Live snapshot unavailable, falling back to static config"
+            )
             return None
 
     def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
@@ -433,6 +442,8 @@ class OrchestraStatusService:
             blocked_reason=blocked_reason,
             blocked_issue_number=blocked_issue_number,
             blocked_issue_reason=blocked_issue_reason,
+            polling_interval=self.config.polling_interval,
+            port=self.config.port,
         )
 
         log.debug(
