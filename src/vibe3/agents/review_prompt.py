@@ -139,20 +139,20 @@ def build_review_task_section(task_text: str | None) -> str:
     # Default: findings-first task guidance
     return """## Review Task
 
-    **Prioritize**: correctness → regression risk → API breaks → missing tests
+**Prioritize**: correctness → regression risk → API breaks → missing tests
 
-    **Focus on**:
-    - Run `git diff <base>...HEAD` to see file changes
-    - Review only changed code, not the entire codebase
-    - Use AST analysis to understand function-level impact
-    - Give findings first, then verdict with brief rationale
-    - Verdict meaning: PASS/REFUSE may omit `audit_ref`; MINOR means merge is
-      acceptable with follow-up; MAJOR/BLOCK require fixes and `audit_ref`
+**Focus on**:
+- Run `git diff <base>...HEAD` to see file changes
+- Review only changed code, not the entire codebase
+- Use AST analysis to understand function-level impact
+- Give findings first, then verdict with brief rationale
+- Verdict meaning: PASS/REFUSE may omit `audit_ref`; MINOR means merge is
+  acceptable with follow-up; MAJOR/BLOCK require fixes and `audit_ref`
 
-    **Skip**:
-    - Generic architecture commentary unrelated to this diff
-    - Praise/description paragraphs
-    - Style suggestions unless they affect correctness"""
+**Skip**:
+- Generic architecture commentary unrelated to this diff
+- Praise/description paragraphs
+- Style suggestions unless they affect correctness"""
 
 
 def build_output_contract_section(output_format: str | None) -> str:
@@ -173,25 +173,25 @@ def build_output_contract_section(output_format: str | None) -> str:
     # Default: findings-first output format
     return """## Output format requirements
 
-    **FINDINGS FIRST — No praise, no generic commentary.**
+**FINDINGS FIRST — No praise, no generic commentary.**
 
-    The first line must be exactly:
-    VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE
+The first line must be exactly:
+VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE
 
-    If findings exist, list them concisely:
-    path/to/file.py:42 [BLOCK] <specific issue with code evidence>
-    path/to/file.py:100 [MAJOR] <specific issue with code evidence>
+If findings exist, list them concisely:
+path/to/file.py:42 [BLOCK] <specific issue with code evidence>
+path/to/file.py:100 [MAJOR] <specific issue with code evidence>
 
-    Then provide a brief rationale (1-2 sentences):
-    - PASS: "Why no blocking/major issue was found for this diff"
-    - MINOR: "Summary of the accepted follow-up issue"
-    - MAJOR: "Summary of what should be addressed before merge"
-    - BLOCK: "Summary of critical issues that must be fixed"
-    - REFUSE: "Why a normal review verdict cannot be provided"
+Then provide a brief rationale (1-2 sentences):
+- PASS: "Why no blocking/major issue was found for this diff"
+- MINOR: "Summary of the accepted follow-up issue"
+- MAJOR: "Summary of what should be addressed before merge"
+- BLOCK: "Summary of critical issues that must be fixed"
+- REFUSE: "Why a normal review verdict cannot be provided"
 
-    The final line must repeat the same VERDICT.
+The final line must repeat the same VERDICT.
 
-    **DO NOT**:
+**DO NOT**:
 - Write lengthy summary before findings
 - Include "Strength" / "Positive" / "Praise" paragraphs
 - Give generic architecture commentary unrelated to the diff"""

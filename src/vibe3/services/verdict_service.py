@@ -79,7 +79,7 @@ class VerdictService:
         6. Updates flow state's latest_verdict (quick query)
 
         Args:
-            verdict: Verdict value (PASS, MAJOR, BLOCK, UNKNOWN)
+            verdict: Verdict value (PASS, MINOR, MAJOR, BLOCK, REFUSE, UNKNOWN)
             reason: Optional reason for the verdict
             issues: Optional issues description
             branch: Target branch (current if None)

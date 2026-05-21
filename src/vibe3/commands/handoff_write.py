@@ -322,8 +322,10 @@ def verdict(
 
     Verdict values:
     - PASS: No issues, ready to merge
+    - MINOR: Minor issues, merge acceptable with follow-up
     - MAJOR: Issues found, needs fix before merge
     - BLOCK: Critical issues, blocks merge
+    - REFUSE: Cannot perform normal review (ethical/legal concerns)
     - UNKNOWN: Cannot determine
 
     Examples:
