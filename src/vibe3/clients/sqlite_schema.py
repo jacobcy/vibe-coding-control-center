@@ -119,6 +119,7 @@ _CREATE_ERROR_LOG = """
         tick_id INTEGER NOT NULL,
         error_code TEXT NOT NULL,
         error_message TEXT NOT NULL,
+        severity TEXT,
         issue_number INTEGER,
         branch TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -138,6 +139,11 @@ _CREATE_ERROR_LOG_INDEXES = [
         "error_log(branch, created_at DESC)"
     ),
 ]
+
+# Severity index created separately after migration
+_CREATE_ERROR_SEVERITY_INDEX = (
+    "CREATE INDEX IF NOT EXISTS idx_error_severity ON error_log(severity)"
+)
 
 _CREATE_FAILED_GATE_STATE = """
     CREATE TABLE IF NOT EXISTS failed_gate_state (
@@ -348,6 +354,44 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_ERROR_LOG)
     for index_sql in _CREATE_ERROR_LOG_INDEXES:
         cursor.execute(index_sql)
+
+    # Migration: add severity column to error_log and backfill from registry
+    error_log_columns = {
+        row[1] for row in cursor.execute("PRAGMA table_info(error_log)").fetchall()
+    }
+    if "severity" not in error_log_columns:
+        cursor.execute("ALTER TABLE error_log ADD COLUMN severity TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added severity column to error_log"
+        )
+
+    # Backfill NULL/missing severity values using registry
+    # Runs both for newly added column and for any rows with NULL severity
+    # (handles interrupted migrations or earlier code writing without severity)
+    from vibe3.exceptions.error_classification import get_error_handling_contract
+
+    before_changes = conn.total_changes
+    # Fetch all error codes with NULL severity
+    null_severity_codes = cursor.execute(
+        "SELECT DISTINCT error_code FROM error_log WHERE severity IS NULL"
+    ).fetchall()
+    for (error_code,) in null_severity_codes:
+        contract = get_error_handling_contract(error_code)
+        cursor.execute(
+            "UPDATE error_log SET severity = ? WHERE error_code = ? "
+            "AND severity IS NULL",
+            (contract.severity.value, error_code),
+        )
+    updated = conn.total_changes - before_changes
+    # Only log if updated is a real number (not a mock in tests)
+    if isinstance(updated, int) and updated > 0:
+        logger.bind(external="sqlite", operation="migration").info(
+            f"Backfilled severity for {updated} error_log records"
+        )
+
+    # Create severity index (after column exists)
+    cursor.execute(_CREATE_ERROR_SEVERITY_INDEX)
+
     cursor.execute(_CREATE_FAILED_GATE_STATE)
     cursor.execute(_CREATE_ORCHESTRA_QUEUE)
     cursor.execute(_CREATE_TRANSITION_HISTORY)
@@ -475,6 +519,12 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(
         "INSERT OR IGNORE INTO schema_meta (key, value) "
         "VALUES ('store_type', 'handoff_store')"
+    )
+    # Track migration version for lightweight guard in sqlite_base.py
+    # Increment this when adding new migrations that need to run on existing DBs
+    cursor.execute(
+        "INSERT OR REPLACE INTO schema_meta (key, value) "
+        "VALUES ('migration_version', '1')"
     )
     conn.commit()
     logger.bind(external="sqlite", operation="init_schema").debug(

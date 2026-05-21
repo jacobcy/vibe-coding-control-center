@@ -4,6 +4,7 @@ This module provides path normalization, resolution, and display utilities.
 For handoff target resolution, see handoff_resolution module.
 """
 
+import re
 from pathlib import Path
 
 from vibe3.utils.git_path_client import (
@@ -17,9 +18,7 @@ from vibe3.utils.git_path_client import (
 # Import handoff resolution functions from dedicated module
 from vibe3.utils.handoff_resolution import (
     _SHARED_HANDOFF_PREFIX,
-    is_shared_handoff_ref,
     resolve_handoff_target,
-    to_display_target,
 )
 
 # Backward compatibility alias
@@ -257,6 +256,33 @@ def check_ref_exists(
         return (ref_value, False)
 
 
+def _path_to_alias(path: str) -> str:
+    """Convert a ref path to shortcut alias if applicable.
+
+    Args:
+        path: Relative path (e.g., "docs/plans/xxx.md" or
+            ".git/vibe3/handoff/task-xxx/run-yyy.md")
+
+    Returns:
+        Shortcut alias (@plan, @report, @spec, @task-xxx/run-yyy.md) or
+        original path
+    """
+    if path.startswith("docs/plans/"):
+        return "@plan"
+    if path.startswith("docs/reports/"):
+        return "@report"
+    if path.startswith("docs/specs/"):
+        return "@spec"
+    # Shared artifacts: add @ prefix and keep the rest
+    if path.startswith("vibe3/handoff/"):
+        return f"@{path[14:]}"  # Remove "vibe3/handoff/" prefix, add @
+    if ".git/vibe3/handoff/" in path:
+        match = re.search(r"\.git/vibe3/handoff/(.+)", path)
+        if match:
+            return f"@{match.group(1)}"
+    return path
+
+
 def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
     """Convert a display-form ref path to a ``vibe3 handoff show`` command.
 
@@ -268,13 +294,26 @@ def ref_to_handoff_cmd(path: str, branch: str | None = None) -> str:
     ``--branch <branch>`` when branch is known.
     Other relative paths and absolute paths are returned as-is (not handoff artifacts).
     """
-    if is_shared_handoff_ref(path):
-        return f"vibe3 handoff show {to_display_target(path)}"
+    # Determine display target with alias substitution
+    if (
+        path.startswith("docs/plans/")
+        or path.startswith("docs/reports/")
+        or path.startswith("docs/specs/")
+    ):
+        display_target = _path_to_alias(path)
+    elif path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
+        display_target = _path_to_alias(path)
+    else:
+        display_target = path
+
+    if path.startswith("vibe3/handoff/") or ".git/vibe3/handoff/" in path:
+        # Shared artifact: use @ prefix form without --branch
+        return f"vibe3 handoff show {display_target}"
     # Only treat docs/reports and docs/plans as handoff artifacts
     if path.startswith("docs/reports/") or path.startswith("docs/plans/"):
         if branch:
-            return f"vibe3 handoff show --branch {branch} {path}"
-        return f"vibe3 handoff show {path}"
+            return f"vibe3 handoff show --branch {branch} {display_target}"
+        return f"vibe3 handoff show {display_target}"
     # Non-handoff paths (temp/logs, etc.) return as-is
     return path
 

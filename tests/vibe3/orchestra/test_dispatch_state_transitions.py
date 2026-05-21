@@ -51,6 +51,9 @@ class TestStateTransitions:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches in priority order
         await coordinator.coordinate()
 
         assert len(emit_calls) == 2
@@ -100,6 +103,9 @@ class TestStateTransitions:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches (limited by capacity)
         await coordinator.coordinate()
 
         assert len(emit_calls) == 2
@@ -147,6 +153,9 @@ class TestStateTransitions:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches first issue
         await coordinator.coordinate()
         assert len(emit_calls) == 1
         assert emit_calls[0][1].number == 1
@@ -197,6 +206,9 @@ class TestStateTransitions:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches manager issue
         await coordinator.coordinate()
         assert len(emit_calls) == 1
 
@@ -264,6 +276,9 @@ class TestStateTransitions:
             lambda role, issue, tick_id=0: emit_calls.append((role, issue))
         )
 
+        # First tick: collects BLOCKED issue (bypassing qualify gate)
+        await coordinator.coordinate()
+        # Second tick: dispatches the falsely-blocked issue (qualify returns READY)
         await coordinator.coordinate()
 
         # Falsely-blocked issue should be dispatched to manager role
@@ -311,6 +326,9 @@ class TestLoggingBehavior:
             capture_event,
         )
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches and logs intent
         await coordinator.coordinate()
 
         normalized_events = [
@@ -370,6 +388,9 @@ class TestLoggingBehavior:
 
         coordinator._emit_dispatch_intent = emit_side_effect
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches and logs intent before emit
         await coordinator.coordinate()
 
         normalized_events = [

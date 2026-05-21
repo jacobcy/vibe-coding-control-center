@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
+from vibe3.services.pr_service import PRService
 from vibe3.services.status_query_service import (
     extract_primary_assignee_login,
     extract_queue_metadata,
@@ -66,6 +68,8 @@ class OrchestraSnapshot:
     blocked_reason: str | None = None
     blocked_issue_number: int | None = None
     blocked_issue_reason: str | None = None
+    polling_interval: int = OrchestraConfig.model_fields["polling_interval"].default
+    port: int = OrchestraConfig.model_fields["port"].default
 
 
 def format_issue_summary_line(entry: IssueStatusEntry) -> str:
@@ -218,9 +222,16 @@ class OrchestraStatusService:
                         blocked_reason=data.get("blocked_reason"),
                         blocked_issue_number=data.get("blocked_issue_number"),
                         blocked_issue_reason=data.get("blocked_issue_reason"),
+                        polling_interval=int(
+                            data.get("polling_interval", config.polling_interval)
+                        ),
+                        port=int(data.get("port", config.port)),
                     )
                 return None
-        except (URLError, ConnectionError, Exception):
+        except (URLError, TimeoutError, ConnectionError, ValueError, TypeError):
+            logger.bind(domain="orchestra").debug(
+                "Live snapshot unavailable, falling back to static config"
+            )
             return None
 
     def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
@@ -237,13 +248,10 @@ class OrchestraStatusService:
         issues = self._get_manager_issues()
         worktrees = self._get_worktree_map()
 
-        # Build status entries
-        entries: list[IssueStatusEntry] = []
+        # First pass: collect issue rows and flow branches for batch PR lookup
+        issue_rows: list[dict[str, Any]] = []
+        flow_branches: set[str] = set()
         active_flows = 0
-
-        # First pass: collect all ready issues for sorting
-        ready_issues_data: list[dict[str, Any]] = []
-        other_issues_data: list[dict[str, Any]] = []
 
         for issue in issues:
             number = issue.get("number")
@@ -265,18 +273,13 @@ class OrchestraStatusService:
             flow_branch = flow.get("branch") if flow else None
             if has_flow:
                 active_flows += 1
+                if flow_branch:
+                    flow_branches.add(flow_branch)
 
             # Check worktree
             branch_name = flow_branch or f"task/issue-{number}"
             worktree_path = worktrees.get(branch_name)
             has_worktree = worktree_path is not None
-
-            # Check PR
-            pr_number = None
-            has_pr = False
-            if has_flow:
-                pr_number = self._orchestrator.get_pr_for_issue(number)
-                has_pr = pr_number is not None
 
             # Parse blocked_by from issue body
             blocked_by_list = parse_blocked_by(issue.get("body") or "")
@@ -290,26 +293,81 @@ class OrchestraStatusService:
             if "supervisor" in labels:
                 continue
 
-            # Collect issue data
+            issue_rows.append(
+                {
+                    "number": number,
+                    "title": title,
+                    "state": state,
+                    "assignee": assignee,
+                    "has_flow": has_flow,
+                    "flow_branch": flow_branch,
+                    "has_worktree": has_worktree,
+                    "worktree_path": worktree_path,
+                    "flow": flow,
+                    "blocked_by": tuple(blocked_by_list),
+                    "milestone": milestone,
+                    "roadmap": roadmap,
+                    "priority": priority,
+                    "labels": labels,
+                }
+            )
+
+        # Batch PR lookup: read-only cache hydration without context-cache writes
+        branch_to_pr: dict[str, Any] = {}
+        if flow_branches:
+            try:
+                pr_service = PRService(
+                    github_client=cast(GitHubClientProtocol, self._github),
+                    git_client=self._git,
+                    store=getattr(self._orchestrator, "store", None),
+                )
+                all_prs = pr_service.refresh_recent_pr_cache(sync_context_cache=False)
+                branch_to_pr = {
+                    b: pr for b, pr in all_prs.items() if b in flow_branches
+                }
+            except Exception as exc:
+                log.warning(f"Failed to batch hydrate PR status: {exc}")
+
+        # Second pass: build issue data with PR info from batch lookup
+        ready_issues_data: list[dict[str, Any]] = []
+        other_issues_data: list[dict[str, Any]] = []
+
+        for row in issue_rows:
+            flow_branch = row["flow_branch"]
+            flow = row["flow"]
+
+            # Determine PR number from batch cache or stored flow value
+            pr_number = None
+            if row["has_flow"] and flow_branch:
+                cached_pr = branch_to_pr.get(flow_branch)
+                # Coerce pr_number to int if present (may be stored as string)
+                pr_number_raw = flow.get("pr_number") if flow else None
+                pr_number = cached_pr.number if cached_pr else None
+                if pr_number is None and pr_number_raw:
+                    try:
+                        pr_number = int(pr_number_raw)
+                    except (ValueError, TypeError):
+                        pass  # Leave as None if conversion fails
+
             issue_data = {
-                "number": number,
-                "title": title,
-                "state": state,
-                "assignee": assignee,
-                "has_flow": has_flow,
-                "flow_branch": flow_branch,
-                "has_worktree": has_worktree,
-                "worktree_path": worktree_path,
-                "has_pr": has_pr,
+                "number": row["number"],
+                "title": row["title"],
+                "state": row["state"],
+                "assignee": row["assignee"],
+                "has_flow": row["has_flow"],
+                "flow_branch": row["flow_branch"],
+                "has_worktree": row["has_worktree"],
+                "worktree_path": row["worktree_path"],
+                "has_pr": pr_number is not None,
                 "pr_number": pr_number,
-                "blocked_by": tuple(blocked_by_list),
-                "milestone": milestone,
-                "roadmap": roadmap,
-                "priority": priority,
-                "labels": labels,
+                "blocked_by": row["blocked_by"],
+                "milestone": row["milestone"],
+                "roadmap": row["roadmap"],
+                "priority": row["priority"],
+                "labels": row["labels"],
             }
 
-            if state == IssueState.READY:
+            if row["state"] == IssueState.READY:
                 ready_issues_data.append(issue_data)
             else:
                 other_issues_data.append(issue_data)
@@ -332,6 +390,7 @@ class OrchestraStatusService:
         all_issues_data = sorted_ready_data + other_issues_data
 
         # Build final entries
+        entries: list[IssueStatusEntry] = []
         for data in all_issues_data:
             entries.append(
                 IssueStatusEntry(
@@ -383,6 +442,8 @@ class OrchestraStatusService:
             blocked_reason=blocked_reason,
             blocked_issue_number=blocked_issue_number,
             blocked_issue_reason=blocked_issue_reason,
+            polling_interval=self.config.polling_interval,
+            port=self.config.port,
         )
 
         log.debug(

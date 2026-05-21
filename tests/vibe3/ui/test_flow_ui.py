@@ -92,7 +92,9 @@ def test_render_flow_timeline_prefers_handoff_ref_over_log_path(capsys) -> None:
     render_flow_timeline(state, events)
 
     output = capsys.readouterr().out
-    assert artifact_path in output
+    # After refactor: should show alias instead of full path
+    assert "@task-issue-304-a97faeda" in output
+    assert artifact_path not in output
     assert log_path not in output
 
 
@@ -144,9 +146,8 @@ def test_render_flow_status_shows_handoff_commands_for_artifacts(capsys) -> None
     render_flow_status(status, worktree_root=str(worktree_root))
 
     output = capsys.readouterr().out
-    # Should show handoff command, not absolute path
+    # Should show full handoff command with alias
     assert "vibe3 handoff show" in output
-    assert "--branch task/issue-304" in output
-    assert "docs/reports/issue-304-report.md" in output
+    assert "@report" in output
     # Should NOT show absolute path
     assert str(worktree_root) not in output

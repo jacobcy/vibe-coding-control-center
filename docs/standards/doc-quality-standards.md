@@ -54,7 +54,7 @@ related_docs:
 
 为避免 `vibe` 相关能力在文档中出现语义混淆，文档写作必须显式区分调用面：
 
-- `shell 命令`：`vibe <domain> <subcommand>`，例如 `vibe flow (shell)`
+- `shell 命令`：`vibe3 <subcommand>` (或 V2 `vibe <domain> <subcommand>`)，例如 `vibe3 flow (shell)`
 - `skill 命令`：`/<skill-name>`，例如 `/vibe-save (skill)`
 
 写作规则：

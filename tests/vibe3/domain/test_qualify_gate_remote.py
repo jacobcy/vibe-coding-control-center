@@ -28,6 +28,11 @@ def mock_store():
     """Create a mock SQLite client."""
     store = Mock()
     store.db_path = ":memory:"
+    store.get_flow_state = Mock(return_value=None)
+    store.get_dependency_links = Mock(return_value=[])
+    store.get_issue_links = Mock(return_value=[])
+    store.update_flow_state = Mock()
+    store.add_event = Mock()
     return store
 
 
@@ -88,7 +93,6 @@ class TestRemoteBlockedReason:
                 "vibe3.domain.qualify_gate.GhIssueLabelPort",
                 return_value=mock_label_port,
             ):
-                # Use non-empty flow_state to avoid early return
                 flow_state = {"status": "active"}
 
                 result = qualify_gate_service.run_qualify_gate(
@@ -99,8 +103,13 @@ class TestRemoteBlockedReason:
                     trigger_state=IssueState.IN_PROGRESS,
                 )
 
-                # Verify blocked by remote reason
                 assert result is None
+                mock_store.update_flow_state.assert_called_once_with(
+                    "task/issue-123-test",
+                    flow_status="blocked",
+                    blocked_reason="Remote block from issue body",
+                    blocked_by_issue=None,
+                )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
                 )
@@ -146,8 +155,13 @@ class TestRemoteBlockedReason:
                     trigger_state=IssueState.IN_PROGRESS,
                 )
 
-                # Verify still blocked by local reason
                 assert result is None
+                mock_store.update_flow_state.assert_called_once_with(
+                    "task/issue-123-test",
+                    flow_status="blocked",
+                    blocked_reason="Local block from SQLite",
+                    blocked_by_issue=None,
+                )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
                 )
@@ -306,11 +320,13 @@ class TestRemoteDependencies:
                     trigger_state=IssueState.IN_PROGRESS,
                 )
 
-                # Body truth blocked → gate should skip (return None)
                 assert result is None
-                # Should align local cache to blocked
-                mock_store.update_flow_state.assert_called()
-                # Should add blocked label if not present
+                mock_store.update_flow_state.assert_called_once_with(
+                    "task/issue-123-test",
+                    flow_status="blocked",
+                    blocked_reason=None,
+                    blocked_by_issue=456,
+                )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
                 )
@@ -338,8 +354,7 @@ class TestProvenanceTracking:
             return_value=mock_truth,
         ):
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=Mock(),
+                "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=Mock()
             ):
                 flow_state = {"status": "active"}
 
@@ -459,7 +474,12 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called()
+                mock_store.update_flow_state.assert_called_once_with(
+                    "task/issue-994",
+                    flow_status="blocked",
+                    blocked_reason="API design pending",
+                    blocked_by_issue=None,
+                )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
                 )
@@ -567,7 +587,12 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called()
+                mock_store.update_flow_state.assert_called_once_with(
+                    "task/issue-994",
+                    flow_status="blocked",
+                    blocked_reason=None,
+                    blocked_by_issue=456,
+                )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
                 )

@@ -7,7 +7,7 @@ from typing import Annotated, Iterator
 
 import typer
 
-from vibe3.commands.command_options import FormatOption
+from vibe3.commands.command_options import FormatOption, SourceOption
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
@@ -42,6 +42,14 @@ def show(
         str | None,
         typer.Argument(help="Issue number (auto-resolves to task branch if exists)"),
     ] = None,
+    branch_opt: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
+    pr_opt: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve branch from"),
+    ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     output_format: FormatOption = "table",
     full: Annotated[
@@ -72,7 +80,10 @@ def show(
     task_svc = TaskService()
 
     try:
-        target_branch = task_svc.resolve_branch(issue)
+        # Pass branch_opt and issue separately for conflict detection
+        target_branch = task_svc.resolve_branch(
+            branch_opt, pr_number=pr_opt, position_arg=issue
+        )
     except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
@@ -145,6 +156,7 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
+    source: SourceOption = "auto",
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
@@ -178,6 +190,10 @@ def resume(
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Resume blocked issues to ready.
+
+    --source local:  SQLite only (no fallback)
+    --source remote: GitHub API + issue body projection
+    --source auto:   local-first, remote fallback (default)
 
     Use --blocked to resume all blocked issues, --all to reset every
     auto-created task/issue-* scene back to ready, or specify issue numbers directly.
@@ -342,6 +358,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
+            source=source,
             progress_callback=progress_callback if yes else None,
         )
     else:
@@ -354,6 +371,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
+            source=source,
             progress_callback=progress_callback if yes else None,
         )
 

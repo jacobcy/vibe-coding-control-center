@@ -25,8 +25,8 @@ BranchArg = Annotated[
 IssueArg = Annotated[
     str,
     typer.Argument(
-        metavar="<task-id>",
-        help="Issue reference or <task-id> to bind as task/related/dependency",
+        metavar="<issue-ref>",
+        help="Issue reference(s) to bind as task/related/dependency",
     ),
 ]
 TaskTailArg = Annotated[
@@ -151,7 +151,12 @@ def update(
         ),
     ] = False,
 ) -> None:
-    """Update flow metadata (idempotent add/update)."""
+    """Update flow metadata (idempotent add/update).
+
+    If an issue number is provided (via positional arg or --branch option) and
+    the corresponding branch doesn't exist in git, automatically creates the
+    branch before registering flow.
+    """
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -160,9 +165,41 @@ def update(
             err=True,
         )
         output_format = "json"
+    from vibe3.clients.git_client import GitClient
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.services.convention_resolver import ConventionResolver
     from vibe3.utils.branch_arg import resolve_branch_arg
+    from vibe3.utils.issue_ref import try_parse_issue_number
 
-    target_branch = resolve_branch_arg(branch)
+    # Early handling for issue number: resolve to canonical branch
+    # before resolve_branch_arg. This avoids UserError from
+    # resolve_issue_branch_input when flow doesn't exist
+    issue_number_input = try_parse_issue_number(branch) if branch else None
+    if issue_number_input is not None:
+        convention = ConventionResolver.from_repo().resolve().branch
+        target_branch = convention.canonical_branch(issue_number_input)
+    else:
+        target_branch = resolve_branch_arg(branch)
+
+    # Auto-create branch if:
+    # 1. Positional argument was an issue number (not explicit branch name)
+    # 2. Target branch doesn't exist in git
+    # 3. Target branch matches task/dev convention
+    git = GitClient()
+    if issue_number_input is not None and not git.branch_exists(target_branch):
+        # Create branch from scene_base_ref
+        config = load_orchestra_config()
+        logger.bind(
+            command="flow update",
+            branch=target_branch,
+            issue_number=issue_number_input,
+        ).info("Auto-creating branch for issue")
+
+        git.create_branch_ref(target_branch, start_ref=config.scene_base_ref)
+        if output_format == "table":
+            typer.echo(
+                f"✓ Created branch '{target_branch}' from {config.scene_base_ref}"
+            )
 
     flow_service = FlowService()
     with trace_scope(trace, "flow update", branch=target_branch):
@@ -242,7 +279,7 @@ def bind(
         ),
     ] = False,
 ) -> None:
-    """Bind an issue to a flow branch. (Usage: vibe flow bind <task-id>)"""
+    """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -278,9 +315,8 @@ def bind(
                     # Multi-ref compatibility remains ordered and per-ref:
                     # each dependency delegates to `block_flow()` in sequence,
                     # while the outward CLI output is synthesized from IssueLink.
-                    # Because blocked state stores a singular `blocked_by_issue`,
-                    # the effective primary blocker after multi-ref delegation is
-                    # the last dependency ref processed here.
+                    # With blocked_by accumulation fix, all dependency refs are
+                    # now accumulated in the issue body's blocked_by field.
                     flow_service.block_flow(
                         target_branch, blocked_by_issue=issue_number, actor=None
                     )

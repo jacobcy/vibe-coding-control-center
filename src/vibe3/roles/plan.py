@@ -173,6 +173,7 @@ def build_plan_request(
     branch: str | None = None,
     repo_path: Path | None = None,
     actor: str = "orchestra:planner",
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner async execution request for dispatch."""
     resolver = ConventionResolver.from_repo()
@@ -187,6 +188,7 @@ def build_plan_request(
         branch=branch,
         repo_path=repo_path,
         actor=actor,
+        tick_id=tick_id,
     )
 
 
@@ -200,6 +202,7 @@ def build_plan_sync_request(
     actor: str,
     dry_run: bool,
     show_prompt: bool,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner sync execution request."""
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -232,6 +235,7 @@ def build_plan_sync_request(
         fallback_include_global_notice=True,
         extra_refs=extra_refs,
         dry_run_summary=dry_run_summary,
+        tick_id=tick_id,
     )
 
 
@@ -272,7 +276,13 @@ def resolve_spec_plan_input(
             raise FileNotFoundError(f"File not found: {file}")
         description = file.read_text(encoding="utf-8")
         spec_path: str | None = str(file.resolve())
-        request = PlanRequest(scope=PlanScope.for_spec(description))
+        request = PlanRequest(
+            scope=PlanScope.for_spec(description),
+            task_guidance=(
+                "Create an implementation plan for this specification:\n\n"
+                f"{description}"
+            ),
+        )
         return PlanSpecInput(
             branch=branch,
             request=request,
@@ -305,7 +315,13 @@ def resolve_spec_plan_input(
             spec_info.file_path if spec_info.kind == "file" else None
         )  # Already defined with str | None type in Case 1
 
-        request = PlanRequest(scope=PlanScope.for_spec(spec_content))
+        request = PlanRequest(
+            scope=PlanScope.for_spec(spec_content),
+            task_guidance=(
+                "Create an implementation plan for this specification:\n\n"
+                f"{spec_content}"
+            ),
+        )
         return PlanSpecInput(
             branch=branch,
             request=request,

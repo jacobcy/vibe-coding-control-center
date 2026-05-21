@@ -45,6 +45,9 @@ class TestQueueOperations:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries (queue was empty after restore)
+        await coordinator.coordinate()
+        # Second tick: dispatches collected entries
         await coordinator.coordinate()
 
         assert len(emit_calls) == 2
@@ -106,6 +109,13 @@ class TestQueueOperations:
         emit_calls = []
         coordinator._emit_dispatch_intent = lambda r, i, t: emit_calls.append((r, i))
 
+        # Mock _collect_frozen_queue to return empty list
+        # (prevent re-collection after invalid removal)
+        async def mock_collect_empty() -> list[QueueEntry]:
+            return []
+
+        coordinator._collect_frozen_queue = mock_collect_empty
+
         await coordinator.coordinate()
 
         assert len(emit_calls) == 0
@@ -149,6 +159,9 @@ class TestQueueOperations:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: dispatches (limited by capacity)
         await coordinator.coordinate()
 
         assert len(emit_calls) == 2
@@ -237,8 +250,9 @@ class TestQueueOperations:
 
         coordinator._emit_dispatch_intent = emit_with_failure
 
-        # With dead try-except removed, publish() failures propagate.
-        # Dispatch handler now catches its own errors and writes blocked_reason.
+        # First tick: collects entries
+        await coordinator.coordinate()
+        # Second tick: tries to dispatch, fails on first emit
         with pytest.raises(RuntimeError, match="emit failed"):
             await coordinator.coordinate()
 
@@ -281,6 +295,9 @@ class TestQueueOperations:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
+        # First tick: collects entries (CLAIMED state works, READY fails)
+        await coordinator.coordinate()
+        # Second tick: dispatches collected CLAIMED entries
         await coordinator.coordinate()
 
         assert len(emit_calls) == 1

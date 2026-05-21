@@ -145,6 +145,11 @@ uv run python src/vibe3/cli.py handoff show <report_ref>
 - 错误处理是否完整
 - 输出契约是否仍然可被下游消费
 
+**异常传播链审查**：
+- 检查异常类型与实际抛出是否匹配
+- 检查中间层 except 是否吞没异常（如空 except 或只 log 不重抛）导致目标处理器不可达
+- 如果是异常处理相关变更，必须确认 executor 已验证传播链可达性
+
 ### 2. 回归风险
 
 重点检查：

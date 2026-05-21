@@ -99,7 +99,21 @@ class ServeStatusService:
 
     def _display_config(self) -> None:
         """Display configuration summary."""
-        self.console.print(f"  - Tick interval: {self.config.polling_interval}s")
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        # Try to get runtime values from live server
+        polling_interval = self.config.polling_interval
+        live = OrchestraStatusService.fetch_live_snapshot(self.config)
+        if live is not None:
+            polling_interval = live.polling_interval
+
+        if polling_interval != self.config.polling_interval:
+            self.console.print(
+                f"  - Tick interval: {polling_interval}s "
+                f"[dim](override, config: {self.config.polling_interval}s)[/dim]"
+            )
+        else:
+            self.console.print(f"  - Tick interval: {polling_interval}s")
         self.console.print(f"  - Max concurrent: {self.config.max_concurrent_flows}\n")
 
     def _display_recent_activity(self) -> None:
@@ -169,16 +183,17 @@ class ServeStatusService:
         self.console.print()
 
     def _display_error_tracking(self) -> None:
-        """Display error tracking status."""
+        """Display error tracking status with severity breakdown."""
         error_tracking = ErrorTrackingService.get_instance()
         error_status = error_tracking.get_status()
 
         self.console.print("[bold]Error Tracking:[/bold]")
         if error_status["total_errors"] > 0:
+            # Show severity-based counts
             self.console.print(f"  Total errors: {error_status['total_errors']}")
-            self.console.print(f"  - Model errors: {error_status['model_errors']}")
-            self.console.print(f"  - API errors: {error_status['api_errors']}")
-            self.console.print(f"  - Execution errors: {error_status['exec_errors']}")
+            self.console.print(f"  - CRITICAL: {error_status['critical_count']}")
+            self.console.print(f"  - ERROR: {error_status['error_count']}")
+            self.console.print(f"  - WARNING: {error_status['warning_count']}")
 
             # Show recent errors
             recent_errors = error_tracking.get_recent_errors(limit=10)
@@ -186,6 +201,7 @@ class ServeStatusService:
                 table = Table(title="\n  Recent Errors (last 10)", show_lines=True)
                 table.add_column("Tick", style="cyan", width=6)
                 table.add_column("Issue", style="yellow", width=10)
+                table.add_column("Severity", style="red", width=8)
                 table.add_column("Code", style="magenta")
                 table.add_column("Time", style="dim", width=19)
                 table.add_column("Message", style="white")
@@ -202,9 +218,14 @@ class ServeStatusService:
                     else:
                         issue_display = f"#{issue_num}"
 
+                    # Get severity from error record
+                    severity = err.get("severity", "ERROR")
+                    severity_display = severity if severity else "ERROR"
+
                     table.add_row(
                         str(err["tick_id"]),
                         issue_display,
+                        severity_display,
                         err["error_code"],
                         time_display,
                         self._clean_error_message(err["error_message"]),

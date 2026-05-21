@@ -16,6 +16,7 @@ from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
+from vibe3.runtime.cleanup_executor import execute_expired_resource_cleanup
 from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
@@ -172,8 +173,6 @@ class HeartbeatServer:
                     # Skip service dispatch, continue to next tick
                     continue
 
-            # Gate is OPEN (or no gate) - proceed with normal dispatch
-
             # Cleanup old error records (maintenance)
             error_tracking = ErrorTrackingService.get_instance()
 
@@ -230,6 +229,24 @@ class HeartbeatServer:
                         f"Cleaned up {deleted_terminal} errors for terminal issues"
                     )
 
+            # Cleanup expired resources (worktrees, branches)
+            if (
+                self.config.expired_resource_cleanup.enabled
+                and tick_number % self.config.expired_resource_cleanup.interval_ticks
+                == 0
+            ):
+                try:
+                    await self._cleanup_expired_resources(tick_number)
+                except Exception as exc:
+                    append_orchestra_event(
+                        "server",
+                        f"tick #{tick_number} expired resource cleanup failed: {exc}",
+                        level="WARNING",
+                    )
+                    logger.bind(domain="orchestra", action="cleanup").warning(
+                        f"Expired resource cleanup failed: {exc}"
+                    )
+
             tasks = []
             tick_services: list[str] = []
             for svc in self._services:
@@ -277,6 +294,13 @@ class HeartbeatServer:
                 logger.bind(domain="orchestra").error(
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
+
+    async def _cleanup_expired_resources(self, tick_number: int) -> None:
+        """Cleanup expired worktrees and branches (runs every N ticks)."""
+        await execute_expired_resource_cleanup(
+            self.config.expired_resource_cleanup,
+            tick_number,
+        )
 
     async def _idle_loop(self) -> None:
         """Keep server running when polling is disabled (HTTP-only mode)."""

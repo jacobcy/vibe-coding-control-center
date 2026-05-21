@@ -57,7 +57,9 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
-    monkeypatch.setattr(serve_module, "ensure_port_available", lambda _: None)
+    monkeypatch.setattr(
+        serve_module, "find_available_port", lambda _port, _max: (8080, False)
+    )
     monkeypatch.setattr(
         serve_module,
         "find_missing_backend_commands",
@@ -95,7 +97,9 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
-    monkeypatch.setattr(serve_module, "ensure_port_available", lambda _: None)
+    monkeypatch.setattr(
+        serve_module, "find_available_port", lambda _port, _max: (8080, False)
+    )
     monkeypatch.setattr(
         serve_module,
         "find_missing_backend_commands",
@@ -133,7 +137,9 @@ def test_start_async_blocks_when_configured_backend_missing(monkeypatch) -> None
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
-    monkeypatch.setattr(serve_module, "ensure_port_available", lambda _: None)
+    monkeypatch.setattr(
+        serve_module, "find_available_port", lambda _port, _max: (8080, False)
+    )
     monkeypatch.setattr(
         serve_module,
         "find_missing_backend_commands",
@@ -167,7 +173,9 @@ def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
-    monkeypatch.setattr(serve_module, "ensure_port_available", lambda _: None)
+    monkeypatch.setattr(
+        serve_module, "find_available_port", lambda _port, _max: (8080, False)
+    )
     monkeypatch.setattr(
         serve_module,
         "find_missing_backend_commands",
@@ -199,7 +207,9 @@ def test_start_async_with_ts_exits_nonzero_when_setup_fails(monkeypatch) -> None
         lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
-    monkeypatch.setattr(serve_module, "ensure_port_available", lambda _: None)
+    monkeypatch.setattr(
+        serve_module, "find_available_port", lambda _port, _max: (8080, False)
+    )
     monkeypatch.setattr(
         serve_module,
         "find_missing_backend_commands",
@@ -332,3 +342,46 @@ def test_logs_shows_log_content(monkeypatch, tmp_path) -> None:
     mock_run.assert_called_once_with(["tail", "-n50", str(log_path)])
 
     patch.stopall()
+
+
+def test_start_auto_discovers_port_when_default_occupied(monkeypatch) -> None:
+    """Test that serve start auto-discovers port when default is occupied
+    and port_range_max is configured."""
+    monkeypatch.setattr(
+        "vibe3.config.orchestra_settings.load_orchestra_config",
+        lambda: OrchestraConfig(
+            pid_file=Path(".git/vibe3/orchestra.pid"),
+            port_range_max=8090,
+        ),
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(
+        serve_module,
+        "find_available_port",
+        lambda _port, _max: (8081, True),
+    )
+    monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {},
+    )
+    monkeypatch.setattr(
+        serve_module, "_start_async_serve", lambda _c, _v: (True, "started async")
+    )
+
+    with patch(
+        "vibe3.models.orchestra_config._default_pid_file",
+        return_value=Path(".git/vibe3/orchestra.pid"),
+    ):
+        mock_vibe_config = VibeConfig()
+
+    with patch(
+        "vibe3.config.settings.VibeConfig.get_defaults",
+        return_value=mock_vibe_config,
+    ):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "start"])
+
+    assert result.exit_code == 0
+    assert "auto-discovered" in result.stdout.lower()
+    assert "8081" in result.stdout

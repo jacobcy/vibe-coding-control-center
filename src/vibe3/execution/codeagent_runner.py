@@ -308,6 +308,7 @@ class CodeagentExecutionService:
             from vibe3.exceptions import AgentExecutionError
             from vibe3.exceptions.error_classification import (
                 classify_error_hybrid,
+                get_error_handling_contract,
             )
             from vibe3.exceptions.error_tracking import ErrorTrackingService
 
@@ -315,14 +316,19 @@ class CodeagentExecutionService:
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.
             error_code = classify_error_hybrid(exc)
 
-            error_tracking = ErrorTrackingService.get_instance()
-            # Record error with issue_number and branch for better diagnostics
+            # Get handling contract for severity-aware behavior
+            error_contract = get_error_handling_contract(error_code)
+
+            # Use store-specific instance to ensure consistency with FailedGate
+            error_tracking = ErrorTrackingService.get_instance(store=ctx.store)
+            # Record error with severity from contract
             error_tracking.record_error(
                 error_code=error_code,
                 error_message=str(exc),
                 tick_id=command.tick_id,  # Use tick_id from command
                 issue_number=command.issue_number,
                 branch=command.branch,
+                severity=error_contract.severity,
             )
 
             # Build abort message
@@ -356,6 +362,7 @@ class CodeagentExecutionService:
             # Block the issue with error code.
             # Supervisor (L2) uses lightweight failure: remove handoff label
             # instead of calling fail_issue() which requires a task flow.
+            # Use severity-aware contract to decide issue action.
             if command.issue_number is not None:
                 if command.role == "supervisor":
                     self._cleanup_supervisor_handoff_label(
@@ -363,7 +370,20 @@ class CodeagentExecutionService:
                         ctx.actor,
                         log,
                     )
+                elif error_contract.issue_action == "record_only":
+                    # WARNING: Record and continue, let noop_gate decide
+                    logger.bind(
+                        domain="codeagent",
+                        role=command.role,
+                        issue_number=command.issue_number,
+                        error_code=error_code,
+                        severity=error_contract.severity.value,
+                    ).info(
+                        f"Execution warning recorded: {error_code} - "
+                        "not blocking issue, letting noop_gate decide"
+                    )
                 else:
+                    # ERROR or CRITICAL: Block/fail the issue
                     from vibe3.services.issue_failure_service import fail_issue
 
                     blocked_reason = f"{error_code}: {exc}"

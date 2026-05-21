@@ -7,7 +7,10 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task_status_classifier import TaskStatusBucket
 from vibe3.ui.console import console
-from vibe3.utils.error_message_cleaner import clean_error_message
+from vibe3.utils.error_message_cleaner import (
+    CODEAGENT_WRAPPER_ANYWHERE_RE,
+    clean_error_message,
+)
 
 
 def _extract_blocked_reason_summary(blocked_reason: str) -> str:
@@ -23,7 +26,17 @@ def _extract_blocked_reason_summary(blocked_reason: str) -> str:
     if not lines:
         return ""
 
-    first_line = lines[0].strip()
+    # First, remove the "codeagent-wrapper failed (code X):" prefix
+    # Use ANYWHERE version to handle "E_EXEC_NO_OUTPUT: codeagent-wrapper..."
+    first_line = CODEAGENT_WRAPPER_ANYWHERE_RE.sub("", lines[0].strip())
+
+    # If first line becomes empty or only contains error code
+    # (e.g., "E_EXEC_NO_OUTPUT:"), try next line for more descriptive error
+    if (not first_line or first_line.rstrip(":").startswith("E_")) and len(lines) > 1:
+        next_line = lines[1].strip()
+        if next_line:
+            first_line = next_line
+
     if len(first_line) <= 60 and "CLAUDE_CODE_TMPDIR" not in first_line:
         result = first_line
     else:

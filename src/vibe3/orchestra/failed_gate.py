@@ -140,9 +140,8 @@ class FailedGate:
         """Check global error thresholds.
 
         Rules:
-        - E_MODEL_* → immediate block
-        - E_API_* (2+ in recent window) → block
-        - E_EXEC_* (2+ in recent window) → block
+        - CRITICAL severity → immediate block
+        - ERROR severity (2+ in recent window) → block
 
         Returns:
             GateResult with blocked=True if threshold reached
@@ -152,33 +151,35 @@ class FailedGate:
         log = logger.bind(domain="orchestra", action="error_threshold_check")
         log.debug("Checking error threshold")
 
-        error_tracking = ErrorTrackingService.get_instance()
+        # Use store-specific instance to ensure gate reads from correct DB
+        error_tracking = ErrorTrackingService.get_instance(store=self.store)
 
-        # Check for model config errors (immediate block)
+        # Check for CRITICAL errors (immediate block)
+        # Use has_model_config_error() for backward compatibility with pre-migration DBs
         if error_tracking.has_model_config_error():
             error_counts = error_tracking.get_error_counts()
-            model_errors = [
+            critical_errors = [
                 code for code in error_counts.keys() if code.startswith("E_MODEL_")
             ]
-            log.error(f"Model config errors detected: {model_errors}")
+            log.error(f"CRITICAL errors detected: {critical_errors}")
             return GateResult(
                 blocked=True,
-                reason=f"Model configuration errors: {', '.join(model_errors)}",
+                reason=f"CRITICAL errors: {', '.join(critical_errors)}",
             )
 
-        # Check for frequent API and EXEC errors (threshold: 2+ in window)
-        error_count = error_tracking.get_api_and_exec_error_count()
+        # Check for frequent ERROR-severity errors (threshold: 2+ in window)
+        error_count = error_tracking.get_threshold_error_count()
 
         if error_count >= ErrorTrackingService.THRESHOLD_COUNT:
             log.error(
-                f"API/Exec error threshold reached: {error_count} errors "
+                f"ERROR-severity threshold reached: {error_count} errors "
                 f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                 f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
             )
             return GateResult(
                 blocked=True,
                 reason=(
-                    f"API/Exec error threshold: {error_count} recent errors "
+                    f"ERROR-severity threshold: {error_count} recent errors "
                     f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                     f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
                 ),
@@ -248,10 +249,10 @@ class FailedGate:
                 (now, cleared_by, reason),
             )
 
-        # Also clear error log
+        # Also clear error log (use store-specific instance for consistency)
         from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        ErrorTrackingService.get_instance().clear(cleared_by, reason)
+        ErrorTrackingService.get_instance(store=self.store).clear(cleared_by, reason)
 
     def increment_blocked_ticks(self) -> None:
         """Increment blocked_ticks counter (called each tick when ACTIVE)."""

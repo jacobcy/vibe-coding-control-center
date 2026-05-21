@@ -1,7 +1,7 @@
 """Plan command."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -11,18 +11,14 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
 )
-from vibe3.execution.issue_role_sync_runner import (
-    run_issue_role_async,
-    run_issue_role_sync,
-)
 from vibe3.roles.plan import (
-    PLAN_SYNC_SPEC,
     execute_spec_plan_async,
     execute_spec_plan_sync,
     resolve_spec_plan_input,
 )
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.branch_arg import resolve_branch_arg
+from vibe3.utils.handoff_resolution import resolve_handoff_target
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -71,31 +67,35 @@ def _plan_for_branch(
     issue_number = flow.task_issue_number
     if not issue_number:
         typer.echo(
-            f"Error: No issue linked to flow '{branch}'.\n"
-            "Run 'vibe flow bind <issue>' first.",
+            "Warning: No issue linked to flow. Lifecycle events will be skipped.",
             err=True,
         )
+
+    # Build request from spec file
+    try:
+        spec_input = resolve_spec_plan_input(branch)
+    except (ValueError, FileNotFoundError) as e:
+        typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
     if no_async:
-        run_issue_role_sync(
+        execute_spec_plan_sync(
+            request=spec_input.request,
             issue_number=issue_number,
-            dry_run=dry_run,
-            fresh_session=False,
-            show_prompt=show_prompt,
-            spec=PLAN_SYNC_SPEC,
+            branch=branch,
         )
     else:
-        run_issue_role_async(
+        execute_spec_plan_async(
+            request=spec_input.request,
             issue_number=issue_number,
-            dry_run=dry_run,
-            spec=PLAN_SYNC_SPEC,
+            branch=branch,
+            cli_args=["plan"],
         )
 
 
 def _plan_spec_impl(
     branch: str,
-    spec_path: Path | None,
+    spec_path: str | None,
     trace: bool,
     dry_run: bool,
     no_async: bool,
@@ -115,17 +115,48 @@ def _plan_spec_impl(
         )
         raise typer.Exit(1)
 
-    # If spec_path provided, update flow's spec_ref
-    if spec_path:
-        if not spec_path.exists() or not spec_path.is_file():
-            typer.echo(f"Error: Spec file not found: {spec_path}", err=True)
-            raise typer.Exit(1)
-        resolved_spec = str(spec_path.resolve())
-        flow_service.bind_spec(branch, resolved_spec, actor=None)
-        typer.echo(f"Spec updated: {resolved_spec}")
-        spec_file = spec_path
+    spec_file: Path | None = None
+    # When spec_ref is an issue number, we don't need a file path
+    spec_is_issue = False
+
+    # Resolve spec parameter: support both paths and issue numbers
+    if spec_path is not None:
+        if spec_path.startswith("@"):
+            # @-prefixed: delegate to resolve_handoff_target (@spec, etc.)
+            try:
+                resolved = resolve_handoff_target(spec_path, branch=branch)
+            except (FileNotFoundError, ValueError) as e:
+                # If resolution fails, check if spec_ref is an issue number
+                if flow.spec_ref and flow.spec_ref.lstrip("#").isdigit():
+                    spec_is_issue = True
+                    typer.echo(f"Using flow spec: {flow.spec_ref} (issue)")
+                else:
+                    typer.echo(f"Error: {e}", err=True)
+                    raise typer.Exit(1)
+            else:
+                # Check if resolved value is an issue number
+                if str(resolved).lstrip("#").isdigit():
+                    spec_is_issue = True
+                    typer.echo(f"Using flow spec: {flow.spec_ref} (issue)")
+                else:
+                    spec_file = Path(resolved)
+                    typer.echo(f"Using flow spec: {flow.spec_ref}")
+        else:
+            # Direct value: check if it's an issue number or a file path
+            if spec_path.lstrip("#").isdigit():
+                spec_is_issue = True
+                flow_service.bind_spec(branch, f"#{spec_path.lstrip('#')}", actor=None)
+                typer.echo(f"Spec updated: #{spec_path.lstrip('#')} (issue)")
+            else:
+                resolved_spec = Path(spec_path)
+                if not resolved_spec.exists() or not resolved_spec.is_file():
+                    typer.echo(f"Error: Spec file not found: {spec_path}", err=True)
+                    raise typer.Exit(1)
+                flow_service.bind_spec(branch, str(resolved_spec.resolve()), actor=None)
+                typer.echo(f"Spec updated: {resolved_spec}")
+                spec_file = resolved_spec
     else:
-        # Use existing spec_ref from flow
+        # No --spec parameter: default to flow's spec_ref
         if not flow.spec_ref:
             typer.echo(
                 "Error: No spec bound.\n"
@@ -134,8 +165,13 @@ def _plan_spec_impl(
                 err=True,
             )
             raise typer.Exit(1)
-        spec_file = Path(flow.spec_ref)
-        typer.echo(f"Using flow spec: {flow.spec_ref}")
+        # Check if spec_ref is an issue number
+        if flow.spec_ref.lstrip("#").isdigit():
+            spec_is_issue = True
+            typer.echo(f"Using flow spec: {flow.spec_ref} (issue)")
+        else:
+            spec_file = Path(flow.spec_ref)
+            typer.echo(f"Using flow spec: {flow.spec_ref}")
 
     if dry_run:
         typer.echo("Plan dry run for specification")
@@ -149,9 +185,12 @@ def _plan_spec_impl(
             err=True,
         )
 
-    # Build request from spec file
+    # Build request from spec file or issue
     try:
-        spec_input = resolve_spec_plan_input(branch, file=spec_file)
+        # When spec is an issue number, pass None to use SpecRefService logic
+        spec_input = resolve_spec_plan_input(
+            branch, file=None if spec_is_issue else spec_file
+        )
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -180,10 +219,18 @@ def default(
     ctx: typer.Context,
     branch: BranchOption = None,
     spec: Annotated[
-        Optional[Path],
+        str | None,
         typer.Option(
             "--spec",
-            help="Spec file path (replaces flow spec_ref; omit to use flow spec_ref)",
+            help="Spec reference: file path, issue number, or '@spec' alias",
+        ),
+    ] = None,
+    task: Annotated[
+        str | None,
+        typer.Option(
+            "--task",
+            help="[DEPRECATED] Alias for --spec (hidden)",
+            hidden=True,
         ),
     ] = None,
     trace: _TRACE_OPT = False,
@@ -196,10 +243,13 @@ def default(
 
     target_branch = resolve_branch_arg(branch)
 
-    if spec is not None:
+    # --task is alias for --spec (backward compatibility)
+    spec_path = spec or task
+
+    if spec_path is not None:
         _plan_spec_impl(
             branch=target_branch,
-            spec_path=spec,
+            spec_path=spec_path,
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,

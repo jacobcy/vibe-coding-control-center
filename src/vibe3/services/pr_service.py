@@ -125,6 +125,7 @@ class PRService:
         force: bool = False,
         limit: int = 50,
         max_age_minutes: int = 10,
+        sync_context_cache: bool = True,
     ) -> dict[str, PRResponse]:
         """Refresh recent PR cache if stale and return branch -> PR mapping."""
         if force or not self.recent_pr_cache.is_fresh(max_age_minutes=max_age_minutes):
@@ -140,10 +141,11 @@ class PRService:
                 branch_to_pr[branch] = pr
 
         self._recent_pr_cache_map = branch_to_pr
-        # Always sync to ensure flow_context_cache has latest PR info
-        # (flow_context_cache may be empty on first access even when recent
-        # PR cache is fresh)
-        self._sync_branch_context_cache(branch_to_pr)
+        if sync_context_cache:
+            # Always sync to ensure flow_context_cache has latest PR info
+            # (flow_context_cache may be empty on first access even when recent
+            # PR cache is fresh)
+            self._sync_branch_context_cache(branch_to_pr)
         return branch_to_pr
 
     def refresh_open_pr_cache(
@@ -152,12 +154,14 @@ class PRService:
         force: bool = False,
         limit: int = 50,
         max_age_minutes: int = 10,
+        sync_context_cache: bool = True,
     ) -> dict[str, PRResponse]:
         """Return open/draft PRs after ensuring recent PR cache is fresh."""
         recent = self.refresh_recent_pr_cache(
             force=force,
             limit=limit,
             max_age_minutes=max_age_minutes,
+            sync_context_cache=sync_context_cache,
         )
         return {branch: pr for branch, pr in recent.items() if pr.state == PRState.OPEN}
 
@@ -169,6 +173,7 @@ class PRService:
         max_age_minutes: int = 10,
         limit: int = 50,
         repo: str | None = None,
+        sync_context_cache: bool = True,
     ) -> PRResponse | None:
         """Return branch PR status from recent cache, with direct fallback on miss."""
         cache = (
@@ -176,6 +181,7 @@ class PRService:
                 force=False,
                 limit=limit,
                 max_age_minutes=max_age_minutes,
+                sync_context_cache=sync_context_cache,
             )
             if refresh
             else self._recent_pr_cache_map
@@ -210,7 +216,8 @@ class PRService:
             },
         )
         self._recent_pr_cache_map[branch] = pr
-        self._sync_branch_context_cache({branch: pr})
+        if sync_context_cache:
+            self._sync_branch_context_cache({branch: pr})
         return pr
 
     def get_open_pr_for_branch(

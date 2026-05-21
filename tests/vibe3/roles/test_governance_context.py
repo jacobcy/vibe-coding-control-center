@@ -21,6 +21,8 @@ def _make_snapshot(**overrides: object) -> OrchestraSnapshot:
         active_worktrees=0,
         circuit_breaker_state="closed",
         circuit_breaker_failures=0,
+        polling_interval=900,
+        port=8080,
     )
     defaults.update(overrides)
     return OrchestraSnapshot(**defaults)  # type: ignore[arg-type]

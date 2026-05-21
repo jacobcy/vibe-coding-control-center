@@ -1,6 +1,6 @@
-# Vibe 3.0 Execution Plan (Isolated Phase Logic)
+# Vibe 3.0 Execution Plan (Historical Archive)
 
-> **⚠️ Agent Instruction**: Focus ONLY on the current Phase. Do not attempt to optimize or understand the global roadmap. Your success is measured strictly by the Command-Line Acceptance Criteria below.
+> **⚠️ Status**: This document is preserved for historical reference only. The V3 Python primary runtime implementation is complete.
 
 > **数据真源**: [docs/standards/v3/handoff-store-standard.md](../../standards/v3/handoff-store-standard.md)
 > **GitHub 调用**: [docs/standards/v3/github-remote-call-standard.md](../../standards/v3/github-remote-call-standard.md)
@@ -9,8 +9,6 @@
 
 ## Technical Authority (Minimum Context)
 
-- ~~[Architecture Design](../implementation/02-architecture.md)~~ (已不存在)
-- ~~[Coding Standards](../implementation/03-coding-standards.md)~~ (已不存在)
 - [Data Standards](../../standards/v3/handoff-store-standard.md) (Authority on Database Schema)
 - [GitHub Standards](../../standards/v3/github-remote-call-standard.md) (Authority on Remote Calls)
 

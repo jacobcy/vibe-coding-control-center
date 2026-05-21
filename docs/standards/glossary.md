@@ -384,7 +384,7 @@ related_docs:
 
 - 正式术语：`Shell 能力层`
 - 别称：`capability layer`
-- 定义：`vibe` shell 暴露的原子、可组合、可验证方法层，是 skill 与共享状态真源之间的唯一合法操作通道。
+- 定义：`vibe3` (Python) 和 `vibe` (V2 Shell) 暴露的原子、可组合、可验证方法层，是 skill 与共享状态真源之间的唯一合法操作通道。
 - 边界：
   - `Shell 能力层` 不是 workflow engine
   - `Shell 能力层` 不是调度器
@@ -393,12 +393,14 @@ related_docs:
   - 定义见 [python-capability-design.md](python-capability-design.md)
 - 使用规则：
   - 讨论命令设计、原子能力、shell 边界时使用 `Shell 能力层`
+  - **V3 Python (`vibe3`) 是当前主能力层**，负责 flow/handoff/orchestra 逻辑
+  - **V2 Shell (`vibe`) 是次要/兼容层**，负责环境初始化、密钥管理和 legacy 工具
 
 ### 5.6 `共享状态真源`
 
 - 正式术语：`共享状态真源`
 - 别称：无
-- 定义：项目共享状态的持久化数据真源集合，当前包括 `registry.json`、`roadmap.json`、`flow-history.json`，以及处于兼容清退期的 `worktrees.json`。
+- 定义：项目共享状态的持久化数据真源集合，当前主要由 `vibe3` 管理，包括 SQLite 数据库（`handoff.db`）以及处于兼容期的 `registry.json`、`roadmap.json` 等。
 - 边界：
   - `共享状态真源` 不是 shell
   - `共享状态真源` 不是 skill
@@ -413,13 +415,16 @@ related_docs:
 ### 5.7 `shell 命令`
 
 - 正式术语：`shell 命令`
-- 别称：`vibe shell`
-- 定义：通过 CLI 直接执行的 `vibe <domain> <subcommand>` 命令能力，例如 `vibe flow`、`vibe task`、`vibe roadmap`。
+- 别称：`vibe3 shell`, `vibe shell`
+- 定义：通过 CLI 直接执行的命令能力。
+  - **主命令 (V3)**：`uv run python src/vibe3/cli.py <subcommand>` (通常别名为 `vibe3`)
+  - **辅助命令 (V2)**：`vibe <domain> <subcommand>` (原 V2 shell 命令)
 - 边界：
   - `shell 命令` 不是 skill
   - `shell 命令` 不是 workflow 文案本身
 - 使用规则：
-  - 文档和沟通中首次提及时，建议显式写成 `vibe flow (shell)` 这类格式
+  - 文档和沟通中首次提及时，建议显式写成 `vibe3 flow (shell)` 这类格式
+  - 优先调用 V3 命令，仅在环境管理等特定场景使用 V2 命令
 
 ### 5.8 `skill 命令`
 

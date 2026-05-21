@@ -9,8 +9,8 @@ description: Use when the user wants to resume work on an existing branch or rel
 
 **核心原则：**
 
-- 先读共享真源（`vibe3 flow show`），再读 handoff（`vibe3 handoff show`）。
-- `vibe3 handoff show` 是 handoff 来源，不是共享真源。
+- 先读共享真源（`vibe3 flow show`），再读 handoff（`vibe3 handoff status` + `vibe3 handoff show @current`）。
+- `vibe3 handoff` 是 handoff 来源，不是共享真源。
 - handoff 的维护义务以 `docs/standards/v3/handoff-governance-standard.md` 为准；发现与现场不一致时必须修正。
 - 不在 continue 阶段发明不存在的 Shell 修复动作。
 
@@ -21,8 +21,9 @@ description: Use when the user wants to resume work on an existing branch or rel
 **快速命令参考**：
 
 ```bash
-uv run python src/vibe3/cli.py flow show    # 查看当前 flow 状态
-uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
+uv run python src/vibe3/cli.py flow show        # 查看当前 flow 状态
+uv run python src/vibe3/cli.py handoff status   # 查看 handoff chain
+uv run python src/vibe3/cli.py handoff show @current  # 查看最新 handoff
 ```
 
 特别约束：
@@ -42,8 +43,8 @@ uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
 
 1. 当前 `git` 现场（`git branch --show-current`、`git status --short`、必要时 `gh pr view`）
 2. `vibe3 flow show`
-3. `vibe3 task status --all --check`
-4. `vibe3 handoff show`（当前 flow 的 handoff 记录）
+3. `vibe3 handoff status`（当前 flow 的 handoff chain）
+4. `vibe3 handoff show @current`（最新的 handoff 记录，如有）
 
 必要时再补充：
 
@@ -55,12 +56,12 @@ uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
 
 ### Step 1: 识别当前目录承载的 flow 对应 task
 
-优先从 `git` 现场、当前 flow scene 与全局 task status 识别：
+优先从 `git` 现场、当前 flow scene 与 handoff chain 识别：
 
 ```bash
 uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py task status --all --check
-uv run python src/vibe3/cli.py handoff show
+uv run python src/vibe3/cli.py handoff status
+uv run python src/vibe3/cli.py handoff show @current
 ```
 
 识别内容：
@@ -75,7 +76,7 @@ uv run python src/vibe3/cli.py handoff show
 
 ### Step 2: 读取本地 handoff
 
-运行 `vibe3 handoff show`，把输出作为以下信息的补充来源：
+运行 `vibe3 handoff status` 和 `vibe3 handoff show @current`，把输出作为以下信息的补充来源：
 
 - 本轮已完成
 - 当前判断

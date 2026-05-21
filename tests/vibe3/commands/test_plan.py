@@ -32,9 +32,11 @@ def _patch_plan_deps(monkeypatch, mock_flow: MagicMock | None = None) -> MagicMo
 
     mock_async = MagicMock()
     mock_sync = MagicMock()
+    mock_resolve = MagicMock()
 
-    monkeypatch.setattr("vibe3.commands.plan.run_issue_role_async", mock_async)
-    monkeypatch.setattr("vibe3.commands.plan.run_issue_role_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_async", mock_async)
+    monkeypatch.setattr("vibe3.commands.plan.execute_spec_plan_sync", mock_sync)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
     monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
     monkeypatch.setattr(
         "vibe3.commands.plan.resolve_branch_arg", lambda _: "task/issue-42"
@@ -52,9 +54,7 @@ def test_plan_help_shows_options() -> None:
 
 
 def test_plan_spec_uses_flow_spec_ref(monkeypatch) -> None:
-    """Test plan --branch without --spec delegates to _plan_for_branch."""
-    # _plan_for_branch requires spec_ref and issue_number,
-    # then calls run_issue_role_async/sync
+    """Test plan --branch without --spec delegates to execute_spec_plan_async."""
     mock_runner = _patch_plan_deps(
         monkeypatch, mock_flow=_make_mock_flow(spec_ref="@task-42/spec.md")
     )
@@ -64,7 +64,7 @@ def test_plan_spec_uses_flow_spec_ref(monkeypatch) -> None:
 
 
 def test_plan_branch_basic_flow(monkeypatch) -> None:
-    """Test plan --branch delegates to run_issue_role_async."""
+    """Test plan --branch delegates to execute_spec_plan_async."""
     mock_runner = _patch_plan_deps(monkeypatch)
     result = runner.invoke(plan_app, ["--branch", "42"])
     assert result.exit_code == 0
