@@ -1,11 +1,11 @@
-"""Frozen-queue dispatch coordinator.
+"""Stateless scan-dispatch coordinator.
 
 Queue rule:
-1. Only collect a new queue when the frozen queue is empty
-2. Keep queued issues resident across ticks
-3. After dispatch, an issue waits for its state label to change
-4. Once state changes, move that issue to the front of the queue
-5. Only capacity uses tmux session counting
+1. Each tick: fresh scan from GitHub for dispatchable states
+2. Get active issues from tmux sessions + SessionRegistry
+3. Filter out active, DONE, supervisor-labeled, assignee-missing issues
+4. Sort by queue ordering rules
+5. Dispatch up to available capacity
 """
 
 from __future__ import annotations
@@ -30,19 +30,13 @@ from vibe3.orchestra.issue_loader import (
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.queue_operations import (
-    collect_raw_issues_without_qualify,
-    select_ready_issues,
-)
-from vibe3.orchestra.queue_persistence_mixin import (
-    QueueEntry,
-    QueuePersistenceMixin,
-)
+from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.label_utils import (
     clean_old_state_labels,
+    normalize_labels,
     should_skip_from_queue,
 )
 
@@ -52,8 +46,8 @@ if TYPE_CHECKING:
     from vibe3.roles.definitions import TriggerableRoleDefinition
 
 
-class GlobalDispatchCoordinator(QueuePersistenceMixin):
-    """Frozen queue with state-change requeue semantics."""
+class GlobalDispatchCoordinator:
+    """Stateless scan-dispatch coordinator (no frozen queue)."""
 
     def __init__(
         self,
@@ -75,74 +69,14 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
             max_workers=config.max_concurrent_flows
         )
         self._owns_executor = executor is None
-        self._frozen_queue: list[QueueEntry] | None = None
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
         self._check_service: CheckService | None = None
         self._supervisor_label = config.supervisor_handoff.issue_label
-
-        # Load persisted queue on init (restart recovery)
-        self._frozen_queue = self._restore_queue()
 
     def shutdown(self) -> None:
         """Shutdown the executor if we own it."""
         if self._owns_executor and self._executor:
             self._executor.shutdown(wait=True)
-
-    async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
-        """Poll GitHub for issues with a specific state label."""
-        raw_issues = await asyncio.get_running_loop().run_in_executor(
-            self._executor,
-            lambda: self._github.list_issues(
-                limit=100,
-                state="open",
-                assignee=None,
-                repo=self._config.repo,
-                label=state.to_label(),
-            ),
-        )
-
-        # BLOCKED bypass: skip qualify gate so falsely-unblocked issues
-        # enter the queue.  Qualification is deferred to
-        # qualify_blocked_issue() at dispatch time (coordinate()).
-        if state == IssueState.BLOCKED:
-            raw_selected = collect_raw_issues_without_qualify(raw_issues)
-
-            # Apply skip filter after collection (preserves original behavior
-            # where issues flow through qualify gate for side effects)
-            selected: list[IssueInfo] = []
-            for issue in raw_selected:
-                if should_skip_from_queue(
-                    issue,
-                    supervisor_label=self._supervisor_label,
-                    manager_usernames=self._config.get_manager_usernames(),
-                    require_manager_assignee=True,
-                ):
-                    continue
-                selected.append(issue)
-
-            append_orchestra_event(
-                "dispatcher",
-                f"poll_issues_by_state({state.value}): "
-                f"{len(selected)} ready issues (bypassed qualify gate)",
-            )
-            return selected
-
-        ready = select_ready_issues(
-            raw_issues,
-            state,
-            self._config,
-            self._github,
-            self._store,
-            self._flow_manager,
-            self._qualify_gate,
-            self._supervisor_label,
-        )
-
-        append_orchestra_event(
-            "dispatcher",
-            f"poll_issues_by_state({state.value}): {len(ready)} ready issues",
-        )
-        return ready
 
     def _emit_dispatch_intent(
         self, role: "TriggerableRoleDefinition", issue: IssueInfo, tick_id: int = 0
@@ -270,33 +204,166 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
 
         return True
 
+    def _get_active_issue_numbers(self) -> set[int]:
+        """Get set of issue numbers currently in active sessions."""
+        active_issues: set[int] = set()
+
+        # Check SessionRegistry for active sessions
+        if self._registry is not None:
+            sessions = self._store.list_live_runtime_sessions()
+            for session in sessions:
+                target_id = session.get("target_id")
+                if target_id and str(target_id).startswith("issue-"):
+                    try:
+                        issue_number = int(str(target_id).split("-", 1)[1])
+                        active_issues.add(issue_number)
+                    except (ValueError, IndexError):
+                        pass
+
+        return active_issues
+
+    async def _scan_dispatchable_states(self) -> list[IssueInfo]:
+        """Scan GitHub for issues in dispatchable states.
+
+        Returns:
+            List of IssueInfo objects from dispatchable states
+        """
+        candidates: list[IssueInfo] = []
+        seen_issue_numbers: set[int] = set()
+
+        append_orchestra_event(
+            "dispatcher",
+            "GlobalDispatchCoordinator: starting state scan",
+        )
+
+        # Collect issues from all dispatchable states
+        for state in (
+            IssueState.REVIEW,
+            IssueState.MERGE_READY,
+            IssueState.IN_PROGRESS,
+            IssueState.CLAIMED,
+            IssueState.HANDOFF,
+            IssueState.BLOCKED,
+            IssueState.READY,
+        ):
+            try:
+                # Poll GitHub for issues with this state label
+                raw_issues = await asyncio.get_running_loop().run_in_executor(
+                    self._executor,
+                    lambda: self._github.list_issues(
+                        limit=100,
+                        state="open",
+                        assignee=None,
+                        repo=self._config.repo,
+                        label=state.to_label(),
+                    ),
+                )
+
+                # Process raw issues
+                for item in raw_issues:
+                    labels = normalize_labels(item.get("labels"))
+                    if not any(lbl.startswith("state/") for lbl in labels):
+                        continue
+
+                    issue = IssueInfo.from_github_payload(item)
+                    if issue is None:
+                        continue
+
+                    # Skip duplicates
+                    if issue.number in seen_issue_numbers:
+                        continue
+                    seen_issue_numbers.add(issue.number)
+
+                    # For BLOCKED issues: skip qualify gate at scan time
+                    # Qualification is deferred to dispatch time (see coordinate())
+                    if state == IssueState.BLOCKED:
+                        if should_skip_from_queue(
+                            issue,
+                            supervisor_label=self._supervisor_label,
+                            manager_usernames=self._config.get_manager_usernames(),
+                            require_manager_assignee=True,
+                        ):
+                            continue
+                        candidates.append(issue)
+                        continue
+
+                    # For other states: check qualify gate immediately
+                    # (preserve existing behavior from select_ready_issues)
+                    branch, flow_state = get_flow_context(
+                        issue.number,
+                        self._config,
+                        self._github,
+                        self._store,
+                        self._flow_manager,
+                    )
+
+                    target = self._qualify_gate.run_qualify_gate(
+                        issue, branch, flow_state, issue.labels, state
+                    )
+                    if target is None or target != state:
+                        continue
+
+                    if should_skip_from_queue(
+                        issue,
+                        supervisor_label=self._supervisor_label,
+                        manager_usernames=self._config.get_manager_usernames(),
+                        require_manager_assignee=True,
+                    ):
+                        continue
+
+                    candidates.append(issue)
+
+            except Exception as exc:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: scan failed for {state.value}: {exc}",
+                )
+                logger.bind(
+                    domain="global_dispatch",
+                    state=state.value,
+                ).error(f"scan failed for {state.value}: {exc}")
+
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: scan complete, {len(candidates)} candidates",
+        )
+
+        return candidates
+
+    def get_queued_issue_numbers(self) -> set[int]:
+        """Get set of issue numbers currently in flight.
+
+        Returns issues with active sessions (tmux + registry).
+        """
+        return self._get_active_issue_numbers()
+
     async def coordinate(self, tick_id: int = 0) -> None:
-        """Run one heartbeat tick against the frozen queue.
+        """Run one heartbeat tick: scan, filter, sort, dispatch.
 
         Args:
             tick_id: Current tick number from heartbeat (default: 0)
         """
-        if self._frozen_queue is None or len(self._frozen_queue) == 0:
-            self._frozen_queue = await self._collect_frozen_queue()
-            self._check_service = None  # Invalidate cache when queue is rebuilt
-            # Persist freshly collected queue after assignment
-            self._persist_queue()
-            if not self._frozen_queue:
-                append_orchestra_event(
-                    "dispatcher",
-                    "GlobalDispatchCoordinator: no candidates",
-                )
-                return
+        # 1. Who is running?
+        active_issues = self._get_active_issue_numbers()
 
-        self._promote_progressed_entries()
+        # 2. What is dispatchable? (fresh scan from GitHub)
+        candidates = await self._scan_dispatchable_states()
 
-        if not self._frozen_queue:
+        # 3. Filter: remove active, DONE
+        candidates = [c for c in candidates if c.number not in active_issues]
+        candidates = [c for c in candidates if c.state != IssueState.DONE]
+
+        if not candidates:
             append_orchestra_event(
                 "dispatcher",
-                "GlobalDispatchCoordinator: queue emptied by state changes",
+                "GlobalDispatchCoordinator: no candidates after filtering",
             )
             return
 
+        # 4. Sort by queue ordering rules
+        candidates = sort_ready_issues(candidates)
+
+        # 5. Check capacity
         status = self._capacity.get_capacity_status("manager")
         available_slots = status["remaining"]
 
@@ -307,110 +374,49 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
             )
             return
 
+        # 6. Dispatch up to available slots
         dispatched_count = 0
-        index = 0
-        while index < len(self._frozen_queue):
-            if dispatched_count >= available_slots:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
-                    f"skipped remaining (capacity full)",
-                )
-                return
-
-            entry = self._frozen_queue[index]
-            issue = self._load_issue(entry.issue_number)
-            if issue is None or issue.state is None:
-                self._frozen_queue.pop(index)
-                continue
-
-            if should_skip_from_queue(
-                issue,
-                supervisor_label=self._supervisor_label,
-                manager_usernames=self._config.get_manager_usernames(),
-                require_manager_assignee=True,
-            ):
-                append_orchestra_event(
-                    "dispatcher",
-                    f"GlobalDispatchCoordinator: removed #{issue.number} "
-                    "from queue (supervisor or assignee check failed)",
-                )
-                self._frozen_queue.pop(index)
-                continue
-
-            if issue.state == IssueState.DONE:
-                self._frozen_queue.pop(index)
-                continue
-
-            entry.collected_state = issue.state.value
-
-            if entry.waiting_state is not None:
-                index += 1
-                continue
-
-            # Per-issue active session gate
-            if self._registry is not None:
-                active = self._registry.get_live_sessions_for_issue(
-                    issue_number=entry.issue_number,
-                    roles=["manager", "planner", "executor", "reviewer"],
-                )
-                if active:
-                    append_orchestra_event(
-                        "dispatcher",
-                        f"GlobalDispatchCoordinator: skipped #{entry.issue_number} "
-                        f"(active session: role={active[0].get('role')})",
-                    )
-                    index += 1
-                    continue
-
-            # For BLOCKED issues: run qualify gate at intent time.
-            # If qualify_blocked_issue returns None (still blocked per body truth),
-            # the issue is popped from the current frozen queue cycle.
-            # It may be re-collected on the next queue rebuild if it still has
-            # the state/blocked label.
+        for issue in candidates[:available_slots]:
+            # For BLOCKED issues: run qualify gate at dispatch time
             if issue.state == IssueState.BLOCKED:
                 target_state = self._qualify_gate.qualify_blocked_issue(issue)
 
-                # Check degraded mode immediately after qualification
+                # Check degraded mode
                 degraded = get_degraded_manager()
                 if degraded.is_degraded():
                     degraded_reason = degraded.get_reason()
                     reason_value = degraded_reason.value if degraded_reason else None
                     logger.bind(
                         domain="orchestra",
-                        action="collect_blocked_intents",
+                        action="dispatch_blocked",
                         degraded_mode=True,
                         reason=reason_value,
                         issue_number=issue.number,
                     ).warning(f"Qualification of #{issue.number} entered degraded mode")
 
-                # Then check target_state
                 if target_state is None:
-                    self._frozen_queue.pop(index)
                     continue
 
                 role = find_role_for_state(target_state)
                 if role is None:
-                    self._frozen_queue.pop(index)
                     continue
-                entry.collected_state = target_state.value
-            else:
+            elif issue.state is not None:
                 role = find_role_for_state(issue.state)
                 if role is None:
-                    self._frozen_queue.pop(index)
                     continue
+            else:
+                continue
 
-            # === NEW: Pre-dispatch health check ===
+            # Pre-dispatch health check
             if not self._health_check_before_dispatch(issue):
                 append_orchestra_event(
                     "dispatcher",
                     f"GlobalDispatchCoordinator: skipped #{issue.number} "
                     "(health check failed)",
                 )
-                self._frozen_queue.pop(index)
                 continue
-            # === END health check ===
 
+            # Emit dispatch intent
             green = "\033[32m"
             reset = "\033[0m"
             append_orchestra_event(
@@ -419,7 +425,6 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 f"#{issue.number} ({role.registry_role})",
             )
             self._emit_dispatch_intent(role, issue, tick_id)
-            entry.waiting_state = entry.collected_state
             dispatched_count += 1
 
             logger.bind(
@@ -430,7 +435,6 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 f"Emitted dispatch intent for #{issue.number} "
                 f"({role.registry_role})"
             )
-            index += 1
 
         if dispatched_count > 0:
             green = "\033[32m"
@@ -440,6 +444,3 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 f"GlobalDispatchCoordinator: {green}dispatch-intent="
                 f"{dispatched_count}{reset}",
             )
-
-        # Persist queue state after dispatch mutations
-        self._persist_queue()

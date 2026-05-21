@@ -153,17 +153,6 @@ _CREATE_FAILED_GATE_STATE = """
     )
 """
 
-_CREATE_ORCHESTRA_QUEUE = """
-    CREATE TABLE IF NOT EXISTS orchestra_queue (
-        issue_number INTEGER PRIMARY KEY,
-        collected_state TEXT,
-        waiting_state TEXT,
-        retry_count INTEGER NOT NULL DEFAULT 0,
-        last_attempted_at TEXT,
-        updated_at TEXT NOT NULL
-    )
-"""
-
 _CREATE_TRANSITION_HISTORY = """
     CREATE TABLE IF NOT EXISTS transition_history (
         branch TEXT NOT NULL,
@@ -349,7 +338,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for index_sql in _CREATE_ERROR_LOG_INDEXES:
         cursor.execute(index_sql)
     cursor.execute(_CREATE_FAILED_GATE_STATE)
-    cursor.execute(_CREATE_ORCHESTRA_QUEUE)
     cursor.execute(_CREATE_TRANSITION_HISTORY)
     for stmt in _CREATE_TRANSITION_HISTORY_INDEXES.strip().split(";"):
         stmt = stmt.strip()
@@ -396,42 +384,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 f"Migrated {migrated} historical transitions from "
                 "flow_events to transition_history"
             )
-
-    # Migration: add retry_count and last_attempted_at to orchestra_queue
-    queue_columns = {
-        row[1]
-        for row in cursor.execute("PRAGMA table_info(orchestra_queue)").fetchall()
-    }
-    if "retry_count" not in queue_columns:
-        cursor.execute(
-            "ALTER TABLE orchestra_queue "
-            "ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0"
-        )
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added retry_count column to orchestra_queue"
-        )
-
-    # Migration: rename enqueued_at to last_attempted_at if it exists
-    # (legacy field from earlier migration, semantics changed from queue
-    # time to last attempt time)
-    if "enqueued_at" in queue_columns and "last_attempted_at" not in queue_columns:
-        # SQLite doesn't support DROP COLUMN, so we add the new column
-        # and copy data. The old enqueued_at will remain but is dual-written
-        # to satisfy its NOT NULL constraint (value not read by new code).
-        cursor.execute("ALTER TABLE orchestra_queue ADD COLUMN last_attempted_at TEXT")
-        cursor.execute(
-            "UPDATE orchestra_queue SET last_attempted_at = enqueued_at "
-            "WHERE enqueued_at IS NOT NULL"
-        )
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added last_attempted_at column to orchestra_queue "
-            "(migrated from enqueued_at)"
-        )
-    elif "last_attempted_at" not in queue_columns:
-        cursor.execute("ALTER TABLE orchestra_queue ADD COLUMN last_attempted_at TEXT")
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added last_attempted_at column to orchestra_queue"
-        )
 
     # Create indexes for runtime_session table
     for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):

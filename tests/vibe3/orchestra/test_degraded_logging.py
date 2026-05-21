@@ -10,10 +10,7 @@ from vibe3.observability.degraded_mode import (
     DegradedModeManager,
     DegradedModeReason,
 )
-from vibe3.orchestra.global_dispatch_coordinator import (
-    GlobalDispatchCoordinator,
-    QueueEntry,
-)
+from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
 
 
 @pytest.fixture(autouse=True)
@@ -39,7 +36,6 @@ def test_dispatch_logs_degraded_mode():
     mock_config.max_concurrent_flows = 1
     mock_config.max_retry_budget = 3
     mock_config.get_manager_usernames.return_value = ["manager-bot"]
-    # Mock supervisor_handoff with issue_label
     mock_supervisor_handoff = MagicMock()
     mock_supervisor_handoff.issue_label = "supervisor"
     mock_config.supervisor_handoff = mock_supervisor_handoff
@@ -53,17 +49,6 @@ def test_dispatch_logs_degraded_mode():
         assignees=["manager-bot"],
     )
 
-    # Setup frozen queue with blocked issue
-    frozen_queue = [
-        QueueEntry(
-            issue_number=123,
-            collected_state="blocked",
-            waiting_state=None,
-            retry_count=0,
-            last_attempted_at=None,
-        )
-    ]
-
     # Mock qualify_gate to enter degraded mode
     def mock_qualify(issue):
         # Enter degraded mode during qualification
@@ -72,69 +57,59 @@ def test_dispatch_logs_degraded_mode():
         return IssueState.READY  # Return a valid state
 
     with patch(
-        "vibe3.orchestra.global_dispatch_coordinator.load_issue"
-    ) as mock_load_issue:
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
-        ) as mock_flow_context:
-            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
-                # Configure mock_store methods
-                mock_store.load_frozen_queue.return_value = []
-                mock_store.save_frozen_queue = MagicMock()
-                mock_store.clear_frozen_queue = MagicMock()
-                mock_store.remove_from_frozen_queue = MagicMock()
+        "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+    ) as mock_flow_context:
+        with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+            mock_flow_context.return_value = ("task/issue-123", None)
 
-                mock_load_issue.return_value = blocked_issue
-                mock_flow_context.return_value = ("task/issue-123", None)
+            coordinator = GlobalDispatchCoordinator(
+                config=mock_config,
+                capacity=mock_capacity,
+                github=mock_github,
+                store=mock_store,
+                flow_manager=mock_flow_manager,
+            )
 
-                # Create coordinator
-                coordinator = GlobalDispatchCoordinator(
-                    config=mock_config,
-                    capacity=mock_capacity,
-                    github=mock_github,
-                    store=mock_store,
-                    flow_manager=mock_flow_manager,
+            # Mock _scan_dispatchable_states to return blocked issue
+            async def mock_scan():
+                return [blocked_issue]
+
+            coordinator._scan_dispatchable_states = mock_scan
+
+            # Mock qualify_gate
+            coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+            coordinator._health_check_before_dispatch = lambda issue: True
+
+            # Run coordination with log capture
+            import asyncio
+
+            with patch(
+                "vibe3.orchestra.global_dispatch_coordinator.logger"
+            ) as mock_logger:
+                asyncio.run(coordinator.coordinate(tick_id=1))
+
+                # Verify degraded mode warning was logged
+                degraded_calls = [
+                    call
+                    for call in mock_logger.bind.call_args_list
+                    if "degraded_mode" in str(call)
+                ]
+
+                # Should have at least one call with degraded_mode=True
+                assert len(degraded_calls) > 0
+
+                # Verify the degraded mode warning was emitted
+                warning_calls = [
+                    call
+                    for call in mock_logger.bind.return_value.warning.call_args_list
+                ]
+                assert len(warning_calls) > 0
+
+                # Check that the log contains issue number
+                any_call_has_issue_123 = any(
+                    "123" in str(call) for call in warning_calls
                 )
-
-                # Set frozen queue
-                coordinator._frozen_queue = frozen_queue
-
-                # Mock qualify_gate
-                coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
-
-                # Mock _health_check_before_dispatch to pass
-                coordinator._health_check_before_dispatch = lambda issue: True
-
-                # Run coordination with log capture
-                import asyncio
-
-                with patch(
-                    "vibe3.orchestra.global_dispatch_coordinator.logger"
-                ) as mock_logger:
-                    asyncio.run(coordinator.coordinate(tick_id=1))
-
-                    # Verify degraded mode warning was logged
-                    degraded_calls = [
-                        call
-                        for call in mock_logger.bind.call_args_list
-                        if "degraded_mode" in str(call)
-                    ]
-
-                    # Should have at least one call with degraded_mode=True
-                    assert len(degraded_calls) > 0
-
-                    # Verify the degraded mode warning was emitted
-                    warning_calls = [
-                        call
-                        for call in mock_logger.bind.return_value.warning.call_args_list
-                    ]
-                    assert len(warning_calls) > 0
-
-                    # Check that the log contains issue number
-                    any_call_has_issue_123 = any(
-                        "123" in str(call) for call in warning_calls
-                    )
-                    assert any_call_has_issue_123
+                assert any_call_has_issue_123
 
 
 def test_dispatch_no_log_when_not_degraded():
@@ -152,7 +127,6 @@ def test_dispatch_no_log_when_not_degraded():
     mock_config.max_concurrent_flows = 1
     mock_config.max_retry_budget = 3
     mock_config.get_manager_usernames.return_value = ["manager-bot"]
-    # Mock supervisor_handoff with issue_label
     mock_supervisor_handoff = MagicMock()
     mock_supervisor_handoff.issue_label = "supervisor"
     mock_config.supervisor_handoff = mock_supervisor_handoff
@@ -166,70 +140,49 @@ def test_dispatch_no_log_when_not_degraded():
         assignees=["manager-bot"],
     )
 
-    # Setup frozen queue with blocked issue
-    frozen_queue = [
-        QueueEntry(
-            issue_number=456,
-            collected_state="blocked",
-            waiting_state=None,
-            retry_count=0,
-            last_attempted_at=None,
-        )
-    ]
-
     # Mock qualify_gate to NOT enter degraded mode
     def mock_qualify(issue):
         # Do NOT enter degraded mode
         return IssueState.READY
 
     with patch(
-        "vibe3.orchestra.global_dispatch_coordinator.load_issue"
-    ) as mock_load_issue:
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
-        ) as mock_flow_context:
-            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
-                # Configure mock_store methods
-                mock_store.load_frozen_queue.return_value = []
-                mock_store.save_frozen_queue = MagicMock()
-                mock_store.clear_frozen_queue = MagicMock()
-                mock_store.remove_from_frozen_queue = MagicMock()
+        "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+    ) as mock_flow_context:
+        with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+            mock_flow_context.return_value = ("task/issue-456", None)
 
-                mock_load_issue.return_value = blocked_issue
-                mock_flow_context.return_value = ("task/issue-456", None)
+            coordinator = GlobalDispatchCoordinator(
+                config=mock_config,
+                capacity=mock_capacity,
+                github=mock_github,
+                store=mock_store,
+                flow_manager=mock_flow_manager,
+            )
 
-                # Create coordinator
-                coordinator = GlobalDispatchCoordinator(
-                    config=mock_config,
-                    capacity=mock_capacity,
-                    github=mock_github,
-                    store=mock_store,
-                    flow_manager=mock_flow_manager,
-                )
+            # Mock _scan_dispatchable_states to return blocked issue
+            async def mock_scan():
+                return [blocked_issue]
 
-                # Set frozen queue
-                coordinator._frozen_queue = frozen_queue
+            coordinator._scan_dispatchable_states = mock_scan
 
-                # Mock qualify_gate
-                coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+            # Mock qualify_gate
+            coordinator._qualify_gate.qualify_blocked_issue = mock_qualify
+            coordinator._health_check_before_dispatch = lambda issue: True
 
-                # Mock _health_check_before_dispatch to pass
-                coordinator._health_check_before_dispatch = lambda issue: True
+            # Run coordination with log capture
+            import asyncio
 
-                # Run coordination with log capture
-                import asyncio
+            with patch(
+                "vibe3.orchestra.global_dispatch_coordinator.logger"
+            ) as mock_logger:
+                asyncio.run(coordinator.coordinate(tick_id=1))
 
-                with patch(
-                    "vibe3.orchestra.global_dispatch_coordinator.logger"
-                ) as mock_logger:
-                    asyncio.run(coordinator.coordinate(tick_id=1))
+                # Verify NO degraded mode warning was logged
+                degraded_calls = [
+                    call
+                    for call in mock_logger.bind.call_args_list
+                    if "degraded_mode" in str(call)
+                ]
 
-                    # Verify NO degraded mode warning was logged
-                    degraded_calls = [
-                        call
-                        for call in mock_logger.bind.call_args_list
-                        if "degraded_mode" in str(call)
-                    ]
-
-                    # Should have NO calls with degraded_mode=True
-                    assert len(degraded_calls) == 0
+                # Should have NO calls with degraded_mode=True
+                assert len(degraded_calls) == 0

@@ -43,27 +43,6 @@ def test_fd_not_exhausted_under_high_frequency(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
-def test_fd_not_exhausted_queue_operations(tmp_path: Path) -> None:
-    """Verify queue operations do not exhaust FDs."""
-    db_path = str(tmp_path / "test.db")
-    client = SQLiteClient(db_path=db_path)
-
-    proc = psutil.Process(os.getpid())
-    before = proc.num_fds()
-
-    # Perform 1000 queue operations (heartbeat pattern)
-    for i in range(1000):
-        client.save_queue_entry(i % 100, collected_state=f"state-{i}")
-        entry = client.load_queue_entry(i % 100)
-        assert entry is not None
-
-    after = proc.num_fds()
-    fd_growth = after - before
-
-    assert fd_growth < 5, f"FD grew by {fd_growth}"
-
-
-@pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
 def test_fd_not_exhausted_event_operations(tmp_path: Path) -> None:
     """Verify event operations do not exhaust FDs."""
     db_path = str(tmp_path / "test.db")

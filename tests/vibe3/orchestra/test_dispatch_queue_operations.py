@@ -1,394 +1,362 @@
-"""Tests for GlobalDispatchCoordinator queue operations."""
+"""Tests for GlobalDispatchCoordinator stateless dispatch operations."""
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.global_dispatch_coordinator import QueueEntry
+from vibe3.models.orchestration import IssueInfo, IssueState
 
 
-class TestQueueOperations:
-    @pytest.mark.asyncio
-    async def test_dispatch_all_when_capacity_available(
-        self, make_issue, make_capacity, make_coordinator, install_issue_loader
-    ) -> None:
-        issues = [make_issue(1), make_issue(2)]
-        capacity = make_capacity(remaining=2)
-
-        coordinator = make_coordinator(
-            "planner",
-            issues,
-            capacity=capacity,
-            with_branches=True,
-            mock_health_check=True,
-        )
-
-        async def mock_collect() -> list[QueueEntry]:
-            return [
-                QueueEntry(issue_number=1, collected_state="claimed"),
-                QueueEntry(issue_number=2, collected_state="claimed"),
-            ]
-
-        coordinator._collect_frozen_queue = mock_collect
-
-        install_issue_loader(
-            coordinator,
-            {
-                1: IssueState.CLAIMED,
-                2: IssueState.CLAIMED,
-            },
-        )
-
-        emit_calls = []
-        coordinator._emit_dispatch_intent = (
-            lambda role, issue, tick_id: emit_calls.append((role, issue))
-        )
-
-        await coordinator.coordinate()
-
-        assert len(emit_calls) == 2
+class TestStatelessDispatch:
+    """Tests for the stateless scan-dispatch coordinate() behavior."""
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "issue_num,role,collected_state,issue_state,labels,assignees",
-        [
-            (
-                467,
-                "handoff-manager",
-                "handoff",
-                IssueState.HANDOFF,
-                ["supervisor", "state/handoff"],
-                ["manager-bot"],
-            ),
-            (468, "manager", "ready", IssueState.READY, ["state/ready"], []),
-            (
-                469,
-                "handoff-manager",
-                "handoff",
-                IssueState.HANDOFF,
-                ["state/handoff"],
-                [],
-            ),
-        ],
-    )
-    async def test_invalid_issues_removed_from_frozen_queue(
-        self,
-        make_issue,
-        make_capacity,
-        make_coordinator,
-        make_issue_info,
-        issue_num,
-        role,
-        collected_state,
-        issue_state,
-        labels,
-        assignees,
-    ) -> None:
-        """Issues violating queue criteria are removed (supervisor, no assignee)."""
-        issue = make_issue(issue_num)
-        capacity = make_capacity(remaining=1)
-
-        coordinator = make_coordinator(
-            role, [issue], capacity=capacity, mock_health_check=True
-        )
-        coordinator._frozen_queue = [
-            QueueEntry(
-                issue_number=issue_num,
-                collected_state=collected_state,
-                waiting_state=None,
-            )
-        ]
-        coordinator._load_issue = lambda n: make_issue_info(
-            n, issue_state, labels=labels, assignees=assignees
+    async def test_dispatch_all_when_capacity_available(self) -> None:
+        """When capacity available, dispatch all ready issues."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
         )
 
-        emit_calls = []
-        coordinator._emit_dispatch_intent = lambda r, i, t: emit_calls.append((r, i))
+        # Setup mocks
+        mock_github = MagicMock()
+        mock_store = MagicMock()
+        mock_flow_manager = MagicMock()
+        mock_capacity = MagicMock()
+        mock_config = MagicMock()
 
-        await coordinator.coordinate()
+        mock_capacity.get_capacity_status.return_value = {"remaining": 2}
+        mock_config.repo = "test/repo"
+        mock_config.max_concurrent_flows = 2
+        mock_config.get_manager_usernames.return_value = ["manager-bot"]
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
 
-        assert len(emit_calls) == 0
-        assert coordinator._frozen_queue == []
+        # Create ready issues
+        issue1 = IssueInfo(
+            number=1,
+            title="Issue 1",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
+        )
+        issue2 = IssueInfo(
+            number=2,
+            title="Issue 2",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
+        )
+
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.load_issue"
+        ) as mock_load_issue:
+            with patch(
+                "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+            ) as mock_flow_context:
+                with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+                    mock_load_issue.side_effect = lambda n, *args: {
+                        1: issue1,
+                        2: issue2,
+                    }.get(n)
+                    mock_flow_context.return_value = ("task/issue-1", None)
+
+                    coordinator = GlobalDispatchCoordinator(
+                        config=mock_config,
+                        capacity=mock_capacity,
+                        github=mock_github,
+                        store=mock_store,
+                        flow_manager=mock_flow_manager,
+                    )
+
+                    # Mock _scan_dispatchable_states to return ready issues
+                    async def mock_scan():
+                        return [issue1, issue2]
+
+                    coordinator._scan_dispatchable_states = mock_scan
+                    coordinator._health_check_before_dispatch = lambda issue: True
+
+                    emit_calls = []
+                    coordinator._emit_dispatch_intent = (
+                        lambda role, issue, tick_id: emit_calls.append((role, issue))
+                    )
+
+                    await coordinator.coordinate()
+
+                    assert len(emit_calls) == 2
 
     @pytest.mark.asyncio
-    async def test_skip_when_capacity_full(
-        self, make_issue, make_capacity, make_coordinator, install_issue_loader
-    ) -> None:
-        issues = [make_issue(1), make_issue(2), make_issue(3)]
-        capacity = make_capacity(remaining=2)
-
-        coordinator = make_coordinator(
-            "planner",
-            issues,
-            capacity=capacity,
-            with_branches=True,
-            mock_health_check=True,
+    async def test_skip_when_capacity_full(self) -> None:
+        """When capacity full, dispatch nothing."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
         )
 
-        async def mock_collect() -> list[QueueEntry]:
-            return [
-                QueueEntry(issue_number=1, collected_state="claimed"),
-                QueueEntry(issue_number=2, collected_state="claimed"),
-                QueueEntry(issue_number=3, collected_state="claimed"),
-            ]
+        mock_github = MagicMock()
+        mock_store = MagicMock()
+        mock_flow_manager = MagicMock()
+        mock_capacity = MagicMock()
+        mock_config = MagicMock()
 
-        coordinator._collect_frozen_queue = mock_collect
+        mock_capacity.get_capacity_status.return_value = {"remaining": 0}
+        mock_config.repo = "test/repo"
+        mock_config.max_concurrent_flows = 1
+        mock_config.get_manager_usernames.return_value = ["manager-bot"]
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
 
-        install_issue_loader(
-            coordinator,
-            {
-                1: IssueState.CLAIMED,
-                2: IssueState.CLAIMED,
-                3: IssueState.CLAIMED,
-            },
-        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+        ) as mock_flow_context:
+            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+                mock_flow_context.return_value = ("task/issue-1", None)
 
-        emit_calls = []
-        coordinator._emit_dispatch_intent = (
-            lambda role, issue, tick_id: emit_calls.append((role, issue))
-        )
+                coordinator = GlobalDispatchCoordinator(
+                    config=mock_config,
+                    capacity=mock_capacity,
+                    github=mock_github,
+                    store=mock_store,
+                    flow_manager=mock_flow_manager,
+                )
 
-        await coordinator.coordinate()
+                issue1 = IssueInfo(
+                    number=1,
+                    title="Issue 1",
+                    state=IssueState.CLAIMED,
+                    labels=["state/claimed"],
+                    assignees=["manager-bot"],
+                )
 
-        assert len(emit_calls) == 2
+                async def mock_scan():
+                    return [issue1]
+
+                coordinator._scan_dispatchable_states = mock_scan
+
+                emit_calls = []
+                coordinator._emit_dispatch_intent = (
+                    lambda role, issue, tick_id: emit_calls.append((role, issue))
+                )
+
+                await coordinator.coordinate()
+
+                assert len(emit_calls) == 0
 
     @pytest.mark.asyncio
-    async def test_frozen_queue_prevents_duplicate_dispatch_without_state_change(
-        self, make_issue, make_capacity, make_coordinator, install_issue_loader
-    ) -> None:
-        issues = [make_issue(1), make_issue(2)]
-        capacity = make_capacity(remaining=3)
-
-        coordinator = make_coordinator(
-            "planner",
-            issues,
-            capacity=capacity,
-            with_branches=True,
-            mock_health_check=True,
+    async def test_filter_active_issues(self) -> None:
+        """Active issues (in tmux/registry) are filtered out."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
         )
 
-        async def mock_collect() -> list[QueueEntry]:
-            return [
-                QueueEntry(issue_number=1, collected_state="claimed"),
-                QueueEntry(issue_number=2, collected_state="claimed"),
-            ]
+        mock_github = MagicMock()
+        mock_store = MagicMock()
+        mock_flow_manager = MagicMock()
+        mock_capacity = MagicMock()
+        mock_config = MagicMock()
+        mock_registry = MagicMock()
 
-        coordinator._collect_frozen_queue = mock_collect
+        mock_capacity.get_capacity_status.return_value = {"remaining": 2}
+        mock_config.repo = "test/repo"
+        mock_config.max_concurrent_flows = 2
+        mock_config.get_manager_usernames.return_value = ["manager-bot"]
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
 
-        install_issue_loader(
-            coordinator,
-            {
-                1: IssueState.CLAIMED,
-                2: IssueState.CLAIMED,
-            },
+        # Issue 1 is active (has live session)
+        issue1 = IssueInfo(
+            number=1,
+            title="Issue 1",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
+        )
+        # Issue 2 is not active
+        issue2 = IssueInfo(
+            number=2,
+            title="Issue 2",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
         )
 
-        emit_calls = []
-        coordinator._emit_dispatch_intent = (
-            lambda role, issue, tick_id: emit_calls.append((role, issue))
-        )
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+        ) as mock_flow_context:
+            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+                mock_flow_context.return_value = ("task/issue-2", None)
 
-        await coordinator.coordinate()
-        await coordinator.coordinate()
+                coordinator = GlobalDispatchCoordinator(
+                    config=mock_config,
+                    capacity=mock_capacity,
+                    github=mock_github,
+                    store=mock_store,
+                    flow_manager=mock_flow_manager,
+                    registry=mock_registry,
+                )
 
-        assert len(emit_calls) == 2
+                # Mock registry to indicate issue 1 is active
+                mock_store.list_live_runtime_sessions.return_value = [
+                    {"target_id": "issue-1", "role": "executor"}
+                ]
+
+                async def mock_scan():
+                    return [issue1, issue2]
+
+                coordinator._scan_dispatchable_states = mock_scan
+                coordinator._health_check_before_dispatch = lambda issue: True
+
+                emit_calls = []
+                coordinator._emit_dispatch_intent = (
+                    lambda role, issue, tick_id: emit_calls.append((role, issue))
+                )
+
+                await coordinator.coordinate()
+
+                # Only issue 2 should be dispatched
+                assert len(emit_calls) == 1
+                assert emit_calls[0][1].number == 2
 
     @pytest.mark.asyncio
-    async def test_emit_failure_handled_gracefully(
-        self, make_issue, make_capacity, make_coordinator, install_issue_loader
-    ) -> None:
-        issue1 = make_issue(1)
-        issue2 = make_issue(2)
-        capacity = make_capacity(remaining=2)
-
-        coordinator = make_coordinator(
-            "planner",
-            [issue1, issue2],
-            capacity=capacity,
-            with_branches=True,
-            mock_health_check=True,
+    async def test_filter_done_issues(self) -> None:
+        """Issues in DONE state are filtered out."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
         )
 
-        async def mock_collect() -> list[QueueEntry]:
-            return [
-                QueueEntry(issue_number=1, collected_state="claimed"),
-                QueueEntry(issue_number=2, collected_state="claimed"),
-            ]
+        mock_github = MagicMock()
+        mock_store = MagicMock()
+        mock_flow_manager = MagicMock()
+        mock_capacity = MagicMock()
+        mock_config = MagicMock()
 
-        coordinator._collect_frozen_queue = mock_collect
+        mock_capacity.get_capacity_status.return_value = {"remaining": 2}
+        mock_config.repo = "test/repo"
+        mock_config.max_concurrent_flows = 2
+        mock_config.get_manager_usernames.return_value = ["manager-bot"]
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
 
-        install_issue_loader(
-            coordinator,
-            {
-                1: IssueState.CLAIMED,
-                2: IssueState.CLAIMED,
-            },
+        # Issue in DONE state
+        done_issue = IssueInfo(
+            number=1,
+            title="Done Issue",
+            state=IssueState.DONE,
+            labels=["state/done"],
+            assignees=["manager-bot"],
+        )
+        # Issue ready to dispatch
+        ready_issue = IssueInfo(
+            number=2,
+            title="Ready Issue",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
         )
 
-        emit_calls = []
-        call_count = [0]
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+        ) as mock_flow_context:
+            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+                mock_flow_context.return_value = ("task/issue-2", None)
 
-        def emit_with_failure(role, issue, tick_id=0):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                raise RuntimeError("emit failed")
-            emit_calls.append((role, issue))
+                coordinator = GlobalDispatchCoordinator(
+                    config=mock_config,
+                    capacity=mock_capacity,
+                    github=mock_github,
+                    store=mock_store,
+                    flow_manager=mock_flow_manager,
+                )
 
-        coordinator._emit_dispatch_intent = emit_with_failure
+                async def mock_scan():
+                    return [done_issue, ready_issue]
 
-        # With dead try-except removed, publish() failures propagate.
-        # Dispatch handler now catches its own errors and writes blocked_reason.
-        with pytest.raises(RuntimeError, match="emit failed"):
-            await coordinator.coordinate()
+                coordinator._scan_dispatchable_states = mock_scan
+                coordinator._health_check_before_dispatch = lambda issue: True
 
-        assert call_count[0] == 1
+                emit_calls = []
+                coordinator._emit_dispatch_intent = (
+                    lambda role, issue, tick_id: emit_calls.append((role, issue))
+                )
+
+                await coordinator.coordinate()
+
+                # Only ready issue should be dispatched
+                assert len(emit_calls) == 1
+                assert emit_calls[0][1].number == 2
 
     @pytest.mark.asyncio
-    async def test_collect_failure_does_not_affect_other_roles(
-        self,
-        make_issue,
-        make_capacity,
-        make_coordinator,
-        install_issue_loader,
-        make_issue_info,
-    ) -> None:
-        """Test that polling failure for one state doesn't prevent others."""
-        issue_planner = make_issue(10)
-        capacity = make_capacity(remaining=1)
-
-        coordinator = make_coordinator(
-            "planner",
-            [issue_planner],
-            capacity=capacity,
-            with_branches=True,
-            mock_health_check=True,
+    async def test_health_check_failure_skips_dispatch(self) -> None:
+        """Issues failing health check are skipped."""
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
         )
 
-        async def mock_poll(state: IssueState) -> list:
-            if state == IssueState.READY:
-                raise RuntimeError("API error")
-            elif state == IssueState.CLAIMED:
-                return [make_issue_info(10, IssueState.CLAIMED)]
-            return []
+        mock_github = MagicMock()
+        mock_store = MagicMock()
+        mock_flow_manager = MagicMock()
+        mock_capacity = MagicMock()
+        mock_config = MagicMock()
 
-        coordinator._poll_issues_by_state = mock_poll
+        mock_capacity.get_capacity_status.return_value = {"remaining": 2}
+        mock_config.repo = "test/repo"
+        mock_config.max_concurrent_flows = 2
+        mock_config.get_manager_usernames.return_value = ["manager-bot"]
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
 
-        install_issue_loader(coordinator, {10: IssueState.CLAIMED})
-
-        emit_calls = []
-        coordinator._emit_dispatch_intent = (
-            lambda role, issue, tick_id: emit_calls.append((role, issue))
+        issue1 = IssueInfo(
+            number=1,
+            title="Issue 1",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
+        )
+        issue2 = IssueInfo(
+            number=2,
+            title="Issue 2",
+            state=IssueState.CLAIMED,
+            labels=["state/claimed"],
+            assignees=["manager-bot"],
         )
 
-        await coordinator.coordinate()
+        with patch(
+            "vibe3.orchestra.global_dispatch_coordinator.get_flow_context"
+        ) as mock_flow_context:
+            with patch("vibe3.orchestra.global_dispatch_coordinator.publish"):
+                mock_flow_context.return_value = ("task/issue-1", None)
 
-        assert len(emit_calls) == 1
+                coordinator = GlobalDispatchCoordinator(
+                    config=mock_config,
+                    capacity=mock_capacity,
+                    github=mock_github,
+                    store=mock_store,
+                    flow_manager=mock_flow_manager,
+                )
 
-    @pytest.mark.asyncio
-    async def test_empty_queue_does_nothing(
-        self, make_capacity, make_coordinator, install_issue_loader
-    ) -> None:
-        capacity = make_capacity(remaining=1)
+                async def mock_scan():
+                    return [issue1, issue2]
 
-        coordinator = make_coordinator(
-            "planner", [], capacity=capacity, with_branches=True, mock_health_check=True
-        )
+                coordinator._scan_dispatchable_states = mock_scan
 
-        async def mock_collect() -> list[QueueEntry]:
-            return []
+                # Issue 1 fails health check, issue 2 passes
+                def health_check(issue):
+                    return issue.number != 1
 
-        coordinator._collect_frozen_queue = mock_collect
+                coordinator._health_check_before_dispatch = health_check
 
-        install_issue_loader(coordinator, {})
+                emit_calls = []
+                coordinator._emit_dispatch_intent = (
+                    lambda role, issue, tick_id: emit_calls.append((role, issue))
+                )
 
-        emit_calls = []
-        coordinator._emit_dispatch_intent = (
-            lambda role, issue, tick_id: emit_calls.append((role, issue))
-        )
+                await coordinator.coordinate()
 
-        await coordinator.coordinate()
-
-        assert len(emit_calls) == 0
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "test_case,expected_count,expected_numbers",
-        [
-            ("normal", 2, {100, 101}),
-            ("supervisor_only", 0, set()),
-        ],
-    )
-    async def test_blocked_issues_collection_filtering(
-        self,
-        make_capacity,
-        make_coordinator,
-        test_case,
-        expected_count,
-        expected_numbers,
-    ) -> None:
-        """BLOCKED issues bypass qualify gate; supervisor-labeled issues excluded."""
-        capacity = make_capacity(remaining=2)
-
-        coordinator = make_coordinator(
-            "manager",
-            [],
-            capacity=capacity,
-            mock_health_check=True,
-        )
-
-        # Create raw payloads based on test case
-        if test_case == "normal":
-            raw_payloads = [
-                {
-                    "number": 100,
-                    "title": "Issue 100",
-                    "labels": [{"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/100",
-                },
-                {
-                    "number": 101,
-                    "title": "Issue 101",
-                    "labels": [{"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/101",
-                },
-                # Supervisor-labeled issue should be filtered out
-                {
-                    "number": 102,
-                    "title": "Issue 102",
-                    "labels": [{"name": "supervisor"}, {"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/102",
-                },
-            ]
-        else:  # supervisor_only
-            raw_payloads = [
-                {
-                    "number": 102,
-                    "title": "Issue 102",
-                    "labels": [{"name": "supervisor"}, {"name": "state/blocked"}],
-                    "assignees": [{"login": "manager-bot"}],
-                    "html_url": "https://github.com/owner/repo/issues/102",
-                }
-            ]
-
-        # Mock GitHub API to return raw payloads for BLOCKED state
-        def mock_list_issues(**kwargs):
-            if kwargs.get("label") == "state/blocked":
-                return raw_payloads
-            return []
-
-        coordinator._github.list_issues = mock_list_issues
-
-        # Directly test _poll_issues_by_state for BLOCKED state
-        blocked_issues = await coordinator._poll_issues_by_state(IssueState.BLOCKED)
-
-        # Verify filtering behavior
-        assert len(blocked_issues) == expected_count
-        assert {issue.number for issue in blocked_issues} == expected_numbers
-
-        # Verify all returned issues have BLOCKED state
-        for issue in blocked_issues:
-            assert issue.state == IssueState.BLOCKED
+                # Only issue 2 should be dispatched
+                assert len(emit_calls) == 1
+                assert emit_calls[0][1].number == 2
