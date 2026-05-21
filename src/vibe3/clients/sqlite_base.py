@@ -110,15 +110,29 @@ class SQLiteClientBase:
     def _init_db(self) -> None:
         """Initialize schema and run migrations (idempotent).
 
-        Runs init_schema() on every startup to ensure schema migrations
-        (like adding severity column) are applied to existing databases.
-        init_schema() is idempotent - it checks column existence before
-        attempting migrations.
+        Uses a migration version check to avoid re-running full DDL
+        on every SQLiteClient instantiation. Increments migration_version
+        in sqlite_schema.py when adding new migrations.
         """
         conn = _get_global_connection(self.db_path)
         with _global_lock:
-            # Always run init_schema() to ensure migrations are applied
-            # init_schema() is idempotent and checks for column existence
+            # Lightweight guard: check migration version
+            # Update required_migration_version when adding new migrations
+            required_migration_version = 1  # Increment when adding
+
+            try:
+                version_row = conn.execute(
+                    "SELECT value FROM schema_meta WHERE key = 'migration_version'"
+                ).fetchone()
+                current_version = int(version_row[0]) if version_row else 0
+                if current_version >= required_migration_version:
+                    # Migrations already applied, skip full init
+                    return
+            except (sqlite3.OperationalError, ValueError):
+                # Table doesn't exist or invalid version, need to init
+                pass
+
+            # Run full schema initialization (includes migration_version update)
             init_schema(conn)
 
     def _get_connection(self) -> sqlite3.Connection:

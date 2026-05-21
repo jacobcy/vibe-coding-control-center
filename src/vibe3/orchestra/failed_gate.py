@@ -249,10 +249,10 @@ class FailedGate:
                 (now, cleared_by, reason),
             )
 
-        # Also clear error log
+        # Also clear error log (use store-specific instance for consistency)
         from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        ErrorTrackingService.get_instance().clear(cleared_by, reason)
+        ErrorTrackingService.get_instance(store=self.store).clear(cleared_by, reason)
 
     def increment_blocked_ticks(self) -> None:
         """Increment blocked_ticks counter (called each tick when ACTIVE)."""

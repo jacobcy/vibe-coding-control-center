@@ -465,7 +465,7 @@ class ErrorTrackingService:
         """Get error tracking status for display with severity breakdown.
 
         Returns:
-            Dict with error statistics by severity (all counts are windowed)
+            Dict with error statistics (all counts are windowed)
         """
         # Severity-based counts (all within time window)
         critical_count = self._get_severity_count("CRITICAL")
@@ -473,29 +473,44 @@ class ErrorTrackingService:
         warning_count = self.get_warning_count()
         windowed_total = critical_count + error_count + warning_count
 
-        # Legacy prefix-based counts for backward compatibility (all-time)
-        error_counts = self.get_error_counts()
+        # Legacy prefix counts (also windowed for consistency)
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT error_code, COUNT(*) as count
+                FROM error_log
+                WHERE created_at >= datetime('now', ? || ' minutes')
+                GROUP BY error_code
+                """,
+                (f"-{self.TIME_WINDOW_MINUTES}",),
+            ).fetchall()
+        windowed_error_counts = {row[0]: row[1] for row in rows}
+
         model_errors = sum(
-            count for code, count in error_counts.items() if is_model_error(code)
+            count
+            for code, count in windowed_error_counts.items()
+            if is_model_error(code)
         )
         api_errors = sum(
-            count for code, count in error_counts.items() if is_api_error(code)
+            count for code, count in windowed_error_counts.items() if is_api_error(code)
         )
         exec_errors = sum(
-            count for code, count in error_counts.items() if code.startswith("E_EXEC_")
+            count
+            for code, count in windowed_error_counts.items()
+            if code.startswith("E_EXEC_")
         )
 
         return {
-            "total_errors": windowed_total,  # Now consistent with severity counts
+            "total_errors": windowed_total,
             # New severity-based counts
             "critical_count": critical_count,
             "error_count": error_count,
             "warning_count": warning_count,
-            # Legacy counts for backward compatibility (all-time)
+            # Legacy prefix counts (windowed for consistency)
             "model_errors": model_errors,
             "api_errors": api_errors,
             "exec_errors": exec_errors,
-            "error_counts": error_counts,
+            "error_counts": windowed_error_counts,
             "api_error_window_count": self.get_api_error_count(),
             "threshold": self.THRESHOLD_COUNT,
             "time_window_minutes": self.TIME_WINDOW_MINUTES,

@@ -365,27 +365,29 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added severity column to error_log"
         )
 
-        # Backfill existing error records using registry
-        # Import here to avoid circular dependency at module level
-        from vibe3.exceptions.error_classification import get_error_handling_contract
+    # Backfill NULL/missing severity values using registry
+    # Runs both for newly added column and for any rows with NULL severity
+    # (handles interrupted migrations or earlier code writing without severity)
+    from vibe3.exceptions.error_classification import get_error_handling_contract
 
-        before_changes = conn.total_changes
-        # Fetch all error codes and update their severity
-        error_codes = cursor.execute(
-            "SELECT DISTINCT error_code FROM error_log"
-        ).fetchall()
-        for (error_code,) in error_codes:
-            contract = get_error_handling_contract(error_code)
-            cursor.execute(
-                "UPDATE error_log SET severity = ? WHERE error_code = ?",
-                (contract.severity.value, error_code),
-            )
-        updated = conn.total_changes - before_changes
-        # Only log if updated is a real number (not a mock in tests)
-        if isinstance(updated, int) and updated > 0:
-            logger.bind(external="sqlite", operation="migration").info(
-                f"Backfilled severity for {updated} error_log records"
-            )
+    before_changes = conn.total_changes
+    # Fetch all error codes with NULL severity
+    null_severity_codes = cursor.execute(
+        "SELECT DISTINCT error_code FROM error_log WHERE severity IS NULL"
+    ).fetchall()
+    for (error_code,) in null_severity_codes:
+        contract = get_error_handling_contract(error_code)
+        cursor.execute(
+            "UPDATE error_log SET severity = ? WHERE error_code = ? "
+            "AND severity IS NULL",
+            (contract.severity.value, error_code),
+        )
+    updated = conn.total_changes - before_changes
+    # Only log if updated is a real number (not a mock in tests)
+    if isinstance(updated, int) and updated > 0:
+        logger.bind(external="sqlite", operation="migration").info(
+            f"Backfilled severity for {updated} error_log records"
+        )
 
     # Create severity index (after column exists)
     cursor.execute(_CREATE_ERROR_SEVERITY_INDEX)
@@ -517,6 +519,12 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(
         "INSERT OR IGNORE INTO schema_meta (key, value) "
         "VALUES ('store_type', 'handoff_store')"
+    )
+    # Track migration version for lightweight guard in sqlite_base.py
+    # Increment this when adding new migrations that need to run on existing DBs
+    cursor.execute(
+        "INSERT OR REPLACE INTO schema_meta (key, value) "
+        "VALUES ('migration_version', '1')"
     )
     conn.commit()
     logger.bind(external="sqlite", operation="init_schema").debug(
