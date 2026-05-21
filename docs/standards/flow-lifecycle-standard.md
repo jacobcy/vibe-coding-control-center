@@ -12,6 +12,7 @@ created: 2026-04-28
 last_updated: 2026-04-28
 related_docs:
   - docs/standards/glossary.md
+  - docs/standards/vibe3-error-severity-and-blocking-standard.md
   - docs/standards/vibe3-role-checks-and-balances-standard.md
   - docs/standards/v3/data-model-standard.md
   - docs/standards/vibe3-event-driven-standard.md
@@ -49,7 +50,7 @@ Flow 生命周期涉及三个真源：
 ```
 new → active → blocked → active (恢复)
            ↓         ↓
-         done      failed → blocked (业务错误)
+         done      failed → blocked
            ↓
         aborted
 ```
@@ -58,7 +59,7 @@ new → active → blocked → active (恢复)
 
 - **Flow Status**：`active/blocked/done/aborted`（SQLite flow_state）
   - 描述 flow 的执行状态
-  - 图中的 `failed → blocked` 是 Flow Status 的转换
+  - 图中的 `failed → blocked` 表示：失败原因可能收口为 blocked，但 blocked 不等于 failed
 
 - **Issue State**：`ready/claimed/in-progress/blocked/handoff/review/merge-ready/done`（GitHub label）
   - 描述 issue 的编排状态
@@ -72,12 +73,16 @@ new → active → blocked → active (恢复)
 
 **FAILED → BLOCKED 统一**：
 
-- **设计原则**：FAILED 是原因，BLOCKED 是结果
-- **实现统一**：所有执行失败现在都进入 `state/blocked` 状态
+- **设计原则**：FAILED 是可能的原因之一，BLOCKED 是工作流结果
+- **语义边界**：`blocked` 是 workflow state，不是错误等级
+- **实现统一**：执行失败、contract deviation、依赖未满足等场景都可能进入 `state/blocked`
 - **数据模型**：
   - `failed_reason` 字段已废弃
-  - 统一使用 `blocked_reason` 字段记录失败原因
+  - 统一使用 `blocked_reason` 字段记录阻塞原因
   - `IssueState.FAILED` 枚举保留用于兼容遗留数据
+
+关于运行时 `CRITICAL / ERROR / WARNING` 语义，见
+[vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md)。
 
 **遗留数据处理**：
 
