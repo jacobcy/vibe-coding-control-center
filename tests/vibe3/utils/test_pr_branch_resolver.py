@@ -189,11 +189,13 @@ class TestCommandIntegration:
                 mock_service_class.return_value = mock_service
 
                 # 运行命令
-                runner.invoke(app, ["flow", "show", "--pr", "1183"])
+                result = runner.invoke(app, ["flow", "show", "--pr", "1183"])
 
-                # 验证命令执行（即使后续逻辑失败，参数解析应该成功）
-                # 由于我们没有完整 mock 所有依赖，命令可能会失败
-                # 但至少不应该出现参数解析错误
+                # 验证参数解析成功（不应该出现 "No such option" 错误）
+                # exit_code 2 表示 Click 参数解析失败
+                assert result.exit_code != 2
+                # 输出不应该包含选项错误
+                assert "No such option: --pr" not in result.output
 
     def test_handoff_status_with_pr(self):
         """测试 handoff status --pr 集成"""
@@ -202,8 +204,10 @@ class TestCommandIntegration:
         runner = CliRunner()
 
         # 类似上面的测试，验证参数解析
-        runner.invoke(app, ["handoff", "status", "--pr", "1183"])
-        # 验证命令执行
+        result = runner.invoke(app, ["handoff", "status", "--pr", "1183"])
+        # 验证参数解析成功
+        assert result.exit_code != 2
+        assert "No such option: --pr" not in result.output
 
     def test_task_show_with_pr(self):
         """测试 task show --pr 集成"""
@@ -212,5 +216,7 @@ class TestCommandIntegration:
         runner = CliRunner()
 
         # 类似上面的测试，验证参数解析
-        runner.invoke(app, ["task", "show", "--pr", "1183"])
-        # 验证命令执行
+        result = runner.invoke(app, ["task", "show", "--pr", "1183"])
+        # 验证参数解析成功
+        assert result.exit_code != 2
+        assert "No such option: --pr" not in result.output

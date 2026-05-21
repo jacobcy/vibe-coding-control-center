@@ -80,7 +80,10 @@ def show(
     task_svc = TaskService()
 
     try:
-        target_branch = task_svc.resolve_branch(branch_opt or issue, pr_number=pr_opt)
+        # Pass branch_opt and issue separately for conflict detection
+        target_branch = task_svc.resolve_branch(
+            branch_opt, pr_number=pr_opt, position_arg=issue
+        )
     except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error

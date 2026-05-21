@@ -115,12 +115,14 @@ class TaskShowService:
         branch: str | None = None,
         *,
         pr_number: int | None = None,
+        position_arg: str | None = None,
     ) -> str:
         """Resolve explicit or current branch for task commands.
 
         Args:
-            branch: Branch name or issue number
+            branch: Branch name or issue number (--branch option)
             pr_number: PR number to resolve branch from
+            position_arg: Positional argument (issue number or branch)
 
         Returns:
             Resolved branch name
@@ -131,7 +133,9 @@ class TaskShowService:
         return resolve_command_branch(
             branch_opt=branch,
             pr_opt=pr_number,
+            position_arg=position_arg,
             flow_service=self.flow_service,
+            github_client=self.github_client,
         )
 
     @staticmethod

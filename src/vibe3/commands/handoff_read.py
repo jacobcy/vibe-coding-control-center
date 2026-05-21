@@ -175,10 +175,6 @@ def status(
         output_format = "json"
 
     with trace_scope(trace, "handoff status", domain="handoff"):
-        logger.bind(command="handoff status", branch=branch_opt or pr_opt).info(
-            "Showing handoff details"
-        )
-
         flow_service = FlowService()
         try:
             target_branch = resolve_command_branch(
@@ -190,6 +186,10 @@ def status(
         except (UserError, SystemError) as error:
             typer.echo(f"Error: {error}", err=True)
             raise typer.Exit(1) from error
+
+        logger.bind(command="handoff status", branch=target_branch).info(
+            "Showing handoff details"
+        )
 
         # Aggregate handoff status from service
         status_service = HandoffStatusService(flow_service=flow_service)
@@ -280,9 +280,10 @@ def status(
             verbose=verbose,
         )
         if not show_all and (result.events or result.recent_updates):
+            explicit_branch = branch_opt or branch_arg or pr_opt
             console.print(
                 f"[dim]Tip: use 'vibe3 handoff show @current"
-                f"{' --branch ' + target_branch if branch_opt or branch_arg else ''}"
+                f"{' --branch ' + target_branch if explicit_branch else ''}"
                 f"' to view full content, or 'vibe3 handoff status --all'"
                 f" to show all events.[/]"
             )

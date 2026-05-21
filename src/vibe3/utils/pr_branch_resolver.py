@@ -1,5 +1,7 @@
 """PR to Branch resolution with conflict detection."""
 
+import shutil
+
 import typer
 
 from vibe3.clients.github_client import GitHubClient
@@ -25,10 +27,21 @@ def resolve_branch_from_pr(
     Raises:
         UserError: If PR not found or inaccessible
     """
+    if not shutil.which("gh"):
+        raise UserError(
+            "gh CLI 未安装或不在 PATH 中，无法查询 PR。\n"
+            "请安装 GitHub CLI: https://cli.github.com"
+        )
+
     client = github_client or GitHubClient()
 
     try:
         pr = client.get_pr(pr_number)
+    except FileNotFoundError as e:
+        raise UserError(
+            f"无法获取 PR #{pr_number}: gh CLI 不可用。\n"
+            f"请确认 GitHub CLI 已正确安装。"
+        ) from e
     except Exception as e:
         raise UserError(
             f"无法获取 PR #{pr_number}: {e}\n"
@@ -36,7 +49,10 @@ def resolve_branch_from_pr(
         ) from e
 
     if not pr:
-        raise UserError(f"PR #{pr_number} 不存在。\n" f"请确认 PR 编号是否正确。")
+        raise UserError(
+            f"PR #{pr_number} 不存在或无法访问。\n"
+            f"请确认 PR 编号是否正确，以及是否有仓库访问权限。"
+        )
 
     branch = pr.head_branch
     if not branch:
