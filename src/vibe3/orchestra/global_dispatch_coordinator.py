@@ -209,16 +209,21 @@ class GlobalDispatchCoordinator:
         active_issues: set[int] = set()
 
         # Check SessionRegistry for active sessions
+        # Schema: runtime_session.target_type='issue', target_id='42' (numeric string)
+        # See execution_lifecycle._parse_branch_target() and
+        # SQLiteSessionRepo.create_runtime_session().
         if self._registry is not None:
             sessions = self._store.list_live_runtime_sessions()
             for session in sessions:
+                if session.get("target_type") != "issue":
+                    continue
                 target_id = session.get("target_id")
-                if target_id and str(target_id).startswith("issue-"):
-                    try:
-                        issue_number = int(str(target_id).split("-", 1)[1])
-                        active_issues.add(issue_number)
-                    except (ValueError, IndexError):
-                        pass
+                if not target_id:
+                    continue
+                try:
+                    active_issues.add(int(str(target_id)))
+                except ValueError:
+                    pass
 
         return active_issues
 

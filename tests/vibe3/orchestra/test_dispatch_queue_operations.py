@@ -198,9 +198,11 @@ class TestStatelessDispatch:
                     registry=mock_registry,
                 )
 
-                # Mock registry to indicate issue 1 is active
+                # Mock registry to indicate issue 1 is active.
+                # Schema matches real runtime_session rows:
+                # target_type='issue', target_id='<numeric>'.
                 mock_store.list_live_runtime_sessions.return_value = [
-                    {"target_id": "issue-1", "role": "executor"}
+                    {"target_type": "issue", "target_id": "1", "role": "executor"}
                 ]
 
                 async def mock_scan():
@@ -360,3 +362,66 @@ class TestStatelessDispatch:
                 # Only issue 2 should be dispatched
                 assert len(emit_calls) == 1
                 assert emit_calls[0][1].number == 2
+
+
+class TestActiveIssueParsing:
+    """Regression tests for _get_active_issue_numbers schema parsing.
+
+    Real runtime_session rows store target_type='issue' and target_id as a
+    numeric string (e.g. '42'). An earlier draft expected target_id to look
+    like 'issue-<n>', which silently matched nothing in production and caused
+    already-running issues to be re-dispatched every tick.
+    """
+
+    def _make_coordinator(self, sessions):
+        from vibe3.orchestra.global_dispatch_coordinator import (
+            GlobalDispatchCoordinator,
+        )
+
+        mock_store = MagicMock()
+        mock_store.list_live_runtime_sessions.return_value = sessions
+        mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 2
+        mock_supervisor_handoff = MagicMock()
+        mock_supervisor_handoff.issue_label = "supervisor"
+        mock_config.supervisor_handoff = mock_supervisor_handoff
+        return GlobalDispatchCoordinator(
+            config=mock_config,
+            capacity=MagicMock(),
+            github=MagicMock(),
+            store=mock_store,
+            flow_manager=MagicMock(),
+            registry=MagicMock(),
+        )
+
+    def test_recognizes_real_schema(self) -> None:
+        """target_type='issue' + numeric target_id is recognized."""
+        coordinator = self._make_coordinator(
+            [
+                {"target_type": "issue", "target_id": "42", "role": "executor"},
+                {"target_type": "issue", "target_id": "303", "role": "manager"},
+            ]
+        )
+        assert coordinator._get_active_issue_numbers() == {42, 303}
+
+    def test_ignores_non_issue_target_types(self) -> None:
+        """Rows with target_type != 'issue' are ignored (e.g. raw branches)."""
+        coordinator = self._make_coordinator(
+            [
+                {"target_type": "branch", "target_id": "main", "role": "executor"},
+                {"target_type": "issue", "target_id": "7", "role": "executor"},
+            ]
+        )
+        assert coordinator._get_active_issue_numbers() == {7}
+
+    def test_ignores_malformed_target_id(self) -> None:
+        """Non-numeric / empty target_id is skipped without raising."""
+        coordinator = self._make_coordinator(
+            [
+                {"target_type": "issue", "target_id": "issue-1", "role": "executor"},
+                {"target_type": "issue", "target_id": "", "role": "executor"},
+                {"target_type": "issue", "target_id": None, "role": "executor"},
+                {"target_type": "issue", "target_id": "99", "role": "executor"},
+            ]
+        )
+        assert coordinator._get_active_issue_numbers() == {99}
