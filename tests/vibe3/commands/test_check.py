@@ -1,4 +1,7 @@
-"""Integration tests for Check command."""
+"""Tests for check command.
+
+Merged from test_check_branch.py + test_check_command.py.
+"""
 
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
@@ -6,8 +9,33 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
+from vibe3.commands.check import app as check_app
 
 runner = CliRunner()
+
+
+# ==============================================================================
+# Branch parameter tests (from test_check_branch.py)
+# ==============================================================================
+
+
+def test_check_branch_mutually_exclusive_with_init() -> None:
+    """--branch and --init should be mutually exclusive."""
+    result = runner.invoke(check_app, ["--branch", "dev/test", "--init"])
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output.lower()
+
+
+def test_check_branch_mutually_exclusive_with_clean_branch() -> None:
+    """--branch and --clean-branch should be mutually exclusive."""
+    result = runner.invoke(check_app, ["--branch", "dev/test", "--clean-branch"])
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output.lower()
+
+
+# ==============================================================================
+# Check command integration tests (from test_check_command.py)
+# ==============================================================================
 
 
 @dataclass

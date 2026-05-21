@@ -1,11 +1,15 @@
-"""Shared fixtures for PR command tests."""
+"""Shared fixtures for command tests."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from typer.testing import CliRunner
 
+from vibe3.commands.inspect import app as inspect_app
 from vibe3.models.coverage import CoverageReport, LayerCoverage
+from vibe3.models.flow import FlowState, FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
+from vibe3.services.handoff_status_service import HandoffStatusResult
 
 
 @pytest.fixture(autouse=True)
@@ -102,6 +106,120 @@ def mock_coverage_failing() -> CoverageReport:
         total_covered=2020,
         total_lines=2500,
         overall_percent=80.8,
+    )
+
+
+@pytest.fixture
+def cli_runner():
+    """Shared CliRunner instance for invoking CLI commands."""
+    return CliRunner()
+
+
+@pytest.fixture
+def mock_flow_service():
+    """Factory fixture that creates a configured FlowService mock.
+
+    Returns a MagicMock with sensible defaults for FlowService methods.
+    Tests should still patch at the correct module path, e.g.:
+        patch("vibe3.commands.flow_manage.FlowService", return_value=mock_flow_service)
+    """
+    service = MagicMock()
+    service.get_current_branch.return_value = "task/test-branch"
+    service.store = MagicMock()
+    return service
+
+
+@pytest.fixture
+def mock_git_client():
+    """Factory fixture that creates a configured GitClient mock.
+
+    Returns a MagicMock with sensible defaults for GitClient methods.
+    Tests should still patch at the correct module path, e.g.:
+        patch("vibe3.utils.branch_arg.GitClient", return_value=mock_git_client)
+    """
+    client = MagicMock()
+    client.get_current_branch.return_value = "task/test-branch"
+    client.get_git_common_dir.return_value = "/tmp/.git"
+    client.get_worktree_root.return_value = "/tmp"
+    return client
+
+
+@pytest.fixture
+def mock_pr_service():
+    """Factory fixture that creates a configured PRService mock.
+
+    Returns a MagicMock with sensible defaults for PRService methods.
+    Tests should still patch at the correct module path, e.g.:
+        patch("vibe3.commands.pr_lifecycle.PRService", return_value=mock_pr_service)
+    """
+    service = MagicMock()
+    service.store = MagicMock()
+    return service
+
+
+@pytest.fixture
+def mock_handoff_service():
+    """Factory fixture that creates a configured HandoffService mock.
+
+    Returns a MagicMock with sensible defaults for HandoffService methods.
+    Tests should still patch at the correct module path, e.g.:
+        patch(
+            "vibe3.commands.handoff_write.HandoffService",
+            return_value=mock_handoff_service,
+        )
+    """
+    service = MagicMock()
+    service.storage = MagicMock()
+    service.storage.ensure_current_handoff.return_value = "/path/to/current.md"
+    return service
+
+
+@pytest.fixture
+def mock_status_result():
+    """Create a default HandoffStatusResult for testing."""
+    return HandoffStatusResult(
+        branch="task/test-branch",
+        flow_found=True,
+        flow_id="test-flow",
+        current_step=None,
+        agents=[],
+        events=[],
+        has_handoff=True,
+        handoff_path="/path/to/current.md",
+    )
+
+
+@pytest.fixture
+def mock_flow_status_response():
+    """Create a default FlowStatusResponse for testing."""
+    return FlowStatusResponse(
+        branch="task/test-branch",
+        state=FlowState.ACTIVE,
+        flow_id="test-flow",
+        created_at="2024-01-01T00:00:00Z",
+        actors=[],
+        events=[],
+    )
+
+
+@pytest.fixture
+def inspect_app_fixture():
+    """Provide the inspect CLI app for testing."""
+    return inspect_app
+
+
+@pytest.fixture
+def mock_pr_full():
+    """Create a fully configured PR object for testing."""
+    return PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
     )
 
 
