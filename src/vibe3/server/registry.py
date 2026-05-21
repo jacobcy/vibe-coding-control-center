@@ -74,8 +74,6 @@ def _build_server_with_launch_cwd(
 
     failed_gate = FailedGate(store=shared_store)
 
-    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
-
     shared_flow_manager = FlowManager(config, registry=shared_registry)
     shared_circuit_breaker = None
 
@@ -108,6 +106,8 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
         store=shared_store,
     )
+
+    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
     heartbeat.register(facade)
 
     # Combined shutdown callback for all services

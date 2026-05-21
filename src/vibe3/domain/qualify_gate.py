@@ -147,9 +147,16 @@ class QualifyGateService:
             return None
 
         flow_state = self._store.get_flow_state(branch)
-        return self.run_qualify_gate(
+        result = self.run_qualify_gate(
             issue, branch, flow_state, list(issue.labels), IssueState.BLOCKED
         )
+
+        # Guard: run_qualify_gate may return BLOCKED when flow_state is missing
+        # but labels contain state/blocked. BLOCKED state cannot be dispatched.
+        if result == IssueState.BLOCKED:
+            return None
+
+        return result
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -170,7 +177,6 @@ class QualifyGateService:
         """
         blocked_label = self._convention.state_label(self._convention.blocked_label)
 
-        # Align local cache
         if not flow_state or flow_state.get("flow_status") != "blocked":
             self._store.update_flow_state(
                 branch,
@@ -184,7 +190,6 @@ class QualifyGateService:
                 "local cache synced to blocked from body truth",
             )
 
-        # Align remote label
         if blocked_label not in labels:
             try:
                 label_port = GhIssueLabelPort(repo=self.config.repo)
@@ -235,15 +240,6 @@ class QualifyGateService:
         """Auto-resume a blocked issue when body truth is not blocked.
 
         Clears local blocked cache and removes state/blocked label.
-        Routes through restore label inference (Task 3 will unify this
-        to task-resume service path).
-
-        Args:
-            flow_state: Original flow state used to infer target label
-                before clearing.
-
-        Returns:
-            Target IssueState after auto-resume.
         """
         from vibe3.models.flow import FlowState
 
@@ -254,7 +250,6 @@ class QualifyGateService:
         else:
             target_label = IssueState.CLAIMED
 
-        # Clear local blocked cache
         self._store.update_flow_state(
             branch,
             flow_status="active",
@@ -268,7 +263,6 @@ class QualifyGateService:
             detail=f"Auto-resume: body truth not blocked for #{issue_number}",
         )
 
-        # Remove blocked label
         blocked_label = self._convention.state_label(self._convention.blocked_label)
         if blocked_label in labels:
             try:

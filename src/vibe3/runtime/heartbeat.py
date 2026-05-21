@@ -173,8 +173,6 @@ class HeartbeatServer:
                     # Skip service dispatch, continue to next tick
                     continue
 
-            # Gate is OPEN (or no gate) - proceed with normal dispatch
-
             # Cleanup old error records (maintenance)
             error_tracking = ErrorTrackingService.get_instance()
 
