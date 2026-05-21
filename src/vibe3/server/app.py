@@ -27,7 +27,7 @@ from vibe3.server.registry import (
     _start_async_serve,
     _validate_pid_file,
 )
-from vibe3.server.server_utils import ensure_port_available
+from vibe3.server.server_utils import find_available_port
 
 app = typer.Typer(
     help="Orchestra server: heartbeat polling + HTTP status endpoints",
@@ -203,7 +203,12 @@ def start(
         config.pid_file.unlink(missing_ok=True)
 
     # Pre-flight: Check if port is available
-    ensure_port_available(config.port)
+    requested_port = config.port
+    effective_port, was_auto_discovered = find_available_port(
+        config.port, config.port_range_max
+    )
+    if was_auto_discovered:
+        config = config.model_copy(update={"port": effective_port})
 
     # Phase 1: FailedGate Preflight
     from vibe3.orchestra.failed_gate import FailedGate
@@ -251,6 +256,11 @@ def start(
         typer.echo(msg)
         if not ok:
             raise typer.Exit(1)
+        if was_auto_discovered:
+            typer.echo(
+                f"  Port auto-discovered: {effective_port}"
+                f" (default {requested_port} was occupied)"
+            )
         if ts:
             ts_ok, ts_msg = _setup_tailscale_webhook(config.port)
             typer.echo(ts_msg)
@@ -270,8 +280,13 @@ def start(
     typer.echo("=" * separator_width)  # Separator line
     typer.echo("")  # Blank line
 
+    port_hint = (
+        f" (auto-discovered, port {requested_port} was occupied)"
+        if was_auto_discovered
+        else ""
+    )
     typer.echo(
-        f"Starting Orchestra server on port {config.port} "
+        f"Starting Orchestra server on port {config.port}{port_hint} "
         f"(tick interval: {config.polling_interval}s, "
         f"max_concurrent: {config.max_concurrent_flows}, "
         f"scene_base: {config.scene_base_ref})"

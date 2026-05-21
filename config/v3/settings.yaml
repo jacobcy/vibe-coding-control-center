@@ -240,6 +240,7 @@ orchestra:
 
   # HTTP port for status endpoint
   port: 8080
+  # port_range_max: 8090  # Optional: max port for auto-discovery (default: port + 10)
 
   # Maximum concurrent flows
   max_concurrent_flows: 3

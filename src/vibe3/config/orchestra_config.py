@@ -248,6 +248,15 @@ class OrchestraConfig(BaseModel):
     dry_run: bool = False
     pid_file: Path = Field(default_factory=_default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
+    port_range_max: int | None = Field(
+        default=None,
+        ge=1,
+        le=65535,
+        description=(
+            "Maximum port for auto-discovery range. "
+            "If None, defaults to port + 10 (max 10 ports to scan)."
+        ),
+    )
     bot_username: str | None = Field(
         default=None,
         description=(
