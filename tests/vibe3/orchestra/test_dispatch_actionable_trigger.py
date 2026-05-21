@@ -247,8 +247,10 @@ class TestActionableTriggeredCollection:
         # Mock dispatch loop to return 0 (no dispatches)
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
-        # Mock actionable check: queue has actionable entries
-        # (Don't trigger collect)
+        # Mock _collect_frozen_queue to track if it gets called
+        mock_coordinator._collect_frozen_queue = AsyncMock(
+            side_effect=AssertionError("Should not call _collect_frozen_queue")
+        )
 
         # Mock persist
         mock_coordinator._persist_queue = MagicMock()
@@ -260,6 +262,7 @@ class TestActionableTriggeredCollection:
 
         # Should NOT have called _collect_frozen_queue
         # (since restored queue has actionable entries)
+        mock_coordinator._collect_frozen_queue.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_collect_when_actionable_exhausted(self, mock_coordinator):
@@ -298,7 +301,11 @@ class TestActionableTriggeredCollection:
 
         mock_coordinator._promote_progressed_entries = MagicMock()
         mock_coordinator._dispatch_loop = MagicMock(return_value=1)
-        mock_coordinator._collect_frozen_queue = MagicMock()
+
+        # Mock _collect_frozen_queue to track if it gets called
+        mock_coordinator._collect_frozen_queue = AsyncMock(
+            side_effect=AssertionError("Should not call _collect_frozen_queue")
+        )
 
         mock_coordinator._persist_queue = MagicMock()
 

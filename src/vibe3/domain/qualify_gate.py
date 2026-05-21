@@ -147,9 +147,16 @@ class QualifyGateService:
             return None
 
         flow_state = self._store.get_flow_state(branch)
-        return self.run_qualify_gate(
+        result = self.run_qualify_gate(
             issue, branch, flow_state, list(issue.labels), IssueState.BLOCKED
         )
+
+        # Guard: run_qualify_gate may return BLOCKED when flow_state is missing
+        # but labels contain state/blocked. BLOCKED state cannot be dispatched.
+        if result == IssueState.BLOCKED:
+            return None
+
+        return result
 
     # ------------------------------------------------------------------
     # Private helpers
