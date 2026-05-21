@@ -116,26 +116,45 @@ def _plan_spec_impl(
         raise typer.Exit(1)
 
     spec_file: Path | None = None
+    # When spec_ref is an issue number, we don't need a file path
+    spec_is_issue = False
 
-    # Resolve spec parameter using shared @-resolution channel
+    # Resolve spec parameter: support both paths and issue numbers
     if spec_path is not None:
         if spec_path.startswith("@"):
             # @-prefixed: delegate to resolve_handoff_target (@spec, etc.)
             try:
-                spec_file = resolve_handoff_target(spec_path, branch=branch)
-                typer.echo(f"Using flow spec: {flow.spec_ref}")
+                resolved = resolve_handoff_target(spec_path, branch=branch)
             except (FileNotFoundError, ValueError) as e:
-                typer.echo(f"Error: {e}", err=True)
-                raise typer.Exit(1)
+                # If resolution fails, check if spec_ref is an issue number
+                if flow.spec_ref and flow.spec_ref.lstrip("#").isdigit():
+                    spec_is_issue = True
+                    typer.echo(f"Using flow spec: {flow.spec_ref} (issue)")
+                else:
+                    typer.echo(f"Error: {e}", err=True)
+                    raise typer.Exit(1)
+            else:
+                # Check if resolved value is an issue number
+                if str(resolved).lstrip("#").isdigit():
+                    spec_is_issue = True
+                    typer.echo(f"Using flow spec: {flow.spec_ref} (issue)")
+                else:
+                    spec_file = Path(resolved)
+                    typer.echo(f"Using flow spec: {flow.spec_ref}")
         else:
-            # File path provided: override flow's spec_ref
-            resolved_spec = Path(spec_path)
-            if not resolved_spec.exists() or not resolved_spec.is_file():
-                typer.echo(f"Error: Spec file not found: {spec_path}", err=True)
-                raise typer.Exit(1)
-            flow_service.bind_spec(branch, str(resolved_spec.resolve()), actor=None)
-            typer.echo(f"Spec updated: {resolved_spec}")
-            spec_file = resolved_spec
+            # Direct value: check if it's an issue number or a file path
+            if spec_path.lstrip("#").isdigit():
+                spec_is_issue = True
+                flow_service.bind_spec(branch, f"#{spec_path.lstrip('#')}", actor=None)
+                typer.echo(f"Spec updated: #{spec_path.lstrip('#')} (issue)")
+            else:
+                resolved_spec = Path(spec_path)
+                if not resolved_spec.exists() or not resolved_spec.is_file():
+                    typer.echo(f"Error: Spec file not found: {spec_path}", err=True)
+                    raise typer.Exit(1)
+                flow_service.bind_spec(branch, str(resolved_spec.resolve()), actor=None)
+                typer.echo(f"Spec updated: {resolved_spec}")
+                spec_file = resolved_spec
     else:
         # No --spec parameter: default to flow's spec_ref
         if not flow.spec_ref:
@@ -146,8 +165,13 @@ def _plan_spec_impl(
                 err=True,
             )
             raise typer.Exit(1)
-        spec_file = Path(flow.spec_ref)
-        typer.echo(f"Using flow spec: {flow.spec_ref}")
+        # Check if spec_ref is an issue number
+        if flow.spec_ref.lstrip("#").isdigit():
+            spec_is_issue = True
+            typer.echo(f"Using flow spec: {flow.spec_ref} (issue)")
+        else:
+            spec_file = Path(flow.spec_ref)
+            typer.echo(f"Using flow spec: {flow.spec_ref}")
 
     if dry_run:
         typer.echo("Plan dry run for specification")
@@ -161,9 +185,12 @@ def _plan_spec_impl(
             err=True,
         )
 
-    # Build request from spec file
+    # Build request from spec file or issue
     try:
-        spec_input = resolve_spec_plan_input(branch, file=spec_file)
+        # When spec is an issue number, pass None to use SpecRefService logic
+        spec_input = resolve_spec_plan_input(
+            branch, file=None if spec_is_issue else spec_file
+        )
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -198,6 +225,14 @@ def default(
             help="Spec file path or '@spec' to use flow's spec_ref",
         ),
     ] = None,
+    task: Annotated[
+        str | None,
+        typer.Option(
+            "--task",
+            help="[DEPRECATED] Alias for --spec (hidden)",
+            hidden=True,
+        ),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     no_async: _ASYNC_OPT = False,
@@ -208,10 +243,13 @@ def default(
 
     target_branch = resolve_branch_arg(branch)
 
-    if spec is not None:
+    # --task is alias for --spec (backward compatibility)
+    spec_path = spec or task
+
+    if spec_path is not None:
         _plan_spec_impl(
             branch=target_branch,
-            spec_path=spec,
+            spec_path=spec_path,
             trace=trace,
             dry_run=dry_run,
             no_async=no_async,

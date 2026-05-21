@@ -276,8 +276,13 @@ def status(
             verbose=verbose,
         )
         if not show_all and (result.events or result.recent_updates):
+            # Conditionally add --branch hint if viewing different branch
+            current_branch = flow_service.get_current_branch()
+            tip_cmd = "vibe3 handoff show @current"
+            if target_branch != current_branch:
+                tip_cmd += f" --branch {target_branch}"
             console.print(
-                "[dim]Tip: use 'vibe3 handoff show @current' "
+                f"[dim]Tip: use '{tip_cmd}' "
                 "to view full handoff content (including non-event updates).[/]"
             )
 
