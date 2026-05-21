@@ -30,7 +30,10 @@ from vibe3.orchestra.issue_loader import (
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.queue_operations import select_ready_issues
+from vibe3.orchestra.queue_operations import (
+    collect_raw_issues_without_qualify,
+    select_ready_issues,
+)
 from vibe3.orchestra.queue_persistence_mixin import (
     QueueEntry,
     QueuePersistenceMixin,
@@ -40,7 +43,6 @@ from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.label_utils import (
     clean_old_state_labels,
-    normalize_labels,
     should_skip_from_queue,
 )
 
@@ -103,14 +105,12 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         # enter the queue.  Qualification is deferred to
         # qualify_blocked_issue() at dispatch time (coordinate()).
         if state == IssueState.BLOCKED:
+            raw_selected = collect_raw_issues_without_qualify(raw_issues)
+
+            # Apply skip filter after collection (preserves original behavior
+            # where issues flow through qualify gate for side effects)
             selected: list[IssueInfo] = []
-            for item in raw_issues:
-                labels = normalize_labels(item.get("labels"))
-                if not any(lbl.startswith("state/") for lbl in labels):
-                    continue
-                issue = IssueInfo.from_github_payload(item)
-                if issue is None:
-                    continue
+            for issue in raw_selected:
                 if should_skip_from_queue(
                     issue,
                     supervisor_label=self._supervisor_label,
@@ -119,6 +119,7 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 ):
                     continue
                 selected.append(issue)
+
             append_orchestra_event(
                 "dispatcher",
                 f"poll_issues_by_state({state.value}): "
@@ -362,7 +363,11 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                     index += 1
                     continue
 
-            # For BLOCKED issues: run qualify gate at intent time
+            # For BLOCKED issues: run qualify gate at intent time.
+            # If qualify_blocked_issue returns None (still blocked per body truth),
+            # the issue is popped from the current frozen queue cycle.
+            # It may be re-collected on the next queue rebuild if it still has
+            # the state/blocked label.
             if issue.state == IssueState.BLOCKED:
                 target_state = self._qualify_gate.qualify_blocked_issue(issue)
 
