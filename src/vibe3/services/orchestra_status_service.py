@@ -331,11 +331,14 @@ class OrchestraStatusService:
             pr_number = None
             if row["has_flow"] and flow_branch:
                 cached_pr = branch_to_pr.get(flow_branch)
-                pr_number = (
-                    cached_pr.number
-                    if cached_pr
-                    else flow.get("pr_number") if flow else None
-                )
+                # Coerce pr_number to int if present (may be stored as string)
+                pr_number_raw = flow.get("pr_number") if flow else None
+                pr_number = cached_pr.number if cached_pr else None
+                if pr_number is None and pr_number_raw:
+                    try:
+                        pr_number = int(pr_number_raw)
+                    except (ValueError, TypeError):
+                        pass  # Leave as None if conversion fails
 
             issue_data = {
                 "number": row["number"],
