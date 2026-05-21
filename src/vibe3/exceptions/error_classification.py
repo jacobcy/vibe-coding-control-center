@@ -17,12 +17,14 @@ from vibe3.exceptions.error_codes import (
     E_API_TIMEOUT,
     E_API_UNAVAILABLE,
     E_API_UNKNOWN,
+    E_CAPACITY_SKIP,
     E_EXEC_NO_OUTPUT,
     E_EXEC_UNKNOWN,
     E_MODEL_CONFIG,
     E_MODEL_NOT_FOUND,
     E_MODEL_PERMISSION,
 )
+from vibe3.exceptions.error_severity import ErrorHandlingContract, ErrorSeverity
 
 if TYPE_CHECKING:
     pass
@@ -143,8 +145,6 @@ def classify_error(error_output: str) -> str:
 
     # Capacity control - normal skip (not an error)
     if "tmux session" in output_lower and "already exists" in output_lower:
-        from vibe3.exceptions.error_codes import E_CAPACITY_SKIP
-
         return E_CAPACITY_SKIP
 
     # Fallback with warning for unclassified errors
@@ -153,3 +153,146 @@ def classify_error(error_output: str) -> str:
         error_output=error_output[:100],  # Truncate for logging
     ).warning("Unclassified error, defaulting to E_EXEC_UNKNOWN")
     return E_EXEC_UNKNOWN
+
+
+# Error registry: maps error codes to handling contracts
+ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
+    # CRITICAL: Model configuration errors - immediate failed gate
+    E_MODEL_NOT_FOUND: ErrorHandlingContract(
+        code=E_MODEL_NOT_FOUND,
+        severity=ErrorSeverity.CRITICAL,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="fail_issue",
+        gate_action="immediate",
+        description="Model not found or unavailable",
+    ),
+    E_MODEL_PERMISSION: ErrorHandlingContract(
+        code=E_MODEL_PERMISSION,
+        severity=ErrorSeverity.CRITICAL,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="fail_issue",
+        gate_action="immediate",
+        description="Permission denied for model access",
+    ),
+    E_MODEL_CONFIG: ErrorHandlingContract(
+        code=E_MODEL_CONFIG,
+        severity=ErrorSeverity.CRITICAL,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="fail_issue",
+        gate_action="immediate",
+        description="Model configuration error",
+    ),
+    # ERROR: API errors - threshold-based failed gate
+    E_API_RATE_LIMIT: ErrorHandlingContract(
+        code=E_API_RATE_LIMIT,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="block_flow",
+        gate_action="threshold",
+        description="API rate limit exceeded",
+    ),
+    E_API_TIMEOUT: ErrorHandlingContract(
+        code=E_API_TIMEOUT,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="block_flow",
+        gate_action="threshold",
+        description="API request timeout",
+    ),
+    E_API_UNAVAILABLE: ErrorHandlingContract(
+        code=E_API_UNAVAILABLE,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="block_flow",
+        gate_action="threshold",
+        description="API service unavailable",
+    ),
+    E_API_NETWORK: ErrorHandlingContract(
+        code=E_API_NETWORK,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="block_flow",
+        gate_action="threshold",
+        description="Network connection error",
+    ),
+    E_API_UNKNOWN: ErrorHandlingContract(
+        code=E_API_UNKNOWN,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="block_flow",
+        gate_action="threshold",
+        description="Unknown API error",
+    ),
+    # WARNING: Execution diagnostics - recorded/surfaced, no gate activation
+    E_EXEC_NO_OUTPUT: ErrorHandlingContract(
+        code=E_EXEC_NO_OUTPUT,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="ignore",
+        description="Agent execution produced no output",
+    ),
+    E_CAPACITY_SKIP: ErrorHandlingContract(
+        code=E_CAPACITY_SKIP,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="ignore",
+        description="Capacity control skip (not an error)",
+    ),
+}
+
+
+def get_error_handling_contract(error_code: str) -> ErrorHandlingContract:
+    """Get handling contract for an error code.
+
+    Args:
+        error_code: Error code (E_MODEL_*, E_API_*, E_EXEC_*, E_CAPACITY_*)
+
+    Returns:
+        ErrorHandlingContract with severity and handling metadata
+
+    Note:
+        Unregistered codes return a fallback ERROR contract for backward
+        compatibility during migration.
+    """
+    if error_code not in ERROR_REGISTRY:
+        # Default to ERROR for backward compatibility during migration
+        logger.bind(
+            domain="error_tracking",
+            error_code=error_code,
+        ).warning(
+            f"Unregistered error code {error_code}, using fallback ERROR contract"
+        )
+        return ErrorHandlingContract(
+            code=error_code,
+            severity=ErrorSeverity.ERROR,
+            counts_toward_threshold=True,
+            record_in_error_log=True,
+            write_timeline_event=True,
+            issue_action="block_flow",
+            gate_action="threshold",
+            description=f"Unregistered error code: {error_code}",
+        )
+
+    return ERROR_REGISTRY[error_code]

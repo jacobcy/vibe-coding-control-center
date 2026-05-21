@@ -3,6 +3,13 @@
 > **文档定位**：定义系统错误处理策略，区分代码错误和业务错误
 > **适用范围**：所有 Python 代码（v3）和 Agent 决策逻辑
 
+> **边界说明**：本文档是通用异常 taxonomy 标准，定义
+> `SystemError / UserError / BatchError`。  
+> Orchestra 运行时的 `CRITICAL / ERROR / WARNING`、`failed_gate`、
+> `blocked` 语义，不由本文档定义，统一以
+> [vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md)
+> 为准。
+
 ---
 
 ## 一、错误分类体系

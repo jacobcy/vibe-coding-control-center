@@ -7,6 +7,7 @@ created: 2026-03-15
 last_updated: 2026-03-19
 related_docs:
   - docs/standards/error-handling.md  # 错误处理规范（权威）
+  - docs/standards/vibe3-error-severity-and-blocking-standard.md
   - docs/standards/error-handling-fix-summary.md  # 修复总结
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
@@ -17,6 +18,8 @@ related_docs:
 # Vibe 3.0 - 异常处理实现指南
 
 > **权威规范**：[docs/standards/error-handling.md](../../standards/error-handling.md)
+> **Orchestra 运行时补充规范**：
+> [docs/standards/vibe3-error-severity-and-blocking-standard.md](../../standards/vibe3-error-severity-and-blocking-standard.md)
 > **本文档定位**：实现指南，提供代码示例和架构说明
 
 ---
@@ -29,7 +32,27 @@ related_docs:
 - ✅ CLI 层统一捕获和展示
 - ✅ **统一使用 `--yes` 参数绕过业务逻辑错误**
 
-**详细规范请参考**：[错误处理规范](../../standards/error-handling.md)
+**详细规范请参考**：
+- [错误处理规范](../../standards/error-handling.md)
+- [Vibe3 Error Severity and Blocking Standard](../../standards/vibe3-error-severity-and-blocking-standard.md)
+
+### 本文档与运行时错误标准的边界
+
+本文档主要定义：
+
+- Python 异常类型如何分层
+- CLI 如何统一展示异常
+- service/client 层如何抛出和传播异常
+
+以下语义不由本文档单独裁定：
+
+- `failed_gate` 何时关闭
+- `CRITICAL / ERROR / WARNING` 如何作用于 Orchestra
+- `blocked` 是否代表工作流正常收口
+
+这些运行时语义统一以
+`docs/standards/vibe3-error-severity-and-blocking-standard.md`
+为准。
 
 ---
 
