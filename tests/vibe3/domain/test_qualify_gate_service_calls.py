@@ -1,19 +1,21 @@
-"""Test that qualify_gate uses service layer for blocked state changes."""
+"""Test qualify_gate local blocked state synchronization helpers."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models.orchestration import IssueState
 
 
-class TestAlignBlockedStateUsesServiceLayer:
-    """Test _align_blocked_state routes through FlowService.block_flow()."""
+class TestAlignBlockedState:
+    """Test _align_blocked_state updates local cache idempotently."""
 
-    def test_calls_block_flow_with_reason_and_blocked_by(self):
-        """Should call FlowService.block_flow() with correct parameters."""
+    def test_aligns_local_cache_and_missing_label(self):
+        """Blocked truth should sync local cache and add the blocked label."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
-        service._convention = MagicMock()
+        service._convention = Mock()
+        service._convention.blocked_label = "blocked"
+        service._convention.state_label = Mock(return_value="state/blocked")
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
@@ -22,32 +24,33 @@ class TestAlignBlockedStateUsesServiceLayer:
             blocked_by_issue=200,
         )
 
-        with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
-            mock_fs_instance = MagicMock()
-            mock_flow_service.return_value = mock_fs_instance
-
+        mock_label_port = MagicMock()
+        with patch(
+            "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=mock_label_port
+        ):
             service._align_blocked_state(
                 issue_number=100,
                 branch="test-branch",
                 truth=truth,
-                labels=["state/blocked"],
+                labels=["state/in-progress"],
                 flow_state={"flow_status": "active"},
             )
 
-            # Verify block_flow was called with correct parameters
-            mock_flow_service.assert_called_once_with(store=service._store)
-            mock_fs_instance.block_flow.assert_called_once_with(
-                branch="test-branch",
-                reason="dependency issue",
-                blocked_by_issue=200,
-                actor="orchestra:qualify",
-            )
+        service._store.update_flow_state.assert_called_once_with(
+            "test-branch",
+            flow_status="blocked",
+            blocked_reason="dependency issue",
+            blocked_by_issue=200,
+        )
+        mock_label_port.add_issue_label.assert_called_once_with(100, "state/blocked")
 
-    def test_does_not_call_store_directly(self):
-        """Should NOT call _store.update_flow_state directly."""
+    def test_does_not_rewrite_when_already_blocked_and_labeled(self):
+        """Already-synced blocked state should not write local cache again."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
-        service._convention = MagicMock()
+        service._convention = Mock()
+        service._convention.blocked_label = "blocked"
+        service._convention.state_label = Mock(return_value="state/blocked")
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
@@ -56,74 +59,98 @@ class TestAlignBlockedStateUsesServiceLayer:
             blocked_by_issue=None,
         )
 
-        with patch("vibe3.domain.qualify_gate.FlowService"):
+        mock_label_port = MagicMock()
+        with patch(
+            "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=mock_label_port
+        ):
             service._align_blocked_state(
                 issue_number=100,
                 branch="test-branch",
                 truth=truth,
                 labels=["state/blocked"],
-                flow_state=None,
+                flow_state={"flow_status": "blocked"},
             )
 
-            # Should NOT call store directly
-            service._store.update_flow_state.assert_not_called()
+        service._store.update_flow_state.assert_not_called()
+        mock_label_port.add_issue_label.assert_not_called()
 
 
-class TestAutoResumeBlockedUsesServiceLayer:
-    """Test _auto_resume_blocked routes through resume_issue()."""
+class TestAutoResumeBlocked:
+    """Test _auto_resume_blocked clears local blocked cache directly."""
 
-    def test_calls_resume_issue_with_correct_params(self):
-        """Should call resume_issue() with issue_number and target state."""
+    def test_clears_local_cache_and_syncs_labels(self):
+        """Auto-resume should clear SQLite blocked metadata before label sync."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
-        service._convention = MagicMock()
+        service._convention = Mock()
+        service._convention.blocked_label = "blocked"
+        service._convention.state_label = Mock(return_value="state/blocked")
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
-        with patch("vibe3.domain.qualify_gate.resume_issue") as mock_resume:
-            result = service._auto_resume_blocked(
-                issue_number=100,
-                branch="test-branch",
-                labels=["state/ready"],
-                flow_state={
-                    "flow_status": "blocked",
-                    "branch": "test-branch",
-                    "flow_slug": "test-slug",
-                },
-            )
+        mock_label_port = MagicMock()
+        with patch.object(
+            service._convention, "state_label", return_value="state/blocked"
+        ):
+            with patch(
+                "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                return_value=mock_label_port,
+            ):
+                with patch(
+                    "vibe3.domain.qualify_gate.infer_resume_label",
+                    return_value=IssueState.READY,
+                ):
+                    with patch("vibe3.models.flow.FlowState.model_validate"):
+                        result = service._auto_resume_blocked(
+                            issue_number=100,
+                            branch="test-branch",
+                            labels=["state/blocked"],
+                            flow_state={
+                                "flow_status": "blocked",
+                                "branch": "test-branch",
+                                "flow_slug": "test-slug",
+                            },
+                        )
 
-            # Verify resume_issue was called
-            mock_resume.assert_called_once()
-            call_kwargs = mock_resume.call_args[1]
-            assert call_kwargs["issue_number"] == 100
-            assert call_kwargs["reason"] == "Auto-resume: body truth not blocked"
-            assert call_kwargs["from_state"] == "blocked"
-            assert call_kwargs["actor"] == "orchestra:qualify"
-            assert call_kwargs["repo"] == "test/repo"
+        service._store.update_flow_state.assert_called_once_with(
+            "test-branch",
+            flow_status="active",
+            blocked_reason=None,
+            blocked_by_issue=None,
+        )
+        service._store.add_event.assert_called_once()
+        mock_label_port.remove_issue_label.assert_called_once_with(100, "state/blocked")
+        mock_label_port.add_issue_label.assert_called_once_with(100, "state/ready")
+        assert result == IssueState.READY
 
-            # Should return target state
-            assert result in [IssueState.READY, IssueState.CLAIMED]
-
-    def test_does_not_call_store_directly(self):
-        """Should NOT call _store.update_flow_state directly."""
+    def test_skips_label_sync_when_blocked_label_missing(self):
+        """Without blocked label, auto-resume only clears local metadata."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
-        service._convention = MagicMock()
+        service._convention = Mock()
+        service._convention.blocked_label = "blocked"
+        service._convention.state_label = Mock(return_value="state/blocked")
         service.config = MagicMock()
         service.config.repo = "test/repo"
 
-        with patch("vibe3.domain.qualify_gate.resume_issue"):
-            service._auto_resume_blocked(
-                issue_number=100,
-                branch="test-branch",
-                labels=["state/ready"],
-                flow_state={
-                    "flow_status": "blocked",
-                    "branch": "test-branch",
-                    "flow_slug": "test-slug",
-                },
-            )
+        with patch(
+            "vibe3.domain.qualify_gate.infer_resume_label",
+            return_value=IssueState.CLAIMED,
+        ):
+            with patch("vibe3.models.flow.FlowState.model_validate"):
+                with patch("vibe3.domain.qualify_gate.GhIssueLabelPort") as mock_port:
+                    result = service._auto_resume_blocked(
+                        issue_number=100,
+                        branch="test-branch",
+                        labels=["state/in-progress"],
+                        flow_state={
+                            "flow_status": "blocked",
+                            "branch": "test-branch",
+                            "flow_slug": "test-slug",
+                        },
+                    )
 
-            # Should NOT call store directly
-            service._store.update_flow_state.assert_not_called()
-            service._store.add_event.assert_not_called()
+        service._store.update_flow_state.assert_called_once()
+        service._store.add_event.assert_called_once()
+        mock_port.assert_not_called()
+        assert result == IssueState.CLAIMED

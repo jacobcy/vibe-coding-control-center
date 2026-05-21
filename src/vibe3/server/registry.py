@@ -107,12 +107,7 @@ def _build_server_with_launch_cwd(
         store=shared_store,
     )
 
-    # Pass coordinator reference to heartbeat server for all_blocked check
-    heartbeat = HeartbeatServer(
-        config,
-        failed_gate=failed_gate,
-        coordinator=facade._coordinator,
-    )
+    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
     heartbeat.register(facade)
 
     # Combined shutdown callback for all services

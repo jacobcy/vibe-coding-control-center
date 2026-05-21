@@ -139,10 +139,11 @@ class TestRunQualifyGate:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            with patch("vibe3.domain.qualify_gate.FlowService") as mock_flow_service:
-                mock_fs_instance = Mock()
-                mock_flow_service.return_value = mock_fs_instance
-
+            mock_label_port = Mock()
+            with patch(
+                "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                return_value=mock_label_port,
+            ):
                 result = qualify_gate_service.run_qualify_gate(
                     issue=sample_issue,
                     branch="task/issue-123-test",
@@ -152,13 +153,14 @@ class TestRunQualifyGate:
                 )
 
                 assert result is None
-                # FlowService.block_flow should be called
-                mock_flow_service.assert_called_once_with(store=mock_store)
-                mock_fs_instance.block_flow.assert_called_once_with(
-                    branch="task/issue-123-test",
-                    reason="Manual intervention required",
+                mock_store.update_flow_state.assert_called_once_with(
+                    "task/issue-123-test",
+                    flow_status="blocked",
+                    blocked_reason="Manual intervention required",
                     blocked_by_issue=None,
-                    actor="orchestra:qualify",
+                )
+                mock_label_port.add_issue_label.assert_called_once_with(
+                    123, "state/blocked"
                 )
 
     def test_manual_block_already_has_label(
@@ -303,24 +305,43 @@ class TestRunQualifyGate:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            with patch("vibe3.domain.qualify_gate.resume_issue") as mock_resume:
-                mock_store.get_flows_by_issue.return_value = []
+            from vibe3.models.flow import FlowState
 
-                qualify_gate_service.run_qualify_gate(
-                    issue=sample_issue,
-                    branch="task/issue-123-test",
-                    flow_state=flow_state,
-                    labels=["state/blocked"],
-                    trigger_state=IssueState.BLOCKED,
-                )
+            with patch.object(FlowState, "model_validate") as mock_validate:
+                mock_fs = Mock()
+                mock_validate.return_value = mock_fs
 
-                # resume_issue should be called with correct params
-                mock_resume.assert_called_once()
-                call_kwargs = mock_resume.call_args[1]
-                assert call_kwargs["issue_number"] == 123
-                assert call_kwargs["reason"] == "Auto-resume: body truth not blocked"
-                assert call_kwargs["from_state"] == "blocked"
-                assert call_kwargs["actor"] == "orchestra:qualify"
+                with patch(
+                    "vibe3.domain.qualify_gate.infer_resume_label",
+                    return_value=IssueState.IN_PROGRESS,
+                ):
+                    mock_label_port = Mock()
+                    with patch(
+                        "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                        return_value=mock_label_port,
+                    ):
+                        result = qualify_gate_service.run_qualify_gate(
+                            issue=sample_issue,
+                            branch="task/issue-123-test",
+                            flow_state=flow_state,
+                            labels=["state/blocked"],
+                            trigger_state=IssueState.BLOCKED,
+                        )
+
+                        assert result == IssueState.IN_PROGRESS
+                        mock_store.update_flow_state.assert_called_once_with(
+                            "task/issue-123-test",
+                            flow_status="active",
+                            blocked_reason=None,
+                            blocked_by_issue=None,
+                        )
+                        mock_store.add_event.assert_called_once()
+                        mock_label_port.remove_issue_label.assert_called_once_with(
+                            123, "state/blocked"
+                        )
+                        mock_label_port.add_issue_label.assert_called_once_with(
+                            123, "state/in-progress"
+                        )
 
     def test_unblock_with_stale_local_cache_without_blocked_label(
         self, qualify_gate_service, sample_issue, mock_store
@@ -353,20 +374,38 @@ class TestRunQualifyGate:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            with patch("vibe3.domain.qualify_gate.resume_issue") as mock_resume:
-                mock_store.get_flows_by_issue.return_value = []
+            from vibe3.models.flow import FlowState
 
-                result = qualify_gate_service.run_qualify_gate(
-                    issue=sample_issue,
-                    branch="task/issue-123-test",
-                    flow_state=flow_state,
-                    labels=["state/in-progress"],
-                    trigger_state=IssueState.IN_PROGRESS,
-                )
+            with patch.object(FlowState, "model_validate") as mock_validate:
+                mock_fs = Mock()
+                mock_validate.return_value = mock_fs
 
-                # resume_issue should be called
-                mock_resume.assert_called_once()
-                assert result in [IssueState.IN_PROGRESS, IssueState.CLAIMED]
+                with patch(
+                    "vibe3.domain.qualify_gate.infer_resume_label",
+                    return_value=IssueState.IN_PROGRESS,
+                ):
+                    mock_label_port = Mock()
+                    with patch(
+                        "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                        return_value=mock_label_port,
+                    ):
+                        result = qualify_gate_service.run_qualify_gate(
+                            issue=sample_issue,
+                            branch="task/issue-123-test",
+                            flow_state=flow_state,
+                            labels=["state/in-progress"],
+                            trigger_state=IssueState.IN_PROGRESS,
+                        )
+
+                        assert result == IssueState.IN_PROGRESS
+                        mock_store.update_flow_state.assert_called_once_with(
+                            "task/issue-123-test",
+                            flow_status="active",
+                            blocked_reason=None,
+                            blocked_by_issue=None,
+                        )
+                        mock_store.add_event.assert_called_once()
+                        mock_label_port.remove_issue_label.assert_not_called()
 
 
 class TestQualifyBlockedIssue:

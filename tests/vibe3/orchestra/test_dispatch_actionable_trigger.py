@@ -12,7 +12,7 @@ Test Strategy:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -344,3 +344,105 @@ class TestActionableTriggeredCollection:
         assert mock_coordinator._frozen_queue[0].waiting_state == "blocked"
         assert mock_coordinator._frozen_queue[1].issue_number == 2
         assert mock_coordinator._frozen_queue[1].waiting_state is None
+
+    @pytest.mark.asyncio
+    async def test_no_collect_when_capacity_full_and_only_waiting_entries(
+        self, mock_coordinator
+    ):
+        """Capacity-full ticks should not recollect just because actionable is empty."""
+        mock_coordinator._frozen_queue = [
+            QueueEntry(
+                issue_number=1,
+                collected_state="claimed",
+                waiting_state="claimed",
+            ),
+        ]
+        mock_coordinator._capacity.get_capacity_status = MagicMock(
+            return_value={
+                "remaining": 0,
+                "active_count": 1,
+                "max_capacity": 1,
+            }
+        )
+        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._collect_frozen_queue = AsyncMock()
+        mock_coordinator._persist_queue = MagicMock()
+
+        await mock_coordinator.coordinate(tick_id=1)
+
+        mock_coordinator._collect_frozen_queue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_pause_dispatch_when_rebuild_finds_only_blocked(
+        self, mock_coordinator
+    ):
+        """Blocked-only rebuilds pause after queueing one qualify pass."""
+        mock_coordinator._frozen_queue = []
+        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._dispatch_loop = MagicMock(return_value=0)
+        mock_coordinator._persist_queue = MagicMock()
+
+        async def mock_collect() -> list[QueueEntry]:
+            return [
+                QueueEntry(issue_number=10, collected_state="blocked"),
+                QueueEntry(issue_number=11, collected_state="blocked"),
+            ]
+
+        mock_coordinator._collect_frozen_queue = mock_collect
+
+        await mock_coordinator.coordinate(tick_id=1)
+
+        assert mock_coordinator._dispatch_paused is True
+        assert [entry.issue_number for entry in mock_coordinator._frozen_queue] == [
+            10,
+            11,
+        ]
+
+    @pytest.mark.asyncio
+    async def test_paused_blocked_queue_drops_rechecked_blocked_entries(
+        self, mock_coordinator
+    ):
+        """After one qualify pass, stable blocked-only queues become quiet."""
+        mock_coordinator._dispatch_paused = True
+        mock_coordinator._frozen_queue = [
+            QueueEntry(issue_number=10, collected_state="blocked", waiting_state=None),
+        ]
+        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._probe_for_non_blocked_candidates = AsyncMock()
+
+        def mock_dispatch_loop(_tick_id: int = 0) -> int:
+            mock_coordinator._frozen_queue = []
+            return 0
+
+        mock_coordinator._dispatch_loop = MagicMock(side_effect=mock_dispatch_loop)
+
+        async def mock_collect() -> list[QueueEntry]:
+            return [QueueEntry(issue_number=10, collected_state="blocked")]
+
+        mock_coordinator._collect_frozen_queue = mock_collect
+
+        await mock_coordinator.coordinate(tick_id=1)
+
+        assert mock_coordinator._dispatch_paused is True
+        assert mock_coordinator._frozen_queue == []
+        mock_coordinator._probe_for_non_blocked_candidates.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_paused_dispatch_skips_recollect_until_non_blocked_probe_hits(
+        self, mock_coordinator
+    ):
+        """Paused dispatch shouldnt keep recollecting while only blocked work exists."""
+        mock_coordinator._dispatch_paused = True
+        mock_coordinator._frozen_queue = []
+        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._collect_frozen_queue = AsyncMock()
+        mock_coordinator._probe_for_non_blocked_candidates = AsyncMock(
+            return_value=False
+        )
+
+        await mock_coordinator.coordinate(tick_id=1)
+
+        mock_coordinator._collect_frozen_queue.assert_not_called()
+        mock_coordinator._probe_for_non_blocked_candidates.assert_awaited_once()
