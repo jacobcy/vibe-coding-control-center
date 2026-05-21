@@ -126,6 +126,16 @@ tmux display-message -p '#{session_name}'
 - 先后顺序为什么这样安排
 - 每步如何验证
 
+#### 异常处理变更
+
+涉及 except/raise/try-except 块修改的任务，plan 阶段必须：
+
+1. **追踪异常传播链**：标注异常抛出点 → 中间 except 层 → 目标处理器
+2. **验证传播可达性**：
+   - 检查中间层 except 是否会吞没异常（导致目标处理器不可达）
+   - 检查异常类型匹配（抛出类型与 except 捕获类型是否一致）
+3. **标注未验证风险**：如果无法确认中间层行为，用 handoff 记录"未验证：异常传播链中间层 X 可能吞没异常"
+
 ### 治理与 prompt 改动
 
 适用于 rules、prompt、配置文案、context builder、输出契约调整。
