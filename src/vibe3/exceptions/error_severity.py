@@ -1,6 +1,7 @@
 """Error severity classification for Orchestra runtime."""
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -64,6 +65,6 @@ class ErrorHandlingContract(BaseModel):
     counts_toward_threshold: bool
     record_in_error_log: bool
     write_timeline_event: bool
-    issue_action: str  # "record_only" | "block_flow" | "fail_issue"
-    gate_action: str  # "ignore" | "threshold" | "immediate"
+    issue_action: Literal["record_only", "block_flow", "fail_issue"]
+    gate_action: Literal["ignore", "threshold", "immediate"]
     description: str = ""
