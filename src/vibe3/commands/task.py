@@ -20,6 +20,7 @@ from vibe3.ui.task_ui import (
     render_task_show,
 )
 from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.utils.pr_branch_resolver import resolve_command_branch
 
 app = typer.Typer(
     help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
@@ -41,6 +42,14 @@ def show(
     issue: Annotated[
         str | None,
         typer.Argument(help="Issue number (auto-resolves to task branch if exists)"),
+    ] = None,
+    branch_opt: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
+    pr_opt: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve branch from"),
     ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     output_format: FormatOption = "table",
@@ -72,7 +81,12 @@ def show(
     task_svc = TaskService()
 
     try:
-        target_branch = task_svc.resolve_branch(issue)
+        target_branch = resolve_command_branch(
+            branch_opt=branch_opt,
+            pr_opt=pr_opt,
+            position_arg=issue,
+            flow_service=task_svc.flow_service,
+        )
     except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error

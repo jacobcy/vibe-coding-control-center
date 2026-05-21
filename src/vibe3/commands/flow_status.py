@@ -33,7 +33,7 @@ from vibe3.ui.flow_ui import (
     render_flows_status_dashboard,
 )
 from vibe3.utils.branch_utils import find_parent_branch
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.utils.pr_branch_resolver import resolve_command_branch
 
 if TYPE_CHECKING:
     pass
@@ -55,6 +55,10 @@ def show(
     branch_opt: Annotated[
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
+    pr_opt: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve branch from"),
+    ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,
     output_format: FormatOption = "table",
@@ -73,7 +77,6 @@ def show(
     ] = False,
 ) -> None:
     """Show flow details with source-aware reads."""
-    branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -84,14 +87,16 @@ def show(
 
     with trace_scope(trace, "flow show", domain="flow"):
         service = FlowService()
-        if branch:
-            try:
-                target_branch = resolve_issue_branch_input(branch, service) or branch
-            except (UserError, SystemError) as error:
-                typer.echo(f"Error: {error}", err=True)
-                raise typer.Exit(1) from error
-        else:
-            target_branch = service.get_current_branch()
+        try:
+            target_branch = resolve_command_branch(
+                branch_opt=branch_opt,
+                pr_opt=pr_opt,
+                position_arg=branch_arg,
+                flow_service=service,
+            )
+        except (UserError, SystemError) as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
 
         # Get task issue number for remote fallback
         links = service.store.get_issue_links(target_branch)
