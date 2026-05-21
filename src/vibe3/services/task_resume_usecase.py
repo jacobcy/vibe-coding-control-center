@@ -81,6 +81,7 @@ class TaskResumeUsecase:
         repo: str | None = None,
         candidate_mode: str = "resumable",
         label_state: str | None = None,
+        source: str = "auto",
         progress_callback: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         """Resume failed or blocked issues.
@@ -95,6 +96,7 @@ class TaskResumeUsecase:
             candidate_mode: Candidate selection mode ("resumable" or "all_task")
             label_state: Optional state to restore (None=delete worktree,
                 "handoff"/"ready"=keep worktree)
+            source: Data source strategy (local/remote/auto)
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,
                     status: str) -> None
