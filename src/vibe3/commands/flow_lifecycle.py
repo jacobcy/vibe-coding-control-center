@@ -6,7 +6,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import trace_scope
-from vibe3.models.branch_convention import BranchConvention
+from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.issue_ref import try_parse_issue_number
@@ -50,7 +50,7 @@ def blocked(
         # resolve_issue_branch_input when flow doesn't exist
         issue_number_input = try_parse_issue_number(branch) if branch else None
         if issue_number_input is not None:
-            convention = BranchConvention.vibe_center()
+            convention = ConventionResolver.from_repo().resolve().branch
             target_branch = convention.canonical_branch(issue_number_input)
         else:
             target_branch = resolve_branch_arg(branch)
@@ -67,7 +67,7 @@ def blocked(
 
         if not flow_status:
             # Try to auto-create flow if branch matches task/dev convention
-            convention = BranchConvention.vibe_center()
+            convention = ConventionResolver.from_repo().resolve().branch
             issue_number = convention.parse_issue_number(target_branch)
 
             if issue_number:
@@ -89,6 +89,9 @@ def blocked(
                         output_format="table",
                         json_output=False,
                     )
+                except typer.Exit:
+                    # Let typer.Exit propagate (normal CLI exit)
+                    raise
                 except Exception as exc:
                     logger.bind(
                         branch=target_branch,
@@ -105,7 +108,7 @@ def blocked(
                 # No flow and not an issue branch - require manual creation
                 typer.echo(
                     f"Error: 目标分支 '{target_branch}' 没有 flow\n"
-                    "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+                    "先执行 `vibe3 flow update <branch>` 或切到已有 flow 的分支",
                     err=True,
                 )
                 raise typer.Exit(1)

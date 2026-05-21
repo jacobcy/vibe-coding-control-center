@@ -166,7 +166,7 @@ def update(
         output_format = "json"
     from vibe3.clients.git_client import GitClient
     from vibe3.config.orchestra_settings import load_orchestra_config
-    from vibe3.models.branch_convention import BranchConvention
+    from vibe3.services.convention_resolver import ConventionResolver
     from vibe3.utils.branch_arg import resolve_branch_arg
     from vibe3.utils.issue_ref import try_parse_issue_number
 
@@ -175,7 +175,7 @@ def update(
     # resolve_issue_branch_input when flow doesn't exist
     issue_number_input = try_parse_issue_number(branch) if branch else None
     if issue_number_input is not None:
-        convention = BranchConvention.vibe_center()
+        convention = ConventionResolver.from_repo().resolve().branch
         target_branch = convention.canonical_branch(issue_number_input)
     else:
         target_branch = resolve_branch_arg(branch)
