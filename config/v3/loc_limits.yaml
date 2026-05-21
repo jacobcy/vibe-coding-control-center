@@ -233,6 +233,15 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
         limit: 460
         reason: "Health check failure 测试集，7 个独立测试用例验证 coordinator 对 CheckService 结果的处理逻辑，每个测试需要完整 mock setup，拆分会降低可读性"
+      - path: "tests/vibe3/orchestra/test_dispatch_state_transitions.py"
+        limit: 450
+        reason: "Dispatch state transition 测试集，覆盖 promote、dispatch loop、recollection 等状态转换场景，每个测试需要完整 mock setup 和多步断言"
+      - path: "tests/vibe3/orchestra/test_dispatch_queue_operations.py"
+        limit: 450
+        reason: "Dispatch queue operation 测试集，覆盖 merge、persist、restore、eviction 等 queue 操作场景，共享 fixture，拆分收益低"
+      - path: "tests/vibe3/orchestra/test_dispatch_actionable_trigger.py"
+        limit: 400
+        reason: "Actionable trigger 测试集，覆盖 collect/merge/dispatch loop 的 actionable 判断逻辑，共享 fixture，拆分收益低"
       - path: "tests/vibe3/commands/test_scan.py"
         limit: 410
         reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"

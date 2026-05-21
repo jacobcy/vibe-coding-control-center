@@ -481,14 +481,24 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         # Step 2: Promote progressed entries (state changes)
         self._promote_progressed_entries()
 
+        # Normalize after promotion: _promote_progressed_entries() may set
+        # self._frozen_queue = None when all entries are removed
+        if self._frozen_queue is None:
+            self._frozen_queue = []
+
         # Step 3: Dispatch actionable entries FIRST
         # Note: dispatch event logging is handled by _dispatch_loop internally
         _dispatched_count = self._dispatch_loop(tick_id)
 
         # Step 4: Check if actionable candidates are exhausted AFTER dispatch
         if self._frozen_queue:
+            # Actionable = entries that are:
+            # - Not blocked (collected_state != "blocked")
+            # - Not already dispatched (waiting_state is None)
             actionable = [
-                e for e in self._frozen_queue if e.collected_state != "blocked"
+                e
+                for e in self._frozen_queue
+                if e.waiting_state is None and e.collected_state != "blocked"
             ]
             need_collect = not actionable
         else:
