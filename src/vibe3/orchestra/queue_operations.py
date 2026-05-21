@@ -25,6 +25,41 @@ if TYPE_CHECKING:
     from vibe3.orchestra.flow_dispatch import FlowManager
 
 
+def _collect_raw_issues_without_qualify(
+    raw_issues: list[dict[str, object]],
+    supervisor_label: str,
+    manager_usernames: list[str],
+) -> list[IssueInfo]:
+    """Apply collection-time filters without running the qualify gate.
+
+    Performs the shared 4-step filtering chain:
+    1. normalize_labels
+    2. state/ label presence check
+    3. IssueInfo.from_github_payload
+    4. should_skip_from_queue
+
+    Skips the qualify gate so callers can defer qualification (e.g. BLOCKED
+    bypass path) or apply it selectively.
+    """
+    selected: list[IssueInfo] = []
+    for item in raw_issues:
+        labels = normalize_labels(item.get("labels"))
+        if not any(lbl.startswith("state/") for lbl in labels):
+            continue
+        issue = IssueInfo.from_github_payload(item)
+        if issue is None:
+            continue
+        if should_skip_from_queue(
+            issue,
+            supervisor_label=supervisor_label,
+            manager_usernames=manager_usernames,
+            require_manager_assignee=True,
+        ):
+            continue
+        selected.append(issue)
+    return selected
+
+
 def select_ready_issues(
     raw_issues: list[dict[str, object]],
     trigger_state: IssueState,
@@ -55,17 +90,11 @@ def select_ready_issues(
     if role is None:
         return selected
 
-    for item in raw_issues:
-        labels = normalize_labels(item.get("labels"))
+    raw_selected = _collect_raw_issues_without_qualify(
+        raw_issues, supervisor_label, config.get_manager_usernames()
+    )
 
-        # Untracked state: ignore issues with no state labels
-        if not any(lbl.startswith("state/") for lbl in labels):
-            continue
-
-        issue = IssueInfo.from_github_payload(item)
-        if issue is None:
-            continue
-
+    for issue in raw_selected:
         # All roles go through Qualify Gate for body-truth alignment.
         # Blocked issues from label are re-evaluated against body truth
         # before retention, removal, or promotion.
@@ -75,7 +104,7 @@ def select_ready_issues(
 
         # Qualify Gate — returns target state or None if blocked
         target = qualify_gate.run_qualify_gate(
-            issue, branch, flow_state, labels, trigger_state
+            issue, branch, flow_state, issue.labels, trigger_state
         )
         if target is None or target != trigger_state:
             continue
@@ -90,16 +119,6 @@ def select_ready_issues(
                     f"skip #{issue.number}: branch '{branch}' not found in git",
                 )
                 continue
-
-        # Verify assignee/supervisor filters
-        # Always require manager assignee for all dispatch stages
-        if should_skip_from_queue(
-            issue,
-            supervisor_label=supervisor_label,
-            manager_usernames=config.get_manager_usernames(),
-            require_manager_assignee=True,
-        ):
-            continue
 
         selected.append(issue)
 
