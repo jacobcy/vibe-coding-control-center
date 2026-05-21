@@ -153,8 +153,9 @@ def update(
 ) -> None:
     """Update flow metadata (idempotent add/update).
 
-    If a positional issue number is provided and the corresponding branch
-    doesn't exist in git, automatically creates the branch before registering flow.
+    If an issue number is provided (via positional arg or --branch option) and
+    the corresponding branch doesn't exist in git, automatically creates the
+    branch before registering flow.
     """
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
@@ -195,7 +196,10 @@ def update(
         ).info("Auto-creating branch for issue")
 
         git.create_branch_ref(target_branch, start_ref=config.scene_base_ref)
-        typer.echo(f"✓ Created branch '{target_branch}' from {config.scene_base_ref}")
+        if output_format == "table":
+            typer.echo(
+                f"✓ Created branch '{target_branch}' from {config.scene_base_ref}"
+            )
 
     flow_service = FlowService()
     with trace_scope(trace, "flow update", branch=target_branch):
