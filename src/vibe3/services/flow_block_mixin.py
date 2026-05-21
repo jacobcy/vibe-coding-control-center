@@ -10,7 +10,7 @@ from vibe3.exceptions import UserError
 from vibe3.models.issue_body import FlowStateProjection
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
-from vibe3.services.issue_body_service import merge_projection
+from vibe3.services.issue_body_service import merge_projection, parse_projection
 from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
 
@@ -35,11 +35,22 @@ class FlowLifecycleMixin:
             )
             return
 
-        # Build projection
+        # Parse existing blocked_by
+        current_proj = parse_projection(current_body)
+        existing_deps = set(current_proj.blocked_by)
+
+        # Merge new blocker (deduplicate)
+        # When blocked_by_issue is None, clear dependencies (reason-only block)
+        if blocked_by_issue is not None:
+            new_blocked_by = sorted(existing_deps | {blocked_by_issue})
+        else:
+            new_blocked_by = []
+
+        # Build projection with merged blocked_by
         proj = FlowStateProjection(
             state="blocked",
-            blocked_by=[blocked_by_issue] if blocked_by_issue else [],
-            blocked_reason=reason,
+            blocked_by=new_blocked_by,
+            blocked_reason=reason or current_proj.blocked_reason,
         )
 
         # Merge and update (short-circuit if unchanged)
