@@ -377,8 +377,12 @@ async def test_tick_loop_skip_cleanup_when_disabled(monkeypatch) -> None:
 
     cleanup_calls: list[int] = []
 
+    tick_count = 0
+
     async def _sleep_once(_seconds: float) -> None:
-        if len(cleanup_calls) >= 2:
+        nonlocal tick_count
+        tick_count += 1
+        if tick_count >= 3:
             server.stop()
 
     async def _mock_cleanup(tick_number: int) -> None:
