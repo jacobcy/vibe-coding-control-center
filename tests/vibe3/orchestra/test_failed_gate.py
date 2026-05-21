@@ -59,7 +59,7 @@ def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
     result = gate.check()
 
     assert result.blocked
-    assert "Model configuration errors" in (result.reason or "")
+    assert "CRITICAL" in (result.reason or "")
 
 
 def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
@@ -319,4 +319,4 @@ def test_critical_closes_gate_immediately(temp_store: SQLiteClient) -> None:
     # Gate should close immediately
     result = gate.check()
     assert result.blocked, "Gate should close immediately for CRITICAL"
-    assert "Model configuration errors" in (result.reason or "")
+    assert "CRITICAL" in (result.reason or "")

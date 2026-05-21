@@ -203,12 +203,37 @@ class ErrorTrackingService:
 
         return {row[0]: row[1] for row in rows}
 
+    def has_critical_error(self) -> bool:
+        """Check if there are any CRITICAL severity errors.
+
+        Returns:
+            True if any CRITICAL-severity error has been recorded
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT COUNT(*) FROM error_log
+                WHERE severity = ?
+                """,
+                (ErrorSeverity.CRITICAL.value,),
+            ).fetchone()
+
+        return rows[0] > 0 if rows else False
+
     def has_model_config_error(self) -> bool:
         """Check if there are any model configuration errors.
 
+        Uses severity-based check for CRITICAL errors, falling back to
+        E_MODEL_* prefix check for backward compatibility with pre-migration data.
+
         Returns:
-            True if any E_MODEL_* error has been recorded
+            True if any CRITICAL-severity or E_MODEL_* error has been recorded
         """
+        # Check by severity first (standard approach)
+        if self.has_critical_error():
+            return True
+
+        # Fallback to prefix check for backward compatibility
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute("""
                 SELECT COUNT(*) FROM error_log
@@ -331,7 +356,7 @@ class ErrorTrackingService:
             rows = conn.execute(
                 """
                 SELECT tick_id, error_code, error_message,
-                       issue_number, branch, created_at
+                       issue_number, branch, created_at, severity
                 FROM error_log
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -347,6 +372,7 @@ class ErrorTrackingService:
                 "issue_number": row[3],
                 "branch": row[4],
                 "created_at": row[5],
+                "severity": row[6] or "ERROR",  # Default to ERROR if NULL
             }
             for row in rows
         ]
@@ -439,16 +465,16 @@ class ErrorTrackingService:
         """Get error tracking status for display with severity breakdown.
 
         Returns:
-            Dict with error statistics by severity
+            Dict with error statistics by severity (all counts are windowed)
         """
-        error_counts = self.get_error_counts()
-
-        # Severity-based counts
+        # Severity-based counts (all within time window)
         critical_count = self._get_severity_count("CRITICAL")
         error_count = self.get_threshold_error_count()
         warning_count = self.get_warning_count()
+        windowed_total = critical_count + error_count + warning_count
 
-        # Legacy prefix-based counts for backward compatibility
+        # Legacy prefix-based counts for backward compatibility (all-time)
+        error_counts = self.get_error_counts()
         model_errors = sum(
             count for code, count in error_counts.items() if is_model_error(code)
         )
@@ -460,12 +486,12 @@ class ErrorTrackingService:
         )
 
         return {
-            "total_errors": sum(error_counts.values()),
+            "total_errors": windowed_total,  # Now consistent with severity counts
             # New severity-based counts
             "critical_count": critical_count,
             "error_count": error_count,
             "warning_count": warning_count,
-            # Legacy counts for backward compatibility
+            # Legacy counts for backward compatibility (all-time)
             "model_errors": model_errors,
             "api_errors": api_errors,
             "exec_errors": exec_errors,

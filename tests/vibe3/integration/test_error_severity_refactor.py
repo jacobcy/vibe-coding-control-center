@@ -80,7 +80,7 @@ def test_scenario_critical_immediate_close(temp_store: SQLiteClient) -> None:
     # Gate should close immediately
     result = gate.check()
     assert result.blocked
-    assert "Model configuration errors" in (result.reason or "")
+    assert "CRITICAL" in (result.reason or "")
 
 
 def test_scenario_mixed_severities(temp_store: SQLiteClient) -> None:

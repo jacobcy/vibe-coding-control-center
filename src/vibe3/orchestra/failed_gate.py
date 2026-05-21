@@ -140,9 +140,8 @@ class FailedGate:
         """Check global error thresholds.
 
         Rules:
-        - E_MODEL_* → immediate block
-        - E_API_* (2+ in recent window) → block
-        - E_EXEC_* (2+ in recent window) → block
+        - CRITICAL severity → immediate block
+        - ERROR severity (2+ in recent window) → block
 
         Returns:
             GateResult with blocked=True if threshold reached
@@ -152,18 +151,25 @@ class FailedGate:
         log = logger.bind(domain="orchestra", action="error_threshold_check")
         log.debug("Checking error threshold")
 
-        error_tracking = ErrorTrackingService.get_instance()
+        # Use store-specific instance to ensure gate reads from correct DB
+        error_tracking = ErrorTrackingService.get_instance(store=self.store)
 
-        # Check for model config errors (immediate block)
-        if error_tracking.has_model_config_error():
+        # Check for CRITICAL severity errors (immediate block)
+        if error_tracking.has_critical_error():
             error_counts = error_tracking.get_error_counts()
-            model_errors = [
-                code for code in error_counts.keys() if code.startswith("E_MODEL_")
+            from vibe3.exceptions.error_classification import (
+                get_error_handling_contract,
+            )
+
+            critical_errors = [
+                code
+                for code in error_counts.keys()
+                if get_error_handling_contract(code).severity.value == "CRITICAL"
             ]
-            log.error(f"Model config errors detected: {model_errors}")
+            log.error(f"CRITICAL errors detected: {critical_errors}")
             return GateResult(
                 blocked=True,
-                reason=f"Model configuration errors: {', '.join(model_errors)}",
+                reason=f"CRITICAL errors: {', '.join(critical_errors)}",
             )
 
         # Check for frequent ERROR-severity errors (threshold: 2+ in window)
