@@ -166,7 +166,7 @@ store.add_event("tmux_*_started")  # checkpoint only
 ### 3.3 业务逻辑都在 execute_sync
 
 ```python
-# execute_sync
+# execute_sync (vibe3)
 record_handoff_unified(...)  # handoff
 persist_execution_lifecycle_event(...)  # lifecycle
 _apply_unified_noop_gate(...)  # gate
@@ -176,7 +176,7 @@ _apply_unified_noop_gate(...)  # gate
 - orchestration 层没有 gate/state 推进逻辑
 - `VIBE3_ASYNC_CHILD` 只服务 outer coordinator 的防重/容量判断
 - tmux wrapper 只保留容器 checkpoint，不承载业务 lifecycle
-- 真正的业务收口仍在 sync shell 内完成
+- 真正的业务收口仍在 `vibe3` 同步链内完成
 
 这说明当前主链已经大幅收敛，但不等于 Issue 476 已自动关闭；476 仍然负责验证是否要进一步收紧 async wrapper 与 sync shell 的边界表达。
 
@@ -186,7 +186,7 @@ _apply_unified_noop_gate(...)  # gate
 
 **用途**：
 - `coordinator.py` 通过此标记跳过 capacity/session check（避免 child 与 parent 冲突）
-- **不改变同步链行为**：child 内的 execute_sync 仍然执行完整的 gate/callback
+- **不改变同步链行为**：child 内的 `vibe3` execute_sync 仍然执行完整的 gate/callback
 
 **注意**：当前实现里，async child 与 orchestration sync 共享完全相同的 execute_sync 行为，包括 gate/callback。
 

@@ -1,4 +1,4 @@
-# Dependency Handling Mechanism (V2)
+# Dependency Handling Mechanism (V3)
 
 ## Overview
 
@@ -46,7 +46,7 @@ Vibe Center 3.0 支持声明式依赖管理。当一个 flow 依赖其他 issue 
 
 ### 1. Qualify Gate (资格门)
 
-**Location**: `src/vibe3/orchestra/services/state_label_dispatch.py`
+**Location**: `src/vibe3/domain/qualify_gate.py`
 
 Orchestra 在发射派发意图前执行三步校验：
 - **Step 1 (Manual)**: 检查本地 `blocked_reason`。如果有值，则保持阻塞。
