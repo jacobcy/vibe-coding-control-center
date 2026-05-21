@@ -297,6 +297,27 @@ class ErrorTrackingService:
 
         return rows[0] if rows else 0
 
+    def _get_severity_count(self, severity: str) -> int:
+        """Get count of errors by severity level within time window.
+
+        Args:
+            severity: Severity level string (CRITICAL, ERROR, WARNING)
+
+        Returns:
+            Count of errors with the given severity in the sliding window.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT COUNT(*) FROM error_log
+                WHERE severity = ?
+                  AND created_at >= datetime('now', ? || ' minutes')
+                """,
+                (severity, f"-{self.TIME_WINDOW_MINUTES}"),
+            ).fetchone()
+
+        return rows[0] if rows else 0
+
     def get_recent_errors(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent errors for status display.
 
@@ -415,12 +436,19 @@ class ErrorTrackingService:
             return result.rowcount
 
     def get_status(self) -> dict[str, Any]:
-        """Get error tracking status for display.
+        """Get error tracking status for display with severity breakdown.
 
         Returns:
-            Dict with error statistics
+            Dict with error statistics by severity
         """
         error_counts = self.get_error_counts()
+
+        # Severity-based counts
+        critical_count = self._get_severity_count("CRITICAL")
+        error_count = self.get_threshold_error_count()
+        warning_count = self.get_warning_count()
+
+        # Legacy prefix-based counts for backward compatibility
         model_errors = sum(
             count for code, count in error_counts.items() if is_model_error(code)
         )
@@ -433,6 +461,11 @@ class ErrorTrackingService:
 
         return {
             "total_errors": sum(error_counts.values()),
+            # New severity-based counts
+            "critical_count": critical_count,
+            "error_count": error_count,
+            "warning_count": warning_count,
+            # Legacy counts for backward compatibility
             "model_errors": model_errors,
             "api_errors": api_errors,
             "exec_errors": exec_errors,
