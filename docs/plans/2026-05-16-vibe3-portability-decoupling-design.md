@@ -19,7 +19,7 @@
 
 1. 必要运行时资源复制到用户目录。
 2. 项目语义和治理真源继续读取当前 repo。
-3. 新项目通过 `vibe3 init` 接入最小能力，而不是被迫复制当前仓库全部外壳。
+3. 新项目通过 `vibe init` 接入最小能力，而不是被迫复制当前仓库全部外壳。
 
 ## 设计原则
 
@@ -46,7 +46,7 @@
 
 ### 4. Init 只生成最小骨架，不复制整套仓库外壳
 
-`vibe3 init` 的职责是：
+`vibe init` 的职责是：
 
 - 检测/落地最小项目适配层
 - 生成 `.vibe/config.yaml`
@@ -67,7 +67,7 @@
 - 通用 minimal policy skeleton
 - 通用 models / backend preset 模板
 - 通用 skills manifest
-- `vibe3 init` 所需模板文件
+- `vibe init` 所需模板文件
 
 它们的特点是：
 
@@ -92,7 +92,7 @@
 - repo-local `config/v3/skills.json`
 - repo-local label / branch / workflow 语义
 
-### C. 应由 `vibe3 init` 生成到目标项目的最小骨架
+### C. 应由 `vibe init` 生成到目标项目的最小骨架
 
 这些资源既不应放在用户目录作为共享真源，也不应要求目标项目手写：
 
@@ -190,7 +190,7 @@
 | 通用 prompts | `~/.vibe/assets` | 任何项目可复用 |
 | 通用 prompt recipes | `~/.vibe/assets` | 任何项目可复用 |
 | 通用 policy skeleton | `~/.vibe/assets` | 任何项目可复用 |
-| init 模板 | `~/.vibe/assets` | `vibe3 init` 依赖 |
+| init 模板 | `~/.vibe/assets` | `vibe init` 依赖 |
 | `skills/` | repo-local | 项目协作语义真源 |
 | `.agent/` | repo-local | 项目 workflow / policy / template 真源 |
 | `supervisor/` | repo-local | 当前发行版特有 |
@@ -225,14 +225,16 @@
 - 业务层不再直接拼接 repo 相对路径
 - 所有 fallback 都要可观测，可输出 provenance
 
-## `vibe3 init` 目标行为
+## `vibe init` 目标行为
+
+> 注：当前 `vibe init` 由 `bin/vibe` shell 脚本实现。`vibe3` Python CLI 尚未实现 `init` 子命令。
 
 ### 命令形态
 
 ```bash
-vibe3 init --profile minimal
-vibe3 init --profile github-flow
-vibe3 init --profile vibe-center
+vibe init --profile minimal
+vibe init --profile github-flow
+vibe init --profile vibe-center
 ```
 
 ### `minimal` profile
@@ -318,7 +320,7 @@ vibe3 init --profile vibe-center
 - 加入 provenance 输出
 - 为 repo-local override 提供一致入口
 
-### Phase 4: `vibe3 init`
+### Phase 4: `vibe init`
 
 - 落地 profile-based init
 - 支持空仓库最小接入
@@ -354,7 +356,7 @@ vibe3 init --profile vibe-center
 
 1. 资产分发层
 2. loader / resolver 层
-3. `vibe3 init` / profile 层
+3. `vibe init` / profile 层
 4. core 去 repo 假设层
 5. Vibe Center adapter 层
 6. 验证与文档层

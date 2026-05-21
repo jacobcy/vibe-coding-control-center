@@ -51,7 +51,7 @@ When using vibe3 in external projects:
 
 2. **Vibe Center profile**:
    ```bash
-   vibe3 init --profile vibe-center
+   vibe init --profile vibe-center
    ```
    - All policies from vibe-center adapter
    - Skills (vibe-commit, vibe-review, etc.)
@@ -100,7 +100,7 @@ if not path:
 If you were copying Vibe Center repo structure:
 
 - **Stop**: Don't copy `.agent/` or `skills/` directories
-- **Use**: `vibe3 init --profile vibe-center` to get clean setup
+- **Use**: `vibe init --profile vibe-center` to get clean setup
 - **Customize**: Override specific files in `.vibe/` overlay
 
 ## References
