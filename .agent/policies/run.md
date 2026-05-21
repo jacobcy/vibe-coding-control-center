@@ -253,7 +253,7 @@ executor 不得仅凭以下方式判断行为：
 |------|----------|------|
 | `count=True` 默认值 | 代码追踪 + 手动验证 | `count=True` 默认 0，非 1 |
 | `ctx.meta` 继承 | 代码追踪全链路 | `main_callback` 设置 → 子命令读取 |
-| 继承 guard 触发条件 | 代码追踪 guard 条件 | `verbose == 1` 是默认值，不是用户传入 |
+| 继承 guard 触发条件 | 代码追踪 guard 条件 | `server_main` 中 `verbose == 1` 是该命令默认值，guard 检查是否需继承全局设置 |
 
 **注意**: 以上引用的代码路径（如 `cli.py:main_callback`）为示例，实际追踪时应基于当前项目的真实代码路径。
 
