@@ -80,8 +80,9 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         self._check_service: CheckService | None = None
         self._supervisor_label = config.supervisor_handoff.issue_label
 
-        # Load persisted queue on init (restart recovery)
-        self._frozen_queue = self._restore_queue()
+        # Queue is lazily restored on first coordinate() call
+        # (not eagerly in __init__ to avoid startup I/O and keep
+        # coordinate() as the single queue-lifecycle owner)
 
     def shutdown(self) -> None:
         """Shutdown the executor if we own it."""
@@ -270,32 +271,44 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
 
         return True
 
-    async def coordinate(self, tick_id: int = 0) -> None:
-        """Run one heartbeat tick against the frozen queue.
+    def _merge_queue(
+        self,
+        existing: list[QueueEntry],
+        fresh: list[QueueEntry],
+    ) -> list[QueueEntry]:
+        """Merge fresh entries into existing queue, deduplicating by issue_number.
+
+        If same issue_number exists in both, keep the existing entry
+        (to preserve waiting_state and retry_count).
+
+        Args:
+            existing: Current queue entries (may have waiting_state set)
+            fresh: Freshly collected entries (waiting_state is None)
+
+        Returns:
+            Merged queue with all unique issue_numbers
+        """
+        existing_numbers = {e.issue_number for e in existing}
+        merged = list(existing)
+        for entry in fresh:
+            if entry.issue_number not in existing_numbers:
+                merged.append(entry)
+        return merged
+
+    def _dispatch_loop(self, tick_id: int = 0) -> int:
+        """Run dispatch loop against frozen queue.
+
+        This method extracts the dispatch logic from coordinate() into a
+        separate method for better readability and testability.
 
         Args:
             tick_id: Current tick number from heartbeat (default: 0)
+
+        Returns:
+            Number of issues dispatched in this tick
         """
-        if self._frozen_queue is None or len(self._frozen_queue) == 0:
-            self._frozen_queue = await self._collect_frozen_queue()
-            self._check_service = None  # Invalidate cache when queue is rebuilt
-            # Persist freshly collected queue after assignment
-            self._persist_queue()
-            if not self._frozen_queue:
-                append_orchestra_event(
-                    "dispatcher",
-                    "GlobalDispatchCoordinator: no candidates",
-                )
-                return
-
-        self._promote_progressed_entries()
-
         if not self._frozen_queue:
-            append_orchestra_event(
-                "dispatcher",
-                "GlobalDispatchCoordinator: queue emptied by state changes",
-            )
-            return
+            return 0
 
         status = self._capacity.get_capacity_status("manager")
         available_slots = status["remaining"]
@@ -305,7 +318,7 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 "dispatcher",
                 "GlobalDispatchCoordinator: capacity full",
             )
-            return
+            return 0
 
         dispatched_count = 0
         index = 0
@@ -316,7 +329,7 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                     f"GlobalDispatchCoordinator: dispatched={dispatched_count} "
                     f"skipped remaining (capacity full)",
                 )
-                return
+                return dispatched_count
 
             entry = self._frozen_queue[index]
             issue = self._load_issue(entry.issue_number)
@@ -441,5 +454,45 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 f"{dispatched_count}{reset}",
             )
 
-        # Persist queue state after dispatch mutations
+        return dispatched_count
+
+    async def coordinate(self, tick_id: int = 0) -> None:
+        """Run one heartbeat tick against the frozen queue.
+
+        Args:
+            tick_id: Current tick number from heartbeat (default: 0)
+
+        Queue Collection Strategy:
+            Only collect fresh queue when actionable (non-blocked) candidates
+            are exhausted AFTER dispatch. This avoids wasted GitHub API calls.
+        """
+        # Step 1: Restore queue from persistence if None
+        if self._frozen_queue is None:
+            restored = self._restore_queue()
+            self._frozen_queue = restored if restored is not None else []
+            self._check_service = None  # Invalidate cache on restore
+
+        # Step 2: Promote progressed entries (state changes)
+        self._promote_progressed_entries()
+
+        # Step 3: Dispatch actionable entries FIRST
+        # Note: dispatch event logging is handled by _dispatch_loop internally
+        _dispatched_count = self._dispatch_loop(tick_id)
+
+        # Step 4: Check if actionable candidates are exhausted AFTER dispatch
+        if self._frozen_queue:
+            actionable = [
+                e for e in self._frozen_queue if e.collected_state != "blocked"
+            ]
+            need_collect = not actionable
+        else:
+            # Queue is empty → need to collect
+            need_collect = True
+
+        if need_collect:
+            fresh = await self._collect_frozen_queue()
+            self._frozen_queue = self._merge_queue(self._frozen_queue, fresh)
+            self._check_service = None  # Invalidate cache
+
+        # Step 5: Persist queue state
         self._persist_queue()
