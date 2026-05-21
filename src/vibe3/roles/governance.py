@@ -434,11 +434,17 @@ def build_governance_recipe(
 
     supervisor_content_source = current.source
 
+    manager_usernames = config.get_manager_usernames()
+    manager_bot = manager_usernames[0] if manager_usernames else "vibe-manager-agent"
+
     variables: dict[str, PromptVariableSource] = {
         "supervisor_name": PromptVariableSource(
             kind=VariableSourceKind.LITERAL, value=current_material
         ),
         "supervisor_content": supervisor_content_source,
+        "manager_bot": PromptVariableSource(
+            kind=VariableSourceKind.LITERAL, value=manager_bot
+        ),
     }
     for key in _GOVERNANCE_RUNTIME_VARS:
         variables[key] = PromptVariableSource(

@@ -79,12 +79,12 @@ Roadmap skill 必须读取以下配置：
 # 查看配置（未来可使用 vibe3 config show）
 cat config/v3/settings.yaml | grep manager_usernames
 
-# 或使用 Python 加载
-uv run python -c "import yaml; config = yaml.safe_load(open('config/v3/settings.yaml')); print(config.get('manager_usernames', ['vibe-manager-agent']))"
+# 或使用 Python 加载并获取第一个 manager bot 名称
+uv run python -c "import yaml; config = yaml.safe_load(open('config/v3/settings.yaml')); usernames = config.get('manager_usernames', ['vibe-manager-agent']); print(usernames[0] if usernames else 'vibe-manager-agent')"
 ```
 
 默认行为：
-- 若配置文件不存在或字段缺失，使用默认值 `[“vibe-manager-agent”]`
+- 若配置文件不存在或字段缺失，使用默认值 `[“vibe-manager-agent”]`（本机 `~/.vibe/settings.yaml` 可覆盖）
 - 只使用配置中的第一个 manager username
 
 边界对照：
@@ -150,19 +150,21 @@ Manager assignee 配置位于：
 ### 分配规则（强制）
 
 **自动化路径**：
-- 通过三级审查 → 分配给 `vibe-manager-agent`
+- 通过三级审查 → 分配给 `{manager_bot}`（从 `config.manager_usernames[0]` 解析）
 - 利用 manager dispatch 机制 → 自动触发执行
 
 **使用规则**：
 - ✅ 必须使用配置中的 manager_usernames
-- ✅ 默认使用 `vibe-manager-agent`
+- ✅ 默认使用配置中 `manager_usernames[0]`
 - ❌ 禁止使用人类用户名（如 jacobcy、alice）
 - ❌ 禁止使用示例中的 placeholder（如 @alice）
 
 ### 触发机制
 
 1. Issue 通过三级审查
-2. Roadmap skill 分配 assignee: `gh issue edit <number> --assignee vibe-manager-agent`
+2. Roadmap skill 分配 assignee（两步骤）：
+   - 读取配置获取 manager bot 名称：`uv run python -c "..."`
+   - 执行分配：`gh issue edit <number> --assignee <manager_bot_name>`
 3. Manager dispatch 检测到 issue 分配给 manager_usernames
 4. Manager 自动启动执行链
 
@@ -224,7 +226,7 @@ Manager assignee 配置位于：
 
 合规示例：
 ```
-[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=bugfix.
+[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
 [governance suggest] Skipped: needs human scope confirmation before automation.
 [governance suggest] Recommend Close: dependency removed in #123, API deprecated.
 ```
@@ -322,13 +324,12 @@ gh issue list -l "roadmap/p0"
 - 检查：运行三级审查（Level 1/2/3）
 - 决策：通过全部三级审查
 - 执行动作：
-  1. 分配 assignee：
-     ```bash
-     gh issue edit <number> --assignee vibe-manager-agent
-     ```
+  1. 分配 assignee（两步骤）：
+     - 读取配置：`uv run python -c "..."`
+     - 执行分配：`gh issue edit <number> --assignee <manager_bot_name>`
   2. 写 intake comment：
      ```bash
-     gh issue comment <number> --body "[governance suggest] Intake: assigned to @vibe-manager-agent (manager-pool); scope=bugfix."
+     gh issue comment <number> --body "[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix."
      # scope 可选值：bugfix, feature, refactor
      ```
 
