@@ -1,10 +1,29 @@
 """Tests for CI status rendering in render_pr_details."""
 
+import re
 from io import StringIO
-from unittest.mock import patch
+
+from rich.console import Console
 
 from vibe3.models.pr import CICheck, PRResponse, PRState
 from vibe3.ui.pr_ui import render_pr_details
+
+
+def _render_to_plain(pr: PRResponse) -> str:
+    """Render PR details and return plain text without ANSI codes."""
+    test_console = Console(file=StringIO(), force_terminal=True, no_color=True)
+    import vibe3.ui.pr_ui
+
+    original_console = vibe3.ui.pr_ui.console
+    vibe3.ui.pr_ui.console = test_console
+    try:
+        render_pr_details(pr)
+    finally:
+        vibe3.ui.pr_ui.console = original_console
+
+    # Strip any remaining ANSI escape sequences
+    raw = test_console.file.getvalue()
+    return re.sub(r"\x1b\[[0-9;]*m", "", raw)
 
 
 class TestPRUICIRender:
@@ -37,10 +56,7 @@ class TestPRUICIRender:
             ci_checks=checks,
         )
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            render_pr_details(pr)
-            output = mock_stdout.getvalue()
-
+        output = _render_to_plain(pr)
         assert "✓ All checks passed" in output
         assert "CI Status" in output
 
@@ -71,11 +87,8 @@ class TestPRUICIRender:
             ci_checks=checks,
         )
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            render_pr_details(pr)
-            output = mock_stdout.getvalue()
-
-        assert "✗ 1 check(s) failed" in output
+        output = _render_to_plain(pr)
+        assert "1 check(s) failed" in output
         assert "Test" in output
         assert "FAILURE" in output
         assert "View details" in output
@@ -101,12 +114,36 @@ class TestPRUICIRender:
             ci_checks=checks,
         )
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            render_pr_details(pr)
-            output = mock_stdout.getvalue()
-
-        assert "● 1 check(s) pending" in output
+        output = _render_to_plain(pr)
+        assert "1 check(s) pending" in output
         assert "Build" in output
+
+    def test_render_ci_other_bucket(self) -> None:
+        """Test rendering when CI checks have unknown bucket."""
+        checks = [
+            CICheck(
+                name="Skipped Check",
+                state="SKIPPED",
+                bucket="skipping",
+                link="https://github.com/test/repo/actions/runs/1",
+            ),
+        ]
+
+        pr = PRResponse(
+            number=123,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="feature",
+            base_branch="main",
+            url="https://github.com/test/repo/pull/123",
+            ci_checks=checks,
+        )
+
+        output = _render_to_plain(pr)
+        assert "CI Status" in output
+        assert "1 check(s) in other state" in output
+        assert "Skipped Check" in output
+        assert "skipping" in output
 
     def test_render_ci_fallback_to_ci_passed(self) -> None:
         """Test fallback to ci_passed when ci_checks is empty."""
@@ -121,10 +158,7 @@ class TestPRUICIRender:
             ci_passed=True,
         )
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            render_pr_details(pr)
-            output = mock_stdout.getvalue()
-
+        output = _render_to_plain(pr)
         assert "✓ Passed" in output
 
     def test_render_ci_fallback_to_ci_status(self) -> None:
@@ -141,9 +175,6 @@ class TestPRUICIRender:
             ci_status="pending",
         )
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            render_pr_details(pr)
-            output = mock_stdout.getvalue()
-
+        output = _render_to_plain(pr)
         assert "CI Status" in output
         assert "pending" in output

@@ -121,13 +121,34 @@ class PRReadMixin:
                 ["gh", "pr", "checks", target, "--json", "name,state,bucket,link"],
                 capture_output=True,
                 text=True,
+                timeout=30,
             )
             if checks_result.returncode == 0:
                 checks_data = json.loads(checks_result.stdout)
                 ci_checks = [CICheck(**c) for c in checks_data if isinstance(c, dict)]
-        except Exception:
+            else:
+                stderr = checks_result.stderr.strip() if checks_result.stderr else None
+                logger.bind(
+                    external="github",
+                    target=target,
+                    returncode=checks_result.returncode,
+                    stderr=stderr,
+                ).debug("gh pr checks returned non-zero exit code")
+        except json.JSONDecodeError as e:
+            logger.bind(external="github", target=target, error=str(e)).debug(
+                "Failed to parse gh pr checks JSON output"
+            )
+        except subprocess.TimeoutExpired:
             logger.bind(external="github", target=target).debug(
-                "Failed to fetch CI checks"
+                "gh pr checks timed out after 30 seconds"
+            )
+        except FileNotFoundError:
+            logger.bind(external="github", target=target).debug(
+                "gh CLI not found when fetching CI checks"
+            )
+        except Exception as e:
+            logger.bind(external="github", target=target, error=str(e)).debug(
+                "Unexpected error fetching CI checks"
             )
 
         return PRResponse(

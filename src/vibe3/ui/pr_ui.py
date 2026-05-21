@@ -62,6 +62,7 @@ def render_pr_details(pr: PRResponse) -> None:
         passed = all(c.bucket == "pass" for c in pr.ci_checks)
         failed = [c for c in pr.ci_checks if c.bucket == "fail"]
         pending = [c for c in pr.ci_checks if c.bucket == "pending"]
+        other = [c for c in pr.ci_checks if c.bucket not in ("pass", "fail", "pending")]
 
         if passed:
             console.print("\n[bold]CI Status:[/] [green]✓ All checks passed[/]")
@@ -82,6 +83,15 @@ def render_pr_details(pr: PRResponse) -> None:
             )
             for check in pending:
                 console.print(f"  [yellow]●[/] {check.name}")
+        elif other:
+            # Handle unknown buckets (skipping, cancel, etc.)
+            console.print(
+                "\n[bold]CI Status:[/] [dim]{} check(s) in other state[/]".format(
+                    len(other)
+                )
+            )
+            for check in other:
+                console.print(f"  [dim]○[/] {check.name} [dim]({check.bucket})[/]")
     else:
         # Fallback to ci_passed / ci_status for backward compat
         if pr.ci_passed:
