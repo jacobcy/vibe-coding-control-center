@@ -119,3 +119,16 @@ class TestLoadSupplementaryPromptsRoot:
         result = VibeConfig._load_supplementary(data)
 
         assert "agent_prompt" not in result
+
+    def test_empty_prompts_root_falls_back(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Empty string paths.prompts_root is treated as falsy and falls back."""
+        # Run from tmp_path so repo-local prompts paths do not exist
+        monkeypatch.chdir(tmp_path)
+        data: dict = {"paths": {"prompts_root": ""}}
+
+        result = VibeConfig._load_supplementary(data)
+
+        # Empty string should be treated as falsy and not attempt path resolution
+        assert "agent_prompt" not in result
