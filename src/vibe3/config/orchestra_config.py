@@ -193,6 +193,23 @@ class SupervisorHandoffConfig(BaseModel):
         return convention.state_label(convention.handoff_label)
 
 
+class ExpiredResourceCleanupConfig(BaseModel):
+    """Configuration for expired resource cleanup service."""
+
+    enabled: bool = True
+    interval_ticks: int = Field(
+        default=10,
+        ge=1,
+        description="Run cleanup every N heartbeat ticks (~2.5h at default interval)",
+    )
+    max_age_days: int = Field(
+        default=7, ge=1, description="Max age in days before cleanup"
+    )
+    enable_worktree_cleanup: bool = True
+    enable_local_branch_cleanup: bool = True
+    enable_remote_branch_cleanup: bool = True
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration.
 
@@ -258,6 +275,9 @@ class OrchestraConfig(BaseModel):
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
+    )
+    expired_resource_cleanup: ExpiredResourceCleanupConfig = Field(
+        default_factory=ExpiredResourceCleanupConfig
     )
     max_retry_budget: int = Field(
         default=3,
