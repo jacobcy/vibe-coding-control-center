@@ -274,14 +274,27 @@ def get_error_handling_contract(error_code: str) -> ErrorHandlingContract:
     Returns:
         ErrorHandlingContract with severity and handling metadata
 
-    Raises:
-        KeyError: If error_code not in registry
+    Note:
+        Unregistered codes return a fallback ERROR contract for backward
+        compatibility during migration.
     """
     if error_code not in ERROR_REGISTRY:
+        # Default to ERROR for backward compatibility during migration
         logger.bind(
             domain="error_tracking",
             error_code=error_code,
-        ).error(f"Error code {error_code} not found in registry")
-        raise KeyError(f"Error code {error_code} not found in registry")
+        ).warning(
+            f"Unregistered error code {error_code}, using fallback ERROR contract"
+        )
+        return ErrorHandlingContract(
+            code=error_code,
+            severity=ErrorSeverity.ERROR,
+            counts_toward_threshold=True,
+            record_in_error_log=True,
+            write_timeline_event=True,
+            issue_action="block_flow",
+            gate_action="threshold",
+            description=f"Unregistered error code: {error_code}",
+        )
 
     return ERROR_REGISTRY[error_code]
