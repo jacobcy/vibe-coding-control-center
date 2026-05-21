@@ -52,7 +52,9 @@ def run_command(
     plan: Annotated[
         Optional[str],
         typer.Option(
-            "--plan", "-p", help="Path to plan file or '@plan' to use flow's plan_ref"
+            "--plan",
+            "-p",
+            help="Plan reference: file path or '@plan' to use flow's plan_ref",
         ),
     ] = None,
     skill: Annotated[
@@ -215,7 +217,9 @@ def default(
     plan: Annotated[
         Optional[str],
         typer.Option(
-            "--plan", "-p", help="Path to plan file or '@plan' to use flow's plan_ref"
+            "--plan",
+            "-p",
+            help="Plan reference: file path or '@plan' to use flow's plan_ref",
         ),
     ] = None,
     skill: Annotated[

@@ -222,7 +222,7 @@ def default(
         str | None,
         typer.Option(
             "--spec",
-            help="Spec file path or '@spec' to use flow's spec_ref",
+            help="Spec reference: file path, issue number, or '@spec' alias",
         ),
     ] = None,
     task: Annotated[
