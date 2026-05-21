@@ -9,22 +9,7 @@ from typing import TYPE_CHECKING
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils.constants import AUTOMATED_MARKERS
-
-
-def _path_to_alias(path: str) -> str:
-    """Convert a ref path to shortcut alias if applicable."""
-    if path.startswith("docs/plans/"):
-        return "@plan"
-    if path.startswith("docs/reports/"):
-        return "@report"
-    if path.startswith("docs/specs/"):
-        return "@spec"
-    if ".git/vibe3/handoff/" in path:
-        match = re.search(r"\.git/vibe3/handoff/([^/]+)/", path)
-        if match:
-            return f"@{match.group(1)}"
-    return path
-
+from vibe3.utils.path_helpers import ref_to_handoff_cmd
 
 if TYPE_CHECKING:
     from vibe3.services.task_service import TaskShowResult
@@ -233,9 +218,9 @@ def render_task_show(
         latest_ref = task_result.latest_ref
         worktree_root = task.worktree_root if hasattr(task, "worktree_root") else None
         display_ref = resolve_ref_path(latest_ref.ref, worktree_root)
-        ref_alias = _path_to_alias(display_ref)
+        ref_cmd = ref_to_handoff_cmd(display_ref, task.branch)
         console.print("\n[bold]Latest Work[/]")
-        console.print(f"Ref:     {latest_ref.kind}  {ref_alias}")
+        console.print(f"Ref:     {latest_ref.kind}  {ref_cmd}")
 
         # Show summary (full or truncated)
         if latest_ref.summary:

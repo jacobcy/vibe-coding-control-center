@@ -146,8 +146,8 @@ def test_render_flow_status_shows_handoff_commands_for_artifacts(capsys) -> None
     render_flow_status(status, worktree_root=str(worktree_root))
 
     output = capsys.readouterr().out
-    # After refactor: should show alias instead of handoff command
+    # Should show full handoff command with alias
+    assert "vibe3 handoff show" in output
     assert "@report" in output
-    # Should NOT show handoff command or absolute path
-    assert "vibe3 handoff show" not in output
+    # Should NOT show absolute path
     assert str(worktree_root) not in output
