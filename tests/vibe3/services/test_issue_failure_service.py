@@ -213,3 +213,25 @@ def test_fail_issue_lands_in_same_blocked_write_path():
         assert flow_state is not None
         assert flow_state["blocked_reason"] == "Manager cycle exhausted"
         assert flow_state["flow_status"] == "blocked"
+
+
+def test_block_manager_noop_issue_no_flow():
+    """block_manager_noop_issue() should return early if no flow exists."""
+    with patch(
+        "vibe3.services.issue_failure_service._get_issue_flow_service"
+    ) as mock_get_service:
+        mock_service = MagicMock()
+        mock_store = MagicMock()
+        mock_service.store = mock_store
+        mock_get_service.return_value = mock_service
+
+        # No flow found
+        mock_store.get_flows_by_issue.return_value = []
+
+        with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
+            block_manager_noop_issue(
+                issue_number=123, repo=None, reason="Test reason", actor="test:actor"
+            )
+
+            # Should NOT call block_flow
+            mock_flow_service.return_value.block_flow.assert_not_called()

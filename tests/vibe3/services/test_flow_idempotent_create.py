@@ -14,19 +14,6 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.flow_service import FlowService
 
 
-@pytest.fixture(autouse=True)
-def _stable_actor(monkeypatch):
-    """Avoid real git identity lookups during flow creation tests."""
-    monkeypatch.setattr(
-        "vibe3.services.flow_write_mixin.SignatureService.get_worktree_actor",
-        lambda: "test-actor",
-    )
-    monkeypatch.setattr(
-        "vibe3.services.flow_read_mixin.GitHubClient.get_pr",
-        lambda self, pr_number=None, branch=None: None,
-    )
-
-
 @pytest.fixture
 def db():
     return SQLiteClient(db_path=tempfile.mktemp(suffix=".db"))

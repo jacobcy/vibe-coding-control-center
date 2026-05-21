@@ -1,10 +1,23 @@
-"""Shared fixtures for coverage service tests."""
+"""Shared fixtures for services tests."""
 
 from pathlib import Path
 
 import pytest
 
 from vibe3.analysis.coverage_service import CoverageService
+
+
+@pytest.fixture(autouse=True)
+def stable_worktree_actor(monkeypatch):
+    """Avoid real git identity lookups during flow creation tests."""
+    monkeypatch.setattr(
+        "vibe3.services.flow_write_mixin.SignatureService.get_worktree_actor",
+        lambda: "test-actor",
+    )
+    monkeypatch.setattr(
+        "vibe3.services.flow_read_mixin.GitHubClient.get_pr",
+        lambda self, pr_number=None, branch=None: None,
+    )
 
 
 @pytest.fixture

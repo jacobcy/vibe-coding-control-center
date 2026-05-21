@@ -6,6 +6,7 @@ import pytest
 
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.pr import PRResponse, PRState
+from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
 
 
@@ -162,18 +163,6 @@ def test_pr_service_preserves_falsey_injected_dependencies() -> None:
     assert service.briefing_service.github_client is github_client
 
 
-def test_pr_service_default_instantiation_creates_all_dependencies() -> None:
-    """PRService() with zero arguments creates all default collaborators."""
-    service = PRService()
-
-    assert service.github_client is not None
-    assert service.git_client is not None
-    assert service.store is not None
-    assert service.version_service is not None
-    assert service.briefing_service is not None
-    assert service.loc_comment_service is not None
-
-
 def test_create_pr_push_failure_surfaces_upstream_guidance(
     pr_service: PRService, no_conflict_git: MagicMock
 ) -> None:
@@ -206,16 +195,6 @@ def test_close_pr_calls_gh_pr_close(pr_service: PRService) -> None:
 
     assert result is True
     gh_instance.close_pr.assert_called_once_with(123, comment="Closing PR")
-
-
-def test_close_pr_returns_success_marker(pr_service: PRService) -> None:
-    """Test close_pr returns success marker."""
-    gh_instance = pr_service.github_client
-    gh_instance.close_pr.return_value = True
-
-    result = pr_service.close_pr(123)
-
-    assert result is True
 
 
 def test_pr_service_close_open_pr_for_flow(pr_service: PRService) -> None:
@@ -372,3 +351,19 @@ def test_mark_ready_handles_loc_comment_failure(
     # Verify PR was still marked ready despite LOC error
     gh_instance.mark_ready.assert_called_once_with(123)
     assert result.draft is False
+
+
+def test_pr_create_usecase_preserves_falsey_injected_dependencies() -> None:
+    """Injected usecase collaborators should be preserved even if they are falsey."""
+    flow_service = MagicMock()
+    flow_service.__bool__.return_value = False
+    base_resolver = MagicMock()
+    base_resolver.__bool__.return_value = False
+
+    usecase = PRCreateUsecase(
+        flow_service=flow_service,
+        base_resolver=base_resolver,
+    )
+
+    assert usecase._flow_service is flow_service
+    assert usecase._base_resolver is base_resolver

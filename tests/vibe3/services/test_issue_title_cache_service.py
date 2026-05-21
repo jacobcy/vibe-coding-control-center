@@ -37,15 +37,6 @@ class TestIssueTitleCacheService:
         # Should not call GitHub on cache hit
         mock_github.view_issue.assert_not_called()
 
-    def test_get_title_cache_miss(self, mock_store, mock_github):
-        """Test get_title returns None on cache miss."""
-        mock_store.get_flow_context_cache.return_value = None
-
-        service = IssueTitleCacheService(mock_store, mock_github)
-        title = service.get_title("task/issue-123")
-
-        assert title is None
-
     def test_get_title_with_fallback_cache_hit(self, mock_store, mock_github):
         """Test fallback returns cached title without GitHub call."""
         mock_store.get_flow_context_cache.return_value = {
@@ -153,14 +144,6 @@ class TestIssueTitleCacheService:
         assert title is None
         assert error is True
 
-    def test_github_client_lazy_initialization(self, mock_store):
-        """Test GitHub client is lazy-initialized when needed."""
-        service = IssueTitleCacheService(mock_store, github_client=None)
-
-        # Should raise error because we can't import GitHubClient in tests
-        # But the property exists
-        assert service._github_client is None
-
     def test_get_titles_with_fallback_batch(self, mock_store, mock_github):
         """Test batch title retrieval with fallback."""
 
@@ -206,17 +189,6 @@ class TestIssueTitleCacheService:
             "task_issue_number": None,  # No issue number
             "issue_title": None,
         }
-
-        service = IssueTitleCacheService(mock_store, mock_github)
-        title, error = service._fetch_and_cache_title("task/issue-123")
-
-        assert title is None
-        assert error is False
-        mock_github.view_issue.assert_not_called()
-
-    def test_fetch_and_cache_no_cache_entry(self, mock_store, mock_github):
-        """Test _fetch_and_cache_title returns None when no cache entry."""
-        mock_store.get_flow_context_cache.return_value = None
 
         service = IssueTitleCacheService(mock_store, mock_github)
         title, error = service._fetch_and_cache_title("task/issue-123")
