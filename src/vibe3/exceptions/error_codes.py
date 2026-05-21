@@ -27,6 +27,9 @@ E_EXEC_MISSING_REF: Final[str] = "E_EXEC_MISSING_REF"
 E_EXEC_AUTO_SCENE_RESET: Final[str] = "E_EXEC_AUTO_SCENE_RESET"
 E_EXEC_UNKNOWN: Final[str] = "E_EXEC_UNKNOWN"
 
+# Capacity control - normal skip (not an error)
+E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"
+
 
 def is_model_error(error_code: str) -> bool:
     """Check if error is a model configuration error."""

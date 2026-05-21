@@ -356,12 +356,22 @@ class CodeagentExecutionService:
             # Block the issue with error code.
             # Supervisor (L2) uses lightweight failure: remove handoff label
             # instead of calling fail_issue() which requires a task flow.
+            # Capacity skip (E_CAPACITY_SKIP) is normal behavior, not an error.
             if command.issue_number is not None:
                 if command.role == "supervisor":
                     self._cleanup_supervisor_handoff_label(
                         command.issue_number,
                         ctx.actor,
                         log,
+                    )
+                elif error_code == "E_CAPACITY_SKIP":
+                    # Capacity control skip is normal - don't block the issue
+                    logger.bind(
+                        domain="codeagent",
+                        role=command.role,
+                        issue_number=command.issue_number,
+                    ).info(
+                        "Execution skipped due to capacity control (normal behavior)"
                     )
                 else:
                     from vibe3.services.issue_failure_service import fail_issue
