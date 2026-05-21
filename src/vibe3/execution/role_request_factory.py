@@ -26,6 +26,7 @@ def build_role_async_request(
     repo_path: Path | None = None,
     actor: str | None = None,
     refs: dict[str, str] | None = None,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Unified factory for building role-specific async CLI requests."""
     resolver = ConventionResolver.from_repo()
@@ -47,6 +48,7 @@ def build_role_async_request(
         refs=effective_refs,
         worktree_requirement=worktree_requirement,
         repo_path=repo_path,
+        tick_id=tick_id,
     )
 
 
@@ -69,6 +71,7 @@ def build_role_sync_request(
     fallback_include_global_notice: bool = True,
     extra_refs: dict[str, str] | None = None,
     dry_run_summary: dict[str, Any] | None = None,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Unified factory for building role-specific sync prompt requests."""
     actor = actor or f"orchestra:{role}"
@@ -91,4 +94,5 @@ def build_role_sync_request(
         extra_refs=extra_refs,
         dry_run_summary=dry_run_summary,
         worktree_requirement=worktree_requirement,
+        tick_id=tick_id,
     )

@@ -143,6 +143,7 @@ def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
             request_builder=build_plan_request,
             actor=event.actor,
             branch=event.branch,
+            tick_id=event.tick_id,
         )
     except Exception as exc:
         logger.bind(
@@ -193,6 +194,7 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
             plan_ref=plan_ref,
             audit_ref=audit_ref,
             commit_mode=commit_mode,
+            tick_id=event.tick_id,
         )
     except Exception as exc:
         logger.bind(
@@ -237,6 +239,7 @@ def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
             actor=event.actor,
             branch=event.branch,
             report_ref=report_ref,
+            tick_id=event.tick_id,
         )
     except Exception as exc:
         logger.bind(

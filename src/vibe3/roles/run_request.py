@@ -39,6 +39,7 @@ def build_run_request(
     audit_ref: str | None = None,
     commit_mode: bool = False,
     actor: str = "orchestra:executor",
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the executor async execution request for dispatch."""
     refs: dict[str, str] = {}
@@ -82,6 +83,7 @@ def build_run_request(
         repo_path=repo_path,
         actor=actor,
         refs=refs,
+        tick_id=tick_id,
     )
 
 
@@ -95,6 +97,7 @@ def build_run_sync_request(
     actor: str,
     dry_run: bool,
     show_prompt: bool,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the executor sync execution request."""
     store = SQLiteClient()
@@ -153,6 +156,7 @@ def build_run_sync_request(
         fallback_include_global_notice=True,
         extra_refs={k: str(v) for k, v in refs.items()},
         dry_run_summary=dry_run_summary,
+        tick_id=tick_id,
     )
 
 

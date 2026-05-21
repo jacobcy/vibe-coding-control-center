@@ -173,6 +173,7 @@ def build_plan_request(
     branch: str | None = None,
     repo_path: Path | None = None,
     actor: str = "orchestra:planner",
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner async execution request for dispatch."""
     resolver = ConventionResolver.from_repo()
@@ -187,6 +188,7 @@ def build_plan_request(
         branch=branch,
         repo_path=repo_path,
         actor=actor,
+        tick_id=tick_id,
     )
 
 
@@ -200,6 +202,7 @@ def build_plan_sync_request(
     actor: str,
     dry_run: bool,
     show_prompt: bool,
+    tick_id: int = 0,
 ) -> ExecutionRequest:
     """Build the planner sync execution request."""
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -232,6 +235,7 @@ def build_plan_sync_request(
         fallback_include_global_notice=True,
         extra_refs=extra_refs,
         dry_run_summary=dry_run_summary,
+        tick_id=tick_id,
     )
 
 
