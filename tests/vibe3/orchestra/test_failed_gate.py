@@ -33,6 +33,11 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
 
 def test_failed_gate_open(temp_store: SQLiteClient) -> None:
     """Gate should be open when no errors are recorded."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create ErrorTrackingService with test database
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
     gate = FailedGate(store=temp_store)
     result = gate.check()
 
@@ -54,11 +59,11 @@ def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
     result = gate.check()
 
     assert result.blocked
-    assert "Model configuration errors" in (result.reason or "")
+    assert "CRITICAL" in (result.reason or "")
 
 
 def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
-    """Gate should block when API error threshold is reached."""
+    """Gate should block when ERROR-severity error threshold is reached."""
     from vibe3.exceptions.error_tracking import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
@@ -74,7 +79,7 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     result = gate.check()
 
     assert result.blocked
-    assert "API/Exec error threshold" in (result.reason or "")
+    assert "ERROR-severity threshold" in (result.reason or "")
 
 
 def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
@@ -273,3 +278,45 @@ def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
     # Custom instance should still be accessible
     custom_instance2 = ErrorTrackingService.get_instance(store=store)
     assert custom_instance2 is custom_instance
+
+
+def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:
+    """Test that WARNING severity errors don't close the gate."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.orchestra.failed_gate import FailedGate
+
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    gate = FailedGate(store=temp_store)
+
+    # Record multiple WARNING errors
+    for i in range(5):
+        ErrorTrackingService.get_instance().record_error(
+            error_code="E_EXEC_NO_OUTPUT",
+            error_message=f"No output {i}",
+        )
+
+    # Gate should remain open
+    result = gate.check()
+    assert not result.blocked, "Gate should not close for WARNING errors"
+
+
+def test_critical_closes_gate_immediately(temp_store: SQLiteClient) -> None:
+    """Test that CRITICAL severity closes gate immediately."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.orchestra.failed_gate import FailedGate
+
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    gate = FailedGate(store=temp_store)
+
+    # Record one CRITICAL error
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_MODEL_NOT_FOUND",
+        error_message="Model not found",
+    )
+
+    # Gate should close immediately
+    result = gate.check()
+    assert result.blocked, "Gate should close immediately for CRITICAL"
+    assert "CRITICAL" in (result.reason or "")

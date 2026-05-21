@@ -230,28 +230,29 @@ def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
     """record_error should work with only required parameters."""
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
-    # Call with minimal parameters (non-API/non-EXEC error)
+    # Call with minimal parameters (WARNING-severity error, no threshold)
     threshold_reached, error_count = ErrorTrackingService._instance.record_error(
-        "E_OTHER_ERROR", "Test message"
+        "E_EXEC_NO_OUTPUT", "Test message"  # WARNING severity in registry
     )
 
-    # Verify return values (non-API/non-EXEC errors don't trigger threshold)
+    # Verify return values (WARNING errors don't trigger threshold)
     assert threshold_reached is False
     assert error_count == 0
 
     # Verify database state - record should be persisted
     with sqlite3.connect(temp_store.db_path) as conn:
         row = conn.execute("""
-            SELECT tick_id, error_code, error_message, issue_number, branch
+            SELECT tick_id, error_code, error_message, issue_number, branch, severity
             FROM error_log
             ORDER BY created_at DESC LIMIT 1
             """).fetchone()
         assert row is not None
         assert row[0] == 0  # tick_id defaults to 0
-        assert row[1] == "E_OTHER_ERROR"
+        assert row[1] == "E_EXEC_NO_OUTPUT"
         assert row[2] == "Test message"
         assert row[3] is None  # issue_number is NULL
         assert row[4] is None  # branch is NULL
+        assert row[5] == "WARNING"  # severity inferred from registry
 
 
 def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
@@ -259,24 +260,257 @@ def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
     # Call with tick_id only (mirrors governance_sync_runner usage)
+    # Using WARNING-severity error to test non-threshold case
     threshold_reached, error_count = ErrorTrackingService._instance.record_error(
-        "E_OTHER_ERROR", "Test message", tick_id=42
+        "E_EXEC_NO_OUTPUT", "Test message", tick_id=42
     )
 
-    # Verify return values (non-API/non-EXEC errors don't trigger threshold)
+    # Verify return values (WARNING errors don't trigger threshold)
     assert threshold_reached is False
     assert error_count == 0
 
     # Verify database state - record should be persisted
     with sqlite3.connect(temp_store.db_path) as conn:
         row = conn.execute("""
-            SELECT tick_id, error_code, error_message, issue_number, branch
+            SELECT tick_id, error_code, error_message, issue_number, branch, severity
             FROM error_log
             ORDER BY created_at DESC LIMIT 1
             """).fetchone()
         assert row is not None
         assert row[0] == 42  # tick_id preserved
-        assert row[1] == "E_OTHER_ERROR"
+        assert row[1] == "E_EXEC_NO_OUTPUT"
         assert row[2] == "Test message"
         assert row[3] is None  # issue_number is NULL
         assert row[4] is None  # branch is NULL
+        assert row[5] == "WARNING"  # severity inferred from registry
+
+
+# Tests for severity-aware tracking (Task 3)
+
+
+def test_record_error_with_explicit_severity(temp_store: SQLiteClient) -> None:
+    """record_error should accept severity parameter and store it."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Import here to avoid circular dependency
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Record error with explicit severity
+    threshold_reached, error_count = ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT",
+        "Rate limit exceeded",
+        severity=ErrorSeverity.ERROR,
+    )
+
+    # Verify severity stored in database
+    with sqlite3.connect(temp_store.db_path) as conn:
+        row = conn.execute("""
+            SELECT error_code, severity
+            FROM error_log
+            ORDER BY created_at DESC LIMIT 1
+            """).fetchone()
+        assert row is not None
+        assert row[0] == "E_API_RATE_LIMIT"
+        assert row[1] == "ERROR"
+
+
+def test_record_error_infers_severity_from_registry(
+    temp_store: SQLiteClient,
+) -> None:
+    """record_error should infer severity from error registry when not provided."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Import here to avoid circular dependency
+
+    # Record error without severity (should infer from registry)
+    ErrorTrackingService._instance.record_error(
+        "E_MODEL_NOT_FOUND",  # CRITICAL in registry
+        "Model not found",
+    )
+
+    # Verify severity inferred correctly
+    with sqlite3.connect(temp_store.db_path) as conn:
+        row = conn.execute("""
+            SELECT error_code, severity
+            FROM error_log
+            ORDER BY created_at DESC LIMIT 1
+            """).fetchone()
+        assert row is not None
+        assert row[0] == "E_MODEL_NOT_FOUND"
+        assert row[1] == "CRITICAL"  # Inferred from registry
+
+
+def test_get_threshold_error_count_counts_error_severity(
+    temp_store: SQLiteClient,
+) -> None:
+    """get_threshold_error_count should count only ERROR-severity errors."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Record errors of different severities
+    ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT",
+        "Rate limit",
+        severity=ErrorSeverity.ERROR,
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_API_TIMEOUT",
+        "Timeout",
+        severity=ErrorSeverity.ERROR,
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_MODEL_NOT_FOUND",
+        "Model error",
+        severity=ErrorSeverity.CRITICAL,
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_EXEC_NO_OUTPUT",
+        "No output",
+        severity=ErrorSeverity.WARNING,
+    )
+
+    # Count should only include ERROR-severity errors
+    count = ErrorTrackingService._instance.get_threshold_error_count()
+    assert count == 2  # Only ERROR, not CRITICAL or WARNING
+
+
+def test_get_warning_count_counts_warning_severity(temp_store: SQLiteClient) -> None:
+    """get_warning_count should count only WARNING-severity errors."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Record errors of different severities
+    ErrorTrackingService._instance.record_error(
+        "E_EXEC_NO_OUTPUT",
+        "No output 1",
+        severity=ErrorSeverity.WARNING,
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_EXEC_NO_OUTPUT",
+        "No output 2",
+        severity=ErrorSeverity.WARNING,
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT",
+        "Rate limit",
+        severity=ErrorSeverity.ERROR,
+    )
+
+    # Count should only include WARNING-severity errors
+    count = ErrorTrackingService._instance.get_warning_count()
+    assert count == 2
+
+
+def test_threshold_count_uses_severity_not_prefix(temp_store: SQLiteClient) -> None:
+    """Threshold counting should be by severity, not error code prefix."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Record a custom error code with ERROR severity
+    ErrorTrackingService._instance.record_error(
+        "E_CUSTOM_ERROR",  # Not E_API_* or E_EXEC_*
+        "Custom error",
+        severity=ErrorSeverity.ERROR,
+    )
+
+    # Should be counted by severity
+    count = ErrorTrackingService._instance.get_threshold_error_count()
+    assert count == 1
+
+
+def test_threshold_count_respects_time_window(temp_store: SQLiteClient) -> None:
+    """get_threshold_error_count should respect time window."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Record recent error
+    ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT",
+        "Recent",
+        severity=ErrorSeverity.ERROR,
+    )
+
+    # Insert old error outside window
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute("""
+            INSERT INTO error_log
+            (tick_id, error_code, error_message, severity, created_at)
+            VALUES (1, 'E_API_TIMEOUT', 'Old', 'ERROR', datetime('now', '-15 minutes'))
+        """)
+        conn.commit()
+
+    # Count should only include recent error
+    count = ErrorTrackingService._instance.get_threshold_error_count()
+    assert count == 1
+
+
+def test_migration_backfills_severity_column(tmp_path: Path) -> None:
+    """Migration should add severity column and backfill from error registry."""
+    from vibe3.clients.sqlite_schema import init_schema
+
+    # Create database WITHOUT severity column
+    db_path = tmp_path / "migration_test.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create error_log table without severity column (pre-migration schema)
+    cursor.execute("""
+        CREATE TABLE error_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tick_id INTEGER NOT NULL,
+            error_code TEXT NOT NULL,
+            error_message TEXT NOT NULL,
+            issue_number INTEGER,
+            branch TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # Insert error records with known error codes
+    cursor.execute("""
+        INSERT INTO error_log (tick_id, error_code, error_message)
+        VALUES (1, 'E_MODEL_NOT_FOUND', 'Model not found')
+    """)
+    cursor.execute("""
+        INSERT INTO error_log (tick_id, error_code, error_message)
+        VALUES (2, 'E_API_RATE_LIMIT', 'Rate limit')
+    """)
+    cursor.execute("""
+        INSERT INTO error_log (tick_id, error_code, error_message)
+        VALUES (3, 'E_EXEC_NO_OUTPUT', 'No output')
+    """)
+    conn.commit()
+
+    # Verify severity column does NOT exist
+    columns_before = {
+        row[1] for row in cursor.execute("PRAGMA table_info(error_log)").fetchall()
+    }
+    assert "severity" not in columns_before
+
+    # Run init_schema() which should add severity column and backfill
+    init_schema(conn)
+
+    # Verify severity column exists
+    columns_after = {
+        row[1] for row in cursor.execute("PRAGMA table_info(error_log)").fetchall()
+    }
+    assert "severity" in columns_after
+
+    # Verify severity values are populated from error registry
+    rows = cursor.execute("""
+        SELECT error_code, severity FROM error_log ORDER BY tick_id
+    """).fetchall()
+
+    assert len(rows) == 3
+    # E_MODEL_NOT_FOUND → CRITICAL
+    assert rows[0] == ("E_MODEL_NOT_FOUND", "CRITICAL")
+    # E_API_RATE_LIMIT → ERROR
+    assert rows[1] == ("E_API_RATE_LIMIT", "ERROR")
+    # E_EXEC_NO_OUTPUT → WARNING
+    assert rows[2] == ("E_EXEC_NO_OUTPUT", "WARNING")
+
+    conn.close()

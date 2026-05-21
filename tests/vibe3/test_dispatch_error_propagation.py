@@ -154,7 +154,7 @@ class TestFailedGateExecThreshold:
         with patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_ets:
             mock_instance = MagicMock()
             mock_instance.has_model_config_error.return_value = False
-            mock_instance.get_api_and_exec_error_count.return_value = 2
+            mock_instance.get_threshold_error_count.return_value = 2
             mock_ets.get_instance.return_value = mock_instance
             mock_ets.THRESHOLD_COUNT = 2
             mock_ets.TIME_WINDOW_MINUTES = 10
@@ -164,7 +164,7 @@ class TestFailedGateExecThreshold:
                 result = gate._check_error_threshold()
 
                 assert result.blocked is True
-                assert "API/Exec error threshold" in (result.reason or "")
+                assert "ERROR-severity threshold" in (result.reason or "")
 
     def test_e_exec_below_threshold_passes(self):
         """Single E_EXEC_* error below threshold should not trigger."""
@@ -173,7 +173,7 @@ class TestFailedGateExecThreshold:
         with patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_ets:
             mock_instance = MagicMock()
             mock_instance.has_model_config_error.return_value = False
-            mock_instance.get_api_and_exec_error_count.return_value = 1
+            mock_instance.get_threshold_error_count.return_value = 1
             mock_ets.get_instance.return_value = mock_instance
             mock_ets.THRESHOLD_COUNT = 2
 

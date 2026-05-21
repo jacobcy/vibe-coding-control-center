@@ -398,3 +398,46 @@ class TestTransitionCountFlow:
         transition_call = [c for c in update_calls if "transition_count" in c[1]]
         assert len(transition_call) > 0
         assert transition_call[0][1]["transition_count"] == 1
+
+
+class TestSeverityAwareErrorHandling:
+    """Test severity-based error handling in codeagent_runner."""
+
+    def test_warning_does_not_fail_issue(self) -> None:
+        """Test that WARNING severity errors don't fail the issue."""
+        from vibe3.exceptions.error_classification import get_error_handling_contract
+        from vibe3.exceptions.error_severity import ErrorSeverity
+
+        # Get the handling contract for E_EXEC_NO_OUTPUT (WARNING)
+        contract = get_error_handling_contract("E_EXEC_NO_OUTPUT")
+
+        # Verify it's WARNING and doesn't fail issue
+        assert contract.severity == ErrorSeverity.WARNING
+        assert contract.issue_action == "record_only"
+        assert contract.gate_action == "ignore"
+
+    def test_critical_fails_issue_immediately(self) -> None:
+        """Test that CRITICAL severity fails issue immediately."""
+        from vibe3.exceptions.error_classification import get_error_handling_contract
+        from vibe3.exceptions.error_severity import ErrorSeverity
+
+        # Get the handling contract for E_MODEL_NOT_FOUND (CRITICAL)
+        contract = get_error_handling_contract("E_MODEL_NOT_FOUND")
+
+        # Verify it's CRITICAL and fails issue
+        assert contract.severity == ErrorSeverity.CRITICAL
+        assert contract.issue_action == "fail_issue"
+        assert contract.gate_action == "immediate"
+
+    def test_error_uses_threshold_gating(self) -> None:
+        """Test that ERROR severity uses threshold-based gating."""
+        from vibe3.exceptions.error_classification import get_error_handling_contract
+        from vibe3.exceptions.error_severity import ErrorSeverity
+
+        # Get the handling contract for E_API_RATE_LIMIT (ERROR)
+        contract = get_error_handling_contract("E_API_RATE_LIMIT")
+
+        # Verify it's ERROR and uses threshold
+        assert contract.severity == ErrorSeverity.ERROR
+        assert contract.issue_action in ["block_flow", "fail_issue"]
+        assert contract.gate_action == "threshold"
