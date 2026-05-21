@@ -21,6 +21,7 @@ from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
 
 
 class HeartbeatServer:
@@ -35,9 +36,11 @@ class HeartbeatServer:
         self,
         config: OrchestraConfig,
         failed_gate: FailedGate | None = None,
+        coordinator: GlobalDispatchCoordinator | None = None,
     ) -> None:
         self.config = config
         self._failed_gate = failed_gate
+        self._coordinator = coordinator
         self._services: list[ServiceBase] = []
         self._semaphore = asyncio.Semaphore(config.max_concurrent_flows)
         self._running = False
@@ -175,10 +178,9 @@ class HeartbeatServer:
 
             # Gate is OPEN (or no gate) - proceed with normal dispatch
 
-            # NEW: Check if all issues are blocked
+            # Check if all issues are blocked
             if (
-                hasattr(self, "_coordinator")
-                and self._coordinator is not None
+                self._coordinator is not None
                 and self._failed_gate is not None
                 and self._coordinator.get_all_blocked_status()
             ):

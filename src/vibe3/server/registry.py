@@ -74,8 +74,6 @@ def _build_server_with_launch_cwd(
 
     failed_gate = FailedGate(store=shared_store)
 
-    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
-
     shared_flow_manager = FlowManager(config, registry=shared_registry)
     shared_circuit_breaker = None
 
@@ -107,6 +105,13 @@ def _build_server_with_launch_cwd(
         capacity=shared_capacity,
         failed_gate=failed_gate,
         store=shared_store,
+    )
+
+    # Pass coordinator reference to heartbeat server for all_blocked check
+    heartbeat = HeartbeatServer(
+        config,
+        failed_gate=failed_gate,
+        coordinator=facade._coordinator,
     )
     heartbeat.register(facade)
 

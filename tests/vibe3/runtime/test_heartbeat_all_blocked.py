@@ -13,18 +13,18 @@ from vibe3.runtime.heartbeat import HeartbeatServer
 async def test_heartbeat_sets_all_blocked_gate(monkeypatch):
     """When all collected issues are blocked, should set all_blocked gate."""
     config = OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
-    server = HeartbeatServer(config)
+
+    # Mock coordinator that reports all blocked
+    coordinator = MagicMock()
+    coordinator.get_all_blocked_status = MagicMock(return_value=True)
+
+    server = HeartbeatServer(config, coordinator=coordinator)
 
     # Mock failed gate
     gate = MagicMock()
     gate.check.return_value = GateResult.open_gate()
     gate.activate = MagicMock()
     server._failed_gate = gate
-
-    # Mock coordinator that reports all blocked
-    coordinator = MagicMock()
-    coordinator.get_all_blocked_status = MagicMock(return_value=True)
-    server._coordinator = coordinator
 
     # Track events
     events: list[str] = []
@@ -75,7 +75,12 @@ async def test_heartbeat_sets_all_blocked_gate(monkeypatch):
 async def test_heartbeat_continues_when_not_all_blocked(monkeypatch):
     """When not all issues are blocked, heartbeat should continue normally."""
     config = OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
-    server = HeartbeatServer(config)
+
+    # Mock coordinator that reports NOT all blocked
+    coordinator = MagicMock()
+    coordinator.get_all_blocked_status = MagicMock(return_value=False)
+
+    server = HeartbeatServer(config, coordinator=coordinator)
 
     # Mock service to track ticks
     class _MockService:
@@ -93,11 +98,6 @@ async def test_heartbeat_continues_when_not_all_blocked(monkeypatch):
     gate = MagicMock()
     gate.check.return_value = GateResult.open_gate()
     server._failed_gate = gate
-
-    # Mock coordinator that reports NOT all blocked
-    coordinator = MagicMock()
-    coordinator.get_all_blocked_status = MagicMock(return_value=False)
-    server._coordinator = coordinator
 
     # Mock ErrorTrackingService
     cleanup_service = MagicMock()
@@ -133,8 +133,10 @@ async def test_heartbeat_continues_when_not_all_blocked(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_heartbeat_handles_missing_coordinator_gracefully(monkeypatch):
-    """When coordinator is not set, heartbeat should continue normally."""
+    """When coordinator is not provided, heartbeat should continue normally."""
     config = OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
+
+    # No coordinator passed (defaults to None)
     server = HeartbeatServer(config)
 
     # Mock service to track ticks
@@ -154,8 +156,8 @@ async def test_heartbeat_handles_missing_coordinator_gracefully(monkeypatch):
     gate.check.return_value = GateResult.open_gate()
     server._failed_gate = gate
 
-    # No coordinator set (None)
-    assert not hasattr(server, "_coordinator") or server._coordinator is None
+    # Coordinator should be None
+    assert server._coordinator is None
 
     # Mock ErrorTrackingService
     cleanup_service = MagicMock()
@@ -193,7 +195,12 @@ async def test_heartbeat_handles_missing_coordinator_gracefully(monkeypatch):
 async def test_heartbeat_no_stop_when_queue_empty(monkeypatch):
     """When frozen queue is empty, heartbeat should continue (not all_blocked)."""
     config = OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
-    server = HeartbeatServer(config)
+
+    # Mock coordinator with empty queue (get_all_blocked_status returns False)
+    coordinator = MagicMock()
+    coordinator.get_all_blocked_status = MagicMock(return_value=False)
+
+    server = HeartbeatServer(config, coordinator=coordinator)
 
     # Mock service to track ticks
     class _MockService:
@@ -211,11 +218,6 @@ async def test_heartbeat_no_stop_when_queue_empty(monkeypatch):
     gate = MagicMock()
     gate.check.return_value = GateResult.open_gate()
     server._failed_gate = gate
-
-    # Mock coordinator with empty queue (get_all_blocked_status returns False)
-    coordinator = MagicMock()
-    coordinator.get_all_blocked_status = MagicMock(return_value=False)
-    server._coordinator = coordinator
 
     # Mock ErrorTrackingService
     cleanup_service = MagicMock()
