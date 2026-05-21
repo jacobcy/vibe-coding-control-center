@@ -108,18 +108,18 @@ class SQLiteClientBase:
         )
 
     def _init_db(self) -> None:
-        """Initialize schema using singleton connection (thread-safe)."""
+        """Initialize schema and run migrations (idempotent).
+
+        Runs init_schema() on every startup to ensure schema migrations
+        (like adding severity column) are applied to existing databases.
+        init_schema() is idempotent - it checks column existence before
+        attempting migrations.
+        """
         conn = _get_global_connection(self.db_path)
         with _global_lock:
-            # Check if schema already initialized (thread-safe check)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name='schema_meta'"
-            )
-            if cursor.fetchone() is None:
-                # Schema not initialized yet, do it now (protected by lock)
-                init_schema(conn)
+            # Always run init_schema() to ensure migrations are applied
+            # init_schema() is idempotent and checks for column existence
+            init_schema(conn)
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get the global singleton connection for this database."""

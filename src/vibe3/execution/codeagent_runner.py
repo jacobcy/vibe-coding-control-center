@@ -319,7 +319,8 @@ class CodeagentExecutionService:
             # Get handling contract for severity-aware behavior
             error_contract = get_error_handling_contract(error_code)
 
-            error_tracking = ErrorTrackingService.get_instance()
+            # Use store-specific instance to ensure consistency with FailedGate
+            error_tracking = ErrorTrackingService.get_instance(store=ctx.store)
             # Record error with severity from contract
             error_tracking.record_error(
                 error_code=error_code,

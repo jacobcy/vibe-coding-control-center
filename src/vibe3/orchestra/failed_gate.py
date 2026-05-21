@@ -154,17 +154,12 @@ class FailedGate:
         # Use store-specific instance to ensure gate reads from correct DB
         error_tracking = ErrorTrackingService.get_instance(store=self.store)
 
-        # Check for CRITICAL severity errors (immediate block)
-        if error_tracking.has_critical_error():
+        # Check for CRITICAL errors (immediate block)
+        # Use has_model_config_error() for backward compatibility with pre-migration DBs
+        if error_tracking.has_model_config_error():
             error_counts = error_tracking.get_error_counts()
-            from vibe3.exceptions.error_classification import (
-                get_error_handling_contract,
-            )
-
             critical_errors = [
-                code
-                for code in error_counts.keys()
-                if get_error_handling_contract(code).severity.value == "CRITICAL"
+                code for code in error_counts.keys() if code.startswith("E_MODEL_")
             ]
             log.error(f"CRITICAL errors detected: {critical_errors}")
             return GateResult(

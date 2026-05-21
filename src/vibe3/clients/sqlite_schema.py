@@ -381,7 +381,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 (contract.severity.value, error_code),
             )
         updated = conn.total_changes - before_changes
-        if updated > 0:
+        # Only log if updated is a real number (not a mock in tests)
+        if isinstance(updated, int) and updated > 0:
             logger.bind(external="sqlite", operation="migration").info(
                 f"Backfilled severity for {updated} error_log records"
             )

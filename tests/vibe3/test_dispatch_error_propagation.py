@@ -153,7 +153,7 @@ class TestFailedGateExecThreshold:
         # so we must patch the source module, not failed_gate.
         with patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_ets:
             mock_instance = MagicMock()
-            mock_instance.has_critical_error.return_value = False
+            mock_instance.has_model_config_error.return_value = False
             mock_instance.get_threshold_error_count.return_value = 2
             mock_ets.get_instance.return_value = mock_instance
             mock_ets.THRESHOLD_COUNT = 2
@@ -172,7 +172,7 @@ class TestFailedGateExecThreshold:
 
         with patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_ets:
             mock_instance = MagicMock()
-            mock_instance.has_critical_error.return_value = False
+            mock_instance.has_model_config_error.return_value = False
             mock_instance.get_threshold_error_count.return_value = 1
             mock_ets.get_instance.return_value = mock_instance
             mock_ets.THRESHOLD_COUNT = 2
