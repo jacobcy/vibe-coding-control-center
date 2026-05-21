@@ -26,6 +26,7 @@ from vibe3.roles.run import (
 from vibe3.roles.run_command import resolve_skill_path
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.branch_arg import resolve_branch_arg
+from vibe3.utils.handoff_resolution import resolve_handoff_target
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -49,9 +50,9 @@ def run_command(
         typer.Argument(help="Instructions to pass to codeagent"),
     ] = None,
     plan: Annotated[
-        Optional[Path],
+        Optional[str],
         typer.Option(
-            "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
+            "--plan", "-p", help="Path to plan file or '@plan' to use flow's plan_ref"
         ),
     ] = None,
     skill: Annotated[
@@ -135,9 +136,27 @@ def run_command(
         )
         return
 
+    # Resolve plan parameter using shared @-resolution channel
+    resolved_plan: Path | None = None
+    if plan is not None:
+        if plan.startswith("@"):
+            # @-prefixed: delegate to resolve_handoff_target (@plan, etc.)
+            try:
+                resolved_plan = resolve_handoff_target(plan, branch=target_branch)
+                typer.echo(f"Using flow plan: {plan}")
+            except (FileNotFoundError, ValueError) as e:
+                typer.echo(f"Error: {e}", err=True)
+                raise typer.Exit(1)
+        else:
+            # File path provided: override flow's plan_ref
+            resolved_plan = Path(plan)
+            if not resolved_plan.exists() or not resolved_plan.is_file():
+                typer.echo(f"Error: Plan file not found: {plan}", err=True)
+                raise typer.Exit(1)
+
     try:
         summary = resolve_run_mode(
-            flow_service, target_branch, instructions, plan, skill
+            flow_service, target_branch, instructions, resolved_plan, skill
         )
     except ValueError as error:
         typer.echo(f"Error: {error}", err=True)
@@ -194,9 +213,9 @@ def default(
         typer.Argument(help="Instructions to pass to codeagent"),
     ] = None,
     plan: Annotated[
-        Optional[Path],
+        Optional[str],
         typer.Option(
-            "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
+            "--plan", "-p", help="Path to plan file or '@plan' to use flow's plan_ref"
         ),
     ] = None,
     skill: Annotated[
