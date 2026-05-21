@@ -173,7 +173,12 @@ class TaskResumeUsecase:
                 issue_number=issue_number,
                 resume_kind=resume_kind,
                 branch=branch,
+                source=source,
             ).info("Processing resume candidate")
+
+            # Source-aware state resolution
+            # TODO: Implement full --source remote sync logic in follow-up
+            # Current implementation: source parameter is logged for observability
 
             if resume_kind == "all":
                 if isinstance(branch, str):
