@@ -57,6 +57,48 @@ def render_pr_details(pr: PRResponse) -> None:
     )
     console.print(f"\nURL: [link={pr.url}]{pr.url}[/link]")
 
+    # CI status display
+    if pr.ci_checks:
+        passed = all(c.bucket == "pass" for c in pr.ci_checks)
+        failed = [c for c in pr.ci_checks if c.bucket == "fail"]
+        pending = [c for c in pr.ci_checks if c.bucket == "pending"]
+        other = [c for c in pr.ci_checks if c.bucket not in ("pass", "fail", "pending")]
+
+        if passed:
+            console.print("\n[bold]CI Status:[/] [green]✓ All checks passed[/]")
+        elif failed:
+            console.print(
+                "\n[bold]CI Status:[/] [red]✗ {} check(s) failed[/]".format(len(failed))
+            )
+            for check in failed:
+                console.print(
+                    f"  [red]✗[/] [bold]{check.name}[/] [dim]({check.state})[/]"
+                )
+                console.print(f"    [dim][link={check.link}]View details[/link][/]")
+        elif pending:
+            console.print(
+                "\n[bold]CI Status:[/] [yellow]● {} check(s) pending[/]".format(
+                    len(pending)
+                )
+            )
+            for check in pending:
+                console.print(f"  [yellow]●[/] {check.name}")
+        elif other:
+            # Handle unknown buckets (skipping, cancel, etc.)
+            console.print(
+                "\n[bold]CI Status:[/] [dim]{} check(s) in other state[/]".format(
+                    len(other)
+                )
+            )
+            for check in other:
+                console.print(f"  [dim]○[/] {check.name} [dim]({check.bucket})[/]")
+    else:
+        # Fallback to ci_passed / ci_status for backward compat
+        if pr.ci_passed:
+            console.print("\n[bold]CI Status:[/] [green]✓ Passed[/]")
+        elif pr.ci_status:
+            console.print(f"\n[bold]CI Status:[/] [dim]{pr.ci_status}[/]")
+
     if pr.metadata:
         console.print("\n[bold]Vibe3 Metadata:[/]")
         if pr.metadata.task_issue:
