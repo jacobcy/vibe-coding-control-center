@@ -311,8 +311,8 @@ Minimum fields:
 - `code`
 - `severity`
 - `counts_toward_threshold`
-- `default_timeline_event_type`
-- `default_issue_action`
+- `write_timeline_event`
+- `issue_action`
 - `description`
 
 ### 2. Error tracking

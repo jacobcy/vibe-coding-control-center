@@ -145,8 +145,6 @@ def classify_error(error_output: str) -> str:
 
     # Capacity control - normal skip (not an error)
     if "tmux session" in output_lower and "already exists" in output_lower:
-        from vibe3.exceptions.error_codes import E_CAPACITY_SKIP
-
         return E_CAPACITY_SKIP
 
     # Fallback with warning for unclassified errors
@@ -241,7 +239,7 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         gate_action="threshold",
         description="Unknown API error",
     ),
-    # WARNING: Execution errors - local blocked only
+    # WARNING: Execution diagnostics - recorded/surfaced, no gate activation
     E_EXEC_NO_OUTPUT: ErrorHandlingContract(
         code=E_EXEC_NO_OUTPUT,
         severity=ErrorSeverity.WARNING,
