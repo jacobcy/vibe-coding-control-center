@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from vibe3.exceptions.error_classification import get_error_handling_contract
 from vibe3.exceptions.error_severity import ErrorHandlingContract, ErrorSeverity
 
 
@@ -169,3 +170,27 @@ def test_error_handling_contract_optional_description():
         description="Test description",
     )
     assert contract_with_desc.description == "Test description"
+
+
+def test_critical_error_registry():
+    """Test that CRITICAL errors are registered correctly."""
+    contract = get_error_handling_contract("E_MODEL_NOT_FOUND")
+    assert contract.severity == ErrorSeverity.CRITICAL
+    assert contract.gate_action == "immediate"
+    assert contract.counts_toward_threshold is False
+
+
+def test_error_registry():
+    """Test that ERROR codes are registered correctly."""
+    contract = get_error_handling_contract("E_API_RATE_LIMIT")
+    assert contract.severity == ErrorSeverity.ERROR
+    assert contract.gate_action == "threshold"
+    assert contract.counts_toward_threshold is True
+
+
+def test_warning_registry():
+    """Test that WARNING codes are registered correctly."""
+    contract = get_error_handling_contract("E_EXEC_NO_OUTPUT")
+    assert contract.severity == ErrorSeverity.WARNING
+    assert contract.gate_action == "ignore"
+    assert contract.counts_toward_threshold is False
