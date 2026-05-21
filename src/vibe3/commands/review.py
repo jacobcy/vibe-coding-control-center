@@ -211,5 +211,5 @@ def base(
             branch=current_branch,
         )
     _emit_review_result(result.verdict, result.handoff_file)
-    if result.verdict in {"BLOCK", "ERROR"}:
+    if result.verdict in {"MAJOR", "BLOCK", "REFUSE", "ERROR"}:
         raise typer.Exit(1)

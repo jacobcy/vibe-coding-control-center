@@ -1,10 +1,15 @@
 """Unified no-op gate: blocks when agent fails to change issue state."""
 
+import json
+from typing import cast
+
 from loguru import logger
 
 from vibe3.agents.models import ExecutionRole
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.role_policy import get_role_block_function
+from vibe3.models.verdict import VerdictRecord
+from vibe3.services.verdict_policy import VerdictValue, requires_audit_ref
 
 # Loop prevention constants
 SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair
@@ -23,6 +28,28 @@ def extract_state_label(issue_payload: dict[str, object]) -> str | None:
         name = label.get("name")
         if isinstance(name, str) and name.startswith("state/"):
             return name
+    return None
+
+
+def _extract_latest_verdict(flow_state: dict | None) -> VerdictValue | None:
+    if not flow_state:
+        return None
+
+    raw_verdict = flow_state.get("latest_verdict")
+    if raw_verdict is None:
+        return None
+    if isinstance(raw_verdict, VerdictRecord):
+        return cast(VerdictValue, raw_verdict.verdict)
+    if isinstance(raw_verdict, dict):
+        try:
+            return cast(VerdictValue, VerdictRecord(**raw_verdict).verdict)
+        except Exception:
+            return None
+    if isinstance(raw_verdict, str):
+        try:
+            return cast(VerdictValue, VerdictRecord(**json.loads(raw_verdict)).verdict)
+        except Exception:
+            return None
     return None
 
 
@@ -273,10 +300,76 @@ def apply_unified_noop_gate(
             )
             return
 
-    # --- NEW: required_ref check ---
-    # Only check ref for worker roles (planner/executor/reviewer).
-    # Manager skips this check (required_ref_key is None).
-    if required_ref_key is not None and flow_state is not None:
+    # --- NEW: reviewer verdict-aware checks ---
+    if role == "reviewer":
+        latest_verdict = _extract_latest_verdict(flow_state)
+        if latest_verdict is None:
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning("No-op gate BLOCK: latest verdict missing after reviewer")
+            store.add_event(
+                branch,
+                EVENT_REQUIRED_REF_MISSING,
+                actor,
+                detail=(
+                    f"Latest verdict missing after {role}: "
+                    f"state was {before_state_label}"
+                ),
+                refs={
+                    "before_state": str(before_state_label or ""),
+                    "issue": str(issue_number),
+                    "required_ref": "latest_verdict",
+                },
+            )
+            _block_fn(
+                issue_number=issue_number,
+                repo=repo,
+                reason="latest verdict missing after reviewer",
+                actor=actor,
+            )
+            return
+
+        if requires_audit_ref(latest_verdict):
+            ref_value = flow_state.get("audit_ref") if flow_state else None
+            if not ref_value:
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(
+                    f"No-op gate BLOCK: required ref audit_ref missing after {role} "
+                    f"for verdict {latest_verdict}"
+                )
+                store.add_event(
+                    branch,
+                    EVENT_REQUIRED_REF_MISSING,
+                    actor,
+                    detail=(
+                        f"Required ref audit_ref missing after {role} "
+                        f"for verdict {latest_verdict}: state was {before_state_label}"
+                    ),
+                    refs={
+                        "before_state": str(before_state_label or ""),
+                        "issue": str(issue_number),
+                        "required_ref": "audit_ref",
+                        "verdict": latest_verdict,
+                    },
+                )
+                _block_fn(
+                    issue_number=issue_number,
+                    repo=repo,
+                    reason=(
+                        f"required ref missing for verdict {latest_verdict}: "
+                        "audit_ref"
+                    ),
+                    actor=actor,
+                )
+                return
+    elif required_ref_key is not None and flow_state is not None:
         ref_value = flow_state.get(required_ref_key)
         if not ref_value:
             logger.bind(

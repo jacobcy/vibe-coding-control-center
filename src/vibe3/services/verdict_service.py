@@ -8,7 +8,6 @@ It follows the principle of "tools, not decisions":
 
 import json
 from datetime import UTC, datetime
-from typing import Literal
 
 from loguru import logger
 
@@ -19,6 +18,7 @@ from vibe3.services.actor_support import extract_role_from_actor
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
+from vibe3.services.verdict_policy import VerdictValue
 from vibe3.utils.git_path_client import GitPathProtocol
 
 
@@ -63,7 +63,7 @@ class VerdictService:
 
     def write_verdict(
         self,
-        verdict: Literal["PASS", "MAJOR", "BLOCK", "UNKNOWN"],
+        verdict: VerdictValue,
         reason: str | None = None,
         issues: str | None = None,
         branch: str | None = None,

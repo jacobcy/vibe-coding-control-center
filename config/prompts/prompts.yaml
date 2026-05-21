@@ -626,18 +626,20 @@ review:
   # Unlike plan/run output shape guidance, this is a hard behavioral contract.
   output_format: |
     The first line must be exactly:
-    VERDICT: PASS | MAJOR | BLOCK
+    VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE
 
     Each finding should follow this format:
     path/to/file.py:42 [MAJOR] concise issue description
 
     The final line must repeat the same `VERDICT:`:
-    VERDICT: PASS | MAJOR | BLOCK
+    VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE
 
     Where:
     - PASS: No significant issues found
+    - MINOR: Review passes; please consider a follow-up issue for improvements
     - MAJOR: Issues found that should be addressed before merge
     - BLOCK: Critical issues that must be fixed before merge
+    - REFUSE: Reviewer cannot responsibly provide a normal review verdict
 
   # Static: reviewer exit contract plus default review guidance.
   # Target recipe section name: review.exit_contract
@@ -652,11 +654,12 @@ review:
     Prioritize actionable findings with clear severity.
     Follow the repository review contract.
     You must directly output the review result in stdout.
-    The first line must be exactly `VERDICT: PASS | MAJOR | BLOCK`.
+    The first line must be exactly `VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE`.
     The final line must repeat the same `VERDICT:` line.
     Keep `VERDICT` and `audit_ref` separate: verdict is the conclusion, audit_ref is the detailed report.
+    `PASS` and `REFUSE` may omit `audit_ref`; `MINOR`, `MAJOR`, and `BLOCK` require `audit_ref`.
     You must explicitly record your final conclusion with
-    `uv run python src/vibe3/cli.py handoff verdict <PASS|MAJOR|BLOCK>`.
+    `uv run python src/vibe3/cli.py handoff verdict <PASS|MINOR|MAJOR|BLOCK|REFUSE>`.
     You should write a canonical audit report under `docs/reports/` in the current worktree
     and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
     Use a repository-relative path such as `docs/reports/issue-123-audit-report.md`.

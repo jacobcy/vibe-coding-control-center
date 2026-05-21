@@ -32,7 +32,7 @@ def get_role_section(
 ROLE_TO_REQUIRED_REF_KEY: dict[str, str | None] = {
     "planner": "plan_ref",
     "executor": "report_ref",
-    "reviewer": "audit_ref",
+    "reviewer": None,
     "manager": None,  # manager 不受 ref 检查约束
 }
 

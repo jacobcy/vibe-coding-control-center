@@ -24,47 +24,53 @@ def test_infer_resume_label_with_pr() -> None:
     assert infer_resume_label(state) == IssueState.HANDOFF
 
 
-def test_infer_resume_label_audit_pass() -> None:
-    """Audit pass -> IN_PROGRESS."""
+def test_infer_resume_label_pass() -> None:
+    """Review pass -> MERGE_READY, even without audit_ref."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
-        audit_ref="audit.md",
         latest_verdict=_create_verdict("PASS"),
     )
-    assert infer_resume_label(state) == IssueState.IN_PROGRESS
+    assert infer_resume_label(state) == IssueState.MERGE_READY
 
 
-def test_infer_resume_label_audit_major() -> None:
-    """Audit major issues -> IN_PROGRESS."""
+def test_infer_resume_label_minor() -> None:
+    """Minor review -> MERGE_READY."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
-        audit_ref="audit.md",
+        latest_verdict=_create_verdict("MINOR"),
+    )
+    assert infer_resume_label(state) == IssueState.MERGE_READY
+
+
+def test_infer_resume_label_major() -> None:
+    """Major review issues -> IN_PROGRESS."""
+    state = FlowState(
+        branch="task/issue-1",
+        flow_slug="test",
         latest_verdict=_create_verdict("MAJOR"),
     )
     assert infer_resume_label(state) == IssueState.IN_PROGRESS
 
 
-def test_infer_resume_label_conflict_pr_vs_audit() -> None:
-    """Conflict: both PR and Audit exist -> HANDOFF (PR wins)."""
+def test_infer_resume_label_conflict_pr_vs_verdict() -> None:
+    """Conflict: PR always wins over verdict."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
         pr_ref="http://pr/1",
-        audit_ref="audit.md",
         latest_verdict=_create_verdict("PASS"),
     )
     assert infer_resume_label(state) == IssueState.HANDOFF
 
 
-def test_infer_resume_label_audit_unknown() -> None:
-    """Audit unknown -> HANDOFF."""
+def test_infer_resume_label_refuse() -> None:
+    """Refuse -> HANDOFF."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
-        audit_ref="audit.md",
-        latest_verdict=_create_verdict("UNKNOWN"),
+        latest_verdict=_create_verdict("REFUSE"),
     )
     assert infer_resume_label(state) == IssueState.HANDOFF
 
