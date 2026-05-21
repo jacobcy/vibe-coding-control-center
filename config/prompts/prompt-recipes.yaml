@@ -196,9 +196,9 @@ recipes:
       running_issue_count:
         kind: provider
         provider: governance.running_issue_count
-      queued_issue_count:
+      in_flight_issue_count:
         kind: provider
-        provider: governance.queued_issue_count
+        provider: governance.in_flight_issue_count
       suggested_issue_count:
         kind: provider
         provider: governance.suggested_issue_count
@@ -306,9 +306,9 @@ recipes:
       running_issue_count:
         kind: provider
         provider: governance.running_issue_count
-      queued_issue_count:
+      in_flight_issue_count:
         kind: provider
-        provider: governance.queued_issue_count
+        provider: governance.in_flight_issue_count
       suggested_issue_count:
         kind: provider
         provider: governance.suggested_issue_count

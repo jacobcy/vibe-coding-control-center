@@ -64,7 +64,7 @@ def run() -> None:
     )
 
     # Create and run MCP server
-    mcp = create_mcp_server(status_service, get_queued=None)
+    mcp = create_mcp_server(status_service, get_in_flight=None)
 
     # Run in stdio mode (standard MCP client transport)
     mcp.run(transport="stdio")

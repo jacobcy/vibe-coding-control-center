@@ -184,9 +184,10 @@ def status(
         else:
             console.print("Dispatch: [green]active[/]")
 
-        if orch_snapshot.queued_issues:
+        if orch_snapshot.in_flight_issues:
             console.print(
-                f"Queue: [yellow]{len(orch_snapshot.queued_issues)} issues waiting[/]"
+                f"In-flight: [yellow]"
+                f"{len(orch_snapshot.in_flight_issues)} issues running[/]"
             )
         console.print()
 
@@ -198,10 +199,10 @@ def status(
 
         stale_flows = service.list_flows(status="stale") if not all_flows else []
 
-        queued_set = set(orch_snapshot.queued_issues)
+        in_flight_set = set(orch_snapshot.in_flight_issues)
         query_service = StatusQueryService(repo=config.repo)
         orchestrated_issues = query_service.fetch_orchestrated_issues(
-            flows, queued_set, stale_flows=stale_flows
+            flows, in_flight_set, stale_flows=stale_flows
         )
 
         supervisor_label = config.supervisor_handoff.issue_label

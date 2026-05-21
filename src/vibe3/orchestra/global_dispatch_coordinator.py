@@ -335,10 +335,15 @@ class GlobalDispatchCoordinator:
 
         return candidates
 
-    def get_queued_issue_numbers(self) -> set[int]:
+    def get_in_flight_issue_numbers(self) -> set[int]:
         """Get set of issue numbers currently in flight.
 
         Returns issues with active sessions (tmux + registry).
+
+        Note: the stateless scan-dispatch design has no persisted "waiting
+        to be dispatched" queue — fresh candidates are produced by
+        `_scan_dispatchable_states()` on each tick. The only durable
+        per-issue state is whether a runtime session is live.
         """
         return self._get_active_issue_numbers()
 

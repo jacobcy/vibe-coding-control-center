@@ -58,7 +58,7 @@ class OrchestraSnapshot:
     active_issues: tuple[IssueStatusEntry, ...]
     active_flows: int
     active_worktrees: int
-    queued_issues: tuple[int, ...] = ()
+    in_flight_issues: tuple[int, ...] = ()
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None
@@ -206,7 +206,7 @@ class OrchestraStatusService:
                         active_issues=tuple(entries),
                         active_flows=int(data.get("active_flows", 0)),
                         active_worktrees=int(data.get("active_worktrees", 0)),
-                        queued_issues=tuple(data.get("queued_issues", [])),
+                        in_flight_issues=tuple(data.get("in_flight_issues", [])),
                         circuit_breaker_state=str(
                             data.get("circuit_breaker_state", "closed")
                         ),
@@ -232,7 +232,7 @@ class OrchestraStatusService:
             )
             return None
 
-    def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
+    def snapshot(self, in_flight: set[int] | None = None) -> OrchestraSnapshot:
         """Build current status snapshot for the assignee issue pool.
 
         The snapshot only includes assignee issues (issues assigned to manager
@@ -384,7 +384,7 @@ class OrchestraStatusService:
             active_issues=tuple(entries),
             active_flows=active_flows,
             active_worktrees=len(worktrees),
-            queued_issues=tuple(queued) if queued else (),
+            in_flight_issues=tuple(in_flight) if in_flight else (),
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
             circuit_breaker_last_failure=self._get_circuit_breaker_last_failure(),

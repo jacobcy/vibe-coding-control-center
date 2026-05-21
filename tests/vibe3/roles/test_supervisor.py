@@ -127,7 +127,7 @@ recipes:
       running_issue_count:
         kind: literal
         value: "0"
-      queued_issue_count:
+      in_flight_issue_count:
         kind: literal
         value: "0"
       suggested_issue_count:

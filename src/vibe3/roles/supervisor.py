@@ -89,7 +89,7 @@ def build_supervisor_handoff_payload(
         "active_flows": 0,
         "active_worktrees": 0,
         "running_issue_count": 0,
-        "queued_issue_count": 0,
+        "in_flight_issue_count": 0,
         "suggested_issue_count": 0,
         "circuit_breaker_state": "closed",
         "circuit_breaker_failures": 0,
