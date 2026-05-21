@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.global_dispatch_coordinator import QueueEntry
+from vibe3.orchestra.queue_operations import promote_progressed_entries
 
 
 class TestQueueOperations:
@@ -409,3 +412,119 @@ class TestQueueOperations:
         # Verify all returned issues have BLOCKED state
         for issue in blocked_issues:
             assert issue.state == IssueState.BLOCKED
+
+    def test_dispatch_failed_blocked_issue_not_promoted(self, make_issue_info) -> None:
+        """Verify dispatch-failed BLOCKED issues are removed (infinite loop guard)."""
+        config = MagicMock()
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
+
+        github = MagicMock()
+
+        # Entry that was dispatched (dispatched=True), collected as ready,
+        # and then transitioned to blocked (dispatch failed, got blocked)
+        entry = {
+            "issue_number": 123,
+            "collected_state": "ready",  # was collected as ready
+            "waiting_state": "ready",  # was dispatched
+            "retry_count": 0,
+            "last_attempted_at": None,
+            "dispatched": True,  # was dispatched
+        }
+
+        # Mock issue loader to return BLOCKED state
+        def mock_loader(issue_number: int):
+            return make_issue_info(123, IssueState.BLOCKED)
+
+        promoted, retained, removed = promote_progressed_entries(
+            [entry],
+            config,
+            github,
+            registry=None,
+            supervisor_label="supervisor",
+            load_issue_func=mock_loader,
+            max_retry_budget=3,
+        )
+
+        # Should be removed, not promoted
+        assert len(promoted) == 0
+        assert len(retained) == 0
+        assert len(removed) == 1
+        assert removed[0]["issue_number"] == 123
+
+    def test_collected_blocked_issue_still_promoted(self, make_issue_info) -> None:
+        """Verify collected-as-BLOCKED issues are retained.
+
+        (not removed by infinite loop guard)
+        """
+        config = MagicMock()
+        config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
+
+        github = MagicMock()
+
+        # Entry that was collected as blocked (not dispatch-failed)
+        entry = {
+            "issue_number": 456,
+            "collected_state": "blocked",  # was collected as blocked
+            "waiting_state": "blocked",  # was waiting in blocked
+            "retry_count": 0,
+            "last_attempted_at": None,
+            "dispatched": False,  # was not dispatched
+        }
+
+        # Mock issue loader to return BLOCKED state
+        def mock_loader(issue_number: int):
+            return make_issue_info(456, IssueState.BLOCKED)
+
+        promoted, retained, removed = promote_progressed_entries(
+            [entry],
+            config,
+            github,
+            registry=None,
+            supervisor_label="supervisor",
+            load_issue_func=mock_loader,
+            max_retry_budget=3,
+        )
+
+        # Should be retained (waiting for state change), not removed
+        assert len(promoted) == 0
+        assert len(retained) == 1
+        assert len(removed) == 0
+        assert retained[0]["issue_number"] == 456
+
+    @pytest.mark.asyncio
+    async def test_dispatched_flag_set_after_dispatch(
+        self, make_issue, make_capacity, make_coordinator, install_issue_loader
+    ) -> None:
+        """Verify dispatched flag is set to True after dispatch."""
+        issue = make_issue(1)
+        capacity = make_capacity(remaining=1)
+
+        coordinator = make_coordinator(
+            "planner",
+            [issue],
+            capacity=capacity,
+            with_branches=True,
+            mock_health_check=True,
+        )
+
+        # Set _frozen_queue directly (new queue strategy collects lazily)
+        coordinator._frozen_queue = [
+            QueueEntry(issue_number=1, collected_state="claimed")
+        ]
+
+        install_issue_loader(coordinator, {1: IssueState.CLAIMED})
+
+        emit_calls = []
+        coordinator._emit_dispatch_intent = (
+            lambda role, issue, tick_id: emit_calls.append((role, issue))
+        )
+
+        await coordinator.coordinate()
+
+        # Verify dispatch happened
+        assert len(emit_calls) == 1
+
+        # Verify dispatched flag is set
+        assert coordinator._frozen_queue is not None
+        assert len(coordinator._frozen_queue) == 1
+        assert coordinator._frozen_queue[0].dispatched is True

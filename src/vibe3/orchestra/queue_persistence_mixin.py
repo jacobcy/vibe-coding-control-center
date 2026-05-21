@@ -32,6 +32,7 @@ class QueueEntry:
     waiting_state: str | None = None
     retry_count: int = 0
     last_attempted_at: str | None = None
+    dispatched: bool = False
 
 
 class QueuePersistenceMixin:
@@ -114,6 +115,7 @@ class QueuePersistenceMixin:
                     waiting_state=None,  # Reset to trigger re-dispatch
                     retry_count=entry.get("retry_count", 0),
                     last_attempted_at=entry.get("last_attempted_at"),
+                    dispatched=entry.get("dispatched", False),
                 )
             )
 
@@ -142,6 +144,7 @@ class QueuePersistenceMixin:
                 "waiting_state": e.waiting_state,
                 "retry_count": e.retry_count,
                 "last_attempted_at": e.last_attempted_at,
+                "dispatched": e.dispatched,
             }
             for e in frozen_queue
         ]
@@ -168,6 +171,7 @@ class QueuePersistenceMixin:
                 "waiting_state": e.waiting_state,
                 "retry_count": e.retry_count,
                 "last_attempted_at": e.last_attempted_at,
+                "dispatched": e.dispatched,
             }
             for e in frozen_queue
         ]
@@ -190,6 +194,7 @@ class QueuePersistenceMixin:
                 waiting_state=e.get("waiting_state"),
                 retry_count=e.get("retry_count", 0),
                 last_attempted_at=e.get("last_attempted_at"),
+                dispatched=e.get("dispatched", False),
             )
             for e in promoted
         ]
@@ -201,6 +206,7 @@ class QueuePersistenceMixin:
                 waiting_state=e.get("waiting_state"),
                 retry_count=e.get("retry_count", 0),
                 last_attempted_at=e.get("last_attempted_at"),
+                dispatched=e.get("dispatched", False),
             )
             for e in retained
         ]

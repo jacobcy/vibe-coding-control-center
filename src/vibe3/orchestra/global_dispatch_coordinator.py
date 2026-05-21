@@ -495,6 +495,7 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
             )
             self._emit_dispatch_intent(role, issue, tick_id)
             entry.waiting_state = entry.collected_state
+            entry.dispatched = True
             dispatched_count += 1
 
             logger.bind(

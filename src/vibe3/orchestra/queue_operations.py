@@ -231,6 +231,20 @@ def promote_progressed_entries(
         # Blocked label alone is not a terminal fact.
         # Promote for re-evaluation — body truth alignment happens in qualify gate.
         if current_state == "blocked":
+            # Dispatch-failed issue that got blocked: don't re-promote for
+            # immediate re-dispatch (infinite loop guard).  It will be
+            # re-evaluated by the qualify gate on the next fresh collection.
+            if entry.get("collected_state") in ("ready", "handoff") and entry.get(
+                "dispatched", False
+            ):
+                removed.append(entry)
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: removed #{entry['issue_number']} "
+                    "from queue (dispatch-failed and blocked, infinite loop guard)",
+                )
+                continue
+
             retry_count = entry.get("retry_count", 0) + 1
             entry["retry_count"] = retry_count
             entry["last_attempted_at"] = datetime.now(timezone.utc).isoformat()
