@@ -1,0 +1,4 @@
+# Project-local Codex config.
+# Intentionally keep this file minimal.
+# Do not define project-local MCP servers here unless the repository explicitly
+# wants Codex to auto-start them for every user in this workspace.
