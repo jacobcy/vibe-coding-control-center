@@ -166,7 +166,7 @@ class HeartbeatServer:
                             f"{gate_result.reason}"
                         ),
                     )
-                    logger.bind(domain="orchestra", action="tick").error(
+                    logger.bind(domain="orchestra", action="tick").warning(
                         f"Tick #{tick_number} blocked by failed gate: "
                         f"{gate_result.reason}"
                     )
@@ -291,7 +291,7 @@ class HeartbeatServer:
                     "server",
                     f"tick error in {type(service).__name__}: {exc}",
                 )
-                logger.bind(domain="orchestra").error(
+                logger.bind(domain="orchestra").warning(
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
 
