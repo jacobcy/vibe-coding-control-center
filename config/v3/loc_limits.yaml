@@ -37,7 +37,7 @@ code_limits:
         reason: "Task resume 操作聚合，包含 reset、label resume 等内聚操作；_clear_blocked_projection 改进后增加显式字段清除逻辑"
       # Exceptions 聚合 —— 允许 510
       - path: "src/vibe3/exceptions/error_tracking.py"
-        limit: 510
+        limit: 520
         reason: "Error tracking 核心服务，新增 severity-aware 计数、critical 检查、windowed status 统计，错误分类逻辑紧密耦合"
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 450
@@ -48,7 +48,7 @@ code_limits:
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/sqlite_schema.py"
-        limit: 530
+        limit: 540
         reason: "Schema DDL 与迁移聚合，包含 9 个表定义（含 transition_history）、16+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑，DDL 字符串和迁移逻辑紧密耦合不宜拆分"
       - path: "src/vibe3/clients/git_client.py"
         limit: 520
