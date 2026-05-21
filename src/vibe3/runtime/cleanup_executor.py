@@ -1,7 +1,5 @@
 """Cleanup executor for expired resources (worktrees, branches)."""
 
-import asyncio
-
 from loguru import logger
 
 from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
@@ -53,9 +51,8 @@ async def execute_expired_resource_cleanup(
     # Cleanup worktrees
     if config.enable_worktree_cleanup:
         try:
-            result = await asyncio.to_thread(
-                service.clean_expired_agent_worktrees,
-                config.max_age_days,
+            result = service.clean_expired_agent_worktrees(
+                config.max_age_days, quiet=True
             )
             cleaned = result.get("cleaned", [])
             if cleaned and isinstance(cleaned, list) and len(cleaned) > 0:
@@ -82,9 +79,8 @@ async def execute_expired_resource_cleanup(
     # Cleanup local branches
     if config.enable_local_branch_cleanup:
         try:
-            result = await asyncio.to_thread(
-                service.clean_expired_local_branches,
-                config.max_age_days,
+            result = service.clean_expired_local_branches(
+                config.max_age_days, quiet=True
             )
             cleaned = result.get("cleaned", [])
             if cleaned and isinstance(cleaned, list) and len(cleaned) > 0:
@@ -111,9 +107,8 @@ async def execute_expired_resource_cleanup(
     # Cleanup remote branches (only if GitHub client available)
     if config.enable_remote_branch_cleanup and github_client is not None:
         try:
-            result = await asyncio.to_thread(
-                service.clean_expired_remote_branches,
-                config.max_age_days,
+            result = service.clean_expired_remote_branches(
+                config.max_age_days, quiet=True
             )
             cleaned = result.get("cleaned", [])
             if cleaned and isinstance(cleaned, list) and len(cleaned) > 0:
