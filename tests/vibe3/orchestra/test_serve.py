@@ -345,10 +345,14 @@ def test_logs_shows_log_content(monkeypatch, tmp_path) -> None:
 
 
 def test_start_auto_discovers_port_when_default_occupied(monkeypatch) -> None:
-    """Test that serve start auto-discovers port when default is occupied."""
+    """Test that serve start auto-discovers port when default is occupied
+    and port_range_max is configured."""
     monkeypatch.setattr(
         "vibe3.config.orchestra_settings.load_orchestra_config",
-        lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
+        lambda: OrchestraConfig(
+            pid_file=Path(".git/vibe3/orchestra.pid"),
+            port_range_max=8090,
+        ),
     )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
     monkeypatch.setattr(
