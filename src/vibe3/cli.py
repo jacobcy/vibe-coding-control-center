@@ -131,9 +131,11 @@ def run_command(
     ] = None,
     branch: run.BranchOption = None,
     plan: Annotated[
-        Optional[Path],
+        Optional[str],
         typer.Option(
-            "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
+            "--plan",
+            "-p",
+            help="Plan reference: file path or '@plan' to use flow's plan_ref",
         ),
     ] = None,
     skill: Annotated[

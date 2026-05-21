@@ -139,8 +139,8 @@ def _resolve_shared_artifact(
             raise FileNotFoundError(f"Not a file: {target}")
         return current_md
 
-    # Special handling for @plan/@report/@audit aliases
-    if key in ("plan", "report", "audit"):
+    # Special handling for @plan/@report/@audit/@spec aliases
+    if key in ("plan", "report", "audit", "spec"):
         return _resolve_artifact_alias(key, f"{key}_ref", branch, git_client)
 
     # Standard shared artifact (not @current, @plan, @report, or @audit)
@@ -208,7 +208,7 @@ def _resolve_artifact_alias(
 
     # Guard against self-referential alias values (e.g., plan_ref='@plan')
     # which would cause infinite recursion via resolve_handoff_target
-    if ref_value in ("@plan", "@report", "@audit", "@current"):
+    if ref_value in ("@plan", "@report", "@audit", "@spec", "@current"):
         raise ValueError(
             f"Invalid {ref_field}: self-referential alias {ref_value!r} "
             f"would cause infinite recursion"
@@ -285,7 +285,7 @@ def resolve_handoff_target(
        The ``@`` is stripped and the remainder is joined to the handoff dir.
        Special cases requiring branch context (explicit or current):
        - ``@current`` → per-branch current.md
-       - ``@plan/@report/@audit`` → resolved from flow_state refs
+       - ``@plan/@report/@audit/@spec`` → resolved from flow_state refs
        Other shared artifacts (``@task-xxx/run.md``) ignore branch.
 
     2. ``relative/path`` → canonical worktree ref.

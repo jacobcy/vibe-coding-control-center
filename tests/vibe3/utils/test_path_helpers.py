@@ -1,11 +1,13 @@
 from pathlib import Path
 
-from vibe3.utils.path_helpers import (
+from vibe3.utils.handoff_resolution import (
     is_shared_handoff_ref,
+    to_display_target,
+)
+from vibe3.utils.path_helpers import (
     ref_to_handoff_cmd,
     resolve_ref_path,
     sanitize_event_detail_paths,
-    to_display_target,
 )
 
 
@@ -85,21 +87,21 @@ def test_ref_to_handoff_cmd_docs_reports_with_branch() -> None:
     """Docs reports with branch get --branch format."""
     path = "docs/reports/audit.md"
     result = ref_to_handoff_cmd(path, branch="task/issue-476")
-    assert result == "vibe3 handoff show --branch task/issue-476 docs/reports/audit.md"
+    assert result == "vibe3 handoff show --branch task/issue-476 @report"
 
 
 def test_ref_to_handoff_cmd_docs_plans_with_branch() -> None:
     """Docs plans with branch get --branch format."""
     path = "docs/plans/plan.md"
     result = ref_to_handoff_cmd(path, branch="task/issue-476")
-    assert result == "vibe3 handoff show --branch task/issue-476 docs/plans/plan.md"
+    assert result == "vibe3 handoff show --branch task/issue-476 @plan"
 
 
 def test_ref_to_handoff_cmd_docs_without_branch() -> None:
     """Docs refs without branch get plain format."""
     path = "docs/reports/audit.md"
     result = ref_to_handoff_cmd(path, branch=None)
-    assert result == "vibe3 handoff show docs/reports/audit.md"
+    assert result == "vibe3 handoff show @report"
 
 
 def test_ref_to_handoff_cmd_non_handoff_path() -> None:

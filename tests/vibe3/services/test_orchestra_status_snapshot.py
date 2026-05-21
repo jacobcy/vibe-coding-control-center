@@ -1,6 +1,6 @@
 """Tests for OrchestraStatusService snapshot boundary behavior."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
@@ -147,3 +147,70 @@ class TestSnapshotIssuePoolBoundary:
         assert (
             snapshot.blocked_issue_reason == "API/Exec error threshold: 3 recent errors"
         )
+
+    def test_snapshot_batches_pr_lookup_without_per_issue_branch_fallback(self):
+        """snapshot should batch PR lookup via PRService instead of
+        per-issue get_pr_for_issue."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 501,
+                "title": "Issue with PR",
+                "assignees": [{"login": "manager-bot"}],
+                "labels": [{"name": "state/in-progress"}],
+                "milestone": None,
+                "body": "",
+            },
+            {
+                "number": 502,
+                "title": "Issue without PR",
+                "assignees": [{"login": "manager-bot"}],
+                "labels": [{"name": "state/in-progress"}],
+                "milestone": None,
+                "body": "",
+            },
+        ]
+
+        config = OrchestraConfig(
+            manager_usernames=["manager-bot"],
+            repo="test/repo",
+        )
+        orchestrator = MagicMock()
+        orchestrator.get_active_flow_count.return_value = 2
+        orchestrator.get_flow_for_issue.side_effect = lambda n: (
+            {
+                "branch": f"task/issue-{n}",
+                "pr_number": None,
+            }
+            if n in (501, 502)
+            else None
+        )
+        orchestrator.get_pr_for_issue.side_effect = AssertionError(
+            "snapshot should not call per-issue PR fallback"
+        )
+
+        mock_pr_service = MagicMock()
+        mock_pr_service.refresh_recent_pr_cache.return_value = {
+            "task/issue-501": MagicMock(number=9001),
+        }
+
+        with patch(
+            "vibe3.services.orchestra_status_service.PRService",
+            return_value=mock_pr_service,
+        ):
+            service = OrchestraStatusService(
+                config=config,
+                github=github,
+                orchestrator=orchestrator,
+            )
+            snapshot = service.snapshot()
+
+        mock_pr_service.refresh_recent_pr_cache.assert_called_once_with(
+            sync_context_cache=False
+        )
+        orchestrator.get_pr_for_issue.assert_not_called()
+        assert len(snapshot.active_issues) == 2
+        issue_501 = next(e for e in snapshot.active_issues if e.number == 501)
+        issue_502 = next(e for e in snapshot.active_issues if e.number == 502)
+        assert issue_501.pr_number == 9001
+        assert issue_502.pr_number is None

@@ -319,3 +319,58 @@ def test_refresh_recent_pr_cache_skips_github_when_cache_is_fresh() -> None:
         assert context is not None
         assert context["pr_number"] == 303
         assert context["pr_title"] == "Cached PR"
+
+
+def test_refresh_recent_pr_cache_can_skip_context_cache_sync() -> None:
+    """PRService.refresh_recent_pr_cache(sync_context_cache=False)
+    should not write to flow_context_cache."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir) / "repo"
+        repo_path.mkdir()
+        git_dir = repo_path / ".git"
+        git_dir.mkdir()
+        (git_dir / "vibe3").mkdir()
+
+        db_path = repo_path / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+        store.update_flow_state("feature-readonly", flow_slug="readonly")
+
+        cache = RecentPRCache(repo_path)
+        cache._save_cache(
+            {
+                "last_sync": (
+                    datetime.now(timezone.utc) - timedelta(minutes=2)
+                ).isoformat(),
+                "prs": {
+                    "feature-readonly": {
+                        "number": 999,
+                        "title": "Readonly PR",
+                        "state": "OPEN",
+                        "draft": False,
+                        "url": "https://github.com/test/pr/999",
+                        "head_branch": "feature-readonly",
+                        "base_branch": "main",
+                        "merged_at": None,
+                    }
+                },
+            }
+        )
+
+        github_client = MagicMock()
+        git_client = MagicMock()
+        git_client.get_git_common_dir.return_value = str(git_dir)
+
+        service = PRService(
+            github_client=github_client,
+            git_client=git_client,
+            store=store,
+        )
+
+        with patch.object(service, "_sync_branch_context_cache") as mock_sync:
+            branch_to_pr = service.refresh_recent_pr_cache(sync_context_cache=False)
+
+            mock_sync.assert_not_called()
+
+        assert branch_to_pr["feature-readonly"].number == 999
+        context = store.get_flow_context_cache("feature-readonly")
+        assert context is None
