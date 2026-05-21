@@ -191,9 +191,9 @@ def resume(
 ) -> None:
     """Resume blocked issues to ready.
 
-    --source local:  SQLite only (default, backward compatible)
+    --source local:  SQLite only (no fallback)
     --source remote: GitHub API + issue body projection
-    --source auto:   local-first, remote fallback
+    --source auto:   local-first, remote fallback (default)
 
     Use --blocked to resume all blocked issues, --all to reset every
     auto-created task/issue-* scene back to ready, or specify issue numbers directly.

@@ -38,12 +38,18 @@ class TaskResumeResolver:
             flow_service: Optional FlowService instance
         """
         self.store = store
-        self.flow_service = flow_service
+        if flow_service is None:
+            from vibe3.services.flow_service import FlowService
+
+            self.flow_service = FlowService(store=store)
+        else:
+            self.flow_service = flow_service
 
     def resolve_resume_state(
         self,
         issue_number: int,
         source: Literal["local", "remote", "auto"],
+        repo: str | None = None,
     ) -> ResumeState:
         """Resolve resume state with source strategy.
 
@@ -62,18 +68,20 @@ class TaskResumeResolver:
             return self._read_local(issue_number)
 
         if source == "remote":
-            return self._read_remote(issue_number)
+            return self._read_remote(issue_number, repo)
 
         # auto: local-first with remote fallback
+        from vibe3.exceptions import UserError
+
         try:
             return self._read_local(issue_number)
-        except Exception:
+        except UserError:
             logger.bind(
                 domain="resolver",
                 action="resolve_resume_state",
                 issue_number=issue_number,
             ).warning("Local read failed, falling back to remote")
-            return self._read_remote(issue_number)
+            return self._read_remote(issue_number, repo)
 
     def _read_local(self, issue_number: int) -> ResumeState:
         """Read from local SQLite only."""
@@ -100,7 +108,7 @@ class TaskResumeResolver:
             data_source=DataSource.LOCAL_SQLITE,
         )
 
-    def _read_remote(self, issue_number: int) -> ResumeState:
+    def _read_remote(self, issue_number: int, repo: str | None = None) -> ResumeState:
         """Read from GitHub API + issue body projection."""
         from vibe3.clients.github_client import GitHubClient
         from vibe3.exceptions import SystemError
@@ -115,7 +123,7 @@ class TaskResumeResolver:
         ).debug("Reading resume state from GitHub")
 
         # Fetch issue data
-        issue = github_client.view_issue(issue_number)
+        issue = github_client.view_issue(issue_number, repo=repo)
         if not issue or issue == "network_error":
             raise SystemError(f"Failed to fetch issue #{issue_number}")
 
@@ -127,9 +135,8 @@ class TaskResumeResolver:
         projection = parse_projection_with_fallback(body) if body else None
 
         # Extract state from issue
-        assignee = (
-            issue.get("assignee", {}).get("login") if issue.get("assignee") else None
-        )
+        assignees_data = issue.get("assignees", [])
+        assignee = assignees_data[0].get("login") if assignees_data else None
         labels = [label["name"] for label in issue.get("labels", [])]
 
         # Determine branch from issue number (canonical pattern)
@@ -146,7 +153,7 @@ class TaskResumeResolver:
             blocked_reason=projection.blocked_reason if projection else None,
             assignee=assignee,
             labels=labels,
-            data_source=DataSource.ISSUE_BODY_FALLBACK,
+            data_source=DataSource.GITHUB_API,
         )
 
     def _resolve_branch_from_issue(self, issue_number: int) -> str | None:

@@ -6,7 +6,7 @@ whether they are in failed or blocked state.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 from loguru import logger
 
@@ -20,6 +20,7 @@ from vibe3.services.label_service import LabelService
 from vibe3.services.status_query_service import StatusQueryService
 from vibe3.services.task_resume_candidates import TaskResumeCandidates
 from vibe3.services.task_resume_operations import TaskResumeOperations
+from vibe3.services.task_resume_resolver import TaskResumeResolver
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
@@ -69,6 +70,9 @@ class TaskResumeUsecase:
             flow_service=self.flow_service,
             label_service=self.label_service,
             issue_flow_service=self.issue_flow_service,
+        )
+        self.resolver = TaskResumeResolver(
+            store=self.flow_service.store, flow_service=self.flow_service
         )
 
     def resume_issues(
@@ -177,8 +181,28 @@ class TaskResumeUsecase:
             ).info("Processing resume candidate")
 
             # Source-aware state resolution
-            # TODO: Implement full --source remote sync logic in follow-up
-            # Current implementation: source parameter is logged for observability
+            if source in ("remote", "auto"):
+                # Use resolver for source-aware reads
+                try:
+                    resume_state = self.resolver.resolve_resume_state(
+                        issue_number=issue_number,
+                        source=cast(Literal["local", "remote", "auto"], source),
+                        repo=repo,
+                    )
+                    logger.bind(
+                        domain="resume",
+                        action="state_resolved",
+                        issue_number=issue_number,
+                        data_source=resume_state.data_source,
+                    ).debug(f"Resume state resolved from {resume_state.data_source}")
+                except Exception as exc:
+                    logger.bind(
+                        domain="resume",
+                        action="state_resolution_failed",
+                        issue_number=issue_number,
+                        source=source,
+                    ).warning(f"Failed to resolve state: {exc}")
+                    # Continue with local flow data as fallback
 
             if resume_kind == "all":
                 if isinstance(branch, str):
