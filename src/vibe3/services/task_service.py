@@ -406,9 +406,11 @@ class TaskService:
         """
         return self._show_service.fetch_issue_with_comments(issue_number)
 
-    def resolve_branch(self, branch: str | None = None) -> str:
+    def resolve_branch(
+        self, branch: str | None = None, *, pr_number: int | None = None
+    ) -> str:
         """Resolve explicit or current branch for task commands."""
-        return self._show_service.resolve_branch(branch)
+        return self._show_service.resolve_branch(branch, pr_number=pr_number)
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state."""

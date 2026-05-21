@@ -11,14 +11,12 @@ from typing import Any, cast
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
-from vibe3.exceptions import GitError, UserError
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.utils.comment_utils import is_human_comment
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.utils.path_helpers import resolve_ref_path
 
 
@@ -112,14 +110,29 @@ class TaskShowService:
         """Fetch issue data including comments from GitHub."""
         return self.github_client.view_issue(issue_number)
 
-    def resolve_branch(self, branch: str | None = None) -> str:
-        """Resolve explicit or current branch for task commands."""
-        if branch:
-            return resolve_issue_branch_input(branch, self.flow_service) or branch
-        try:
-            return self.flow_service.get_current_branch()
-        except GitError as exc:
-            raise UserError(f"unable to resolve current branch ({exc})") from exc
+    def resolve_branch(
+        self,
+        branch: str | None = None,
+        *,
+        pr_number: int | None = None,
+    ) -> str:
+        """Resolve explicit or current branch for task commands.
+
+        Args:
+            branch: Branch name or issue number
+            pr_number: PR number to resolve branch from
+
+        Returns:
+            Resolved branch name
+        """
+        # Import here to avoid circular dependency
+        from vibe3.utils.pr_branch_resolver import resolve_command_branch
+
+        return resolve_command_branch(
+            branch_opt=branch,
+            pr_opt=pr_number,
+            flow_service=self.flow_service,
+        )
 
     @staticmethod
     def _summarize_text(text: str, *, limit: int = 1200) -> str:
