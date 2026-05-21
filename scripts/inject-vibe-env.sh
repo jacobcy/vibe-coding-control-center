@@ -2,7 +2,7 @@
 # Inject environment variables into a running tmux session
 #
 # Modes:
-#   1. Default mode: Inject all VIBE_* variables from ~/.zshrc
+#   1. Default mode: Inject specific VIBE_* variables (listed in DEFAULT_VIBE_VARS) from ~/.zshrc
 #   2. Command mode: Inject only variables specified as KEY=VALUE arguments
 #
 # Usage:
@@ -10,7 +10,7 @@
 #   ./inject-vibe-env.sh <session-name> KEY=VALUE [KEY=VALUE ...]
 #
 # Examples:
-#   # Inject all VIBE vars from ~/.zshrc
+#   # Inject default VIBE vars (VIBE_BACKEND_SUPERVISOR, VIBE_MODEL_SUPERVISOR, etc.)
 #   ./inject-vibe-env.sh vibe3-orchestra-serve
 #
 #   # Inject only specific variables (ignores ~/.zshrc)
@@ -26,11 +26,16 @@ if [[ $# -eq 0 ]]; then
     echo "Inject environment variables into a running tmux session."
     echo ""
     echo "Modes:"
-    echo "  1. Default: No KEY=VALUE args → inject all VIBE_* vars from ~/.zshrc"
+    echo "  1. Default: No KEY=VALUE args → inject default VIBE vars from ~/.zshrc"
     echo "  2. Command: With KEY=VALUE args → inject only specified variables"
     echo ""
+    echo "Default VIBE vars injected in default mode:"
+    echo "  VIBE_BACKEND_SUPERVISOR, VIBE_MODEL_SUPERVISOR"
+    echo "  VIBE_BACKEND_GOVERNANCE, VIBE_MODEL_GOVERNANCE"
+    echo "  VIBE_DEFAULT_BACKEND, VIBE_DEFAULT_MODEL"
+    echo ""
     echo "Examples:"
-    echo "  # Default mode: inject all VIBE vars from ~/.zshrc"
+    echo "  # Default mode: inject default VIBE vars from ~/.zshrc"
     echo "  $0 vibe3-orchestra-serve"
     echo ""
     echo "  # Command mode: inject only specified variables"
@@ -97,17 +102,20 @@ if ! tmux has-session -t "$session_name" 2>/dev/null; then
     exit 1
 fi
 
-# Extract variable from ~/.zshrc
+# Extract variable from ~/.zshrc using safe evaluation
 extract_var_from_zshrc() {
     local var_name="$1"
     local value
+
     # Try to get from current environment first
     if [[ -n "${(P)var_name}" ]]; then
         echo "${(P)var_name}"
         return
     fi
-    # Fallback: parse ~/.zshrc
-    value=$(grep -E "^export ${var_name}=" ~/.zshrc 2>/dev/null | head -1 | sed "s/^export ${var_name}=//")
+
+    # Fallback: safely evaluate in a clean zsh process
+    # This properly handles quotes, variable expansion, and inline comments
+    value=$(zsh -c "source ~/.zshrc 2>/dev/null && echo \"\${(P)var_name}\"" 2>/dev/null)
     echo "$value"
 }
 
@@ -142,12 +150,27 @@ injected_count=0
 
 for var value in "${(@kv)vars_to_inject}"; do
     # Method 1: Set session-level environment (for new windows/panes)
-    tmux set-environment -t "$session_name" "$var" "$value" 2>/dev/null
+    if ! tmux set-environment -t "$session_name" "$var" "$value" 2>&1; then
+        echo_error "  Failed to set $var in session environment"
+        continue
+    fi
 
     # Method 2: Also export in all existing panes (for immediate effect)
-    panes=$(tmux list-panes -t "$session_name" -F "#{pane_id}" 2>/dev/null || true)
-    for pane in $=panes; do
-        tmux send-keys -t "$pane" "export $var='$value'" C-m 2>/dev/null || true
+    # Only inject into panes that appear to be at a shell prompt
+    panes=$(tmux list-panes -t "$session_name" -F "#{pane_id} #{pane_current_command}" 2>/dev/null || true)
+    for pane_info in $=panes; do
+        pane_id="${pane_info%% *}"
+        pane_cmd="${pane_info#* }"
+
+        # Skip panes running interactive programs (vim, less, etc.)
+        # Only inject into shells (zsh, bash, sh)
+        if [[ "$pane_cmd" =~ ^(zsh|bash|sh)$ ]]; then
+            # Safely escape the value for shell injection
+            escaped_value=$(printf '%q' "$value")
+            if ! tmux send-keys -t "$pane_id" "export $var=$escaped_value" C-m 2>&1; then
+                echo_error "    Failed to inject into pane $pane_id"
+            fi
+        fi
     done
 
     echo_success "  $var=$value"
