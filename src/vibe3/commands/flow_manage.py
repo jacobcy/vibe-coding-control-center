@@ -151,7 +151,11 @@ def update(
         ),
     ] = False,
 ) -> None:
-    """Update flow metadata (idempotent add/update)."""
+    """Update flow metadata (idempotent add/update).
+
+    If a positional issue number is provided and the corresponding branch
+    doesn't exist in git, automatically creates the branch before registering flow.
+    """
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -160,9 +164,38 @@ def update(
             err=True,
         )
         output_format = "json"
+    from vibe3.clients.git_client import GitClient
+    from vibe3.config.orchestra_settings import load_orchestra_config
+    from vibe3.models.branch_convention import BranchConvention
     from vibe3.utils.branch_arg import resolve_branch_arg
+    from vibe3.utils.issue_ref import try_parse_issue_number
 
-    target_branch = resolve_branch_arg(branch)
+    # Early handling for issue number: resolve to canonical branch
+    # before resolve_branch_arg. This avoids UserError from
+    # resolve_issue_branch_input when flow doesn't exist
+    issue_number_input = try_parse_issue_number(branch) if branch else None
+    if issue_number_input is not None:
+        convention = BranchConvention.vibe_center()
+        target_branch = convention.canonical_branch(issue_number_input)
+    else:
+        target_branch = resolve_branch_arg(branch)
+
+    # Auto-create branch if:
+    # 1. Positional argument was an issue number (not explicit branch name)
+    # 2. Target branch doesn't exist in git
+    # 3. Target branch matches task/dev convention
+    git = GitClient()
+    if issue_number_input is not None and not git.branch_exists(target_branch):
+        # Create branch from scene_base_ref
+        config = load_orchestra_config()
+        logger.bind(
+            command="flow update",
+            branch=target_branch,
+            issue_number=issue_number_input,
+        ).info("Auto-creating branch for issue")
+
+        git.create_branch_ref(target_branch, start_ref=config.scene_base_ref)
+        typer.echo(f"✓ Created branch '{target_branch}' from {config.scene_base_ref}")
 
     flow_service = FlowService()
     with trace_scope(trace, "flow update", branch=target_branch):
