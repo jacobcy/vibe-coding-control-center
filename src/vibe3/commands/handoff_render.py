@@ -8,12 +8,33 @@ import re
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import resolve_ref_path
 from vibe3.utils.constants import AUTOMATED_MARKERS
-from vibe3.utils.path_helpers import (
-    ref_to_handoff_cmd,
-    sanitize_event_detail_paths,
-)
+from vibe3.utils.path_helpers import sanitize_event_detail_paths
 
-_to_handoff_cmd = ref_to_handoff_cmd
+
+def _path_to_alias(path: str) -> str:
+    """Convert a ref path to shortcut alias if applicable.
+
+    Args:
+        path: Relative or absolute ref path
+
+    Returns:
+        Shortcut alias (@plan, @report, etc.) or original path
+    """
+    if path.startswith("docs/plans/"):
+        return "@plan"
+    if path.startswith("docs/reports/"):
+        return "@report"
+    if path.startswith("docs/specs/"):
+        return "@spec"
+    # Shared artifacts: extract key from .git/vibe3/handoff/<key>/
+    if ".git/vibe3/handoff/" in path:
+        match = re.search(r"\.git/vibe3/handoff/([^/]+)/", path)
+        if match:
+            return f"@{match.group(1)}"
+    return path
+
+
+_to_handoff_cmd = _path_to_alias
 
 
 def _render_handoff_events(
@@ -121,14 +142,12 @@ def _render_handoff_events(
                         for f in value:
                             display_f = resolve_ref_path(f, worktree_root)
                             console.print(
-                                f"      [dim]- "
-                                f"{_to_handoff_cmd(display_f, branch)}[/]"
+                                f"      [dim]- " f"{_to_handoff_cmd(display_f)}[/]"
                             )
                     elif key == "ref":
                         display_ref = resolve_ref_path(value, worktree_root)
                         console.print(
-                            "    [dim]ref: "
-                            f"{_to_handoff_cmd(display_ref, branch)}[/]"
+                            "    [dim]ref: " f"{_to_handoff_cmd(display_ref)}[/]"
                         )
                     else:
                         console.print(f"    [dim]{key}: {value}[/]")
@@ -140,13 +159,9 @@ def _render_handoff_events(
                 if files and isinstance(files, list):
                     for f in files:
                         display_f = resolve_ref_path(f, worktree_root)
-                        console.print(
-                            "  [dim]- " f"{_to_handoff_cmd(display_f, branch)}[/]"
-                        )
+                        console.print("  [dim]- " f"{_to_handoff_cmd(display_f)}[/]")
                 ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
                 if ref:
                     display_ref = resolve_ref_path(ref, worktree_root)
-                    console.print(
-                        "  [dim]- " f"{_to_handoff_cmd(display_ref, branch)}[/]"
-                    )
+                    console.print("  [dim]- " f"{_to_handoff_cmd(display_ref)}[/]")
         console.print()

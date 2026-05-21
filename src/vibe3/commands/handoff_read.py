@@ -277,10 +277,8 @@ def status(
         )
         if not show_all and (result.events or result.recent_updates):
             console.print(
-                f"[dim]Tip: use 'vibe3 handoff show @current"
-                f"{' --branch ' + target_branch if branch else ''}"
-                f"' to view full content, or 'vibe3 handoff status --all'"
-                f" to show all events.[/]"
+                "[dim]Tip: use 'vibe3 handoff show @current' "
+                "to view full handoff content (including non-event updates).[/]"
             )
 
 

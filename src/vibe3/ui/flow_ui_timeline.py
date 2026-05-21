@@ -3,7 +3,6 @@
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, status_text
-from vibe3.utils.path_helpers import check_ref_exists, ref_to_handoff_cmd
 
 
 def _filter_passive_if_active_exists(events: list[FlowEvent]) -> list[FlowEvent]:
@@ -219,11 +218,21 @@ def _render_event_refs(
         isinstance(ref, str) and isinstance(event.detail, str) and ref in event.detail
     )
     if ref and isinstance(ref, str) and not detail_contains_ref:
-        # Use unified check_ref_exists for consistent worktree resolution
-        display_path, exists = check_ref_exists(ref, branch)
-        ref_cmd = ref_to_handoff_cmd(display_path, branch)
-        _ref_suffix = "" if exists else " [dim yellow](not found)[/]"
-        console.print(f"  [dim]- {ref_cmd}[/]{_ref_suffix}")
+        # Convert path to shortcut alias directly
+        import re
+
+        if ref.startswith("docs/plans/"):
+            ref_alias = "@plan"
+        elif ref.startswith("docs/reports/"):
+            ref_alias = "@report"
+        elif ref.startswith("docs/specs/"):
+            ref_alias = "@spec"
+        elif ".git/vibe3/handoff/" in ref:
+            match = re.search(r"\.git/vibe3/handoff/([^/]+)/", ref)
+            ref_alias = f"@{match.group(1)}" if match else ref
+        else:
+            ref_alias = ref
+        console.print(f"  [dim]- {ref_alias}[/]")
 
 
 def _render_timeline(
@@ -299,6 +308,14 @@ def _render_refs(
     refs_shown = False
     titles = issue_titles or {}
 
+    # Map ref fields to shortcut aliases
+    alias_map = {
+        "spec_ref": "@spec",
+        "plan_ref": "@plan",
+        "report_ref": "@report",
+        "audit_ref": "@audit",
+    }
+
     for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref", "indicate_ref"]:
         val = getattr(state, label, None)
         if val:
@@ -324,11 +341,15 @@ def _render_refs(
                     console.print(f"  [dim]{label:10}[/]  {display_path}{actor_str}")
                     continue
 
-            # Use unified check_ref_exists for consistent worktree resolution
-            display_path, exists = check_ref_exists(val, state.branch)
-            ref_cmd = ref_to_handoff_cmd(display_path, state.branch)
-            _missing = "" if exists else " [dim yellow](not found)[/]"
-            console.print(f"  [dim]{label:10}[/]  {ref_cmd}{actor_str}{_missing}")
+            # Display shortcut alias directly for plan/report/audit refs
+            alias = alias_map.get(label, label)
+            if label == "indicate_ref":
+                # indicate_ref shows tip for viewing full handoff
+                console.print(
+                    f"  [dim]{label:10}[/]  vibe3 handoff show @current{actor_str}"
+                )
+            else:
+                console.print(f"  [dim]{label:10}[/]  {alias}{actor_str}")
 
 
 def _render_state_summary(state: FlowStatusResponse) -> None:

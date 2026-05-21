@@ -1,12 +1,27 @@
 """Flow UI rendering."""
 
+import re
 from typing import Any
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_primitives import display_actor, kv, resolve_ref_path, status_text
 from vibe3.ui.flow_ui_timeline import render_flow_timeline  # noqa: F401
-from vibe3.utils.path_helpers import ref_to_handoff_cmd
+
+
+def _path_to_alias(path: str) -> str:
+    """Convert a ref path to shortcut alias if applicable."""
+    if path.startswith("docs/plans/"):
+        return "@plan"
+    if path.startswith("docs/reports/"):
+        return "@report"
+    if path.startswith("docs/specs/"):
+        return "@spec"
+    if ".git/vibe3/handoff/" in path:
+        match = re.search(r"\.git/vibe3/handoff/([^/]+)/", path)
+        if match:
+            return f"@{match.group(1)}"
+    return path
 
 
 def _render_flow_row(
@@ -130,12 +145,12 @@ def render_flow_status(
     ):
         if ref:
             ref_display = resolve_ref_path(ref, worktree_root)
-            ref_cmd = ref_to_handoff_cmd(ref_display, status.branch)
+            ref_alias = _path_to_alias(ref_display)
         else:
-            ref_cmd = "—"
+            ref_alias = "—"
         console.print(f"  [dim]{stage}:[/]")
         kv("actor", actor or "—", 2)
-        kv("ref", ref_cmd, 2)
+        kv("ref", ref_alias, 2)
     # Latest verdict — shown inline under review results
     if status.latest_verdict:
         v = status.latest_verdict
