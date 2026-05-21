@@ -31,7 +31,7 @@ from vibe3.orchestra.issue_loader import (
 )
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_operations import (
-    _collect_raw_issues_without_qualify,
+    collect_raw_issues_without_qualify,
     select_ready_issues,
 )
 from vibe3.orchestra.queue_persistence_mixin import (
@@ -105,11 +105,21 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         # enter the queue.  Qualification is deferred to
         # qualify_blocked_issue() at dispatch time (coordinate()).
         if state == IssueState.BLOCKED:
-            selected = _collect_raw_issues_without_qualify(
-                raw_issues,
-                self._supervisor_label,
-                self._config.get_manager_usernames(),
-            )
+            raw_selected = collect_raw_issues_without_qualify(raw_issues)
+
+            # Apply skip filter after collection (preserves original behavior
+            # where issues flow through qualify gate for side effects)
+            selected: list[IssueInfo] = []
+            for issue in raw_selected:
+                if should_skip_from_queue(
+                    issue,
+                    supervisor_label=self._supervisor_label,
+                    manager_usernames=self._config.get_manager_usernames(),
+                    require_manager_assignee=True,
+                ):
+                    continue
+                selected.append(issue)
+
             append_orchestra_event(
                 "dispatcher",
                 f"poll_issues_by_state({state.value}): "
@@ -355,9 +365,9 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
 
             # For BLOCKED issues: run qualify gate at intent time.
             # If qualify_blocked_issue returns None (still blocked per body truth),
-            # the issue is popped from frozen_queue and does NOT re-enter the
-            # polling pool. It will not loop indefinitely — the issue must have
-            # its state label changed externally to be reconsidered.
+            # the issue is popped from the current frozen queue cycle.
+            # It may be re-collected on the next queue rebuild if it still has
+            # the state/blocked label.
             if issue.state == IssueState.BLOCKED:
                 target_state = self._qualify_gate.qualify_blocked_issue(issue)
 
