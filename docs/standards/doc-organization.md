@@ -41,7 +41,7 @@ related_docs:
 docs/
 ├── README.md                        # 项目文档总览和索引
 ├── standards/                       # 标准和规范文档
-│   ├── DOC_ORGANIZATION.md         # 本文档组织标准
+│   ├── doc-organization.md         # 本文档组织标准
 │   └── ...                         # 其他现行标准
 ├── specs/                          # 规范文档
 ├── prds/                           # 产品需求文档（全局 PRD）
