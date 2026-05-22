@@ -41,11 +41,12 @@ related_docs:
 
 ## 2. Term Axes
 
-本项目术语按五个维度组织：
+本项目术语按六个维度组织：
 
 - 共享状态术语
 - Git 与现场术语
 - 系统职责术语
+- 运行时层级术语
 - 文档流程术语
 - 调用面术语
 
@@ -102,9 +103,9 @@ related_docs:
 
 - 正式术语：`task issue`
 - 别称：无
-- 定义：**vibe3 视角下的执行关系角色**。指被 vibe3 纳入 flow 管理的 `assignee issue`。
+- 定义：**vibe3 视角下的执行关系角色**。指被 vibe3 纳入 flow 管理的 `assignee issue`，且作为该 flow 的主执行目标。
 - 判定标准：
-  - 在 SQLite `flow_issue_links` 中有记录，且角色为 `task` 或 `dependency`。
+  - 在 SQLite `flow_issue_links` 中有记录，且角色为 `task`。
   - 该 issue 必须属于 `assignee issue pool`。
 - 边界：
   - **不是**新的 GitHub 对象类型。
@@ -215,15 +216,14 @@ related_docs:
 - **`active`**：flow 正常执行中，准备就绪或正在处理
 - **`blocked`**：flow 被阻塞（手动锁定或依赖未满足）。
   - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。`blocked_reason` 的存在会阻止 QualifyGate 的自动解封。
-  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。依赖关系真源为 `flow_issue_links(role='dependency')`，而非 `blocked_by_issue` 字段。
+  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。依赖关系真源为 `flow_issue_links(role='dependency')`。
   - 判定标准：依赖项在 GitHub 上进入 `closed` 终态即视为满足。
   - 自动巡逻：Orchestra 会主动拉取该状态任务进入"资格门"校验，满足条件后自动解套并智能恢复到正确阶段。
-- **`failed`**：flow 执行失败，需要人工修复或放弃
 - **`done`**：flow 执行完成（PR 已合并）。`task/issue-N` 分支的对应 issue 会自动关闭。
 - **`stale`**：flow 长期未活动或被系统标记为休眠（例如 empty ready flow、orphaned flow）。由 governance 机制重建 ready flow 后恢复。
 - **`aborted`**：flow 被人工/自动中止（PR closed unmerged / issue 关闭 / branch 丢失）
 
-> `merged` 是历史遗留状态，已通过 `models/flow.py` 的 `_migrate_flow_status_value()` 统一规范化为 `done`。禁止在新代码中使用。
+> `merged` 是历史遗留状态，已统一规范化为 `done`；`failed` 已通过 `models/flow.py` 迁移为 `active` 状态并配合 `blocked_reason` 或 `failed_reason` 字段进行语义表达。禁止在新代码中将 `failed` 作为 `flow_status` 的字面值。
 
 ### 3.4.2 `dependency` (issue role)
 
@@ -352,11 +352,14 @@ related_docs:
   - 文档中优先使用 `Skill 层`
   - `胶水层` 作为历史叫法保留
 
-### 5.4.1 `Orchestra`
+### 5.4.1 Orchestra
 
 - 正式术语：`Orchestra`
 - 别称：`Orchestrator`
 - 定义：本项目中的顶层编排与分诊中枢。负责多 issue / 多 flow 的事实观察、心跳治理、assignee 触发调度、队列管理和非 state label 治理。
+- 核心机制：
+  - **Heartbeat Tick**：Driver 进程内部的一次轮询循环，负责触发各 Service 的 `on_tick()`。
+  - **Dispatch (派发)**：判定需要处理后，启动异步 child session（tmux）执行具体任务的动作。
 - 边界：
   - `Orchestra` 不直接负责单个 flow 的执行逻辑
   - `Orchestra` 不直接写代码
@@ -365,6 +368,7 @@ related_docs:
 - 落点：
   - Python 模块：`src/vibe3/orchestra/`
   - Skill: `skills/vibe-orchestra/SKILL.md`
+
 
 ### 5.4.2 `Manager`
 
@@ -444,7 +448,14 @@ related_docs:
   - `/vibe-save (skill)`
 - 后续同段复用同一对象时可省略后缀，但跨段再次出现建议重标一次，避免歧义。
 
-## 6. Document Process Terms
+## 6. Runtime Hierarchy Terms
+
+- **`Orchestra Driver`**：通过 `vibe3 serve start` 启动的长期运行主进程。
+- **`Heartbeat Tick`**：Driver 内部的周期性轮询循环。
+- **`Async Child Session`**：由 Tick 派发的、在独立 tmux session 中运行的异步子任务（如 manager run, governance scan）。
+- **`Domain Event`**：Agent 执行生命周期的真源，负责驱动状态转换与副作用。
+
+## 7. Document Process Terms
 
 以下术语只属于文档流程层级，不属于运行时系统分层：
 
@@ -462,9 +473,9 @@ related_docs:
 
 当作同一个概念。
 
-## 6.1 Documentation Role Terms
+### 7.1 Documentation Role Terms
 
-### `入口文件`
+#### `入口文件`
 
 - 正式术语：`入口文件`
 - 别称：无
@@ -478,7 +489,7 @@ related_docs:
   - 入口文件应提供导航、最小必要约束和引用链
   - 不在入口文件中堆叠复杂规范
 
-### `标准文件`
+#### `标准文件`
 
 - 正式术语：`标准文件`
 - 别称：无
@@ -491,7 +502,7 @@ related_docs:
 - 使用规则：
   - 讨论项目一致规范、稳定定义和边界时使用 `标准文件`
 
-### `参考文件`
+#### `参考文件`
 
 - 正式术语：`参考文件`
 - 别称：无
@@ -504,7 +515,7 @@ related_docs:
 - 使用规则：
   - 引用外部库、外部知识、外部资料时使用 `参考文件`
 
-### `规则文件`
+#### `规则文件`
 
 - 正式术语：`规则文件`
 - 别称：无
@@ -517,9 +528,9 @@ related_docs:
 - 使用规则：
   - 执行代理需要具体执行细则、实现边界和模式时使用 `规则文件`
 
-## 7. Identity Tracking Terms
+## 8. Identity Tracking Terms
 
-### 7.1 `署名`
+### 8.1 `署名`
 
 - 正式术语：`署名`
 - 别称：`Authorship`, `打卡`, `追加署名`
@@ -535,7 +546,7 @@ related_docs:
   - 讨论 Agent 如何宣告自己的参与贡献时，统一使用**“署名”**。
   - “如果误用签名，指的也是署名，不是数字签名。”项目语境下默认口语中的签名等同于署名。
 
-### 7.2 `物理签名`
+### 8.2 `物理签名`
 
 - 正式术语：`物理签名`
 - 别称：`Git Author`, `Alias`, `工作区身份`
@@ -548,7 +559,7 @@ related_docs:
 - 使用规则：
   - 讨论底层谁在提交代码或初始化 Worktree 所记录的身份时，使用**“物理签名”**。
 
-### 7.3 `actor`
+### 8.3 `actor`
 
 - 正式术语：`actor`
 - 别称：无
@@ -560,7 +571,7 @@ related_docs:
   - SQLite `flow_state` 中的 `latest_actor` 字段。
   - `FlowEvent` 中的 `actor` 字段。
 
-### 7.4 `initiated_by`
+### 8.4 `initiated_by`
 
 - 正式术语：`initiated_by`
 - 别称：无
@@ -571,7 +582,7 @@ related_docs:
 - 落点：
   - SQLite `flow_state` 中的 `initiated_by` 字段。
 
-## 8. Common Confusions
+## 9. Common Confusions
 
 以下混用是高风险错误：
 
