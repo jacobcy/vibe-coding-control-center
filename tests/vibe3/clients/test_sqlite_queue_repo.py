@@ -1,7 +1,6 @@
 """Tests for SQLiteQueueRepo CRUD operations."""
 
 import sqlite3
-import time
 
 from vibe3.clients.sqlite_client import SQLiteClient
 
@@ -24,53 +23,28 @@ def test_fresh_db_has_orchestra_queue_table(tmp_path):
     assert columns["updated_at"] == "TEXT"
 
 
-def test_save_and_load_single_entry(tmp_path):
-    """Save one entry, load it back — fields match."""
-    db_path = tmp_path / "test.db"
-    client = SQLiteClient(db_path=str(db_path))
-
-    client.save_queue_entry(
-        issue_number=123,
-        collected_state="state_collected",
-        waiting_state="state_waiting",
-    )
-
-    entry = client.load_queue_entry(123)
-    assert entry["issue_number"] == 123
-    assert entry["collected_state"] == "state_collected"
-    assert entry["waiting_state"] == "state_waiting"
-    assert entry["updated_at"] is not None
-
-
-def test_save_overwrites_existing_entry(tmp_path):
-    """Save twice — second write wins."""
-    db_path = tmp_path / "test.db"
-    client = SQLiteClient(db_path=str(db_path))
-
-    client.save_queue_entry(456, collected_state="first")
-    client.save_queue_entry(456, collected_state="second")
-
-    entry = client.load_queue_entry(456)
-    assert entry["collected_state"] == "second"
-
-
-def test_load_missing_returns_none(tmp_path):
-    """Load non-existent issue_number returns None."""
-    db_path = tmp_path / "test.db"
-    client = SQLiteClient(db_path=str(db_path))
-
-    assert client.load_queue_entry(999) is None
-
-
 def test_remove_entry(tmp_path):
     """Save then remove — load returns None."""
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    client.save_queue_entry(789, collected_state="to_remove")
+    # Setup: insert entry using raw SQL
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (789, "to_remove"),
+        )
+
     client.remove_queue_entry(789)
 
-    assert client.load_queue_entry(789) is None
+    # Verify: check entry is gone using raw SQL
+    with sqlite3.connect(str(db_path)) as conn:
+        row = conn.execute(
+            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
+            (789,),
+        ).fetchone()
+    assert row is None
 
 
 def test_remove_missing_is_noop(tmp_path):
@@ -86,9 +60,23 @@ def test_load_all_returns_all_entries(tmp_path):
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    client.save_queue_entry(101, collected_state="a")
-    client.save_queue_entry(102, collected_state="b")
-    client.save_queue_entry(103, collected_state="c")
+    # Setup: insert 3 entries using raw SQL
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (101, "a"),
+        )
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (102, "b"),
+        )
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (103, "c"),
+        )
 
     entries = client.load_all_queue_entries()
     assert len(entries) == 3
@@ -100,8 +88,18 @@ def test_replace_all_entries(tmp_path):
     db_path = tmp_path / "test.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    client.save_queue_entry(201, collected_state="old1")
-    client.save_queue_entry(202, collected_state="old2")
+    # Setup: insert 2 old entries using raw SQL
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (201, "old1"),
+        )
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (202, "old2"),
+        )
 
     new_entries = [
         {"issue_number": 301, "collected_state": "new1"},
@@ -113,33 +111,19 @@ def test_replace_all_entries(tmp_path):
     entries = client.load_all_queue_entries()
     assert len(entries) == 3
     assert {e["issue_number"] for e in entries} == {301, 302, 303}
-    assert client.load_queue_entry(201) is None
-    assert client.load_queue_entry(202) is None
 
-
-def test_updated_at_auto_set_on_save(tmp_path):
-    """Save entry, updated_at is non-null."""
-    db_path = tmp_path / "test.db"
-    client = SQLiteClient(db_path=str(db_path))
-
-    client.save_queue_entry(401, collected_state="test")
-    assert client.load_queue_entry(401)["updated_at"] is not None
-
-
-def test_updated_at_updates_on_second_save(tmp_path):
-    """Save, wait, save again — updated_at changes."""
-    db_path = tmp_path / "test.db"
-    client = SQLiteClient(db_path=str(db_path))
-
-    client.save_queue_entry(501, collected_state="first")
-    first_updated = client.load_queue_entry(501)["updated_at"]
-
-    time.sleep(0.01)
-
-    client.save_queue_entry(501, collected_state="second")
-    second_updated = client.load_queue_entry(501)["updated_at"]
-
-    assert second_updated != first_updated
+    # Verify old entries are gone using raw SQL
+    with sqlite3.connect(str(db_path)) as conn:
+        row_201 = conn.execute(
+            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
+            (201,),
+        ).fetchone()
+        row_202 = conn.execute(
+            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
+            (202,),
+        ).fetchone()
+    assert row_201 is None
+    assert row_202 is None
 
 
 def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
@@ -156,14 +140,16 @@ def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
 
     all_entries = client.load_all_queue_entries()
     assert len(all_entries) == 2
-    entry_601 = client.load_queue_entry(601)
+    # Find entry 601 and verify it has the second value
+    entry_601 = next((e for e in all_entries if e["issue_number"] == 601), None)
     assert entry_601 is not None
     assert entry_601["collected_state"] == "second"
 
 
 def test_legacy_enqueued_at_migration(tmp_path):
     """Simulate a legacy DB with enqueued_at NOT NULL, run init_schema,
-    then verify save_queue_entry succeeds and both columns are populated."""
+    verify last_attempted_at column is added, legacy data is migrated,
+    and new inserts succeed."""
     db_path = tmp_path / "legacy.db"
 
     # Step 1: Create a legacy-style orchestra_queue with enqueued_at NOT NULL
@@ -187,7 +173,7 @@ def test_legacy_enqueued_at_migration(tmp_path):
         )
 
     # Step 2: Run init_schema (triggers migration)
-    client = SQLiteClient(db_path=str(db_path))
+    SQLiteClient(db_path=str(db_path))
 
     # Step 3: Verify migration added last_attempted_at
     with sqlite3.connect(str(db_path)) as conn:
@@ -198,19 +184,32 @@ def test_legacy_enqueued_at_migration(tmp_path):
         assert "last_attempted_at" in columns
 
     # Step 4: Verify legacy row has last_attempted_at migrated from enqueued_at
-    legacy_entry = client.load_queue_entry(100)
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
+            (100,),
+        ).fetchone()
+        legacy_entry = dict(row) if row else None
     assert legacy_entry["last_attempted_at"] == "2026-05-16T10:00:00"
 
     # Step 5: Verify new inserts succeed (NOT NULL constraint satisfied)
-    client.save_queue_entry(
-        issue_number=200,
-        collected_state="blocked",
-        waiting_state="review",
-        retry_count=2,
-        last_attempted_at="2026-05-17T09:00:00",
-    )
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO orchestra_queue "
+            "(issue_number, collected_state, waiting_state, retry_count, "
+            "last_attempted_at, enqueued_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+            (200, "blocked", "review", 2, "2026-05-17T09:00:00", "2026-05-17T09:00:00"),
+        )
 
-    new_entry = client.load_queue_entry(200)
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
+            (200,),
+        ).fetchone()
+        new_entry = dict(row) if row else None
     assert new_entry["issue_number"] == 200
     assert new_entry["retry_count"] == 2
     assert new_entry["last_attempted_at"] == "2026-05-17T09:00:00"
@@ -248,7 +247,13 @@ def test_replace_all_with_legacy_enqueued_at(tmp_path):
     ]
     client.replace_all_queue_entries(entries)
 
-    loaded = client.load_queue_entry(300)
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
+            (300,),
+        ).fetchone()
+        loaded = dict(row) if row else None
     assert loaded["retry_count"] == 1
     assert loaded["last_attempted_at"] == "2026-05-17T08:00:00"
     assert loaded["enqueued_at"] == "2026-05-17T08:00:00"
@@ -259,7 +264,9 @@ def test_queue_entry_persists_across_connections(tmp_path):
     db_path = tmp_path / "persist.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    client.save_queue_entry(777, collected_state="persisted")
+    client.replace_all_queue_entries(
+        [{"issue_number": 777, "collected_state": "persisted", "retry_count": 0}]
+    )
 
     with sqlite3.connect(str(db_path)) as conn:
         row = conn.execute(
@@ -276,8 +283,19 @@ def test_queue_operations_persist_across_connections(tmp_path):
     db_path = tmp_path / "persist_ops.db"
     client = SQLiteClient(db_path=str(db_path))
 
-    client.save_queue_entry(1, collected_state="one")
-    client.save_queue_entry(2, collected_state="two")
+    # Setup: insert 2 entries using raw SQL
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (1, "one"),
+        )
+        conn.execute(
+            "INSERT INTO orchestra_queue (issue_number, collected_state, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (2, "two"),
+        )
+
     client.remove_queue_entry(1)
     client.replace_all_queue_entries(
         [{"issue_number": 3, "collected_state": "three", "retry_count": 0}]

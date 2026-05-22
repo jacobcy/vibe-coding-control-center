@@ -18,64 +18,6 @@ class SQLiteQueueRepo(_HasConnection):
             self._enqueued_at_cache[self.db_path] = "enqueued_at" in columns
         return self._enqueued_at_cache[self.db_path]
 
-    def save_queue_entry(
-        self,
-        issue_number: int,
-        collected_state: str | None = None,
-        waiting_state: str | None = None,
-        retry_count: int = 0,
-        last_attempted_at: str | None = None,
-    ) -> None:
-        """INSERT OR REPLACE a single queue entry."""
-        updated_at = datetime.datetime.now().isoformat()
-        # Use last_attempted_at for enqueued_at if column exists (backward compat)
-        timestamp = last_attempted_at or updated_at
-
-        conn = self._get_connection()
-        with conn:
-            if self._check_has_enqueued_at(conn):
-                conn.execute(
-                    "INSERT OR REPLACE INTO orchestra_queue "
-                    "(issue_number, collected_state, waiting_state, retry_count, "
-                    "last_attempted_at, enqueued_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        issue_number,
-                        collected_state,
-                        waiting_state,
-                        retry_count,
-                        last_attempted_at,
-                        timestamp,
-                        updated_at,
-                    ),
-                )
-            else:
-                conn.execute(
-                    "INSERT OR REPLACE INTO orchestra_queue "
-                    "(issue_number, collected_state, waiting_state, retry_count, "
-                    "last_attempted_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        issue_number,
-                        collected_state,
-                        waiting_state,
-                        retry_count,
-                        last_attempted_at,
-                        updated_at,
-                    ),
-                )
-
-    def load_queue_entry(self, issue_number: int) -> dict[str, Any] | None:
-        conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
-            (issue_number,),
-        )
-        row = cursor.fetchone()
-        return dict(row) if row else None
-
     def load_all_queue_entries(self) -> list[dict[str, Any]]:
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row

@@ -51,11 +51,19 @@ def test_fd_not_exhausted_queue_operations(tmp_path: Path) -> None:
     proc = psutil.Process(os.getpid())
     before = proc.num_fds()
 
-    # Perform 1000 queue operations (heartbeat pattern)
+    # Perform 1000 queue operations using singleton connection (heartbeat pattern)
     for i in range(1000):
-        client.save_queue_entry(i % 100, collected_state=f"state-{i}")
-        entry = client.load_queue_entry(i % 100)
-        assert entry is not None
+        client.replace_all_queue_entries(
+            [
+                {
+                    "issue_number": i % 100,
+                    "collected_state": f"state-{i}",
+                    "retry_count": 0,
+                }
+            ]
+        )
+        entries = client.load_all_queue_entries()
+        assert len(entries) > 0
 
     after = proc.num_fds()
     fd_growth = after - before
