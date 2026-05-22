@@ -59,8 +59,6 @@ def test_dispatch_logs_degraded_mode():
             issue_number=123,
             collected_state="blocked",
             waiting_state=None,
-            retry_count=0,
-            last_attempted_at=None,
         )
     ]
 
@@ -172,8 +170,6 @@ def test_dispatch_no_log_when_not_degraded():
             issue_number=456,
             collected_state="blocked",
             waiting_state=None,
-            retry_count=0,
-            last_attempted_at=None,
         )
     ]
 
