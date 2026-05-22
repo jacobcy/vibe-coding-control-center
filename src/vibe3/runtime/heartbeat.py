@@ -16,7 +16,7 @@ from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
-from vibe3.runtime.cleanup_executor import execute_expired_resource_cleanup
+from vibe3.runtime.periodic_check_executor import execute_periodic_check
 from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
@@ -229,22 +229,22 @@ class HeartbeatServer:
                         f"Cleaned up {deleted_terminal} errors for terminal issues"
                     )
 
-            # Cleanup expired resources (worktrees, branches)
+            # Periodic consistency check
+            # (PR merged/closed, issue closed, label anomalies, etc.)
             if (
-                self.config.expired_resource_cleanup.enabled
-                and tick_number % self.config.expired_resource_cleanup.interval_ticks
-                == 0
+                self.config.periodic_check.enabled
+                and tick_number % self.config.periodic_check.interval_ticks == 0
             ):
                 try:
-                    await self._cleanup_expired_resources(tick_number)
+                    await self._run_periodic_check(tick_number)
                 except Exception as exc:
                     append_orchestra_event(
                         "server",
-                        f"tick #{tick_number} expired resource cleanup failed: {exc}",
+                        f"tick #{tick_number} periodic check failed: {exc}",
                         level="WARNING",
                     )
                     logger.bind(domain="orchestra", action="cleanup").warning(
-                        f"Expired resource cleanup failed: {exc}"
+                        f"Periodic check failed: {exc}"
                     )
 
             tasks = []
@@ -295,10 +295,10 @@ class HeartbeatServer:
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
 
-    async def _cleanup_expired_resources(self, tick_number: int) -> None:
-        """Cleanup expired worktrees and branches (runs every N ticks)."""
-        await execute_expired_resource_cleanup(
-            self.config.expired_resource_cleanup,
+    async def _run_periodic_check(self, tick_number: int) -> None:
+        """Run periodic consistency check (every N ticks)."""
+        await execute_periodic_check(
+            self.config.periodic_check,
             tick_number,
         )
 

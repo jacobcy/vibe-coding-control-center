@@ -195,6 +195,72 @@ class CheckService(CheckRemote):
 
         return None
 
+    def _check_multiple_state_labels(
+        self, issue_number: int, issue_payload: dict
+    ) -> list[str]:
+        """Check for multiple state/* labels and auto-fix the anomaly.
+
+        An issue should have exactly one state/* label. Having multiple
+        (e.g., state/blocked + state/review) is an anomaly that needs
+        correction. This method detects the anomaly and uses LabelService
+        to atomically fix it by keeping the highest-priority state.
+
+        Priority: blocked > done > in-progress > review > handoff > claimed > ready
+
+        Returns:
+            List of issue descriptions (empty if no anomaly detected).
+        """
+        labels = issue_payload.get("labels", [])
+        state_labels = [
+            lbl["name"]
+            for lbl in labels
+            if isinstance(lbl, dict) and lbl.get("name", "").startswith("state/")
+        ]
+
+        if len(state_labels) <= 1:
+            return []
+
+        # Determine which state to keep (highest priority)
+        priority_order = [
+            IssueState.BLOCKED,
+            IssueState.DONE,
+            IssueState.IN_PROGRESS,
+            IssueState.REVIEW,
+            IssueState.HANDOFF,
+            IssueState.CLAIMED,
+            IssueState.READY,
+        ]
+
+        target_state = IssueState.READY  # fallback
+        for candidate in priority_order:
+            if candidate.to_label() in state_labels:
+                target_state = candidate
+                break
+
+        # Auto-fix using LabelService (atomic: add new, remove old)
+        try:
+            from vibe3.services.label_service import LabelService
+
+            label_service = LabelService()
+            label_service.set_state(issue_number, target_state)
+            logger.bind(domain="check", action="fix").info(
+                f"Auto-fixed multi-label on issue #{issue_number}: "
+                f"{state_labels} -> {target_state.to_label()}"
+            )
+            return [
+                f"Issue #{issue_number} had multiple state labels "
+                f"({', '.join(state_labels)}), auto-fixed to "
+                f"{target_state.to_label()}"
+            ]
+        except Exception as exc:
+            logger.bind(domain="check", action="fix").warning(
+                f"Failed to auto-fix multi-label on issue " f"#{issue_number}: {exc}"
+            )
+            return [
+                f"Issue #{issue_number} has multiple state labels "
+                f"({', '.join(state_labels)}), manual fix required"
+            ]
+
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
         issues: list[str] = []
@@ -245,6 +311,12 @@ class CheckService(CheckRemote):
                 orchestration_state = issue_state_from_payload(issue)
                 if str(issue.get("state", "")).upper() == "CLOSED":
                     task_issue_closed = True
+
+                # Check for multiple state/* labels (anomaly)
+                label_issues = self._check_multiple_state_labels(
+                    task_issue, issue_payload
+                )
+                issues.extend(label_issues)
 
         # only one task issue per branch
         if len(task_issues) > 1:
