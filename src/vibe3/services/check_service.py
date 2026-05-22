@@ -157,20 +157,6 @@ class CheckService(CheckRemote):
         except Exception:
             return None
 
-    def _parse_issue_number_from_branch(self, branch: str) -> int | None:
-        """Extract issue number from task/issue-N branch pattern.
-
-        Args:
-            branch: Branch name (e.g., "task/issue-456")
-
-        Returns:
-            Issue number or None if not a task branch
-        """
-        import re
-
-        match = re.fullmatch(r"^task/issue-(\d+)$", branch)
-        return int(match.group(1)) if match else None
-
     def _block_issue_for_pr_closed(self, branch: str, pr_number: int) -> None:
         """Block issue when PR closed without merge.
 
@@ -211,22 +197,15 @@ class CheckService(CheckRemote):
                 ).info(f"Issue #{task_issue_number} already closed, skip blocking")
                 return
 
-        # Use standard block_flow method to block the flow
-        # This will transition issue state to BLOCKED via LabelService
-        from vibe3.services.flow_service import FlowService
+        # Transition issue state to BLOCKED while keeping flow_status as "aborted"
+        # This allows --clean-branch to properly clean up these flows
+        from vibe3.services.label_service import LabelService
 
-        flow_service = FlowService(
-            store=self.store,
-            git_client=self.git_client,
-        )
-
-        block_reason = f"PR #{pr_number} 已关闭（未合并），需要评估后续处理方案"
+        label_service = LabelService()
 
         try:
-            flow_service.block_flow(
-                branch=branch,
-                reason=block_reason,
-                actor="vibe:check",
+            label_service.transition(
+                task_issue_number, IssueState.BLOCKED, actor="vibe:check"
             )
 
             logger.bind(
@@ -234,7 +213,10 @@ class CheckService(CheckRemote):
                 action="block_pr_closed",
                 branch=branch,
                 issue_number=task_issue_number,
-            ).info(f"Blocked issue #{task_issue_number} for closed PR #{pr_number}")
+            ).info(
+                f"Transitioned issue #{task_issue_number} to BLOCKED for "
+                f"closed PR #{pr_number}"
+            )
         except Exception as exc:
             logger.bind(
                 domain="check",

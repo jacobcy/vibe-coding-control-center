@@ -359,7 +359,7 @@ class CheckCleanupService:
             )
 
             # Add informative comment
-            comment_body = """旧 flow 已清理（worktree 和 branch 已删除）。
+            comment_body = """旧 flow 已清理（flow record 已删除）。
 
 **建议方案：**
 
