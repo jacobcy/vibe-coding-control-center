@@ -348,7 +348,6 @@ class TestExecutionRolePolicy:
         for role in roles:
             backend = service.resolve_backend(role)
             assert isinstance(backend, str)
-            assert isinstance(backend, str)
             assert backend in ["claude", "openai"]
 
     def test_all_roles_resolve_prompt_contract(
