@@ -99,8 +99,8 @@ class CodeagentExecutionService:
     ) -> None:
         """Check for unauthorized commits by planner.
 
-        Planner should only create docs/plans/ changes. If we detect
-        commits outside this directory, log a warning and record a finding.
+        Planner should only create docs/plans/ or docs/reports/ changes. If we detect
+        commits outside these directories, log a warning and record a finding.
         """
         if not branch:
             return
@@ -113,9 +113,9 @@ class CodeagentExecutionService:
             if commit_count_after > commit_count_before:
                 # New commits detected - check what changed
                 commits_diff = commit_count_after - commit_count_before
-                log.warning(
-                    f"Planner created {commits_diff} unauthorized commit(s) - "
-                    "planner should only create docs/plans/ files"
+                log.info(
+                    f"Planner created {commits_diff} new commit(s) — "
+                    "checking files for policy compliance"
                 )
 
                 # Get the list of changed files in new commits

@@ -57,9 +57,10 @@ class TestPlannerCommitDetection:
                 log=mock_log,
             )
 
-        # Should log info about authorized commits
-        mock_log.info.assert_called_once()
-        assert "authorized files" in mock_log.info.call_args[0][0]
+        # Should log info about new commits and authorized commits
+        assert mock_log.info.call_count == 2
+        # Last info should mention authorized files
+        assert "authorized files" in mock_log.info.call_args_list[-1][0][0]
 
     def test_planner_unauthorized_commits_flagged(self) -> None:
         """Planner commits outside docs/plans/ trigger finding."""
@@ -94,8 +95,8 @@ class TestPlannerCommitDetection:
                 log=mock_log,
             )
 
-        # Should log warnings
-        assert mock_log.warning.call_count == 2
+        # Should log warning about unauthorized files
+        assert mock_log.warning.call_count == 1
 
         # Should record finding to handoff
         mock_handoff_instance.append_current_handoff.assert_called_once()
@@ -138,8 +139,8 @@ class TestPlannerCommitDetection:
                 log=mock_log,
             )
 
-        # Should log warnings
-        assert mock_log.warning.call_count == 2
+        # Should log warning about unauthorized files
+        assert mock_log.warning.call_count == 1
 
         # Should record finding to handoff
         mock_handoff_instance.append_current_handoff.assert_called_once()
@@ -222,7 +223,8 @@ class TestPlannerCommitDetection:
                 log=mock_log,
             )
 
-        # Should log warning about handoff failure
-        assert mock_log.warning.call_count == 3  # 2 for commits + 1 for handoff
+        # Should log warnings about unauthorized files and handoff failure
+        # 1 for unauthorized files + 1 for handoff
+        assert mock_log.warning.call_count == 2
         last_call = mock_log.warning.call_args_list[-1]
         assert "Failed to record planner finding" in last_call[0][0]
