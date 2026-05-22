@@ -1,5 +1,6 @@
 """Unified execution coordinator."""
 
+import dataclasses
 import os
 import re
 from contextlib import contextmanager
@@ -168,6 +169,10 @@ class ExecutionCoordinator:
         is_async_child_sync = request.mode == "sync" and (
             os.environ.get("VIBE3_ASYNC_CHILD") == "1"
         )
+        # --no-async serve flag overrides all dispatch to sync mode
+        if os.environ.get("VIBE3_NO_ASYNC") == "1":
+            request = dataclasses.replace(request, mode="sync")
+
         runtime_session_id: int | None = None
 
         # 1. Check capacity

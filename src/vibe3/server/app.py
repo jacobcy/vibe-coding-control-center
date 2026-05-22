@@ -306,6 +306,8 @@ def start(
             _resolve_dispatcher_models_root(config, Path.cwd())
         )
         os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir(Path.cwd()))
+        # --no-async flag: propagate to all dispatched role agents
+        os.environ["VIBE3_NO_ASYNC"] = "1"
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")
