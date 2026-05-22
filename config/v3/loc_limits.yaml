@@ -56,6 +56,9 @@ code_limits:
       - path: "src/vibe3/clients/github_pr_ops.py"
         limit: 530
         reason: "GitHub PR 操作与查询聚合（日志和错误处理对生产环境必要）"
+      - path: "src/vibe3/clients/github_pr_read_ops.py"
+        limit: 520
+        reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
       - path: "src/vibe3/clients/sqlite_client.py"
         limit: 650
         reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
