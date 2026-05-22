@@ -5,13 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.label_service import LabelService
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
 
@@ -408,23 +403,11 @@ def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> N
 
 def test_clear_flow_reasons_clears_blocked_projection() -> None:
     """Test that _clear_flow_reasons clears blocked state from issue body."""
-    git_client = GitClient()
-    github_client = GitHubClient()
-    flow_service = FlowService()
-    label_service = LabelService()
-    issue_flow_service = IssueFlowService()
-
-    operations = TaskResumeOperations(
-        git_client=git_client,
-        github_client=github_client,
-        flow_service=flow_service,
-        label_service=label_service,
-        issue_flow_service=issue_flow_service,
-    )
+    operations = _make_operations()
 
     with (
-        patch.object(flow_service.store, "update_flow_state"),
-        patch.object(flow_service.store, "get_flow_state") as mock_get,
+        patch.object(operations.flow_service.store, "update_flow_state"),
+        patch.object(operations.flow_service.store, "get_flow_state") as mock_get,
         patch.object(operations, "_clear_blocked_projection") as mock_clear,
     ):
         # Setup flow state with issue number
@@ -443,19 +426,7 @@ def test_clear_flow_reasons_clears_blocked_projection() -> None:
 
 def test_clear_blocked_projection_updates_issue_body() -> None:
     """Test that _clear_blocked_projection correctly clears managed section."""
-    git_client = GitClient()
-    github_client = GitHubClient()
-    flow_service = FlowService()
-    label_service = LabelService()
-    issue_flow_service = IssueFlowService()
-
-    operations = TaskResumeOperations(
-        git_client=git_client,
-        github_client=github_client,
-        flow_service=flow_service,
-        label_service=label_service,
-        issue_flow_service=issue_flow_service,
-    )
+    operations = _make_operations()
 
     # Mock issue body with blocked state
     blocked_body = """User content here.
@@ -470,10 +441,10 @@ def test_clear_blocked_projection_updates_issue_body() -> None:
 
 <!-- vibe3-flow-state-end -->"""
 
-    with patch.object(github_client, "get_issue_body") as mock_get:
+    with patch.object(operations.github_client, "get_issue_body") as mock_get:
         mock_get.return_value = blocked_body
 
-        with patch.object(github_client, "update_issue_body") as mock_update:
+        with patch.object(operations.github_client, "update_issue_body") as mock_update:
             mock_update.return_value = True
 
             # Execute
@@ -496,24 +467,12 @@ def test_clear_blocked_projection_updates_issue_body() -> None:
 
 def test_clear_blocked_projection_handles_none_body() -> None:
     """Test that _clear_blocked_projection handles missing issue body."""
-    git_client = GitClient()
-    github_client = GitHubClient()
-    flow_service = FlowService()
-    label_service = LabelService()
-    issue_flow_service = IssueFlowService()
+    operations = _make_operations()
 
-    operations = TaskResumeOperations(
-        git_client=git_client,
-        github_client=github_client,
-        flow_service=flow_service,
-        label_service=label_service,
-        issue_flow_service=issue_flow_service,
-    )
-
-    with patch.object(github_client, "get_issue_body") as mock_get:
+    with patch.object(operations.github_client, "get_issue_body") as mock_get:
         mock_get.return_value = None
 
-        with patch.object(github_client, "update_issue_body") as mock_update:
+        with patch.object(operations.github_client, "update_issue_body") as mock_update:
             # Execute
             operations._clear_blocked_projection(123)
 
@@ -523,19 +482,11 @@ def test_clear_blocked_projection_handles_none_body() -> None:
 
 def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
     """Test that reset_task_scene calls cleanup service for tombstone creation."""
-    git_client = GitClient()
-    github_client = GitHubClient()
-    flow_service = FlowService()
-    label_service = LabelService()
-    issue_flow_service = IssueFlowService()
-
-    operations = TaskResumeOperations(
-        git_client=git_client,
-        github_client=github_client,
-        flow_service=flow_service,
-        label_service=label_service,
-        issue_flow_service=issue_flow_service,
+    operations = _make_operations()
+    operations.git_client.find_worktree_path_for_branch.return_value = Path(
+        "/tmp/issue-999"
     )
+    operations.git_client.branch_exists.return_value = True
 
     branch = "task/issue-999"
 
