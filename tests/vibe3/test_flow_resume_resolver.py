@@ -35,23 +35,45 @@ def test_infer_resume_label_pass() -> None:
 
 
 def test_infer_resume_label_minor() -> None:
-    """Minor review -> MERGE_READY."""
+    """Minor review -> MERGE_READY (requires audit_ref)."""
+    state = FlowState(
+        branch="task/issue-1",
+        flow_slug="test",
+        latest_verdict=_create_verdict("MINOR"),
+        audit_ref="audit.md",
+    )
+    assert infer_resume_label(state) == IssueState.MERGE_READY
+
+
+def test_infer_resume_label_minor_without_audit() -> None:
+    """Minor review without audit_ref -> REVIEW."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
         latest_verdict=_create_verdict("MINOR"),
     )
-    assert infer_resume_label(state) == IssueState.MERGE_READY
+    assert infer_resume_label(state) == IssueState.REVIEW
 
 
 def test_infer_resume_label_major() -> None:
-    """Major review issues -> IN_PROGRESS."""
+    """Major review issues -> IN_PROGRESS (requires audit_ref)."""
+    state = FlowState(
+        branch="task/issue-1",
+        flow_slug="test",
+        latest_verdict=_create_verdict("MAJOR"),
+        audit_ref="audit.md",
+    )
+    assert infer_resume_label(state) == IssueState.IN_PROGRESS
+
+
+def test_infer_resume_label_major_without_audit() -> None:
+    """Major review without audit_ref -> REVIEW."""
     state = FlowState(
         branch="task/issue-1",
         flow_slug="test",
         latest_verdict=_create_verdict("MAJOR"),
     )
-    assert infer_resume_label(state) == IssueState.IN_PROGRESS
+    assert infer_resume_label(state) == IssueState.REVIEW
 
 
 def test_infer_resume_label_conflict_pr_vs_verdict() -> None:

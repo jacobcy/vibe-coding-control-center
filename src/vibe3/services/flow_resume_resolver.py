@@ -6,7 +6,7 @@ on its local reference states (pr_ref, audit_ref, plan_ref, report_ref).
 
 from vibe3.models.flow import FlowState
 from vibe3.models.orchestration import IssueState
-from vibe3.services.verdict_policy import VerdictValue, blocks_merge, passes_review
+from vibe3.services.verdict_policy import VerdictValue, passes_review
 
 
 def infer_resume_label(flow_state: FlowState) -> IssueState:
@@ -37,11 +37,24 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
         verdict: VerdictValue = flow_state.latest_verdict.verdict
         # Verdict is the primary signal for review completion.
         if passes_review(verdict):
-            return IssueState.MERGE_READY
-        if blocks_merge(verdict):
+            # PASS -> merge-ready immediately
+            if verdict == "PASS":
+                return IssueState.MERGE_READY
+            # MINOR requires audit_ref
+            if verdict == "MINOR":
+                if flow_state.audit_ref:
+                    return IssueState.MERGE_READY
+                # Missing audit_ref -> back to review
+                return IssueState.REVIEW
+        else:
+            # blocks_merge(verdict) is True for these
             if verdict in {"MAJOR", "BLOCK"}:
-                return IssueState.IN_PROGRESS  # Needs revision before merge
-            return IssueState.HANDOFF  # REFUSE / UNKNOWN -> manager takes over
+                if flow_state.audit_ref:
+                    return IssueState.IN_PROGRESS
+                # Missing audit_ref -> back to review
+                return IssueState.REVIEW
+            # REFUSE / UNKNOWN -> manager takes over
+            return IssueState.HANDOFF
 
     if flow_state.plan_ref and flow_state.report_ref:
         # Code has been written (report exists) but no review yet
