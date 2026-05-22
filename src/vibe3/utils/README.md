@@ -13,7 +13,6 @@
 | git_helpers.py | 104 | Handoff 目录计算、commit message、current branch |
 | constants.py | 105 | 常量定义（默认路径、后缀等） |
 | comment_utils.py | 80 | Comment 格式化工具 |
-| label_utils.py | 85 | Label 操作工具 |
 | issue_branch_resolver.py | 41 | Issue 到分支的解析和转换 |
 | trace.py | 36 | Trace 工具函数 |
 | issue_ref.py | 14 | Issue 引用解析（#123, owner/repo#123） |
@@ -32,13 +31,12 @@
 - **codeagent_helpers.py**: Codeagent 后端辅助
 - **constants.py**: 常量定义
 - **comment_utils.py**: Comment 格式化
-- **label_utils.py**: Label 操作
 
 ## 依赖关系
 
 ```
 utils/
-├── 无内部依赖：branch_utils, git_helpers, constants, comment_utils, label_utils, trace, issue_ref
+├── 无内部依赖：branch_utils, git_helpers, constants, comment_utils, trace, issue_ref
 ├── 独立配置：codeagent_helpers (依赖 VibeConfig)
 └── Git 相关：git_path_client (依赖 GitClient), path_helpers (依赖 git_path_client)
 ```
