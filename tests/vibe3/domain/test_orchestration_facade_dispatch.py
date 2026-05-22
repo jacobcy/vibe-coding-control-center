@@ -133,3 +133,54 @@ class TestOrchestrationFacadeDispatchServices:
 
         # Verify coordinate was called
         mock_coordinate.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    async def test_injected_registry_used_in_on_tick(
+        self,
+        mock_config_cls: MagicMock,
+        mock_monotonic: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        """Verify that when registry is injected, on_tick() uses it."""
+        from vibe3.environment.session_registry import SessionRegistryService
+
+        mock_config_cls.return_value = MagicMock(
+            polling_interval=1,
+            governance=MagicMock(interval_ticks=1),
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+            ),
+        )
+        mock_monotonic.side_effect = [float(i) for i in range(20)]
+
+        mock_capacity = MagicMock()
+        # Skip dispatch to test reconciliation
+        mock_capacity.can_dispatch.return_value = False
+        mock_capacity.get_capacity_status.return_value = {
+            "remaining": 1,
+            "active_count": 0,
+            "max_capacity": 5,
+        }
+
+        # Create mock registry
+        mock_registry = MagicMock(spec=SessionRegistryService)
+
+        facade = OrchestrationFacade(
+            tick_count=0,
+            capacity=mock_capacity,
+            registry=mock_registry,
+        )
+
+        with (
+            patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock),
+            patch.object(facade, "on_heartbeat_tick"),
+        ):
+            await facade.on_tick()
+
+        # Verify registry methods were called on the injected instance
+        mock_registry.mark_worker_sessions_done_when_tmux_gone.assert_called_once()
+        mock_registry.reconcile_live_state.assert_called_once()
