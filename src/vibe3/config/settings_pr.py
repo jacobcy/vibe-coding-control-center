@@ -53,7 +53,9 @@ class MergeGateConfig(BaseModel):
     """Merge gate configuration."""
 
     block_on_score_at_or_above: int = Field(default=9)
-    block_on_verdict: list[str] = Field(default_factory=lambda: ["BLOCK"])
+    block_on_verdict: list[str] = Field(
+        default_factory=lambda: ["MAJOR", "BLOCK", "REFUSE", "UNKNOWN"]
+    )
 
 
 class SizeThreshold(BaseModel):

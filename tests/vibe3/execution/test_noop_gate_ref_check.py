@@ -1,5 +1,6 @@
 """Unit tests for ref-check logic in no-op gate."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from vibe3.execution.noop_gate import apply_unified_noop_gate
@@ -103,7 +104,18 @@ class TestRefCheck:
                 role="reviewer",
                 before_state_label="state/review",
                 required_ref_key="audit_ref",
-                flow_state={"audit_ref": "path/to/audit.md"},
+                flow_state={
+                    "audit_ref": "path/to/audit.md",
+                    "latest_verdict": json.dumps(
+                        {
+                            "verdict": "PASS",
+                            "actor": "reviewer",
+                            "role": "reviewer",
+                            "timestamp": "2026-05-22T00:00:00+00:00",
+                            "flow_branch": "task/issue-55",
+                        }
+                    ),
+                },
             )
 
         mock_block.assert_called_once()
@@ -112,6 +124,112 @@ class TestRefCheck:
         store.add_event.assert_called_once()
         event_args = store.add_event.call_args
         assert event_args[0][1] == "state_unchanged"
+
+    def test_reviewer_pass_without_audit_ref_is_allowed(self) -> None:
+        """PASS verdict should not require audit_ref."""
+        store = _make_mock_store()
+        store.get_flow_state.return_value = {
+            "latest_verdict": json.dumps(
+                {
+                    "verdict": "PASS",
+                    "actor": "reviewer",
+                    "role": "reviewer",
+                    "timestamp": "2026-05-22T00:00:00+00:00",
+                    "flow_branch": "task/issue-55",
+                }
+            )
+        }
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
+        ):
+            latest_verdict = store.get_flow_state.return_value["latest_verdict"]
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/handoff"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=55,
+                branch="task/issue-55",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
+                required_ref_key="audit_ref",
+                flow_state={"latest_verdict": latest_verdict},
+            )
+
+        mock_block.assert_not_called()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+
+    def test_reviewer_minor_without_audit_ref_blocks(self) -> None:
+        """MINOR verdict still requires audit_ref."""
+        store = _make_mock_store()
+        store.get_flow_state.return_value = {
+            "latest_verdict": json.dumps(
+                {
+                    "verdict": "MINOR",
+                    "actor": "reviewer",
+                    "role": "reviewer",
+                    "timestamp": "2026-05-22T00:00:00+00:00",
+                    "flow_branch": "task/issue-55",
+                }
+            )
+        }
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
+        ):
+            latest_verdict = store.get_flow_state.return_value["latest_verdict"]
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/handoff"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=55,
+                branch="task/issue-55",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
+                required_ref_key="audit_ref",
+                flow_state={"latest_verdict": latest_verdict},
+            )
+
+        mock_block.assert_called_once()
+        assert "audit_ref" in mock_block.call_args.kwargs["reason"]
+
+    def test_reviewer_missing_verdict_blocks_even_if_state_changed(self) -> None:
+        """Reviewer must persist a verdict before passing the gate."""
+        store = _make_mock_store()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_reviewer_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/handoff"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=55,
+                branch="task/issue-55",
+                actor="agent:review",
+                role="reviewer",
+                before_state_label="state/review",
+                required_ref_key="audit_ref",
+                flow_state={},
+            )
+
+        mock_block.assert_called_once()
+        assert "latest verdict missing" in mock_block.call_args.kwargs["reason"]
 
     def test_manager_skips_ref_check_state_changed_passes(self) -> None:
         """Manager role skips ref check; only state change matters."""

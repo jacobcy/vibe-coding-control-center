@@ -121,7 +121,10 @@ pr_scoring:
 
     # Always block if codex returns these verdicts
     block_on_verdict:
+      - "MAJOR"
       - "BLOCK"
+      - "REFUSE"
+      - "UNKNOWN"
 
 # Review 配置
 # Review Configuration

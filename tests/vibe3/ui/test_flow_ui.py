@@ -1,9 +1,11 @@
 """Tests for flow timeline and flow show rendering."""
 
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 from vibe3.models.flow import FlowEvent, FlowStatusResponse
+from vibe3.models.verdict import VerdictRecord
 from vibe3.ui.flow_ui import render_flow_status, render_flow_timeline
 
 
@@ -151,3 +153,37 @@ def test_render_flow_status_shows_handoff_commands_for_artifacts(capsys) -> None
     assert "@report" in output
     # Should NOT show absolute path
     assert str(worktree_root) not in output
+
+
+def test_render_flow_status_shows_minor_and_refuse_verdicts(capsys) -> None:
+    status_minor = FlowStatusResponse(
+        branch="task/issue-401",
+        flow_slug="issue-401",
+        flow_status="active",
+        latest_verdict=VerdictRecord(
+            verdict="MINOR",
+            actor="reviewer",
+            role="reviewer",
+            timestamp=datetime.now(UTC),
+            flow_branch="task/issue-401",
+        ),
+    )
+    status_refuse = FlowStatusResponse(
+        branch="task/issue-402",
+        flow_slug="issue-402",
+        flow_status="active",
+        latest_verdict=VerdictRecord(
+            verdict="REFUSE",
+            actor="reviewer",
+            role="reviewer",
+            timestamp=datetime.now(UTC),
+            flow_branch="task/issue-402",
+        ),
+    )
+
+    render_flow_status(status_minor, worktree_root=None)
+    render_flow_status(status_refuse, worktree_root=None)
+
+    output = capsys.readouterr().out
+    assert "MINOR" in output
+    assert "REFUSE" in output

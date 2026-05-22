@@ -71,6 +71,10 @@ def _build_reason(score: RiskScore, dimensions: PRDimensions) -> str:
         reasons.append("online review critical")
     elif dimensions.codex_verdict == "MAJOR":
         reasons.append("online review major")
+    elif dimensions.codex_verdict == "MINOR":
+        reasons.append("online review minor")
+    elif dimensions.codex_verdict == "REFUSE":
+        reasons.append("online review refused")
 
     if not reasons:
         reasons.append("变更范围较小")
@@ -93,6 +97,10 @@ def _build_recommendations(score: RiskScore, dimensions: PRDimensions) -> list[s
         recommendations.append("补充跨模块联动验证或说明影响范围")
     if dimensions.codex_verdict in {"MAJOR", "CRITICAL", "BLOCK"}:
         recommendations.append("先处理审查结论，再继续推进合并")
+    if dimensions.codex_verdict == "MINOR":
+        recommendations.append("可以合并，但建议补 follow-up issue")
+    if dimensions.codex_verdict == "REFUSE":
+        recommendations.append("先澄清审查拒绝原因，再继续推进")
 
     if not recommendations and score.level in {RiskLevel.LOW, RiskLevel.MEDIUM}:
         recommendations.append("保持当前粒度，继续按常规测试和审查推进")

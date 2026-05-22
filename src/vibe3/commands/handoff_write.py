@@ -1,12 +1,13 @@
 """Handoff write commands - Modify handoff state and record events."""
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.verdict_policy import VerdictValue
 from vibe3.services.verdict_service import VerdictService
 from vibe3.ui.console import console
 from vibe3.utils.branch_arg import resolve_branch_arg
@@ -296,8 +297,10 @@ def next_step(
 
 def verdict(
     verdict_value: Annotated[
-        Literal["PASS", "MAJOR", "BLOCK", "UNKNOWN"],
-        typer.Argument(help="Verdict value (PASS, MAJOR, BLOCK, UNKNOWN)"),
+        VerdictValue,
+        typer.Argument(
+            help="Verdict value (PASS, MINOR, MAJOR, BLOCK, REFUSE, UNKNOWN)"
+        ),
     ],
     reason: Annotated[
         str | None, typer.Option("--reason", "-r", help="Verdict reason")
@@ -319,8 +322,10 @@ def verdict(
 
     Verdict values:
     - PASS: No issues, ready to merge
+    - MINOR: Minor issues, merge acceptable with follow-up
     - MAJOR: Issues found, needs fix before merge
     - BLOCK: Critical issues, blocks merge
+    - REFUSE: Cannot perform normal review (ethical/legal concerns)
     - UNKNOWN: Cannot determine
 
     Examples:

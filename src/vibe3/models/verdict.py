@@ -1,9 +1,10 @@
 """Verdict data model for handoff chain."""
 
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel
+
+from vibe3.services.verdict_policy import VerdictValue
 
 
 class VerdictRecord(BaseModel):
@@ -18,7 +19,7 @@ class VerdictRecord(BaseModel):
     - The agent layer (prompts) makes decisions based on the verdict data
     """
 
-    verdict: Literal["PASS", "MAJOR", "BLOCK", "UNKNOWN"]
+    verdict: VerdictValue
     actor: str  # e.g., "claude/claude-sonnet-4-6"
     role: str  # e.g., "reviewer" | "manager"
     timestamp: datetime
