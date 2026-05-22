@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 
 from vibe3.models.orchestration import IssueState
-from vibe3.utils.label_utils import has_manager_assignee
+from vibe3.services.label_utils import has_manager_assignee
 
 
 class TaskStatusBucket(str, Enum):

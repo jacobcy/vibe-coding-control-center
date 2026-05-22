@@ -33,13 +33,13 @@ from vibe3.prompts.models import (
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
+from vibe3.services.label_utils import normalize_assignees, normalize_labels
 from vibe3.services.orchestra_status_service import (
     IssueStatusEntry,
     format_issue_runtime_line,
     format_issue_summary_line,
     is_running_issue,
 )
-from vibe3.utils.label_utils import normalize_assignees, normalize_labels
 
 GOVERNANCE_ROLE = RoleDefinition(
     name="governance",

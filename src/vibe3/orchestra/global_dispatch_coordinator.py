@@ -41,7 +41,7 @@ from vibe3.orchestra.queue_persistence_mixin import (
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.label_utils import (
+from vibe3.services.label_utils import (
     clean_old_state_labels,
     should_skip_from_queue,
 )
