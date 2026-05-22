@@ -8,7 +8,7 @@ authority:
   - action-verb-reminders
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-05-22
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -111,3 +111,15 @@ related_docs:
 - 默认含义：执行检查、验证或审计
 - 前置提醒：确认检查对象、失败条件和输出格式明确
 - 不要隐含什么：不要把 `check` 做成修复命令，不要在失败时静默改数据
+
+### 2.14 `handoff`
+
+- 默认含义：在不同 agent 或不同 session 之间传递本地执行上下文与中间态产物
+- 前置提醒：确认 handoff 内容已持久化到共享 store（如 `.git/vibe3/handoff.db`），且关键 artifact 已登记
+- 不要隐含什么：不要把 `handoff` 理解为 GitHub PR 的合入或 issue 的关闭，它仅限于本地执行链的衔接
+
+### 2.15 `indicate`
+
+- 默认含义：由管理角色（如 manager）发布明确的指令、动作建议或停点要求，供后续执行角色消费
+- 前置提醒：确认 indicate 内容清晰、不具歧义，且已绑定到当前 flow 的 handoff 链路中
+- 不要隐含什么：不要借 `indicate` 隐式修改业务代码或外部状态，它仅作为执行层面的意图传达

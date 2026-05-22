@@ -1,3 +1,20 @@
+---
+document_type: constitution
+title: VIBE Constitution
+status: approved
+scope: project-core
+authority:
+  - core-principles
+  - agent-behavior-standards
+author: Vibe Team
+created: 2024-01-15
+last_updated: 2026-05-22
+related_docs:
+  - AGENTS.md
+  - STRUCTURE.md
+  - CLAUDE.md
+---
+
 # VIBE Constitution
 
 Vibe Coding 的核心是：**认知优先，代码次之**。
