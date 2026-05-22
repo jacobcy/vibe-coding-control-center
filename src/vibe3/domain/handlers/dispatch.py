@@ -120,7 +120,7 @@ def _dispatch_role_intent(
 
 
 @register_handler("PlannerDispatchIntent")
-def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
+def handle_planner_dispatch_intent(event: PlannerDispatchIntent, /) -> None:
     """Handle PlannerDispatchIntent event via role request builder."""
     with get_store() as store:
         flow_state = store.get_flow_state(event.branch) if event.branch else None
@@ -155,7 +155,7 @@ def handle_planner_dispatch_intent(event: PlannerDispatchIntent) -> None:
 
 
 @register_handler("ExecutorDispatchIntent")
-def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
+def handle_executor_dispatch_intent(event: ExecutorDispatchIntent, /) -> None:
     """Handle ExecutorDispatchIntent event via role request builder.
 
     Enriches the neutral dispatch intent with execution-specific context
@@ -206,7 +206,7 @@ def handle_executor_dispatch_intent(event: ExecutorDispatchIntent) -> None:
 
 
 @register_handler("ReviewerDispatchIntent")
-def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent) -> None:
+def handle_reviewer_dispatch_intent(event: ReviewerDispatchIntent, /) -> None:
     """Handle ReviewerDispatchIntent event via role request builder.
 
     Enriches the neutral dispatch intent with report_ref and retry context

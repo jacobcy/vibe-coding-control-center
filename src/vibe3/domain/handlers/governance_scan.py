@@ -18,7 +18,7 @@ from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 
 
 @register_handler("GovernanceScanStarted")
-def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
+def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
     """Dispatch governance scan via CLI self-invocation."""
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.environment.session_registry import SessionRegistryService

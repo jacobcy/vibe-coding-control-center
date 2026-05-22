@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 @register_handler("SupervisorIssueIdentified")
 def handle_supervisor_issue_identified(
-    event: SupervisorIssueIdentified, coordinator: ExecutionCoordinator | None = None
+    event: SupervisorIssueIdentified, /, coordinator: ExecutionCoordinator | None = None
 ) -> None:
     """Dispatch supervisor apply via CLI self-invocation."""
     from vibe3.execution.issue_role_support import build_issue_async_cli_request
