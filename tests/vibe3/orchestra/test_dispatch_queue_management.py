@@ -678,12 +678,11 @@ class TestActionableTriggeredCollection:
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
         # Mock collect to return fresh entries
-        async def mock_collect() -> list[QueueEntry]:
-            return [
+        mock_coordinator._collect_frozen_queue = AsyncMock(
+            return_value=[
                 QueueEntry(issue_number=2, collected_state="ready", waiting_state=None),
             ]
-
-        mock_coordinator._collect_frozen_queue = mock_collect
+        )
 
         mock_coordinator._persist_queue = MagicMock()
 
@@ -691,6 +690,7 @@ class TestActionableTriggeredCollection:
 
         # Should have called _collect_frozen_queue
         # (because all entries were blocked)
+        mock_coordinator._collect_frozen_queue.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_collect_when_actionable_available(self, mock_coordinator):
