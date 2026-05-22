@@ -223,15 +223,23 @@ class FlowLifecycleMixin:
         )
 
         # Update flow state with blocked_reason (unified with block)
-        # Do NOT write flow_status - blocked inferred from issue label
         self.store.update_flow_state(
             branch,
+            flow_status="blocked",
             blocked_reason=reason,
             latest_actor=effective_actor,
         )
 
-        # Add timeline comment via FlowTimelineService if issue linked
+        # Find task issue number
         issue_number = flow_data.get("task_issue_number")
+        if not issue_number:
+            issue_links = self.store.get_issue_links(branch)
+            for link in issue_links:
+                if link.get("issue_role") == "task":
+                    issue_number = link.get("issue_number")
+                    if isinstance(issue_number, int):
+                        break
+
         if issue_number:
             try:
                 timeline_service = FlowTimelineService(store=self.store)
@@ -249,6 +257,21 @@ class FlowLifecycleMixin:
                     branch=branch,
                     issue_number=issue_number,
                 ).warning(f"Failed to add timeline comment: {e}")
+
+            # Project blocked state to issue body (critical for truth consistency)
+            try:
+                self._project_blocked_state(
+                    issue_number,
+                    blocked_by_issue=None,
+                    reason=reason,
+                )
+            except Exception as e:
+                logger.bind(
+                    domain="flow",
+                    action="fail",
+                    branch=branch,
+                    issue_number=issue_number,
+                ).warning(f"Failed to project blocked state: {e}")
 
         logger.bind(branch=branch).success("Flow marked as failed (blocked_reason)")
 
