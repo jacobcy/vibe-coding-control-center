@@ -16,7 +16,23 @@ def reset_error_tracking() -> Iterator[None]:
     yield
     from vibe3.exceptions.error_tracking import ErrorTrackingService
 
+    db_paths = [
+        instance.db_path for instance in ErrorTrackingService._registry.values()
+    ]
+    if ErrorTrackingService._instance is not None:
+        db_paths.append(ErrorTrackingService._instance.db_path)
+    if ErrorTrackingService._default_instance is not None:
+        db_paths.append(ErrorTrackingService._default_instance.db_path)
+
     ErrorTrackingService.clear_instance()
+
+    for db_path in set(db_paths):
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("DELETE FROM error_log")
+            conn.execute(
+                "UPDATE failed_gate_state SET is_active = 0, "
+                "reason = NULL, triggered_at = NULL, blocked_ticks = 0 WHERE id = 1"
+            )
 
 
 @pytest.fixture
