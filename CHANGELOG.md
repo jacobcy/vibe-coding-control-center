@@ -253,6 +253,14 @@
 - **Skill Layer**: 100% complete (full audit workflow with AI analysis)
 - **Integration**: 100% complete (vibe check --audit-tasks working)
 
+### ⚠️ Deprecations
+- **`features.skills` split into `features.local_skills` and `features.global_skills`**
+  - Old key: `features.skills: <bool>` (no longer generated)
+  - New keys: `features.local_skills: <bool>` + `features.global_skills: <bool>`
+  - Migration: re-run `vibe init` to regenerate `.vibe/config.yaml` in the new format
+  - Detection: `vibe init` warns when legacy `features.skills` key is present without the new keys
+  - Source: PR #1133
+
 ## [2.1.5] - 2026-03-07
 
 ### ✨ New Features
