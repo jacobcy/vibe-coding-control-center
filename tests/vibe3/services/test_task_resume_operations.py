@@ -601,3 +601,37 @@ def test_reset_issue_to_ready_with_remote_flag() -> None:
                 terminate_sessions=True,
                 keep_flow_record=False,
             )
+
+
+def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> None:
+    """With --label auto and no flow, should restore to READY (not CLAIMED)."""
+    operations = _make_operations()
+    operations.label_service.get_state.return_value = IssueState.BLOCKED
+    operations.github_client.view_issue.return_value = {"comments": []}
+
+    # Mock NO flow (branch is None)
+    mock_flow = MagicMock()
+    mock_flow.branch = None
+
+    # get_flow_state returns None (no flow state exists)
+    operations.flow_service.store.get_flow_state.return_value = None
+
+    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
+        mock_label_instance = MagicMock()
+        mock_label_instance.confirm_issue_state = MagicMock()
+        mock_label_cls.return_value = mock_label_instance
+
+        operations.reset_issue_to_ready(
+            issue_number=303,
+            resume_kind="blocked",
+            flow=mock_flow,
+            repo=None,
+            reason="test resume",
+            worktree_path=None,
+            label_state="",  # ← --label auto (no flow exists)
+        )
+
+        # Verify: state restored to READY (not CLAIMED)
+        mock_label_instance.confirm_issue_state.assert_called_once()
+        call_args = mock_label_instance.confirm_issue_state.call_args
+        assert call_args[0][1] == IssueState.READY  # Second positional arg is state

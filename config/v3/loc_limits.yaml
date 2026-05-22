@@ -27,8 +27,8 @@ code_limits:
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check_service.py"
-        limit: 620
-        reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记等紧密耦合逻辑"
+        limit: 680
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分，包含 PR 状态处理、分支清理、flow 状态标记、PR closed 阻塞逻辑等紧密耦合逻辑"
       - path: "src/vibe3/services/issue_failure_service.py"
         limit: 600
         reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
@@ -232,6 +232,9 @@ code_limits:
       - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
+      - path: "tests/vibe3/services/test_check_cleanup_service.py"
+        limit: 540
+        reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 2 个测试后略微超标"
       - path: "tests/vibe3/services/test_task_resume_operations.py"
         limit: 650
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，合并 legacy test_services 目录后测试覆盖更全面，共享 fixture，拆分收益低"

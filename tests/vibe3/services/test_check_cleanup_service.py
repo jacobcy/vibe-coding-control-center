@@ -397,3 +397,93 @@ class TestCleanResidualBranches:
         # Should have some result despite failures
         assert "failed" in result
         assert result["total_flows_checked"] == 2
+
+
+def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
+    """Aborted flow with --clean-branch should resume issue to READY."""
+    from vibe3.models.orchestration import IssueState
+
+    store = MagicMock()
+    git_client = MagicMock()
+    github_client = MagicMock()
+
+    # Mock aborted flow
+    store.get_all_flows.return_value = [
+        {
+            "branch": "task/issue-200",
+            "flow_status": "aborted",
+            "blocked_reason": "PR #123 closed without merge",
+        }
+    ]
+
+    # Mock issue open
+    github_client.view_issue.return_value = {
+        "state": "open",
+    }
+
+    service = CheckCleanupService(
+        store=store,
+        git_client=git_client,
+        github_client=github_client,
+    )
+
+    with patch(
+        "vibe3.services.flow_cleanup_service.FlowCleanupService"
+    ) as mock_cleanup_cls:
+        mock_cleanup = MagicMock()
+        mock_cleanup.cleanup_flow_scene.return_value = {
+            "flow_record": True,
+            "worktree": True,
+            "local_branch": True,
+        }
+        mock_cleanup_cls.return_value = mock_cleanup
+
+        with patch(
+            "vibe3.services.issue_failure_service.LabelService"
+        ) as mock_label_cls:
+            mock_label = MagicMock()
+            mock_label_cls.return_value = mock_label
+
+            # Mock get_state to return None (no current state)
+            mock_label.get_state.return_value = None
+
+            results = service._clean_terminal_flows()
+
+    # Verify issue resumed to READY
+    mock_label.confirm_issue_state.assert_called_once()
+    call_args = mock_label.confirm_issue_state.call_args
+    assert call_args[0][0] == 200  # issue_number
+    assert call_args[0][1] == IssueState.READY
+
+    # Verify cleanup happened
+    assert "Cleaned 1 aborted flows" in results["summary"]
+
+
+def test_resume_blocked_issue_adds_cleanup_comment() -> None:
+    """Resume should add comment explaining cleanup and recommendations."""
+    store = MagicMock()
+    git_client = MagicMock()
+    github_client = MagicMock()
+
+    service = CheckCleanupService(
+        store=store,
+        git_client=git_client,
+        github_client=github_client,
+    )
+
+    github_client.view_issue.return_value = {
+        "state": "open",
+    }
+
+    with patch("vibe3.services.issue_failure_service.LabelService"):
+        service._resume_blocked_issue("task/issue-300")
+
+    # Verify comment added
+    github_client.add_comment.assert_called_once()
+    call_args = github_client.add_comment.call_args
+    assert call_args[0][0] == 300  # issue_number
+
+    comment_body = call_args[0][1]
+    assert "旧 flow 已清理" in comment_body
+    assert "follow-up issue" in comment_body.lower()
+    assert "不建议" in comment_body

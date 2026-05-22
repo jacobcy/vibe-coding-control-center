@@ -137,7 +137,10 @@ class TaskResumeOperations:
                 if fs_dict:
                     target_state = infer_resume_label(FlowState.model_validate(fs_dict))
                 else:
-                    target_state = IssueState.CLAIMED
+                    # No flow → restore to READY (can be claimed by any agent)
+                    # CLAIMED is wrong: implies claimed by actor, but no flow
+                    # exists to provide execution context
+                    target_state = IssueState.READY
             else:
                 valid_states = {
                     "ready": IssueState.READY,
