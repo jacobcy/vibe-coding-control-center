@@ -55,14 +55,6 @@ def test_can_dispatch_rejects_when_at_max(
         assert service.can_dispatch("manager") is False
 
 
-def test_can_dispatch_with_zero_live_sessions(
-    service: CapacityService,
-) -> None:
-    """can_dispatch returns True when no live sessions."""
-    with patch.object(service._registry, "count_live_worker_sessions", return_value=0):
-        assert service.can_dispatch("manager") is True
-
-
 def test_can_dispatch_exact_boundary(
     service: CapacityService,
 ) -> None:

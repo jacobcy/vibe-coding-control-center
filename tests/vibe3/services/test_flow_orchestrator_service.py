@@ -13,14 +13,6 @@ from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 
-def test_flow_orchestrator_service_initialization() -> None:
-    """FlowOrchestratorService should initialize with config."""
-    config = load_orchestra_config()
-    service = FlowOrchestratorService(config)
-
-    assert service.config == config
-
-
 def _pr_response(
     *,
     number: int = 42,

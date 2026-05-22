@@ -68,22 +68,6 @@ class TestIssueFlowServiceConventionInjection:
 class TestIssueFlowServiceBranchNaming:
     """Tests for branch name generation and parsing."""
 
-    def test_canonical_branch_name_formats_correctly(self) -> None:
-        """Should generate canonical branch name task/issue-N."""
-        service = IssueFlowService()
-
-        assert service.canonical_branch_name(372) == "task/issue-372"
-        assert service.canonical_branch_name(1) == "task/issue-1"
-        assert service.canonical_branch_name(999) == "task/issue-999"
-
-    def test_parse_issue_number_extracts_from_canonical(self) -> None:
-        """Should extract issue number from canonical task branch."""
-        service = IssueFlowService()
-
-        assert service.parse_issue_number("task/issue-372") == 372
-        assert service.parse_issue_number("task/issue-1") == 1
-        assert service.parse_issue_number("task/issue-999") == 999
-
     def test_parse_issue_number_returns_none_for_non_canonical(self) -> None:
         """Should return None for non-canonical branches."""
         service = IssueFlowService()

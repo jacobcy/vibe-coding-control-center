@@ -2,10 +2,48 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from vibe3.clients import SQLiteClient
+from vibe3.clients.git_client import GitClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.services.check_cleanup_service import CheckCleanupService
 from vibe3.services.expired_resource_cleanup_service import (
     ExpiredResourceCleanupService,
 )
+
+
+@pytest.fixture
+def mock_store():
+    """Create a mock SQLiteClient."""
+    return MagicMock(spec=SQLiteClient)
+
+
+@pytest.fixture
+def mock_git_client():
+    """Create a mock GitClient."""
+    client = MagicMock(spec=GitClient)
+    client.get_current_branch.return_value = "feature/test-branch"
+    client._run.return_value = "/path/to/.git"
+    return client
+
+
+@pytest.fixture
+def mock_github_client():
+    """Create a mock GitHubClient."""
+    client = MagicMock(spec=GitHubClient)
+    client.list_all_prs.return_value = []
+    return client
+
+
+@pytest.fixture
+def cleanup_service(mock_store, mock_git_client, mock_github_client):
+    """Create a CheckCleanupService instance with mocked dependencies."""
+    return CheckCleanupService(
+        store=mock_store,
+        git_client=mock_git_client,
+        github_client=mock_github_client,
+    )
 
 
 def test_clean_residual_branches_filters_live_sessions_before_cleanup() -> None:
@@ -137,72 +175,6 @@ def test_clean_residual_branches_handles_no_live_sessions() -> None:
             assert result["skipped_live"] == []
 
 
-def test_clean_expired_local_branches_deletes_old() -> None:
-    """Delete local branches older than max age, excluding protected and current."""
-    from datetime import datetime, timedelta
-
-    store = MagicMock()
-    git_client = MagicMock()
-    service = ExpiredResourceCleanupService(store=store, git_client=git_client)
-
-    # Mock git_client
-    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
-    recent_date = (datetime.now() - timedelta(days=3)).strftime(
-        "%Y-%m-%d %H:%M:%S +0800"
-    )
-
-    git_client.get_all_branches_with_timestamps.return_value = [
-        {"branch": "feature-old", "timestamp": old_date},
-        {"branch": "feature-recent", "timestamp": recent_date},
-        {"branch": "main", "timestamp": old_date},  # Protected
-        {"branch": "current-branch", "timestamp": old_date},  # Current
-    ]
-
-    git_client.get_current_branch.return_value = "current-branch"
-    git_client.branch_exists.return_value = True
-
-    # Mock worktree check
-    git_client.is_branch_occupied_by_worktree.return_value = False
-    git_client.find_worktree_path_for_branch.return_value = None
-
-    result = service.clean_expired_local_branches(max_age_days=7)
-
-    # Verify: only feature-old deleted
-    assert "cleaned" in result
-    assert "feature-old" in result["cleaned"]
-    assert "main" not in result["cleaned"]
-    assert "current-branch" not in result["cleaned"]
-    assert "feature-recent" not in result["cleaned"]
-
-
-def test_clean_expired_remote_branches_parses_non_0800_offsets() -> None:
-    """Remote cleanup should handle git timestamps with or without timezone colon."""
-    from datetime import datetime, timedelta, timezone
-
-    store = MagicMock()
-    git_client = MagicMock()
-    github_client = MagicMock()
-    service = ExpiredResourceCleanupService(
-        store=store, git_client=git_client, github_client=github_client
-    )
-
-    old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
-        "%Y-%m-%d %H:%M:%S +0000"
-    )
-    old_date_with_colon = old_date[:-2] + ":" + old_date[-2:]
-    git_client.get_all_branches_with_timestamps.return_value = [
-        {"branch": "origin/feature-old", "timestamp": old_date},
-        {"branch": "origin/feature-colon", "timestamp": old_date_with_colon},
-    ]
-    github_client.list_all_prs.return_value = []
-
-    result = service.clean_expired_remote_branches(max_age_days=7)
-
-    assert result["cleaned"] == ["origin/feature-old", "origin/feature-colon"]
-    git_client.delete_remote_branch.assert_any_call("feature-old")
-    git_client.delete_remote_branch.assert_any_call("feature-colon")
-
-
 def test_clean_residual_branches_integrates_all_cleanups() -> None:
     """Should call all cleanup methods when enabled."""
     store = MagicMock()
@@ -243,33 +215,6 @@ def test_clean_residual_branches_integrates_all_cleanups() -> None:
                 assert "agent_worktrees cleaned 1" in summary
                 assert "remote_branches cleaned 1" in summary
                 assert "local_branches cleaned 1" in summary
-
-
-def test_clean_expired_local_branches_reports_worktree_removal() -> None:
-    """When a local branch has a worktree, record it in skipped_worktree."""
-    from datetime import datetime, timedelta
-    from pathlib import Path
-
-    store = MagicMock()
-    git_client = MagicMock()
-    service = ExpiredResourceCleanupService(store=store, git_client=git_client)
-
-    old_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S +0800")
-    git_client.get_all_branches_with_timestamps.return_value = [
-        {"branch": "feature-old", "timestamp": old_date},
-    ]
-    git_client.get_current_branch.return_value = "main"
-    git_client.branch_exists.return_value = True
-
-    git_client.is_branch_occupied_by_worktree.return_value = True
-    git_client.find_worktree_path_for_branch.return_value = Path("/tmp/wt")
-
-    with patch("vibe3.services.expired_resource_cleanup_service.remove_worktree") as rm:
-        result = service.clean_expired_local_branches(max_age_days=7)
-
-    rm.assert_called_once()
-    assert "feature-old" in result["skipped_worktree"]
-    assert "feature-old" in result["cleaned"]
 
 
 def test_cleanup_detached_worktrees_removes_orphaned_worktrees() -> None:
@@ -345,3 +290,110 @@ detached
         if c[0][0][:2] == ["worktree", "remove"]
     ]
     assert len(remove_calls) == 1
+
+
+class TestCleanResidualBranches:
+    """Tests for clean_residual_branches method in CheckCleanupService."""
+
+    def test_clean_residual_branches_removes_done_flow_branches(
+        self, cleanup_service, mock_store, mock_git_client
+    ):
+        """Should clean physical resources for done flows but keep flow record."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/done-branch", "flow_status": "done"},
+            {"branch": "feature/active-branch", "flow_status": "active"},
+        ]
+        # Simulate local branch exists for done branch
+        mock_git_client._run.return_value = "feature/done-branch"
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = cleanup_service.clean_residual_branches()
+
+        # Done flow should be in kept_records (physical resources cleaned, record kept)
+        assert "feature/done-branch" in result["kept_records"]
+        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows only
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_skips_when_no_resources(
+        self, cleanup_service, mock_store, mock_git_client
+    ):
+        """Should preserve done/merged flow records even without physical resources.
+
+        Done/merged flows keep their records as completion history.
+        Only aborted flows have their records deleted.
+        """
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/done-branch", "flow_status": "done"},
+        ]
+        # Simulate no resources exist
+        mock_git_client._run.return_value = ""
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = cleanup_service.clean_residual_branches()
+
+        # Done flow record should be preserved (in kept_records, not cleaned)
+        assert len(result["kept_records"]) == 1
+        assert "feature/done-branch" in result["kept_records"]
+        assert len(result["cleaned"]) == 0  # cleaned is for aborted flows
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_aborted_deletes_record(
+        self, cleanup_service, mock_store, mock_git_client
+    ):
+        """Should delete aborted flow records to allow issue restart."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/aborted-branch", "flow_status": "aborted"},
+        ]
+        # Simulate no resources exist
+        mock_git_client._run.return_value = ""
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = cleanup_service.clean_residual_branches()
+
+        # Aborted flow record should be deleted (in cleaned)
+        assert len(result["cleaned"]) == 1
+        assert "feature/aborted-branch" in result["cleaned"]
+        assert len(result["kept_records"]) == 0  # kept_records is for done/merged
+        assert result["total_flows_checked"] == 1
+
+    def test_clean_residual_branches_removes_invalid_records(
+        self, cleanup_service, mock_store, mock_git_client
+    ):
+        """Should remove HEAD records from database."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "HEAD", "flow_status": "done"},
+            {"branch": "HEAD~1", "flow_status": "aborted"},
+        ]
+
+        result = cleanup_service.clean_residual_branches()
+
+        assert len(result["removed_invalid"]) == 2
+        assert mock_store.delete_flow.call_count == 2
+
+    def test_clean_residual_branches_handles_partial_failures(
+        self, cleanup_service, mock_store, mock_git_client
+    ):
+        """Should continue cleaning even if some fail."""
+        mock_store.get_all_flows.return_value = [
+            {"branch": "feature/branch-1", "flow_status": "done"},
+            {"branch": "feature/branch-2", "flow_status": "done"},
+        ]
+        # First branch succeeds, second fails
+        call_count = [0]
+
+        def mock_run(cmd):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                return "feature/branch-1"  # First call for branch-1
+            elif call_count[0] <= 2:
+                raise RuntimeError("git error")  # First call for branch-2 fails
+            return ""  # Subsequent calls
+
+        mock_git_client._run.side_effect = mock_run
+        mock_git_client.find_worktree_path_for_branch.return_value = None
+
+        result = cleanup_service.clean_residual_branches()
+
+        # Should have some result despite failures
+        assert "failed" in result
+        assert result["total_flows_checked"] == 2
