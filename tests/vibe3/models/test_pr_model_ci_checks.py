@@ -21,7 +21,7 @@ class TestCICheckModel:
         assert check.link == "https://github.com/test/repo/actions/runs/123"
 
     def test_ci_check_serialization(self) -> None:
-        """Test CICheck model serialization."""
+        """Test CICheck model serialization excludes None fields."""
         check = CICheck(
             name="Build",
             state="FAILURE",
@@ -29,7 +29,7 @@ class TestCICheckModel:
             link="https://github.com/test/repo/actions/runs/456",
         )
 
-        data = check.model_dump()
+        data = check.model_dump(exclude_none=True)
         assert data == {
             "name": "Build",
             "state": "FAILURE",

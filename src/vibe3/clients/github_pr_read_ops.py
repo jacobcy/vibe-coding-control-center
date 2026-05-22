@@ -34,18 +34,23 @@ def _build_failure_command(run_id: str, job_id: str | None) -> str:
 def _classify_failed_step_name(step_name: str) -> str | None:
     """Classify a failed step name into a coarse failure category."""
     lowered = step_name.lower()
-    if "pytest" in lowered or "tests" in lowered or "test" in lowered:
-        return "pytest"
-    if "loc" in lowered:
-        return "loc"
-    if "ruff" in lowered or "lint" in lowered:
-        return "ruff"
-    if "mypy" in lowered or "type check" in lowered:
-        return "mypy"
-    if "black" in lowered or "format" in lowered:
-        return "black"
+    # Specific tools first to avoid "Run bats tests" matching "test" before "bats"
     if "bats" in lowered:
         return "bats"
+    if "ruff" in lowered:
+        return "ruff"
+    if "black" in lowered or "format" in lowered:
+        return "black"
+    if "mypy" in lowered or "type check" in lowered:
+        return "mypy"
+    if "loc" in lowered:
+        return "loc"
+    # Generic test match as last resort
+    if "pytest" in lowered or "tests" in lowered or "test" in lowered:
+        return "pytest"
+    # Generic lint match (may include non-ruff steps like "dual-layer lint")
+    if "lint" in lowered:
+        return "lint"
     return None
 
 

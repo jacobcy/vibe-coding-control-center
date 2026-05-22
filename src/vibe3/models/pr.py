@@ -19,12 +19,10 @@ class CICheck(BaseModel):
     failure_category: Optional[str] = Field(
         None,
         description="Classified failure category for failed checks",
-        exclude_if=lambda value: value is None,
     )
     failure_command: Optional[str] = Field(
         None,
         description="Command to inspect detailed failure logs",
-        exclude_if=lambda value: value is None,
     )
 
 
