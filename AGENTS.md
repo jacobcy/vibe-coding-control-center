@@ -1,3 +1,20 @@
+---
+document_type: core-entry
+title: AI Agent Guide
+status: approved
+scope: project-entry
+authority:
+  - agent-entry-navigation
+  - essential-reading-order
+author: Claude Sonnet 4.5
+created: 2024-01-15
+last_updated: 2026-05-22
+related_docs:
+  - SOUL.md
+  - STRUCTURE.md
+  - CLAUDE.md
+---
+
 # AI Agent Guide
 
 Welcome, AI Agent. This file serves as your entry point to Vibe Center 3.0.

@@ -1,3 +1,20 @@
+---
+document_type: core-entry
+title: AI Agent Workspace (.agent)
+status: approved
+scope: project-entry
+authority:
+  - agent-workspace-structure
+  - agent-interoperability-protocol
+author: Claude Sonnet 4.5
+created: 2024-01-15
+last_updated: 2026-05-22
+related_docs:
+  - AGENTS.md
+  - SOUL.md
+  - STRUCTURE.md
+---
+
 # AI Agent Workspace (.agent)
 
 **这是 AI Agent (Claude, OpenCode, Codex, Trae, etc.) 的指定工作环境。**
@@ -9,14 +26,15 @@
 - **[CLAUDE.md](../CLAUDE.md)**: 技术栈与上下文
 - **[SOUL.md](../SOUL.md)**: 核心原则与价值观 (Constitution & Principles)
 - **[docs/standards/glossary.md](../docs/standards/glossary.md)**: 项目术语真源
-- **[docs/standards/action-verbs.md](../docs/standards/action-verbs.md)**: 高频动作词真源
+- **[docs/standards/action-verbs.md](../docs/standards/action-verbs.md)**: 高频 动作词真源
 
 ## 📂 目录结构 (Directory Structure)
 
 - **`context/`**: 记忆与任务管理
-  - `memory.md`: 长期记忆，记录关键决策和架构选择。
-  - handoff：当前 flow 的交接记录（`vibe3 handoff status` 读取，`vibe3 handoff append` 写入）。
-- **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务逻辑。
+  - `memory.md`: 长期记忆，记录关键决策和架构选择（日常记忆优先使用 `claude-memory` MCP 工具）。
+  - `task.md`: **[UNTRACKED]** 由 `vibe3 handoff` 命令自动管理的短期上下文，不建议手动编辑。
+  - `handoff`: 由 `vibe3 handoff status` 读取，`vibe3 handoff append` 写入的当前 flow 交接事实。
+- **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务 逻辑。
 - **`rules/`**: 具体的编码标准和项目规则。
   - `coding-standards.md`: 实现、边界、工具与交付细则
   - `patterns.md`: 执行模式、报告模式与渐进披露模式
