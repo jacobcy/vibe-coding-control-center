@@ -74,6 +74,12 @@ def render_pr_details(pr: PRResponse) -> None:
                 console.print(
                     f"  [red]✗[/] [bold]{check.name}[/] [dim]({check.state})[/]"
                 )
+                if check.failure_category:
+                    console.print(
+                        f"    [dim]Failure category:[/] {check.failure_category}"
+                    )
+                if check.failure_command:
+                    console.print(f"    [dim]Inspect with:[/] {check.failure_command}")
                 console.print(f"    [dim][link={check.link}]View details[/link][/]")
         elif pending:
             console.print(
