@@ -17,9 +17,9 @@ from vibe3.commands.handoff_render import (
 from vibe3.exceptions import SystemError, UserError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_status_service import HandoffStatusService
+from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import render_handoff_detail
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.utils.pr_branch_resolver import resolve_command_branch
 
 

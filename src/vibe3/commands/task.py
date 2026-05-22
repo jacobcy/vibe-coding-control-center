@@ -13,13 +13,13 @@ from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
     render_task_comments,
     render_task_show,
 )
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 app = typer.Typer(
     help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"

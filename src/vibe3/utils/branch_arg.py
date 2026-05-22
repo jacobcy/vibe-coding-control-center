@@ -6,7 +6,7 @@ adds current-branch fallback for None input.
 
 from vibe3.clients.git_client import GitClient
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
+from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 
 
 def resolve_branch_arg(branch_arg: str | None) -> str:
