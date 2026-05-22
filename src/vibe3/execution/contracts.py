@@ -1,9 +1,30 @@
 """Execution contracts for unifying role execution."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Protocol
 
 from vibe3.execution.role_contracts import WorktreeRequirement
+
+if TYPE_CHECKING:
+    from vibe3.agents.backends.async_launcher import AsyncExecutionHandle
+
+
+class AsyncLauncherProtocol(Protocol):
+    """Protocol for async command launcher function."""
+
+    def __call__(
+        self,
+        command: list[str],
+        *,
+        execution_name: str,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        keep_alive_seconds: int = 0,
+    ) -> "AsyncExecutionHandle": ...
+
+
+_StartAsyncFactory = AsyncLauncherProtocol
 
 
 @dataclass

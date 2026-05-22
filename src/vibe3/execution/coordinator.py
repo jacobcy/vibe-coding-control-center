@@ -9,15 +9,18 @@ from typing import Generator, Optional
 
 from loguru import logger
 
-from vibe3.agents.backends.async_launcher import start_async_command
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.clients.protocols import BackendProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.auto_scene_recovery import AutoSceneRecoveryService
 from vibe3.execution.capacity_service import CapacityService
 from vibe3.execution.codeagent_runner import CodeagentExecutionService
-from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+from vibe3.execution.contracts import (
+    ExecutionLaunchResult,
+    ExecutionRequest,
+    _StartAsyncFactory,
+)
 from vibe3.execution.execution_lifecycle import execution_prefix
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -46,15 +49,66 @@ class ExecutionCoordinator:
         self,
         config: OrchestraConfig,
         store: SQLiteClient,
-        backend: Optional[CodeagentBackend] = None,
+        backend: Optional[BackendProtocol] = None,
+        start_async: Optional[_StartAsyncFactory] = None,
         capacity: Optional[CapacityService] = None,
     ) -> None:
         """Initialize the execution coordinator."""
         self.config = config
         self.store = store
-        self.backend = backend or CodeagentBackend()
-        self.capacity = capacity or CapacityService(config, store, self.backend)
-        self.registry = SessionRegistryService(store, self.backend)
+        self._backend_factory = backend
+        self._start_async_factory = start_async
+        self._capacity_factory = capacity
+        self._backend: Optional[BackendProtocol] = None
+        self._async_launcher: Optional[_StartAsyncFactory] = None
+        self._capacity: Optional[CapacityService] = None
+        self._registry: Optional[SessionRegistryService] = None
+
+    @staticmethod
+    def _default_backend() -> BackendProtocol:
+        """Default backend factory."""
+        from vibe3.agents.backends.codeagent import CodeagentBackend
+
+        return CodeagentBackend()
+
+    @staticmethod
+    def _default_start_async() -> _StartAsyncFactory:
+        """Default async launcher factory."""
+        from vibe3.agents.backends.async_launcher import start_async_command
+
+        return start_async_command
+
+    @property
+    def backend(self) -> BackendProtocol:
+        """Lazy-initialized backend."""
+        if self._backend is None:
+            self._backend = self._backend_factory or self._default_backend()
+        return self._backend
+
+    @property
+    def _start_async(self) -> _StartAsyncFactory:
+        """Lazy-initialized async launcher."""
+        if self._async_launcher is None:
+            self._async_launcher = (
+                self._start_async_factory or self._default_start_async()
+            )
+        return self._async_launcher
+
+    @property
+    def capacity(self) -> CapacityService:
+        """Lazy-initialized capacity service."""
+        if self._capacity is None:
+            self._capacity = self._capacity_factory or CapacityService(
+                self.config, self.store, self.backend
+            )
+        return self._capacity
+
+    @property
+    def registry(self) -> SessionRegistryService:
+        """Lazy-initialized registry service."""
+        if self._registry is None:
+            self._registry = SessionRegistryService(self.store, self.backend)
+        return self._registry
 
     def _resolve_cwd(self, request: ExecutionRequest) -> Optional[Path]:
         """Resolve execution cwd from explicit request or environment policy."""
@@ -285,7 +339,7 @@ class ExecutionCoordinator:
                     )
 
                 if request.cmd:
-                    handle = start_async_command(
+                    handle = self._start_async(
                         request.cmd,
                         execution_name=request.execution_name,
                         cwd=cwd_path,
