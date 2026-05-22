@@ -295,7 +295,7 @@ def test_get_pr_for_issue_uses_branch_pr_status_fallback() -> None:
 
         github.list_all_prs.assert_called_once_with(state="all", limit=50)
         github.list_prs_for_branch.assert_called_once_with(
-            "task/issue-123", state="all"
+            "task/issue-123", state="all", repo=None
         )
         assert result == 42
 

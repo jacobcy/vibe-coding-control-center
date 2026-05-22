@@ -6,6 +6,7 @@ on its local reference states (pr_ref, audit_ref, plan_ref, report_ref).
 
 from vibe3.models.flow import FlowState
 from vibe3.models.orchestration import IssueState
+from vibe3.services.verdict_policy import VerdictValue, passes_review
 
 
 def infer_resume_label(flow_state: FlowState) -> IssueState:
@@ -17,7 +18,7 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
 
     Priority Rules (High to Low):
     1. pr_ref exists -> HANDOFF (Code is ready for delivery)
-    2. audit_ref exists -> IN_PROGRESS or HANDOFF (Based on verdict)
+    2. latest_verdict exists -> MERGE_READY / IN_PROGRESS / HANDOFF (Based on verdict)
     3. report_ref exists -> REVIEW (Code is written, needs review)
     4. plan_ref exists -> IN_PROGRESS (Plan exists, needs execution)
     5. default -> CLAIMED (Start fresh)
@@ -32,13 +33,28 @@ def infer_resume_label(flow_state: FlowState) -> IssueState:
         # PR already exists -> Manager should take over
         return IssueState.HANDOFF
 
-    if flow_state.audit_ref and flow_state.latest_verdict:
-        verdict = flow_state.latest_verdict.verdict.lower()
-        # Review has been completed
-        if verdict in {"pass", "major"}:
-            return IssueState.IN_PROGRESS  # Need to modify code based on review
-        if verdict == "unknown":
-            return IssueState.HANDOFF  # Cannot decide -> Manager takes over
+    if flow_state.latest_verdict:
+        verdict: VerdictValue = flow_state.latest_verdict.verdict
+        # Verdict is the primary signal for review completion.
+        if passes_review(verdict):
+            # PASS -> merge-ready immediately
+            if verdict == "PASS":
+                return IssueState.MERGE_READY
+            # MINOR requires audit_ref
+            if verdict == "MINOR":
+                if flow_state.audit_ref:
+                    return IssueState.MERGE_READY
+                # Missing audit_ref -> back to review
+                return IssueState.REVIEW
+        else:
+            # blocks_merge(verdict) is True for these
+            if verdict in {"MAJOR", "BLOCK"}:
+                if flow_state.audit_ref:
+                    return IssueState.IN_PROGRESS
+                # Missing audit_ref -> back to review
+                return IssueState.REVIEW
+            # REFUSE / UNKNOWN -> manager takes over
+            return IssueState.HANDOFF
 
     if flow_state.plan_ref and flow_state.report_ref:
         # Code has been written (report exists) but no review yet

@@ -42,11 +42,24 @@ class TestReviewerNoOpGate:
         self,
     ) -> None:
         """Reviewer state/review -> state/handoff -> pass"""
+        from datetime import datetime
         from unittest.mock import patch
 
         from vibe3.execution.noop_gate import apply_unified_noop_gate
+        from vibe3.models.verdict import VerdictRecord
 
         mock_store = MagicMock()
+        mock_verdict = VerdictRecord(
+            verdict="PASS",
+            timestamp=datetime.now(),
+            actor="agent:review",
+            role="reviewer",
+            flow_branch="task/issue-303",
+        )
+        flow_state = {
+            "latest_verdict": mock_verdict,
+            "audit_ref": "audit.md",
+        }
 
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
@@ -65,6 +78,7 @@ class TestReviewerNoOpGate:
                 actor="agent:review",
                 role="reviewer",
                 before_state_label="state/review",
+                flow_state=flow_state,
             )
 
         mock_block.assert_not_called()

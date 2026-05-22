@@ -139,9 +139,13 @@ def render_flow_status(
     # Latest verdict — shown inline under review results
     if status.latest_verdict:
         v = status.latest_verdict
-        verdict_color = {"PASS": "green", "MAJOR": "yellow", "BLOCK": "red"}.get(
-            v.verdict, "cyan"
-        )
+        verdict_color = {
+            "PASS": "green",
+            "MINOR": "cyan",
+            "MAJOR": "yellow",
+            "BLOCK": "red",
+            "REFUSE": "magenta",
+        }.get(v.verdict, "cyan")
         console.print(
             f"  [dim]verdict:[/] [{verdict_color}]{v.verdict}[/]" f"  [dim]{v.actor}[/]"
         )

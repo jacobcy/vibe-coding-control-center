@@ -119,6 +119,31 @@ class TestVerdictService:
         # Assert
         assert record.role == "manager"
 
+    def test_write_verdict_accepts_minor(
+        self,
+        verdict_service: VerdictService,
+        mock_store: MagicMock,
+        mock_handoff_storage: MagicMock,
+    ) -> None:
+        """Test writing a MINOR verdict successfully."""
+        mock_store.get_flow_state.return_value = {}
+
+        with patch(
+            "vibe3.services.verdict_service.SignatureService.resolve_for_branch"
+        ) as mock_resolve:
+            mock_resolve.return_value = "reviewer"
+
+            record = verdict_service.write_verdict(
+                verdict="MINOR",
+                reason="Acceptable with follow-up",
+                branch="test-branch",
+            )
+
+        assert record.verdict == "MINOR"
+        mock_handoff_storage.append_current_handoff.assert_called_once()
+        mock_store.update_flow_state.assert_called_once()
+        mock_store.add_event.assert_called_once()
+
     def test_get_latest_verdict_exists(
         self,
         verdict_service: VerdictService,

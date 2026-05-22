@@ -89,9 +89,11 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
     store.update_flow_state("debug/new-attempt", flow_slug="new-attempt")
 
     class FakeGitHub:
-        def list_prs_for_branch(self, branch: str, *, state: str | None = None):
+        def list_prs_for_branch(
+            self, branch: str, *, state: str | None = None, repo: str | None = None
+        ):
             assert branch == "task/issue-467"
-            _ = state
+            _ = state, repo
             return [
                 PRResponse(
                     number=469,
@@ -104,9 +106,11 @@ def test_link_task_demotes_previous_task_flow_on_fresh_db(tmp_path):
                 )
             ]
 
-        def list_all_prs(self, *, state: str = "all", limit: int = 50):
+        def list_all_prs(
+            self, *, state: str = "all", limit: int = 50, repo: str | None = None
+        ):
             """Return all PRs for recent PR cache."""
-            _ = state, limit
+            _ = state, limit, repo
             return [
                 PRResponse(
                     number=469,

@@ -61,10 +61,20 @@ class TestCalculateRiskScore:
         assert result.breakdown.get("codex_critical", 0) == 5
 
     def test_block_verdict_blocks(self) -> None:
-        # block_on_verdict 配置为 ["BLOCK"]
+        # block_on_verdict should block severity verdicts
         dims = PRDimensions(changed_lines=10, codex_verdict="BLOCK")
         result = calculate_risk_score(dims)
         assert result.block is True
+
+    def test_refuse_verdict_blocks(self) -> None:
+        dims = PRDimensions(changed_lines=10, codex_verdict="REFUSE")
+        result = calculate_risk_score(dims)
+        assert result.block is True
+
+    def test_minor_verdict_does_not_block(self) -> None:
+        dims = PRDimensions(changed_lines=10, codex_verdict="MINOR")
+        result = calculate_risk_score(dims)
+        assert result.block is False
 
     def test_codex_major_adds_weight(self) -> None:
         base = PRDimensions(changed_lines=10)

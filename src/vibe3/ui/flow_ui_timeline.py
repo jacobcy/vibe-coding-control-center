@@ -340,8 +340,10 @@ def _render_state_summary(state: FlowStatusResponse) -> None:
     v = state.latest_verdict
     color = {
         "PASS": "green",
+        "MINOR": "cyan",
         "MAJOR": "yellow",
         "BLOCK": "red",
+        "REFUSE": "magenta",
     }.get(v.verdict, "cyan")
     console.print(f"  [dim]verdict[/]     [{color}]{v.verdict}[/] [dim]({v.actor})[/]")
 

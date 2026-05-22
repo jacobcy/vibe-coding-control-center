@@ -136,7 +136,7 @@ class TestBuildOutputContractSection:
         """Should use default format if None."""
         result = build_output_contract_section(None)
         assert "## Output format requirements" in result
-        assert "VERDICT: PASS | MAJOR | BLOCK" in result
+        assert "VERDICT: PASS | MINOR | MAJOR | BLOCK | REFUSE" in result
 
 
 class TestBuildReviewPromptBody:
@@ -168,7 +168,11 @@ class TestBuildReviewPromptBody:
             context = build_review_prompt_body(request)
 
         assert "VERDICT:" in context
-        assert "PASS" in context or "MAJOR" in context or "BLOCK" in context
+        assert "PASS" in context
+        assert "MINOR" in context
+        assert "MAJOR" in context
+        assert "BLOCK" in context
+        assert "REFUSE" in context
 
     def test_build_review_prompt_body_minimal_without_ast(self) -> None:
         """Context should work without AST analysis (reviewer uses git diff)."""
@@ -228,3 +232,4 @@ class TestBuildReviewPromptBody:
         assert "The final line must repeat the same `VERDICT:`" in context
         assert "canonical audit report under `docs/reports/`" in context
         assert "handoff audit" in context
+        assert "PASS` and `REFUSE` may omit `audit_ref`" in context

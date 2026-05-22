@@ -106,20 +106,23 @@ class PRReadPort(Protocol):
         ...
 
     def list_prs_for_branch(
-        self, branch: str, *, state: str | None = None
+        self, branch: str, *, state: str | None = None, repo: str | None = None
     ) -> list[PRResponse]:
         """List PRs for a specific branch.
 
         Args:
             branch: Branch name to query
             state: Optional PR state filter
+            repo: Optional repository in owner/repo format
 
         Returns:
             List of PR responses
         """
         ...
 
-    def list_all_prs(self, state: str = "open", limit: int = 100) -> list[PRResponse]:
+    def list_all_prs(
+        self, state: str = "open", limit: int = 100, *, repo: str | None = None
+    ) -> list[PRResponse]:
         """List all PRs in repository (batch query).
 
         Batch query optimization: fetch all PRs in one API call
@@ -128,6 +131,7 @@ class PRReadPort(Protocol):
         Args:
             state: PR state filter (open, closed, merged, all)
             limit: Maximum number of PRs to return
+            repo: Optional repository in owner/repo format
 
         Returns:
             List of PR responses

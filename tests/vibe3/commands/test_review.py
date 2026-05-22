@@ -116,3 +116,55 @@ def test_review_base_help_mentions_dry_run_option():
     output = _strip_ansi(result.output)
     assert "--dry-run" in output
     assert "--message" not in output
+
+
+class TestReviewBaseExitCodes:
+    """Verify review base exit codes follow verdict semantics."""
+
+    def test_minor_verdict_does_not_exit_nonzero(self) -> None:
+        with (
+            patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
+            patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
+            patch("vibe3.commands.review.build_base_review_request") as mock_request,
+            patch("vibe3.commands.review.execute_manual_review_sync") as mock_execute,
+        ):
+            mock_flow.return_value = (object(), "feature/test")
+            mock_base.return_value.resolve_review_base.return_value = type(
+                "ResolvedBase",
+                (),
+                {"base_branch": "main", "auto_detected": False},
+            )()
+            mock_request.return_value = (object(), 123, None)
+            mock_execute.return_value = type(
+                "Result",
+                (),
+                {"verdict": "MINOR", "handoff_file": None},
+            )()
+
+            result = runner.invoke(app, ["base", "main", "--no-async"])
+
+        assert result.exit_code == 0
+
+    def test_refuse_verdict_exits_nonzero(self) -> None:
+        with (
+            patch("vibe3.commands.review.ensure_flow_for_current_branch") as mock_flow,
+            patch("vibe3.commands.review.build_base_resolution_usecase") as mock_base,
+            patch("vibe3.commands.review.build_base_review_request") as mock_request,
+            patch("vibe3.commands.review.execute_manual_review_sync") as mock_execute,
+        ):
+            mock_flow.return_value = (object(), "feature/test")
+            mock_base.return_value.resolve_review_base.return_value = type(
+                "ResolvedBase",
+                (),
+                {"base_branch": "main", "auto_detected": False},
+            )()
+            mock_request.return_value = (object(), 123, None)
+            mock_execute.return_value = type(
+                "Result",
+                (),
+                {"verdict": "REFUSE", "handoff_file": None},
+            )()
+
+            result = runner.invoke(app, ["base", "main", "--no-async"])
+
+        assert result.exit_code == 1
