@@ -295,20 +295,70 @@ related_docs:
 
 ## 5. System Responsibility Terms
 
-### 5.1 `调度`
+### 5.1 Server 层
+
+- 正式术语：`Server 层`
+- 别称：`服务层`
+- 定义：负责外部访问（HTTP/webhook）、健康检查和进程级 Driver 装配。
+- 边界：
+  - 不负责业务逻辑判断。
+  - 不负责角色特有的派发规则。
+- 落点：`src/vibe3/server/`
+
+### 5.2 Runtime 层
+
+- 正式术语：`Runtime 层`
+- 别称：`运行时层`
+- 定义：负责心跳（Heartbeat）、任务队列管理和事件路由。将外部观察（Observation）交由 Domain 层处理。
+- 边界：
+  - 不负责业务状态推进。
+  - 不直接启动具体角色任务。
+- 落点：`src/vibe3/runtime/`
+
+### 5.3 Domain 层
+
+- 正式术语：`Domain 层`
+- 别称：`领域层`
+- 定义：业务编排的唯一真源。定义领域事件，决定“下一步该发生什么”，驱动状态机。
+- 边界：
+  - 不直接操作 tmux/worktree 细节。
+  - 不负责具体的执行细节。
+- 落点：`src/vibe3/domain/`
+
+### 5.4 Execution 层
+
+- 正式术语：`Execution 层`
+- 别称：`执行层`
+- 定义：统一执行控制面。负责角色策略解析、容量控制（Capacity）、生命周期记录（Lifecycle）和 Session 真相写入。
+- 边界：
+  - 是 Domain 层的执行代理。
+  - 不包含业务编排逻辑。
+- 落点：`src/vibe3/execution/`
+
+### 5.5 Environment 层
+
+- 正式术语：`Environment 层`
+- 别称：`环境层`
+- 定义：负责环境原语（Worktree 创建/回收、tmux session 隔离）。
+- 边界：
+  - 不判断何时派发任务。
+  - 不决定执行哪个角色。
+- 落点：`src/vibe3/environment/`
+
+### 5.6 `调度`
 
 - 正式术语：`调度`
 - 别称：无
 - 定义：决定“下一个要推进什么”的活动，面向 feature、issue、roadmap item、task 的选择、排序和分组。
 - 边界：
   - `调度` 不是代码执行
-  - `调度` 不是单个 task 的步骤组织
+  - `调度` 不是单个 task 的步骤 organization
 - 落点：
   - 命令边界见 [command-standard.md](command-standard.md)
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
-### 5.2 `编排`
+### 5.7 `编排`
 
 - 正式术语：`编排`
 - 别称：无
@@ -321,7 +371,7 @@ related_docs:
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
-### 5.3 `执行代理`
+### 5.8 `执行代理`
 
 - 正式术语：`执行代理`
 - 别称：`执行器`
@@ -337,26 +387,26 @@ related_docs:
   - 文档中优先使用 `执行代理`
   - `执行器` 只用于识别历史语境
 
-### 5.4 `Skill 层`
+### 5.9 Role Adapters (角色适配器)
 
-- 正式术语：`Skill 层`
-- 别称：`胶水层`
-- 定义：负责理解上下文、调度、编排，并通过 shell 能力完成业务逻辑的技能层。
+- 正式术语：`Role Adapters`
+- 别称：`Skill 层`, `胶水层`
+- 定义：负责特定角色的输入组装、Prompt 渲染和结果解释。
 - 边界：
-  - `Skill 层` 不是共享状态真源
-  - `Skill 层` 不应直接写 JSON 真源
+  - 不应各自实现通用的派发（Dispatch）骨架。
+  - 业务逻辑应收拢至 Domain 层，执行动作应收拢至 Execution 层。
 - 落点：
   - 规则见 [skill-standard.md](skill-standard.md)
   - 设计边界见 [python-capability-design.md](python-capability-design.md)
 - 使用规则：
-  - 文档中优先使用 `Skill 层`
-  - `胶水层` 作为历史叫法保留
+  - 文档中优先使用 `Role Adapters`
+  - `Skill 层` 作为历史叫法保留
 
-### 5.4.1 Orchestra
+### 5.9.1 Orchestra
 
 - 正式术语：`Orchestra`
 - 别称：`Orchestrator`
-- 定义：本项目中的顶层编排与分诊中枢。负责多 issue / 多 flow 的事实观察、心跳治理、assignee 触发调度、队列管理和非 state label 治理。
+- 定义：本项目中的顶层编排与分诊角色适配器。负责多 issue / 多 flow 的事实观察、心跳治理、assignee 触发调度、队列管理和非 state label 治理。
 - 核心机制：
   - **Heartbeat Tick**：Driver 进程内部的一次轮询循环，负责触发各 Service 的 `on_tick()`。
   - **Dispatch (派发)**：判定需要处理后，启动异步 child session（tmux）执行具体任务的动作。
@@ -365,26 +415,28 @@ related_docs:
   - `Orchestra` 不直接写代码
   - `Orchestra` 不替 manager agent 决定固定的 plan / run / review 顺序
   - `Orchestra` 不把 `state label` 当作主触发源
+  - **最终应收敛为薄适配层，不再持有业务真相**。
 - 落点：
   - Python 模块：`src/vibe3/orchestra/`
   - Skill: `skills/vibe-orchestra/SKILL.md`
 
 
-### 5.4.2 `Manager`
+### 5.9.2 `Manager`
 
 - 正式术语：`Manager`
 - 别称：`Execution Proxy`, `执行负责人`
-- 定义：本项目中的单 flow 现场能力与执行代理。负责将 issue 映射到 flow，提供 branch / worktree 现场创建、复用、清理和观察入口，并构建与派发 agent 命令。
+- 定义：本项目中的单 flow 状态控制角色适配器。负责将 issue 映射到 flow，提供 branch / worktree 现场创建、复用、清理和观察入口，以及管理 flow 生命周期相关的状态决策。
 - 边界：
   - `Manager` 不负责多 issue 编排
   - `Manager` 不直接写代码
   - `Manager` 不替 agent 决定是否进入 plan、run、review、gh pr create 或 closeout
   - `Manager` 的清理能力不等于默认自动收口 workflow
+  - **不再复写通用执行框架，其执行动作应交由 Execution 层**。
 - 落点：
   - Python 模块：`src/vibe3/manager/`
   - Skill: `skills/vibe-manager/SKILL.md`
 
-### 5.5 `Shell 能力层`
+### 5.10 `Shell 能力层`
 
 - 正式术语：`Shell 能力层`
 - 别称：`capability layer`
@@ -400,7 +452,7 @@ related_docs:
   - **V3 Python (`vibe3`) 是当前主能力层**，负责 flow/handoff/orchestra 逻辑
   - **V2 Shell (`vibe`) 是次要/兼容层**，负责环境初始化、密钥管理和 legacy 工具
 
-### 5.6 `共享状态真源`
+### 5.11 `共享状态真源`
 
 - 正式术语：`共享状态真源`
 - 别称：无
@@ -416,7 +468,7 @@ related_docs:
   - `roadmap.json` 当前只按 mirror / cache / projection / backup 理解
   - 不要再用“物理真源”同时指 shell 和 JSON 文件
 
-### 5.7 `shell 命令`
+### 5.12 `shell 命令`
 
 - 正式术语：`shell 命令`
 - 别称：`vibe3 shell`, `vibe shell`
@@ -430,7 +482,7 @@ related_docs:
   - 文档和沟通中首次提及时，建议显式写成 `vibe3 flow (shell)` 这类格式
   - 优先调用 V3 命令，仅在环境管理等特定场景使用 V2 命令
 
-### 5.8 `skill 命令`
+### 5.13 `skill 命令`
 
 - 正式术语：`skill 命令`
 - 别称：`vibe skill`
@@ -441,7 +493,7 @@ related_docs:
 - 使用规则：
   - 文档和沟通中首次提及时，建议显式写成 `/vibe-save (skill)` 这类格式
 
-### 5.9 `调用面标注规则`
+### 5.14 `调用面标注规则`
 
 - 当同一段内容同时出现 shell 与 skill 能力时，首次提及必须显式标注调用面：
   - `vibe flow (shell)`
