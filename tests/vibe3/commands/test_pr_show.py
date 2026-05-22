@@ -165,66 +165,54 @@ class TestPRShowBoundTask:
 
     def test_pr_show_comments_sorted_chronologically(self) -> None:
         """Test pr show displays comments in chronological order."""
-        # Create a mock PR with comments in reverse chronological order
-        mock_pr = MagicMock()
-        mock_pr.number = 126
-        mock_pr.title = "Test PR with comments"
-        mock_pr.state.value = "OPEN"
-        mock_pr.draft = False
-        mock_pr.head_branch = "feature/test-comments"
-        mock_pr.base_branch = "main"
+        mock_pr = MagicMock(
+            number=126,
+            title="Test PR",
+            draft=False,
+            metadata=None,
+            body="",
+            review_comments=[],
+        )
+        mock_pr.state.value, mock_pr.head_branch, mock_pr.base_branch = (
+            "OPEN",
+            "feature/test",
+            "main",
+        )
         mock_pr.url = "https://github.com/test/test/pull/126"
-        mock_pr.metadata = None
-        mock_pr.body = "Test body"
-        mock_pr.review_comments = []
         mock_pr.comments = [
             {
-                "user": {"login": "charlie"},
-                "body": "Latest comment",
+                "user": {"login": "c"},
+                "body": "LATE",
                 "createdAt": "2026-05-06T15:00:00Z",
             },
             {
-                "user": {"login": "alice"},
-                "body": "First comment",
+                "user": {"login": "a"},
+                "body": "EARLY",
                 "createdAt": "2026-05-06T10:00:00Z",
             },
             {
-                "user": {"login": "bob"},
-                "body": "Second comment",
+                "user": {"login": "b"},
+                "body": "MID",
                 "createdAt": "2026-05-06T12:00:00Z",
             },
         ]
-
-        # Mock PR service
-        mock_pr_svc = MagicMock()
-        mock_pr_svc.get_pr.return_value = mock_pr
-        mock_pr_svc.git_client.get_current_branch.return_value = "feature/test-comments"
+        mock_pr_svc = MagicMock(
+            get_pr=MagicMock(return_value=mock_pr),
+            store=MagicMock(get_issue_links=MagicMock(return_value=[])),
+        )
+        mock_pr_svc.git_client.get_current_branch.return_value = "feature/test"
         mock_pr_svc.github_client.get_pr.return_value = mock_pr
-
-        # Mock SQLite client
-        mock_store = MagicMock()
-        mock_store.get_issue_links.return_value = []
-        mock_pr_svc.store = mock_store
-
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
             with patch(
-                "vibe3.commands.pr_query._load_pr_analysis_summary",
-                return_value={},
+                "vibe3.commands.pr_query._load_pr_analysis_summary", return_value={}
             ):
                 result = runner.invoke(app, ["pr", "show", "126"])
-
-                # Check command succeeded
                 assert result.exit_code == 0
-
-                # Check comments appear in chronological order (ascending)
-                # Find positions of each comment in output
-                alice_pos = result.output.find("First comment")
-                bob_pos = result.output.find("Second comment")
-                charlie_pos = result.output.find("Latest comment")
-
-                # Verify chronological ordering
-                # alice (10:00) < bob (12:00) < charlie (15:00)
-                assert alice_pos < bob_pos < charlie_pos
+                assert (
+                    result.output.find("EARLY")
+                    < result.output.find("MID")
+                    < result.output.find("LATE")
+                )
 
 
 class TestPRShowLocalReview:

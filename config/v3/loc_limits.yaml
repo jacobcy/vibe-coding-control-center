@@ -272,8 +272,8 @@ code_limits:
         limit: 420
         reason: "TaskService fresh DB 测试集，覆盖 issue 链接、角色重分类、flow 降级、ref 选择等核心业务逻辑，包含完整的 mock setup 和参数化状态转换测试，拆分会破坏测试场景完整性"
       - path: "tests/vibe3/commands/test_pr_show.py"
-        limit: 450
-        reason: "PR show 命令测试集，覆盖 PR 详情展示、inspect 生成、trace 输出、branch 推导逻辑等紧密耦合功能，拆分收益低"
+        limit: 485
+        reason: "PR show 命令测试集，覆盖 PR 详情展示、inspect 生成、trace 输出、branch 推导逻辑、comment chronological sorting 测试等紧密耦合功能，拆分收益低"
       - path: "tests/vibe3/commands/test_handoff_advanced_commands.py"
         limit: 420
         reason: "Handoff 高级命令测试集（从 test_handoff_commands.py 拆分），覆盖 append/plan/report/audit 命令、next step 逻辑、real service path 测试等紧密耦合场景"
