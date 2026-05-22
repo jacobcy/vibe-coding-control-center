@@ -13,10 +13,8 @@ class DataSource(str, Enum):
         LOCAL_SQLITE: Data from local SQLite flow_state table
         GITHUB_API: Data from GitHub PR/issue API
         ISSUE_BODY_FALLBACK: Data from issue body managed section projection
-        ORCHESTRA_SERVER: Data from Orchestra HTTP server snapshot
     """
 
     LOCAL_SQLITE = "local"
     GITHUB_API = "github"
     ISSUE_BODY_FALLBACK = "fallback"
-    ORCHESTRA_SERVER = "server"

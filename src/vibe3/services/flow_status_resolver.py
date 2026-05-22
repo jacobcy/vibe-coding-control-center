@@ -2,29 +2,25 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.models.data_source import DataSource
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_body_service import parse_projection_with_fallback
+from vibe3.services.issue_body_service import parse_projection
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
 
 
-SourceStrategy = Literal["local", "remote", "auto"]
-
-
 class FlowStatusResolver:
     """Resolver for source-aware flow status reads.
 
-    Implements unified source strategy:
-    - local: SQLite only, no fallback
-    - remote: GitHub API + issue body projection
-    - auto: local-first, remote fallback when SQLite missing
+    Implements source strategy:
+    - Default (remote=False): Local-first with remote fallback when SQLite missing
+    - Remote mode (remote=True): Fetch complete state from GitHub issue + comments
     """
 
     def __init__(
@@ -44,43 +40,34 @@ class FlowStatusResolver:
     def resolve(
         self,
         branch: str,
-        source: Literal["local", "remote", "auto"],
+        remote: bool = False,
         issue_number: int | None = None,
     ) -> FlowStatusResponse | None:
         """Resolve flow status with source strategy.
 
         Args:
             branch: Branch name to query
-            source: "local" | "remote" | "auto"
-            issue_number: Task issue number (required for remote fallback)
+            remote: If True, fetch complete remote state from GitHub
+            issue_number: Task issue number (required if remote=True)
 
         Returns:
             FlowStatusResponse with data_source field set,
-            or None if auto mode and not found
+            or None if not found
 
         Raises:
-            ValueError: If remote source but no issue_number
-            UserError: If local source and flow not found
+            ValueError: If remote=True but no issue_number
         """
-        if source == "local":
-            result = self._read_local(branch)
-            if result is None:
-                from vibe3.exceptions import UserError
-
-                raise UserError(f"Flow not found for branch '{branch}'")
-            return result
-
-        if source == "remote":
+        if remote:
             if not issue_number:
                 from vibe3.exceptions import UserError
 
                 raise UserError(
-                    "Cannot use --source remote without issue number. "
+                    "Cannot use --remote without issue number. "
                     "Bind a task issue first: vibe3 flow bind <issue> --role task"
                 )
             return self._read_remote(branch, issue_number)
 
-        # auto: local-first with remote fallback
+        # Default: local-first with remote fallback
         result = self._read_local(branch)
         if result is not None:
             return result
@@ -94,7 +81,7 @@ class FlowStatusResolver:
             domain="resolver",
             action="resolve",
             branch=branch,
-            source=source,
+            remote=remote,
         ).warning("Local read returned None, falling back to remote")
 
         return self._read_remote(branch, issue_number)
@@ -116,22 +103,26 @@ class FlowStatusResolver:
         return response
 
     def _read_remote(self, branch: str, issue_number: int) -> FlowStatusResponse:
-        """Read from GitHub issue body projection.
+        """Read complete remote state from GitHub.
+
+        Fetches issue body projection AND timeline from comments.
 
         Args:
             branch: Branch name
             issue_number: Issue number (required)
 
         Returns:
-            FlowStatusResponse with ISSUE_BODY_FALLBACK data_source
+            FlowStatusResponse with ISSUE_BODY_FALLBACK data_source and timeline
 
         Raises:
-            ValueError: If issue_number is None or body is empty
+            ValueError: If issue_number is None
+            SystemError: If GitHub API fails
         """
         if issue_number is None:
             raise ValueError("issue_number required for remote source")
 
         from vibe3.clients.github_client import GitHubClient
+        from vibe3.services.timeline_parser import parse_timeline_from_comments
 
         github_client = GitHubClient()
 
@@ -140,32 +131,45 @@ class FlowStatusResolver:
             action="resolve_remote",
             branch=branch,
             issue_number=issue_number,
-        ).debug("Reading flow status from issue body")
+        ).debug("Reading complete remote state from GitHub")
 
-        body = github_client.get_issue_body(issue_number)
-        if not body:
+        # Fetch issue with comments
+        issue_data = github_client.view_issue(issue_number)
+        if not issue_data or issue_data == "network_error":
             from vibe3.exceptions import SystemError
 
             raise SystemError(
-                f"Failed to fetch issue body for #{issue_number}. "
-                "GitHub API returned empty or None."
+                f"Failed to fetch issue #{issue_number}. "
+                "GitHub API returned None or network error."
             )
 
-        projection = parse_projection_with_fallback(body)
+        # Type guard: issue_data is dict at this point
+        if not isinstance(issue_data, dict):
+            from vibe3.exceptions import SystemError
 
-        # Directly use projection state (no normalization)
-        # Blocked state is inferred from projection's blocked_by/blocked_reason fields
-        # Remote sync semantics: respect the actual state from issue body projection
-        response_state = projection.state
+            raise SystemError(
+                f"Unexpected issue data type for #{issue_number}: {type(issue_data)}"
+            )
 
-        # Build minimal response from projection
+        # Parse body for projection
+        body = str(issue_data.get("body") or "")
+        projection = parse_projection(body)
+
+        # Parse timeline from comments
+        comments = issue_data.get("comments") or []
+        if not isinstance(comments, list):
+            comments = []
+        timeline = parse_timeline_from_comments(comments)
+
+        # Build response with timeline
         return FlowStatusResponse(
             branch=branch,
             flow_slug=branch.replace("/", "-"),
-            flow_status=response_state,  # type: ignore[arg-type]
+            flow_status=projection.state,  # type: ignore[arg-type]
             blocked_by_issue=(
                 projection.blocked_by[0] if projection.blocked_by else None
             ),
             blocked_reason=projection.blocked_reason,
+            timeline=timeline,  # NEW: timeline from comments
             data_source=DataSource.ISSUE_BODY_FALLBACK,
         )

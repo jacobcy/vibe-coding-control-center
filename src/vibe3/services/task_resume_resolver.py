@@ -112,7 +112,7 @@ class TaskResumeResolver:
         """Read from GitHub API + issue body projection."""
         from vibe3.clients.github_client import GitHubClient
         from vibe3.exceptions import SystemError
-        from vibe3.services.issue_body_service import parse_projection_with_fallback
+        from vibe3.services.issue_body_service import parse_projection
 
         github_client = GitHubClient()
 
@@ -132,7 +132,7 @@ class TaskResumeResolver:
 
         # Parse projection from issue body
         body = issue.get("body", "")
-        projection = parse_projection_with_fallback(body) if body else None
+        projection = parse_projection(body) if body else None
 
         # Extract state from issue
         assignees_data = issue.get("assignees", [])

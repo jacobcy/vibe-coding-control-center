@@ -101,18 +101,6 @@ def render_projection(proj: FlowStateProjection) -> str:
     return "\n".join(lines)
 
 
-def parse_projection_with_fallback(body: str) -> FlowStateProjection:
-    """Parse flow-state projection from issue body.
-
-    Args:
-        body: Full issue body text
-
-    Returns:
-        FlowStateProjection (empty/active state if no managed section)
-    """
-    return parse_projection(body)
-
-
 def merge_projection(body: str, proj: FlowStateProjection) -> str:
     """Merge flow-state projection into issue body.
 

@@ -23,6 +23,21 @@ class MainBranchProtectedError(Exception):
 ExecutionStatus = Literal["pending", "running", "done", "crashed", "aborted"]
 
 
+class TimelineEvent(BaseModel):
+    """Timeline event extracted from GitHub comments.
+
+    Represents automation events (flow_created, state_transitioned, etc.)
+    extracted from GitHub issue comments using automation markers.
+    """
+
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    event_type: str = Field(
+        ..., description="Event type (flow_created, state_transitioned, etc.)"
+    )
+    actor: str = Field(..., description="GitHub actor login")
+    detail: str = Field(default="", description="Event detail text")
+
+
 def _migrate_flow_status_value(v: str | None) -> str | None:
     """Normalize legacy flow status values."""
     if v == "idle":
@@ -259,6 +274,8 @@ class FlowStatusResponse(BaseModel):
     execution_completed_at: str | None = None
     latest_verdict: VerdictRecord | None = None
     worktree_root: str | None = None  # NEW: Worktree root path for path resolution
+    # Timeline events from GitHub comments
+    timeline: list[TimelineEvent] = Field(default_factory=list)
     # Provenance tracking
     data_source: DataSource | None = None
 

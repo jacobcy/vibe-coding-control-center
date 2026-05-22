@@ -66,7 +66,7 @@ def test_flow_show_timeline_when_registered(
     # Should call resolver.resolve with correct branch
     mock_resolver.resolve.assert_called_once_with(
         branch=branch,
-        source="auto",
+        remote=False,
         issue_number=None,
     )
     # Should call store.get_events to get timeline events
@@ -121,6 +121,6 @@ def test_flow_show_numeric_issue_resolves_branch(
     # Should call resolver.resolve with resolved branch and parsed issue_number
     mock_resolver.resolve.assert_called_once_with(
         branch="task/issue-436",
-        source="auto",
+        remote=False,
         issue_number=436,  # parsed from input "436"
     )

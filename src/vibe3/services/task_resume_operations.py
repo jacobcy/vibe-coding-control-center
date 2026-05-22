@@ -16,7 +16,7 @@ from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_body_service import (
     FlowStateProjection,
     merge_projection,
-    parse_projection_with_fallback,
+    parse_projection,
 )
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
@@ -432,7 +432,7 @@ class TaskResumeOperations:
                 return
 
             # Parse existing projection to preserve non-blocked fields
-            body_projection = parse_projection_with_fallback(current_body)
+            body_projection = parse_projection(current_body)
 
             # Explicitly clear blocked fields, preserve everything else
             cleared = FlowStateProjection(

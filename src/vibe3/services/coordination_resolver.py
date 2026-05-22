@@ -172,7 +172,7 @@ class CoordinationResolver:
             from body, or None if read failed
         """
         from vibe3.clients.github_client import GitHubClient
-        from vibe3.services.issue_body_service import parse_projection_with_fallback
+        from vibe3.services.issue_body_service import parse_projection
 
         client = GitHubClient()
 
@@ -181,7 +181,7 @@ class CoordinationResolver:
             if not body:
                 return None
 
-            projection = parse_projection_with_fallback(body)
+            projection = parse_projection(body)
 
             return {
                 "projection_state": projection.state,
