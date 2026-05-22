@@ -16,6 +16,14 @@ class CICheck(BaseModel):
     state: str  # SUCCESS, FAILURE, PENDING, etc.
     bucket: str  # pass, fail, pending, skipping, cancel
     link: str
+    failure_category: Optional[str] = Field(
+        None,
+        description="Classified failure category for failed checks",
+    )
+    failure_command: Optional[str] = Field(
+        None,
+        description="Command to inspect detailed failure logs",
+    )
 
 
 class PRState(str, Enum):

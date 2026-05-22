@@ -21,7 +21,7 @@ class TestCICheckModel:
         assert check.link == "https://github.com/test/repo/actions/runs/123"
 
     def test_ci_check_serialization(self) -> None:
-        """Test CICheck model serialization."""
+        """Test CICheck model serialization excludes None fields."""
         check = CICheck(
             name="Build",
             state="FAILURE",
@@ -29,13 +29,28 @@ class TestCICheckModel:
             link="https://github.com/test/repo/actions/runs/456",
         )
 
-        data = check.model_dump()
+        data = check.model_dump(exclude_none=True)
         assert data == {
             "name": "Build",
             "state": "FAILURE",
             "bucket": "fail",
             "link": "https://github.com/test/repo/actions/runs/456",
         }
+
+    def test_ci_check_serialization_includes_failure_metadata(self) -> None:
+        """Test CICheck model serialization keeps failure metadata."""
+        check = CICheck(
+            name="Test",
+            state="FAILURE",
+            bucket="fail",
+            link="https://github.com/test/repo/actions/runs/456/job/789",
+            failure_category="pytest",
+            failure_command="gh run view 456 --job 789 --log-failed",
+        )
+
+        data = check.model_dump()
+        assert data["failure_category"] == "pytest"
+        assert data["failure_command"] == "gh run view 456 --job 789 --log-failed"
 
 
 class TestPRResponseCIChecks:

@@ -93,6 +93,33 @@ class TestPRUICIRender:
         assert "FAILURE" in output
         assert "View details" in output
 
+    def test_render_ci_failed_includes_failure_category_and_command(self) -> None:
+        """Test failed CI rendering includes failure category and command."""
+        checks = [
+            CICheck(
+                name="Test",
+                state="FAILURE",
+                bucket="fail",
+                link="https://github.com/test/repo/actions/runs/2/job/3",
+                failure_category="pytest",
+                failure_command="gh run view 2 --job 3 --log-failed",
+            ),
+        ]
+
+        pr = PRResponse(
+            number=123,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="feature",
+            base_branch="main",
+            url="https://github.com/test/repo/pull/123",
+            ci_checks=checks,
+        )
+
+        output = _render_to_plain(pr)
+        assert "pytest" in output
+        assert "gh run view 2 --job 3 --log-failed" in output
+
     def test_render_ci_pending(self) -> None:
         """Test rendering when CI checks are pending."""
         checks = [
