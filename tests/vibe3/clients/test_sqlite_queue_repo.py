@@ -148,7 +148,8 @@ def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
 
 def test_legacy_enqueued_at_migration(tmp_path):
     """Simulate a legacy DB with enqueued_at NOT NULL, run init_schema,
-    then verify save_queue_entry succeeds and both columns are populated."""
+    verify last_attempted_at column is added, legacy data is migrated,
+    and new inserts succeed."""
     db_path = tmp_path / "legacy.db"
 
     # Step 1: Create a legacy-style orchestra_queue with enqueued_at NOT NULL
