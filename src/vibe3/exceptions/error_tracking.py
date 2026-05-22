@@ -231,6 +231,7 @@ class ErrorTrackingService:
                 """
                 SELECT DISTINCT error_code FROM error_log
                 WHERE severity = ?
+                ORDER BY error_code
                 """,
                 (ErrorSeverity.CRITICAL.value,),
             ).fetchall()
