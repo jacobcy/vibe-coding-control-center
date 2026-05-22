@@ -18,6 +18,7 @@ from vibe3.environment.worktree_context import WorktreeContext
 from vibe3.environment.worktree_support import (
     find_worktree_by_path,
     initialize_worktree,
+    recycle_worktree_path,
 )
 from vibe3.exceptions import SystemError
 from vibe3.services.status_query_service import is_auto_task_branch
@@ -71,39 +72,39 @@ class WorktreeLifecycle:
         # Pre-flight: cleanup stale references
         self._prune_worktrees()
 
-        # Check if worktree already exists and is registered
-        if wt_path.exists() and find_worktree_by_path(self.repo_path, wt_path):
-            # Verify branch matches before reusing
-            if self.validate_branch_matches(wt_path, branch):
-                logger.info(
-                    "Reusing existing registered worktree",
-                    path=str(wt_path),
-                    branch=branch,
-                    issue=issue_number,
-                )
-                return WorktreeContext(
-                    path=wt_path,
-                    is_temporary=False,
-                    branch=branch,
-                    issue_number=issue_number,
-                )
+        if wt_path.exists():
+            is_registered = find_worktree_by_path(self.repo_path, wt_path)
+
+            if is_registered:
+                if self.validate_branch_matches(wt_path, branch):
+                    logger.info(
+                        "Reusing existing registered worktree",
+                        path=str(wt_path),
+                        branch=branch,
+                        issue=issue_number,
+                    )
+                    return WorktreeContext(
+                        path=wt_path,
+                        is_temporary=False,
+                        branch=branch,
+                        issue_number=issue_number,
+                    )
+                else:
+                    logger.warning(
+                        "Existing worktree has different branch, removing",
+                        path=str(wt_path),
+                        expected_branch=branch,
+                    )
+                    # recycle_worktree_path is git-aware: runs
+                    # `git worktree remove --force` before rmtree,
+                    # so both filesystem and git metadata are cleaned.
+                    recycle_worktree_path(self.repo_path, wt_path)
             else:
                 logger.warning(
-                    "Existing worktree has different branch, removing",
+                    "Deleting unregistered directory at target worktree path",
                     path=str(wt_path),
-                    expected_branch=branch,
                 )
-                from vibe3.environment.worktree_support import recycle_worktree_path
-
-                recycle_worktree_path(self.repo_path, wt_path)
-
-        # If path exists but is not registered, delete it
-        if wt_path.exists() and not find_worktree_by_path(self.repo_path, wt_path):
-            logger.warning(
-                "Deleting unregistered directory at target worktree path",
-                path=str(wt_path),
-            )
-            shutil.rmtree(wt_path)
+                shutil.rmtree(wt_path)
 
         try:
             result = subprocess.run(
