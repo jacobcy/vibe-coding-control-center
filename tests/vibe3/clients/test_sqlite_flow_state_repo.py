@@ -105,3 +105,60 @@ def test_soft_delete_flow_clears_refs_from_active_flow() -> None:
         assert deleted["plan_ref"] is None
         assert deleted["report_ref"] is None
         assert deleted["audit_ref"] is None
+
+
+def test_get_task_issue_number_returns_int_when_link_exists() -> None:
+    """Test get_task_issue_number returns int when flow_issue_links has task."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("task/issue-123", flow_slug="issue_123")
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("task/issue-123", 123, "task"),
+        )
+        conn.commit()
+
+        result = store.get_task_issue_number("task/issue-123")
+        assert result == 123
+        assert isinstance(result, int)
+
+
+def test_get_task_issue_number_returns_none_when_missing() -> None:
+    """Test that get_task_issue_number returns None when no matching row."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("dev/issue-456", flow_slug="issue_456")
+
+        result = store.get_task_issue_number("dev/issue-456")
+        assert result is None
+
+
+def test_get_task_issue_number_ignores_non_task_roles() -> None:
+    """Test that get_task_issue_number only returns task role, not others."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        store.update_flow_state("dev/issue-789", flow_slug="issue_789")
+
+        conn = store._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO flow_issue_links "
+            "(branch, issue_number, issue_role, created_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            ("dev/issue-789", 789, "spec"),
+        )
+        conn.commit()
+
+        result = store.get_task_issue_number("dev/issue-789")
+        assert result is None
