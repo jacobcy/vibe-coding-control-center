@@ -235,8 +235,8 @@ code_limits:
         limit: 410
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
-        limit: 480
-        reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations 等多个场景，新增 GH_TOKEN 认证测试后略微超标"
+        limit: 540
+        reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"
       - path: "tests/vibe3/orchestra/test_dispatch_health_checks.py"
         limit: 460
         reason: "Health check failure 测试集，7 个独立测试用例验证 coordinator 对 CheckService 结果的处理逻辑，每个测试需要完整 mock setup，拆分会降低可读性"
