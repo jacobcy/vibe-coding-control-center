@@ -251,8 +251,12 @@ def test_sync_child_clears_async_marker_before_entering_sync_shell(
 
 def test_sync_skips_when_live_session_exists_for_target(
     mock_dependencies,
+    monkeypatch,
 ):
     """Regular sync dispatches should be deduped by live session for same target."""
+    # Ensure VIBE3_ASYNC_CHILD is not set to avoid skipping the dedup check
+    monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
+
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
