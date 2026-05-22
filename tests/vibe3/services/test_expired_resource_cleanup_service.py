@@ -68,8 +68,15 @@ def test_clean_expired_remote_branches_parses_non_0800_offsets(
 ) -> None:
     """Remote cleanup should handle git timestamps with or without timezone colon."""
     github_client = MagicMock()
+    # Mock pr_service to avoid real GitHub API calls and cache I/O
+    pr_service = MagicMock()
+    pr_service.refresh_open_pr_cache.return_value = []
+
     service = ExpiredResourceCleanupService(
-        store=mock_store, git_client=mock_git_client, github_client=github_client
+        store=mock_store,
+        git_client=mock_git_client,
+        github_client=github_client,
+        pr_service=pr_service,
     )
 
     old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
@@ -80,7 +87,6 @@ def test_clean_expired_remote_branches_parses_non_0800_offsets(
         {"branch": "origin/feature-old", "timestamp": old_date},
         {"branch": "origin/feature-colon", "timestamp": old_date_with_colon},
     ]
-    github_client.list_all_prs.return_value = []
 
     result = service.clean_expired_remote_branches(max_age_days=7)
 

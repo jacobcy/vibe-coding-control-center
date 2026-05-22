@@ -6,6 +6,7 @@ import pytest
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.services.check_cleanup_service import CheckCleanupService
 from vibe3.services.expired_resource_cleanup_service import (
     ExpiredResourceCleanupService,
@@ -28,11 +29,20 @@ def mock_git_client():
 
 
 @pytest.fixture
-def cleanup_service(mock_store, mock_git_client):
+def mock_github_client():
+    """Create a mock GitHubClient."""
+    client = MagicMock(spec=GitHubClient)
+    client.list_all_prs.return_value = []
+    return client
+
+
+@pytest.fixture
+def cleanup_service(mock_store, mock_git_client, mock_github_client):
     """Create a CheckCleanupService instance with mocked dependencies."""
     return CheckCleanupService(
         store=mock_store,
         git_client=mock_git_client,
+        github_client=mock_github_client,
     )
 
 

@@ -8,7 +8,10 @@ Execute commit + PR creation (vibe-commit skill).
 
 ## Context
 - Review VERDICT: PASS (trusted audit)
-- 3 test files deleted, 9 trivial tests removed, 134 LOC reduced
+- Net change: 3 test files deleted, new tests added, -134 LOC
+  - Deleted: test_issue_failure_refactored.py, test_pr_create_usecase.py, test_flow_status_resolver.py
+  - Added: test_expired_resource_cleanup_service.py (new module)
+  - Relocated: tests moved between files for better organization
 - 420 tests passing, coverage 68% maintained
 - Baseline structural diff: stable (no major module/dependency changes)
 
@@ -19,10 +22,11 @@ Execute commit + PR creation (vibe-commit skill).
 - Risk: LOW — test deduplication only, no functional code changes
 
 ## Requirements
-- PR title should reflect test deduplication refactor
+- PR description should reflect test deduplication refactor
 - Ensure PR description lists:
   - Files deleted: test_issue_failure_refactored.py, test_pr_create_usecase.py, test_flow_status_resolver.py
-  - Tests removed: 9 trivial tests across 5 files
-  - LOC reduction: -134 lines
+  - Files added: test_expired_resource_cleanup_service.py
+  - Tests relocated: FlowStatusResolver → test_flow_status.py, clean_residual_branches → test_check_cleanup_service.py
+  - Net LOC reduction: -134 lines
   - Deferred work rationale
 - Mention that core test coverage maintained, all 420 tests pass
