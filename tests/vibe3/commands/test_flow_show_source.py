@@ -15,13 +15,13 @@ runner = CliRunner()
 def test_flow_show_source_remote_no_issue_returns_user_error(
     mock_service_cls,
 ) -> None:
-    """flow show --source remote without issue number should return clean user error."""
+    """flow show --remote without issue number should return clean user error."""
     mock_service = MagicMock()
     mock_service.get_current_branch.return_value = "feature/no-issue"
     mock_service.store.get_issue_links.return_value = []  # No task issue linked
     mock_service_cls.return_value = mock_service
 
-    result = runner.invoke(app, ["flow", "show", "--source", "remote"])
+    result = runner.invoke(app, ["flow", "show", "--remote"])
 
     # Should exit with error, not traceback
     assert result.exit_code == 1
@@ -43,7 +43,7 @@ def test_flow_show_source_auto_fallback_to_issue_body(
     _find_parent_branch,
     _render_timeline,
 ) -> None:
-    """flow show --source auto should fallback to issue body when local missing."""
+    """flow show should fallback to issue body when local missing."""
     mock_store = MagicMock()
     mock_service = MagicMock()
     branch = "dev/issue-123"
@@ -58,10 +58,12 @@ def test_flow_show_source_auto_fallback_to_issue_body(
     mock_issue_flow_service_cls.return_value = mock_issue_flow_service
     mock_issue_flow_service.parse_issue_number_any.return_value = 123
 
-    # Mock GitHub client to return issue body
+    # Mock GitHub client to return issue with body
     mock_github_client = MagicMock()
     mock_github_client_cls.return_value = mock_github_client
-    mock_github_client.get_issue_body.return_value = """
+    mock_github_client.view_issue.return_value = {
+        "number": 123,
+        "body": """
 <!-- vibe3-flow-state-start -->
 
 **Vibe3 Flow State**
@@ -69,7 +71,9 @@ def test_flow_show_source_auto_fallback_to_issue_body(
 - **State**: active
 
 <!-- vibe3-flow-state-end -->
-"""
+""",
+        "comments": [],
+    }
 
     # Mock timeline response (required for successful flow show)
     flow_status = FlowStatusResponse(
@@ -82,12 +86,12 @@ def test_flow_show_source_auto_fallback_to_issue_body(
         "events": [],
     }
 
-    result = runner.invoke(app, ["flow", "show", "--source", "auto"])
+    result = runner.invoke(app, ["flow", "show"])
 
     # Should succeed (fallback worked)
     assert result.exit_code == 0
     # Should call GitHub API for fallback
-    mock_github_client.get_issue_body.assert_called_once_with(123)
+    mock_github_client.view_issue.assert_called_once_with(123)
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
@@ -102,7 +106,7 @@ def test_flow_show_source_auto_uses_parse_issue_number_any_fallback(
     _find_parent_branch,
     _render_timeline,
 ) -> None:
-    """flow show --source auto uses parse_issue_number_any when local DB missing."""
+    """flow show uses parse_issue_number_any when local DB missing."""
     mock_store = MagicMock()
     mock_service = MagicMock()
     branch = "dev/issue-456"  # Branch name contains issue number
@@ -117,10 +121,12 @@ def test_flow_show_source_auto_uses_parse_issue_number_any_fallback(
     mock_issue_flow_service_cls.return_value = mock_issue_flow_service
     mock_issue_flow_service.parse_issue_number_any.return_value = 456
 
-    # Mock GitHub client to return issue body
+    # Mock GitHub client to return issue with body
     mock_github_client = MagicMock()
     mock_github_client_cls.return_value = mock_github_client
-    mock_github_client.get_issue_body.return_value = """
+    mock_github_client.view_issue.return_value = {
+        "number": 456,
+        "body": """
 <!-- vibe3-flow-state-start -->
 
 **Vibe3 Flow State**
@@ -128,7 +134,9 @@ def test_flow_show_source_auto_uses_parse_issue_number_any_fallback(
 - **State**: active
 
 <!-- vibe3-flow-state-end -->
-"""
+""",
+        "comments": [],
+    }
 
     # Mock timeline response (required for successful flow show)
     flow_status = FlowStatusResponse(
@@ -141,9 +149,9 @@ def test_flow_show_source_auto_uses_parse_issue_number_any_fallback(
         "events": [],
     }
 
-    result = runner.invoke(app, ["flow", "show", "--source", "auto"])
+    result = runner.invoke(app, ["flow", "show"])
 
     # Should succeed (fallback with parse_issue_number_any worked)
     assert result.exit_code == 0
     # Should call GitHub API with issue number from branch name
-    mock_github_client.get_issue_body.assert_called_once_with(456)
+    mock_github_client.view_issue.assert_called_once_with(456)
