@@ -243,7 +243,7 @@ class HeartbeatServer:
                         f"tick #{tick_number} periodic check failed: {exc}",
                         level="WARNING",
                     )
-                    logger.bind(domain="orchestra", action="cleanup").warning(
+                    logger.bind(domain="orchestra", action="periodic_check").warning(
                         f"Periodic check failed: {exc}"
                     )
 

@@ -197,7 +197,7 @@ class CheckService(CheckRemote):
 
     def _check_multiple_state_labels(
         self, issue_number: int, issue_payload: dict
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str]]:
         """Check for multiple state/* labels and auto-fix the anomaly.
 
         An issue should have exactly one state/* label. Having multiple
@@ -205,10 +205,12 @@ class CheckService(CheckRemote):
         correction. This method detects the anomaly and uses LabelService
         to atomically fix it by keeping the highest-priority state.
 
-        Priority: blocked > done > in-progress > review > handoff > claimed > ready
+        Priority: blocked > done > in-progress > review > merge-ready >
+        handoff > claimed > ready
 
         Returns:
-            List of issue descriptions (empty if no anomaly detected).
+            Tuple of (warnings, issues). Warnings for successful auto-fix,
+            issues for cases requiring manual intervention.
         """
         labels = issue_payload.get("labels", [])
         state_labels = [
@@ -218,7 +220,7 @@ class CheckService(CheckRemote):
         ]
 
         if len(state_labels) <= 1:
-            return []
+            return ([], [])
 
         # Determine which state to keep (highest priority)
         priority_order = [
@@ -226,6 +228,7 @@ class CheckService(CheckRemote):
             IssueState.DONE,
             IssueState.IN_PROGRESS,
             IssueState.REVIEW,
+            IssueState.MERGE_READY,
             IssueState.HANDOFF,
             IssueState.CLAIMED,
             IssueState.READY,
@@ -247,19 +250,25 @@ class CheckService(CheckRemote):
                 f"Auto-fixed multi-label on issue #{issue_number}: "
                 f"{state_labels} -> {target_state.to_label()}"
             )
-            return [
-                f"Issue #{issue_number} had multiple state labels "
-                f"({', '.join(state_labels)}), auto-fixed to "
-                f"{target_state.to_label()}"
-            ]
+            return (
+                [
+                    f"Issue #{issue_number} had multiple state labels "
+                    f"({', '.join(state_labels)}), auto-fixed to "
+                    f"{target_state.to_label()}"
+                ],
+                [],
+            )
         except Exception as exc:
             logger.bind(domain="check", action="fix").warning(
                 f"Failed to auto-fix multi-label on issue " f"#{issue_number}: {exc}"
             )
-            return [
-                f"Issue #{issue_number} has multiple state labels "
-                f"({', '.join(state_labels)}), manual fix required"
-            ]
+            return (
+                [],
+                [
+                    f"Issue #{issue_number} has multiple state labels "
+                    f"({', '.join(state_labels)}), manual fix required"
+                ],
+            )
 
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
@@ -313,9 +322,10 @@ class CheckService(CheckRemote):
                     task_issue_closed = True
 
                 # Check for multiple state/* labels (anomaly)
-                label_issues = self._check_multiple_state_labels(
+                label_warnings, label_issues = self._check_multiple_state_labels(
                     task_issue, issue_payload
                 )
+                warnings.extend(label_warnings)
                 issues.extend(label_issues)
 
         # only one task issue per branch

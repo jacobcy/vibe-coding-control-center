@@ -1,11 +1,15 @@
-"""Periodic check executor for consistency validation via vibe3 check.
+"""Periodic check executor for consistency validation and resource cleanup.
+
+Runs two phases on each interval tick:
+1. Consistency check: PR merged/closed, issue closed, multi-label detection
+2. Resource cleanup: expired worktrees and branches (if enabled)
 
 Replaces the old expired resource cleanup with comprehensive checks including:
 - PR merged/closed detection
 - Issue closed detection
 - Multiple state/* label detection and auto-fix
 - Flow consistency checks
-- Expired resource cleanup (via --clean-branch if enabled)
+- Expired resource cleanup (worktrees, local/remote branches)
 """
 
 from loguru import logger
@@ -75,3 +79,9 @@ async def execute_periodic_check(
         logger.bind(domain="orchestra", action="periodic_check").warning(
             f"Periodic check failed: {exc}"
         )
+
+    # Phase 2: Expired resource cleanup (if enabled)
+    # Import cleanup executor to reuse existing logic
+    from vibe3.runtime.cleanup_executor import execute_expired_resource_cleanup
+
+    await execute_expired_resource_cleanup(config, tick_number)
