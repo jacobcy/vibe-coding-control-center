@@ -46,6 +46,8 @@ vibe-center/
 │
 ├── src/vibe3/                   # V3 Python 实现（主要）
 │   ├── cli.py                   # CLI 主入口
+│   ├── __main__.py              # 进程入口（vibe3 serve）
+│   ├── adapters/                # 逻辑适配器与集成桥接
 │   ├── agents/                  # AI Agent 调用层
 │   ├── analysis/                # 代码智能与影响分析
 │   ├── clients/                 # 外部客户端
@@ -84,8 +86,8 @@ vibe-center/
 ├── .agent/                      # AI 工作区
 │   ├── README.md                # AI 工作区说明
 │   ├── context/                 # AI 上下文
-│   │   ├── task.md              # [UNTRACKED] 由 vibe3 handoff 命令管理，不直接编辑
-│   │   └── memory/              # [TRACKED] AI 上下文记忆（已迁移至 claude-memory MCP 工具）
+│   │   ├── memory/              # [TRACKED] AI 上下文记忆（已迁移至 claude-memory MCP 工具）
+│   │   └── ...                  # 动态上下文（如 handoff）由 vibe3 管理，见 .git/vibe3/
 │   ├── rules/                   # 编码规则
 │   │   ├── coding-standards.md  # 编码标准
 │   │   ├── python-standards.md  # Python 标准（V3 权威）
@@ -180,6 +182,8 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 **主要模块**：
 - `cli.py` - CLI 主入口（Typer 路由分发）
+- `__main__.py` - 进程入口（`vibe3 serve` 启动点）
+- `adapters/` - 逻辑适配器与外部集成桥接
 - `agents/` - AI Agent 调用层（plan/review/run pipeline + backends）
 - `analysis/` - 代码智能（symbol 分析、结构快照、变更范围）
 - `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
@@ -267,10 +271,10 @@ vibe3 inspect commit <sha>                # 改动影响范围
 
 #### `.agent/context/` - AI 上下文
 
-| 文件 | 职责 | 更新频率 |
+| 路径 | 职责 | 更新频率 |
 |------|------|---------|
-| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff status` 或 `vibe3 handoff show` 命令访问，不直接编辑） | 每个动作后 |
-| `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具） | 仅补充关键模式 |
+| **`.git/vibe3/handoff/`** | **[UNTRACKED]** 当前 flow 的 handoff 真源（包含 `current.md`、plans、reports）。通过 `vibe3 handoff` 命令管理。 | 每个动作后 |
+| `memory/` | **[TRACKED]** AI 上下文记忆目录（包含历史决策与模式参考，日常记忆优先使用 claude-memory MCP 工具）。 | 仅补充关键模式 |
 
 #### `.claude/rules/` - 编码规则
 
