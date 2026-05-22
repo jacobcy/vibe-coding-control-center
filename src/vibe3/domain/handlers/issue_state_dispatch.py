@@ -15,7 +15,7 @@ from vibe3.services.issue_failure_service import block_manager_noop_issue
 
 
 @register_handler("ManagerDispatchIntent")
-def handle_manager_dispatch_intent(event: ManagerDispatchIntent) -> None:
+def handle_manager_dispatch_intent(event: ManagerDispatchIntent, /) -> None:
     """Dispatch manager from an authoritative dispatch-intent event."""
     if event.actor == "human:resume":
         logger.bind(

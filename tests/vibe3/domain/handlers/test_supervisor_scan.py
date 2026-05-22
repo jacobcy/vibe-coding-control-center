@@ -74,6 +74,42 @@ class TestSupervisorScanHandler:
             )
         )
 
+    @patch("vibe3.domain.handlers.supervisor_scan.get_store")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.supervisor_scan.load_orchestra_config")
+    def test_uses_injected_coordinator_without_lazy_creation(
+        self,
+        mock_from_settings: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_get_store: MagicMock,
+    ) -> None:
+        from vibe3.domain.handlers.supervisor_scan import (
+            handle_supervisor_issue_identified,
+        )
+
+        mock_config = MagicMock(dry_run=False)
+        mock_from_settings.return_value = mock_config
+
+        injected_coordinator = MagicMock()
+        injected_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+            tmux_session="vibe3-supervisor-42",
+            log_path="/tmp/sup.log",
+        )
+
+        handle_supervisor_issue_identified(
+            SupervisorIssueIdentified(
+                issue_number=42,
+                issue_title="Test governance issue",
+                supervisor_file="supervisor.md",
+            ),
+            coordinator=injected_coordinator,
+        )
+
+        injected_coordinator.dispatch_execution.assert_called_once()
+        mock_coordinator_cls.assert_not_called()
+        mock_get_store.assert_not_called()
+
     @patch("vibe3.orchestra.logging.append_orchestra_event")
     @patch("vibe3.clients.sqlite_client.SQLiteClient")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")

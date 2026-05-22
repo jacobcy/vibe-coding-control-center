@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TypeVar, cast
 
 from loguru import logger
 
-if TYPE_CHECKING:
-    from vibe3.domain.events import DomainEvent
+from vibe3.domain.events import DomainEvent
+
+T = TypeVar("T", bound=DomainEvent)
 
 
-def register_handler(event_name: str) -> Callable:
+def register_handler(event_name: str) -> Callable[
+    [Callable[[T], None]],
+    Callable[[T], None],
+]:
     """Decorator to register a handler for an event.
 
     Eliminates boilerplate of manual subscribe() calls.
@@ -29,8 +33,10 @@ def register_handler(event_name: str) -> Callable:
     """
     from vibe3.domain.publisher import subscribe
 
-    def decorator(func: Callable[[DomainEvent], None]) -> Callable[[DomainEvent], None]:
-        subscribe(event_name, func)
+    def decorator(
+        func: Callable[[T], None],
+    ) -> Callable[[T], None]:
+        subscribe(event_name, cast(Callable[[DomainEvent], None], func))
         logger.bind(domain="events").info(
             f"{func.__name__} registered for {event_name}"
         )
