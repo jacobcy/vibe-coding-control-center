@@ -198,13 +198,13 @@ Why: ...
 
 Manager assignee 配置位于：
 - **配置文件**：`config/v3/settings.yaml`
-- **配置字段**：`manager_usernames`
-- **默认值**：`["vibe-manager-agent"]`（从 `config.manager_usernames` 解析）
+- **配置字段**：`orchestra.manager_usernames`
+- **默认值**：`["vibe-manager-agent"]`（从 `config.orchestra.manager_usernames` 解析，若为空则由 `ConventionResolver` 回退）
 
 ### 选择规则（强制）
 
 **必须使用**：
-- ✅ `{manager_bot}`（从 `config.manager_usernames[0]` 解析的默认 manager）
+- ✅ `{manager_bot}`（从 `OrchestraConfig.get_manager_usernames()[0]` 解析的默认 manager）
 
 **禁止使用**：
 - ❌ 仓库 owner（如 `jacobcy`、`alice`）
@@ -277,7 +277,7 @@ Forbidden:
    - **边界明确的 refactor / cleanup**
 4. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
 5. 对可纳入对象执行最小动作：
-   - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `manager_bot`（`manager_usernames[0]`），禁止使用人类用户名）
+   - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `{manager_bot}`，禁止使用人类用户名）
    - 如有必要补最小 routing labels
 6. 对不适合纳入的对象记录简短原因
 7. **扫描 `supervisor + state/ready` issues**，对每个执行：

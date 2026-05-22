@@ -169,6 +169,7 @@ orchestra:
     # Available template variables:
     # - {supervisor_name}
     # - {supervisor_content}
+    # - {manager_bot}
     # - {issue_scope_name}
     # - {scope_note}
     # - {server_status}
@@ -189,6 +190,7 @@ orchestra:
 
       ## Governance Material
       - Supervisor: {supervisor_name}
+      - Manager Bot: {manager_bot}
 
       {supervisor_content}
 

@@ -80,11 +80,18 @@ Roadmap skill 必须读取以下配置：
 cat config/v3/settings.yaml | grep manager_usernames
 
 # 或使用 Python 加载并获取第一个 manager bot 名称
-uv run python -c "import yaml; config = yaml.safe_load(open('config/v3/settings.yaml')); usernames = config.get('manager_usernames', ['vibe-manager-agent']); print(usernames[0] if usernames else 'vibe-manager-agent')"
+uv run python -c "
+import yaml
+from pathlib import Path
+config_path = Path('config/v3/settings.yaml')
+config = yaml.safe_load(open(config_path)) if config_path.exists() else {}
+usernames = config.get('orchestra', {}).get('manager_usernames', ['vibe-manager-agent'])
+print(usernames[0] if usernames else 'vibe-manager-agent')
+"
 ```
 
 默认行为：
-- 若配置文件不存在或字段缺失，使用默认值 `[“vibe-manager-agent”]`（本机 `~/.vibe/settings.yaml` 可覆盖）
+- 若配置文件不存在或字段缺失，使用默认值 `["vibe-manager-agent"]`（本机 `~/.vibe/settings.yaml` 可覆盖）
 - 只使用配置中的第一个 manager username
 
 边界对照：
