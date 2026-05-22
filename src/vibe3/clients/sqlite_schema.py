@@ -439,14 +439,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 "flow_events to transition_history"
             )
 
-    # Migration: remove retry_count and last_attempted_at from orchestra_queue
+    # Migration: remove retry_count, last_attempted_at, enqueued_at from orchestra_queue
     # (SQLite doesn't support DROP COLUMN, so recreate table)
     queue_columns = {
         row[1]
         for row in cursor.execute("PRAGMA table_info(orchestra_queue)").fetchall()
     }
-    if "retry_count" in queue_columns or "last_attempted_at" in queue_columns:
-        # Create new table without retry columns
+    legacy_cols = {"retry_count", "last_attempted_at", "enqueued_at"}
+    if legacy_cols & queue_columns:
         cursor.execute("""
             CREATE TABLE orchestra_queue_new (
                 issue_number INTEGER PRIMARY KEY,
@@ -455,17 +455,16 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 updated_at TEXT NOT NULL
             )
         """)
-        # Copy data (exclude retry columns)
         cursor.execute("""
             INSERT INTO orchestra_queue_new
             SELECT issue_number, collected_state, waiting_state, updated_at
             FROM orchestra_queue
         """)
-        # Replace old table
         cursor.execute("DROP TABLE orchestra_queue")
         cursor.execute("ALTER TABLE orchestra_queue_new RENAME TO orchestra_queue")
+        removed = sorted(legacy_cols & queue_columns)
         logger.bind(external="sqlite", operation="migration").info(
-            "Removed retry_count and last_attempted_at columns from orchestra_queue"
+            f"Removed legacy columns from orchestra_queue: {', '.join(removed)}"
         )
 
     # Create indexes for runtime_session table
@@ -515,7 +514,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Increment this when adding new migrations that need to run on existing DBs
     cursor.execute(
         "INSERT OR REPLACE INTO schema_meta (key, value) "
-        "VALUES ('migration_version', '1')"
+        "VALUES ('migration_version', '2')"
     )
     conn.commit()
     logger.bind(external="sqlite", operation="init_schema").debug(
