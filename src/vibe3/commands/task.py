@@ -160,7 +160,7 @@ def resume(
         bool,
         typer.Option(
             "--remote",
-            help="保留远程分支，从远程重建本地 scene（默认删除远程分支）",
+            help="保留远程分支不删除（默认删除远程分支）",
         ),
     ] = False,
     blocked: Annotated[
@@ -197,7 +197,7 @@ def resume(
 ) -> None:
     """Resume blocked issues to ready.
 
-    Use --remote to keep remote branch and rebuild local scene.
+    Use --remote to keep remote branch (do not delete origin).
     Use --label [STATE] to only update labels without deleting worktree.
     --remote and --label are mutually exclusive.
 

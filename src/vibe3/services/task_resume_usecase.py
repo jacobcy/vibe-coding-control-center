@@ -96,7 +96,7 @@ class TaskResumeUsecase:
             candidate_mode: Candidate selection mode ("resumable" or "all_task")
             label_state: Optional state to restore (None=delete worktree,
                 "handoff"/"ready"=keep worktree)
-            remote: If True, keep remote branch and rebuild local scene.
+            remote: If True, keep remote branch (do not delete origin).
                 If False, delete remote branch (default).
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,

@@ -193,7 +193,6 @@ class TaskResumeOperations:
                     emit_progress(f"resetting task scene for branch {branch}")
                     self.reset_task_scene(
                         branch,
-                        worktree_path=worktree_path,
                         include_remote=not remote,
                     )
                     emit_progress("task scene reset done", status="done")
@@ -212,7 +211,6 @@ class TaskResumeOperations:
     def reset_task_scene(
         self,
         branch: str,
-        worktree_path: str | None = None,
         include_remote: bool = True,
     ) -> None:
         """Delete the stale task scene so the next run starts from scratch.
@@ -226,7 +224,6 @@ class TaskResumeOperations:
 
         Args:
             branch: Branch name
-            worktree_path: Optional worktree path
             include_remote: If True, delete remote branch (default).
                 If False, keep remote branch (for --remote mode).
 
@@ -239,7 +236,6 @@ class TaskResumeOperations:
             domain="resume",
             action="reset_task_scene",
             branch=branch,
-            worktree_path=worktree_path,
         ).info("Resetting task scene")
 
         cleanup_service = FlowCleanupService(
