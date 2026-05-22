@@ -243,10 +243,16 @@ class HandoffService:
             raise UserError(f"Unsupported handoff kind: {ref_kind}")
 
         # Build flow state updates
-        flow_updates = {ref_field: ref_value}
+        flow_updates: dict[str, Any] = {ref_field: ref_value}
         actor_field = self._KIND_TO_ACTOR_FIELD.get(normalized_kind)
         if actor_field:
             flow_updates[actor_field] = effective_actor
+
+        # Clear blocked_reason when required refs are written
+        # This handles the case where gate was skipped (e.g., no state label)
+        # but executor/planner successfully wrote the required artifact
+        if ref_field in ("plan_ref", "report_ref"):
+            flow_updates["blocked_reason"] = None
 
         if verdict:
             role = extract_role_from_actor(effective_actor)
