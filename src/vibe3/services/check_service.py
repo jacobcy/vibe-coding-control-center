@@ -208,6 +208,10 @@ class CheckService(CheckRemote):
         Priority: blocked > done > in-progress > review > merge-ready >
         handoff > claimed > ready
 
+        If none of the known IssueState labels are present (e.g., a future/new
+        state/* label), the issue is flagged for manual fix instead of forcing
+        a default state.
+
         Returns:
             Tuple of (warnings, issues). Warnings for successful auto-fix,
             issues for cases requiring manual intervention.
@@ -234,11 +238,27 @@ class CheckService(CheckRemote):
             IssueState.READY,
         ]
 
-        target_state = IssueState.READY  # fallback
+        # Find the highest priority state from existing labels
+        target_state = None
         for candidate in priority_order:
             if candidate.to_label() in state_labels:
                 target_state = candidate
                 break
+
+        # If no known IssueState found, flag for manual fix
+        if target_state is None:
+            logger.bind(domain="check", action="fix").warning(
+                f"Issue #{issue_number} has multiple state labels with "
+                f"unknown states: {state_labels}"
+            )
+            return (
+                [],
+                [
+                    f"Issue #{issue_number} has multiple state labels "
+                    f"({', '.join(state_labels)}) with unknown state, "
+                    f"manual fix required"
+                ],
+            )
 
         # Auto-fix using LabelService (atomic: add new, remove old)
         try:

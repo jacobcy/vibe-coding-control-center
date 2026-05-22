@@ -2,14 +2,9 @@
 
 Runs two phases on each interval tick:
 1. Consistency check: PR merged/closed, issue closed, multi-label detection
-2. Resource cleanup: expired worktrees and branches (if enabled)
-
-Replaces the old expired resource cleanup with comprehensive checks including:
-- PR merged/closed detection
-- Issue closed detection
-- Multiple state/* label detection and auto-fix
-- Flow consistency checks
-- Expired resource cleanup (worktrees, local/remote branches)
+   (offloaded to a worker thread to avoid blocking the event loop)
+2. Resource cleanup: expired worktrees and branches (delegated to
+   execute_expired_resource_cleanup with config flags)
 """
 
 from loguru import logger
@@ -26,6 +21,8 @@ async def execute_periodic_check(
 
     This function is called from HeartbeatServer's tick loop when
     tick_number % interval_ticks == 0.
+
+    Phase 1 is offloaded to a worker thread to avoid blocking the event loop.
 
     Args:
         config: Periodic check configuration
@@ -46,7 +43,10 @@ async def execute_periodic_check(
             f"Running periodic consistency check (tick #{tick_number})"
         )
 
-        results = service.verify_all_flows(status="active")
+        # Offload blocking I/O work to a thread to avoid blocking the event loop
+        import asyncio
+
+        results = await asyncio.to_thread(service.verify_all_flows, "active")
 
         # Summary logging
         total = len(results)

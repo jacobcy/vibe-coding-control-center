@@ -196,13 +196,12 @@ class SupervisorHandoffConfig(BaseModel):
 class PeriodicCheckConfig(BaseModel):
     """Configuration for periodic consistency checks via vibe3 check.
 
-    Replaces the old expired resource cleanup with a more comprehensive
-    consistency check that includes:
-    - PR merged/closed detection
-    - Issue closed detection
-    - Multiple state/* label detection
-    - Flow consistency checks
-    - Expired resource cleanup (via --clean-branch)
+    Runs two phases on each interval tick:
+    1. Consistency check: PR merged/closed, issue closed, multi-label detection
+    2. Resource cleanup: expired worktrees and branches (if enabled)
+
+    Cleanup is performed by calling execute_expired_resource_cleanup directly
+    with the configuration flags below.
     """
 
     enabled: bool = True
