@@ -109,6 +109,7 @@ class TestRemoteBlockedReason:
                     flow_status="blocked",
                     blocked_reason="Remote block from issue body",
                     blocked_by_issue=None,
+                    latest_actor="system:qualify_gate",
                 )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
@@ -161,6 +162,7 @@ class TestRemoteBlockedReason:
                     flow_status="blocked",
                     blocked_reason="Local block from SQLite",
                     blocked_by_issue=None,
+                    latest_actor="system:qualify_gate",
                 )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
@@ -326,6 +328,7 @@ class TestRemoteDependencies:
                     flow_status="blocked",
                     blocked_reason=None,
                     blocked_by_issue=456,
+                    latest_actor="system:qualify_gate",
                 )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
@@ -479,6 +482,7 @@ class TestE2EBlockedReconciliation:
                     flow_status="blocked",
                     blocked_reason="API design pending",
                     blocked_by_issue=None,
+                    latest_actor="system:qualify_gate",
                 )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
@@ -592,6 +596,7 @@ class TestE2EBlockedReconciliation:
                     flow_status="blocked",
                     blocked_reason=None,
                     blocked_by_issue=456,
+                    latest_actor="system:qualify_gate",
                 )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"

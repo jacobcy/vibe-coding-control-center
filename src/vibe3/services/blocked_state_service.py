@@ -531,7 +531,7 @@ class BlockedStateService:
     def _write_database_cache(
         self,
         branch: str,
-        reason: str,
+        reason: str | None,
         blocked_by_issue: int | None,
         actor: str,
     ) -> None:

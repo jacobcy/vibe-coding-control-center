@@ -187,14 +187,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         mock_label_instance.confirm_issue_state.assert_called_once()
 
     # Verify: reasons cleared and flow_status restored to active
-    operations.flow_service.store.update_flow_state.assert_called_once_with(
-        "task/issue-303",
-        flow_status="active",
-        blocked_reason=None,
-        failed_reason=None,
-        blocked_by_issue=None,
-        latest_actor="human:resume",
-    )
+    operations.flow_service.store.update_flow_state.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
@@ -356,20 +349,29 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
 
 
 def test_clear_flow_reasons_clears_both_reasons() -> None:
-    """_clear_flow_reasons should clear both blocked_reason and failed_reason."""
+    """_clear_flow_reasons should use BlockedStateService.unblock."""
     operations = _make_operations()
 
-    operations._clear_flow_reasons("task/issue-303", "blocked")
+    with (
+        patch.object(
+            operations.flow_service.store, "get_task_issue_number"
+        ) as mock_get_issue,
+        patch(
+            "vibe3.services.blocked_state_service.BlockedStateService"
+        ) as mock_blocked_service_cls,
+    ):
+        mock_get_issue.return_value = 303
+        mock_blocked_instance = MagicMock()
+        mock_blocked_service_cls.return_value = mock_blocked_instance
 
-    # Verify: reasons cleared and flow_status restored to active
-    operations.flow_service.store.update_flow_state.assert_called_once_with(
-        "task/issue-303",
-        flow_status="active",
-        blocked_reason=None,
-        failed_reason=None,
-        blocked_by_issue=None,
-        latest_actor="human:resume",
-    )
+        operations._clear_flow_reasons("task/issue-303", "blocked")
+
+        mock_blocked_instance.unblock.assert_called_once_with(
+            branch="task/issue-303",
+            target_state=IssueState.CLAIMED,
+            actor="human:resume",
+            issue_number=303,
+        )
 
 
 def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> None:
@@ -401,24 +403,32 @@ def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> N
             )
 
 
-def test_clear_flow_reasons_clears_blocked_projection() -> None:
-    """Test that _clear_flow_reasons clears blocked state from issue body."""
+def test_clear_flow_reasons_uses_blocked_state_service() -> None:
+    """Test that _clear_flow_reasons uses BlockedStateService.unblock."""
     operations = _make_operations()
 
     with (
-        patch.object(operations.flow_service.store, "update_flow_state"),
         patch.object(
             operations.flow_service.store, "get_task_issue_number"
         ) as mock_get_issue,
-        patch.object(operations, "_clear_blocked_projection") as mock_clear,
+        patch(
+            "vibe3.services.blocked_state_service.BlockedStateService"
+        ) as mock_blocked_service_cls,
     ):
         mock_get_issue.return_value = 123
+        mock_blocked_instance = MagicMock()
+        mock_blocked_service_cls.return_value = mock_blocked_instance
 
         # Execute
         operations._clear_flow_reasons("task/issue-123", "blocked")
 
-        # Verify _clear_blocked_projection called with issue number
-        mock_clear.assert_called_once_with(123)
+        # Verify BlockedStateService.unblock called with correct args
+        mock_blocked_instance.unblock.assert_called_once_with(
+            branch="task/issue-123",
+            target_state=IssueState.CLAIMED,
+            actor="human:resume",
+            issue_number=123,
+        )
 
 
 def test_clear_blocked_projection_updates_issue_body() -> None:

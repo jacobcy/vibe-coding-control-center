@@ -183,7 +183,7 @@ class QualifyGateService:
             service = BlockedStateService(store=self._store)
             service._write_database_cache(
                 branch=branch,
-                reason=truth.blocked_reason or "",
+                reason=truth.blocked_reason,
                 blocked_by_issue=truth.blocked_by_issue,
                 actor="system:qualify_gate",
             )

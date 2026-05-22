@@ -1,6 +1,6 @@
 """Unit tests for QualifyGateService domain logic."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -158,6 +158,7 @@ class TestRunQualifyGate:
                     flow_status="blocked",
                     blocked_reason="Manual intervention required",
                     blocked_by_issue=None,
+                    latest_actor="system:qualify_gate",
                 )
                 mock_label_port.add_issue_label.assert_called_once_with(
                     123, "state/blocked"
@@ -315,11 +316,12 @@ class TestRunQualifyGate:
                     "vibe3.domain.qualify_gate.infer_resume_label",
                     return_value=IssueState.IN_PROGRESS,
                 ):
-                    mock_label_port = Mock()
                     with patch(
-                        "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                        return_value=mock_label_port,
-                    ):
+                        "vibe3.services.blocked_state_service.BlockedStateService"
+                    ) as mock_blocked_cls:
+                        mock_blocked_instance = MagicMock()
+                        mock_blocked_cls.return_value = mock_blocked_instance
+
                         result = qualify_gate_service.run_qualify_gate(
                             issue=sample_issue,
                             branch="task/issue-123-test",
@@ -329,18 +331,11 @@ class TestRunQualifyGate:
                         )
 
                         assert result == IssueState.IN_PROGRESS
-                        mock_store.update_flow_state.assert_called_once_with(
-                            "task/issue-123-test",
-                            flow_status="active",
-                            blocked_reason=None,
-                            blocked_by_issue=None,
-                        )
-                        mock_store.add_event.assert_called_once()
-                        mock_label_port.remove_issue_label.assert_called_once_with(
-                            123, "state/blocked"
-                        )
-                        mock_label_port.add_issue_label.assert_called_once_with(
-                            123, "state/in-progress"
+                        mock_blocked_instance.unblock.assert_called_once_with(
+                            branch="task/issue-123-test",
+                            target_state=IssueState.IN_PROGRESS,
+                            actor="orchestra:qualify",
+                            issue_number=sample_issue.number,
                         )
 
     def test_unblock_with_stale_local_cache_without_blocked_label(
@@ -403,6 +398,7 @@ class TestRunQualifyGate:
                             flow_status="active",
                             blocked_reason=None,
                             blocked_by_issue=None,
+                            latest_actor="orchestra:qualify",
                         )
                         mock_store.add_event.assert_called_once()
                         mock_label_port.remove_issue_label.assert_not_called()
