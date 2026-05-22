@@ -257,8 +257,8 @@ class TestAutoFix:
         assert call_kwargs["status"] == ["active", "stale"]
         assert "on_progress" in call_kwargs
 
-    def test_auto_fix_creates_handoff_file(self, check_service, mock_git_client):
-        """Test that auto_fix creates missing handoff file."""
+    def test_auto_fix_cannot_fix_handoff(self, check_service, mock_git_client):
+        """Test that auto_fix cannot fix handoff issues."""
 
         with tempfile.TemporaryDirectory() as tmpdir:
             git_dir = Path(tmpdir) / ".git"
@@ -276,7 +276,7 @@ class TestAutoFix:
                     ]
                 )
 
-        assert result.success
+        assert not result.success
 
     def test_auto_fix_unfixable_returns_hint(self, check_service):
         """Test that unfixable issues return error with --init hint."""

@@ -46,8 +46,8 @@ def check_service(mock_store, mock_git_client, mock_github_client):
 class TestAutoFixBranch:
     """Tests for auto_fix_branch method."""
 
-    def test_auto_fix_branch_creates_handoff(self, check_service, mock_git_client):
-        """auto_fix creates handoff for the specified branch."""
+    def test_auto_fix_branch_cannot_fix_handoff(self, check_service, mock_git_client):
+        """auto_fix cannot fix handoff issues."""
         with tempfile.TemporaryDirectory() as tmpdir:
             git_dir = Path(tmpdir) / ".git"
             git_dir.mkdir()
@@ -62,7 +62,7 @@ class TestAutoFixBranch:
                     branch="feature/other-branch",
                 )
 
-        assert result.success
+        assert not result.success
 
     def test_auto_fix_branch_unknown_issue_is_unfixable(
         self, check_service, mock_github_client

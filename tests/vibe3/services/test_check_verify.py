@@ -201,7 +201,7 @@ class TestVerifyCurrentFlow:
         assert any("plan_ref file not found" in issue for issue in result.issues)
 
     def test_verify_current_handoff_missing(self, check_service, mock_store):
-        """Test shared handoff file missing."""
+        """Handoff file check removed - missing file is not an error."""
         mock_store.get_flow_state.return_value = {
             "branch": "feature/test-branch",
             "task_issue_number": 123,
@@ -213,7 +213,6 @@ class TestVerifyCurrentFlow:
         with tempfile.TemporaryDirectory() as tmpdir:
             git_dir = Path(tmpdir) / ".git"
             git_dir.mkdir()
-            # Don't create handoff file
 
             with patch.object(
                 check_service.github_client,
@@ -231,8 +230,10 @@ class TestVerifyCurrentFlow:
                 ):
                     result = check_service.verify_current_flow()
 
-        assert not result.is_valid
-        assert any("Shared handoff file not found" in issue for issue in result.issues)
+        assert result.is_valid
+        assert not any(
+            "Shared handoff file not found" in issue for issue in result.issues
+        )
 
     def test_verify_ready_issue_does_not_require_handoff(
         self, check_service, mock_store, mock_github_client

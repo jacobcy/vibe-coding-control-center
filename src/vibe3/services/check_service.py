@@ -19,12 +19,10 @@ from vibe3.services.check_remote import (
     CheckRemote,
     is_empty_auto_scene,
     issue_state_from_payload,
-    requires_handoff,
     resolve_task_issue_number,
 )
 from vibe3.services.flow_status_service import FlowStatusService
 from vibe3.services.pr_service import PRService
-from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 if TYPE_CHECKING:
     from vibe3.models.pr import PRResponse
@@ -468,15 +466,6 @@ class CheckService(CheckRemote):
                                 f"{task_issue}' to reset."
                             )
 
-        # shared current.md
-        if flow_status not in self.INACTIVE_FLOW_STATUSES and requires_handoff(
-            orchestration_state
-        ):
-            git_dir = self.git_client.get_git_common_dir()
-            handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
-            if not handoff_path.exists():
-                issues.append(f"Shared handoff file not found: {handoff_path}")
-
         is_valid = len(issues) == 0
         logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).debug(
             "Check completed"
@@ -527,18 +516,7 @@ class CheckService(CheckRemote):
         branch = branch or self.git_client.get_current_branch()
         fixed: list[str] = []
 
-        for issue in issues:
-            if "Shared handoff file not found" in issue:
-                git_dir = self.git_client.get_git_common_dir()
-                handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
-                handoff_path.parent.mkdir(parents=True, exist_ok=True)
-                handoff_path.write_text(f"# {branch}\n", encoding="utf-8")
-                fixed.append(issue)
-                logger.bind(domain="check", action="fix", branch=branch).debug(
-                    f"Created missing handoff file: {handoff_path}"
-                )
-
-        unfixed = [i for i in issues if i not in fixed]
+        unfixed = issues
         if unfixed:
             hint = (
                 "  Some issues cannot be auto-fixed. "
