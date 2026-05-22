@@ -270,14 +270,18 @@ def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
     assert custom_instance is not default_instance
     assert custom_instance.db_path != default_instance.db_path
 
-    # Clear default instance
+    # Clear default instance (now clears _registry too, preventing test leakage)
     ErrorTrackingService.clear_instance()
     default_instance3 = ErrorTrackingService.get_instance()
     assert default_instance3 is not default_instance
 
-    # Custom instance should still be accessible
+    # Custom instance should also be cleared (new behavior)
+    # Previously: custom_instance2 would be the same as custom_instance
+    # Now: clear_instance() clears _registry, so a new instance is created
     custom_instance2 = ErrorTrackingService.get_instance(store=store)
-    assert custom_instance2 is custom_instance
+    assert (
+        custom_instance2 is not custom_instance
+    ), "clear_instance() should clear _registry to prevent test leakage"
 
 
 def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:

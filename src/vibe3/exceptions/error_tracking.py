@@ -85,12 +85,13 @@ class ErrorTrackingService:
 
         Args:
             db_path: If provided, clear only the instance for that db_path.
-                     If None, clear only the default instance.
+                     If None, clear all instances (default + registry).
         """
         if db_path is None:
-            # Clear default instance
+            # Clear all instances (prevent test state leakage)
             cls._default_instance = None
             cls._instance = None  # Keep _instance in sync
+            cls._registry.clear()  # Clear all per-db-path instances
         else:
             # Clear specific db_path instance
             cls._registry.pop(db_path, None)
