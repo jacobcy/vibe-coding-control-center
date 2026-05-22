@@ -12,24 +12,6 @@ All external services are mocked.
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-from typer.testing import CliRunner
-
-from vibe3.commands.inspect import app
-
-
-@pytest.fixture
-def cli_runner():
-    """Fixture for Typer CLI test runner."""
-    return CliRunner()
-
-
-@pytest.fixture
-def inspect_app_fixture():
-    """Fixture for the inspect app."""
-    return app
-
-
 # ========== Help Tests (from test_inspect_help.py) ==========
 
 

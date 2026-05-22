@@ -1,5 +1,7 @@
 """Shared fixtures for command tests."""
 
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +15,7 @@ from vibe3.services.handoff_status_service import HandoffStatusResult
 
 
 @pytest.fixture(autouse=True)
-def mock_git_client_base():
+def mock_git_client_base() -> Generator[None, None, None]:
     """Globally patch GitClient methods that require a real git repo."""
     # Use a non-protected branch name to avoid flow protection errors
     with (
@@ -110,13 +112,13 @@ def mock_coverage_failing() -> CoverageReport:
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Shared CliRunner instance for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_flow_service():
+def mock_flow_service() -> MagicMock:
     """Factory fixture that creates a configured FlowService mock.
 
     Returns a MagicMock with sensible defaults for FlowService methods.
@@ -130,7 +132,7 @@ def mock_flow_service():
 
 
 @pytest.fixture
-def mock_git_client():
+def mock_git_client() -> MagicMock:
     """Factory fixture that creates a configured GitClient mock.
 
     Returns a MagicMock with sensible defaults for GitClient methods.
@@ -145,7 +147,7 @@ def mock_git_client():
 
 
 @pytest.fixture
-def mock_pr_service():
+def mock_pr_service() -> MagicMock:
     """Factory fixture that creates a configured PRService mock.
 
     Returns a MagicMock with sensible defaults for PRService methods.
@@ -158,7 +160,7 @@ def mock_pr_service():
 
 
 @pytest.fixture
-def mock_handoff_service():
+def mock_handoff_service() -> MagicMock:
     """Factory fixture that creates a configured HandoffService mock.
 
     Returns a MagicMock with sensible defaults for HandoffService methods.
@@ -175,7 +177,7 @@ def mock_handoff_service():
 
 
 @pytest.fixture
-def mock_status_result():
+def mock_status_result() -> HandoffStatusResult:
     """Create a default HandoffStatusResult for testing."""
     return HandoffStatusResult(
         branch="task/test-branch",
@@ -190,7 +192,7 @@ def mock_status_result():
 
 
 @pytest.fixture
-def mock_flow_status_response():
+def mock_flow_status_response() -> FlowStatusResponse:
     """Create a default FlowStatusResponse for testing."""
     return FlowStatusResponse(
         branch="task/test-branch",
@@ -203,13 +205,13 @@ def mock_flow_status_response():
 
 
 @pytest.fixture
-def inspect_app_fixture():
+def inspect_app_fixture() -> Any:
     """Provide the inspect CLI app for testing."""
     return inspect_app
 
 
 @pytest.fixture
-def mock_pr_full():
+def mock_pr_full() -> PRResponse:
     """Create a fully configured PR object for testing."""
     return PRResponse(
         number=123,
@@ -224,7 +226,7 @@ def mock_pr_full():
 
 
 @pytest.fixture
-def mock_inspect_passing():
+def mock_inspect_passing() -> dict[str, Any]:
     """Mock inspect data that passes quality gate."""
     return {
         "score": {
