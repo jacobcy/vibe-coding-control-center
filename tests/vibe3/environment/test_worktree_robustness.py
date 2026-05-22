@@ -169,9 +169,16 @@ class TestOrphanDirectoryCleanup:
                     stdout="",
                     stderr="",
                 ),
-                # _find_worktree_by_path returns False (not registered)
+                # _find_worktree_by_path returns False (not registered) - first call
                 subprocess.CompletedProcess(
-                    args=["git", "worktree", "list"],
+                    args=["git", "worktree", "list", "--porcelain"],
+                    returncode=0,
+                    stdout="worktree /other/path\n",  # Different worktree
+                    stderr="",
+                ),
+                # _find_worktree_by_path returns False (not registered) - second call
+                subprocess.CompletedProcess(
+                    args=["git", "worktree", "list", "--porcelain"],
                     returncode=0,
                     stdout="worktree /other/path\n",  # Different worktree
                     stderr="",

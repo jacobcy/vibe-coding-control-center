@@ -71,6 +71,32 @@ class WorktreeLifecycle:
         # Pre-flight: cleanup stale references
         self._prune_worktrees()
 
+        # Check if worktree already exists and is registered
+        if wt_path.exists() and find_worktree_by_path(self.repo_path, wt_path):
+            # Verify branch matches before reusing
+            if self.validate_branch_matches(wt_path, branch):
+                logger.info(
+                    "Reusing existing registered worktree",
+                    path=str(wt_path),
+                    branch=branch,
+                    issue=issue_number,
+                )
+                return WorktreeContext(
+                    path=wt_path,
+                    is_temporary=False,
+                    branch=branch,
+                    issue_number=issue_number,
+                )
+            else:
+                logger.warning(
+                    "Existing worktree has different branch, removing",
+                    path=str(wt_path),
+                    expected_branch=branch,
+                )
+                from vibe3.environment.worktree_support import recycle_worktree_path
+
+                recycle_worktree_path(self.repo_path, wt_path)
+
         # If path exists but is not registered, delete it
         if wt_path.exists() and not find_worktree_by_path(self.repo_path, wt_path):
             logger.warning(
