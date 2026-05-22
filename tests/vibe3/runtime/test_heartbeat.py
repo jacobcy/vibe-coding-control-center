@@ -302,7 +302,7 @@ async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
-    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup)
+    monkeypatch.setattr(server, "_run_periodic_check", _mock_cleanup)
     server._running = True
 
     await server._tick_loop()
@@ -348,7 +348,7 @@ async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
-    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup_failure)
+    monkeypatch.setattr(server, "_run_periodic_check", _mock_cleanup_failure)
     server._running = True
 
     await server._tick_loop()
@@ -389,7 +389,7 @@ async def test_tick_loop_skip_cleanup_when_disabled(monkeypatch) -> None:
         cleanup_calls.append(tick_number)
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
-    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup)
+    monkeypatch.setattr(server, "_run_periodic_check", _mock_cleanup)
     server._running = True
 
     await server._tick_loop()
