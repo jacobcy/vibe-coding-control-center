@@ -63,6 +63,7 @@ class TaskResumeOperations:
         reason: str,
         worktree_path: str | None = None,
         label_state: str | None = None,
+        remote: bool = False,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state.
@@ -76,6 +77,8 @@ class TaskResumeOperations:
             worktree_path: Optional worktree path (for optimization)
             label_state: Optional state to restore (None=delete worktree,
                 empty/"handoff"=restore to handoff, "ready"=restore to ready)
+            remote: If True, keep remote branch (use with --remote flag).
+                If False, delete remote branch (default).
             progress_callback: Optional callback for progress updates.
                 Signature: (issue_number: int, branch: str | None, step: str,
                     status: str) -> None
@@ -188,7 +191,11 @@ class TaskResumeOperations:
             if isinstance(branch, str):
                 try:
                     emit_progress(f"resetting task scene for branch {branch}")
-                    self.reset_task_scene(branch, worktree_path=worktree_path)
+                    self.reset_task_scene(
+                        branch,
+                        worktree_path=worktree_path,
+                        include_remote=not remote,
+                    )
                     emit_progress("task scene reset done", status="done")
                 except Exception as exc:
                     emit_progress(f"scene reset failed: {exc}", status="failed")
@@ -202,7 +209,12 @@ class TaskResumeOperations:
             else:
                 emit_progress("no branch to reset, done", status="done")
 
-    def reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
+    def reset_task_scene(
+        self,
+        branch: str,
+        worktree_path: str | None = None,
+        include_remote: bool = True,
+    ) -> None:
         """Delete the stale task scene so the next run starts from scratch.
 
         Flow record deletion is guaranteed even if worktree/branch/handoff
@@ -212,8 +224,14 @@ class TaskResumeOperations:
         This method uses FlowCleanupService for consistent cleanup behavior
         across `task resume` and `check --clean-branch`.
 
+        Args:
+            branch: Branch name
+            worktree_path: Optional worktree path
+            include_remote: If True, delete remote branch (default).
+                If False, keep remote branch (for --remote mode).
+
         Note: Always deletes flow record (keep_flow_record=False) because
-        the purpose of `task resume` is to restart the flow from scratch.
+            the purpose of `task resume` is to restart the flow from scratch.
         """
         from vibe3.services.flow_cleanup_service import FlowCleanupService
 
@@ -233,7 +251,7 @@ class TaskResumeOperations:
 
         results = cleanup_service.cleanup_flow_scene(
             branch,
-            include_remote=True,  # Delete remote branch for clean restart
+            include_remote=include_remote,  # Use parameter (False for --remote mode)
             terminate_sessions=True,
             keep_flow_record=False,  # Delete flow record to allow fresh start
         )
