@@ -24,6 +24,7 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
+    from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.orchestra.failed_gate import FailedGate
     from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
@@ -50,6 +51,7 @@ class OrchestrationFacade(ServiceBase):
         store: "SQLiteClient | None" = None,
         github: "GitHubClient | None" = None,
         flow_manager: "FlowManager | None" = None,
+        registry: "SessionRegistryService | None" = None,
     ) -> None:
         """Initialize facade with tick counter.
 
@@ -70,6 +72,11 @@ class OrchestrationFacade(ServiceBase):
                 creates a new GitHubClient instance.
             flow_manager: Optional FlowManager for dependency injection. When omitted,
                 creates a new FlowManager instance with the provided config.
+            registry: Optional SessionRegistryService for dependency injection.
+                When omitted with capacity provided, creates a new
+                SessionRegistryService instance. This enables reusing a shared
+                registry instance across the facade's lifetime instead of
+                creating a new one on each tick.
         """
         self._tick_count = tick_count
         self._config = config or load_orchestra_config()
@@ -80,6 +87,7 @@ class OrchestrationFacade(ServiceBase):
         self._failed_gate = failed_gate
         self._github = github or GitHubClient()
         self._flow_manager = flow_manager or FlowManager(self._config)
+        self._registry: SessionRegistryService | None = registry
 
         if self._capacity is not None:
             from vibe3.environment.session_registry import SessionRegistryService
@@ -88,14 +96,16 @@ class OrchestrationFacade(ServiceBase):
             )
 
             actual_store = store or SQLiteClient()
-            registry = SessionRegistryService(actual_store, self._capacity._backend)
+            self._registry = registry or SessionRegistryService(
+                actual_store, self._capacity._backend
+            )
             self._coordinator = GlobalDispatchCoordinator(
                 config=self._config,
                 capacity=self._capacity,
                 github=self._github,
                 store=actual_store,
                 flow_manager=self._flow_manager,
-                registry=registry,
+                registry=self._registry,
             )
 
     def shutdown(self) -> None:
@@ -168,17 +178,15 @@ class OrchestrationFacade(ServiceBase):
 
         # Always reconcile session state to prevent stale capacity tracking.
         if self._capacity:
+            # Type guard: registry is guaranteed non-None when capacity exists
+            assert self._registry is not None
             try:
                 # Reconcile session state (mark dead tmux sessions as orphaned)
                 # This ensures count_live_worker_sessions() returns accurate results.
-                from vibe3.environment.session_registry import SessionRegistryService
-
-                store = SQLiteClient()
-                registry = SessionRegistryService(store, self._capacity._backend)
-                # Mark worker sessions as done (not orphaned) when tmux exits
-                registry.mark_worker_sessions_done_when_tmux_gone()
-                # Then orphan any remaining dead sessions (failed launches)
-                registry.reconcile_live_state()
+                # Uses the registry instance from constructor injection instead of
+                # creating a new SQLiteClient + SessionRegistryService per tick.
+                self._registry.mark_worker_sessions_done_when_tmux_gone()
+                self._registry.reconcile_live_state()
             except Exception as exc:
                 append_orchestra_event(
                     "server",
