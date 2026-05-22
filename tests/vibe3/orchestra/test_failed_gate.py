@@ -240,6 +240,38 @@ def test_clear_instance_specific_db_path(tmp_path: Path) -> None:
     assert instance2_new is instance2
 
 
+def test_clear_instance_with_db_path_clears_matching_singleton(
+    tmp_path: Path,
+) -> None:
+    """clear_instance(db_path) should also clear _instance if it matches."""
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+    # Create a test database
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(db_path)
+    from vibe3.clients.sqlite_schema import init_schema
+
+    init_schema(conn)
+    conn.close()
+
+    store = SQLiteClient(db_path=str(db_path))
+
+    # Set _instance directly (simulating test fixture behavior)
+    ErrorTrackingService._instance = ErrorTrackingService(store=store)
+
+    # Verify _instance is set
+    assert ErrorTrackingService._instance is not None
+    assert ErrorTrackingService._instance.db_path == str(db_path)
+
+    # Clear with db_path
+    ErrorTrackingService.clear_instance(db_path=str(db_path))
+
+    # _instance should also be cleared (matching db_path)
+    assert (
+        ErrorTrackingService._instance is None
+    ), "clear_instance(db_path) should clear _instance if db_path matches"
+
+
 def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
     """get_instance() without store should return default instance."""
     from vibe3.exceptions.error_tracking import ErrorTrackingService
@@ -270,14 +302,18 @@ def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
     assert custom_instance is not default_instance
     assert custom_instance.db_path != default_instance.db_path
 
-    # Clear default instance
+    # Clear default instance (now clears _registry too, preventing test leakage)
     ErrorTrackingService.clear_instance()
     default_instance3 = ErrorTrackingService.get_instance()
     assert default_instance3 is not default_instance
 
-    # Custom instance should still be accessible
+    # Custom instance should also be cleared (new behavior)
+    # Previously: custom_instance2 would be the same as custom_instance
+    # Now: clear_instance() clears _registry, so a new instance is created
     custom_instance2 = ErrorTrackingService.get_instance(store=store)
-    assert custom_instance2 is custom_instance
+    assert (
+        custom_instance2 is not custom_instance
+    ), "clear_instance() should clear _registry to prevent test leakage"
 
 
 def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:

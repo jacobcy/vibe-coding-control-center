@@ -84,16 +84,30 @@ class ErrorTrackingService:
         """Clear instance(s) for testing.
 
         Args:
-            db_path: If provided, clear only the instance for that db_path.
-                     If None, clear only the default instance.
+            db_path: If provided, clear the instance for that db_path from
+                     _registry. Also clears _instance/_default_instance if
+                     their db_path matches. If None, clear all instances
+                     (default + registry).
         """
         if db_path is None:
-            # Clear default instance
+            # Clear all instances (prevent test state leakage)
             cls._default_instance = None
             cls._instance = None  # Keep _instance in sync
+            cls._registry.clear()  # Clear all per-db-path instances
         else:
-            # Clear specific db_path instance
+            # Clear specific db_path instance from registry
             cls._registry.pop(db_path, None)
+            # Also clear _instance/_default_instance if they match
+            if (
+                cls._instance is not None
+                and getattr(cls._instance, "db_path", None) == db_path
+            ):
+                cls._instance = None
+            if (
+                cls._default_instance is not None
+                and getattr(cls._default_instance, "db_path", None) == db_path
+            ):
+                cls._default_instance = None
 
     def __init__(
         self, store: SQLiteClient | None = None, retention_days: int | None = None
