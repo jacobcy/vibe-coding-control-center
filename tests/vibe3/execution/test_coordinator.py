@@ -468,7 +468,7 @@ def test_coordinator_dispatch_launch_failed_duplicate_tmux_gets_context(
         result = coordinator.dispatch_execution(request)
 
         assert result.launched is False
-        assert result.reason_code == "launch_failed"
+        assert result.reason_code == "duplicate_dispatch"
         assert "previous session still alive" in result.reason
         assert "vibe3-planner-issue-303" in result.reason
         assert "previous session still alive" in mock_event.call_args.args[1]

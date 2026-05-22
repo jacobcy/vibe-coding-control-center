@@ -375,14 +375,15 @@ class ExecutionCoordinator:
                     target_id=request.target_id,
                 ).warning(f"Execution launch skipped: {formatted_msg}")
 
-                # Still mark as launch_failed (test expectation), but with WARNING level
+                # Mark session failed to release capacity,
+                # but use duplicate_dispatch reason
                 if request.mode == "async" and runtime_session_id is not None:
                     self.registry.mark_failed(runtime_session_id)
 
                 return ExecutionLaunchResult(
                     launched=False,
                     reason=formatted_msg,
-                    reason_code="launch_failed",
+                    reason_code="duplicate_dispatch",
                 )
 
             # Generic error handling for other exceptions

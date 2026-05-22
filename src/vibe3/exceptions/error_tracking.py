@@ -220,6 +220,24 @@ class ErrorTrackingService:
 
         return rows[0] > 0 if rows else False
 
+    def get_critical_error_codes(self) -> list[str]:
+        """Get error codes of CRITICAL severity errors.
+
+        Returns:
+            List of error codes with CRITICAL severity.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT error_code FROM error_log
+                WHERE severity = ?
+                ORDER BY error_code
+                """,
+                (ErrorSeverity.CRITICAL.value,),
+            ).fetchall()
+
+        return [row[0] for row in rows]
+
     def has_model_config_error(self) -> bool:
         """Check if there are any model configuration errors.
 

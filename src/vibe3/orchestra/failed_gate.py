@@ -155,16 +155,23 @@ class FailedGate:
         error_tracking = ErrorTrackingService.get_instance(store=self.store)
 
         # Check for CRITICAL errors (immediate block)
-        # Use has_model_config_error() for backward compatibility with pre-migration DBs
-        if error_tracking.has_model_config_error():
-            error_counts = error_tracking.get_error_counts()
-            critical_errors = [
-                code for code in error_counts.keys() if code.startswith("E_MODEL_")
-            ]
+        # Two-stage check for backward compatibility with pre-migration DBs:
+        # 1. If CRITICAL-severity rows exist → use get_critical_error_codes()
+        # 2. If only legacy E_MODEL_% prefix rows exist → use descriptive message
+        if error_tracking.has_critical_error():
+            critical_errors = error_tracking.get_critical_error_codes()
             log.error(f"CRITICAL errors detected: {critical_errors}")
             return GateResult(
                 blocked=True,
                 reason=f"CRITICAL errors: {', '.join(critical_errors)}",
+            )
+        elif error_tracking.has_model_config_error():
+            # Legacy path: E_MODEL_% prefix without CRITICAL severity rows
+            log.error("Legacy model config errors detected (no severity metadata)")
+            return GateResult(
+                blocked=True,
+                reason="Model configuration errors "
+                "(legacy, severity migration pending)",
             )
 
         # Check for frequent ERROR-severity errors (threshold: 2+ in window)
