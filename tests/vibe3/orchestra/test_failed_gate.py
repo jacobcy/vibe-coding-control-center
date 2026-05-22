@@ -18,6 +18,17 @@ def reset_error_tracking() -> Iterator[None]:
 
     ErrorTrackingService.clear_instance()
 
+    for instance in list(ErrorTrackingService._registry.values()):
+        try:
+            with sqlite3.connect(instance.db_path) as conn:
+                conn.execute("DELETE FROM error_log")
+                conn.execute(
+                    "UPDATE failed_gate_state SET is_active = 0, "
+                    "reason = NULL, triggered_at = NULL WHERE id = 1"
+                )
+        except Exception:
+            pass
+
 
 @pytest.fixture
 def temp_store(tmp_path: Path) -> SQLiteClient:
