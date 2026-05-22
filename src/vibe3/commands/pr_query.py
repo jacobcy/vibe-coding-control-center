@@ -39,9 +39,9 @@ from vibe3.observability.trace import trace_context
 from vibe3.services.branch_resolver import resolve_branch_from_pr
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_local_review_summary, render_pr_details
-from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
 def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
