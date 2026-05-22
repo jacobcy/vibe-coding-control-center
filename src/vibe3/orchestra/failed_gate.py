@@ -175,7 +175,11 @@ class FailedGate:
             )
 
         # Check for frequent ERROR-severity errors (threshold: 2+ in window)
-        error_count = error_tracking.get_threshold_error_count()
+        # Exclude manual_scan errors - manual governance failures should not
+        # trigger live orchestra freeze (manual scan is diagnostic)
+        error_count = error_tracking.get_threshold_error_count(
+            source_filter="orchestra_tick"
+        )
 
         if error_count >= ErrorTrackingService.THRESHOLD_COUNT:
             log.warning(

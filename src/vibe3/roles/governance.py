@@ -508,7 +508,9 @@ def build_governance_request(
     if snapshot.circuit_breaker_state == "open":
         log.warning("Skipping governance: circuit breaker is OPEN")
         root = repo_path or resolve_orchestra_repo_root()
-        append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
+        append_governance_event(
+            "skipped: circuit breaker OPEN", source=None, repo_root=root
+        )
         return None
 
     snapshot_context = build_governance_snapshot_context(
@@ -529,6 +531,7 @@ def build_governance_request(
         log.info(f"Dry run plan file: {dry_run_plan_path}")
         append_governance_event(
             f"dry-run plan written ({current_material}): {dry_run_plan_path}",
+            source=None,
             repo_root=root,
         )
         return None
@@ -538,6 +541,7 @@ def build_governance_request(
     root = repo_path or resolve_orchestra_repo_root()
     append_governance_event(
         f"dispatching governance scan tick={tick_count} material={current_material}",
+        source=None,
         repo_root=root,
     )
 

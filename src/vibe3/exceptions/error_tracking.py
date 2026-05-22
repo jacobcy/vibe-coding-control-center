@@ -135,6 +135,7 @@ class ErrorTrackingService:
         issue_number: int | None = None,
         branch: str | None = None,
         severity: ErrorSeverity | None = None,
+        source: str | None = None,
     ) -> tuple[bool, int]:
         """Record error and check if threshold reached.
 
@@ -145,6 +146,7 @@ class ErrorTrackingService:
             issue_number: Optional linked issue
             branch: Optional linked branch
             severity: Optional severity level. If None, inferred from error registry.
+            source: Optional source identifier (e.g. "manual_scan", "orchestra_tick").
 
         Returns:
             (threshold_reached: bool, error_count_in_window: int)
@@ -159,14 +161,16 @@ class ErrorTrackingService:
             conn.execute(
                 """
                 INSERT INTO error_log
-                (tick_id, error_code, error_message, severity, issue_number, branch)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (tick_id, error_code, error_message, severity, source,
+                 issue_number, branch)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     tick_id,
                     error_code,
                     error_message,
                     severity.value,
+                    source,
                     issue_number,
                     branch,
                 ),
@@ -314,25 +318,44 @@ class ErrorTrackingService:
 
         return rows[0] if rows else 0
 
-    def get_threshold_error_count(self) -> int:
+    def get_threshold_error_count(self, source_filter: str | None = None) -> int:
         """Get count of ERROR-severity errors within time window.
 
         Counts by severity level rather than error code prefix, providing
         accurate threshold detection for all ERROR-severity errors regardless
         of their code classification.
 
+        Args:
+            source_filter: Optional source to filter by (e.g., "orchestra_tick").
+                          If provided, only counts errors with matching source.
+
         Returns:
             Number of ERROR-severity errors in the sliding window.
         """
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE severity = ?
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (ErrorSeverity.ERROR.value, f"-{self.TIME_WINDOW_MINUTES}"),
-            ).fetchone()
+            if source_filter is not None:
+                rows = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM error_log
+                    WHERE severity = ?
+                      AND source = ?
+                      AND created_at >= datetime('now', ? || ' minutes')
+                    """,
+                    (
+                        ErrorSeverity.ERROR.value,
+                        source_filter,
+                        f"-{self.TIME_WINDOW_MINUTES}",
+                    ),
+                ).fetchone()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM error_log
+                    WHERE severity = ?
+                      AND created_at >= datetime('now', ? || ' minutes')
+                    """,
+                    (ErrorSeverity.ERROR.value, f"-{self.TIME_WINDOW_MINUTES}"),
+                ).fetchone()
 
         return rows[0] if rows else 0
 
@@ -354,24 +377,38 @@ class ErrorTrackingService:
 
         return rows[0] if rows else 0
 
-    def _get_severity_count(self, severity: str) -> int:
+    def _get_severity_count(
+        self, severity: str, source_filter: str | None = None
+    ) -> int:
         """Get count of errors by severity level within time window.
 
         Args:
             severity: Severity level string (CRITICAL, ERROR, WARNING)
+            source_filter: Optional source to filter by
 
         Returns:
             Count of errors with the given severity in the sliding window.
         """
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE severity = ?
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (severity, f"-{self.TIME_WINDOW_MINUTES}"),
-            ).fetchone()
+            if source_filter is not None:
+                rows = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM error_log
+                    WHERE severity = ?
+                      AND source = ?
+                      AND created_at >= datetime('now', ? || ' minutes')
+                    """,
+                    (severity, source_filter, f"-{self.TIME_WINDOW_MINUTES}"),
+                ).fetchone()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM error_log
+                    WHERE severity = ?
+                      AND created_at >= datetime('now', ? || ' minutes')
+                    """,
+                    (severity, f"-{self.TIME_WINDOW_MINUTES}"),
+                ).fetchone()
 
         return rows[0] if rows else 0
 
@@ -388,7 +425,7 @@ class ErrorTrackingService:
             rows = conn.execute(
                 """
                 SELECT tick_id, error_code, error_message,
-                       issue_number, branch, created_at, severity
+                       issue_number, branch, created_at, severity, source
                 FROM error_log
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -405,6 +442,7 @@ class ErrorTrackingService:
                 "branch": row[4],
                 "created_at": row[5],
                 "severity": row[6] or "ERROR",  # Default to ERROR if NULL
+                "source": row[7],  # NULL for legacy data
             }
             for row in rows
         ]

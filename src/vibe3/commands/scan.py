@@ -29,7 +29,9 @@ def _execute_governance_internal(material_override: str | None = None) -> None:
     """
     from vibe3.services.scan_service import dispatch_governance_execution
 
-    dispatch_governance_execution(material_override=material_override)
+    dispatch_governance_execution(
+        material_override=material_override, source="manual_scan"
+    )
 
 
 def _run_governance_scan(
@@ -50,7 +52,9 @@ def _run_governance_scan(
     else:
         from vibe3.execution.governance_sync_runner import run_governance_async
 
-        run_governance_async(tick_count=0, material_override=material_override)
+        run_governance_async(
+            tick_count=0, material_override=material_override, source="manual_scan"
+        )
 
 
 def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
@@ -72,6 +76,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
         dry_run=True,
         show_prompt=True,
         session_id=None,
+        source="manual_scan",
     )
 
 

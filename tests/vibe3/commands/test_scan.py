@@ -73,7 +73,9 @@ class TestGovernanceScan:
                 runner.invoke(app, ["scan", "governance", "--no-async"])
                 mock_facade.assert_not_called()
                 assert mock_service_run.called
-                mock_service_run.assert_called_once_with(material_override=None)
+                mock_service_run.assert_called_once_with(
+                    material_override=None, source="manual_scan"
+                )
 
 
 class TestSupervisorScan:
@@ -118,7 +120,9 @@ class TestScanIntegration:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan(no_async=True)
-            mock_service.assert_called_once_with(material_override=None)
+            mock_service.assert_called_once_with(
+                material_override=None, source="manual_scan"
+            )
 
     def test_supervisor_scan_registers_handlers(self):
         """Supervisor scan calls service layer directly, not facade."""
@@ -157,7 +161,9 @@ class TestFailedGateBlocking:
             from vibe3.commands.scan import _run_governance_scan
 
             _run_governance_scan(no_async=True)
-            mock_service.assert_called_once_with(material_override=None)
+            mock_service.assert_called_once_with(
+                material_override=None, source="manual_scan"
+            )
 
     def test_supervisor_scan_blocked_by_failed_gate(self):
         """Manual supervisor scan ignores FailedGate (only for heartbeat)."""

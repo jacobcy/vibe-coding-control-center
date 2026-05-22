@@ -33,6 +33,7 @@ def run_governance_sync(
     dry_run: bool = False,
     show_prompt: bool = False,
     session_id: str | None = None,
+    source: str | None = None,
 ) -> None:
     """Run governance scan synchronously with error tracking.
 
@@ -46,6 +47,7 @@ def run_governance_sync(
         dry_run: If True, print command without executing
         show_prompt: If True, print prompt content in dry-run mode
         session_id: Optional session ID for resume
+        source: Optional source identifier (e.g., "manual_scan", "orchestra_tick")
     """
     config = load_orchestra_config()
     flow_manager = FlowManager(config)
@@ -100,7 +102,8 @@ def run_governance_sync(
         # Log successful completion
         append_governance_event(
             f"governance scan completed tick={tick_count} "
-            f"exit_code={result.exit_code}"
+            f"exit_code={result.exit_code}",
+            source=source,
         )
         logger.bind(domain="governance", tick=tick_count).success(
             f"Governance scan completed: {result.exit_code}"
@@ -123,13 +126,15 @@ def run_governance_sync(
             tick_id=tick_count,  # Governance runs in tick context
             issue_number=None,  # Governance is global, not issue-specific
             branch=None,
+            source=source,
         )
 
         logger.bind(domain="governance", tick=tick_count).error(
             f"Governance scan failed: {error_code} - {exc}"
         )
         append_governance_event(
-            f"governance scan failed tick={tick_count} " f"error={error_code}: {exc}"
+            f"governance scan failed tick={tick_count} error={error_code}: {exc}",
+            source=source,
         )
 
         # Re-raise for CLI exit code handling
@@ -140,6 +145,7 @@ def run_governance_async(
     *,
     tick_count: int = 0,
     material_override: str | None = None,
+    source: str | None = None,
 ) -> None:
     """Run governance scan in background tmux session (async).
 
@@ -150,6 +156,7 @@ def run_governance_async(
     Args:
         tick_count: Tick number for governance material rotation
         material_override: Optional governance role to override material rotation
+        source: Optional source identifier (e.g., "manual_scan", "orchestra_tick")
     """
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
@@ -184,7 +191,8 @@ def run_governance_async(
             )
             append_governance_event(
                 f"governance dispatch skipped: tick={tick_count} "
-                f"reason={skip_result.reason}"
+                f"reason={skip_result.reason}",
+                source=source,
             )
             echo(skip_result.reason)
             return
@@ -197,7 +205,9 @@ def run_governance_async(
 
     # Check circuit breaker before dispatching
     if snapshot.circuit_breaker_state == "open":
-        append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
+        append_governance_event(
+            "skipped: circuit breaker OPEN", source=source, repo_root=root
+        )
         echo("Governance dispatch skipped: circuit breaker is OPEN")
         return
 
@@ -219,10 +229,19 @@ def run_governance_async(
     ]
     if material_override:
         cmd.extend(["--material", material_override])
+    if source:
+        cmd.extend(["--source", source])
 
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
     env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+
+    # Derive actor from source (Step 10: actor field cleanup)
+    actor = "orchestra:governance" if source == "orchestra_tick" else "cli:governance"
+
+    refs = {"tick": str(tick_count)}
+    if source:
+        refs["source"] = source
 
     request = ExecutionRequest(
         role="governance",
@@ -232,8 +251,8 @@ def run_governance_async(
         cmd=cmd,
         repo_path=str(root),
         env=env,
-        refs={"tick": str(tick_count)},
-        actor="cli:governance",
+        refs=refs,
+        actor=actor,
         mode="async",
         worktree_requirement=GOVERNANCE_GATE_CONFIG,
     )
@@ -252,11 +271,13 @@ def run_governance_async(
         append_governance_event(
             f"governance agent launched: tick={tick_count} "
             f"session={result.tmux_session}",
+            source=source,
         )
         echo(f"Governance scan dispatched in tmux session: {result.tmux_session}")
     elif result:
         append_governance_event(
             f"governance dispatch skipped: tick={tick_count} "
             f"reason={result.reason}",
+            source=source,
         )
         echo(f"Governance scan skipped: {result.reason}")

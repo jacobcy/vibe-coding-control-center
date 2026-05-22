@@ -56,7 +56,8 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
             )
             append_governance_event(
                 f"governance dispatch skipped: tick={event.tick_count} "
-                f"reason={skip_result.reason}"
+                f"reason={skip_result.reason}",
+                source="orchestra_tick",
             )
             logger.bind(
                 domain="governance_handler",
@@ -77,7 +78,9 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
 
     # Check circuit breaker before dispatching
     if snapshot.circuit_breaker_state == "open":
-        append_governance_event("skipped: circuit breaker OPEN", repo_root=root)
+        append_governance_event(
+            "skipped: circuit breaker OPEN", source="orchestra_tick", repo_root=root
+        )
         return
 
     execution_name = build_governance_execution_name(event.tick_count)
@@ -97,6 +100,8 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
         "internal",
         "governance",
         str(event.tick_count),
+        "--source",
+        "orchestra_tick",
     ]
 
     env = dict(os.environ)
@@ -112,7 +117,7 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
         cmd=cmd,
         repo_path=str(root),
         env=env,
-        refs={"tick": str(event.tick_count)},
+        refs={"tick": str(event.tick_count), "source": "orchestra_tick"},
         actor="orchestra:governance",
         mode="async",
         worktree_requirement=GOVERNANCE_GATE_CONFIG,
@@ -135,9 +140,11 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
         append_governance_event(
             f"governance agent launched: tick={event.tick_count} "
             f"session={result.tmux_session}",
+            source="orchestra_tick",
         )
     elif result:
         append_governance_event(
             f"governance dispatch skipped: tick={event.tick_count} "
             f"reason={result.reason}",
+            source="orchestra_tick",
         )

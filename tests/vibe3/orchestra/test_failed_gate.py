@@ -96,10 +96,13 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
     # Record 2 API errors (threshold is 2 in 10 minutes)
+    # Use orchestra_tick source to match FailedGate's filter
     ErrorTrackingService._instance.record_error(
-        "E_API_RATE_LIMIT", "Rate limit", tick_id=1
+        "E_API_RATE_LIMIT", "Rate limit", tick_id=1, source="orchestra_tick"
     )
-    ErrorTrackingService._instance.record_error("E_API_TIMEOUT", "Timeout", tick_id=2)
+    ErrorTrackingService._instance.record_error(
+        "E_API_TIMEOUT", "Timeout", tick_id=2, source="orchestra_tick"
+    )
 
     gate = FailedGate(store=temp_store)
     result = gate.check()

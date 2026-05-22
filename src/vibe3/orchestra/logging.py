@@ -153,16 +153,28 @@ def append_orchestra_run_separator(
     return _events_path
 
 
-def append_governance_event(message: str, *, repo_root: Path | None = None) -> Path:
+def append_governance_event(
+    message: str, *, source: str | None = None, repo_root: Path | None = None
+) -> Path:
     """Append a governance event to both governance.log and events.log.
 
     Uses append mode and delegates to append_orchestra_event for events.log
     to benefit from persistent file handle.
+
+    Args:
+        message: Event message to append
+        source: Optional source identifier (e.g., "manual_scan", "orchestra_tick")
+        repo_root: Optional repository root path
+
+    Returns:
+        Path to the governance.log file
     """
     path = governance_events_log_path(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
+    # Include source in message if provided
+    full_message = f"{message} source={source}" if source else message
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(f"[{timestamp}] {message}\n")
+        handle.write(f"[{timestamp}] {full_message}\n")
     # Delegate to append_orchestra_event to use persistent handle
-    append_orchestra_event("governance", message, repo_root=repo_root)
+    append_orchestra_event("governance", full_message, repo_root=repo_root)
     return path

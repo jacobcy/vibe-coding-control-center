@@ -214,6 +214,7 @@ class ServeStatusService:
                 table.add_column("Issue", style="yellow", width=10)
                 table.add_column("Severity", style="red", width=8)
                 table.add_column("Code", style="magenta")
+                table.add_column("Source", style="blue", width=7)
                 table.add_column("Time", style="dim", width=19)
                 table.add_column("Message", style="white")
 
@@ -233,11 +234,21 @@ class ServeStatusService:
                     severity = err.get("severity", "ERROR")
                     severity_display = severity if severity else "ERROR"
 
+                    # Format source display
+                    source = err.get("source")
+                    if source == "manual_scan":
+                        source_display = "manual"
+                    elif source == "orchestra_tick":
+                        source_display = "tick"
+                    else:
+                        source_display = "-"
+
                     table.add_row(
                         str(err["tick_id"]),
                         issue_display,
                         severity_display,
                         err["error_code"],
+                        source_display,
                         time_display,
                         self._clean_error_message(err["error_message"]),
                     )

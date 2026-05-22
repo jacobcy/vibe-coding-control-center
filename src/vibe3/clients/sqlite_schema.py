@@ -120,6 +120,7 @@ _CREATE_ERROR_LOG = """
         error_code TEXT NOT NULL,
         error_message TEXT NOT NULL,
         severity TEXT,
+        source TEXT,
         issue_number INTEGER,
         branch TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -389,6 +390,18 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
     # Create severity index (after column exists)
     cursor.execute(_CREATE_ERROR_SEVERITY_INDEX)
+
+    # Migration: add source column to error_log for governance source semantics
+    if "source" not in error_log_columns:
+        cursor.execute("ALTER TABLE error_log ADD COLUMN source TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added source column to error_log"
+        )
+
+    # Create source index (after column exists)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_error_log_source ON error_log(source)"
+    )
 
     cursor.execute(_CREATE_FAILED_GATE_STATE)
     cursor.execute(_CREATE_ORCHESTRA_QUEUE)

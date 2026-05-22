@@ -80,6 +80,10 @@ def internal_governance_dispatch(
             help="Override material rotation with specific governance role",
         ),
     ] = None,
+    source: Annotated[
+        str | None,
+        typer.Option("--source", help="Source identifier for error tracking"),
+    ] = None,
 ) -> None:
     """L3: Dispatch the Governance scan agent (execution-only).
 
@@ -91,7 +95,9 @@ def internal_governance_dispatch(
     """
     from vibe3.services.scan_service import dispatch_governance_execution
 
-    dispatch_governance_execution(tick_count=tick, material_override=material)
+    dispatch_governance_execution(
+        tick_count=tick, material_override=material, source=source
+    )
 
 
 @app.command("bootstrap")
