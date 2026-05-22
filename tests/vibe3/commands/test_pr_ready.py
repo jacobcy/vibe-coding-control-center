@@ -172,6 +172,7 @@ def test_pr_ready_yes_only_affects_confirmation(mock_pr_response):
     with (
         patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
         patch("vibe3.commands.pr_lifecycle.FlowService") as mock_flow_service,
+        patch("vibe3.commands.pr_lifecycle.typer.confirm") as mock_confirm,
     ):
         mock_pr_instance = MagicMock()
         mock_pr_instance.mark_ready.return_value = mock_pr_response
@@ -185,6 +186,8 @@ def test_pr_ready_yes_only_affects_confirmation(mock_pr_response):
         result = runner.invoke(app, ["ready", "123", "--yes"])
 
         assert result.exit_code == 0
+        # Assert that typer.confirm was NOT called when --yes is provided
+        mock_confirm.assert_not_called()
         # Output should NOT contain gate bypass wording
         assert "Skipping coverage gate" not in result.output
         assert "绕过业务逻辑检查" not in result.output

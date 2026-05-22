@@ -180,14 +180,13 @@ def mock_handoff_service() -> MagicMock:
 def mock_status_result() -> HandoffStatusResult:
     """Create a default HandoffStatusResult for testing."""
     return HandoffStatusResult(
-        branch="task/test-branch",
-        flow_found=True,
-        flow_id="test-flow",
-        current_step=None,
-        agents=[],
+        flow_slug="test-flow",
+        worktree_root="/path/to/worktree",
+        state=FlowState.ACTIVE,
         events=[],
-        has_handoff=True,
-        handoff_path="/path/to/current.md",
+        latest_verdict=None,
+        live_sessions=[],
+        recent_updates=[],
     )
 
 
