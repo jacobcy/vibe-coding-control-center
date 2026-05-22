@@ -15,15 +15,25 @@ def parse_timeline_from_comments(
     """Parse timeline events from GitHub issue comments.
 
     Args:
-        comments: List of GitHub comment objects with author, body, created_at
+        comments: List of GitHub comment objects with author, body, createdAt
 
     Returns:
-        List of TimelineEvent objects extracted from automation markers
+        List of TimelineEvent objects extracted from [flow] markers
     """
     events: list[TimelineEvent] = []
 
-    # Pattern to match automation markers: ### event_type
-    marker_pattern = re.compile(r"^###\s+(\w+)", re.MULTILINE)
+    # Display text to event_type mapping (reverse of _build_timeline_comment)
+    display_map = {
+        "flow_blocked": "Flow blocked",
+        "flow_failed": "Flow failed",
+        "flow_aborted": "Flow aborted",
+        "resumed": "Flow resumed",
+        "state_transitioned": "State transitioned",
+    }
+    reverse_map = {v: k for k, v in display_map.items()}
+
+    # Pattern to match [flow] display_text
+    marker_pattern = re.compile(r"^\[flow\]\s+([^\n]+)", re.MULTILINE)
 
     for comment in comments:
         if not isinstance(comment, dict):
@@ -32,11 +42,20 @@ def parse_timeline_from_comments(
         body = str(comment.get("body") or "")
         author = comment.get("author") or {}
         actor = str(author.get("login") or "unknown")
-        created_at_str = str(comment.get("created_at") or "")
 
-        # Find all automation markers in this comment
+        # GitHub API uses camelCase: createdAt
+        created_at_str = str(
+            comment.get("createdAt") or comment.get("created_at") or ""
+        )
+
+        # Find all [flow] markers in this comment
         for match in marker_pattern.finditer(body):
-            event_type = match.group(1)
+            display_text = match.group(1).strip()
+
+            # Map display text back to event_type
+            event_type = reverse_map.get(
+                display_text, display_text.lower().replace(" ", "_")
+            )
 
             # Extract detail (text after the marker)
             start = match.end()
@@ -48,7 +67,8 @@ def parse_timeline_from_comments(
                     created_at_str.replace("Z", "+00:00")
                 )
             except (ValueError, AttributeError):
-                timestamp = datetime.now()
+                # Use deterministic sentinel instead of datetime.now()
+                timestamp = datetime.min
 
             events.append(
                 TimelineEvent(

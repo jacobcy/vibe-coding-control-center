@@ -201,7 +201,7 @@ def render_flow_status(
         if status.execution_pid:
             kv("pid", status.execution_pid, 2)
 
-    # Display timeline if present (from --remote)
+    # Display timeline if present (from remote source or fallback)
     if status.timeline:
         console.print("  [dim]timeline:[/]  [dim](from GitHub comments)[/]")
         for event in status.timeline:
