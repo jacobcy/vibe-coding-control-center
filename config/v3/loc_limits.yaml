@@ -225,12 +225,12 @@ code_limits:
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
         limit: 480
         reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性"
-      - path: "tests/vibe3/execution/test_noop_gate_unit.py"
-        limit: 480
-        reason: "Noop gate 三分支语义测试，15 个测试围绕同一 gate 函数，共享 mock fixture，拆分收益低"
+      - path: "tests/vibe3/execution/test_noop_gate_basic.py"
+        limit: 550
+        reason: "Noop gate 基础行为测试集（4个原noop_gate文件→3个文件的部分合并），覆盖 state 验证、GitHub API 错误处理、required_ref 逻辑、verdict-aware ref 检查等 19 个测试，共享 conftest.py helper，拆分收益低"
       - path: "tests/vibe3/execution/test_noop_gate_transition_count.py"
-        limit: 480
-        reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
+        limit: 450
+        reason: "Transition count + single-step limit 测试集（mock 层），覆盖全局计数、软/硬限制、pair 追踪等 12 个测试，共享 conftest.py helper，拆分收益低"
       - path: "tests/vibe3/services/test_task_resume_operations.py"
         limit: 410
         reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
