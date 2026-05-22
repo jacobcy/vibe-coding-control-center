@@ -457,3 +457,33 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
 
     # Verify cleanup happened
     assert "Cleaned 1 aborted flows" in results["summary"]
+
+
+def test_resume_blocked_issue_adds_cleanup_comment() -> None:
+    """Resume should add comment explaining cleanup and recommendations."""
+    store = MagicMock()
+    git_client = MagicMock()
+    github_client = MagicMock()
+
+    service = CheckCleanupService(
+        store=store,
+        git_client=git_client,
+        github_client=github_client,
+    )
+
+    github_client.view_issue.return_value = {
+        "state": "open",
+    }
+
+    with patch("vibe3.services.issue_failure_service.LabelService"):
+        service._resume_blocked_issue("task/issue-300")
+
+    # Verify comment added
+    github_client.add_comment.assert_called_once()
+    call_args = github_client.add_comment.call_args
+    assert call_args[0][0] == 300  # issue_number
+
+    comment_body = call_args[0][1]
+    assert "旧 flow 已清理" in comment_body
+    assert "follow-up issue" in comment_body.lower()
+    assert "不建议" in comment_body

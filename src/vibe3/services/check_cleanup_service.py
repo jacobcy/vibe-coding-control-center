@@ -350,12 +350,26 @@ class CheckCleanupService:
             current_state = self._get_issue_state(issue_number)
             from_state = current_state if current_state else "blocked"
 
+            # Transition to READY
             resume_issue(
                 issue_number=issue_number,
                 reason="Flow aborted and cleaned up by vibe check --clean-branch",
                 from_state=from_state,
                 to_state=IssueState.READY,
             )
+
+            # Add informative comment
+            comment_body = """旧 flow 已清理（worktree 和 branch 已删除）。
+
+**建议方案：**
+
+1. **关闭此 issue** - 如果需求已不再需要
+2. **创建 follow-up issue** - 如果需要继续开发，建议创建新 issue 重新规划
+3. **重新开始** - 当前 issue 已恢复到 READY 状态，可以被重新派发
+
+**注意：** 不建议在旧 flow 的基础上继续开发，因为之前的代码上下文已丢失。"""
+
+            gh.add_comment(issue_number, comment_body)
 
             logger.bind(domain="check", branch=branch).info(
                 f"Resumed issue #{issue_number} to READY (from {from_state})"
