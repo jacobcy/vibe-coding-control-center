@@ -468,3 +468,83 @@ class TestFailedGateIntegration:
         # Gate is ACTIVE → on_tick skipped, blocked_ticks incremented
         assert tick_calls == []
         mock_gate.increment_blocked_ticks.assert_called_once()
+def test_manual_scan_errors_do_not_trigger_gate(temp_store: SQLiteClient) -> None:
+    """Test that manual_scan source errors do not trigger FailedGate threshold.
+
+    Manual governance scans are diagnostic operations, not part of live orchestra
+    production flow, so their failures should not freeze orchestra.
+    """
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.orchestra.failed_gate import FailedGate
+
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    gate = FailedGate(store=temp_store)
+
+    # Record 2 ERROR-severity errors with source="manual_scan" (threshold is 2)
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_API_RATE_LIMIT",
+        error_message="Rate limit",
+        tick_id=1,
+        source="manual_scan",
+    )
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_API_TIMEOUT",
+        error_message="Timeout",
+        tick_id=2,
+        source="manual_scan",
+    )
+
+    # Gate should remain open - manual_scan errors excluded from threshold
+    result = gate.check()
+    assert not result.blocked, "Manual scan errors should not trigger gate"
+
+
+def test_mixed_sources_only_count_orchestra_errors(temp_store: SQLiteClient) -> None:
+    """Test that threshold only counts orchestra_tick errors
+
+    when mixed sources are present.
+    """
+    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.orchestra.failed_gate import FailedGate
+
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    gate = FailedGate(store=temp_store)
+
+    # Record 1 orchestra_tick error + 2 manual_scan errors
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_API_RATE_LIMIT",
+        error_message="Rate limit",
+        tick_id=1,
+        source="orchestra_tick",
+    )
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_API_TIMEOUT",
+        error_message="Timeout",
+        tick_id=2,
+        source="manual_scan",
+    )
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_API_UNAVAILABLE",
+        error_message="Unavailable",
+        tick_id=3,
+        source="manual_scan",
+    )
+
+    # Gate should remain open - only 1 orchestra error (threshold is 2)
+    result = gate.check()
+    assert not result.blocked, "Should only count orchestra_tick errors"
+
+    # Add another orchestra error to reach threshold
+    ErrorTrackingService.get_instance().record_error(
+        error_code="E_API_RETRY",
+        error_message="Retry",
+        tick_id=4,
+        source="orchestra_tick",
+    )
+
+    # Now gate should close - 2 orchestra errors
+    result = gate.check()
+    assert result.blocked, "Gate should close with 2 orchestra_tick errors"
+    assert "ERROR-severity threshold" in (result.reason or "")
