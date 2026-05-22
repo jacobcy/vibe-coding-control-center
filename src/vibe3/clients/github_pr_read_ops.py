@@ -252,7 +252,14 @@ class PRReadMixin:
         ci_checks: list[CICheck] = []
         try:
             checks_result = subprocess.run(
-                ["gh", "pr", "checks", target, "--json", "name,state,bucket,link"],
+                [
+                    "gh",
+                    "pr",
+                    "checks",
+                    target,
+                    "--json",
+                    "name,state,bucket,link,description,workflow",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=30,

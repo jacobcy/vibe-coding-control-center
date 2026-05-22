@@ -163,6 +163,57 @@ class TestPRShowBoundTask:
                 assert "Great work on this PR!" in result.output
                 assert "Please add more tests." in result.output
 
+    def test_pr_show_comments_sorted_chronologically(self) -> None:
+        """Test pr show displays comments in chronological order."""
+        mock_pr = MagicMock(
+            number=126,
+            title="Test PR",
+            draft=False,
+            metadata=None,
+            body="",
+            review_comments=[],
+        )
+        mock_pr.state.value, mock_pr.head_branch, mock_pr.base_branch = (
+            "OPEN",
+            "feature/test",
+            "main",
+        )
+        mock_pr.url = "https://github.com/test/test/pull/126"
+        mock_pr.comments = [
+            {
+                "user": {"login": "c"},
+                "body": "LATE",
+                "createdAt": "2026-05-06T15:00:00Z",
+            },
+            {
+                "user": {"login": "a"},
+                "body": "EARLY",
+                "createdAt": "2026-05-06T10:00:00Z",
+            },
+            {
+                "user": {"login": "b"},
+                "body": "MID",
+                "createdAt": "2026-05-06T12:00:00Z",
+            },
+        ]
+        mock_pr_svc = MagicMock(
+            get_pr=MagicMock(return_value=mock_pr),
+            store=MagicMock(get_issue_links=MagicMock(return_value=[])),
+        )
+        mock_pr_svc.git_client.get_current_branch.return_value = "feature/test"
+        mock_pr_svc.github_client.get_pr.return_value = mock_pr
+        with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
+            with patch(
+                "vibe3.commands.pr_query._load_pr_analysis_summary", return_value={}
+            ):
+                result = runner.invoke(app, ["pr", "show", "126"])
+                assert result.exit_code == 0
+                assert (
+                    result.output.find("EARLY")
+                    < result.output.find("MID")
+                    < result.output.find("LATE")
+                )
+
 
 class TestPRShowLocalReview:
     """Test pr show command with local review integration."""

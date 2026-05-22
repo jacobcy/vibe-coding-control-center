@@ -80,6 +80,10 @@ def render_pr_details(pr: PRResponse) -> None:
                     )
                 if check.failure_command:
                     console.print(f"    [dim]Inspect with:[/] {check.failure_command}")
+                if check.workflow:
+                    console.print(f"    [dim]Workflow:[/] {check.workflow}")
+                if check.description:
+                    console.print(f"    [dim]Description:[/] {check.description}")
                 console.print(f"    [dim][link={check.link}]View details[/link][/]")
         elif pending:
             console.print(
@@ -124,10 +128,10 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.review_comments:
         console.print("\n[bold cyan]### Review Comments[/]")
-        # Sort by path and line
+        # Sort chronologically
         sorted_reviews = sorted(
             pr.review_comments,
-            key=lambda x: (str(x.get("path", "")), int(x.get("line") or 0)),
+            key=lambda x: str(x.get("created_at", "")),
         )
         for comment in sorted_reviews:
             user = comment.get("user", {}).get("login", "unknown")
@@ -142,7 +146,12 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.reviews:
         console.print("\n[bold cyan]### Reviews[/]")
-        for review in pr.reviews:
+        # Sort chronologically
+        sorted_reviews_list = sorted(
+            pr.reviews,
+            key=lambda x: str(x.get("submitted_at", "")),
+        )
+        for review in sorted_reviews_list:
             user = review.get("user", {}).get("login", "unknown")
             body = review.get("body", "")
             state = review.get("state", "COMMENTED")
@@ -161,7 +170,12 @@ def render_pr_details(pr: PRResponse) -> None:
 
     if pr.comments:
         console.print("\n[bold cyan]### General Comments[/]")
-        for comment in pr.comments:
+        # Sort chronologically
+        sorted_comments = sorted(
+            pr.comments,
+            key=lambda x: str(x.get("createdAt", "")),
+        )
+        for comment in sorted_comments:
             # GitHub API returns "user.login" not "author.login"
             user = comment.get("user", {}).get("login", "unknown")
             body = comment.get("body", "")
