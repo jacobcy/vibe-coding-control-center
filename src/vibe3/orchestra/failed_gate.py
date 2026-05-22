@@ -178,7 +178,7 @@ class FailedGate:
         error_count = error_tracking.get_threshold_error_count()
 
         if error_count >= ErrorTrackingService.THRESHOLD_COUNT:
-            log.error(
+            log.warning(
                 f"ERROR-severity threshold reached: {error_count} errors "
                 f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
                 f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
@@ -204,7 +204,7 @@ class FailedGate:
             error_code: Optional error code that triggered activation
         """
         log = logger.bind(domain="orchestra", action="failed_gate_activate")
-        log.error(f"Activating failed gate: {reason}")
+        log.warning(f"Activating failed gate: {reason}")
 
         now = datetime.now(UTC).isoformat()
 
