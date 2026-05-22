@@ -103,22 +103,26 @@ class FlowStatusResolver:
         return response
 
     def _read_remote(self, branch: str, issue_number: int) -> FlowStatusResponse:
-        """Read from GitHub issue body projection.
+        """Read complete remote state from GitHub.
+
+        Fetches issue body projection AND timeline from comments.
 
         Args:
             branch: Branch name
             issue_number: Issue number (required)
 
         Returns:
-            FlowStatusResponse with ISSUE_BODY_FALLBACK data_source
+            FlowStatusResponse with ISSUE_BODY_FALLBACK data_source and timeline
 
         Raises:
-            ValueError: If issue_number is None or body is empty
+            ValueError: If issue_number is None
+            SystemError: If GitHub API fails
         """
         if issue_number is None:
             raise ValueError("issue_number required for remote source")
 
         from vibe3.clients.github_client import GitHubClient
+        from vibe3.services.timeline_parser import parse_timeline_from_comments
 
         github_client = GitHubClient()
 
@@ -127,32 +131,45 @@ class FlowStatusResolver:
             action="resolve_remote",
             branch=branch,
             issue_number=issue_number,
-        ).debug("Reading flow status from issue body")
+        ).debug("Reading complete remote state from GitHub")
 
-        body = github_client.get_issue_body(issue_number)
-        if not body:
+        # Fetch issue with comments
+        issue_data = github_client.view_issue(issue_number)
+        if not issue_data or issue_data == "network_error":
             from vibe3.exceptions import SystemError
 
             raise SystemError(
-                f"Failed to fetch issue body for #{issue_number}. "
-                "GitHub API returned empty or None."
+                f"Failed to fetch issue #{issue_number}. "
+                "GitHub API returned None or network error."
             )
 
+        # Type guard: issue_data is dict at this point
+        if not isinstance(issue_data, dict):
+            from vibe3.exceptions import SystemError
+
+            raise SystemError(
+                f"Unexpected issue data type for #{issue_number}: {type(issue_data)}"
+            )
+
+        # Parse body for projection
+        body = str(issue_data.get("body") or "")
         projection = parse_projection(body)
 
-        # Directly use projection state (no normalization)
-        # Blocked state is inferred from projection's blocked_by/blocked_reason fields
-        # Remote sync semantics: respect the actual state from issue body projection
-        response_state = projection.state
+        # Parse timeline from comments
+        comments = issue_data.get("comments") or []
+        if not isinstance(comments, list):
+            comments = []
+        timeline = parse_timeline_from_comments(comments)
 
-        # Build minimal response from projection
+        # Build response with timeline
         return FlowStatusResponse(
             branch=branch,
             flow_slug=branch.replace("/", "-"),
-            flow_status=response_state,  # type: ignore[arg-type]
+            flow_status=projection.state,  # type: ignore[arg-type]
             blocked_by_issue=(
                 projection.blocked_by[0] if projection.blocked_by else None
             ),
             blocked_reason=projection.blocked_reason,
+            timeline=timeline,  # NEW: timeline from comments
             data_source=DataSource.ISSUE_BODY_FALLBACK,
         )
