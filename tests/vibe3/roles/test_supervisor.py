@@ -1,5 +1,7 @@
 """Tests for supervisor role module functions."""
 
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
@@ -11,8 +13,10 @@ from vibe3.roles.supervisor import (
     build_supervisor_apply_request,
     build_supervisor_handoff_payload,
     build_supervisor_task_string,
+    get_supervisor_prompt_path,
     iter_supervisor_identified_events,
 )
+from vibe3.services.convention_resolver import ConventionResolver
 
 
 def _make_config(**overrides) -> OrchestraConfig:
@@ -241,3 +245,16 @@ class TestSupervisorIdentifiedEvents:
         assert isinstance(events[0], SupervisorIssueIdentified)
         assert events[0].issue_number == 1
         assert events[0].issue_title == "match"
+
+
+def test_supervisor_uses_profile_resolution() -> None:
+    """Test supervisor prompt path uses profile resolution."""
+    # With vibe-center profile
+    resolver = ConventionResolver(profile="vibe-center")
+    path = get_supervisor_prompt_path(resolver)
+    assert path == "supervisor/apply.md"
+
+    # With minimal profile (no supervisor)
+    resolver_minimal = ConventionResolver(profile="minimal")
+    path_minimal = get_supervisor_prompt_path(resolver_minimal)
+    assert path_minimal is None

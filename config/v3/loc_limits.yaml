@@ -232,8 +232,8 @@ code_limits:
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
       - path: "tests/vibe3/services/test_task_resume_operations.py"
-        limit: 410
-        reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，共享 fixture，拆分收益低"
+        limit: 650
+        reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，合并 legacy test_services 目录后测试覆盖更全面，共享 fixture，拆分收益低"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 540
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"
