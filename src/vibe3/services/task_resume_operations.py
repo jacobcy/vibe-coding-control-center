@@ -392,6 +392,8 @@ class TaskResumeOperations:
             branch: Branch name
             resume_kind: Resume kind (failed, blocked, all)
         """
+        from vibe3.services.blocked_state_service import BlockedStateService
+
         try:
             logger.bind(
                 domain="resume",
@@ -400,25 +402,17 @@ class TaskResumeOperations:
                 resume_kind=resume_kind,
             ).info("Clearing flow reason fields")
 
-            # Clear both blocked_reason and failed_reason
-            # (issue may have been in multiple blocked/failed states)
-            # Also restore flow_status to active if it was blocked
-            self.flow_service.store.update_flow_state(
-                branch,
-                flow_status="active",
-                blocked_reason=None,
-                failed_reason=None,
-                blocked_by_issue=None,
-                latest_actor="human:resume",
+            issue_number = self.flow_service.store.get_task_issue_number(branch)
+
+            service = BlockedStateService(store=self.flow_service.store)
+            service.unblock(
+                branch=branch,
+                target_state=IssueState.CLAIMED,
+                actor="human:resume",
+                issue_number=issue_number,
             )
 
-            # Clear blocked state from issue body projection
-            issue_number = self.flow_service.store.get_task_issue_number(branch)
-            if issue_number:
-                self._clear_blocked_projection(issue_number)
-
         except Exception as exc:
-            # Non-blocking: reason clearing failure should not affect resume
             logger.bind(
                 domain="resume",
                 action="clear_flow_reasons",

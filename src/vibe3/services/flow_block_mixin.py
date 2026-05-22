@@ -8,10 +8,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.issue_body import FlowStateProjection
-from vibe3.models.orchestration import IssueState
-from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_body_service import merge_projection, parse_projection
-from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
 
 
@@ -86,6 +83,8 @@ class FlowLifecycleMixin:
             repo: Repository (defaults to current repo)
             event_type: Event type for timeline ("flow_blocked" or "flow_failed")
         """
+        from vibe3.services.blocked_state_service import BlockedStateService
+
         logger.bind(
             domain="flow",
             action="block",
@@ -106,7 +105,6 @@ class FlowLifecycleMixin:
             flow_actor=flow_data.get("latest_actor"),
         )
 
-        # Link dependency issue if provided
         if blocked_by_issue:
             from vibe3.services.task_service import TaskService
 
@@ -117,72 +115,22 @@ class FlowLifecycleMixin:
                 actor=effective_actor,
             )
 
-        # Update flow state: set flow_status=blocked and blocked metadata
-        self.store.update_flow_state(
-            branch,
-            flow_status="blocked",
-            blocked_by_issue=blocked_by_issue,
-            blocked_reason=reason,
-            latest_actor=effective_actor,
-        )
-
-        # Find task issue number from flow_issue_links (migrated from legacy column)
-        task_issue_number: int | None = None
+        issue_number: int | None = None
         issue_links = self.store.get_issue_links(branch)
         for link in issue_links:
             if link.get("issue_role") == "task":
-                task_issue_number = link.get("issue_number")
-                if isinstance(task_issue_number, int):
+                issue_number = link.get("issue_number")
+                if isinstance(issue_number, int):
                     break
 
-        # Transition issue state to BLOCKED if task issue exists
-        if task_issue_number:
-            try:
-                # Transition issue state to BLOCKED
-                LabelService(repo=repo).transition(
-                    task_issue_number, IssueState.BLOCKED, effective_actor, force=False
-                )
-            except Exception as e:
-                logger.bind(
-                    domain="flow",
-                    action="block",
-                    branch=branch,
-                    issue_number=task_issue_number,
-                ).warning(f"Failed to transition issue state: {e}")
-
-            # Add timeline comment via FlowTimelineService
-            if reason:
-                try:
-                    timeline_service = FlowTimelineService(store=self.store)
-                    timeline_service.record_timeline_event(
-                        branch=branch,
-                        event_type=event_type,
-                        actor=effective_actor,
-                        detail=reason,
-                        issue_number=task_issue_number,
-                    )
-                except Exception as e:
-                    logger.bind(
-                        domain="flow",
-                        action="block",
-                        branch=branch,
-                        issue_number=task_issue_number,
-                    ).warning(f"Failed to add timeline comment: {e}")
-
-            # Project blocked state to issue body
-            try:
-                self._project_blocked_state(
-                    task_issue_number,
-                    blocked_by_issue=blocked_by_issue,
-                    reason=reason,
-                )
-            except Exception as e:
-                logger.bind(
-                    domain="flow",
-                    action="block",
-                    branch=branch,
-                    issue_number=task_issue_number,
-                ).warning(f"Failed to project blocked state: {e}")
+        service = BlockedStateService(store=self.store)
+        service.block(
+            branch=branch,
+            reason=reason or "",
+            blocked_by_issue=blocked_by_issue,
+            actor=effective_actor,
+            issue_number=issue_number,
+        )
 
     def fail_flow(
         self: Self,
@@ -203,6 +151,8 @@ class FlowLifecycleMixin:
             flow_status="failed". The blocked status is inferred from
             IssueState.BLOCKED label on the task issue.
         """
+        from vibe3.services.blocked_state_service import BlockedStateService
+
         logger.bind(
             domain="flow",
             action="fail",
@@ -222,15 +172,6 @@ class FlowLifecycleMixin:
             flow_actor=flow_data.get("latest_actor"),
         )
 
-        # Update flow state with blocked_reason (unified with block)
-        self.store.update_flow_state(
-            branch,
-            flow_status="blocked",
-            blocked_reason=reason,
-            latest_actor=effective_actor,
-        )
-
-        # Find task issue number
         issue_number = flow_data.get("task_issue_number")
         if not issue_number:
             issue_links = self.store.get_issue_links(branch)
@@ -240,38 +181,13 @@ class FlowLifecycleMixin:
                     if isinstance(issue_number, int):
                         break
 
-        if issue_number:
-            try:
-                timeline_service = FlowTimelineService(store=self.store)
-                timeline_service.record_timeline_event(
-                    branch=branch,
-                    event_type="flow_failed",
-                    actor=effective_actor,
-                    detail=reason,
-                    issue_number=issue_number,
-                )
-            except Exception as e:
-                logger.bind(
-                    domain="flow",
-                    action="fail",
-                    branch=branch,
-                    issue_number=issue_number,
-                ).warning(f"Failed to add timeline comment: {e}")
-
-            # Project blocked state to issue body (critical for truth consistency)
-            try:
-                self._project_blocked_state(
-                    issue_number,
-                    blocked_by_issue=None,
-                    reason=reason,
-                )
-            except Exception as e:
-                logger.bind(
-                    domain="flow",
-                    action="fail",
-                    branch=branch,
-                    issue_number=issue_number,
-                ).warning(f"Failed to project blocked state: {e}")
+        service = BlockedStateService(store=self.store)
+        service.block(
+            branch=branch,
+            reason=reason,
+            actor=effective_actor,
+            issue_number=issue_number,
+        )
 
         logger.bind(branch=branch).success("Flow marked as failed (blocked_reason)")
 
