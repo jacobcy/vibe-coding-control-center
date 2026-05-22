@@ -134,7 +134,7 @@ class TestFlowStatusResolver:
     """Tests for FlowStatusResolver source-aware reads."""
 
     def test_resolver_local_reads_from_sqlite(self):
-        """SourceOption 'local' reads from SQLite only, no fallback."""
+        """Without --remote, reads from SQLite only, no fallback."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))
@@ -159,7 +159,7 @@ class TestFlowStatusResolver:
             assert result.data_source == DataSource.LOCAL_SQLITE
 
     def test_resolver_auto_fallback_to_issue_body(self):
-        """SourceOption 'auto' falls back to issue body when SQLite missing."""
+        """When SQLite missing, falls back to issue body projection."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             store = SQLiteClient(db_path=str(db_path))

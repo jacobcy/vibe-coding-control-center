@@ -196,7 +196,7 @@ def show(
             projection = FlowProjection.from_flow_status(flow_status)
 
             # Fetch real-time PR status by branch (regardless of flow_status.pr_number)
-            # For --source remote, flow_status may not have pr_number from issue-body
+            # For --remote, flow_status may not have pr_number from issue-body
             # but branch could still have an open PR
             try:
                 pr = PRService(store=service.store).get_branch_pr_status(target_branch)
