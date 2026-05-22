@@ -23,6 +23,7 @@
 | 文档 | 路径 | 关键内容 |
 |------|------|---------|
 | **Infrastructure Guide** | [docs/v3/architecture/infrastructure-guide.md](v3/architecture/infrastructure-guide.md) | 基础设施服务使用指南 |
+| **Public API Guide** | [docs/v3/architecture/public-api-guide.md](v3/architecture/public-api-guide.md) | 公共接口与最佳实践使用指南 |
 | **Capacity Control** | [docs/v3/architecture/capacity-control.md](v3/architecture/capacity-control.md) | 容量控制详解 |
 | **Dependency Handling** | [docs/v3/architecture/dependency-handling.md](v3/architecture/dependency-handling.md) | 依赖管理机制 |
 
