@@ -119,6 +119,10 @@ Risk Level: LOW
         assert isinstance(result, dict)
         if expected_empty:
             assert result == {}
+        else:
+            # For non-empty cases, verify specific fields were extracted
+            if "Risk Level: LOW" in content:
+                assert result.get("risk_level") == "LOW"
 
 
 class TestFindLatestPrepushReport:

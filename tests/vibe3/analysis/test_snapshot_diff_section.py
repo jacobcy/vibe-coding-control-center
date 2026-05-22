@@ -101,6 +101,8 @@ def test_build_snapshot_diff_section_none():
                 "Structure Changes (Snapshot Diff)",
                 "2026-03-20T10-00-00_main_abc1234",
                 "main",
+                "2026-03-24T15-30-00_feature_def5678",
+                "feature/test",
             ],
             id="basic_info",
         ),
