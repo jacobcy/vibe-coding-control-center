@@ -150,7 +150,7 @@ class TestFlowStatusResolver:
 
             result = resolver.resolve(
                 branch="dev/issue-123",
-                source="local",
+                remote=False,
             )
 
             assert result.branch == "dev/issue-123"
@@ -173,7 +173,9 @@ class TestFlowStatusResolver:
                 mock_github_client = MagicMock()
                 mock_github_client_class.return_value = mock_github_client
 
-                mock_github_client.get_issue_body.return_value = """
+                mock_github_client.view_issue.return_value = {
+                    "number": 123,
+                    "body": """
 <!-- vibe3-flow-state-start -->
 
 **Vibe3 Flow State**
@@ -183,11 +185,13 @@ class TestFlowStatusResolver:
 - **Blocked reason**: Waiting for dependency
 
 <!-- vibe3-flow-state-end -->
-"""
+""",
+                    "comments": [],
+                }
 
                 result = resolver.resolve(
                     branch="dev/issue-123",
-                    source="auto",
+                    remote=False,
                     issue_number=123,  # Required for fallback
                 )
 
@@ -197,4 +201,4 @@ class TestFlowStatusResolver:
                 assert result.blocked_by_issue == 456
                 assert result.blocked_reason == "Waiting for dependency"
                 assert result.data_source == DataSource.ISSUE_BODY_FALLBACK
-                mock_github_client.get_issue_body.assert_called_once_with(123)
+                mock_github_client.view_issue.assert_called_once_with(123)
