@@ -1,7 +1,12 @@
-"""Tests for review command assembler integration."""
+"""Tests for review command assembler integration and CLI surface.
+
+Merged from test_review.py + test_review_help.py (non-removal tests).
+Removal tests from test_review_help.py are in test_removed_commands.py.
+"""
 
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -9,6 +14,17 @@ from typer.testing import CliRunner
 from vibe3.commands.review import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI color codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
+
+
+# ==============================================================================
+# Review context builder tests (from test_review.py)
+# ==============================================================================
 
 
 class TestReviewContextBuilderUsesAssembler:
@@ -49,6 +65,57 @@ class TestReviewContextBuilderUsesAssembler:
 
         assert hasattr(mod, "execute_manual_review_async")
         assert hasattr(mod, "execute_manual_review_sync")
+
+
+# ==============================================================================
+# Review CLI help/surface tests (from test_review_help.py, non-removal)
+# ==============================================================================
+
+
+def test_review_no_args_shows_help():
+    """vibe review (no subcommand) -> shows help.
+
+    Exit 0 or 2 per typer no_args_is_help.
+    """
+    result = runner.invoke(app, [])
+    assert result.exit_code in (0, 2)
+    assert "Usage" in result.output or "base" in result.output
+
+
+def test_review_help_only_shows_supported_commands():
+    """vibe review --help should only show supported command: base.
+
+    Removed commands: commit, uncommitted, analyze-commit, pr
+    """
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    # Supported commands
+    assert "base" in result.output
+    # Removed commands - should NOT appear as command names
+    assert "commit" not in result.output.lower()
+    assert "uncommitted" not in result.output.lower()
+    assert "analyze-commit" not in result.output.lower()
+    # Check Commands section specifically
+    lines = result.output.split("\n")
+    commands_section = False
+    for line in lines:
+        if "Commands" in line:
+            commands_section = True
+            continue
+        if commands_section and line.strip():
+            # In Commands section, check no 'pr' command listed
+            assert not line.strip().startswith("pr")
+    assert "--message" not in result.output
+
+
+def test_review_base_help_mentions_dry_run_option():
+    """vibe review base --help should mention --dry-run option."""
+    result = runner.invoke(app, ["base", "--help"])
+    assert result.exit_code == 0
+    # Strip ANSI codes before checking
+    output = _strip_ansi(result.output)
+    assert "--dry-run" in output
+    assert "--message" not in output
 
 
 class TestReviewBaseExitCodes:

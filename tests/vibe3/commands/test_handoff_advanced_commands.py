@@ -1,4 +1,4 @@
-"""Integration tests for Handoff commands - Advanced operations."""
+"""Integration tests for Handoff commands - All CLI operations."""
 
 from unittest.mock import MagicMock, patch
 
@@ -208,60 +208,6 @@ class TestHandoffAdvancedCommands:
 
         assert result.exit_code != 0
 
-    def test_handoff_audit_command_real_service_path(self, tmp_path, monkeypatch):
-        """Test the real service path for handoff audit command with minimal mocking."""
-        # Setup temporary directories for git and sqlite
-        git_dir = tmp_path / ".git"
-        git_dir.mkdir()
-        (git_dir / "vibe3").mkdir()
-
-        # Patch GitClient to return our temp paths
-        from vibe3.clients.git_client import GitClient
-
-        monkeypatch.setattr(GitClient, "get_git_common_dir", lambda self: str(git_dir))
-        monkeypatch.setattr(GitClient, "get_current_branch", lambda self: "main")
-
-        # Use real SQLiteClient with our temp git dir
-        from vibe3.clients import SQLiteClient
-
-        real_store = SQLiteClient()
-
-        # Pre-seed flow state if needed, though record_audit should handle it
-        audit_ref = ".agent/reports/audit-result.md"
-
-        # Run the command
-        result = runner.invoke(
-            app,
-            [
-                "handoff",
-                "audit",
-                audit_ref,
-                "--actor",
-                "test-actor",
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert "Audit handoff recorded" in result.output
-
-        # Verify side effects on filesystem
-        # Find the handoff directory (it has a hash suffix)
-        handoff_root = git_dir / "vibe3" / "handoff"
-        assert handoff_root.exists()
-        handoff_dirs = list(handoff_root.iterdir())
-        assert len(handoff_dirs) == 1
-        handoff_file = handoff_dirs[0] / "current.md"
-        assert handoff_file.exists()
-        content = handoff_file.read_text()
-        assert audit_ref in content
-        assert "test-actor" in content
-
-        # Verify side effects in database
-        flow_state = real_store.get_flow_state("main")
-        assert flow_state is not None
-        assert flow_state["audit_ref"] == audit_ref
-        assert flow_state["next_step"] is None
-
     @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_plan_with_explicit_branch(self, mock_service_class):
         """Test handoff plan with explicit --branch name."""
@@ -328,3 +274,130 @@ class TestHandoffAdvancedCommands:
             "claude/sonnet-4.6",
             branch="task/issue-473",
         )
+
+
+# Standalone tests for handoff next command
+def test_handoff_next_sets_next_step_for_numeric_branch() -> None:
+    service = MagicMock()
+
+    # Mock store with flow binding
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = [
+        {"branch": "task/issue-235", "flow_status": "active"}
+    ]
+    service.store = mock_store
+
+    # Mock FlowService in both locations (handoff_write uses resolve_branch_arg)
+    mock_flow_service = MagicMock()
+    mock_flow_service.store = mock_store
+
+    with (
+        patch("vibe3.commands.handoff_write.HandoffService", return_value=service),
+        patch("vibe3.utils.branch_arg.FlowService", return_value=mock_flow_service),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "next",
+                "Finalize PR",
+                "--branch",
+                "235",
+                "--actor",
+                "test-actor",
+            ],
+        )
+
+    assert result.exit_code == 0
+    service.record_next_step.assert_called_once_with(
+        "task/issue-235",
+        "Finalize PR",
+        "test-actor",
+    )
+
+
+def test_handoff_next_rejects_nonexistent_flow() -> None:
+    """Should fail-fast with UserError if no flow found."""
+    service = MagicMock()
+
+    # Mock store with no flow binding and no unbound candidates
+    mock_store = MagicMock()
+    mock_store.get_flows_by_issue.return_value = []
+    mock_store.get_flow_state.return_value = None  # No unbound candidates either
+    service.store = mock_store
+
+    # Mock FlowService in branch_arg (resolver creates its own instance)
+    mock_flow_service = MagicMock()
+    mock_flow_service.store = mock_store
+
+    with (
+        patch("vibe3.commands.handoff_write.HandoffService", return_value=service),
+        patch("vibe3.utils.branch_arg.FlowService", return_value=mock_flow_service),
+    ):
+        result = runner.invoke(
+            app,
+            ["handoff", "next", "message", "--branch", "999"],
+        )
+
+    assert result.exit_code == 1
+    # UserError should be captured in the exception attribute
+    assert result.exception is not None
+    assert "No flow found for issue #999" in str(result.exception)
+    # Should NOT call record_next_step when flow doesn't exist
+    service.record_next_step.assert_not_called()
+
+
+# Integration test - keep at end
+def test_handoff_audit_command_real_service_path(tmp_path, monkeypatch):
+    """Test the real service path for handoff audit command with minimal mocking."""
+    # Setup temporary directories for git and sqlite
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "vibe3").mkdir()
+
+    # Patch GitClient to return our temp paths
+    from vibe3.clients.git_client import GitClient
+
+    monkeypatch.setattr(GitClient, "get_git_common_dir", lambda self: str(git_dir))
+    monkeypatch.setattr(GitClient, "get_current_branch", lambda self: "main")
+
+    # Use real SQLiteClient with our temp git dir
+    from vibe3.clients import SQLiteClient
+
+    real_store = SQLiteClient()
+
+    # Pre-seed flow state if needed, though record_audit should handle it
+    audit_ref = ".agent/reports/audit-result.md"
+
+    # Run the command
+    result = runner.invoke(
+        app,
+        [
+            "handoff",
+            "audit",
+            audit_ref,
+            "--actor",
+            "test-actor",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Audit handoff recorded" in result.output
+
+    # Verify side effects on filesystem
+    # Find the handoff directory (it has a hash suffix)
+    handoff_root = git_dir / "vibe3" / "handoff"
+    assert handoff_root.exists()
+    handoff_dirs = list(handoff_root.iterdir())
+    assert len(handoff_dirs) == 1
+    handoff_file = handoff_dirs[0] / "current.md"
+    assert handoff_file.exists()
+    content = handoff_file.read_text()
+    assert audit_ref in content
+    assert "test-actor" in content
+
+    # Verify side effects in database
+    flow_state = real_store.get_flow_state("main")
+    assert flow_state is not None
+    assert flow_state["audit_ref"] == audit_ref
+    assert flow_state["next_step"] is None

@@ -1,4 +1,4 @@
-"""Integration tests for Handoff commands - Basic operations."""
+"""Integration tests for Handoff commands - All CLI operations."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch

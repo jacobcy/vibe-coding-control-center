@@ -1,13 +1,23 @@
-"""Tests for flow bind command role defaults."""
+"""Tests for flow update and bind commands.
+
+Merged from test_flow_actor_defaults.py + test_flow_new_status_check.py.
+"""
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
-from vibe3.commands.flow import app
-from vibe3.models.flow import FlowState
+from vibe3.cli import app
+from vibe3.commands.flow import app as flow_app
+from vibe3.models.flow import FlowState, FlowStatusResponse
 
 runner = CliRunner()
+
+
+# ==============================================================================
+# Flow update tests (from test_flow_actor_defaults.py)
+# ==============================================================================
 
 
 @patch("vibe3.commands.flow_manage.render_flow_created")
@@ -34,7 +44,7 @@ def test_flow_update_idempotent(
     flow_service.ensure_flow_for_branch.return_value = flow
     flow_service_cls.return_value = flow_service
 
-    result = runner.invoke(app, ["update", "--name", "set-default-flow"])
+    result = runner.invoke(flow_app, ["update", "--name", "set-default-flow"])
 
     assert result.exit_code == 0
     flow_service.ensure_flow_for_branch.assert_called_once_with(
@@ -53,7 +63,7 @@ def test_flow_bind_defaults_to_task_role(flow_service_cls, task_service_cls) -> 
     task_service = MagicMock()
     task_service_cls.return_value = task_service
 
-    result = runner.invoke(app, ["bind", "248"])
+    result = runner.invoke(flow_app, ["bind", "248"])
 
     assert result.exit_code == 0
     task_service.link_issue.assert_called_once_with(
@@ -72,7 +82,7 @@ def test_flow_bind_accepts_dependency_role(flow_service_cls, task_service_cls) -
     task_service = MagicMock()
     task_service_cls.return_value = task_service
 
-    result = runner.invoke(app, ["bind", "248", "--role", "dependency"])
+    result = runner.invoke(flow_app, ["bind", "248", "--role", "dependency"])
 
     assert result.exit_code == 0
     flow_service.block_flow.assert_called_once_with(
@@ -93,7 +103,7 @@ def test_flow_bind_supports_multiple_dependency_issues(
     task_service = MagicMock()
     task_service_cls.return_value = task_service
 
-    result = runner.invoke(app, ["bind", "248", "249", "--role", "dependency"])
+    result = runner.invoke(flow_app, ["bind", "248", "249", "--role", "dependency"])
 
     assert result.exit_code == 0
     assert flow_service.block_flow.call_count == 2
@@ -137,7 +147,7 @@ def test_flow_update_blocks_when_branch_has_live_runtime_session(
     with patch(
         "vibe3.utils.branch_arg.resolve_branch_arg", return_value="task/issue-123"
     ):
-        result = runner.invoke(app, ["update"])
+        result = runner.invoke(flow_app, ["update"])
 
     assert result.exit_code == 1
 
@@ -167,3 +177,61 @@ def test_flow_update_does_not_print_branch_creation_in_json_format() -> None:
     # Verify output format consistency through existing tests
     # The logic change (if output_format == "table") ensures this
     pass
+
+
+# ==============================================================================
+# Flow add status check tests (from test_flow_new_status_check.py)
+# ==============================================================================
+
+
+class TestFlowAddStatusCheck:
+    """Tests for flow add status checking."""
+
+    @patch("vibe3.commands.flow_manage.FlowService")
+    @patch("vibe3.utils.branch_arg.GitClient")
+    def test_unregistered_branch_creates_flow(self, mock_git_class, mock_service_class):
+        """A branch without any flow record should create a new flow."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "feature/test"
+        mock_git_class.return_value = mock_git
+
+        mock_service = MagicMock()
+        mock_service.resolve_flow_name.return_value = "new-flow"
+        mock_service.ensure_flow_for_branch.return_value = MagicMock(
+            flow_slug="new-flow", branch="feature/test"
+        )
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(app, ["flow", "update", "--name", "new-flow"])
+
+        assert result.exit_code == 0
+        mock_service.ensure_flow_for_branch.assert_called_once_with(
+            branch="feature/test",
+            slug="new-flow",
+        )
+
+    @pytest.mark.parametrize("flow_status", ["active", "done", "aborted", "stale"])
+    @patch("vibe3.commands.flow_manage.FlowService")
+    def test_existing_flow_confirms_idempotently(
+        self, mock_service_class, flow_status: str
+    ):
+        """Existing flow should be confirmed idempotently."""
+        mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
+        mock_flow = FlowStatusResponse(
+            branch="feature/test",
+            flow_slug="test-flow",
+            flow_status=flow_status,
+        )
+        mock_service.get_flow_status.return_value = mock_flow
+        mock_service.get_flow_state.return_value = FlowState(
+            branch="feature/test",
+            flow_slug="test-flow",
+            flow_status=flow_status,
+        )
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(app, ["flow", "update", "--name", "new-flow"])
+
+        assert result.exit_code == 0
+        mock_service.create_flow.assert_not_called()

@@ -1,13 +1,144 @@
-"""Tests for flow bind command role semantics."""
+"""Tests for task binding - flow bind and pr task guidance.
+
+Merged from test_task_hints.py + test_task_management_bind.py.
+"""
 
 import json
 from unittest.mock import MagicMock, call, patch
 
 from typer.testing import CliRunner
 
+from vibe3.cli import app
 from vibe3.commands.flow import app as flow_app
+from vibe3.models.flow import FlowStatusResponse
 
 runner = CliRunner(env={"NO_COLOR": "1"})
+
+
+# ==============================================================================
+# Task hint tests (from test_task_hints.py)
+# ==============================================================================
+
+
+@patch("vibe3.commands.flow_status.render_flow_timeline")
+@patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
+@patch("vibe3.commands.flow_status.FlowService")
+def test_flow_show_warns_when_task_issue_missing(
+    mock_service_cls, _find_parent_branch, _render_timeline
+) -> None:
+    """flow show should suggest binding a task when none is present."""
+    mock_service = MagicMock()
+    mock_service.get_current_branch.return_value = "task/demo"
+    flow_status = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    mock_service.get_flow_status.return_value = flow_status
+    mock_service.get_flow_timeline.return_value = {
+        "state": flow_status,
+        "events": [],
+    }
+    mock_service_cls.return_value = mock_service
+
+    result = runner.invoke(app, ["flow", "show"])
+
+    assert result.exit_code == 0
+    assert "还没有 task" in result.stdout
+    assert "vibe3 flow bind <issue> --role task" in result.stdout
+
+
+@patch("vibe3.commands.pr_create.PRService")
+@patch("vibe3.commands.pr_create.FlowService")
+def test_pr_create_requires_human_confirmation(
+    mock_flow_service_cls, mock_pr_service_cls
+) -> None:
+    """pr create should exit with human confirmation warning by default."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    mock_flow_service_cls.return_value = flow_service
+
+    mock_pr_service = MagicMock()
+    mock_pr_service.get_open_pr_for_branch.return_value = None
+    mock_pr_service_cls.return_value = mock_pr_service
+
+    result = runner.invoke(app, ["pr", "create", "-t", "Test PR"])
+
+    # New behavior: exits with 0 and shows human-only warning
+    assert result.exit_code == 0
+    assert "此命令需要明确确认" in result.output
+    assert "--yes" in result.output
+    assert "--agent" in result.output
+    mock_pr_service.create_pr.assert_not_called()
+
+
+@patch("vibe3.commands.pr_create.render_pr_created")
+@patch("vibe3.commands.pr_create.PRService")
+@patch("vibe3.commands.pr_create.FlowService")
+def test_pr_create_allows_yes_when_task_issue_missing(
+    mock_flow_service_cls, mock_pr_service_cls, _render_pr_created
+) -> None:
+    """pr create --yes should bypass gates."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_status = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    flow_service.get_flow_status.return_value = flow_status
+    mock_flow_service_cls.return_value = flow_service
+
+    mock_pr_service = MagicMock()
+    mock_pr_service.get_open_pr_for_branch.return_value = None
+    mock_pr_service.create_pr.return_value = MagicMock(model_dump=lambda: {})
+    mock_pr_service_cls.return_value = mock_pr_service
+
+    result = runner.invoke(app, ["pr", "create", "-t", "Test PR", "--yes"])
+
+    assert result.exit_code == 0
+    mock_pr_service.create_pr.assert_called_once()
+
+
+@patch("vibe3.commands.pr_query.FlowService")
+@patch("vibe3.commands.pr_query.PRService")
+def test_pr_show_missing_pr_includes_bind_hint(
+    mock_pr_service_cls, mock_flow_service_cls
+) -> None:
+    """pr show should include bind hint when current flow has no task."""
+    # Mock git_client
+    git_client = MagicMock()
+    git_client.get_current_branch.return_value = "task/demo"
+
+    pr_service = MagicMock()
+    pr_service.git_client = git_client
+    pr_service.get_pr.return_value = None
+    pr_service.get_branch_pr_status.return_value = None
+    mock_pr_service_cls.return_value = pr_service
+
+    # Mock FlowService to return flow status without task_issue_number
+    flow_service = MagicMock()
+    flow_status = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    flow_service.get_flow_status.return_value = flow_status
+    mock_flow_service_cls.return_value = flow_service
+
+    result = runner.invoke(app, ["pr", "show"])
+
+    assert result.exit_code == 1
+    assert "No PR found for current branch 'task/demo'" in result.output
+    assert "vibe3 flow bind <issue> --role task" in result.output
+
+
+# ==============================================================================
+# Flow bind role semantics tests (from test_task_management_bind.py)
+# ==============================================================================
 
 
 def test_flow_bind_supports_related_role() -> None:
