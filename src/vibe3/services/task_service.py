@@ -371,8 +371,7 @@ class TaskService:
                 domain="task",
                 action="get_branch_pr",
                 branch=branch,
-                error=str(exc),
-            ).warning(f"Failed to query PRs for superseded task flow: {exc}")
+            ).exception(f"Failed to query PRs for superseded task flow: {exc}")
             return None
         return pr
 

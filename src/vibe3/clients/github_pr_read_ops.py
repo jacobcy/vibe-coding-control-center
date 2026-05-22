@@ -223,7 +223,17 @@ class PRReadMixin:
             return []
 
         # Parse PR list from output
-        prs_data = json.loads(result.stdout.strip())
+        try:
+            prs_data = json.loads(result.stdout.strip())
+        except json.JSONDecodeError as e:
+            logger.bind(
+                external="github",
+                repo=repo,
+                error=str(e),
+                stdout_preview=result.stdout[:100],
+            ).warning("Failed to parse PR list JSON, returning empty list")
+            return []
+
         prs = []
         for pr_data in prs_data:
             prs.append(
@@ -306,7 +316,18 @@ class PRReadMixin:
             return []
 
         # Parse PR list from output
-        prs_data = json.loads(result.stdout.strip())
+        try:
+            prs_data = json.loads(result.stdout.strip())
+        except json.JSONDecodeError as e:
+            logger.bind(
+                external="github",
+                branch=branch,
+                repo=repo,
+                error=str(e),
+                stdout_preview=result.stdout[:100],
+            ).warning("Failed to parse PR list JSON for branch, returning empty list")
+            return []
+
         prs = []
         for pr_data in prs_data:
             prs.append(

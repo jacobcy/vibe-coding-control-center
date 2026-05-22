@@ -198,26 +198,29 @@ class PRService:
             return None
 
         pr = prs[0]
-        self.recent_pr_cache.upsert_branch_pr(
-            branch,
-            {
-                "number": pr.number,
-                "title": pr.title,
-                "state": pr.state.value,
-                "draft": pr.draft,
-                "url": pr.url,
-                "head_branch": pr.head_branch,
-                "base_branch": pr.base_branch,
-                "merged_at": (
-                    pr.merged_at.isoformat()
-                    if isinstance(pr.merged_at, datetime)
-                    else pr.merged_at
-                ),
-            },
-        )
-        self._recent_pr_cache_map[branch] = pr
-        if sync_context_cache:
-            self._sync_branch_context_cache({branch: pr})
+        # Only update local cache when querying the current repo (no repo override)
+        # to avoid polluting cache with PRs from other repositories
+        if repo is None:
+            self.recent_pr_cache.upsert_branch_pr(
+                branch,
+                {
+                    "number": pr.number,
+                    "title": pr.title,
+                    "state": pr.state.value,
+                    "draft": pr.draft,
+                    "url": pr.url,
+                    "head_branch": pr.head_branch,
+                    "base_branch": pr.base_branch,
+                    "merged_at": (
+                        pr.merged_at.isoformat()
+                        if isinstance(pr.merged_at, datetime)
+                        else pr.merged_at
+                    ),
+                },
+            )
+            self._recent_pr_cache_map[branch] = pr
+            if sync_context_cache:
+                self._sync_branch_context_cache({branch: pr})
         return pr
 
     def get_open_pr_for_branch(
