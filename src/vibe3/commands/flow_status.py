@@ -9,7 +9,7 @@ from loguru import logger
 from vibe3.commands.command_options import (
     ActorFilterOption,
     FormatOption,
-    SourceOption,
+    RemoteOption,
 )
 from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.commands.flow_status_helpers import (
@@ -62,7 +62,7 @@ def show(
     snapshot: StatusOption = False,
     trace: TraceOption = False,
     output_format: FormatOption = "table",
-    source: SourceOption = "auto",
+    remote: RemoteOption = False,
     show_all: Annotated[
         bool, typer.Option("--show-all", help="Show orchestra actor events")
     ] = False,
@@ -118,7 +118,7 @@ def show(
         resolver = FlowStatusResolver(store=service.store, flow_service=service)
         flow_status = resolver.resolve(
             branch=target_branch,
-            source=source,
+            remote=remote,
             issue_number=task_issue_number,
         )
 

@@ -2,29 +2,25 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.models.data_source import DataSource
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_body_service import parse_projection_with_fallback
+from vibe3.services.issue_body_service import parse_projection
 
 if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
 
 
-SourceStrategy = Literal["local", "remote", "auto"]
-
-
 class FlowStatusResolver:
     """Resolver for source-aware flow status reads.
 
-    Implements unified source strategy:
-    - local: SQLite only, no fallback
-    - remote: GitHub API + issue body projection
-    - auto: local-first, remote fallback when SQLite missing
+    Implements source strategy:
+    - Default (remote=False): Local-first with remote fallback when SQLite missing
+    - Remote mode (remote=True): Fetch complete state from GitHub issue + comments
     """
 
     def __init__(
@@ -44,43 +40,34 @@ class FlowStatusResolver:
     def resolve(
         self,
         branch: str,
-        source: Literal["local", "remote", "auto"],
+        remote: bool = False,
         issue_number: int | None = None,
     ) -> FlowStatusResponse | None:
         """Resolve flow status with source strategy.
 
         Args:
             branch: Branch name to query
-            source: "local" | "remote" | "auto"
-            issue_number: Task issue number (required for remote fallback)
+            remote: If True, fetch complete remote state from GitHub
+            issue_number: Task issue number (required if remote=True)
 
         Returns:
             FlowStatusResponse with data_source field set,
-            or None if auto mode and not found
+            or None if not found
 
         Raises:
-            ValueError: If remote source but no issue_number
-            UserError: If local source and flow not found
+            ValueError: If remote=True but no issue_number
         """
-        if source == "local":
-            result = self._read_local(branch)
-            if result is None:
-                from vibe3.exceptions import UserError
-
-                raise UserError(f"Flow not found for branch '{branch}'")
-            return result
-
-        if source == "remote":
+        if remote:
             if not issue_number:
                 from vibe3.exceptions import UserError
 
                 raise UserError(
-                    "Cannot use --source remote without issue number. "
+                    "Cannot use --remote without issue number. "
                     "Bind a task issue first: vibe3 flow bind <issue> --role task"
                 )
             return self._read_remote(branch, issue_number)
 
-        # auto: local-first with remote fallback
+        # Default: local-first with remote fallback
         result = self._read_local(branch)
         if result is not None:
             return result
@@ -94,7 +81,7 @@ class FlowStatusResolver:
             domain="resolver",
             action="resolve",
             branch=branch,
-            source=source,
+            remote=remote,
         ).warning("Local read returned None, falling back to remote")
 
         return self._read_remote(branch, issue_number)
@@ -151,7 +138,7 @@ class FlowStatusResolver:
                 "GitHub API returned empty or None."
             )
 
-        projection = parse_projection_with_fallback(body)
+        projection = parse_projection(body)
 
         # Directly use projection state (no normalization)
         # Blocked state is inferred from projection's blocked_by/blocked_reason fields

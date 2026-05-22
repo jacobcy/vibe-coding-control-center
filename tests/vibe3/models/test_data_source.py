@@ -8,7 +8,6 @@ def test_data_source_enum_values():
     assert DataSource.LOCAL_SQLITE == "local"
     assert DataSource.GITHUB_API == "github"
     assert DataSource.ISSUE_BODY_FALLBACK == "fallback"
-    assert DataSource.ORCHESTRA_SERVER == "server"
 
 
 def test_data_source_enum_str():

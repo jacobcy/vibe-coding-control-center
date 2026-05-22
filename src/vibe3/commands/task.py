@@ -7,7 +7,7 @@ from typing import Annotated, Iterator
 
 import typer
 
-from vibe3.commands.command_options import FormatOption, SourceOption
+from vibe3.commands.command_options import FormatOption
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
@@ -156,7 +156,10 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
-    source: SourceOption = "auto",
+    remote: Annotated[
+        bool,
+        typer.Option("--remote", help="Fetch complete remote state from GitHub"),
+    ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
     ] = False,
@@ -191,10 +194,7 @@ def resume(
 ) -> None:
     """Resume blocked issues to ready.
 
-    --source local:  SQLite only (no fallback)
-    --source remote: GitHub API + issue body projection
-    --source auto:   local-first, remote fallback (default)
-
+    Use --remote to fetch complete remote state from GitHub.
     Use --blocked to resume all blocked issues, --all to reset every
     auto-created task/issue-* scene back to ready, or specify issue numbers directly.
 
@@ -358,7 +358,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
-            source=source,
+            source=("remote" if remote else "auto"),
             progress_callback=progress_callback if yes else None,
         )
     else:
@@ -371,7 +371,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
-            source=source,
+            source=("remote" if remote else "auto"),
             progress_callback=progress_callback if yes else None,
         )
 
