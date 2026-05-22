@@ -359,53 +359,112 @@ def review_mixin():
     return ReviewMixin()
 
 
-def test_di_injection_with_mock_client() -> None:
-    """Test that GitHubClient can be injected for testing.
+def test_get_pr_diff_file_limit_error(review_mixin):
+    """Test that PR diff with >300 files raises UserError."""
+    with patch("subprocess.run") as mock_run:
+        # Mock subprocess error with file limit message
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "diff", "200"],
+            stderr=(
+                "could not find pull request diff: HTTP 406: Sorry,"
+                " the diff exceeded the maximum number of files (300)."
+                " Consider using 'List pull requests files' API"
+                " or locally cloning the repository instead."
+            ),
+        )
 
-    This test verifies the DI pattern works: services should be able to
-    accept a mock GitHubClient and use it instead of creating a real one.
-    """
-    # Create a mock client
-    mock_client = MagicMock(spec=GitHubClient)
+        with pytest.raises(UserError) as exc_info:
+            review_mixin.get_pr_diff(200)
 
-    # Mock get_pr to return a specific PR
-    mock_pr = MagicMock(
-        number=42,
-        title="Injected PR",
-        body="This PR was fetched via injected client",
-        state=PRState.OPEN,
-        head_branch="test-branch",
-        base_branch="main",
-        url="https://github.com/org/repo/pull/42",
-        draft=False,
-    )
-    mock_client.get_pr.return_value = mock_pr
-
-    # Verify the mock is used correctly
-    result = mock_client.get_pr(pr_number=42)
-
-    assert result.number == 42
-    assert result.title == "Injected PR"
-    mock_client.get_pr.assert_called_once_with(pr_number=42)
+        error_msg = str(exc_info.value)
+        assert "too many files" in error_msg
+        assert "GitHub limit: 300" in error_msg
+        assert "#200" in error_msg
+        assert "vibe inspect branch" in error_msg
 
 
-def test_di_injection_in_service_context() -> None:
-    """Test DI injection works in a service-like context.
+def test_get_pr_diff_other_error(review_mixin):
+    """Test that other PR diff errors raise GitHubError."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "diff", "200"],
+            stderr="Network error",
+        )
 
-    Simulates how a service would use an injected GitHubClient.
-    """
-    mock_client = MagicMock(spec=GitHubClient)
+        with pytest.raises(GitHubError) as exc_info:
+            review_mixin.get_pr_diff(200)
 
-    # Mock view_issue to return issue data
-    mock_client.view_issue.return_value = {
-        "number": 123,
-        "title": "Test Issue",
-        "state": "open",
-    }
+        assert exc_info.value.status_code == 1
+        assert "Network error" in exc_info.value.message
 
-    # Simulate service using the injected client
-    issue_data = mock_client.view_issue(123)
 
-    assert issue_data["number"] == 123
-    assert issue_data["title"] == "Test Issue"
-    mock_client.view_issue.assert_called_once_with(123)
+def test_get_pr_files_file_limit_error(review_mixin):
+    """Test that PR files with >300 files raises UserError."""
+    with patch("subprocess.run") as mock_run:
+        # Mock subprocess error with file limit message
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "diff", "200", "--name-only"],
+            stderr=(
+                "could not find pull request diff: HTTP 406: Sorry,"
+                " the diff exceeded the maximum number of files (300)."
+            ),
+        )
+
+        with pytest.raises(UserError) as exc_info:
+            review_mixin.get_pr_files(200)
+
+        error_msg = str(exc_info.value)
+        assert "too many files" in error_msg
+        assert "GitHub limit: 300" in error_msg
+        assert "#200" in error_msg
+
+
+def test_get_pr_files_success(review_mixin):
+    """Test successful get_pr_files."""
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.stdout = "file1.py\nfile2.py\nfile3.py\n"
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        result = review_mixin.get_pr_files(42)
+
+        assert result == ["file1.py", "file2.py", "file3.py"]
+
+
+def test_get_pr_files_other_error(review_mixin):
+    """Test that other PR files errors raise GitHubError."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "diff", "200", "--name-only"],
+            stderr="Authentication failed",
+        )
+
+        with pytest.raises(GitHubError) as exc_info:
+            review_mixin.get_pr_files(200)
+
+        assert exc_info.value.status_code == 1
+        assert "Authentication failed" in exc_info.value.message
+
+
+def test_error_message_suggests_alternatives(review_mixin):
+    """Test that error message suggests alternative approaches."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "diff", "200"],
+            stderr="diff exceeded the maximum number of files (300)",
+        )
+
+        with pytest.raises(UserError) as exc_info:
+            review_mixin.get_pr_diff(200)
+
+        error_msg = str(exc_info.value)
+        # Should suggest alternatives
+        assert "Alternatives:" in error_msg
+        assert "vibe inspect branch" in error_msg
+        assert "pull/200/files" in error_msg
