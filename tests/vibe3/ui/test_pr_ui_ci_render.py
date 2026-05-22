@@ -205,3 +205,34 @@ class TestPRUICIRender:
         output = _render_to_plain(pr)
         assert "CI Status" in output
         assert "pending" in output
+
+    def test_render_ci_failed_includes_workflow_and_description(self) -> None:
+        """Test failed CI rendering includes workflow and description."""
+        checks = [
+            CICheck(
+                name="Test",
+                state="FAILURE",
+                bucket="fail",
+                link="https://github.com/test/repo/actions/runs/2/job/3",
+                workflow="CI",
+                description="pytest failed",
+                failure_category="pytest",
+                failure_command="gh run view 2 --job 3 --log-failed",
+            ),
+        ]
+
+        pr = PRResponse(
+            number=123,
+            title="Test PR",
+            state=PRState.OPEN,
+            head_branch="feature",
+            base_branch="main",
+            url="https://github.com/test/repo/pull/123",
+            ci_checks=checks,
+        )
+
+        output = _render_to_plain(pr)
+        assert "Workflow: CI" in output
+        assert "Description: pytest failed" in output
+        assert "pytest" in output
+        assert "gh run view 2 --job 3 --log-failed" in output

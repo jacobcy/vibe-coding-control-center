@@ -16,6 +16,10 @@ class CICheck(BaseModel):
     state: str  # SUCCESS, FAILURE, PENDING, etc.
     bucket: str  # pass, fail, pending, skipping, cancel
     link: str
+    workflow: Optional[str] = Field(None, description="GitHub Actions workflow name")
+    description: Optional[str] = Field(
+        None, description="Failure description from check"
+    )
     failure_category: Optional[str] = Field(
         None,
         description="Classified failure category for failed checks",
