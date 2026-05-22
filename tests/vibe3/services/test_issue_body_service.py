@@ -6,7 +6,6 @@ from vibe3.services.issue_body_service import (
     MANAGED_SECTION_START,
     merge_projection,
     parse_projection,
-    parse_projection_with_fallback,
     render_projection,
 )
 
