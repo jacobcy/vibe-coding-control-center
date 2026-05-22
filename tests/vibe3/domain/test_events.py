@@ -74,3 +74,31 @@ def test_manager_dispatch_intent_event_creation():
     assert event.issue_number == 123
     assert event.branch == "task/issue-123"
     assert event.trigger_state == "ready"
+
+
+def test_issue_failed_event_structure():
+    """Test IssueFailed event has correct structure."""
+    event = IssueFailed(
+        issue_number=42,
+        reason="execution crashed",
+        actor="agent:executor",
+        role="executor",
+    )
+
+    assert event.issue_number == 42
+    assert event.reason == "execution crashed"
+    assert event.actor == "agent:executor"
+    assert event.role == "executor"
+    assert event.timestamp is None
+
+
+def test_issue_failed_with_timestamp():
+    """Test IssueFailed event with custom timestamp."""
+    event = IssueFailed(
+        issue_number=42,
+        reason="execution crashed",
+        actor="agent:executor",
+        timestamp="2026-04-09T12:00:00Z",
+    )
+
+    assert event.timestamp == "2026-04-09T12:00:00Z"
