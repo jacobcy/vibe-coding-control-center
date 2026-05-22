@@ -307,7 +307,9 @@ def start(
         )
         os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir(Path.cwd()))
         # --no-async flag: propagate to all dispatched role agents
-        os.environ["VIBE3_NO_ASYNC"] = "1"
+        # Only set when user explicitly requested --no-async (not in async wrapper)
+        if no_async:
+            os.environ["VIBE3_NO_ASYNC"] = "1"
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")
