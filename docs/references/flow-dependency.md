@@ -187,6 +187,60 @@ VALUES
 
 ---
 
+## 多依赖语义
+
+当使用 `flow bind --role dependency` 同时绑定多个依赖时，系统表现出**双重语义**：
+
+### 行为描述
+
+```bash
+vibe3 flow bind --role dependency 100 101 102
+```
+
+执行流程：
+1. **按顺序调用**: 对每个依赖 issue 依次调用 `block_flow()`（100 → 101 → 102）
+2. **数据库字段**: `flow_state.blocked_by_issue` 被最后一次调用覆盖，最终值为 102
+3. **Issue Body 累积**: 所有依赖都累积到 issue body 的 `blocked_by` 字段（100, 101, 102 均保留）
+4. **链接记录**: 所有依赖都记录在 `flow_issue_links` 表中，角色为 `dependency`
+
+### 双重存储机制
+
+这种"双重语义"源于两层存储：
+
+| 存储层 | 字段 | 更新行为 | 最终值 |
+|--------|------|---------|--------|
+| **flow_state 表** | `blocked_by_issue` | 每次调用覆盖 | 102（最后一个） |
+| **issue body** | `blocked_by` | 通过 `_project_blocked_state()` 合并去重 | [100, 101, 102] |
+| **flow_issue_links 表** | `issue_role='dependency'` | 每次调用插入 | 三条记录 |
+
+代码位置：
+- 多 ref 循环：`src/vibe3/commands/flow_manage.py:310-320`
+- 字段覆盖：`src/vibe3/services/flow_block_mixin.py:121-127`
+- 累积合并：`src/vibe3/services/flow_block_mixin.py:23-65`
+
+### 最佳实践
+
+**不推荐**同时绑定多个依赖：
+```bash
+# 可能造成语义混淆
+vibe3 flow bind --role dependency 100 101 102
+```
+
+**推荐**逐个绑定：
+```bash
+vibe3 flow bind --role dependency 100
+vibe3 flow bind --role dependency 101
+vibe3 flow bind --role dependency 102
+```
+
+或使用 `flow blocked --task` 命令建立依赖关系，语义更明确。
+
+### 详细说明
+
+参见 [Flow Bind 使用指南](../v3/infrastructure/flow-bind-usage.md) 获取完整用法说明。
+
+---
+
 ## 查询与验证
 
 ### 查看依赖关系
