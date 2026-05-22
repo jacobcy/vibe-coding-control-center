@@ -410,11 +410,9 @@ class TaskResumeOperations:
             )
 
             # Clear blocked state from issue body projection
-            flow_data = self.flow_service.store.get_flow_state(branch)
-            if flow_data:
-                issue_number = flow_data.get("task_issue_number")
-                if issue_number:
-                    self._clear_blocked_projection(issue_number)
+            issue_number = self.flow_service.store.get_task_issue_number(branch)
+            if issue_number:
+                self._clear_blocked_projection(issue_number)
 
         except Exception as exc:
             # Non-blocking: reason clearing failure should not affect resume

@@ -174,6 +174,32 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved dependency links")
         return deps
 
+    def get_task_issue_number(self, branch: str) -> int | None:
+        """Get task issue number for a branch from flow_issue_links.
+
+        Args:
+            branch: Branch name to query
+
+        Returns:
+            Task issue number if found, None otherwise
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT issue_number FROM flow_issue_links "
+            "WHERE branch = ? AND issue_role = 'task' LIMIT 1",
+            (branch,),
+        )
+        row = cursor.fetchone()
+        result = int(row[0]) if row and row[0] is not None else None
+        logger.bind(
+            external="sqlite",
+            operation="get_task_issue_number",
+            branch=branch,
+            issue_number=result,
+        ).debug("Retrieved task issue number")
+        return result
+
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
         conn = self._get_connection()

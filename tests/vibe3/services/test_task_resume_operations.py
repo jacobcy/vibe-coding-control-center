@@ -407,15 +407,12 @@ def test_clear_flow_reasons_clears_blocked_projection() -> None:
 
     with (
         patch.object(operations.flow_service.store, "update_flow_state"),
-        patch.object(operations.flow_service.store, "get_flow_state") as mock_get,
+        patch.object(
+            operations.flow_service.store, "get_task_issue_number"
+        ) as mock_get_issue,
         patch.object(operations, "_clear_blocked_projection") as mock_clear,
     ):
-        # Setup flow state with issue number
-        mock_get.return_value = {
-            "branch": "task/issue-123",
-            "task_issue_number": 123,
-            "blocked_reason": "API design pending",
-        }
+        mock_get_issue.return_value = 123
 
         # Execute
         operations._clear_flow_reasons("task/issue-123", "blocked")
