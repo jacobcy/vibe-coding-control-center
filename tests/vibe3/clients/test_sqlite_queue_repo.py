@@ -140,7 +140,6 @@ def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
 
     all_entries = client.load_all_queue_entries()
     assert len(all_entries) == 2
-    # Find entry 601 and verify it has the second value
     entry_601 = next((e for e in all_entries if e["issue_number"] == 601), None)
     assert entry_601 is not None
     assert entry_601["collected_state"] == "second"
@@ -273,9 +272,7 @@ def test_queue_operations_persist_across_connections(tmp_path):
         )
 
     client.remove_queue_entry(1)
-    client.replace_all_queue_entries(
-        [{"issue_number": 3, "collected_state": "three"}]
-    )
+    client.replace_all_queue_entries([{"issue_number": 3, "collected_state": "three"}])
 
     with sqlite3.connect(str(db_path)) as conn:
         rows = conn.execute(
