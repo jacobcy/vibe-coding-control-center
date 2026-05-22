@@ -158,7 +158,10 @@ def resume(
     ] = None,
     remote: Annotated[
         bool,
-        typer.Option("--remote", help="Fetch complete remote state from GitHub"),
+        typer.Option(
+            "--remote",
+            help="保留远程分支不删除（默认删除远程分支）",
+        ),
     ] = False,
     blocked: Annotated[
         bool, typer.Option("--blocked", help="Resume all blocked issues")
@@ -194,37 +197,9 @@ def resume(
 ) -> None:
     """Resume blocked issues to ready.
 
-    Use --remote to fetch complete remote state from GitHub.
-    Use --blocked to resume all blocked issues, --all to reset every
-    auto-created task/issue-* scene back to ready, or specify issue numbers directly.
-
-    **Label-only mode (no worktree deletion)**:
-    Use --label [STATE] to clear blocked_reason and restore
-    to specified state WITHOUT deleting worktree/branch.
-    - `--label auto` → auto-infer target state from refs
-    - `--label handoff` → restore to handoff
-    - `--label ready` → restore to ready
-    - `--label claimed` → restore to claimed
-    - `--label in-progress` → restore to in-progress
-    - `--label review` → restore to review
-    - `--label merge-ready` → restore to merge-ready
-    Without --label, the original behavior deletes worktree/branch.
-
-    Examples:
-        vibe3 task resume 303 --label auto -y
-            # Auto-infer target state from refs (keep worktree)
-        vibe3 task resume 303 --label handoff -y
-            # Restore to handoff, keep worktree
-        vibe3 task resume 303 --label ready -y
-            # Restore to ready, keep worktree
-        vibe3 task resume 303 --label in-progress -y
-            # Restore to in-progress, keep worktree
-        vibe3 task resume 303 --label review -y
-            # Restore to review, keep worktree
-        vibe3 task resume 303 --label merge-ready -y
-            # Restore to merge-ready, keep worktree
-        vibe3 task resume 303 -y
-            # Delete worktree/branch (original)
+    Use --remote to keep remote branch (do not delete origin).
+    Use --label [STATE] to only update labels without deleting worktree.
+    --remote and --label are mutually exclusive.
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -237,6 +212,13 @@ def resume(
     register_event_handlers()
 
     # Validate arguments
+    if remote and label is not None:
+        typer.echo(
+            "Error: Cannot specify both --remote and --label",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     selected_modes = [blocked, all_tasks]
     has_flag = any(selected_modes)
     if not has_flag and not issue_numbers:
@@ -358,7 +340,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
-            source=("remote" if remote else "auto"),
+            remote=remote,
             progress_callback=progress_callback if yes else None,
         )
     else:
@@ -371,7 +353,7 @@ def resume(
             stale_flows=stale_flows,
             candidate_mode=candidate_mode,
             label_state=effective_label,
-            source=("remote" if remote else "auto"),
+            remote=remote,
             progress_callback=progress_callback if yes else None,
         )
 

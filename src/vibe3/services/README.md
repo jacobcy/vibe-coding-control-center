@@ -148,7 +148,7 @@ Created → Claimed → In-Progress → Merge-Ready → Merged
 当任务执行失败时，系统提供恢复机制：
 
 1. **候选发现**：`task_resume_candidates.py` 发现可恢复的任务
-2. **恢复解析**：`task_resume_resolver.py` 解析恢复路径
+2. **恢复解析**：`flow_resume_resolver.py` 解析恢复路径
 3. **恢复执行**：`task_resume_operations.py` 执行恢复动作
 
 ### Handoff 机制
