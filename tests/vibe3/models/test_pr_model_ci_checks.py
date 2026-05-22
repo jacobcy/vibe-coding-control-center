@@ -37,6 +37,21 @@ class TestCICheckModel:
             "link": "https://github.com/test/repo/actions/runs/456",
         }
 
+    def test_ci_check_serialization_includes_failure_metadata(self) -> None:
+        """Test CICheck model serialization keeps failure metadata."""
+        check = CICheck(
+            name="Test",
+            state="FAILURE",
+            bucket="fail",
+            link="https://github.com/test/repo/actions/runs/456/job/789",
+            failure_category="pytest",
+            failure_command="gh run view 456 --job 789 --log-failed",
+        )
+
+        data = check.model_dump()
+        assert data["failure_category"] == "pytest"
+        assert data["failure_command"] == "gh run view 456 --job 789 --log-failed"
+
 
 class TestPRResponseCIChecks:
     """Test suite for PRResponse.ci_checks field."""

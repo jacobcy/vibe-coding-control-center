@@ -221,6 +221,60 @@ def test_get_pr_not_found(
     assert pr is None
 
 
+def test_get_pr_enriches_failed_checks_with_category_and_command() -> None:
+    """Test get_pr enriches failed CI checks with failure metadata."""
+    client = GitHubClient()
+
+    pr_data = {
+        "number": 123,
+        "title": "Test PR",
+        "body": "Test body",
+        "state": "OPEN",
+        "headRefName": "feature-branch",
+        "baseRefName": "main",
+        "url": "https://github.com/org/repo/pull/123",
+        "isDraft": False,
+        "createdAt": "2026-03-16T10:00:00Z",
+        "updatedAt": "2026-03-16T10:00:00Z",
+        "mergedAt": None,
+    }
+    checks_data = [
+        {
+            "name": "Lint & Test",
+            "state": "FAILURE",
+            "bucket": "fail",
+            "link": "https://github.com/org/repo/actions/runs/26262915490/job/77300075332",
+        }
+    ]
+    run_data = {
+        "jobs": [
+            {
+                "name": "Lint & Test",
+                "conclusion": "failure",
+                "steps": [
+                    {"name": "Setup", "conclusion": "success"},
+                    {"name": "Run Python tests (pytest)", "conclusion": "failure"},
+                ],
+            }
+        ]
+    }
+
+    with patch("vibe3.clients.github_pr_read_ops.subprocess.run") as mock_run:
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout=json.dumps(pr_data), stderr=""),
+            MagicMock(returncode=0, stdout=json.dumps(checks_data), stderr=""),
+            MagicMock(returncode=0, stdout=json.dumps(run_data), stderr=""),
+        ]
+
+        pr = client.get_pr(pr_number=123)
+
+    assert pr is not None
+    assert getattr(pr.ci_checks[0], "failure_category", None) == "pytest"
+    assert getattr(pr.ci_checks[0], "failure_command", None) == (
+        "gh run view 26262915490 --job 77300075332 --log-failed"
+    )
+
+
 def test_mark_ready_success(
     github_client: GitHubClient, mock_subprocess: MagicMock
 ) -> None:

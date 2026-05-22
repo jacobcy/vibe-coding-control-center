@@ -1,12 +1,141 @@
 """GitHub client PR read operations."""
 
 import json
+import re
 import subprocess
 from typing import Any
 
 from loguru import logger
 
 from vibe3.models.pr import CICheck, PRMetadata, PRResponse, PRState
+
+_ACTIONS_RUN_LINK_RE = re.compile(
+    r"actions/runs/(?P<run_id>\d+)(?:/job/(?P<job_id>\d+))?"
+)
+
+
+def _extract_actions_run_details(link: str) -> tuple[str | None, str | None]:
+    """Extract GitHub Actions run and job IDs from a check link."""
+    match = _ACTIONS_RUN_LINK_RE.search(link)
+    if not match:
+        return None, None
+
+    return match.group("run_id"), match.group("job_id")
+
+
+def _build_failure_command(run_id: str, job_id: str | None) -> str:
+    """Build the command to inspect the failing job logs."""
+    command = f"gh run view {run_id}"
+    if job_id:
+        command += f" --job {job_id}"
+    return f"{command} --log-failed"
+
+
+def _classify_failed_step_name(step_name: str) -> str | None:
+    """Classify a failed step name into a coarse failure category."""
+    lowered = step_name.lower()
+    if "pytest" in lowered or "tests" in lowered or "test" in lowered:
+        return "pytest"
+    if "loc" in lowered:
+        return "loc"
+    if "ruff" in lowered or "lint" in lowered:
+        return "ruff"
+    if "mypy" in lowered or "type check" in lowered:
+        return "mypy"
+    if "black" in lowered or "format" in lowered:
+        return "black"
+    if "bats" in lowered:
+        return "bats"
+    return None
+
+
+def _classify_failed_job(job: dict[str, Any]) -> str | None:
+    """Classify a failed GitHub Actions job from step names."""
+    steps = job.get("steps", [])
+    if isinstance(steps, list):
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            conclusion = str(step.get("conclusion", "")).lower()
+            if conclusion in {"failure", "cancelled", "timed_out"}:
+                step_name = str(step.get("name", ""))
+                category = _classify_failed_step_name(step_name)
+                if category:
+                    return category
+                break
+
+    job_name = str(job.get("name", ""))
+    return _classify_failed_step_name(job_name)
+
+
+def _enrich_failed_check(check: CICheck) -> CICheck:
+    """Add failure metadata to a failed check when job details are available."""
+    if check.bucket != "fail":
+        return check
+
+    run_id, job_id = _extract_actions_run_details(check.link)
+    if not run_id:
+        return check
+
+    failure_command = _build_failure_command(run_id, job_id)
+    failure_category: str | None = None
+
+    if not job_id:
+        return check.model_copy(update={"failure_command": failure_command})
+
+    try:
+        run_result = subprocess.run(
+            [
+                "gh",
+                "run",
+                "view",
+                run_id,
+                "--job",
+                job_id,
+                "--json",
+                "jobs",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        logger.bind(external="github", run_id=run_id, job_id=job_id).debug(
+            "gh CLI not found when fetching Actions job details"
+        )
+        return check.model_copy(update={"failure_command": failure_command})
+    except subprocess.TimeoutExpired:
+        logger.bind(external="github", run_id=run_id, job_id=job_id).debug(
+            "gh run view timed out after 30 seconds"
+        )
+        return check.model_copy(update={"failure_command": failure_command})
+
+    if run_result.returncode == 0:
+        try:
+            run_data = json.loads(run_result.stdout)
+        except json.JSONDecodeError as e:
+            logger.bind(
+                external="github",
+                run_id=run_id,
+                job_id=job_id,
+                error=str(e),
+            ).debug("Failed to parse gh run view JSON output")
+        else:
+            jobs = run_data.get("jobs", [])
+            if isinstance(jobs, list):
+                for job in jobs:
+                    if not isinstance(job, dict):
+                        continue
+                    failure_category = _classify_failed_job(job)
+                    if failure_category:
+                        break
+
+    return check.model_copy(
+        update={
+            "failure_category": failure_category,
+            "failure_command": failure_command,
+        }
+    )
 
 
 class PRReadMixin:
@@ -125,7 +254,11 @@ class PRReadMixin:
             )
             if checks_result.returncode == 0:
                 checks_data = json.loads(checks_result.stdout)
-                ci_checks = [CICheck(**c) for c in checks_data if isinstance(c, dict)]
+                ci_checks = [
+                    _enrich_failed_check(CICheck(**c))
+                    for c in checks_data
+                    if isinstance(c, dict)
+                ]
             else:
                 stderr = checks_result.stderr.strip() if checks_result.stderr else None
                 logger.bind(
