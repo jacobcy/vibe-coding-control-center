@@ -7,16 +7,6 @@ from vibe3.clients.sqlite_base import _HasConnection
 
 class SQLiteQueueRepo(_HasConnection):
     db_path: str
-    _enqueued_at_cache: dict[str, bool] = {}  # db_path -> has_enqueued_at
-
-    def _check_has_enqueued_at(self, conn: sqlite3.Connection) -> bool:
-        """Check if legacy enqueued_at column exists (cached per db_path)."""
-        if self.db_path not in self._enqueued_at_cache:
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(orchestra_queue)")
-            columns = {row[1] for row in cursor.fetchall()}
-            self._enqueued_at_cache[self.db_path] = "enqueued_at" in columns
-        return self._enqueued_at_cache[self.db_path]
 
     def load_all_queue_entries(self) -> list[dict[str, Any]]:
         conn = self._get_connection()
@@ -39,40 +29,18 @@ class SQLiteQueueRepo(_HasConnection):
         conn = self._get_connection()
         with conn:
             conn.execute("DELETE FROM orchestra_queue")
-            has_enqueued_at = self._check_has_enqueued_at(conn)
             for entry in entries:
-                timestamp = entry.get("last_attempted_at") or now
-                if has_enqueued_at:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO orchestra_queue "
-                        "(issue_number, collected_state, waiting_state, retry_count, "
-                        "last_attempted_at, enqueued_at, updated_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (
-                            entry["issue_number"],
-                            entry.get("collected_state"),
-                            entry.get("waiting_state"),
-                            entry.get("retry_count", 0),
-                            entry.get("last_attempted_at"),
-                            timestamp,
-                            now,
-                        ),
-                    )
-                else:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO orchestra_queue "
-                        "(issue_number, collected_state, waiting_state, retry_count, "
-                        "last_attempted_at, updated_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                        (
-                            entry["issue_number"],
-                            entry.get("collected_state"),
-                            entry.get("waiting_state"),
-                            entry.get("retry_count", 0),
-                            entry.get("last_attempted_at"),
-                            now,
-                        ),
-                    )
+                conn.execute(
+                    "INSERT OR REPLACE INTO orchestra_queue "
+                    "(issue_number, collected_state, waiting_state, updated_at) "
+                    "VALUES (?, ?, ?, ?)",
+                    (
+                        entry["issue_number"],
+                        entry.get("collected_state"),
+                        entry.get("waiting_state"),
+                        now,
+                    ),
+                )
 
     # Frozen queue compatibility methods (alias for orchestra_queue operations)
     def save_frozen_queue(self, entries: list[dict[str, Any]]) -> None:

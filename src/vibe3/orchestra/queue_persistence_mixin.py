@@ -30,8 +30,6 @@ class QueueEntry:
     issue_number: int
     collected_state: str | None = None
     waiting_state: str | None = None
-    retry_count: int = 0
-    last_attempted_at: str | None = None
 
 
 class QueuePersistenceMixin:
@@ -112,8 +110,6 @@ class QueuePersistenceMixin:
                     issue_number=issue_number,
                     collected_state=entry.get("collected_state"),
                     waiting_state=None,  # Reset to trigger re-dispatch
-                    retry_count=entry.get("retry_count", 0),
-                    last_attempted_at=entry.get("last_attempted_at"),
                 )
             )
 
@@ -140,8 +136,6 @@ class QueuePersistenceMixin:
                 "issue_number": e.issue_number,
                 "collected_state": e.collected_state,
                 "waiting_state": e.waiting_state,
-                "retry_count": e.retry_count,
-                "last_attempted_at": e.last_attempted_at,
             }
             for e in frozen_queue
         ]
@@ -166,8 +160,6 @@ class QueuePersistenceMixin:
                 "issue_number": e.issue_number,
                 "collected_state": e.collected_state,
                 "waiting_state": e.waiting_state,
-                "retry_count": e.retry_count,
-                "last_attempted_at": e.last_attempted_at,
             }
             for e in frozen_queue
         ]
@@ -179,7 +171,6 @@ class QueuePersistenceMixin:
             self._registry,
             self._supervisor_label,
             load_issue_func=self._load_issue,
-            max_retry_budget=self._config.max_retry_budget,
         )
 
         # Convert back to QueueEntry
@@ -188,8 +179,6 @@ class QueuePersistenceMixin:
                 issue_number=e["issue_number"],
                 collected_state=e.get("collected_state"),
                 waiting_state=e.get("waiting_state"),
-                retry_count=e.get("retry_count", 0),
-                last_attempted_at=e.get("last_attempted_at"),
             )
             for e in promoted
         ]
@@ -199,8 +188,6 @@ class QueuePersistenceMixin:
                 issue_number=e["issue_number"],
                 collected_state=e.get("collected_state"),
                 waiting_state=e.get("waiting_state"),
-                retry_count=e.get("retry_count", 0),
-                last_attempted_at=e.get("last_attempted_at"),
             )
             for e in retained
         ]

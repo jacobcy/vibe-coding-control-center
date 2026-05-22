@@ -164,8 +164,6 @@ _CREATE_ORCHESTRA_QUEUE = """
         issue_number INTEGER PRIMARY KEY,
         collected_state TEXT,
         waiting_state TEXT,
-        retry_count INTEGER NOT NULL DEFAULT 0,
-        last_attempted_at TEXT,
         updated_at TEXT NOT NULL
     )
 """
@@ -441,40 +439,33 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 "flow_events to transition_history"
             )
 
-    # Migration: add retry_count and last_attempted_at to orchestra_queue
+    # Migration: remove retry_count and last_attempted_at from orchestra_queue
+    # (SQLite doesn't support DROP COLUMN, so recreate table)
     queue_columns = {
         row[1]
         for row in cursor.execute("PRAGMA table_info(orchestra_queue)").fetchall()
     }
-    if "retry_count" not in queue_columns:
-        cursor.execute(
-            "ALTER TABLE orchestra_queue "
-            "ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0"
-        )
+    if "retry_count" in queue_columns or "last_attempted_at" in queue_columns:
+        # Create new table without retry columns
+        cursor.execute("""
+            CREATE TABLE orchestra_queue_new (
+                issue_number INTEGER PRIMARY KEY,
+                collected_state TEXT,
+                waiting_state TEXT,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        # Copy data (exclude retry columns)
+        cursor.execute("""
+            INSERT INTO orchestra_queue_new
+            SELECT issue_number, collected_state, waiting_state, updated_at
+            FROM orchestra_queue
+        """)
+        # Replace old table
+        cursor.execute("DROP TABLE orchestra_queue")
+        cursor.execute("ALTER TABLE orchestra_queue_new RENAME TO orchestra_queue")
         logger.bind(external="sqlite", operation="migration").info(
-            "Added retry_count column to orchestra_queue"
-        )
-
-    # Migration: rename enqueued_at to last_attempted_at if it exists
-    # (legacy field from earlier migration, semantics changed from queue
-    # time to last attempt time)
-    if "enqueued_at" in queue_columns and "last_attempted_at" not in queue_columns:
-        # SQLite doesn't support DROP COLUMN, so we add the new column
-        # and copy data. The old enqueued_at will remain but is dual-written
-        # to satisfy its NOT NULL constraint (value not read by new code).
-        cursor.execute("ALTER TABLE orchestra_queue ADD COLUMN last_attempted_at TEXT")
-        cursor.execute(
-            "UPDATE orchestra_queue SET last_attempted_at = enqueued_at "
-            "WHERE enqueued_at IS NOT NULL"
-        )
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added last_attempted_at column to orchestra_queue "
-            "(migrated from enqueued_at)"
-        )
-    elif "last_attempted_at" not in queue_columns:
-        cursor.execute("ALTER TABLE orchestra_queue ADD COLUMN last_attempted_at TEXT")
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added last_attempted_at column to orchestra_queue"
+            "Removed retry_count and last_attempted_at columns from orchestra_queue"
         )
 
     # Create indexes for runtime_session table

@@ -283,7 +283,7 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         """Merge fresh entries into existing queue, deduplicating by issue_number.
 
         If same issue_number exists in both, keep the existing entry
-        (to preserve waiting_state and retry_count).
+        (to preserve waiting_state).
 
         Args:
             existing: Current queue entries (may have waiting_state set)

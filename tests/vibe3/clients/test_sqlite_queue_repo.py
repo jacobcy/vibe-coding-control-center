@@ -140,123 +140,98 @@ def test_replace_all_handles_duplicate_issue_numbers(tmp_path):
 
     all_entries = client.load_all_queue_entries()
     assert len(all_entries) == 2
-    # Find entry 601 and verify it has the second value
     entry_601 = next((e for e in all_entries if e["issue_number"] == 601), None)
     assert entry_601 is not None
     assert entry_601["collected_state"] == "second"
 
 
-def test_legacy_enqueued_at_migration(tmp_path):
-    """Simulate a legacy DB with enqueued_at NOT NULL, run init_schema,
-    verify last_attempted_at column is added, legacy data is migrated,
-    and new inserts succeed."""
-    db_path = tmp_path / "legacy.db"
+def test_migration_drops_retry_columns_and_preserves_rows(tmp_path):
+    """Create a legacy DB with retry_count/last_attempted_at/enqueued_at,
+    run init_schema(), verify retry columns are removed and existing rows
+    are preserved."""
+    db_path = tmp_path / "legacy_retry.db"
 
-    # Step 1: Create a legacy-style orchestra_queue with enqueued_at NOT NULL
+    # Create a legacy-style orchestra_queue with retry columns
     with sqlite3.connect(str(db_path)) as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS orchestra_queue ("
             "issue_number INTEGER PRIMARY KEY, "
-            "collected_state TEXT NOT NULL, "
+            "collected_state TEXT, "
             "waiting_state TEXT, "
             "enqueued_at TEXT NOT NULL, "
             "retry_count INTEGER NOT NULL DEFAULT 0, "
+            "last_attempted_at TEXT, "
             "updated_at TEXT NOT NULL)"
         )
-        # Insert a legacy row that only has the old columns
         conn.execute(
             "INSERT INTO orchestra_queue "
             "(issue_number, collected_state, waiting_state, "
-            "enqueued_at, retry_count, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (100, "blocked", "ready", "2026-05-16T10:00:00", 0, "2026-05-16T10:00:00"),
+            "enqueued_at, retry_count, last_attempted_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                100,
+                "blocked",
+                "ready",
+                "2026-05-16T10:00:00",
+                3,
+                "2026-05-16T12:00:00",
+                "2026-05-16T12:00:00",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO orchestra_queue "
+            "(issue_number, collected_state, waiting_state, "
+            "enqueued_at, retry_count, last_attempted_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                200,
+                "collected",
+                None,
+                "2026-05-17T08:00:00",
+                0,
+                None,
+                "2026-05-17T08:00:00",
+            ),
         )
 
-    # Step 2: Run init_schema (triggers migration)
+    # Run init_schema (triggers migration)
     SQLiteClient(db_path=str(db_path))
 
-    # Step 3: Verify migration added last_attempted_at
+    # Verify retry columns and enqueued_at are removed
     with sqlite3.connect(str(db_path)) as conn:
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(orchestra_queue)")
-        columns = {row[1] for row in cursor.fetchall()}
-        assert "last_attempted_at" in columns
+        columns = {
+            row[1]
+            for row in cursor.execute("PRAGMA table_info(orchestra_queue)").fetchall()
+        }
 
-    # Step 4: Verify legacy row has last_attempted_at migrated from enqueued_at
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
-            (100,),
-        ).fetchone()
-        legacy_entry = dict(row) if row else None
-    assert legacy_entry["last_attempted_at"] == "2026-05-16T10:00:00"
+    assert "retry_count" not in columns
+    assert "last_attempted_at" not in columns
+    assert "enqueued_at" not in columns
+    assert columns == {"issue_number", "collected_state", "waiting_state", "updated_at"}
 
-    # Step 5: Verify new inserts succeed (NOT NULL constraint satisfied)
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO orchestra_queue "
-            "(issue_number, collected_state, waiting_state, retry_count, "
-            "last_attempted_at, enqueued_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
-            (200, "blocked", "review", 2, "2026-05-17T09:00:00", "2026-05-17T09:00:00"),
-        )
-
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
-            (200,),
-        ).fetchone()
-        new_entry = dict(row) if row else None
-    assert new_entry["issue_number"] == 200
-    assert new_entry["retry_count"] == 2
-    assert new_entry["last_attempted_at"] == "2026-05-17T09:00:00"
-    assert new_entry["enqueued_at"] == "2026-05-17T09:00:00"  # dual-written
-
-
-def test_replace_all_with_legacy_enqueued_at(tmp_path):
-    """Verify replace_all_queue_entries works on a legacy DB with enqueued_at."""
-    db_path = tmp_path / "legacy2.db"
-
-    # Create legacy schema
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS orchestra_queue ("
-            "issue_number INTEGER PRIMARY KEY, "
-            "collected_state TEXT NOT NULL, "
-            "waiting_state TEXT, "
-            "enqueued_at TEXT NOT NULL, "
-            "retry_count INTEGER NOT NULL DEFAULT 0, "
-            "updated_at TEXT NOT NULL)"
-        )
-
-    # Run migration
+    # Verify existing rows are preserved
     client = SQLiteClient(db_path=str(db_path))
+    all_entries = client.load_all_queue_entries()
+    assert len(all_entries) == 2
 
-    # Replace all entries
-    entries = [
-        {
-            "issue_number": 300,
-            "collected_state": "ready",
-            "waiting_state": None,
-            "retry_count": 1,
-            "last_attempted_at": "2026-05-17T08:00:00",
-        },
-    ]
-    client.replace_all_queue_entries(entries)
+    entry_100 = next((e for e in all_entries if e["issue_number"] == 100), None)
+    assert entry_100 is not None
+    assert entry_100["collected_state"] == "blocked"
+    assert entry_100["waiting_state"] == "ready"
 
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM orchestra_queue WHERE issue_number = ?",
-            (300,),
-        ).fetchone()
-        loaded = dict(row) if row else None
-    assert loaded["retry_count"] == 1
-    assert loaded["last_attempted_at"] == "2026-05-17T08:00:00"
-    assert loaded["enqueued_at"] == "2026-05-17T08:00:00"
+    entry_200 = next((e for e in all_entries if e["issue_number"] == 200), None)
+    assert entry_200 is not None
+    assert entry_200["collected_state"] == "collected"
+
+    # Verify new writes work without retry columns
+    client.replace_all_queue_entries(
+        [{"issue_number": 300, "collected_state": "new_entry"}]
+    )
+    new_entries = client.load_all_queue_entries()
+    entry_300 = next((e for e in new_entries if e["issue_number"] == 300), None)
+    assert entry_300 is not None
+    assert entry_300["collected_state"] == "new_entry"
 
 
 def test_queue_entry_persists_across_connections(tmp_path):
@@ -265,7 +240,7 @@ def test_queue_entry_persists_across_connections(tmp_path):
     client = SQLiteClient(db_path=str(db_path))
 
     client.replace_all_queue_entries(
-        [{"issue_number": 777, "collected_state": "persisted", "retry_count": 0}]
+        [{"issue_number": 777, "collected_state": "persisted"}]
     )
 
     with sqlite3.connect(str(db_path)) as conn:
@@ -297,9 +272,7 @@ def test_queue_operations_persist_across_connections(tmp_path):
         )
 
     client.remove_queue_entry(1)
-    client.replace_all_queue_entries(
-        [{"issue_number": 3, "collected_state": "three", "retry_count": 0}]
-    )
+    client.replace_all_queue_entries([{"issue_number": 3, "collected_state": "three"}])
 
     with sqlite3.connect(str(db_path)) as conn:
         rows = conn.execute(
