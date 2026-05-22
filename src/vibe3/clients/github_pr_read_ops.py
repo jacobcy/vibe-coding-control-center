@@ -171,7 +171,7 @@ class PRReadMixin:
         )
 
     def list_all_prs(
-        self: Any, state: str = "open", limit: int = 100
+        self: Any, state: str = "open", limit: int = 100, *, repo: str | None = None
     ) -> list[PRResponse]:
         """List all PRs in repository without branch filter.
 
@@ -181,18 +181,17 @@ class PRReadMixin:
         Args:
             state: PR state filter (open, closed, merged, all)
             limit: Maximum number of PRs to return
+            repo: Optional repository in owner/repo format
 
         Returns:
-            List of PR objects with all fields
-
-        Raises:
-            subprocess.CalledProcessError: If gh command fails
+            List of PR objects with all fields, or empty list on failure
         """
         logger.bind(
             external="github",
             operation="list_all_prs",
             state=state,
             limit=limit,
+            repo=repo,
         ).debug("Calling GitHub API: list_all_prs (batch query)")
 
         cmd = [
@@ -206,11 +205,35 @@ class PRReadMixin:
             "--json",
             "number,title,state,isDraft,url,headRefName,baseRefName,mergedAt",
         ]
+        if repo:
+            cmd.extend(["--repo", repo])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except FileNotFoundError:
+            logger.bind(external="github", repo=repo).warning(
+                "GitHub CLI (gh) not found, returning empty PR list"
+            )
+            return []
+
+        if result.returncode != 0:
+            logger.bind(external="github", repo=repo, stderr=result.stderr).warning(
+                "Failed to list PRs, returning empty list"
+            )
+            return []
 
         # Parse PR list from output
-        prs_data = json.loads(result.stdout.strip())
+        try:
+            prs_data = json.loads(result.stdout.strip())
+        except json.JSONDecodeError as e:
+            logger.bind(
+                external="github",
+                repo=repo,
+                error=str(e),
+                stdout_preview=result.stdout[:100],
+            ).warning("Failed to parse PR list JSON, returning empty list")
+            return []
+
         prs = []
         for pr_data in prs_data:
             prs.append(
@@ -242,17 +265,26 @@ class PRReadMixin:
         return prs
 
     def list_prs_for_branch(
-        self: Any, branch: str, *, state: str | None = None
+        self: Any, branch: str, *, state: str | None = None, repo: str | None = None
     ) -> list[PRResponse]:
         """List PRs for a specific branch.
 
         Note: For querying multiple branches, prefer list_all_prs()
         for batch optimization (1 API call instead of N).
+
+        Args:
+            branch: Branch name to query
+            state: Optional PR state filter
+            repo: Optional repository in owner/repo format
+
+        Returns:
+            List of PR responses, or empty list on failure
         """
         logger.bind(
             external="github",
             operation="list_prs_for_branch",
             branch=branch,
+            repo=repo,
         ).debug("Calling GitHub API: list_prs")
 
         cmd = [
@@ -266,11 +298,36 @@ class PRReadMixin:
         ]
         if state:
             cmd.extend(["--state", state])
+        if repo:
+            cmd.extend(["--repo", repo])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except FileNotFoundError:
+            logger.bind(external="github", branch=branch, repo=repo).warning(
+                "GitHub CLI (gh) not found, returning empty PR list"
+            )
+            return []
+
+        if result.returncode != 0:
+            logger.bind(
+                external="github", branch=branch, repo=repo, stderr=result.stderr
+            ).warning("Failed to list PRs for branch, returning empty list")
+            return []
 
         # Parse PR list from output
-        prs_data = json.loads(result.stdout.strip())
+        try:
+            prs_data = json.loads(result.stdout.strip())
+        except json.JSONDecodeError as e:
+            logger.bind(
+                external="github",
+                branch=branch,
+                repo=repo,
+                error=str(e),
+                stdout_preview=result.stdout[:100],
+            ).warning("Failed to parse PR list JSON for branch, returning empty list")
+            return []
+
         prs = []
         for pr_data in prs_data:
             prs.append(

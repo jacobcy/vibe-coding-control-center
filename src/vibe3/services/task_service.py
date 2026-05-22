@@ -9,7 +9,6 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_labels import GhIssueLabelPort, IssueLabelPort
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.orchestra_settings import load_orchestra_config
-from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
@@ -367,13 +366,12 @@ class TaskService:
                 github_client=cast(GitHubClientProtocol, self.github_client),
                 store=self.store,
             ).get_branch_pr_status(branch)
-        except GitError as exc:
+        except Exception as exc:
             logger.bind(
                 domain="task",
                 action="get_branch_pr",
                 branch=branch,
-                error=str(exc),
-            ).warning(f"Failed to query PRs for superseded task flow: {exc}")
+            ).exception(f"Failed to query PRs for superseded task flow: {exc}")
             return None
         return pr
 

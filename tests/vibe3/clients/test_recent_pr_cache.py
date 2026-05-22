@@ -15,8 +15,11 @@ class MockGitHubClient:
     def __init__(self, prs: list[PRResponse]) -> None:
         self.prs = prs
 
-    def list_all_prs(self, state: str = "all", limit: int = 50) -> list[PRResponse]:
+    def list_all_prs(
+        self, state: str = "all", limit: int = 50, *, repo: str | None = None
+    ) -> list[PRResponse]:
         assert state == "all"
+        _ = repo
         return self.prs[:limit]
 
 

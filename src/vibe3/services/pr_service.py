@@ -172,51 +172,62 @@ class PRService:
         refresh: bool = True,
         max_age_minutes: int = 10,
         limit: int = 50,
+        repo: str | None = None,
         sync_context_cache: bool = True,
     ) -> PRResponse | None:
-        """Return branch PR status from recent cache, with direct fallback on miss."""
-        cache = (
-            self.refresh_recent_pr_cache(
-                force=False,
-                limit=limit,
-                max_age_minutes=max_age_minutes,
-                sync_context_cache=sync_context_cache,
+        """Return branch PR status from recent cache, with direct fallback on miss.
+
+        When repo is provided, bypass cache entirely since the local cache
+        is scoped to the current git checkout and may return PRs from the
+        wrong repository for the same branch name.
+        """
+        # Cross-repo queries bypass cache entirely to avoid wrong-repo hits
+        if repo is None:
+            cache = (
+                self.refresh_recent_pr_cache(
+                    force=False,
+                    limit=limit,
+                    max_age_minutes=max_age_minutes,
+                    sync_context_cache=sync_context_cache,
+                )
+                if refresh
+                else self._recent_pr_cache_map
             )
-            if refresh
-            else self._recent_pr_cache_map
-        )
-        pr = cache.get(branch)
-        if pr is not None:
-            return pr
+            pr = cache.get(branch)
+            if pr is not None:
+                return pr
 
         try:
-            prs = self.github_client.list_prs_for_branch(branch, state="all")
+            prs = self.github_client.list_prs_for_branch(branch, state="all", repo=repo)
         except Exception:
             return None
         if not prs:
             return None
 
         pr = prs[0]
-        self.recent_pr_cache.upsert_branch_pr(
-            branch,
-            {
-                "number": pr.number,
-                "title": pr.title,
-                "state": pr.state.value,
-                "draft": pr.draft,
-                "url": pr.url,
-                "head_branch": pr.head_branch,
-                "base_branch": pr.base_branch,
-                "merged_at": (
-                    pr.merged_at.isoformat()
-                    if isinstance(pr.merged_at, datetime)
-                    else pr.merged_at
-                ),
-            },
-        )
-        self._recent_pr_cache_map[branch] = pr
-        if sync_context_cache:
-            self._sync_branch_context_cache({branch: pr})
+        # Only update local cache when querying the current repo (no repo override)
+        # to avoid polluting cache with PRs from other repositories
+        if repo is None:
+            self.recent_pr_cache.upsert_branch_pr(
+                branch,
+                {
+                    "number": pr.number,
+                    "title": pr.title,
+                    "state": pr.state.value,
+                    "draft": pr.draft,
+                    "url": pr.url,
+                    "head_branch": pr.head_branch,
+                    "base_branch": pr.base_branch,
+                    "merged_at": (
+                        pr.merged_at.isoformat()
+                        if isinstance(pr.merged_at, datetime)
+                        else pr.merged_at
+                    ),
+                },
+            )
+            self._recent_pr_cache_map[branch] = pr
+            if sync_context_cache:
+                self._sync_branch_context_cache({branch: pr})
         return pr
 
     def get_open_pr_for_branch(
