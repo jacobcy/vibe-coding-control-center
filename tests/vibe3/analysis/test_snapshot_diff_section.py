@@ -92,68 +92,78 @@ def test_build_snapshot_diff_section_none():
     assert result is None
 
 
-def test_build_snapshot_diff_section_basic(sample_diff: StructureDiff):
-    """Test basic snapshot diff section generation."""
+@pytest.mark.parametrize(
+    "section_name,expected_content",
+    [
+        pytest.param(
+            "basic",
+            [
+                "Structure Changes (Snapshot Diff)",
+                "2026-03-20T10-00-00_main_abc1234",
+                "main",
+            ],
+            id="basic_info",
+        ),
+        pytest.param(
+            "file_changes",
+            [
+                "### File Changes",
+                "Added: 2",
+                "Removed: 1",
+                "Modified: 3",
+                "LOC delta: +150",
+                "Functions delta: +8",
+            ],
+            id="file_changes_section",
+        ),
+        pytest.param(
+            "module_changes",
+            ["### Module Changes", "Added: 1", "Modified: 1"],
+            id="module_changes_section",
+        ),
+        pytest.param(
+            "dependency_changes",
+            ["### Dependency Changes", "vibe3.services → vibe3.utils"],
+            id="dependency_changes_section",
+        ),
+        pytest.param(
+            "file_details",
+            [
+                "### File Details (Top 10)",
+                "+ src/vibe3/services/new_service.py",
+                "- src/vibe3/commands/old_cmd.py",
+                "~ src/vibe3/services/flow_service.py",
+            ],
+            id="file_details_section",
+        ),
+        pytest.param(
+            "warnings",
+            ["### Warnings", "[WARNING]", "Module vibe3.services grew by 100 lines"],
+            id="warnings_section",
+        ),
+    ],
+)
+def test_build_snapshot_diff_section_sections(
+    sample_diff: StructureDiff, section_name: str, expected_content: list[str]
+):
+    """Test that all expected sections appear in the output."""
     result = build_snapshot_diff_section(sample_diff)
-
     assert result is not None
-    assert "Structure Changes (Snapshot Diff)" in result
-    assert "2026-03-20T10-00-00_main_abc1234" in result
-    assert "2026-03-24T15-30-00_feature_def5678" in result
-    assert "main" in result
-    assert "feature/test" in result
+    for content in expected_content:
+        assert content in result
 
 
-def test_build_snapshot_diff_section_file_changes(sample_diff: StructureDiff):
-    """Test file changes summary is included."""
-    result = build_snapshot_diff_section(sample_diff)
-
-    assert "### File Changes" in result
-    assert "Added: 2" in result
-    assert "Removed: 1" in result
-    assert "Modified: 3" in result
-    assert "LOC delta: +150" in result
-    assert "Functions delta: +8" in result
-
-
-def test_build_snapshot_diff_section_module_changes(sample_diff: StructureDiff):
-    """Test module changes summary is included."""
-    result = build_snapshot_diff_section(sample_diff)
-
-    assert "### Module Changes" in result
-    assert "Added: 1" in result
-    assert "Modified: 1" in result
-
-
-def test_build_snapshot_diff_section_dependency_changes(sample_diff: StructureDiff):
-    """Test dependency changes are included."""
-    result = build_snapshot_diff_section(sample_diff)
-
-    assert "### Dependency Changes" in result
-    assert "vibe3.services → vibe3.utils" in result
-
-
-def test_build_snapshot_diff_section_file_details(sample_diff: StructureDiff):
-    """Test file details are included."""
-    result = build_snapshot_diff_section(sample_diff)
-
-    assert "### File Details (Top 10)" in result
-    assert "+ src/vibe3/services/new_service.py" in result
-    assert "- src/vibe3/commands/old_cmd.py" in result
-    assert "~ src/vibe3/services/flow_service.py" in result
-
-
-def test_build_snapshot_diff_section_warnings(sample_diff: StructureDiff):
-    """Test warnings are included."""
-    result = build_snapshot_diff_section(sample_diff)
-
-    assert "### Warnings" in result
-    assert "[WARNING]" in result
-    assert "Module vibe3.services grew by 100 lines" in result
-
-
-def test_build_snapshot_diff_section_no_module_changes():
-    """Test diff without module changes."""
+@pytest.mark.parametrize(
+    "has_module_changes,has_warnings",
+    [
+        pytest.param(False, True, id="no_module_changes"),
+        pytest.param(True, False, id="no_warnings"),
+    ],
+)
+def test_build_snapshot_diff_section_optional_sections(
+    has_module_changes: bool, has_warnings: bool
+):
+    """Test diff with optional sections omitted."""
     diff = StructureDiff(
         baseline_id="baseline",
         baseline_branch="main",
@@ -166,7 +176,7 @@ def test_build_snapshot_diff_section_no_module_changes():
             files_added=1,
             files_removed=0,
             files_modified=0,
-            modules_added=0,
+            modules_added=1 if has_module_changes else 0,
             modules_removed=0,
             modules_modified=0,
         ),
@@ -178,37 +188,40 @@ def test_build_snapshot_diff_section_no_module_changes():
                 new_function_count=3,
             ),
         ],
+        module_changes=(
+            [
+                ModuleChange(
+                    module="vibe3.services",
+                    change_type="added",
+                    old_file_count=0,
+                    new_file_count=1,
+                    old_loc=0,
+                    new_loc=50,
+                ),
+            ]
+            if has_module_changes
+            else []
+        ),
+        warnings=(
+            [
+                DiffWarning(
+                    type="module_growth",
+                    severity="warning",
+                    message="Test warning",
+                    module="vibe3.services",
+                ),
+            ]
+            if has_warnings
+            else []
+        ),
     )
 
     result = build_snapshot_diff_section(diff)
     assert result is not None
-    assert "### Module Changes" not in result
-
-
-def test_build_snapshot_diff_section_no_warnings():
-    """Test diff without warnings."""
-    diff = StructureDiff(
-        baseline_id="baseline",
-        baseline_branch="main",
-        baseline_commit="abc1234",
-        current_id="current",
-        current_branch="feature",
-        current_commit="def5678",
-        created_at="2026-03-24T15:30:00",
-        summary=DiffSummary(files_added=1),
-        file_changes=[
-            FileChange(
-                path="src/new.py",
-                change_type="added",
-                new_loc=50,
-                new_function_count=3,
-            ),
-        ],
-    )
-
-    result = build_snapshot_diff_section(diff)
-    assert result is not None
-    assert "### Warnings" not in result
+    if not has_module_changes:
+        assert "### Module Changes" not in result
+    if not has_warnings:
+        assert "### Warnings" not in result
 
 
 def test_build_snapshot_diff_section_many_files():

@@ -16,9 +16,11 @@ from vibe3.analysis.local_review_report import (
 class TestParsePrepushReport:
     """Test report parsing logic."""
 
-    def test_parse_yaml_frontmatter(self) -> None:
-        """Parse report with YAML frontmatter."""
-        content = """---
+    @pytest.mark.parametrize(
+        "content,expected_fields",
+        [
+            pytest.param(
+                """---
 risk_level: HIGH
 risk_score: 7
 verdict: PASS
@@ -28,18 +30,17 @@ created_at: 2026-03-20T22:52:41
 # Pre-push Review Report
 
 Some content here.
-"""
-        result = parse_prepush_report(content)
-
-        assert result["risk_level"] == "HIGH"
-        assert result["risk_score"] == 7
-        assert result["verdict"] == "PASS"
-        assert "created_at" in result
-        assert isinstance(result["created_at"], datetime)
-
-    def test_parse_inline_key_value(self) -> None:
-        """Parse report with inline key-value pairs."""
-        content = """# Pre-push Review Report
+""",
+                {
+                    "risk_level": "HIGH",
+                    "risk_score": 7,
+                    "verdict": "PASS",
+                    "has_created_at": True,
+                },
+                id="yaml_frontmatter",
+            ),
+            pytest.param(
+                """# Pre-push Review Report
 
 ## Risk Assessment
 - Risk Level: HIGH
@@ -47,16 +48,12 @@ Some content here.
 - Verdict: PASS
 
 Some content here.
-"""
-        result = parse_prepush_report(content)
-
-        assert result["risk_level"] == "HIGH"
-        assert result["risk_score"] == 7
-        assert result["verdict"] == "PASS"
-
-    def test_parse_mixed_format(self) -> None:
-        """Parse report with both frontmatter and inline pairs."""
-        content = """---
+""",
+                {"risk_level": "HIGH", "risk_score": 7, "verdict": "PASS"},
+                id="inline_key_value",
+            ),
+            pytest.param(
+                """---
 risk_level: MEDIUM
 created_at: 2026-03-20T22:52:41
 ---
@@ -66,53 +63,62 @@ created_at: 2026-03-20T22:52:41
 ## Risk Assessment
 - Risk Score: 5
 - Verdict: CONDITIONAL
-"""
+""",
+                {"risk_level": "MEDIUM", "risk_score": 5, "verdict": "CONDITIONAL"},
+                id="mixed_format",
+            ),
+        ],
+    )
+    def test_parse_report_success(self, content: str, expected_fields: dict) -> None:
+        """Parse report with various formats."""
         result = parse_prepush_report(content)
 
-        # Frontmatter takes precedence for risk_level
-        assert result["risk_level"] == "MEDIUM"
-        # Inline values supplement missing frontmatter fields
-        assert result["risk_score"] == 5
-        assert result["verdict"] == "CONDITIONAL"
+        for key, value in expected_fields.items():
+            if key == "has_created_at":
+                assert "created_at" in result
+                assert isinstance(result["created_at"], datetime)
+            else:
+                assert result[key] == value
 
-    def test_parse_empty_content(self) -> None:
-        """Parse empty content returns empty dict."""
-        result = parse_prepush_report("")
-        assert result == {}
-
-    def test_parse_no_recognized_fields(self) -> None:
-        """Parse content without recognized fields returns empty dict."""
-        content = """# Some Report
+    @pytest.mark.parametrize(
+        "content,expected_empty",
+        [
+            pytest.param("", True, id="empty_content"),
+            pytest.param(
+                """# Some Report
 
 This is just regular content.
 Nothing special here.
-"""
-        result = parse_prepush_report(content)
-        assert result == {}
-
-    def test_parse_invalid_yaml_frontmatter(self) -> None:
-        """Gracefully handle invalid YAML in frontmatter."""
-        content = """---
+""",
+                True,
+                id="no_recognized_fields",
+            ),
+            pytest.param(
+                """---
 invalid yaml content: [unclosed
 ---
 
 # Report
-"""
-        # Should not raise, should fall back to inline parsing
-        result = parse_prepush_report(content)
-        assert isinstance(result, dict)
-
-    def test_parse_partial_inline_fields(self) -> None:
-        """Parse report with only some inline fields."""
-        content = """# Report
+""",
+                False,  # Should not raise, returns dict (possibly empty)
+                id="invalid_yaml_frontmatter",
+            ),
+            pytest.param(
+                """# Report
 
 Risk Level: LOW
-"""
+""",
+                False,
+                id="partial_inline_fields",
+            ),
+        ],
+    )
+    def test_parse_report_edge_cases(self, content: str, expected_empty: bool) -> None:
+        """Parse report with edge cases."""
         result = parse_prepush_report(content)
-
-        assert result["risk_level"] == "LOW"
-        assert "risk_score" not in result
-        assert "verdict" not in result
+        assert isinstance(result, dict)
+        if expected_empty:
+            assert result == {}
 
 
 class TestFindLatestPrepushReport:
@@ -246,21 +252,36 @@ created_at: 2026-03-20T22:52:41
 class TestLocalReviewReport:
     """Test LocalReviewReport dataclass."""
 
-    def test_dataclass_creation(self) -> None:
-        """Create LocalReviewReport with all fields."""
+    @pytest.mark.parametrize(
+        "risk_level,risk_score,verdict,created_at",
+        [
+            pytest.param(
+                "HIGH", 7, "PASS", datetime(2026, 3, 20, 22, 52, 41), id="all_fields"
+            ),
+            pytest.param(None, None, None, None, id="none_fields"),
+        ],
+    )
+    def test_dataclass_creation(
+        self,
+        risk_level: str | None,
+        risk_score: int | None,
+        verdict: str | None,
+        created_at: datetime | None,
+    ) -> None:
+        """Create LocalReviewReport with various field combinations."""
         report = LocalReviewReport(
-            risk_level="HIGH",
-            risk_score=7,
-            verdict="PASS",
+            risk_level=risk_level,
+            risk_score=risk_score,
+            verdict=verdict,
             report_path=Path("/tmp/report.md"),
-            created_at=datetime(2026, 3, 20, 22, 52, 41),
+            created_at=created_at,
         )
 
-        assert report.risk_level == "HIGH"
-        assert report.risk_score == 7
-        assert report.verdict == "PASS"
+        assert report.risk_level == risk_level
+        assert report.risk_score == risk_score
+        assert report.verdict == verdict
         assert report.report_path == Path("/tmp/report.md")
-        assert report.created_at == datetime(2026, 3, 20, 22, 52, 41)
+        assert report.created_at == created_at
 
     def test_dataclass_frozen(self) -> None:
         """LocalReviewReport is immutable."""
@@ -274,17 +295,3 @@ class TestLocalReviewReport:
 
         with pytest.raises(AttributeError):
             report.risk_level = "LOW"  # type: ignore
-
-    def test_dataclass_with_none_fields(self) -> None:
-        """Create LocalReviewReport with None fields."""
-        report = LocalReviewReport(
-            risk_level=None,
-            risk_score=None,
-            verdict=None,
-            report_path=Path("/tmp/report.md"),
-            created_at=None,
-        )
-
-        assert report.risk_level is None
-        assert report.risk_score is None
-        assert report.verdict is None

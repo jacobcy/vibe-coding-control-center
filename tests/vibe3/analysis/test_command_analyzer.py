@@ -1,36 +1,36 @@
 """Tests for command analyzer call tree building."""
 
+import pytest
+
 from vibe3.analysis.command_analyzer import (
     _calculate_max_depth,
     should_expand,
 )
 
 
-def test_should_expand_service_calls() -> None:
-    """Test that service calls should be expanded."""
-    assert should_expand("service.get_pr") is True
-    assert should_expand("service.create_draft") is True
-
-
-def test_should_expand_client_calls() -> None:
-    """Test that client calls should be expanded."""
-    assert should_expand("client.get_current_branch") is True
-    assert should_expand("github_client.get_pr") is True
-
-
-def test_should_not_expand_builtin() -> None:
-    """Test that builtin calls should not be expanded."""
-    assert should_expand("logger.info") is False
-    assert should_expand("print") is False
-    assert should_expand("len") is False
-    assert should_expand("str") is False
-    assert should_expand("typer.echo") is False
-
-
-def test_should_not_expand_json_yaml() -> None:
-    """Test that json/yaml calls should not be expanded."""
-    assert should_expand("json.dumps") is False
-    assert should_expand("yaml.dump") is False
+@pytest.mark.parametrize(
+    "call_name,expected",
+    [
+        # Service calls - should expand
+        pytest.param("service.get_pr", True, id="service_call"),
+        pytest.param("service.create_draft", True, id="service_call_2"),
+        # Client calls - should expand
+        pytest.param("client.get_current_branch", True, id="client_call"),
+        pytest.param("github_client.get_pr", True, id="github_client_call"),
+        # Builtin calls - should not expand
+        pytest.param("logger.info", False, id="logger"),
+        pytest.param("print", False, id="print"),
+        pytest.param("len", False, id="len"),
+        pytest.param("str", False, id="str"),
+        pytest.param("typer.echo", False, id="typer_echo"),
+        # JSON/YAML calls - should not expand
+        pytest.param("json.dumps", False, id="json_dumps"),
+        pytest.param("yaml.dump", False, id="yaml_dump"),
+    ],
+)
+def test_should_expand(call_name: str, expected: bool) -> None:
+    """Test should_expand with various call patterns."""
+    assert should_expand(call_name) is expected
 
 
 def test_calculate_max_depth_empty() -> None:
