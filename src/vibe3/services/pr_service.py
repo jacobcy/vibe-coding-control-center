@@ -175,20 +175,27 @@ class PRService:
         repo: str | None = None,
         sync_context_cache: bool = True,
     ) -> PRResponse | None:
-        """Return branch PR status from recent cache, with direct fallback on miss."""
-        cache = (
-            self.refresh_recent_pr_cache(
-                force=False,
-                limit=limit,
-                max_age_minutes=max_age_minutes,
-                sync_context_cache=sync_context_cache,
+        """Return branch PR status from recent cache, with direct fallback on miss.
+
+        When repo is provided, bypass cache entirely since the local cache
+        is scoped to the current git checkout and may return PRs from the
+        wrong repository for the same branch name.
+        """
+        # Cross-repo queries bypass cache entirely to avoid wrong-repo hits
+        if repo is None:
+            cache = (
+                self.refresh_recent_pr_cache(
+                    force=False,
+                    limit=limit,
+                    max_age_minutes=max_age_minutes,
+                    sync_context_cache=sync_context_cache,
+                )
+                if refresh
+                else self._recent_pr_cache_map
             )
-            if refresh
-            else self._recent_pr_cache_map
-        )
-        pr = cache.get(branch)
-        if pr is not None:
-            return pr
+            pr = cache.get(branch)
+            if pr is not None:
+                return pr
 
         try:
             prs = self.github_client.list_prs_for_branch(branch, state="all", repo=repo)
