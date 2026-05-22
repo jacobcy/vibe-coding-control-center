@@ -157,6 +157,122 @@ class CheckService(CheckRemote):
         except Exception:
             return None
 
+    def _parse_issue_number_from_branch(self, branch: str) -> int | None:
+        """Extract issue number from task/issue-N branch pattern.
+
+        Args:
+            branch: Branch name (e.g., "task/issue-456")
+
+        Returns:
+            Issue number or None if not a task branch
+        """
+        import re
+
+        match = re.fullmatch(r"^task/issue-(\d+)$", branch)
+        return int(match.group(1)) if match else None
+
+    def _block_issue_for_pr_closed(self, branch: str, pr_number: int) -> None:
+        """Block issue when PR closed without merge.
+
+        Calls standard FlowService.block_flow() to ensure flow state
+        and issue state are synchronized, then adds guidance comment.
+
+        Args:
+            branch: Branch name (e.g., "task/issue-456")
+            pr_number: Closed PR number
+        """
+        # Find task issue from flow
+        issue_links = self.store.get_issue_links(branch)
+        task_issue_number: int | None = None
+        for link in issue_links:
+            if link.get("issue_role") == "task":
+                task_issue_number = link.get("issue_number")
+                if isinstance(task_issue_number, int):
+                    break
+
+        if not task_issue_number:
+            logger.bind(
+                domain="check",
+                action="block_pr_closed",
+                branch=branch,
+            ).debug("No task issue linked, skipping issue blocking")
+            return
+
+        # Check if issue already closed
+        gh_issue = self.github_client.view_issue(task_issue_number)
+        if isinstance(gh_issue, dict):
+            issue_state = str(gh_issue.get("state", "")).upper()
+            if issue_state == "CLOSED":
+                logger.bind(
+                    domain="check",
+                    action="block_pr_closed",
+                    branch=branch,
+                    issue_number=task_issue_number,
+                ).info(f"Issue #{task_issue_number} already closed, skip blocking")
+                return
+
+        # Use standard block_flow method to block the flow
+        # This will transition issue state to BLOCKED via LabelService
+        from vibe3.services.flow_service import FlowService
+
+        flow_service = FlowService(
+            store=self.store,
+            git_client=self.git_client,
+        )
+
+        block_reason = f"PR #{pr_number} 已关闭（未合并），需要评估后续处理方案"
+
+        try:
+            flow_service.block_flow(
+                branch=branch,
+                reason=block_reason,
+                actor="vibe:check",
+            )
+
+            logger.bind(
+                domain="check",
+                action="block_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).info(f"Blocked issue #{task_issue_number} for closed PR #{pr_number}")
+        except Exception as exc:
+            logger.bind(
+                domain="check",
+                action="block_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).warning(f"Failed to block flow: {exc}")
+            # Continue to add comment even if blocking failed
+
+        # Add guidance comment
+        comment_body = f"""PR #{pr_number} 已关闭（未合并）。
+
+**建议方案：**
+
+1. **关闭此 issue** - 如果需求已不再需要或已被其他方式解决
+2. **创建 follow-up issue** - 如果需要继续开发，建议创建新 issue 重新规划
+3. **评估 scope 变化** - 根据最新代码确定是否需要调整范围
+
+**恢复执行选项：**
+
+- `vibe task resume --label ready` - 恢复执行（建议先评估 scope）
+- `vibe check --clean-branch` - 清理旧 flow 并重新开始
+
+**注意：** 不建议在已关闭 PR 的基础上继续开发。"""
+
+        try:
+            self.github_client.add_comment(
+                task_issue_number,
+                comment_body,
+            )
+        except Exception as exc:
+            logger.bind(
+                domain="check",
+                action="block_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).warning(f"Failed to add comment: {exc}")
+
     def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
         """Handle PR state changes detected during check.
 
@@ -189,6 +305,10 @@ class CheckService(CheckRemote):
                 f"PR #{pr.number} closed without merge (detected from GitHub)",
             )
             self._update_pr_cache(branch, pr)
+
+            # Block issue with guidance comment
+            self._block_issue_for_pr_closed(branch, pr.number)
+
             return CheckResult(is_valid=True, branch=branch, issues=result_issues)
 
         return None
