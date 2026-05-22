@@ -49,8 +49,8 @@ Flow 生命周期涉及三个真源：
 
 ```
 new → active → blocked → active (恢复)
-           ↓         ↓
-         done      failed → blocked
+           ↓    ↘    ↓
+         done  stale  failed → blocked (业务错误)
            ↓
         aborted
 ```
@@ -136,53 +136,105 @@ Manager 创建 flow
 
 ## 4. 阻塞与恢复
 
-### 4.1 阻塞场景
+### 4.1 阻塞 API：`FlowService.block_flow()`
 
-**场景 1：手动阻塞**
-- Manager 标记 `blocked_reason` 字段
-- Issue label 自动转为 `state/blocked`
-- **保留现场**：worktree/branch/flow 记录
+阻塞 flow 的标准入口：
 
-**场景 2：依赖阻塞**
-- Issue 链接表标记 `issue_role = 'dependency'`
-- Orchestra 自动巡逻依赖状态
-- 依赖满足后自动恢复
-
-### 4.2 手动恢复
-
-**情况 A：现场值得保留**（--label）
-```bash
-vibe3 task resume --label ready <issue_number>
-```
-
-流程：
 ```python
-_clear_flow_reasons(branch)  # 清除 blocked_reason
-resume_issue(..., to_state=READY)
-# ✅ 不删除 worktree/branch/flow
+def block_flow(
+    self,
+    branch: str,
+    reason: str | None = None,
+    blocked_by_issue: int | None = None,
+    actor: str | None = None,
+    repo: str | None = None,
+    event_type: str = "flow_blocked",
+) -> None
 ```
 
-**情况 B：现场不值得保留**
-```bash
-vibe3 task resume <issue_number>
-```
+**副作用**（原子执行）：
 
-流程：
+1. SQLite：写入 `flow_state.blocked_by_issue`，可选写入 `blocked_reason`
+2. GitHub：task issue label 转为 `state/blocked`
+3. 若提供 `blocked_by_issue`：写入 `flow_issue_links(role='dependency')`
+4. Event：写入 `flow_blocked` 事件
+
+### 4.2 何时使用 block vs abort vs stale
+
+| 场景 | 动作 | API | 恢复路径 |
+|------|------|-----|----------|
+| 派发失败 | `block_flow(reason=...)` | `block_flow()` | `task resume` 或自动解封 |
+| Health check 失败 | `block_flow(reason=...)` | `block_flow()` | `task resume` |
+| 依赖未满足 | `block_flow(blocked_by_issue=N)` | `block_flow()` | 依赖 issue 关闭后自动解封 |
+| 手动阻塞 | `block_flow(reason=..., actor=...)` | `block_flow()` | 仅 `task resume` |
+| Issue 关闭 / Branch 丢失 | `mark_flow_aborted()` | `mark_flow_aborted()` | 无恢复（终端状态） |
+| 空 ready flow / 孤儿 flow | `mark_flow_stale()` | `mark_flow_stale()` | Governance 重建 ready flow |
+
+### 4.3 Abort API：`mark_flow_aborted()`
+
 ```python
-resume_blocked_issue_to_ready(...)
-reset_task_scene(branch)  # 清理物理资源
+def mark_flow_aborted(self, branch: str, reason: str) -> None
 ```
 
-### 4.3 自动恢复（依赖满足）
+- **终端状态**：flow 状态标记为 `aborted`
+- **软删除**：由下游 `vibe3 check --clean-branch` → `cleanup_flow_scene` → `soft_delete_flow()` 处理
+- **事件类型**：`flow_auto_aborted`
+- **GitHub label 处理**：⚠️ 当前实现未显式处理 task issue label 变更（实现缺口）
+- **恢复**：下一轮 collect 不会重新拾取（issue 已 closed）；若 issue 重新打开，由 health check 处理
 
-见 [glossary.md](glossary.md) §3.4.2 dependency 机制。
+### 4.4 Stale API：`mark_flow_stale()`
 
-**恢复目标推断**：见 `flow_resume_resolver.py`。
-1. 有 pr_ref → HANDOFF
-2. 有 audit_ref → IN_PROGRESS 或 HANDOFF
-3. 有 report_ref → REVIEW
-4. 有 plan_ref → IN_PROGRESS
-5. 默认 → CLAIMED
+```python
+def mark_flow_stale(self, branch: str, reason: str) -> None
+```
+
+- **等待状态**：flow 等待 issue 状态变更或 ready flow 重建
+- **事件类型**：`flow_auto_staled`
+- **GitHub label 处理**：⚠️ 当前实现未显式处理 task issue label 变更（实现缺口）
+- **恢复**：由 governance 机制重建 ready flow 后恢复
+
+### 4.5 阻塞原因区分：`blocked_reason` vs `blocked_by_issue` vs dependency links
+
+三个概念各有明确语义，不可混用：
+
+- **`blocked_reason`**：手动阻塞信号 — 在 QualifyGate 中**阻止自动解封**
+- **`blocked_by_issue`**：主要阻塞 issue 的快捷显示字段（不是完整依赖集合）
+- **`flow_issue_links(role='dependency')`**：完整依赖集合的**真源**
+
+**关键规则**：`--reason` 和 `--task`（`blocked_by_issue`）在当前行为中实质互斥。
+
+原因：`blocked_reason` 的存在会导致 QualifyGate 将 flow 视为手动阻塞，优先级高于依赖自动解封。即使同时指定 `--reason` 和 `--task`，`blocked_reason` 也会阻止依赖自动解封生效。
+
+### 4.6 Qualify Gate 在 blocked 恢复中的角色
+
+QualifyGate 通过 `CoordinationTruth.is_blocked` 判断阻塞状态，其真源为 issue body projection 而非仅本地 DB。
+
+**决策流程**：
+
+1. **`resolve_coordination`** — 合并 remote issue body + local DB 出 `CoordinationTruth`
+2. **`is_blocked` 综合判断** — 任一为真即 blocked：`projection_state == 'blocked'` OR `blocked_reason` OR `blocked_by_issue`
+3. **若 blocked** → `_align_blocked_state` 并跳过（不继续后续检查）
+4. **若 NOT blocked 但 local/label stale** → `_auto_resume_blocked`（清除 local blocked 缓存，移除 label）
+5. **通过后运行 `_check_dependencies`** — 结构检查（非恢复判定）
+
+**自动解封副作用**（由 `_auto_resume_blocked` 执行）：
+
+- 清除 `blocked_by_issue`、`blocked_reason`
+- 写入 `flow_unblocked` 事件
+- 推断恢复目标 label（`infer_resume_label`），恢复 task issue label
+
+### 4.7 各状态转换的 GitHub Label 管理
+
+| 转换 | Flow Status 变更 | GitHub Label 变更 | 备注 |
+|------|------------------|-------------------|------|
+| → blocked | active → blocked | 当前 label → `state/blocked` | `block_flow()` 自动处理 |
+| blocked → active（自动） | blocked → active | `state/blocked` → 推断目标 label | QualifyGate 处理 |
+| blocked → active（手动） | blocked → active | `state/blocked` → 用户指定 label | `task resume` 处理 |
+| → done | active → done | 无需处理（issue 自动关闭） | PR merged 触发 |
+| → aborted | * → aborted | ⚠️ 未显式处理 | **实现缺口** |
+| → stale | active → stale | ⚠️ 未显式处理 | **实现缺口** |
+
+**实现缺口说明**：`mark_flow_aborted()` 和 `mark_flow_stale()` 当前未在方法内显式管理 task issue label。对于 aborted，后续 `vibe3 check --clean-branch` 的被动清理会恢复 label；对于 stale，依赖 governance 机制在重建 ready flow 时处理。
 
 ## 5. PR 生命周期
 
@@ -568,3 +620,5 @@ store.add_event(
 - [vibe3-role-checks-and-balances-standard.md](vibe3-role-checks-and-balances-standard.md) - 角色权力边界（权威）
 - [v3/data-model-standard.md](v3/data-model-standard.md) - 数据模型（权威）
 - [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md) - 事件驱动架构
+- [vibe3-noop-gate-boundary-standard.md](vibe3-noop-gate-boundary-standard.md) - 阻塞原则与 noop gate 边界
+- [../analysis/flow-blocked-vs-bind-dependency-analysis.md](../analysis/flow-blocked-vs-bind-dependency-analysis.md) - blocked_reason vs dependency 依赖分析
