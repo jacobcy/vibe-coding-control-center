@@ -138,3 +138,44 @@ def test_add_comment_passes_repo():
             if "--repo" in args and "org/repo" in args:
                 found_repo = True
         assert found_repo
+
+
+def test_close_issue_if_open_already_closed(github_client: GitHubClient) -> None:
+    """Issue already closed should return 'already_closed' without calling close."""
+    with (
+        patch.object(github_client, "view_issue", return_value={"state": "closed"}),
+        patch.object(github_client, "close_issue") as mock_close,
+    ):
+        result = github_client.close_issue_if_open(issue_number=123)
+
+        mock_close.assert_not_called()
+        assert result == "already_closed"
+
+
+def test_close_issue_if_open_calls_close_once(github_client: GitHubClient) -> None:
+    """Open issue should call close_issue once and return 'closed'."""
+    with (
+        patch.object(github_client, "view_issue", return_value={"state": "open"}),
+        patch.object(github_client, "close_issue", return_value=True) as mock_close,
+    ):
+        result = github_client.close_issue_if_open(
+            issue_number=123, closing_comment="Task not suitable"
+        )
+
+        mock_close.assert_called_once_with(
+            issue_number=123, comment="Task not suitable", repo=None
+        )
+        assert result == "closed"
+
+
+def test_close_issue_if_open_returns_failure_when_close_fails(
+    github_client: GitHubClient,
+) -> None:
+    """Failed close operation should return 'failed'."""
+    with (
+        patch.object(github_client, "view_issue", return_value={"state": "open"}),
+        patch.object(github_client, "close_issue", return_value=False),
+    ):
+        result = github_client.close_issue_if_open(issue_number=123)
+
+        assert result == "failed"
