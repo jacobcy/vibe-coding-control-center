@@ -123,6 +123,7 @@ wt-*/
 .agent/context/task.md
 .agent/reports/
 .sisyphus/
+.omo/
 docs/audits/
 docs/plans/
 docs/reports/
