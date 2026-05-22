@@ -193,14 +193,22 @@ class SupervisorHandoffConfig(BaseModel):
         return convention.state_label(convention.handoff_label)
 
 
-class ExpiredResourceCleanupConfig(BaseModel):
-    """Configuration for expired resource cleanup service."""
+class PeriodicCheckConfig(BaseModel):
+    """Configuration for periodic consistency checks via vibe3 check.
+
+    Runs two phases on each interval tick:
+    1. Consistency check: PR merged/closed, issue closed, multi-label detection
+    2. Resource cleanup: expired worktrees and branches (if enabled)
+
+    Cleanup is performed by calling execute_expired_resource_cleanup directly
+    with the configuration flags below.
+    """
 
     enabled: bool = True
     interval_ticks: int = Field(
         default=10,
         ge=1,
-        description="Run cleanup every N heartbeat ticks (~2.5h at default interval)",
+        description="Run check every N heartbeat ticks (~2.5h at default interval)",
     )
     max_age_days: int = Field(
         default=7, ge=1, description="Max age in days before cleanup"
@@ -286,9 +294,7 @@ class OrchestraConfig(BaseModel):
     supervisor_handoff: SupervisorHandoffConfig = Field(
         default_factory=SupervisorHandoffConfig
     )
-    expired_resource_cleanup: ExpiredResourceCleanupConfig = Field(
-        default_factory=ExpiredResourceCleanupConfig
-    )
+    periodic_check: PeriodicCheckConfig = Field(default_factory=PeriodicCheckConfig)
     max_retry_budget: int = Field(
         default=3,
         ge=1,

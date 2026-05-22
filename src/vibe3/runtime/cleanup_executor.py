@@ -2,12 +2,12 @@
 
 from loguru import logger
 
-from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+from vibe3.config.orchestra_config import PeriodicCheckConfig
 from vibe3.orchestra.logging import append_orchestra_event
 
 
 async def execute_expired_resource_cleanup(
-    config: ExpiredResourceCleanupConfig,
+    config: PeriodicCheckConfig,
     tick_number: int,
 ) -> None:
     """Execute expired resource cleanup (worktrees, local/remote branches).

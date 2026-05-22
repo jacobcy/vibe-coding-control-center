@@ -276,12 +276,12 @@ def test_no_shutdown_callback_cleanup_still_runs() -> None:
 @pytest.mark.asyncio
 async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
     """Cleanup should trigger on tick number that is a multiple of interval_ticks."""
-    from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+    from vibe3.config.orchestra_config import PeriodicCheckConfig
 
     config = OrchestraConfig(
         polling_interval=1,
         max_concurrent_flows=3,
-        expired_resource_cleanup=ExpiredResourceCleanupConfig(interval_ticks=2),
+        periodic_check=PeriodicCheckConfig(interval_ticks=2),
     )
     server = HeartbeatServer(config)
     svc = _MockService()
@@ -302,7 +302,7 @@ async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
-    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup)
+    monkeypatch.setattr(server, "_run_periodic_check", _mock_cleanup)
     server._running = True
 
     await server._tick_loop()
@@ -320,12 +320,12 @@ async def test_tick_loop_triggers_cleanup_on_interval_tick(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -> None:
     """Cleanup failure should not prevent service dispatch."""
-    from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+    from vibe3.config.orchestra_config import PeriodicCheckConfig
 
     config = OrchestraConfig(
         polling_interval=1,
         max_concurrent_flows=3,
-        expired_resource_cleanup=ExpiredResourceCleanupConfig(interval_ticks=1),
+        periodic_check=PeriodicCheckConfig(interval_ticks=1),
     )
     server = HeartbeatServer(config)
     svc = _MockService()
@@ -348,7 +348,7 @@ async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
-    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup_failure)
+    monkeypatch.setattr(server, "_run_periodic_check", _mock_cleanup_failure)
     server._running = True
 
     await server._tick_loop()
@@ -364,12 +364,12 @@ async def test_tick_loop_cleanup_failure_does_not_affect_services(monkeypatch) -
 @pytest.mark.asyncio
 async def test_tick_loop_skip_cleanup_when_disabled(monkeypatch) -> None:
     """Cleanup should not run when disabled in config."""
-    from vibe3.config.orchestra_config import ExpiredResourceCleanupConfig
+    from vibe3.config.orchestra_config import PeriodicCheckConfig
 
     config = OrchestraConfig(
         polling_interval=1,
         max_concurrent_flows=3,
-        expired_resource_cleanup=ExpiredResourceCleanupConfig(enabled=False),
+        periodic_check=PeriodicCheckConfig(enabled=False),
     )
     server = HeartbeatServer(config)
     svc = _MockService()
@@ -389,7 +389,7 @@ async def test_tick_loop_skip_cleanup_when_disabled(monkeypatch) -> None:
         cleanup_calls.append(tick_number)
 
     monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
-    monkeypatch.setattr(server, "_cleanup_expired_resources", _mock_cleanup)
+    monkeypatch.setattr(server, "_run_periodic_check", _mock_cleanup)
     server._running = True
 
     await server._tick_loop()
