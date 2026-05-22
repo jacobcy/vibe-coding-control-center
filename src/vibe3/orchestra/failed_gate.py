@@ -157,10 +157,7 @@ class FailedGate:
         # Check for CRITICAL errors (immediate block)
         # Use has_model_config_error() for backward compatibility with pre-migration DBs
         if error_tracking.has_model_config_error():
-            error_counts = error_tracking.get_error_counts()
-            critical_errors = [
-                code for code in error_counts.keys() if code.startswith("E_MODEL_")
-            ]
+            critical_errors = error_tracking.get_critical_error_codes()
             log.error(f"CRITICAL errors detected: {critical_errors}")
             return GateResult(
                 blocked=True,

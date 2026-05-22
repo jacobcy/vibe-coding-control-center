@@ -382,7 +382,7 @@ class ExecutionCoordinator:
                 return ExecutionLaunchResult(
                     launched=False,
                     reason=formatted_msg,
-                    reason_code="launch_failed",
+                    reason_code="duplicate_dispatch",
                 )
 
             # Generic error handling for other exceptions
