@@ -185,15 +185,26 @@ class ServeStatusService:
     def _display_error_tracking(self) -> None:
         """Display error tracking status with severity breakdown."""
         error_tracking = ErrorTrackingService.get_instance()
-        error_status = error_tracking.get_status()
+        # Get ALL errors in database (not just windowed)
+        all_errors_status = error_tracking.get_all_errors_status()
+        # Also get windowed status for threshold monitoring
+        windowed_status = error_tracking.get_status()
 
         self.console.print("[bold]Error Tracking:[/bold]")
-        if error_status["total_errors"] > 0:
-            # Show severity-based counts
-            self.console.print(f"  Total errors: {error_status['total_errors']}")
-            self.console.print(f"  - CRITICAL: {error_status['critical_count']}")
-            self.console.print(f"  - ERROR: {error_status['error_count']}")
-            self.console.print(f"  - WARNING: {error_status['warning_count']}")
+        if all_errors_status["total_errors"] > 0:
+            # Show severity-based counts for all errors
+            self.console.print(f"  Total errors: {all_errors_status['total_errors']}")
+            self.console.print(f"  - CRITICAL: {all_errors_status['critical_count']}")
+            self.console.print(f"  - ERROR: {all_errors_status['error_count']}")
+            self.console.print(f"  - WARNING: {all_errors_status['warning_count']}")
+
+            # Show windowed context if there are recent errors
+            if windowed_status["total_errors"] > 0:
+                self.console.print(
+                    f"\n  [dim]Windowed ({windowed_status['time_window_minutes']}min): "
+                    f"{windowed_status['total_errors']} errors "
+                    f"(threshold: {windowed_status['threshold']})[/dim]"
+                )
 
             # Show recent errors
             recent_errors = error_tracking.get_recent_errors(limit=10)
