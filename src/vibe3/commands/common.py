@@ -38,6 +38,10 @@ def trace_scope(
         ...     pass
     """
     if trace:
+        import os
+
+        # Enable method-level tracing
+        os.environ["VIBE3_TRACE"] = "1"
         setup_logging(verbose=2)
         return trace_context(command=command, domain=domain, tier=tier, **kwargs)
     return nullcontext()

@@ -11,9 +11,6 @@ from typing import Any, Callable, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-# 全局 trace 开关（通过环境变量 VIBE3_TRACE 控制）
-_TRACE_ENABLED = os.environ.get("VIBE3_TRACE", "0") == "1"
-
 
 def trace_method(
     name: str,
@@ -41,7 +38,8 @@ def trace_method(
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if not _TRACE_ENABLED:
+            # Check environment variable at runtime, not at import time
+            if os.environ.get("VIBE3_TRACE", "0") != "1":
                 return func(*args, **kwargs)
 
             from loguru import logger

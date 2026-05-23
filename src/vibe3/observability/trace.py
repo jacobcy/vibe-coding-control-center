@@ -117,6 +117,11 @@ def trace_context(
             # Execute command
             pass
     """
+    # Enable method-level tracing when using trace_context
+    import os
+
+    os.environ["VIBE3_TRACE"] = "1"
+
     logger.bind(tier=tier, command=command, domain=domain, **metadata).info(
         f"[{tier}] Starting: {command}"
     )

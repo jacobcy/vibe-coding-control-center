@@ -37,6 +37,11 @@ from vibe3.observability import setup_logging
 from vibe3.server import app as serve
 
 
+def _enable_trace_mode() -> None:
+    """Enable trace mode for method-level tracing."""
+    os.environ["VIBE3_TRACE"] = "1"
+
+
 # -- Remove help panel borders, keep colors --
 class _NoBorderPanel(_ru.Panel):
     def __init__(self, *args: object, **kwargs: object) -> None:
@@ -210,6 +215,8 @@ def run_command(
     ] = False,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
+    if trace:
+        _enable_trace_mode()
     run.run_command(
         instructions=instructions,
         branch=branch,
