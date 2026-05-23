@@ -6,9 +6,9 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import trace_scope
+from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.issue_ref import try_parse_issue_number
 
 

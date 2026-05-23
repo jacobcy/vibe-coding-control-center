@@ -24,8 +24,8 @@ from vibe3.roles.run import (
     validate_run_prerequisites,
 )
 from vibe3.roles.run_command import resolve_skill_path
+from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.branch_arg import resolve_branch_arg
 from vibe3.utils.handoff_resolution import resolve_handoff_target
 from vibe3.utils.trace import enable_trace
 

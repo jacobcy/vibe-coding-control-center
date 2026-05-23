@@ -24,6 +24,7 @@ from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.exceptions import SystemError, UserError
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
+from vibe3.services.pr_branch_resolver import resolve_command_branch
 from vibe3.services.pr_service import PRService
 from vibe3.services.task_binding_guard import build_bind_task_hint
 from vibe3.ui.console import console
@@ -33,7 +34,6 @@ from vibe3.ui.flow_ui import (
     render_flows_status_dashboard,
 )
 from vibe3.utils.branch_utils import find_parent_branch
-from vibe3.utils.pr_branch_resolver import resolve_command_branch
 
 if TYPE_CHECKING:
     pass

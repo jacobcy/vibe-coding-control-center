@@ -128,7 +128,7 @@ class TaskShowService:
             Resolved branch name
         """
         # Import here to avoid circular dependency
-        from vibe3.utils.pr_branch_resolver import resolve_command_branch
+        from vibe3.services.pr_branch_resolver import resolve_command_branch
 
         return resolve_command_branch(
             branch_opt=branch,
