@@ -16,8 +16,43 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions.error_classification import get_error_handling_contract
-from vibe3.exceptions.error_codes import is_api_error, is_model_error
 from vibe3.exceptions.error_severity import ErrorSeverity
+from vibe3.services.error_tracking_cleanup import (
+    cleanup_old_errors as _cleanup_old_errors,
+)
+from vibe3.services.error_tracking_cleanup import (
+    cleanup_terminal_issue_errors as _cleanup_terminal_issue_errors,
+)
+from vibe3.services.error_tracking_cleanup import clear_errors as _clear_errors
+from vibe3.services.error_tracking_queries import (
+    get_all_errors_status as _get_all_errors_status,
+)
+from vibe3.services.error_tracking_queries import (
+    get_api_and_exec_error_count as _get_api_and_exec_error_count,
+)
+from vibe3.services.error_tracking_queries import (
+    get_api_error_count as _get_api_error_count,
+)
+from vibe3.services.error_tracking_queries import (
+    get_critical_error_codes as _get_critical_error_codes,
+)
+from vibe3.services.error_tracking_queries import get_error_counts as _get_error_counts
+from vibe3.services.error_tracking_queries import (
+    get_recent_errors as _get_recent_errors,
+)
+from vibe3.services.error_tracking_queries import get_status as _get_status
+from vibe3.services.error_tracking_queries import (
+    get_threshold_error_count as _get_threshold_error_count,
+)
+from vibe3.services.error_tracking_queries import (
+    get_warning_count as _get_warning_count,
+)
+from vibe3.services.error_tracking_queries import (
+    has_critical_error as _has_critical_error,
+)
+from vibe3.services.error_tracking_queries import (
+    has_model_config_error as _has_model_config_error,
+)
 
 
 class ErrorTrackingService:
@@ -202,380 +237,66 @@ class ErrorTrackingService:
 
         return threshold_reached, error_count
 
+    # --- Query methods (delegate to error_tracking_queries module) ---
+
     def get_error_counts(self) -> dict[str, int]:
-        """Get current error counts from error_log.
-
-        Returns:
-            Dict mapping error_code -> count
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute("""
-                SELECT error_code, COUNT(*) as count
-                FROM error_log
-                GROUP BY error_code
-                """).fetchall()
-
-        return {row[0]: row[1] for row in rows}
+        """Get current error counts from error_log."""
+        return _get_error_counts(self.db_path)
 
     def has_critical_error(self) -> bool:
-        """Check if there are any CRITICAL severity errors.
-
-        Returns:
-            True if any CRITICAL-severity error has been recorded
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE severity = ?
-                """,
-                (ErrorSeverity.CRITICAL.value,),
-            ).fetchone()
-
-        return rows[0] > 0 if rows else False
+        """Check if there are any CRITICAL severity errors."""
+        return _has_critical_error(self.db_path)
 
     def get_critical_error_codes(self) -> list[str]:
-        """Get error codes of CRITICAL severity errors.
-
-        Returns:
-            List of error codes with CRITICAL severity.
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT DISTINCT error_code FROM error_log
-                WHERE severity = ?
-                ORDER BY error_code
-                """,
-                (ErrorSeverity.CRITICAL.value,),
-            ).fetchall()
-
-        return [row[0] for row in rows]
+        """Get error codes of CRITICAL severity errors."""
+        return _get_critical_error_codes(self.db_path)
 
     def has_model_config_error(self) -> bool:
-        """Check if there are any model configuration errors.
-
-        Uses severity-based check for CRITICAL errors, falling back to
-        E_MODEL_* prefix check for backward compatibility with pre-migration data.
-
-        Returns:
-            True if any CRITICAL-severity or E_MODEL_* error has been recorded
-        """
-        # Check by severity first (standard approach)
-        if self.has_critical_error():
-            return True
-
-        # Fallback to prefix check for backward compatibility
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute("""
-                SELECT COUNT(*) FROM error_log
-                WHERE error_code LIKE 'E_MODEL_%'
-                """).fetchone()
-
-        return rows[0] > 0 if rows else False
+        """Check if there are any model configuration errors."""
+        return _has_model_config_error(self.db_path)
 
     def get_api_error_count(self) -> int:
-        """Get count of recent API errors within configured time window.
-
-        Returns:
-            Count of E_API_* errors in the last TIME_WINDOW_MINUTES minutes
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE error_code LIKE 'E_API_%'
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (f"-{self.TIME_WINDOW_MINUTES}",),
-            ).fetchone()
-
-        return rows[0] if rows else 0
+        """Get count of recent API errors within configured time window."""
+        return _get_api_error_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
     def get_api_and_exec_error_count(self) -> int:
         """Get count of E_API_* and E_EXEC_* errors within time window.
 
         .. deprecated::
-            Use :meth:`get_threshold_error_count` instead, which counts by
-            severity rather than error code prefix.
-
-        Returns:
-            Number of API/exec errors in the sliding window.
+            Use :meth:`get_threshold_error_count` instead.
         """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE (error_code LIKE 'E_API_%' OR error_code LIKE 'E_EXEC_%')
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (f"-{self.TIME_WINDOW_MINUTES}",),
-            ).fetchone()
-
-        return rows[0] if rows else 0
+        return _get_api_and_exec_error_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
     def get_threshold_error_count(self) -> int:
-        """Get count of ERROR-severity errors within time window.
-
-        Counts by severity level rather than error code prefix, providing
-        accurate threshold detection for all ERROR-severity errors regardless
-        of their code classification.
-
-        Returns:
-            Number of ERROR-severity errors in the sliding window.
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE severity = ?
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (ErrorSeverity.ERROR.value, f"-{self.TIME_WINDOW_MINUTES}"),
-            ).fetchone()
-
-        return rows[0] if rows else 0
+        """Get count of ERROR-severity errors within time window."""
+        return _get_threshold_error_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
     def get_warning_count(self) -> int:
-        """Get count of WARNING-severity errors within time window.
-
-        Returns:
-            Number of WARNING-severity errors in the sliding window.
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE severity = ?
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (ErrorSeverity.WARNING.value, f"-{self.TIME_WINDOW_MINUTES}"),
-            ).fetchone()
-
-        return rows[0] if rows else 0
-
-    def _get_severity_count(self, severity: str) -> int:
-        """Get count of errors by severity level within time window.
-
-        Args:
-            severity: Severity level string (CRITICAL, ERROR, WARNING)
-
-        Returns:
-            Count of errors with the given severity in the sliding window.
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT COUNT(*) FROM error_log
-                WHERE severity = ?
-                  AND created_at >= datetime('now', ? || ' minutes')
-                """,
-                (severity, f"-{self.TIME_WINDOW_MINUTES}"),
-            ).fetchone()
-
-        return rows[0] if rows else 0
+        """Get count of WARNING-severity errors within time window."""
+        return _get_warning_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
     def get_recent_errors(self, limit: int = 10) -> list[dict[str, Any]]:
-        """Get recent errors for status display.
-
-        Args:
-            limit: Maximum number of errors to return
-
-        Returns:
-            List of error records (newest first)
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT tick_id, error_code, error_message,
-                       issue_number, branch, created_at, severity
-                FROM error_log
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-
-        return [
-            {
-                "tick_id": row[0],
-                "error_code": row[1],
-                "error_message": row[2],
-                "issue_number": row[3],
-                "branch": row[4],
-                "created_at": row[5],
-                "severity": row[6] or "ERROR",  # Default to ERROR if NULL
-            }
-            for row in rows
-        ]
-
-    def clear(self, cleared_by: str, reason: str) -> None:
-        """Clear all error records.
-
-        Args:
-            cleared_by: Who cleared (e.g., "admin:manual")
-            reason: Reason for clearing
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM error_log")
-
-        logger.bind(
-            domain="error_tracking",
-            cleared_by=cleared_by,
-            reason=reason,
-        ).info("Error log cleared")
-
-    def cleanup_old_errors(self) -> int:
-        """Delete error records older than retention period.
-
-        Returns:
-            Number of deleted records
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            result = conn.execute(
-                """
-                DELETE FROM error_log
-                WHERE created_at < datetime('now', ? || ' days')
-                """,
-                (f"-{self.retention_days}",),
-            )
-            conn.commit()
-            return result.rowcount
-
-    def cleanup_terminal_issue_errors(self) -> int:
-        """Delete error records for issues with terminal flow status.
-
-        Uses flow_issue_links (issue_role='task') as SSOT to identify current
-        task flow for each issue, avoiding false matches on superseded flows.
-
-        Also cleans up orphaned errors that still point at a terminal tombstone
-        branch after the current task flow link has already been removed.
-
-        Terminal states: done, aborted, stale (per _is_reusable_auto_flow
-        in flow_dispatch.py).
-
-        Returns:
-            Number of deleted records
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            result = conn.execute("""
-                DELETE FROM error_log AS el
-                WHERE el.issue_number IS NOT NULL
-                  AND (
-                    EXISTS (
-                        SELECT 1
-                        FROM flow_issue_links fil
-                        INNER JOIN flow_state fs ON fs.branch = fil.branch
-                        WHERE fil.issue_role = 'task'
-                          AND fil.issue_number = el.issue_number
-                          AND fs.flow_status IN ('done', 'aborted', 'stale')
-                          AND fs.deleted_at IS NULL
-                    )
-                    OR (
-                        NOT EXISTS (
-                            SELECT 1
-                            FROM flow_issue_links fil_current
-                            INNER JOIN flow_state fs_current
-                                ON fs_current.branch = fil_current.branch
-                            WHERE fil_current.issue_role = 'task'
-                              AND fil_current.issue_number = el.issue_number
-                              AND fs_current.deleted_at IS NULL
-                        )
-                        AND EXISTS (
-                            SELECT 1
-                            FROM flow_state fs_tomb
-                            WHERE fs_tomb.branch = el.branch
-                              AND fs_tomb.flow_status IN ('done', 'aborted', 'stale')
-                        )
-                    )
-                )
-            """)
-            conn.commit()
-            return result.rowcount
+        """Get recent errors for status display."""
+        return _get_recent_errors(self.db_path, limit)
 
     def get_status(self) -> dict[str, Any]:
-        """Get error tracking status for display with severity breakdown.
-
-        Returns:
-            Dict with error statistics (all counts are windowed)
-        """
-        # Severity-based counts (all within time window)
-        critical_count = self._get_severity_count("CRITICAL")
-        error_count = self.get_threshold_error_count()
-        warning_count = self.get_warning_count()
-        windowed_total = critical_count + error_count + warning_count
-
-        # Legacy prefix counts (also windowed for consistency)
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT error_code, COUNT(*) as count
-                FROM error_log
-                WHERE created_at >= datetime('now', ? || ' minutes')
-                GROUP BY error_code
-                """,
-                (f"-{self.TIME_WINDOW_MINUTES}",),
-            ).fetchall()
-        windowed_error_counts = {row[0]: row[1] for row in rows}
-
-        model_errors = sum(
-            count
-            for code, count in windowed_error_counts.items()
-            if is_model_error(code)
-        )
-        api_errors = sum(
-            count for code, count in windowed_error_counts.items() if is_api_error(code)
-        )
-        exec_errors = sum(
-            count
-            for code, count in windowed_error_counts.items()
-            if code.startswith("E_EXEC_")
-        )
-
-        return {
-            "total_errors": windowed_total,
-            # New severity-based counts
-            "critical_count": critical_count,
-            "error_count": error_count,
-            "warning_count": warning_count,
-            # Legacy prefix counts (windowed for consistency)
-            "model_errors": model_errors,
-            "api_errors": api_errors,
-            "exec_errors": exec_errors,
-            "error_counts": windowed_error_counts,
-            "api_error_window_count": self.get_api_error_count(),
-            "threshold": self.THRESHOLD_COUNT,
-            "time_window_minutes": self.TIME_WINDOW_MINUTES,
-        }
+        """Get error tracking status for display with severity breakdown."""
+        return _get_status(self.db_path, self.TIME_WINDOW_MINUTES, self.THRESHOLD_COUNT)
 
     def get_all_errors_status(self) -> dict[str, Any]:
-        """Get error tracking status for ALL errors in database.
+        """Get error tracking status for ALL errors in database."""
+        return _get_all_errors_status(self.db_path)
 
-        This returns counts for all errors regardless of time window,
-        for visibility into historical errors.
+    # --- Cleanup methods (delegate to error_tracking_cleanup module) ---
 
-        Returns:
-            Dict with error statistics for all errors in database
-        """
-        # Severity-based counts (all errors, no time filter)
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
-                """
-                SELECT severity, COUNT(*) as count
-                FROM error_log
-                GROUP BY severity
-                """,
-            ).fetchall()
+    def clear(self, cleared_by: str, reason: str) -> None:
+        """Clear all error records."""
+        _clear_errors(self.db_path, cleared_by, reason)
 
-        severity_counts = {row[0] or "ERROR": row[1] for row in rows}
-        critical_count = severity_counts.get("CRITICAL", 0)
-        error_count = severity_counts.get("ERROR", 0)
-        warning_count = severity_counts.get("WARNING", 0)
-        total_errors = critical_count + error_count + warning_count
+    def cleanup_old_errors(self) -> int:
+        """Delete error records older than retention period."""
+        return _cleanup_old_errors(self.db_path, self.retention_days)
 
-        return {
-            "total_errors": total_errors,
-            "critical_count": critical_count,
-            "error_count": error_count,
-            "warning_count": warning_count,
-        }
+    def cleanup_terminal_issue_errors(self) -> int:
+        """Delete error records for issues with terminal flow status."""
+        return _cleanup_terminal_issue_errors(self.db_path)
