@@ -2,10 +2,9 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
-from loguru._logger import Logger
 from typer import echo
 
 from vibe3.agents.backends.codeagent import AgentResult, CodeagentBackend
@@ -17,6 +16,9 @@ from vibe3.agents.models import (
 )
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+
+if TYPE_CHECKING:
+    from loguru import Logger
 from vibe3.config.role_policy import get_role_required_ref_key, get_role_section
 from vibe3.config.settings import VibeConfig
 from vibe3.execution.codeagent_support import resolve_command_agent_options
@@ -51,6 +53,7 @@ class SyncExecutionContext:
     store: SQLiteClient | None
     before_state_label: str | None
     execution_cwd: Path
+    commit_count_before: int | None = None
 
 
 class CodeagentExecutionService:
@@ -63,7 +66,7 @@ class CodeagentExecutionService:
     def _cleanup_supervisor_handoff_label(
         issue_number: int,
         actor: str,
-        log: Logger,
+        log: "Logger",
     ) -> None:
         """Remove state/handoff label to prevent supervisor re-dispatch.
 
@@ -86,6 +89,86 @@ class CodeagentExecutionService:
                 f"Failed to remove {handoff_label} label from "
                 f"#{issue_number}: {exc}"
             )
+
+    @staticmethod
+    def _check_planner_commits(
+        commit_count_before: int,
+        branch: str | None,
+        actor: str,
+        log: "Logger",
+        execution_cwd: Path | None = None,
+    ) -> None:
+        """Check for unauthorized commits by planner.
+
+        Planner should only create docs/plans/ or docs/reports/ changes. If we detect
+        commits outside these directories, log a warning and record a finding.
+        """
+        if not branch:
+            return
+
+        try:
+            # Get current commit count
+            result = GitClient(cwd=execution_cwd)._run(["rev-list", "--count", "HEAD"])
+            commit_count_after = int(result.strip())
+
+            if commit_count_after > commit_count_before:
+                # New commits detected - check what changed
+                commits_diff = commit_count_after - commit_count_before
+                log.info(
+                    f"Planner created {commits_diff} new commit(s) — "
+                    "checking files for policy compliance"
+                )
+
+                # Get the list of changed files in new commits
+                # Use HEAD~N..HEAD to get changes in last N commits
+                result = GitClient(cwd=execution_cwd)._run(
+                    [
+                        "diff",
+                        f"HEAD~{commits_diff}",
+                        "HEAD",
+                        "--name-only",
+                    ]
+                )
+                changed_files = result.strip().split("\n") if result.strip() else []
+
+                # Check if any files are outside docs/plans/ and docs/reports/
+                unauthorized_files = [
+                    f
+                    for f in changed_files
+                    if f
+                    and not (
+                        f.startswith("docs/plans/") or f.startswith("docs/reports/")
+                    )
+                ]
+
+                if unauthorized_files:
+                    log.warning(
+                        f"Unauthorized file changes detected: {unauthorized_files}"
+                    )
+
+                    # Record finding to handoff
+                    finding_message = (
+                        f"Planner created {commits_diff} unauthorized commit(s) "
+                        f"with files outside docs/plans/ and docs/reports/: "
+                        f"{unauthorized_files}"
+                    )
+                    try:
+                        HandoffService().append_current_handoff(
+                            message=finding_message,
+                            kind="finding",
+                            actor=actor,
+                            branch=branch,
+                        )
+                    except Exception as exc:
+                        log.warning(f"Failed to record planner finding: {exc}")
+                else:
+                    # All changes are in allowed directories
+                    log.info(
+                        f"Planner created {commits_diff} commit(s) with only "
+                        "authorized files (docs/plans/ or docs/reports/)"
+                    )
+        except Exception as exc:
+            log.warning(f"Failed to check planner commits: {exc}")
 
     @staticmethod
     def _resolve_command_cwd(explicit_cwd: Path | None) -> Path:
@@ -155,6 +238,17 @@ class CodeagentExecutionService:
 
         execution_cwd = self._resolve_command_cwd(command.cwd)
 
+        # Record commit count before execution (for planner commit detection)
+        commit_count_before: int | None = None
+        if command.role == "planner":
+            try:
+                result = GitClient(cwd=execution_cwd)._run(
+                    ["rev-list", "--count", "HEAD"]
+                )
+                commit_count_before = int(result.strip())
+            except Exception as exc:
+                log.warning(f"Failed to record commit count before execution: {exc}")
+
         return SyncExecutionContext(
             options=options,
             session_id=session_id,
@@ -163,6 +257,7 @@ class CodeagentExecutionService:
             store=store,
             before_state_label=before_state_label,
             execution_cwd=execution_cwd,
+            commit_count_before=commit_count_before,
         )
 
     def _finalize_sync_execution(
@@ -199,6 +294,16 @@ class CodeagentExecutionService:
 
             # Get required ref key for this role
             required_ref_key = get_role_required_ref_key(command.role)
+
+            # Planner commit detection: check for unauthorized commits
+            if command.role == "planner" and ctx.commit_count_before is not None:
+                self._check_planner_commits(
+                    ctx.commit_count_before,
+                    ctx.branch,
+                    ctx.actor,
+                    log,
+                    execution_cwd=ctx.execution_cwd,
+                )
 
             # Unified no-op gate: single hard logic check after agent completion.
             # Executes ONLY for L3 worker roles (manager/planner/executor/reviewer).

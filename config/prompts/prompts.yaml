@@ -434,6 +434,14 @@ run:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest plan ref, and next step.
     Use `--comments` flag to load the latest human instruction in full.
 
+    ### Pre-Execution Checks (before starting implementation)
+    1. Run `git log --oneline -5` to check if the expected work may already be committed
+    2. If the plan describes changes that appear to already exist in recent commits:
+       - Verify by reading the relevant files and comparing with plan expectations
+       - If work is already complete: document this in your report, skip redundant execution, still run verification tests
+       - If work is partially done: identify what remains, only execute the missing parts
+    3. If unsure whether existing commits are related: run `git diff --name-only <commit>~1 <commit>` on suspicious commits
+
     Follow plan steps strictly, verify each step before proceeding.
     Write clean code with tests, run verification after changes.
     Document any deviations with reasons.
