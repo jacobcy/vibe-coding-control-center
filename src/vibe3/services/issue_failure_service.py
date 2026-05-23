@@ -54,14 +54,12 @@ def mark_issue(
     """Unified issue state marking interface.
 
     Args:
-        action: "fail" for failure events, "block" for block events.
-            Determines comment style and deduplication strategy.
+        action: "fail" for runtime failures (error_log only),
+            "block" for business blocks (blocked_reason + label).
     """
-    # Normalize role names
     role = _ROLE_MAP.get(role, role)
     actor = actor or _ROLE_DEFAULT_ACTOR.get(role, f"agent:{role}")
 
-    # Get branch from flow state (required for FlowTimelineService)
     branch: str | None = None
     store: SQLiteClient | None = None
     try:
@@ -79,25 +77,40 @@ def mark_issue(
             error=str(e),
         ).warning(f"Failed to get branch for issue #{issue_number}")
 
-    # Use standard FlowService.block_flow() method
-    if branch and store:
-        try:
-            from vibe3.services.flow_service import FlowService
+    if not branch or not store:
+        return
 
-            FlowService(store=store).block_flow(
-                branch=branch,
-                reason=reason,
-                actor=actor,
-                repo=repo,
-                event_type="flow_failed" if action == "fail" else "flow_blocked",
-            )
-        except Exception as e:
-            logger.bind(
-                domain="flow",
-                action="mark_issue",
-                issue_number=issue_number,
-                error=str(e),
-            ).warning(f"Failed to block flow for issue #{issue_number}")
+    if action == "fail":
+        from vibe3.exceptions.error_codes import E_EXEC_FLOW_FAILURE
+        from vibe3.services.error_tracking_service import ErrorTrackingService
+
+        error_tracking = ErrorTrackingService.get_instance(store=store)
+        error_tracking.record_error(
+            error_code=E_EXEC_FLOW_FAILURE,
+            error_message=reason,
+            branch=branch,
+            issue_number=issue_number,
+        )
+
+        timeline = FlowTimelineService(store=store)
+        timeline.record_timeline_event(
+            branch=branch,
+            event_type="flow_failed",
+            actor=actor,
+            detail=f"Flow failed (runtime): {reason}",
+            issue_number=issue_number,
+            repo=repo,
+        )
+    else:
+        from vibe3.services.flow_service import FlowService
+
+        FlowService(store=store).block_flow(
+            branch=branch,
+            reason=reason,
+            actor=actor,
+            repo=repo,
+            event_type="flow_blocked",
+        )
 
 
 def fail_issue(
@@ -109,12 +122,9 @@ def fail_issue(
 ) -> None:
     """Generic fail issue handler.
 
-    Note: This now sets state/blocked instead of state/failed.
-    The failed state is deprecated - all errors are now modeled as blocked
-    with structured blocked_reason field.
-
-    IssueFailed event is still recorded for observability.
-    blocked_reason is recorded in flow state directly in mark_issue().
+    Records runtime failure to error_log and flow_failed timeline event only.
+    Does NOT write blocked_reason or change flow_status.
+    Runtime errors are handled by ERROR system, not BLOCK system.
     """
     mark_issue(
         issue_number=issue_number,

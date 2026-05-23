@@ -3,7 +3,9 @@
 Error categories:
 - E_MODEL_*: Model configuration errors (immediate failed gate)
 - E_API_*: API errors (threshold-based failed gate)
-- E_EXEC_*: Execution errors (local blocked only)
+- E_EXEC_*: Execution errors (various handling strategies)
+  - E_EXEC_FLOW_FAILURE: Runtime failures recorded to error_log only (no block)
+  - Other E_EXEC_*: Local blocked only
 """
 
 from typing import Final
@@ -26,7 +28,8 @@ E_EXEC_INVALID_HANDOFF: Final[str] = "E_EXEC_INVALID_HANDOFF"
 E_EXEC_MISSING_REF: Final[str] = "E_EXEC_MISSING_REF"
 E_EXEC_AUTO_SCENE_RESET: Final[str] = "E_EXEC_AUTO_SCENE_RESET"
 E_EXEC_UNKNOWN: Final[str] = "E_EXEC_UNKNOWN"
-E_DISPATCH_FAILURE: Final[str] = "E_DISPATCH_FAILURE"  # Dispatch failures
+E_DISPATCH_FAILURE: Final[str] = "E_DISPATCH_FAILURE"
+E_EXEC_FLOW_FAILURE: Final[str] = "E_EXEC_FLOW_FAILURE"
 
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"
