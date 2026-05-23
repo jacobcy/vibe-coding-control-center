@@ -6,6 +6,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
+from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.signature_service import SignatureService
 
 
@@ -144,11 +145,13 @@ class FlowLifecycleMixin:
             issue_number=issue_number,
         )
 
-        self.store.add_event(
-            branch,
-            "flow_failed",
-            effective_actor,
-            f"Flow failed (runtime): {reason}",
+        timeline = FlowTimelineService(store=self.store)
+        timeline.record_timeline_event(
+            branch=branch,
+            event_type="flow_failed",
+            actor=effective_actor,
+            detail=f"Flow failed (runtime): {reason}",
+            issue_number=issue_number,
         )
 
         logger.bind(branch=branch).success(

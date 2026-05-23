@@ -3,7 +3,9 @@
 Error categories:
 - E_MODEL_*: Model configuration errors (immediate failed gate)
 - E_API_*: API errors (threshold-based failed gate)
-- E_EXEC_*: Execution errors (local blocked only)
+- E_EXEC_*: Execution errors (various handling strategies)
+  - E_EXEC_FLOW_FAILURE: Runtime failures recorded to error_log only (no block)
+  - Other E_EXEC_*: Local blocked only
 """
 
 from typing import Final

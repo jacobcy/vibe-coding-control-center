@@ -12,7 +12,7 @@ from vibe3.services.issue_failure_service import (
 )
 
 
-def test_fail_manager_issue_records_reason_and_syncs_github():
+def test_fail_manager_issue_records_to_error_log_only():
     """Test fail_manager_issue records to error_log only (no blocked_reason)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
@@ -181,7 +181,7 @@ def test_block_flow_writes_body_label_and_cache():
         mock_label.confirm_issue_state.assert_called_once()
 
 
-def test_fail_issue_lands_in_same_blocked_write_path():
+def test_fail_issue_records_to_error_log_only():
     """Test fail_manager_issue records to error_log only (no block_flow)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
