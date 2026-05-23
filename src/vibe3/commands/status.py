@@ -142,6 +142,16 @@ def status(
             service = FlowService()
             flows = service.list_flows(status=None if all_flows else "active")
 
+            # Fetch orchestrated issues for JSON/YAML output
+            queued_set = set(orch_snapshot.queued_issues)
+            query_service = StatusQueryService(repo=config.repo)
+            orchestrated_issues = query_service.fetch_orchestrated_issues(
+                flows,
+                queued_set,
+                stale_flows=[],
+                manager_usernames=config.get_manager_usernames(),
+            )
+
             output_data = {
                 "orchestra": (
                     orch_snapshot.model_dump()
@@ -149,6 +159,7 @@ def status(
                     else str(orch_snapshot)
                 ),
                 "flows": [f.model_dump() for f in flows],
+                "orchestrated_issues": orchestrated_issues,
             }
 
             if output_format == "json":
