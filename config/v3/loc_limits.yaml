@@ -46,9 +46,6 @@ code_limits:
       - path: "src/vibe3/exceptions/error_classification.py"
         limit: 350
         reason: "Error classification registry with severity-aware contracts，includes all E_MODEL_*, E_API_*, E_EXEC_*, E_DISPATCH_FAILURE contracts；新增 E_DISPATCH_FAILURE 错误分类和 FailedGate threshold 控制契约"
-      - path: "src/vibe3/exceptions/error_tracking.py"
-        limit: 590
-        reason: "Error tracking 核心服务，新增 get_critical_error_codes() 用于 severity-based CRITICAL 检查（替代硬编码前缀），severity-aware 计数、windowed status 统计，错误分类逻辑紧密耦合；clear_instance() 增强：db_path 匹配时同步清理 _instance/_default_instance；新增 get_all_errors_status() 用于全量错误统计（无时间过滤）"
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 480
         reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查等紧密耦合逻辑"
@@ -123,6 +120,9 @@ code_limits:
       - path: "src/vibe3/services/check_cleanup_service.py"
         limit: 540
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑"
+      - path: "src/vibe3/services/error_tracking_service.py"
+        limit: 590
+        reason: "Error tracking 核心服务（从 exceptions/ 迁移到 services/ 以消除循环依赖），包含 get_critical_error_codes() 用于 severity-based CRITICAL 检查（替代硬编码前缀）、severity-aware 计数、windowed status 统计、错误分类逻辑紧密耦合；clear_instance() 增强：db_path 匹配时同步清理 _instance/_default_instance；新增 get_all_errors_status() 用于全量错误统计（无时间过滤）"
 
       # Roles 层 —— 允许 350-600
       - path: "src/vibe3/roles/review.py"
