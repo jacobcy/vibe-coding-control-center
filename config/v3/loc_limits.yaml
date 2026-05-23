@@ -42,7 +42,10 @@ code_limits:
       - path: "src/vibe3/services/task_resume_operations.py"
         limit: 480
         reason: "Task resume 操作聚合，包含 reset、label resume、failed_reason 清除等内聚操作；_clear_flow_reasons 新增 github_client/label_service 注入和 failed_reason 清除逻辑"
-      # Exceptions 聚合 —— 允许 550
+      # Exceptions 聚合 —— 允许 550-590
+      - path: "src/vibe3/exceptions/error_classification.py"
+        limit: 350
+        reason: "Error classification registry with severity-aware contracts，includes all E_MODEL_*, E_API_*, E_EXEC_*, E_DISPATCH_FAILURE contracts；新增 E_DISPATCH_FAILURE 错误分类和 FailedGate threshold 控制契约"
       - path: "src/vibe3/exceptions/error_tracking.py"
         limit: 650
         reason: "Error tracking 核心服务，新增 get_critical_error_codes() 用于 severity-based CRITICAL 检查（替代硬编码前缀），severity-aware 计数、windowed status 统计，错误分类逻辑紧密耦合；clear_instance() 增强：db_path 匹配时同步清理 _instance/_default_instance；新增 get_all_errors_status() 用于全量错误统计（无时间过滤）；新增 source 参数区分 manual_scan 与 orchestra_tick 来源，get_threshold_error_count 支持 source_filter 过滤"
@@ -182,11 +185,11 @@ code_limits:
         limit: 480
         reason: "执行协调器聚合，包含容量控制、执行生命周期、worktree 解析错误捕获、dispatch_execution 核心流程等紧密耦合逻辑"
       - path: "src/vibe3/execution/noop_gate.py"
-        limit: 540
-        reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理等多层防御机制，职责单一但紧密耦合"
+        limit: 650
+        reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理、retry counter 机制（3次重试 + 即时持久化）、error/block 分离（GitHub API 失败记录 error_log 不触发 flow block）等多层防御机制，职责单一但紧密耦合"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 540
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize 等紧密耦合的执行生命周期逻辑"
+        limit: 560
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化等紧密耦合的执行生命周期逻辑"
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 610
         reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
@@ -263,6 +266,9 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_failed_gate.py"
         limit: 570
         reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop、manual_scan 排除逻辑），合并后内聚度高，拆分会破坏测试场景完整性"
+      - path: "tests/vibe3/orchestra/test_serve.py"
+        limit: 500
+        reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑等紧密耦合场景，新增 2 个 resume 回归测试"
       - path: "tests/vibe3/commands/test_scan.py"
         limit: 410
         reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"

@@ -402,6 +402,9 @@ def resume(
     - error_log table (clear all error records)
 
     The next tick will proceed normally after clearing.
+
+    Note: Even if the gate is already OPEN, this command will clear
+    error_log to ensure old errors don't trigger the gate again.
     """
     from rich.console import Console
 
@@ -412,15 +415,18 @@ def resume(
 
     # Check if gate is ACTIVE
     gate_status = failed_gate.get_status()
-    if not gate_status.is_active:
-        console.print("[yellow]Failed Gate is already OPEN[/yellow]")
-        console.print("No need to resume - orchestra is operating normally")
-        raise typer.Exit(0)
 
-    # Clear gate
-    console.print("[cyan]Clearing Failed Gate[/cyan]")
-    console.print(f"  - Reason: {gate_status.reason}")
-    console.print(f"  - Blocked ticks: {gate_status.blocked_ticks}")
+    # Always clear error_log, even if gate is already OPEN
+    # This prevents stale errors from re-triggering the gate
+    if gate_status.is_active:
+        # Gate is ACTIVE: show blocking info
+        console.print("[cyan]Clearing Failed Gate[/cyan]")
+        console.print(f"  - Reason: {gate_status.reason}")
+        console.print(f"  - Blocked ticks: {gate_status.blocked_ticks}")
+    else:
+        # Gate is OPEN: inform user but still clear errors
+        console.print("[yellow]Failed Gate is already OPEN[/yellow]")
+        console.print("[cyan]Clearing error_log to prevent re-triggering[/cyan]")
 
     cleared_by = "admin:manual"
     failed_gate.clear(cleared_by, reason)

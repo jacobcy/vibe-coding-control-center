@@ -299,6 +299,18 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added transition_count column to flow_state"
         )
 
+    # Migration: add retry counter fields for no-op gate GitHub API failures
+    retry_columns = {
+        "noop_gate_github_retry_count": "INTEGER DEFAULT 0",
+        "noop_gate_malformed_retry_count": "INTEGER DEFAULT 0",
+    }
+    for col, col_type in retry_columns.items():
+        if col not in existing:
+            cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} {col_type}")
+            logger.bind(external="sqlite", operation="migration").info(
+                f"Added {col} column to flow_state"
+            )
+
     # Legacy compatibility: keep old column for existing databases.
     # New code no longer reads or writes this field.
     if "latest_indicate_action" not in existing:

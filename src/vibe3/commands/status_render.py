@@ -192,6 +192,27 @@ def render_issue_progress(
         console.print("  [dim](none)[/]")
 
 
+def render_remote_items(remote_items: list[dict[str, object]]) -> None:
+    """Render Remote Tasks (no local flow) section."""
+    console.print("[bold cyan]Remote Tasks (no local flow):[/]")
+    if remote_items:
+        for item in remote_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState, item["state"])
+            assignee = cast(str | None, item.get("assignee"))
+            display_title = title[:48] + "..." if len(title) > 48 else title
+            state_str = state.value.upper()
+            assignee_str = f" [dim]({assignee})[/]" if assignee else ""
+            remote_marker = "[dim][remote][/]"
+            console.print(
+                f"  #{number:4}  [yellow]{state_str:10}[/]  "
+                f"{remote_marker}{assignee_str} {display_title}"
+            )
+    else:
+        console.print("  [dim](none)[/]")
+
+
 def render_supervisor_issues(supervisor_items: list[dict[str, object]]) -> None:
     """Render Supervisor Issues section."""
     console.print("[bold cyan]Supervisor Issues:[/]")
@@ -222,7 +243,7 @@ def render_pr_ref_items(pr_ref_items: list[dict[str, object]]) -> None:
             status_str = state.value.upper()
 
             display_title = title[:48] + "..." if len(title) > 48 else title
-            console.print(f"  #{number:4}  [{status_str:10}]  {display_title}")
+            console.print(f"  #{number:4}  [cyan]{status_str:10}[/]  {display_title}")
             if pr_url:
                 console.print(f"         [cyan]PR: {pr_url}[/]")
     else:

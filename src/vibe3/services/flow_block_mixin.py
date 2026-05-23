@@ -5,10 +5,7 @@ from typing import Self
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
-from vibe3.models.issue_body import FlowStateProjection
-from vibe3.services.issue_body_service import merge_projection, parse_projection
 from vibe3.services.signature_service import SignatureService
 
 
@@ -16,50 +13,6 @@ class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
     store: SQLiteClient
-
-    def _project_blocked_state(
-        self: Self,
-        issue_number: int,
-        blocked_by_issue: int | None,
-        reason: str | None,
-    ) -> None:
-        """Project blocked state to issue body managed section."""
-        client = GitHubClient()
-        current_body = client.get_issue_body(issue_number)
-        if current_body is None:
-            logger.bind(issue_number=issue_number).warning(
-                "Failed to read issue body for projection"
-            )
-            return
-
-        # Parse existing blocked_by
-        current_proj = parse_projection(current_body)
-        existing_deps = set(current_proj.blocked_by)
-
-        # Merge new blocker (deduplicate)
-        # When blocked_by_issue is None, clear dependencies (reason-only block)
-        if blocked_by_issue is not None:
-            new_blocked_by = sorted(existing_deps | {blocked_by_issue})
-        else:
-            new_blocked_by = []
-
-        # Build projection with merged blocked_by
-        proj = FlowStateProjection(
-            state="blocked",
-            blocked_by=new_blocked_by,
-            blocked_reason=reason or current_proj.blocked_reason,
-        )
-
-        # Merge and update (short-circuit if unchanged)
-        merged = merge_projection(current_body, proj)
-        if merged == current_body:
-            # No change, skip API call
-            return
-
-        if not client.update_issue_body(issue_number, merged):
-            logger.bind(issue_number=issue_number).warning(
-                "Failed to update issue body projection"
-            )
 
     def block_flow(
         self: Self,

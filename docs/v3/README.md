@@ -142,14 +142,18 @@ src/vibe3/
 
 ---
 
-### Phase 4: Orchestra（自动编排层）✅ 运行中
+### Phase 4: Orchestra（自动编排层）✅ Active
 
-**状态**: ✅ **运行中** - 已实现核心调度功能，持续优化中
+**状态**: ✅ **Active** - 已实现核心调度功能，治理层（Tier 3）已上线并持续优化中
 
-**目标**: 实现 agent 自动编排，借鉴 Symphony 的调度理念
+**目标**: 实现 agent 自动编排，架构上对齐 Tier 3 治理体系（cron-supervisor, roadmap-intake）
 
 **设计理念**:
 - **不学习 Symphony 的 agent 模型**（v3 已有更完整的 handoff 体系）
+- **实现 Tier 3 治理分层**：
+  - L1: Cron-supervisor & Roadmap-intake（无 worktree 观察层）
+  - L2: Supervisor Apply（轻量治理执行层）
+  - L3: Manager 主链（代码开发层）
 - **借鉴 Symphony 的调度工程问题**：
   - 如何让 daemon 安全地并发管理多个 agent 执行
   - 如何保证不重复 dispatch
@@ -189,7 +193,7 @@ src/vibe3/
 | Phase 1 | Infrastructure（基础设施层） | ✅ 已完成 | 100% |
 | Phase 2 | Trace（调试追踪层） | ⏸️ 待启动 | 0% |
 | Phase 3 | Handoff（责任链层） | ✅ 已完成 | 100% |
-| Phase 4 | Orchestra（自动编排层） | ✅ 运行中 | 持续优化 |
+| Phase 4 | Orchestra（自动编排层） | ✅ Active | 持续优化 |
 
 ### 已完成
 
@@ -205,6 +209,7 @@ src/vibe3/
 - ✅ 核心参数集（`--trace`, `-v`, `--json`, `-y`）
 - ✅ Handoff 责任链系统（SQLite handoff store, HandoffService）
 - ✅ Orchestra 自动编排（Manager, dispatcher, ready queue）
+- ✅ **Tier 3 Governance** - Cron-supervisor, Roadmap-intake, Supervisor-apply
 
 ### 现行 CLI 命令面
 

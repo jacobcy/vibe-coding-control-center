@@ -385,3 +385,79 @@ def test_start_auto_discovers_port_when_default_occupied(monkeypatch) -> None:
     assert result.exit_code == 0
     assert "auto-discovered" in result.stdout.lower()
     assert "8081" in result.stdout
+
+
+def test_resume_clears_errors_even_when_gate_is_open(monkeypatch) -> None:
+    """Test that serve resume clears error_log even when gate is already OPEN.
+
+    This is a regression test for a bug where:
+    - User runs `serve resume` when gate is OPEN
+    - Command exits early without clearing error_log
+    - Old errors remain and re-trigger the gate on next tick
+
+    Fix: resume should always clear error_log, regardless of gate state.
+    """
+    from unittest.mock import MagicMock
+
+    from vibe3.orchestra.failed_gate import GateStatus
+
+    # Mock FailedGate to return OPEN state
+    mock_gate = MagicMock()
+    mock_gate.get_status.return_value = GateStatus(
+        is_active=False,
+        reason=None,
+        triggered_at=None,
+        triggered_by_error_code=None,
+        cleared_at=None,
+        cleared_by=None,
+        cleared_reason=None,
+        blocked_ticks=0,
+    )
+
+    # Patch where FailedGate is defined, not where it's imported
+    with patch("vibe3.orchestra.failed_gate.FailedGate", return_value=mock_gate):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "resume", "--reason", "test"])
+
+    # Command should succeed
+    assert result.exit_code == 0
+
+    # Should show gate is already OPEN
+    assert "already OPEN" in result.stdout
+
+    # But still call clear() to prevent stale errors
+    mock_gate.clear.assert_called_once_with("admin:manual", "test")
+
+
+def test_resume_clears_gate_when_active(monkeypatch) -> None:
+    """Test that serve resume clears gate when it is ACTIVE."""
+    from unittest.mock import MagicMock
+
+    from vibe3.orchestra.failed_gate import GateStatus
+
+    # Mock FailedGate to return ACTIVE state
+    mock_gate = MagicMock()
+    mock_gate.get_status.return_value = GateStatus(
+        is_active=True,
+        reason="ERROR-severity threshold: 2 recent errors",
+        triggered_at="2026-05-23T05:14:08",
+        triggered_by_error_code="E_API_RATE_LIMIT",
+        cleared_at=None,
+        cleared_by=None,
+        cleared_reason=None,
+        blocked_ticks=3,
+    )
+
+    # Patch where FailedGate is defined
+    with patch("vibe3.orchestra.failed_gate.FailedGate", return_value=mock_gate):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "resume", "--reason", "fixed"])
+
+    # Command should succeed
+    assert result.exit_code == 0
+
+    # Should show clearing message (ACTIVE state)
+    assert "Clearing Failed Gate" in result.stdout
+
+    # Should call clear()
+    mock_gate.clear.assert_called_once_with("admin:manual", "fixed")
