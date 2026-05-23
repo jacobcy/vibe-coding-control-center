@@ -18,20 +18,6 @@ TRANSITION_LIMIT_SOFT = 10  # Standard flow limit
 TRANSITION_LIMIT_HARD = 20  # Hard limit with tolerance
 
 
-def extract_state_label(issue_payload: dict[str, object]) -> str | None:
-    """Extract state/ label from GitHub issue payload."""
-    labels = issue_payload.get("labels")
-    if not isinstance(labels, list):
-        return None
-    for label in labels:
-        if not isinstance(label, dict):
-            continue
-        name = label.get("name")
-        if isinstance(name, str) and name.startswith("state/"):
-            return name
-    return None
-
-
 def _extract_latest_verdict(flow_state: dict | None) -> VerdictValue | None:
     if not flow_state:
         return None
@@ -68,26 +54,22 @@ def apply_unified_noop_gate(
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
-    Reads state labels from GitHub issue (remote source of truth).
-
     Rules:
     - if the issue has no state/ label, skip (not managed by state machine)
     - if required_ref is missing (for worker roles), block
     - if the agent did not change the issue's state/ label, block
     - if the agent changed the issue's state/ label, record and pass
     """
+    from vibe3.execution.state_verification import StateVerificationService
     from vibe3.utils.constants import (
-        EVENT_CANNOT_VERIFY_REMOTE_STATE,
         EVENT_REQUIRED_REF_MISSING,
         EVENT_STATE_TRANSITIONED,
         EVENT_STATE_UNCHANGED,
         EVENT_TRANSITION_COUNT_EXCEEDED,
     )
 
-    # Resolve role-specific block function (used in all failure paths)
     _block_fn = get_role_block_function(role)
 
-    # Skip no-op gate if issue has no state/ label (not managed by state machine)
     if not before_state_label:
         logger.bind(
             domain="codeagent",
@@ -97,187 +79,23 @@ def apply_unified_noop_gate(
         ).info("No-op gate SKIP: issue has no state/ label")
         return
 
-    # Read after_state from GitHub issue (remote source of truth)
-    try:
-        from vibe3.clients.github_client import GitHubClient
+    verifier = StateVerificationService(store=store)
+    after_state_label = verifier.get_issue_state_label(
+        issue_number=issue_number,
+        repo=repo,
+        branch=branch,
+        flow_state=flow_state,
+    )
 
-        issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
-    except Exception as exc:
-        # GitHub API failure: runtime error, retry with limit
-        # Check retry count to avoid infinite loop
-        retry_count = (
-            flow_state.get("noop_gate_github_retry_count", 0) if flow_state else 0
-        )
-        if retry_count >= 3:
-            # CRITICAL: GitHub API failure is a RUNTIME ERROR, not business logic
-            # Record to error_log for FailedGate control, do NOT trigger flow block
-            from vibe3.services.error_tracking_service import ErrorTrackingService
-
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).error(
-                f"No-op gate ERROR: GitHub API failed after "
-                f"{retry_count} retries - recording to error_log"
-            )
-            store.add_event(
-                branch,
-                EVENT_CANNOT_VERIFY_REMOTE_STATE,
-                actor,
-                detail=(
-                    f"Gate cannot verify state (GitHub API failed after "
-                    f"{retry_count} retries): {exc}"
-                ),
-                refs={
-                    "state": str(before_state_label or ""),
-                    "issue": str(issue_number),
-                    "error": str(exc),
-                    "retry_count": str(retry_count),
-                },
-            )
-            # Record to error_log, let FailedGate control dispatch
-            # DO NOT call _block_fn() - this is not a flow block
-            try:
-                from vibe3.services.error_tracking_service import ErrorTrackingService
-
-                error_svc = ErrorTrackingService.get_instance(store=store)
-                error_svc.record_error(
-                    error_code="E_API_UNAVAILABLE",
-                    error_message=(
-                        f"GitHub API failed after {retry_count} retries: {exc}"
-                    ),
-                    issue_number=issue_number,
-                    branch=branch,
-                )
-            except Exception as record_exc:
-                logger.bind(
-                    domain="codeagent",
-                    role=role,
-                    issue_number=issue_number,
-                    branch=branch,
-                ).warning(f"Failed to record error to error_log: {record_exc}")
-            raise RuntimeError(
-                f"Cannot verify remote state for #{issue_number} "
-                f"after {retry_count} retries: {exc}"
-            ) from exc
-        else:
-            # Record retry count and raise to trigger retry
-            if flow_state is not None:
-                retry_count_new = retry_count + 1
-                flow_state["noop_gate_github_retry_count"] = retry_count_new
-                # PERSIST IMMEDIATELY: Don't wait for codeagent_runner
-                store.update_flow_state(
-                    branch, noop_gate_github_retry_count=retry_count_new
-                )
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                f"No-op gate RETRY ({retry_count + 1}/3): GitHub API failed, "
-                f"cannot verify state: {exc}"
-            )
-            raise RuntimeError(
-                f"Cannot verify remote state for #{issue_number}: {exc}"
-            ) from exc
-
-    if not isinstance(issue_payload, dict):
-        # Malformed response: runtime error, retry with limit
-        retry_count = (
-            flow_state.get("noop_gate_malformed_retry_count", 0) if flow_state else 0
-        )
-        if retry_count >= 3:
-            # CRITICAL: Malformed response is a RUNTIME ERROR, not business logic
-            # Record to error_log for FailedGate control, do NOT trigger flow block
-            from vibe3.services.error_tracking_service import ErrorTrackingService
-
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).error(
-                f"No-op gate ERROR: GitHub returned malformed response after "
-                f"{retry_count} retries - recording to error_log"
-            )
-            store.add_event(
-                branch,
-                EVENT_CANNOT_VERIFY_REMOTE_STATE,
-                actor,
-                detail=(
-                    f"Gate cannot verify state (malformed GitHub response after "
-                    f"{retry_count} retries)"
-                ),
-                refs={
-                    "state": str(before_state_label or ""),
-                    "issue": str(issue_number),
-                    "retry_count": str(retry_count),
-                },
-            )
-            # Record to error_log, let FailedGate control dispatch
-            # DO NOT call _block_fn() - this is not a flow block
-            try:
-                from vibe3.services.error_tracking_service import ErrorTrackingService
-
-                error_svc = ErrorTrackingService.get_instance(store=store)
-                error_svc.record_error(
-                    error_code="E_API_UNAVAILABLE",
-                    error_message=(
-                        f"Malformed GitHub response after {retry_count} retries"
-                    ),
-                    issue_number=issue_number,
-                    branch=branch,
-                )
-            except Exception as record_exc:
-                logger.bind(
-                    domain="codeagent",
-                    role=role,
-                    issue_number=issue_number,
-                    branch=branch,
-                ).warning(f"Failed to record error to error_log: {record_exc}")
-            raise RuntimeError(
-                f"Malformed GitHub response for #{issue_number} "
-                f"after {retry_count} retries"
-            )
-        else:
-            # Record retry count and raise to trigger retry
-            if flow_state is not None:
-                retry_count_new = retry_count + 1
-                flow_state["noop_gate_malformed_retry_count"] = retry_count_new
-                # PERSIST IMMEDIATELY: Don't wait for codeagent_runner
-                store.update_flow_state(
-                    branch, noop_gate_malformed_retry_count=retry_count_new
-                )
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                f"No-op gate RETRY ({retry_count + 1}/3): GitHub returned "
-                f"malformed response"
-            )
-            raise RuntimeError(f"Malformed GitHub response for #{issue_number}")
-
-    # Clear retry counts on success
     if flow_state is not None:
-        # PERSIST CLEAR IMMEDIATELY: Don't wait for codeagent_runner
         store.update_flow_state(
             branch,
             noop_gate_github_retry_count=0,
             noop_gate_malformed_retry_count=0,
         )
-        # Also update memory dict for consistency
         flow_state["noop_gate_github_retry_count"] = 0
         flow_state["noop_gate_malformed_retry_count"] = 0
 
-    after_state_label = extract_state_label(issue_payload)
-
-    # Fail-safe: if state label disappeared after agent, block
-    # This is a BUSINESS BLOCK, not a runtime error
     if not after_state_label:
         logger.bind(
             domain="codeagent",

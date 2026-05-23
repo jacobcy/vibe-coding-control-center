@@ -27,7 +27,7 @@ from vibe3.execution.execution_lifecycle import (
     execution_prefix,
     persist_execution_lifecycle_event,
 )
-from vibe3.execution.noop_gate import apply_unified_noop_gate, extract_state_label
+from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.actor_support import format_agent_actor
@@ -232,7 +232,14 @@ class CodeagentExecutionService:
                     repo=getattr(self.config, "repo", None),
                 )
                 if isinstance(issue_payload, dict):
-                    before_state_label = extract_state_label(issue_payload)
+                    labels = issue_payload.get("labels", [])
+                    if isinstance(labels, list):
+                        for label in labels:
+                            if isinstance(label, dict):
+                                name = label.get("name")
+                                if isinstance(name, str) and name.startswith("state/"):
+                                    before_state_label = name
+                                    break
             except Exception as exc:
                 log.warning(f"Cannot read issue state for no-op gate: {exc}")
 

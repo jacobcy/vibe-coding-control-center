@@ -12,6 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.exceptions.runtime_errors import GitHubAPIError
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 
 
@@ -43,8 +44,8 @@ class TestRetryCounterPersistence:
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
 
-            # Should raise after first failure
-            with pytest.raises(RuntimeError, match="Cannot verify remote state"):
+            # Should raise GitHubAPIError after first failure
+            with pytest.raises(GitHubAPIError, match="Cannot verify remote state"):
                 apply_unified_noop_gate(
                     store=temp_db,
                     issue_number=issue_number,
@@ -78,8 +79,8 @@ class TestRetryCounterPersistence:
         ):
             mock_gh.return_value.view_issue.return_value = None  # Malformed response
 
-            # Should raise after first failure
-            with pytest.raises(RuntimeError, match="Malformed GitHub response"):
+            # Should raise GitHubAPIError after first failure
+            with pytest.raises(GitHubAPIError, match="Malformed GitHub response"):
                 apply_unified_noop_gate(
                     store=temp_db,
                     issue_number=issue_number,
@@ -153,9 +154,8 @@ class TestRetryCounterPersistence:
         with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
             mock_gh.return_value.view_issue.side_effect = Exception("GitHub API failed")
 
-            # Should raise error (not block flow)
             with pytest.raises(
-                RuntimeError, match="Cannot verify remote state.*after 3 retries"
+                GitHubAPIError, match="Cannot verify remote state.*after 3 retries"
             ):
                 apply_unified_noop_gate(
                     store=temp_db,
