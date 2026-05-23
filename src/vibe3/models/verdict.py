@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from vibe3.services.verdict_policy import VerdictValue
+from vibe3.models.verdict_types import VerdictValue
 
 
 class VerdictRecord(BaseModel):
