@@ -18,20 +18,6 @@ TRANSITION_LIMIT_SOFT = 10  # Standard flow limit
 TRANSITION_LIMIT_HARD = 20  # Hard limit with tolerance
 
 
-def extract_state_label(issue_payload: dict[str, object]) -> str | None:
-    """Extract state/ label from GitHub issue payload."""
-    labels = issue_payload.get("labels")
-    if not isinstance(labels, list):
-        return None
-    for label in labels:
-        if not isinstance(label, dict):
-            continue
-        name = label.get("name")
-        if isinstance(name, str) and name.startswith("state/"):
-            return name
-    return None
-
-
 def _extract_latest_verdict(flow_state: dict | None) -> VerdictValue | None:
     if not flow_state:
         return None

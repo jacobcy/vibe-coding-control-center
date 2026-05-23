@@ -69,6 +69,11 @@ class StateVerificationService:
             )
 
         labels = issue_payload.get("labels", [])
+        if not isinstance(labels, list):
+            self._handle_malformed_response(
+                issue_payload, issue_number, branch, flow_state
+            )
+
         for label in labels:
             if isinstance(label, dict):
                 label_name = label.get("name", "")

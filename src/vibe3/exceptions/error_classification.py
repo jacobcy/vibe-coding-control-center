@@ -10,7 +10,10 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.exceptions import AgentExecutionError, AgentPresetNotFoundError
+from vibe3.exceptions import (
+    AgentExecutionError,
+    AgentPresetNotFoundError,
+)
 from vibe3.exceptions.error_codes import (
     E_API_NETWORK,
     E_API_RATE_LIMIT,
@@ -27,6 +30,7 @@ from vibe3.exceptions.error_codes import (
     E_MODEL_PERMISSION,
 )
 from vibe3.exceptions.error_severity import ErrorHandlingContract, ErrorSeverity
+from vibe3.exceptions.runtime_errors import APIError, GitHubAPIError
 
 if TYPE_CHECKING:
     pass
@@ -41,6 +45,9 @@ EXCEPTION_TO_ERROR_CODE: dict[type[BaseException], str] = {
     # vibe3 exceptions
     AgentExecutionError: E_EXEC_UNKNOWN,
     AgentPresetNotFoundError: E_MODEL_CONFIG,
+    # Runtime infrastructure errors
+    GitHubAPIError: E_API_UNAVAILABLE,
+    APIError: E_API_UNKNOWN,
 }
 
 # Exception name → error code mapping for string matching (supplements current logic)
