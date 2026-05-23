@@ -64,7 +64,9 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_tracking,
+        patch(
+            "vibe3.services.error_tracking_service.ErrorTrackingService"
+        ) as mock_tracking,
         patch(
             "vibe3.services.flow_cleanup_service.FlowCleanupService"
         ) as mock_cleanup_cls,
@@ -140,7 +142,9 @@ def test_auto_scene_reset_skips_when_live_session_exists(
         return Path(req.repo_path) if req.repo_path else tmp_path
 
     with (
-        patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_tracking,
+        patch(
+            "vibe3.services.error_tracking_service.ErrorTrackingService"
+        ) as mock_tracking,
         patch(
             "vibe3.services.flow_cleanup_service.FlowCleanupService"
         ) as mock_cleanup_cls,
@@ -200,7 +204,9 @@ def test_auto_scene_reset_aborted_on_live_session_race(
             "vibe3.execution.auto_scene_recovery._read_worktree_head",
             return_value="HEAD",
         ),
-        patch("vibe3.exceptions.error_tracking.ErrorTrackingService") as mock_tracking,
+        patch(
+            "vibe3.services.error_tracking_service.ErrorTrackingService"
+        ) as mock_tracking,
         patch(
             "vibe3.services.flow_cleanup_service.FlowCleanupService"
         ) as mock_cleanup_cls,
