@@ -44,6 +44,12 @@
 - **版本规划**: 通过 `roadmap/*` 标签控制
 - **Milestone 分配**: 通过 GitHub Milestone 功能控制
 - **执行状态**: 通过 `state/*` 标签控制（由执行层管理）
+  - `state/ready`: 已识别的待治理/待 intake 候选（由 `cron-supervisor` 识别或人工标记）
+  - `state/handoff`: 已通过审查、准备执行的任务（由 `roadmap-intake` 判定）
+  - `state/claimed`: 已被 agent 认领
+  - `state/in-progress`: 正在执行中
+  - `state/done`: 已完成
+  - `state/blocked`: 已阻塞
 
 ### 2.3 队列排序规则
 
@@ -76,6 +82,14 @@ state/* (当前状态)
 ### 3.1 新 Issue 处理流程
 
 当有新 issue 创建时，按照以下流程处理：
+
+#### Step 0: 治理与分诊 (Governance & Intake)
+
+对于治理类任务（带 `supervisor` 标签）或待入库任务，遵循以下 Tier 3 治理流程：
+
+1.  **识别 (Identification)**: `cron-supervisor` 周期性扫描过时文档或治理需求，创建 issue 并标记 `state/ready`。
+2.  **审查 (Intake)**: `roadmap-intake` 执行三级审查（基础条件、架构一致性、生命周期），通过后将 `state/ready` 晋升为 `state/handoff`。
+3.  **派发 (Dispatch)**: Orchestra 检测到 `state/handoff` 标签，根据角色材料（`supervisor/apply.md` 等）启动异步执行 session。
 
 #### Step 1: 评估类型
 

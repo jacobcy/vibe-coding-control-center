@@ -65,16 +65,19 @@ Publisher.publish(event) → EventPublisher 查找订阅者 → 调用 handlers
 **五层架构**：
 ```
 L0  Orchestra / Heartbeat          -- 调度主循环
-L1  Governance Service             -- 定期扫描，只操作 GitHub labels
-L2  Supervisor + Apply             -- 轻量治理执行，临时 worktree 隔离
+L1  Governance Service             -- 定期扫描（cron-supervisor, roadmap-intake），只操作 GitHub labels
+                                      真源：supervisor/governance/ (cron-supervisor.md, roadmap-intake.md)
+L2  Supervisor + Apply             -- 轻量治理执行（supervisor-apply），临时 worktree 隔离
+                                      真源：supervisor/apply.md
 L3  Manager / Plan / Run / Review  -- 代码开发核心，独立 worktree
 L4  Human collaboration            -- 人工协作流程
 ```
 
 **Worktree 语义**：
-- **L1**: 无 worktree（`cwd=None`）
+- **L0/L1**: 无 worktree（`cwd=None`）
 - **L2**: 临时 worktree（`--worktree` 标志）
 - **L3**: 持久 worktree（`cwd=wt_path`）
+
 
 **详细文档**: [vibe3-worktree-ownership-standard.md](standards/vibe3-worktree-ownership-standard.md)
 
