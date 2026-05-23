@@ -42,7 +42,7 @@ class BlockedStateService:
         store: SQLiteClient | None = None,
     ) -> None:
         self._io = BlockedStateIO(
-            github_client=github_client or GitHubClient(),
+            github_client=github_client,
             label_service=label_service,
             store=store,
         )
