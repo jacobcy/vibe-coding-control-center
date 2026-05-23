@@ -5,6 +5,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.loc_service import LocService, LOCStats
 
 LOC_SENTINEL = "<!-- vibe3:pr-loc-summary -->"
@@ -27,6 +28,7 @@ class PRLocCommentService:
         self.github_client = github_client
         self.loc_service = loc_service or LocService()
 
+    @trace_method("PRLocCommentService.publish_loc_summary", layer="service")
     def publish_loc_summary(self, pr_number: int) -> str:
         """Publish or update LOC summary comment on a PR.
 

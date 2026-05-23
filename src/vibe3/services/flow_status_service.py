@@ -9,6 +9,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestration import IssueState
+from vibe3.observability.trace_method import trace_method
 
 
 class FlowStatusService:
@@ -31,6 +32,7 @@ class FlowStatusService:
         self.git_client = git_client
         self.github_client = github_client
 
+    @trace_method("FlowStatusService.rebuild_stale_ready_flow", layer="service")
     def rebuild_stale_ready_flow(
         self,
         branch: str,
@@ -64,6 +66,7 @@ class FlowStatusService:
         orchestrator.create_flow_for_issue(issue)
         return True
 
+    @trace_method("FlowStatusService.mark_flow_status", layer="service")
     def mark_flow_status(
         self,
         branch: str,
@@ -91,6 +94,7 @@ class FlowStatusService:
         """Check if branch follows the task/issue-N auto-flow pattern."""
         return branch.startswith("task/issue-")
 
+    @trace_method("FlowStatusService.mark_flow_done", layer="service")
     def mark_flow_done(
         self,
         branch: str,
@@ -168,12 +172,14 @@ class FlowStatusService:
 
         return suggestions
 
+    @trace_method("FlowStatusService.mark_flow_aborted", layer="service")
     def mark_flow_aborted(self, branch: str, reason: str) -> None:
         """Mark a flow as aborted and record the event."""
         self.mark_flow_status(
             branch, "aborted", reason, "flow_auto_aborted", "auto_abort_flow"
         )
 
+    @trace_method("FlowStatusService.mark_flow_stale", layer="service")
     def mark_flow_stale(self, branch: str, reason: str) -> None:
         """Mark an empty active flow as stale and record the event."""
         self.mark_flow_status(

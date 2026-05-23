@@ -15,6 +15,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.observability.trace_method import trace_method
 from vibe3.orchestra.queue_ordering import (
     resolve_priority,
     resolve_roadmap_rank,
@@ -210,6 +211,7 @@ class StatusQueryService:
             self._title_cache = IssueTitleCacheService(self.store, self.github)
         return self._title_cache
 
+    @trace_method("StatusQueryService.fetch_orchestrated_issues", layer="service")
     def fetch_orchestrated_issues(
         self,
         flows: list[FlowStatusResponse],
@@ -383,6 +385,7 @@ class StatusQueryService:
         # Combine: ready issues first (sorted with real ranks), then others
         return ready_issues + other_issues
 
+    @trace_method("StatusQueryService.fetch_worktree_map", layer="service")
     def fetch_worktree_map(self) -> dict[str, str]:
         """Get worktree branch-to-directory mapping.
 
@@ -405,6 +408,7 @@ class StatusQueryService:
             pass
         return worktree_map
 
+    @trace_method("StatusQueryService.fetch_resume_candidates", layer="service")
     def fetch_resume_candidates(
         self,
         flows: list[FlowStatusResponse],

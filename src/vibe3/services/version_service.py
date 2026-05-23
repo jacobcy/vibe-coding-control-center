@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from vibe3.models.pr import VersionBumpResponse, VersionBumpType
+from vibe3.observability.trace_method import trace_method
 
 
 class VersionService:
@@ -20,6 +21,7 @@ class VersionService:
             version_file = project_root / "VERSION"
         self.version_file = Path(version_file)
 
+    @trace_method("VersionService.get_current_version", layer="service")
     def get_current_version(self) -> str:
         """Get current version from VERSION file.
 
@@ -39,6 +41,7 @@ class VersionService:
 
         return version
 
+    @trace_method("VersionService.calculate_bump", layer="service")
     def calculate_bump(
         self,
         group: str | None = None,

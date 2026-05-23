@@ -21,6 +21,7 @@ from vibe3.models.orchestration import (
     IssueState,
     StateTransition,
 )
+from vibe3.observability.trace_method import trace_method
 
 
 class LabelService:
@@ -33,6 +34,7 @@ class LabelService:
     ) -> None:
         self.issue_port = issue_port or GhIssueLabelPort(repo=repo)
 
+    @trace_method("LabelService.get_state", layer="service")
     def get_state(self, issue_number: int) -> IssueState | None:
         """Get current orchestration state of an issue.
 
@@ -63,6 +65,7 @@ class LabelService:
 
         return None
 
+    @trace_method("LabelService.transition", layer="service")
     def transition(
         self,
         issue_number: int,
@@ -110,6 +113,7 @@ class LabelService:
             forced=force,
         )
 
+    @trace_method("LabelService.confirm_issue_state", layer="service")
     def confirm_issue_state(
         self,
         issue_number: int,
@@ -127,6 +131,7 @@ class LabelService:
             return "blocked"
         return "advanced"
 
+    @trace_method("LabelService.set_state", layer="service")
     def set_state(self, issue_number: int, state: IssueState) -> None:
         """Directly set state (internal method, atomically replace state/* labels).
 
@@ -156,11 +161,13 @@ class LabelService:
             return []
         return [name for name in labels if name.startswith("state/")]
 
+    @trace_method("LabelService.has_label", layer="service")
     def has_label(self, issue_number: int, label: str) -> bool:
         """Check whether an issue currently has the given label."""
         labels = self.issue_port.get_issue_labels(issue_number)
         return labels is not None and label in labels
 
+    @trace_method("LabelService.confirm_vibe_task", layer="service")
     def confirm_vibe_task(
         self,
         issue_number: int,

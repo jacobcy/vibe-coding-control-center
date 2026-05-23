@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.observability.trace_method import trace_method
+
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.clients.github_client import GitHubClient
@@ -38,6 +40,7 @@ class FlowTimelineService:
         self.store = SQLiteClient() if store is None else store
         self.github_client = GitHubClient() if github_client is None else github_client
 
+    @trace_method("FlowTimelineService.record_timeline_event", layer="service")
     def record_timeline_event(
         self,
         branch: str,

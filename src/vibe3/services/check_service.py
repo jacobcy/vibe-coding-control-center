@@ -15,6 +15,7 @@ from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.check_remote import (
     CheckRemote,
     is_empty_auto_scene,
@@ -103,6 +104,7 @@ class CheckService(CheckRemote):
     # Core Logic
     # ------------------------------------------------------------------
 
+    @trace_method("CheckService.verify_current_flow", layer="service")
     def verify_current_flow(self) -> CheckResult:
         """Verify current branch flow consistency."""
         logger.bind(domain="check", action="verify").info("Verifying flow consistency")
@@ -113,6 +115,7 @@ class CheckService(CheckRemote):
 
         return self._check_branch(branch)
 
+    @trace_method("CheckService.verify_branch", layer="service")
     def verify_branch(self, branch: str) -> CheckResult:
         """Verify a specific branch flow consistency.
 
@@ -576,6 +579,7 @@ class CheckService(CheckRemote):
             is_valid=is_valid, issues=issues, warnings=warnings, branch=branch
         )
 
+    @trace_method("CheckService.verify_all_flows", layer="service")
     def verify_all_flows(
         self,
         status: str | list[str] | None = "active",
@@ -613,6 +617,7 @@ class CheckService(CheckRemote):
                 on_progress(i, total, flow["branch"])
         return results
 
+    @trace_method("CheckService.auto_fix", layer="service")
     def auto_fix(self, issues: list[str], *, branch: str | None = None) -> FixResult:
         """Auto-fix local consistency issues for a branch."""
         branch = branch or self.git_client.get_current_branch()

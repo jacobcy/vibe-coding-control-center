@@ -9,6 +9,7 @@ from rich.prompt import Prompt
 
 from vibe3.clients.ai_suggestion_client import AISuggestionClient
 from vibe3.config.settings import VibeConfig
+from vibe3.observability.trace_method import trace_method
 from vibe3.prompts.template_loader import _resolve_prompts_path
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
@@ -45,6 +46,7 @@ class PRCreateUsecase:
             BaseResolutionUsecase() if base_resolver is None else base_resolver
         )
 
+    @trace_method("PRCreateUsecase.check_flow_task", layer="service")
     def check_flow_task(self, branch: str, *, yes: bool = False) -> None:
         """Require current flow to have task bound unless bypassed by --yes."""
         flow_status = self._flow_service.get_flow_status(branch)
@@ -56,6 +58,7 @@ class PRCreateUsecase:
         if yes and (flow_status is None or flow_status.task_issue_number is None):
             logger.warning("Bypassing missing task binding via --yes")
 
+    @trace_method("PRCreateUsecase.suggest_content", layer="service")
     def suggest_content(
         self,
         branch: str,
@@ -98,6 +101,7 @@ class PRCreateUsecase:
         body = self._resolve_field(suggested_body or "", "body", interactive)
         return (title, body)
 
+    @trace_method("PRCreateUsecase.resolve_title", layer="service")
     def resolve_title(self, title: str, ai_title: str, interactive: bool) -> str:
         """Return final PR title, prompting if needed."""
         if title:

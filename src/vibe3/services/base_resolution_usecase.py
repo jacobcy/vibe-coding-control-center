@@ -6,6 +6,7 @@ from typing import Callable, Literal
 from vibe3.clients.git_client import GitClient, GitClientProtocol
 from vibe3.exceptions import UserError
 from vibe3.models.change_source import BranchSource
+from vibe3.observability.trace_method import trace_method
 from vibe3.utils.branch_utils import find_parent_branch
 
 MAIN_BRANCH_NAME = "main"
@@ -47,6 +48,7 @@ class BaseResolutionUsecase:
         """Resolve base branch for PR creation while preserving current default."""
         return requested_base or MAIN_BRANCH_NAME
 
+    @trace_method("BaseResolutionUsecase.resolve_inspect_base", layer="service")
     def resolve_inspect_base(
         self,
         requested_base: str | None,
@@ -59,6 +61,7 @@ class BaseResolutionUsecase:
             default_policy="parent",
         )
 
+    @trace_method("BaseResolutionUsecase.resolve_review_base", layer="service")
     def resolve_review_base(
         self,
         requested_base: str | None,
@@ -71,6 +74,7 @@ class BaseResolutionUsecase:
             default_policy="parent",
         )
 
+    @trace_method("BaseResolutionUsecase.resolve_flow_create_base", layer="service")
     def resolve_flow_create_base(
         self,
         requested_base: str | None,
@@ -84,6 +88,7 @@ class BaseResolutionUsecase:
             default_policy=default_policy,
         ).base_branch
 
+    @trace_method("BaseResolutionUsecase.resolve_base", layer="service")
     def resolve_base(
         self,
         requested_base: str | None,
@@ -112,6 +117,7 @@ class BaseResolutionUsecase:
             return ResolvedBase(base_branch=MAIN_BRANCH_REF, auto_detected=False)
         return ResolvedBase(base_branch=token, auto_detected=False)
 
+    @trace_method("BaseResolutionUsecase.collect_branch_material", layer="service")
     def collect_branch_material(
         self,
         base_branch: str,

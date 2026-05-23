@@ -14,6 +14,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
@@ -71,6 +72,7 @@ class TaskResumeUsecase:
             issue_flow_service=self.issue_flow_service,
         )
 
+    @trace_method("TaskResumeUsecase.resume_issues", layer="service")
     def resume_issues(
         self,
         issue_numbers: list[int] | None = None,

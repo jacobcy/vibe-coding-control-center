@@ -3,6 +3,7 @@
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.config.settings import VibeConfig
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.flow_block_mixin import FlowLifecycleMixin
 from vibe3.services.flow_transition import FlowTransitionMixin
 from vibe3.services.git_path_client import GitPathProtocol
@@ -42,6 +43,7 @@ class FlowService(FlowLifecycleMixin, FlowTransitionMixin):
         self.git_client = GitClient() if git_client is None else git_client
         self.config = VibeConfig.get_defaults() if config is None else config
 
+    @trace_method("FlowService.get_current_branch", layer="service")
     def get_current_branch(self) -> str:
         """Get current git branch.
 

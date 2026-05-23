@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.observability.trace_method import trace_method
+
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
@@ -42,6 +44,7 @@ class CheckCleanupService:
         self.git_client = git_client
         self._github_client = github_client
 
+    @trace_method("CheckCleanupService.clean_residual_branches", layer="service")
     def clean_residual_branches(self) -> dict[str, Any]:
         """Check and clean residual branches for terminal flows.
 
@@ -438,6 +441,7 @@ class CheckCleanupService:
             wt_head = ""
             is_detached = False
 
+            @trace_method("CheckCleanupService.flush", layer="service")
             def flush() -> None:
                 nonlocal wt_path, wt_head, is_detached
                 if wt_path:

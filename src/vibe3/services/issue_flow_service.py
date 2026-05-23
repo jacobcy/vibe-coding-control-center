@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.observability.trace_method import trace_method
 
 if TYPE_CHECKING:
     from vibe3.services.convention_resolver import ConventionResolver
@@ -41,6 +42,7 @@ class IssueFlowService:
     store: SQLiteClient = field(default_factory=_default_store)
     resolver: "ConventionResolver" = field(default_factory=_default_resolver)
 
+    @trace_method("IssueFlowService.canonical_branch_name", layer="service")
     def canonical_branch_name(self, issue_number: int) -> str:
         """Return canonical task branch name.
 
@@ -57,6 +59,7 @@ class IssueFlowService:
         convention = self.resolver.resolve()
         return convention.branch.canonical_branch(issue_number)
 
+    @trace_method("IssueFlowService.parse_issue_number", layer="service")
     def parse_issue_number(self, branch: str) -> int | None:
         """Extract issue number from canonical task branch.
 
@@ -82,6 +85,7 @@ class IssueFlowService:
         # Delegate to convention's parsing
         return convention.branch.parse_issue_number(branch)
 
+    @trace_method("IssueFlowService.parse_issue_number_any", layer="service")
     def parse_issue_number_any(self, branch: str) -> int | None:
         """Extract issue number from task or dev issue branch.
 
@@ -106,6 +110,7 @@ class IssueFlowService:
         convention = self.resolver.resolve()
         return convention.branch.parse_issue_number(branch)
 
+    @trace_method("IssueFlowService.is_issue_branch", layer="service")
     def is_issue_branch(self, branch: str) -> bool:
         """Check if branch is an issue branch (task/issue-N or dev/issue-N).
 
@@ -126,6 +131,7 @@ class IssueFlowService:
         convention = self.resolver.resolve()
         return convention.branch.parse_issue_number(branch) is not None
 
+    @trace_method("IssueFlowService.is_task_branch", layer="service")
     def is_task_branch(self, branch: str) -> bool:
         """Check if branch is a task branch (starts with task prefix).
 
@@ -146,6 +152,7 @@ class IssueFlowService:
         convention = self.resolver.resolve()
         return branch.startswith(convention.branch.task_prefix)
 
+    @trace_method("IssueFlowService.is_canonical_task_branch", layer="service")
     def is_canonical_task_branch(
         self, branch: str, task_issue_number: int | None
     ) -> bool:
@@ -170,6 +177,7 @@ class IssueFlowService:
             task_issue_number
         )
 
+    @trace_method("IssueFlowService.find_active_flow", layer="service")
     def find_active_flow(self, issue_number: int) -> dict | None:
         """Find active flow for an issue with deterministic selection.
 

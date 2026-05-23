@@ -13,6 +13,7 @@ from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.pr_service import PRService
@@ -67,6 +68,7 @@ class TaskService:
     # Core task operations
     # ------------------------------------------------------------------
 
+    @trace_method("TaskService.link_issue", layer="service")
     def link_issue(
         self,
         branch: str,
@@ -164,6 +166,7 @@ class TaskService:
             issue_role=role,
         )
 
+    @trace_method("TaskService.reclassify_issue", layer="service")
     def reclassify_issue(
         self,
         branch: str,
@@ -386,11 +389,13 @@ class TaskService:
             self._issue_label_port = GhIssueLabelPort(repo=config.repo)
         return self._issue_label_port
 
+    @trace_method("TaskService.get_task", layer="service")
     def get_task(self, branch: str) -> FlowStatusResponse | None:
         """Get task (flow) details."""
         logger.bind(domain="task", action="get", branch=branch).debug("Getting task")
         return self._flow_service.get_flow_status(branch)
 
+    @trace_method("TaskService.fetch_issue_with_comments", layer="service")
     def fetch_issue_with_comments(
         self, issue_number: int
     ) -> dict[str, object] | str | None:
@@ -404,6 +409,7 @@ class TaskService:
         """
         return self._show_service.fetch_issue_with_comments(issue_number)
 
+    @trace_method("TaskService.resolve_branch", layer="service")
     def resolve_branch(
         self,
         branch: str | None = None,
@@ -425,6 +431,7 @@ class TaskService:
             branch, pr_number=pr_number, position_arg=position_arg
         )
 
+    @trace_method("TaskService.show_task", layer="service")
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state."""
         return self._show_service.show_task(branch)

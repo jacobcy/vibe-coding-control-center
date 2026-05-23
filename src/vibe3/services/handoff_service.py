@@ -11,6 +11,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import FlowEvent
 from vibe3.models.verdict import VerdictRecord
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.actor_support import (
     extract_role_from_actor,
 )
@@ -107,6 +108,7 @@ class HandoffService:
             ),
         )
 
+    @trace_method("HandoffService.get_handoff_events", layer="service")
     def get_handoff_events(
         self,
         branch: str,
@@ -133,6 +135,7 @@ class HandoffService:
             handoff_events = handoff_events[:limit]
         return handoff_events
 
+    @trace_method("HandoffService.get_success_handoff_events", layer="service")
     def get_success_handoff_events(
         self,
         branch: str,
@@ -160,6 +163,7 @@ class HandoffService:
             success_events = success_events[:limit]
         return success_events
 
+    @trace_method("HandoffService.append_current_handoff", layer="service")
     def append_current_handoff(
         self,
         message: str,
@@ -304,6 +308,7 @@ class HandoffService:
 
         return handoff_path
 
+    @trace_method("HandoffService.record_plan", layer="service")
     def record_plan(
         self,
         plan_ref: str,
@@ -319,6 +324,7 @@ class HandoffService:
         """
         return self._record_ref("plan", plan_ref, actor, branch=branch)
 
+    @trace_method("HandoffService.record_report", layer="service")
     def record_report(
         self,
         report_ref: str,
@@ -334,6 +340,7 @@ class HandoffService:
         """
         return self._record_ref("report", report_ref, actor, branch=branch)
 
+    @trace_method("HandoffService.record_audit", layer="service")
     def record_audit(
         self,
         audit_ref: str,
@@ -380,6 +387,7 @@ class HandoffService:
                 branch=branch,
             )
 
+    @trace_method("HandoffService.record_indicate", layer="service")
     def record_indicate(
         self,
         indicate_ref: str,
@@ -395,6 +403,7 @@ class HandoffService:
         """
         return self._record_ref("indicate", indicate_ref, actor, branch=branch)
 
+    @trace_method("HandoffService.record_next_step", layer="service")
     def record_next_step(
         self,
         branch: str,
@@ -418,6 +427,7 @@ class HandoffService:
             detail=f"Next Step: {next_step}",
         )
 
+    @trace_method("HandoffService.record_passive_artifact", layer="service")
     def record_passive_artifact(
         self,
         *,
@@ -535,6 +545,7 @@ class HandoffService:
         )
         return artifact_path
 
+    @trace_method("HandoffService.record_ci_status", layer="service")
     def record_ci_status(
         self,
         branch: str,
@@ -557,6 +568,7 @@ class HandoffService:
         """
         return self.external_recorder.record_ci_status(branch, pr_number, status, actor)
 
+    @trace_method("HandoffService.record_pr_comments", layer="service")
     def record_pr_comments(
         self,
         branch: str,

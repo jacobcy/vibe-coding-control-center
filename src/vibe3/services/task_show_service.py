@@ -13,6 +13,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.artifact_parser import ArtifactParser
 from vibe3.services.flow_service import FlowService
 from vibe3.services.path_helpers import resolve_ref_path
@@ -104,12 +105,14 @@ class TaskShowService:
         self.flow_service = flow_service
         self.github_client = github_client
 
+    @trace_method("TaskShowService.fetch_issue_with_comments", layer="service")
     def fetch_issue_with_comments(
         self, issue_number: int
     ) -> dict[str, object] | str | None:
         """Fetch issue data including comments from GitHub."""
         return self.github_client.view_issue(issue_number)
 
+    @trace_method("TaskShowService.resolve_branch", layer="service")
     def resolve_branch(
         self,
         branch: str | None = None,
@@ -326,6 +329,7 @@ class TaskShowService:
             checks=self._normalize_pr_checks(pr),
         )
 
+    @trace_method("TaskShowService.show_task", layer="service")
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state plus quick remote summary."""
         target_branch = self.resolve_branch(branch)

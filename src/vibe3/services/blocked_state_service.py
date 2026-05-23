@@ -17,6 +17,7 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.blocked_state_io import BlockedStateIO
 from vibe3.services.blocked_state_types import BlockedState, ConsistencyReport
 from vibe3.services.flow_timeline_service import FlowTimelineService
@@ -52,6 +53,7 @@ class BlockedStateService:
     # Public API: Write Operations
     # ========================================================================
 
+    @trace_method("BlockedStateService.block", layer="service")
     def block(
         self,
         branch: str,
@@ -127,6 +129,7 @@ class BlockedStateService:
                     branch=branch,
                 ).warning(f"Failed to write timeline event: {exc}")
 
+    @trace_method("BlockedStateService.unblock", layer="service")
     def unblock(
         self,
         branch: str,
@@ -192,6 +195,7 @@ class BlockedStateService:
     # Public API: Query Operations
     # ========================================================================
 
+    @trace_method("BlockedStateService.is_blocked", layer="service")
     def is_blocked(
         self,
         branch: str,
@@ -201,6 +205,7 @@ class BlockedStateService:
         state = self.resolve_truth(branch, issue_number)
         return state.is_blocked
 
+    @trace_method("BlockedStateService.get_blocked_reason", layer="service")
     def get_blocked_reason(
         self,
         branch: str,
@@ -210,6 +215,7 @@ class BlockedStateService:
         state = self.resolve_truth(branch, issue_number)
         return state.blocked_reason
 
+    @trace_method("BlockedStateService.write_cache", layer="service")
     def write_cache(
         self,
         branch: str,
@@ -233,6 +239,7 @@ class BlockedStateService:
     # Public API: Synchronization
     # ========================================================================
 
+    @trace_method("BlockedStateService.sync_cache_from_truth", layer="service")
     def sync_cache_from_truth(
         self,
         branch: str,
@@ -273,6 +280,7 @@ class BlockedStateService:
 
         return truth_state
 
+    @trace_method("BlockedStateService.resolve_truth", layer="service")
     def resolve_truth(
         self,
         branch: str,
@@ -291,6 +299,7 @@ class BlockedStateService:
 
         return body_state
 
+    @trace_method("BlockedStateService.validate_consistency", layer="service")
     def validate_consistency(
         self,
         branch: str,

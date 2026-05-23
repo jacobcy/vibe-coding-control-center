@@ -10,6 +10,7 @@ from rich.table import Table
 
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.observability.trace_method import trace_method
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.services.error_tracking_service import ErrorTrackingService
 from vibe3.utils.error_message_cleaner import (
@@ -31,6 +32,7 @@ class ServeStatusService:
         self.config = config or load_orchestra_config()
         self.console = Console()
 
+    @trace_method("ServeStatusService.display_status", layer="service")
     def display_status(
         self,
         pid: int | None,

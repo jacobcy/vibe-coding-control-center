@@ -14,6 +14,7 @@ from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.models.pr import PRState
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.flow_cleanup_service import FlowCleanupService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import block_manager_noop_issue
@@ -60,12 +61,14 @@ class FlowOrchestratorService:
         self.issue_flow_service = IssueFlowService(store=self.store)
         self.task_service = TaskService(store=self.store)
 
+    @trace_method("FlowOrchestratorService.snapshot", layer="service")
     def snapshot(self) -> OrchestraSnapshot | None:
         """Get current orchestra snapshot."""
         return OrchestraStatusService.fetch_live_snapshot(self.config)
 
     # FlowReader protocol implementation
 
+    @trace_method("FlowOrchestratorService.get_flow_for_issue", layer="service")
     def get_flow_for_issue(self, issue_number: int) -> dict[str, Any] | None:
         """Return the active flow record for the given issue, or None.
 
@@ -76,6 +79,7 @@ class FlowOrchestratorService:
         """
         return self.issue_flow_service.find_active_flow(issue_number)
 
+    @trace_method("FlowOrchestratorService.get_pr_for_issue", layer="service")
     def get_pr_for_issue(self, issue_number: int) -> int | None:
         """Return the PR number associated with the issue's flow, or None.
 
@@ -107,12 +111,14 @@ class FlowOrchestratorService:
 
         return None
 
+    @trace_method("FlowOrchestratorService.get_active_flow_count", layer="service")
     def get_active_flow_count(self) -> int:
         """Return the number of currently active flows."""
         return self.store.get_active_flow_count()
 
     # Flow creation logic
 
+    @trace_method("FlowOrchestratorService.bootstrap_issue_flow", layer="service")
     def bootstrap_issue_flow(
         self,
         issue: IssueInfo,
@@ -224,6 +230,7 @@ class FlowOrchestratorService:
                 ).error(f"Failed cleanup after bootstrap failure: {cleanup_exc}")
             raise
 
+    @trace_method("FlowOrchestratorService.rebuild_stale_issue_flow", layer="service")
     def rebuild_stale_issue_flow(
         self,
         issue: IssueInfo,
@@ -277,6 +284,7 @@ class FlowOrchestratorService:
             reactivate_existing=True,
         )
 
+    @trace_method("FlowOrchestratorService.create_flow_for_issue", layer="service")
     def create_flow_for_issue(self, issue: IssueInfo) -> dict[str, Any] | None:
         """Create flow for issue, handling existing flows and branch creation.
 

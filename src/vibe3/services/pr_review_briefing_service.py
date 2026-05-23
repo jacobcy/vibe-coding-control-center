@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.observability.trace_method import trace_method
 
 SENTINEL = "<!-- vibe3:pr-review-briefing -->"
 
@@ -14,6 +15,7 @@ class PRReviewBriefingService:
     def __init__(self, github_client: GitHubClientProtocol) -> None:
         self.github_client = github_client
 
+    @trace_method("PRReviewBriefingService.publish_briefing", layer="service")
     def publish_briefing(
         self, pr_number: int, requested_reviewers: list[str] | None = None
     ) -> str:

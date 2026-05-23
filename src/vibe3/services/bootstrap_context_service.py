@@ -4,6 +4,8 @@ import shlex
 from dataclasses import dataclass, field
 from typing import Literal
 
+from vibe3.observability.trace_method import trace_method
+
 BootstrapActionKind = Literal[
     "bootstrap_flow_scene",
     "snapshot_save",
@@ -34,6 +36,7 @@ class BootstrapContextService:
     It does NOT execute commands directly.
     """
 
+    @trace_method("BootstrapContextService.plan_vibe_new_bootstrap", layer="service")
     def plan_vibe_new_bootstrap(
         self,
         *,

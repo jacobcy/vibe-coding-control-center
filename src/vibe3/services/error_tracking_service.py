@@ -17,6 +17,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.exceptions.error_classification import get_error_handling_contract
 from vibe3.exceptions.error_severity import ErrorSeverity
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.error_tracking_cleanup import (
     cleanup_old_errors as _cleanup_old_errors,
 )
@@ -162,6 +163,7 @@ class ErrorTrackingService:
         if self.retention_days <= 0:
             raise ValueError(f"retention_days must be positive, got {retention_days}")
 
+    @trace_method("ErrorTrackingService.record_error", layer="service")
     def record_error(
         self,
         error_code: str,
@@ -239,26 +241,32 @@ class ErrorTrackingService:
 
     # --- Query methods (delegate to error_tracking_queries module) ---
 
+    @trace_method("ErrorTrackingService.get_error_counts", layer="service")
     def get_error_counts(self) -> dict[str, int]:
         """Get current error counts from error_log."""
         return _get_error_counts(self.db_path)
 
+    @trace_method("ErrorTrackingService.has_critical_error", layer="service")
     def has_critical_error(self) -> bool:
         """Check if there are any CRITICAL severity errors."""
         return _has_critical_error(self.db_path)
 
+    @trace_method("ErrorTrackingService.get_critical_error_codes", layer="service")
     def get_critical_error_codes(self) -> list[str]:
         """Get error codes of CRITICAL severity errors."""
         return _get_critical_error_codes(self.db_path)
 
+    @trace_method("ErrorTrackingService.has_model_config_error", layer="service")
     def has_model_config_error(self) -> bool:
         """Check if there are any model configuration errors."""
         return _has_model_config_error(self.db_path)
 
+    @trace_method("ErrorTrackingService.get_api_error_count", layer="service")
     def get_api_error_count(self) -> int:
         """Get count of recent API errors within configured time window."""
         return _get_api_error_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
+    @trace_method("ErrorTrackingService.get_api_and_exec_error_count", layer="service")
     def get_api_and_exec_error_count(self) -> int:
         """Get count of E_API_* and E_EXEC_* errors within time window.
 
@@ -267,36 +275,44 @@ class ErrorTrackingService:
         """
         return _get_api_and_exec_error_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
+    @trace_method("ErrorTrackingService.get_threshold_error_count", layer="service")
     def get_threshold_error_count(self) -> int:
         """Get count of ERROR-severity errors within time window."""
         return _get_threshold_error_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
+    @trace_method("ErrorTrackingService.get_warning_count", layer="service")
     def get_warning_count(self) -> int:
         """Get count of WARNING-severity errors within time window."""
         return _get_warning_count(self.db_path, self.TIME_WINDOW_MINUTES)
 
+    @trace_method("ErrorTrackingService.get_recent_errors", layer="service")
     def get_recent_errors(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent errors for status display."""
         return _get_recent_errors(self.db_path, limit)
 
+    @trace_method("ErrorTrackingService.get_status", layer="service")
     def get_status(self) -> dict[str, Any]:
         """Get error tracking status for display with severity breakdown."""
         return _get_status(self.db_path, self.TIME_WINDOW_MINUTES, self.THRESHOLD_COUNT)
 
+    @trace_method("ErrorTrackingService.get_all_errors_status", layer="service")
     def get_all_errors_status(self) -> dict[str, Any]:
         """Get error tracking status for ALL errors in database."""
         return _get_all_errors_status(self.db_path)
 
     # --- Cleanup methods (delegate to error_tracking_cleanup module) ---
 
+    @trace_method("ErrorTrackingService.clear", layer="service")
     def clear(self, cleared_by: str, reason: str) -> None:
         """Clear all error records."""
         _clear_errors(self.db_path, cleared_by, reason)
 
+    @trace_method("ErrorTrackingService.cleanup_old_errors", layer="service")
     def cleanup_old_errors(self) -> int:
         """Delete error records older than retention period."""
         return _cleanup_old_errors(self.db_path, self.retention_days)
 
+    @trace_method("ErrorTrackingService.cleanup_terminal_issue_errors", layer="service")
     def cleanup_terminal_issue_errors(self) -> int:
         """Delete error records for issues with terminal flow status."""
         return _cleanup_terminal_issue_errors(self.db_path)

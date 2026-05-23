@@ -14,6 +14,7 @@ from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
 from vibe3.services.pr_service import PRService
@@ -234,6 +235,7 @@ class OrchestraStatusService:
             )
             return None
 
+    @trace_method("OrchestraStatusService.snapshot", layer="service")
     def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
         """Build current status snapshot for the assignee issue pool.
 
@@ -487,6 +489,7 @@ class OrchestraStatusService:
             logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
             return {}
 
+    @trace_method("OrchestraStatusService.get_active_flow_count", layer="service")
     def get_active_flow_count(self) -> int:
         try:
             return self._orchestrator.get_active_flow_count()

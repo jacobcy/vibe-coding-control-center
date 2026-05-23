@@ -18,6 +18,7 @@ from vibe3.models.pr import (
     PRState,
     VersionBumpResponse,
 )
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.pr_loc_comment_service import PRLocCommentService
 from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
 from vibe3.services.pr_utils import (
@@ -119,6 +120,7 @@ class PRService:
                 pr_title=pr.title,
             )
 
+    @trace_method("PRService.refresh_recent_pr_cache", layer="service")
     def refresh_recent_pr_cache(
         self,
         *,
@@ -148,6 +150,7 @@ class PRService:
             self._sync_branch_context_cache(branch_to_pr)
         return branch_to_pr
 
+    @trace_method("PRService.refresh_open_pr_cache", layer="service")
     def refresh_open_pr_cache(
         self,
         *,
@@ -165,6 +168,7 @@ class PRService:
         )
         return {branch: pr for branch, pr in recent.items() if pr.state == PRState.OPEN}
 
+    @trace_method("PRService.get_branch_pr_status", layer="service")
     def get_branch_pr_status(
         self,
         branch: str,
@@ -230,6 +234,7 @@ class PRService:
                 self._sync_branch_context_cache({branch: pr})
         return pr
 
+    @trace_method("PRService.get_open_pr_for_branch", layer="service")
     def get_open_pr_for_branch(
         self,
         branch: str,
@@ -242,6 +247,7 @@ class PRService:
             return pr
         return None
 
+    @trace_method("PRService.create_pr", layer="service")
     def create_pr(
         self,
         title: str,
@@ -318,6 +324,7 @@ class PRService:
         logger.bind(pr_number=pr.number, url=pr.url).success("Pull request created")
         return pr
 
+    @trace_method("PRService.get_pr", layer="service")
     def get_pr(
         self, pr_number: int | None = None, branch: str | None = None
     ) -> PRResponse | None:
@@ -336,6 +343,7 @@ class PRService:
             pr.reviews = self.github_client.list_pr_reviews(pr.number)
         return pr
 
+    @trace_method("PRService.mark_ready", layer="service")
     def mark_ready(
         self,
         pr_number: int,
@@ -440,6 +448,7 @@ class PRService:
             )
             logger.bind(pr_number=pr_number).success("PR marked as ready")
 
+    @trace_method("PRService.sync_pr_state_from_remote", layer="service")
     def sync_pr_state_from_remote(
         self, pr: PRResponse, actor: str | None = None
     ) -> None:
@@ -451,6 +460,7 @@ class PRService:
         )
         self._sync_pr_flow_state(pr, actor=effective_actor)
 
+    @trace_method("PRService.merge_pr", layer="service")
     def merge_pr(self, pr_number: int, actor: str | None = None) -> PRResponse:
         """Merge PR."""
         logger.bind(domain="pr", action="merge", pr_number=pr_number, actor=actor).info(
@@ -495,6 +505,7 @@ class PRService:
         logger.bind(pr_number=pr_number).success("PR merged")
         return merged_pr
 
+    @trace_method("PRService.calculate_version_bump", layer="service")
     def calculate_version_bump(
         self, pr_number: int, group: str | None = None
     ) -> VersionBumpResponse:
@@ -511,6 +522,7 @@ class PRService:
             raise PRNotFoundError(pr_number)
         return self.version_service.calculate_bump(group)
 
+    @trace_method("PRService.close_pr", layer="service")
     def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
         """Close a pull request.
 
@@ -532,6 +544,7 @@ class PRService:
 
         return self.github_client.close_pr(pr_number, comment=comment)
 
+    @trace_method("PRService.close_open_pr_for_flow", layer="service")
     def close_open_pr_for_flow(
         self, branch: str, comment: str | None = None
     ) -> int | None:

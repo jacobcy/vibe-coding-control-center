@@ -16,6 +16,7 @@ from loguru import logger
 
 from vibe3.clients.git_worktree_ops import remove_worktree
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.observability.trace_method import trace_method
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -58,6 +59,9 @@ class ExpiredResourceCleanupService:
             )
         return self._pr_service
 
+    @trace_method(
+        "ExpiredResourceCleanupService.clean_expired_agent_worktrees", layer="service"
+    )
     def clean_expired_agent_worktrees(
         self, max_age_days: int = 7, *, quiet: bool = False
     ) -> dict[str, object]:
@@ -157,6 +161,9 @@ class ExpiredResourceCleanupService:
 
         return {"cleaned": cleaned, "skipped_live": skipped_live, "failed": failed}
 
+    @trace_method(
+        "ExpiredResourceCleanupService.clean_expired_remote_branches", layer="service"
+    )
     def clean_expired_remote_branches(
         self, max_age_days: int = 7, *, quiet: bool = False
     ) -> dict[str, object]:
@@ -294,6 +301,9 @@ class ExpiredResourceCleanupService:
             "failed": failed,
         }
 
+    @trace_method(
+        "ExpiredResourceCleanupService.clean_expired_local_branches", layer="service"
+    )
     def clean_expired_local_branches(
         self, max_age_days: int = 7, *, quiet: bool = False
     ) -> dict[str, object]:

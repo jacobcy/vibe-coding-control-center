@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.observability.trace_method import trace_method
+
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
@@ -57,6 +59,7 @@ class IssueTitleCacheService:
     # Public API - Read Operations (all use branch parameter)
     # ============================================================
 
+    @trace_method("IssueTitleCacheService.get_title", layer="service")
     def get_title(self, branch: str) -> str | None:
         """Get cached title for a branch.
 
@@ -69,6 +72,7 @@ class IssueTitleCacheService:
         cache = self.store.get_flow_context_cache(branch)
         return cache.get("issue_title") if cache else None
 
+    @trace_method("IssueTitleCacheService.get_titles", layer="service")
     def get_titles(self, branches: list[str]) -> dict[str, str]:
         """Get cached titles for multiple branches.
 
@@ -85,6 +89,7 @@ class IssueTitleCacheService:
                 result[branch] = title
         return result
 
+    @trace_method("IssueTitleCacheService.get_title_with_fallback", layer="service")
     def get_title_with_fallback(
         self,
         branch: str,
@@ -109,6 +114,7 @@ class IssueTitleCacheService:
         # Fall back to GitHub
         return self._fetch_and_cache_title(branch)
 
+    @trace_method("IssueTitleCacheService.get_titles_with_fallback", layer="service")
     def get_titles_with_fallback(
         self,
         branches: list[str],
@@ -151,6 +157,7 @@ class IssueTitleCacheService:
     # Public API - Write Operations
     # ============================================================
 
+    @trace_method("IssueTitleCacheService.update_title", layer="service")
     def update_title(
         self,
         branch: str,
@@ -175,6 +182,7 @@ class IssueTitleCacheService:
             branch=branch,
         ).debug("Updated title cache")
 
+    @trace_method("IssueTitleCacheService.update_pr", layer="service")
     def update_pr(
         self,
         branch: str,
@@ -202,6 +210,7 @@ class IssueTitleCacheService:
             pr_number=pr_number,
         ).debug("Updated PR cache")
 
+    @trace_method("IssueTitleCacheService.invalidate", layer="service")
     def invalidate(self, branch: str) -> None:
         """Invalidate cache entry for a branch.
 

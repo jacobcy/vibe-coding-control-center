@@ -8,6 +8,7 @@ from typing import Union, cast
 from loguru import logger
 
 from vibe3.exceptions import SerenaError
+from vibe3.observability.trace_method import trace_method
 
 # Add lib to path for Vibe3Store
 lib_path = Path(__file__).parent.parent.parent.parent.parent / "lib"
@@ -134,6 +135,7 @@ class SerenaClient:
                 raise SerenaError("create agent", str(e)) from e
         return self._agent
 
+    @trace_method("SerenaClient.get_symbols_overview", layer="client")
     def get_symbols_overview(
         self, relative_file: str
     ) -> dict[str, Union[str, int, list]]:
@@ -162,6 +164,7 @@ class SerenaClient:
             ).error("Failed to get symbols overview")
             raise SerenaError("get_symbols_overview", str(e)) from e
 
+    @trace_method("SerenaClient.find_references", layer="client")
     def find_references(
         self, name_path: str, relative_file: str
     ) -> dict[str, Union[str, int, list]]:

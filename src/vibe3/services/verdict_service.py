@@ -15,6 +15,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.models.verdict import VerdictRecord
 from vibe3.models.verdict_types import VerdictValue
+from vibe3.observability.trace_method import trace_method
 from vibe3.services.actor_support import extract_role_from_actor
 from vibe3.services.flow_service import FlowService
 from vibe3.services.git_path_client import GitPathProtocol
@@ -61,6 +62,7 @@ class VerdictService:
         )
         self.storage = handoff_storage or HandoffStorage(self.git_client)
 
+    @trace_method("VerdictService.write_verdict", layer="service")
     def write_verdict(
         self,
         verdict: VerdictValue,
@@ -155,6 +157,7 @@ class VerdictService:
 
         return record
 
+    @trace_method("VerdictService.get_latest_verdict", layer="service")
     def get_latest_verdict(self, branch: str) -> VerdictRecord | None:
         """Get latest verdict from flow state.
 

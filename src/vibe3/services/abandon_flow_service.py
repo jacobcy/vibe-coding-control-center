@@ -14,6 +14,7 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
+from vibe3.observability.trace_method import trace_method
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
@@ -66,6 +67,7 @@ class AbandonFlowService:
         self._pr_service = pr_service
         self._flow_service = flow_service
 
+    @trace_method("AbandonFlowService.abandon_flow", layer="service")
     def abandon_flow(
         self,
         issue_number: int,
