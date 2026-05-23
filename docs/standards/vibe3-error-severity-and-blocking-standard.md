@@ -75,6 +75,14 @@ Examples:
 
 `blocked` is a workflow state, not an error severity.
 
+**Triple-State Synchronization:**
+Blocked states are managed across three data sources to ensure consistency and visibility:
+1. **Issue Body (Truth):** Authoritative remote state stored in the managed section of the GitHub issue body.
+2. **Issue Label (Signal):** Visual indicator of the blocked state.
+3. **Database (Cache):** Local performance optimization of the remote state.
+
+These sources are kept in sync by the `BlockedStateService`.
+
 ## 3. Severity Definitions
 
 ### 3.1 `CRITICAL`
@@ -161,6 +169,14 @@ produce the required artifact.
 
 That result may cause the flow to become `blocked`, but no-op itself is not proof
 of infrastructure failure.
+
+### 4.4 Unified State Management (BlockedStateService)
+
+All transitions into or out of a `blocked` state must use the `BlockedStateService`. This service coordinates:
+
+- **Atomic Writes:** Updates issue body projection, labels, and local database cache in a single logical operation.
+- **Truth Resolution:** Uses the issue body as the authoritative truth, with fallback to the database cache.
+- **Synchronization:** The `Qualify Gate` uses this service to align the local cache with the remote truth before starting execution.
 
 ## 5. Handling Contract
 

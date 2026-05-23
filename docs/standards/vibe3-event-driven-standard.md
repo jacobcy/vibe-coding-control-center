@@ -276,22 +276,35 @@ def main_callback(verbose: int = 0) -> None:
 
 **类型安全**: 处理器必须有完整类型注解，通过 `mypy --strict` 检查。
 
-**参数类型**: 接收具体事件类型，而非基类 `DomainEvent`。
+**参数规范**: 
+- 接收具体事件类型，而非基类 `DomainEvent`。
+- 建议使用 **positional-only** 参数 (`/`) 以提高调用一致性并支持装饰器类型推导。
 
 **返回类型**: 返回 `None`，不返回值。
 
 **示例**:
 ```python
-def handle_plan_completed(event: PlanCompleted) -> None:
+@register_handler("PlanCompleted")
+def handle_plan_completed(event: PlanCompleted, /) -> None:
     """Handle PlanCompleted event."""
     # Validate plan_ref
     # Transition issue state
     # Log completion
 ```
 
-### 5.4 类型转换
+### 5.4 注册方式
 
-由于 contravariance 规则，注册时需要 `cast` 转换。
+推荐使用 `@register_handler` 装饰器自动注册，以减少样板代码并利用类型推导。
+
+```python
+from vibe3.domain.handler_registry import register_handler
+
+@register_handler("PlanCompleted")
+def handle_plan_completed(event: PlanCompleted, /) -> None:
+    ...
+```
+
+对于遗留代码或动态订阅，仍可使用 `subscribe` 函数，但需注意类型转换：
 
 ```python
 from typing import cast
