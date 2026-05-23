@@ -34,8 +34,20 @@ class StubLabelService:
 
     def confirm_issue_state(
         self, issue_number: int, state: IssueState, actor: str, force: bool = False
-    ) -> None:
+    ) -> str:
+        """Return values matching real LabelService.confirm_issue_state behavior."""
+        if self.current_state == state:
+            return "confirmed"
+        # Simulate state machine: allow most transitions, block invalid ones
+        # BLOCKED -> BLOCKED is not allowed unless force=True
+        if (
+            self.current_state == IssueState.BLOCKED
+            and state == IssueState.BLOCKED
+            and not force
+        ):
+            return "blocked"
         self.current_state = state
+        return "advanced"
 
 
 def test_block_writes_to_all_three_sources(tmp_path: Path) -> None:
@@ -278,3 +290,34 @@ def test_block_handles_missing_issue_number(tmp_path: Path) -> None:
     assert flow_state is not None
     assert flow_state.get("flow_status") == "blocked"
     assert flow_state.get("blocked_reason") == "No issue linked"
+
+
+def test_block_respects_state_machine_on_double_block(tmp_path: Path) -> None:
+    """Verify block() handles already-blocked label gracefully without force=True."""
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+
+    github = StubGitHubClient()
+    label_service = StubLabelService()
+    # Simulate issue already in BLOCKED state
+    label_service.current_state = IssueState.BLOCKED
+
+    service = BlockedStateService(
+        store=store,
+        github_client=github,
+        label_service=label_service,
+    )
+
+    # Should not raise even though BLOCKED → BLOCKED is not in ALLOWED_TRANSITIONS
+    service.block(
+        branch="test-branch",
+        reason="Second failure",
+        actor="system",
+        issue_number=123,
+    )
+
+    # DB and body still written; label stays BLOCKED
+    flow_state = store.get_flow_state("test-branch")
+    assert flow_state.get("flow_status") == "blocked"
+    assert flow_state.get("blocked_reason") == "Second failure"
+    assert label_service.current_state == IssueState.BLOCKED
