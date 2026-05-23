@@ -180,7 +180,10 @@ class QualifyGateService:
         blocked_label = self._convention.state_label(self._convention.blocked_label)
 
         if not flow_state or flow_state.get("flow_status") != "blocked":
-            service = BlockedStateService(store=self._store)
+            service = BlockedStateService(
+                github_client=self._github,
+                store=self._store,
+            )
             service.write_cache(
                 branch=branch,
                 reason=truth.blocked_reason,
@@ -253,7 +256,10 @@ class QualifyGateService:
         else:
             target_label = IssueState.CLAIMED
 
-        service = BlockedStateService(store=self._store)
+        service = BlockedStateService(
+            github_client=self._github,
+            store=self._store,
+        )
         service.unblock(
             branch=branch,
             target_state=target_label,

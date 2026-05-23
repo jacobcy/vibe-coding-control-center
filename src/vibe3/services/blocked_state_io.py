@@ -32,7 +32,7 @@ class BlockedStateIO:
         label_service: LabelService | None = None,
         store: SQLiteClient | None = None,
     ) -> None:
-        self.github = github_client or GitHubClient()
+        self.github = github_client
         self.label_service = label_service or LabelService()
         self.store = store
 
@@ -51,6 +51,10 @@ class BlockedStateIO:
         Raises:
             RuntimeError: If issue body cannot be read or updated
         """
+        if not self.github:
+            raise RuntimeError(
+                f"No GitHub client available for projection: issue #{issue_number}"
+            )
         current_body = self.github.get_issue_body(issue_number)
         if current_body is None:
             raise RuntimeError(
@@ -87,6 +91,10 @@ class BlockedStateIO:
         Raises:
             RuntimeError: If issue body cannot be read or updated
         """
+        if not self.github:
+            raise RuntimeError(
+                f"No GitHub client available for projection: issue #{issue_number}"
+            )
         current_body = self.github.get_issue_body(issue_number)
         if current_body is None:
             raise RuntimeError(
@@ -161,6 +169,8 @@ class BlockedStateIO:
 
     def read_body_projection(self, issue_number: int) -> BlockedState:
         """Read blocked state from issue body projection."""
+        if not self.github:
+            return BlockedState.not_blocked()
         try:
             body = self.github.get_issue_body(issue_number)
             if body is None:

@@ -13,6 +13,7 @@ class TestAlignBlockedState:
         """Blocked truth should sync local cache and add the blocked label."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
+        service._github = Mock()
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")
@@ -49,6 +50,7 @@ class TestAlignBlockedState:
         """Already-synced blocked state should not write local cache again."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
+        service._github = Mock()
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")
@@ -83,6 +85,7 @@ class TestAutoResumeBlocked:
         """Auto-resume should use BlockedStateService.unblock."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
+        service._github = Mock()
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")
@@ -123,6 +126,7 @@ class TestAutoResumeBlocked:
         """Without blocked label, auto-resume still uses BlockedStateService."""
         service = QualifyGateService.__new__(QualifyGateService)
         service._store = MagicMock()
+        service._github = Mock()
         service._convention = Mock()
         service._convention.blocked_label = "blocked"
         service._convention.state_label = Mock(return_value="state/blocked")

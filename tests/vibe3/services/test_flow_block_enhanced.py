@@ -32,7 +32,7 @@ def mock_store():
 @pytest.fixture
 def mock_label_service():
     """Mock LabelService."""
-    with patch("vibe3.services.blocked_state_service.LabelService") as mock:
+    with patch("vibe3.services.blocked_state_io.LabelService") as mock:
         yield mock.return_value
 
 
@@ -46,7 +46,7 @@ def mock_flow_timeline_service():
 @pytest.fixture
 def mock_github_client():
     """Mock GitHubClient."""
-    with patch("vibe3.services.blocked_state_service.GitHubClient") as mock:
+    with patch("vibe3.services.blocked_state_io.GitHubClient") as mock:
         mock_instance = mock.return_value
         mock_instance.get_issue_body.return_value = "Test issue body"
         yield mock_instance
@@ -88,7 +88,7 @@ class TestBlockFlowEnhanced:
 
         # Assert - Issue state transition (via confirm_issue_state)
         mock_label_service.confirm_issue_state.assert_called_once_with(
-            42, IssueState.BLOCKED, actor="system:blocked_state_service", force=True
+            42, IssueState.BLOCKED, actor=actor, force=True
         )
 
         # Assert - Timeline comment added
@@ -165,22 +165,21 @@ class TestBlockFlowEnhanced:
 
         # Assert - Issue state transition still happens (via confirm_issue_state)
         mock_label_service.confirm_issue_state.assert_called_once_with(
-            42, IssueState.BLOCKED, actor="system:blocked_state_service", force=True
+            42, IssueState.BLOCKED, actor=actor, force=True
         )
 
         # Assert - Timeline comment added with empty reason
-        # (reason becomes "" in block())
+        # (reason becomes "" in block() for timeline detail)
         mock_flow_timeline_service.record_timeline_event.assert_called_once_with(
             branch=branch,
             event_type="flow_blocked",
             actor=actor,
-            detail="",  # reason is None becomes ""
+            detail="",  # reason is None becomes "" for timeline
             issue_number=42,
         )
 
-        # Assert - Flow state updated with empty reason
-        # None becomes "" in BlockedStateService
+        # Assert - Flow state updated with None reason (preserved)
         mock_store.update_flow_state.assert_called_once()
         update_kwargs = mock_store.update_flow_state.call_args[1]
-        assert update_kwargs["blocked_reason"] == ""
+        assert update_kwargs["blocked_reason"] is None
         assert update_kwargs["latest_actor"] == actor

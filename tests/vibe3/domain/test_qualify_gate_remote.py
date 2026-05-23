@@ -492,6 +492,7 @@ class TestE2EBlockedReconciliation:
         """state/blocked + body active + local blocked cache → auto-resume."""
         config = OrchestraConfig(repo="test/repo")
         github = Mock()
+        github.get_issue_body.return_value = "User content"
         flow_manager = Mock()
         qualify_gate = QualifyGateService(
             config=config, github=github, store=mock_store, flow_manager=flow_manager

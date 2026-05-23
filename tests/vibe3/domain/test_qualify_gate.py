@@ -339,7 +339,7 @@ class TestRunQualifyGate:
                         )
 
     def test_unblock_with_stale_local_cache_without_blocked_label(
-        self, qualify_gate_service, sample_issue, mock_store
+        self, qualify_gate_service, sample_issue, mock_store, mock_github
     ):
         """Stale local blocked cache should auto-resume even without blocked label."""
         qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
@@ -363,6 +363,8 @@ class TestRunQualifyGate:
         mock_truth.blocked_by_issue = None
         mock_truth.dependencies = []
         mock_truth.worktree_path = None
+
+        mock_github.get_issue_body.return_value = "User content"
 
         with patch.object(
             qualify_gate_service._coordination_resolver,

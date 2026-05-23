@@ -37,7 +37,7 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
                 mock_timeline_class.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.blocked_state_service.LabelService"
+                    "vibe3.services.blocked_state_io.LabelService"
                 ) as mock_label_service_class:
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
@@ -80,7 +80,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                 mock_timeline_class.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.blocked_state_service.LabelService"
+                    "vibe3.services.blocked_state_io.LabelService"
                 ) as mock_label_service_class:
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
@@ -145,9 +145,7 @@ def test_block_flow_writes_body_label_and_cache():
         flow_service.create_flow(slug="issue-400", branch=branch, actor="test-user")
         store.add_issue_link(branch, 400, "task")
 
-        with patch(
-            "vibe3.services.blocked_state_service.LabelService"
-        ) as mock_label_cls:
+        with patch("vibe3.services.blocked_state_io.LabelService") as mock_label_cls:
             mock_label = MagicMock()
             mock_label_cls.return_value = mock_label
 
@@ -197,7 +195,7 @@ def test_fail_issue_lands_in_same_blocked_write_path():
                 mock_timeline_cls.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.blocked_state_service.LabelService"
+                    "vibe3.services.blocked_state_io.LabelService"
                 ) as mock_label_cls:
                     mock_label = MagicMock()
                     mock_label_cls.return_value = mock_label
