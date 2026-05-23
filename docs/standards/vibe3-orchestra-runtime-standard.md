@@ -77,10 +77,9 @@ heartbeat tick 是 driver 进程内部的一次轮询循环。
 
 例如：
 
-- governance scan
-- manager issue run
-- supervisor handoff apply
-- state-driven `plan / run / review`
+- **Governance (L1)**: `cron-supervisor` (识别), `roadmap-intake` (审查)
+- **Governance Execution (L2)**: `supervisor-apply` (执行治理 issue)
+- **Development (L3)**: `manager`, `plan`, `run`, `review` (主开发链)
 
 这些 child session 才是实际调用 codeagent 的执行壳。
 
@@ -157,19 +156,22 @@ service 在这一层只负责：
 
 ### 4.1 Governance 是什么
 
-governance 是一个**周期性治理扫描任务**。
+governance 是一个**周期性治理与审查任务组**。
 
-它负责：
+它包含：
+
+- **`cron-supervisor`**: 扫描全局事实（docs/standards），识别偏差，创建 `state/ready` 治理 issue。
+- **`roadmap-intake`**: 审查 `state/ready` issue，执行架构一致性检查，晋升为 `state/handoff`。
+
+它们共同负责：
 
 - 查看全局 issue / flow / scene 事实
-- 判定哪些 issue 可以进入 `state/ready`
-- 创建治理 issue
-- 或对治理 issue 做进一步处理
+- 判定哪些 issue 可以进入可执行状态
+- 维护仓库健康度
 
-它不负责：
+它们不负责：
 
 - 充当 heartbeat driver
-- 直接替代 manager
 - 长时间阻塞主 server
 
 ### 4.2 Governance 在 runtime 中的位置

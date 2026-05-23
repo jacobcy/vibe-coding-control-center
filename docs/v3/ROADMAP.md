@@ -24,9 +24,9 @@ related_docs:
 
 **当前状态**:
 - ✅ Phase 1 (Infrastructure): 100% 完成
-- ⏸️ Phase 2 (Trace): 0% 完成（待启动）
+- ⏸️ Phase 2 (Trace): 待启动（优先级暂低于 Governance）
 - ✅ Phase 3 (Handoff): 100% 完成
-- ✅ Phase 4 (Orchestra): 运行中（Orchestra server 已部署）
+- ✅ Phase 4 (Orchestra): Active/Delivered (Orchestra server 已部署，治理层已上线)
 
 **文档规模**: 40 个文档，约 11,233 行
 
@@ -162,7 +162,7 @@ related_docs:
 
 ## 🎭 Phase 4: Orchestra（自动编排层）
 
-**状态**: ✅ 运行中（Orchestra server 已部署）
+**状态**: ✅ Active/Delivered（Orchestra server 已部署）
 
 **当前进展**:
 - ✅ Orchestra server 已上线（`vibe3 serve`）
@@ -170,7 +170,11 @@ related_docs:
 - ✅ GitHub webhook 接收器已部署
 - ✅ Heartbeat 轮询机制已实现
 - ✅ Issue 分诊与 flow 触发已实现
-- 🔄 多 issue 编排优化进行中
+- ✅ **Tier 3 Governance 实现**
+  - `cron-supervisor`: 自动文档治理识别
+  - `roadmap-intake`: 三级审查机制
+  - `supervisor-apply`: 自动化治理执行
+- 🔄 多 issue 编排与治理闭环持续优化中
 
 **文档**: 设计已完成，核心功能已实现
 
