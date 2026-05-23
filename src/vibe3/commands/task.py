@@ -22,7 +22,22 @@ from vibe3.ui.task_ui import (
 )
 
 app = typer.Typer(
-    help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
+    help="""Manage execution tasks.
+
+Tasks represent work items linked to flows.
+Use task commands to check status and resume blocked work.
+
+Examples:
+  vibe3 task show                # Show current task details
+  vibe3 task show 123            # Show task for issue #123
+  vibe3 task status              # Show global task dashboard
+  vibe3 task resume --blocked    # Resume all blocked issues (dry-run)
+  vibe3 task resume 456 --yes    # Resume issue #456 (execute)
+
+For more details: vibe3 task <command> --help
+""",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
 )
 
 

@@ -51,7 +51,36 @@ _ru.Panel = _NoBorderPanel  # type: ignore[misc]
 
 app = typer.Typer(
     name="vibe",
-    help="Vibe 3.0 - Development orchestration tool",
+    help="""Vibe 3.0 - Development orchestration tool
+
+Three-tier architecture:
+  Tier 3 (Cognitive/Governance): Policies, rules, supervisor
+  Tier 2 (Skill Layer): Orchestration and context management
+  Tier 1 (Shell Layer): Atomic capabilities and state access
+
+Command groups by tier:
+  Skill Layer (orchestration):
+    flow, task
+
+  Shell Layer (capabilities):
+    handoff, inspect, pr, snapshot, ask
+
+  Agent Execution:
+    run, plan, review
+
+  Infrastructure/Governance:
+    serve, mcp, scan, check
+
+  Utility:
+    version, help
+
+Quick start:
+  vibe3 flow status              # Show all active flows
+  vibe3 task show                # Show current task details
+  vibe3 handoff show @plan       # Show plan for current flow
+
+For command details: vibe3 <command> --help
+""",
     add_completion=False,
     no_args_is_help=True,
     rich_markup_mode="rich",
