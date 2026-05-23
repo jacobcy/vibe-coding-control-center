@@ -142,7 +142,7 @@ def _resolve_shared_artifact(
             raise FileNotFoundError(
                 f"current.md not found for branch '{branch}': {target}\n\n"
                 "No handoff file has been created for this branch yet.\n"
-                "Create one: vibe3 handoff init --branch {branch}"
+                f"Create one: vibe3 handoff init --branch {branch}"
             )
         if not current_md.is_file():
             raise FileNotFoundError(f"Not a file: {target}")
@@ -219,7 +219,7 @@ def _resolve_artifact_alias(
                 "Specify branch: vibe3 handoff show @{alias} "
                 "--branch <branch-name>\n"
                 "Or run from a branch: git checkout <branch> "
-                "&& vibe3 handoff show @{alias}"
+                f"&& vibe3 handoff show @{alias}"
             )
 
     _validate_branch_name(branch)
@@ -230,7 +230,7 @@ def _resolve_artifact_alias(
         raise FileNotFoundError(
             f"No flow found for branch '{branch}'\n\n"
             f"@{alias} requires an active flow to resolve the artifact path.\n"
-            "Create a flow: vibe3 flow update --branch {branch}\n"
+            f"Create a flow: vibe3 flow update --branch {branch}\n"
             "Or view available flows: vibe3 flow status"
         )
 
@@ -239,8 +239,8 @@ def _resolve_artifact_alias(
         raise FileNotFoundError(
             f"No {ref_field} recorded for branch '{branch}'\n\n"
             f"This flow has not created a {alias} artifact yet.\n"
-            "Check flow status: vibe3 flow show --branch {branch}\n"
-            "View all handoff events: vibe3 handoff status --branch {branch}"
+            f"Check flow status: vibe3 flow show --branch {branch}\n"
+            f"View all handoff events: vibe3 handoff status --branch {branch}"
         )
 
     # Guard against self-referential alias values (e.g., plan_ref='@plan')
@@ -281,8 +281,8 @@ def _resolve_worktree_artifact(
             raise FileNotFoundError(
                 f"No worktree found for branch '{branch}'\n\n"
                 "The specified branch does not have a worktree.\n"
-                "Create worktree: git worktree add <path> {branch}\n"
-                "Or use current branch: vibe3 handoff show {target}"
+                f"Create worktree: git worktree add <path> {branch}\n"
+                f"Or use current branch: vibe3 handoff show {target}"
             )
         resolved = wt_path / target
         if not resolved.exists():
@@ -290,7 +290,7 @@ def _resolve_worktree_artifact(
                 f"File not found in branch '{branch}' worktree: {target}\n\n"
                 "The file does not exist in the specified branch's worktree.\n"
                 "Check file path or view handoff status: "
-                "vibe3 handoff status --branch {branch}"
+                f"vibe3 handoff status --branch {branch}"
             )
         if not resolved.is_file():
             raise FileNotFoundError(f"Not a file: {target}")
