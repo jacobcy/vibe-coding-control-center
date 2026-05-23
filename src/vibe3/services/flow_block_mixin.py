@@ -67,7 +67,7 @@ class FlowLifecycleMixin:
         reason: str | None = None,
         blocked_by_issue: int | None = None,
         actor: str | None = None,
-        repo: str | None = None,
+        repo: str | None = None,  # noqa: ARG002 - reserved for cross-repo scenarios
         event_type: str = "flow_blocked",
     ) -> None:
         """Mark flow as blocked.
@@ -126,10 +126,11 @@ class FlowLifecycleMixin:
         service = BlockedStateService(store=self.store)
         service.block(
             branch=branch,
-            reason=reason or "",
+            reason=reason,
             blocked_by_issue=blocked_by_issue,
             actor=effective_actor,
             issue_number=issue_number,
+            event_type=event_type,
         )
 
     def fail_flow(

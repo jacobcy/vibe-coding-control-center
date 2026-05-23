@@ -48,6 +48,7 @@ def test_block_flow_calls_blocked_state_service() -> None:
             blocked_by_issue=456,
             actor="claude/sonnet-4.6",
             issue_number=123,
+            event_type="flow_blocked",
         )
 
 

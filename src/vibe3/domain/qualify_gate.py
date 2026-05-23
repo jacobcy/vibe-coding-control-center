@@ -181,7 +181,7 @@ class QualifyGateService:
 
         if not flow_state or flow_state.get("flow_status") != "blocked":
             service = BlockedStateService(store=self._store)
-            service._write_database_cache(
+            service.write_cache(
                 branch=branch,
                 reason=truth.blocked_reason,
                 blocked_by_issue=truth.blocked_by_issue,

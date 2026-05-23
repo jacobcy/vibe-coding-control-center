@@ -129,6 +129,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         "latest_verdict": None,
     }
     operations.flow_service.store.get_flow_state.return_value = mock_flow_state_dict
+    operations.flow_service.store.get_task_issue_number.return_value = 303
 
     with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
         mock_label_instance = MagicMock()
@@ -152,7 +153,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         # Verify: state restored to IN_PROGRESS (inferred from plan_ref)
         mock_label_instance.confirm_issue_state.assert_called_once()
 
-    # Verify: reasons cleared (minimal cleanup, flow record preserved)
+    # Verify: unblock called via BlockedStateService
     operations.flow_service.store.update_flow_state.assert_called_once()
 
 
@@ -161,6 +162,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
+    operations.flow_service.store.get_task_issue_number.return_value = 303
 
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
@@ -195,6 +197,7 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
+    operations.flow_service.store.get_task_issue_number.return_value = 303
 
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"

@@ -139,10 +139,11 @@ class BlockedStateService:
     def block(
         self,
         branch: str,
-        reason: str,
+        reason: str | None,
         blocked_by_issue: int | None = None,
         actor: str = "system",
         issue_number: int | None = None,
+        event_type: str = "flow_blocked",
     ) -> None:
         """Atomically set blocked state in all three sources.
 
@@ -206,6 +207,7 @@ class BlockedStateService:
                 self._write_label_state(
                     issue_number=issue_number,
                     target_state=IssueState.BLOCKED,
+                    actor=actor,
                 )
             except Exception as exc:
                 # Non-critical - log and continue
@@ -221,9 +223,9 @@ class BlockedStateService:
                 timeline = FlowTimelineService(store=self.store)
                 timeline.record_timeline_event(
                     branch=branch,
-                    event_type="flow_blocked",
+                    event_type=event_type,
                     actor=actor,
-                    detail=reason,
+                    detail=reason or "",
                     issue_number=issue_number,
                 )
             except Exception as exc:
@@ -291,6 +293,7 @@ class BlockedStateService:
                 self._write_label_state(
                     issue_number=issue_number,
                     target_state=target_state,
+                    actor=actor,
                 )
             except Exception as exc:
                 # Non-critical - log and continue
@@ -356,6 +359,31 @@ class BlockedStateService:
         state = self.resolve_truth(branch, issue_number)
         return state.blocked_reason
 
+    def write_cache(
+        self,
+        branch: str,
+        reason: str | None,
+        blocked_by_issue: int | None,
+        actor: str = "system",
+    ) -> None:
+        """Write blocked state to database cache only (no body/label update).
+
+        Use when you need to update the cache without touching the truth source.
+        For example, qualify gate uses this to align cache to truth.
+
+        Args:
+            branch: Branch name
+            reason: Blocked reason (None to preserve existing)
+            blocked_by_issue: Blocking issue number
+            actor: Actor performing the write
+        """
+        self._write_database_cache(
+            branch=branch,
+            reason=reason,
+            blocked_by_issue=blocked_by_issue,
+            actor=actor,
+        )
+
     # ========================================================================
     # Public API: Synchronization
     # ========================================================================
@@ -383,21 +411,28 @@ class BlockedStateService:
         # Read current cache
         cache_state = self._read_database_cache(branch) if self.store else None
 
-        # Check if sync needed
-        if cache_state and truth_state.is_blocked != cache_state.is_blocked:
+        # Check if sync needed - sync when blocked-ness OR reason/by_issue differ
+        needs_sync = (
+            not cache_state
+            or truth_state.is_blocked != cache_state.is_blocked
+            or truth_state.blocked_reason != cache_state.blocked_reason
+            or truth_state.blocked_by != cache_state.blocked_by
+        )
+
+        if needs_sync:
             logger.bind(
                 domain="blocked_state",
                 action="sync_cache",
                 branch=branch,
                 truth_blocked=truth_state.is_blocked,
-                cache_blocked=cache_state.is_blocked,
+                cache_blocked=cache_state.is_blocked if cache_state else None,
             ).info("Syncing database cache from issue body truth")
 
             # Update cache to match truth
             if truth_state.is_blocked:
                 self._write_database_cache(
                     branch=branch,
-                    reason=truth_state.blocked_reason or "",
+                    reason=truth_state.blocked_reason,
                     blocked_by_issue=(
                         truth_state.blocked_by[0] if truth_state.blocked_by else None
                     ),
@@ -477,13 +512,19 @@ class BlockedStateService:
     def _write_body_projection(
         self,
         issue_number: int,
-        reason: str,
+        reason: str | None,
         blocked_by_issue: int | None,
     ) -> None:
-        """Write blocked state to issue body projection."""
+        """Write blocked state to issue body projection.
+
+        Raises:
+            RuntimeError: If issue body cannot be read or updated
+        """
         current_body = self.github.get_issue_body(issue_number)
         if current_body is None:
-            return
+            raise RuntimeError(
+                f"Failed to read issue body for projection: issue #{issue_number}"
+            )
 
         # Parse existing projection
         projection = parse_projection(current_body)
@@ -505,13 +546,22 @@ class BlockedStateService:
 
         # Merge and update
         merged = merge_projection(current_body, new_projection)
-        self.github.update_issue_body(issue_number, merged)
+        if not self.github.update_issue_body(issue_number, merged):
+            raise RuntimeError(
+                f"Failed to update issue body projection: issue #{issue_number}"
+            )
 
     def _clear_body_projection(self, issue_number: int) -> None:
-        """Clear blocked state from issue body projection."""
+        """Clear blocked state from issue body projection.
+
+        Raises:
+            RuntimeError: If issue body cannot be read or updated
+        """
         current_body = self.github.get_issue_body(issue_number)
         if current_body is None:
-            return
+            raise RuntimeError(
+                f"Failed to read issue body for clearing: issue #{issue_number}"
+            )
 
         # Parse existing projection
         projection = parse_projection(current_body)
@@ -526,7 +576,10 @@ class BlockedStateService:
 
         # Merge and update
         merged = merge_projection(current_body, cleared)
-        self.github.update_issue_body(issue_number, merged)
+        if not self.github.update_issue_body(issue_number, merged):
+            raise RuntimeError(
+                f"Failed to clear issue body projection: issue #{issue_number}"
+            )
 
     def _write_database_cache(
         self,
@@ -562,12 +615,13 @@ class BlockedStateService:
         self,
         issue_number: int,
         target_state: IssueState,
+        actor: str = "system",
     ) -> None:
         """Write state to issue labels."""
         self.label_service.confirm_issue_state(
             issue_number,
             target_state,
-            actor="system:blocked_state_service",
+            actor=actor,
             force=True,
         )
 
