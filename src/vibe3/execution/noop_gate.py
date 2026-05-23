@@ -111,7 +111,7 @@ def apply_unified_noop_gate(
         if retry_count >= 3:
             # CRITICAL: GitHub API failure is a RUNTIME ERROR, not business logic
             # Record to error_log for FailedGate control, do NOT trigger flow block
-            from vibe3.exceptions.error_tracking import ErrorTrackingService
+            from vibe3.services.error_tracking_service import ErrorTrackingService
 
             logger.bind(
                 domain="codeagent",
@@ -140,7 +140,7 @@ def apply_unified_noop_gate(
             # Record to error_log, let FailedGate control dispatch
             # DO NOT call _block_fn() - this is not a flow block
             try:
-                from vibe3.exceptions.error_tracking import ErrorTrackingService
+                from vibe3.services.error_tracking_service import ErrorTrackingService
 
                 error_svc = ErrorTrackingService.get_instance(store=store)
                 error_svc.record_error(
@@ -192,7 +192,7 @@ def apply_unified_noop_gate(
         if retry_count >= 3:
             # CRITICAL: Malformed response is a RUNTIME ERROR, not business logic
             # Record to error_log for FailedGate control, do NOT trigger flow block
-            from vibe3.exceptions.error_tracking import ErrorTrackingService
+            from vibe3.services.error_tracking_service import ErrorTrackingService
 
             logger.bind(
                 domain="codeagent",
@@ -220,7 +220,7 @@ def apply_unified_noop_gate(
             # Record to error_log, let FailedGate control dispatch
             # DO NOT call _block_fn() - this is not a flow block
             try:
-                from vibe3.exceptions.error_tracking import ErrorTrackingService
+                from vibe3.services.error_tracking_service import ErrorTrackingService
 
                 error_svc = ErrorTrackingService.get_instance(store=store)
                 error_svc.record_error(
