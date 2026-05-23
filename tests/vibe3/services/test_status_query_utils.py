@@ -189,3 +189,72 @@ class TestRemoteField:
 
         assert len(result) == 1
         assert result[0]["remote"] is False
+
+    def test_blocked_state_not_remote(self) -> None:
+        """BLOCKED state should not be marked as remote."""
+        service = self._make_mock_service()
+        service.github.list_issues.return_value = [
+            {
+                "number": 106,
+                "title": "Blocked task",
+                "labels": [{"name": "state/blocked"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+            }
+        ]
+
+        result = service.fetch_orchestrated_issues(
+            flows=[],
+            queued_set=set(),
+            manager_usernames=["manager-bot"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["remote"] is False
+        assert result[0]["state"] == IssueState.BLOCKED
+
+    def test_handoff_state_remote(self) -> None:
+        """HANDOFF state with manager assignee and no flow should be remote."""
+        service = self._make_mock_service()
+        service.github.list_issues.return_value = [
+            {
+                "number": 107,
+                "title": "Handoff task",
+                "labels": [{"name": "state/handoff"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+            }
+        ]
+
+        result = service.fetch_orchestrated_issues(
+            flows=[],
+            queued_set=set(),
+            manager_usernames=["manager-bot"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["remote"] is True
+        assert result[0]["state"] == IssueState.HANDOFF
+
+    def test_merge_ready_state_remote(self) -> None:
+        """MERGE_READY state with manager assignee and no flow should be remote."""
+        service = self._make_mock_service()
+        service.github.list_issues.return_value = [
+            {
+                "number": 108,
+                "title": "Merge ready task",
+                "labels": [{"name": "state/merge-ready"}],
+                "assignees": [{"login": "manager-bot"}],
+                "milestone": None,
+            }
+        ]
+
+        result = service.fetch_orchestrated_issues(
+            flows=[],
+            queued_set=set(),
+            manager_usernames=["manager-bot"],
+        )
+
+        assert len(result) == 1
+        assert result[0]["remote"] is True
+        assert result[0]["state"] == IssueState.MERGE_READY

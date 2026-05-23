@@ -206,7 +206,7 @@ def render_remote_items(remote_items: list[dict[str, object]]) -> None:
             assignee_str = f" [dim]({assignee})[/]" if assignee else ""
             console.print(
                 f"  #{number:4}  [{state_str}][remote]{assignee_str}"
-                f"  {display_title}"
+                f" {display_title}"
             )
     else:
         console.print("  [dim](none)[/]")
