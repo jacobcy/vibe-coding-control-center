@@ -42,11 +42,18 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
 
-                    fail_manager_issue(
-                        issue_number=100,
-                        reason="Test manager failure",
-                        actor="agent:manager",
-                    )
+                    with patch(
+                        "vibe3.services.blocked_state_io.GitHubClient"
+                    ) as mock_github_class:
+                        mock_github = MagicMock()
+                        mock_github.get_issue_body.return_value = "User content"
+                        mock_github_class.return_value = mock_github
+
+                        fail_manager_issue(
+                            issue_number=100,
+                            reason="Test manager failure",
+                            actor="agent:manager",
+                        )
 
         # Verify reason recorded in flow and flow_status set to blocked
         flow_state = store.get_flow_state(branch)
@@ -85,12 +92,19 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
 
-                    block_manager_noop_issue(
-                        issue_number=200,
-                        repo=None,
-                        reason="No progress made",
-                        actor="agent:manager",
-                    )
+                    with patch(
+                        "vibe3.services.blocked_state_io.GitHubClient"
+                    ) as mock_github_class:
+                        mock_github = MagicMock()
+                        mock_github.get_issue_body.return_value = "User content"
+                        mock_github_class.return_value = mock_github
+
+                        block_manager_noop_issue(
+                            issue_number=200,
+                            repo=None,
+                            reason="No progress made",
+                            actor="agent:manager",
+                        )
 
         # Verify reason recorded in flow and flow_status set to blocked
         flow_state = store.get_flow_state(branch)
@@ -114,13 +128,18 @@ def test_block_flow_uses_new_fields():
         flow_service.create_flow(slug="issue-300", branch=branch, actor="test-user")
         store.add_issue_link(branch, 300, "task")
 
-        # Block flow with dependency issue
-        flow_service.block_flow(
-            branch,
-            reason="Blocked by dependency",
-            blocked_by_issue=301,
-            actor="test-actor",
-        )
+        with patch("vibe3.services.blocked_state_io.GitHubClient") as mock_github_class:
+            mock_github = MagicMock()
+            mock_github.get_issue_body.return_value = "User content"
+            mock_github_class.return_value = mock_github
+
+            # Block flow with dependency issue
+            flow_service.block_flow(
+                branch,
+                reason="Blocked by dependency",
+                blocked_by_issue=301,
+                actor="test-actor",
+            )
 
         # Verify flow state in database (blocked metadata, NOT flow_status)
         flow_state = store.get_flow_state(branch)
@@ -155,11 +174,18 @@ def test_block_flow_writes_body_label_and_cache():
                 mock_timeline = MagicMock()
                 mock_timeline_cls.return_value = mock_timeline
 
-                flow_service.block_flow(
-                    branch,
-                    reason="Health check failed: worktree missing",
-                    actor="orchestra:dispatcher",
-                )
+                with patch(
+                    "vibe3.services.blocked_state_io.GitHubClient"
+                ) as mock_github_class:
+                    mock_github = MagicMock()
+                    mock_github.get_issue_body.return_value = "User content"
+                    mock_github_class.return_value = mock_github
+
+                    flow_service.block_flow(
+                        branch,
+                        reason="Health check failed: worktree missing",
+                        actor="orchestra:dispatcher",
+                    )
 
         # Local cache
         flow_state = store.get_flow_state(branch)
@@ -200,11 +226,18 @@ def test_fail_issue_lands_in_same_blocked_write_path():
                     mock_label = MagicMock()
                     mock_label_cls.return_value = mock_label
 
-                    fail_manager_issue(
-                        issue_number=500,
-                        reason="Manager cycle exhausted",
-                        actor="agent:manager",
-                    )
+                    with patch(
+                        "vibe3.services.blocked_state_io.GitHubClient"
+                    ) as mock_github_class:
+                        mock_github = MagicMock()
+                        mock_github.get_issue_body.return_value = "User content"
+                        mock_github_class.return_value = mock_github
+
+                        fail_manager_issue(
+                            issue_number=500,
+                            reason="Manager cycle exhausted",
+                            actor="agent:manager",
+                        )
 
         # Same local cache pattern as block_flow
         flow_state = store.get_flow_state(branch)

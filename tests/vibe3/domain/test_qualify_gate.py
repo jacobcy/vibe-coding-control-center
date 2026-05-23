@@ -223,6 +223,8 @@ class TestRunQualifyGate:
         mock_truth.dependencies = [456]
         mock_truth.worktree_path = None
 
+        mock_github.get_issue_body.return_value = "User content"
+
         with patch.object(
             qualify_gate_service._coordination_resolver,
             "resolve_coordination",
