@@ -13,7 +13,7 @@ from vibe3.services.issue_failure_service import (
 
 
 def test_fail_manager_issue_records_reason_and_syncs_github():
-    """Test fail_manager_issue records reason on flow AND applies GitHub state."""
+    """Test fail_manager_issue records to error_log only (no blocked_reason)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -30,36 +30,21 @@ def test_fail_manager_issue_records_reason_and_syncs_github():
             mock_issue_flow_service_class.return_value = mock_issue_flow_service
             mock_issue_flow_service.store = store
 
-            with patch(
-                "vibe3.services.blocked_state_service.FlowTimelineService"
-            ) as mock_timeline_class:
-                mock_timeline = MagicMock()
-                mock_timeline_class.return_value = mock_timeline
+            fail_manager_issue(
+                issue_number=100,
+                reason="Test manager failure",
+                actor="agent:manager",
+            )
 
-                with patch(
-                    "vibe3.services.blocked_state_io.LabelService"
-                ) as mock_label_service_class:
-                    mock_label_service = MagicMock()
-                    mock_label_service_class.return_value = mock_label_service
-
-                    with patch(
-                        "vibe3.services.blocked_state_io.GitHubClient"
-                    ) as mock_github_class:
-                        mock_github = MagicMock()
-                        mock_github.get_issue_body.return_value = "User content"
-                        mock_github_class.return_value = mock_github
-
-                        fail_manager_issue(
-                            issue_number=100,
-                            reason="Test manager failure",
-                            actor="agent:manager",
-                        )
-
-        # Verify reason recorded in flow and flow_status set to blocked
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
-        assert flow_state["blocked_reason"] == "Test manager failure"
-        assert flow_state["flow_status"] == "blocked"
+        assert flow_state["blocked_reason"] is None
+        assert flow_state["flow_status"] == "active"
+
+        events = store.get_events(branch)
+        failed_events = [e for e in events if e.get("event_type") == "flow_failed"]
+        assert len(failed_events) >= 1
+        assert "Test manager failure" in failed_events[0].get("detail", "")
 
 
 def test_block_manager_noop_issue_records_reason_and_syncs_github():
@@ -197,7 +182,7 @@ def test_block_flow_writes_body_label_and_cache():
 
 
 def test_fail_issue_lands_in_same_blocked_write_path():
-    """Regression: fail_issue() funnels through FlowService.block_flow()."""
+    """Test fail_manager_issue records to error_log only (no block_flow)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(db_path=str(db_path))
@@ -214,36 +199,21 @@ def test_fail_issue_lands_in_same_blocked_write_path():
             mock_issue_flow.store = store
             mock_ifs.return_value = mock_issue_flow
 
-            with patch(
-                "vibe3.services.blocked_state_service.FlowTimelineService"
-            ) as mock_timeline_cls:
-                mock_timeline = MagicMock()
-                mock_timeline_cls.return_value = mock_timeline
+            fail_manager_issue(
+                issue_number=500,
+                reason="Manager cycle exhausted",
+                actor="agent:manager",
+            )
 
-                with patch(
-                    "vibe3.services.blocked_state_io.LabelService"
-                ) as mock_label_cls:
-                    mock_label = MagicMock()
-                    mock_label_cls.return_value = mock_label
-
-                    with patch(
-                        "vibe3.services.blocked_state_io.GitHubClient"
-                    ) as mock_github_class:
-                        mock_github = MagicMock()
-                        mock_github.get_issue_body.return_value = "User content"
-                        mock_github_class.return_value = mock_github
-
-                        fail_manager_issue(
-                            issue_number=500,
-                            reason="Manager cycle exhausted",
-                            actor="agent:manager",
-                        )
-
-        # Same local cache pattern as block_flow
         flow_state = store.get_flow_state(branch)
         assert flow_state is not None
-        assert flow_state["blocked_reason"] == "Manager cycle exhausted"
-        assert flow_state["flow_status"] == "blocked"
+        assert flow_state["blocked_reason"] is None
+        assert flow_state["flow_status"] == "active"
+
+        events = store.get_events(branch)
+        failed_events = [e for e in events if e.get("event_type") == "flow_failed"]
+        assert len(failed_events) >= 1
+        assert "Manager cycle exhausted" in failed_events[0].get("detail", "")
 
 
 def test_block_manager_noop_issue_no_flow():

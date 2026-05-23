@@ -101,18 +101,19 @@ class FlowLifecycleMixin:
 
         Note:
             Failed flows indicate execution errors or system faults.
-            Now unified with blocked: writes blocked_reason instead of
-            flow_status="failed". The blocked status is inferred from
-            IssueState.BLOCKED label on the task issue.
+            This method records to error_log and timeline only - it does NOT
+            trigger business block (no blocked_reason, no label change).
+            Runtime errors are handled by ERROR system, not BLOCK system.
         """
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.exceptions.error_codes import E_EXEC_FLOW_FAILURE
+        from vibe3.services.error_tracking_service import ErrorTrackingService
 
         logger.bind(
             domain="flow",
             action="fail",
             branch=branch,
             reason=reason,
-        ).info("Failing flow")
+        ).info("Failing flow (runtime error)")
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
@@ -135,16 +136,24 @@ class FlowLifecycleMixin:
                     if isinstance(issue_number, int):
                         break
 
-        service = BlockedStateService(store=self.store)
-        service.block(
+        error_tracking = ErrorTrackingService.get_instance(store=self.store)
+        error_tracking.record_error(
+            error_code=E_EXEC_FLOW_FAILURE,
+            error_message=reason,
             branch=branch,
-            reason=reason,
-            actor=effective_actor,
             issue_number=issue_number,
-            event_type="flow_failed",
         )
 
-        logger.bind(branch=branch).success("Flow marked as failed (blocked_reason)")
+        self.store.add_event(
+            branch,
+            "flow_failed",
+            effective_actor,
+            f"Flow failed (runtime): {reason}",
+        )
+
+        logger.bind(branch=branch).success(
+            "Flow marked as failed (error_log only, no block)"
+        )
 
     def abort_flow(
         self: Self,
