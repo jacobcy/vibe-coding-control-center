@@ -10,10 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.global_dispatch_coordinator import (
-    GlobalDispatchCoordinator,
-    QueueEntry,
-)
+from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
+from vibe3.orchestra.queue_entry import QueueEntry
 
 
 @pytest.fixture
@@ -230,14 +228,14 @@ class TestActionableTriggeredCollection:
         """When _frozen_queue is None, restore from persistence."""
         # Setup: queue is None, restore returns entries
         mock_coordinator._frozen_queue = None
-        mock_coordinator._restore_queue = MagicMock(
+        mock_coordinator._queue_persistence.restore = MagicMock(
             return_value=[
                 QueueEntry(issue_number=1, collected_state="ready", waiting_state=None),
             ]
         )
 
         # Mock promote to return entries unchanged
-        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
 
         # Mock dispatch loop to return 0 (no dispatches)
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
@@ -248,12 +246,12 @@ class TestActionableTriggeredCollection:
         )
 
         # Mock persist
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.persist = MagicMock()
 
         await mock_coordinator.coordinate(tick_id=1)
 
         # Should have called restore_queue
-        mock_coordinator._restore_queue.assert_called_once()
+        mock_coordinator._queue_persistence.restore.assert_called_once()
 
         # Should NOT have called _collect_frozen_queue
         # (since restored queue has actionable entries)
@@ -267,7 +265,7 @@ class TestActionableTriggeredCollection:
             QueueEntry(issue_number=1, collected_state="blocked", waiting_state=None),
         ]
 
-        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
         # Mock collect to return fresh entries
@@ -277,7 +275,7 @@ class TestActionableTriggeredCollection:
             ]
         )
 
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.persist = MagicMock()
 
         await mock_coordinator.coordinate(tick_id=1)
 
@@ -294,7 +292,7 @@ class TestActionableTriggeredCollection:
             QueueEntry(issue_number=2, collected_state="blocked", waiting_state=None),
         ]
 
-        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
         mock_coordinator._dispatch_loop = MagicMock(return_value=1)
 
         # Mock _collect_frozen_queue to track if it gets called
@@ -302,7 +300,7 @@ class TestActionableTriggeredCollection:
             side_effect=AssertionError("Should not call _collect_frozen_queue")
         )
 
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.persist = MagicMock()
 
         await mock_coordinator.coordinate(tick_id=1)
 
@@ -320,7 +318,7 @@ class TestActionableTriggeredCollection:
             ),
         ]
 
-        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
         # Mock collect to return fresh entries (including new issue 2)
@@ -334,7 +332,7 @@ class TestActionableTriggeredCollection:
 
         mock_coordinator._collect_frozen_queue = mock_collect
 
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.persist = MagicMock()
 
         await mock_coordinator.coordinate(tick_id=1)
 
@@ -366,9 +364,9 @@ class TestActionableTriggeredCollection:
                 "max_capacity": 1,
             }
         )
-        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
         mock_coordinator._collect_frozen_queue = AsyncMock()
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.persist = MagicMock()
 
         await mock_coordinator.coordinate(tick_id=1)
 
@@ -380,9 +378,9 @@ class TestActionableTriggeredCollection:
     ):
         """Blocked-only rebuilds pause after queueing one qualify pass."""
         mock_coordinator._frozen_queue = []
-        mock_coordinator._promote_progressed_entries = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.persist = MagicMock()
 
         async def mock_collect() -> list[QueueEntry]:
             return [
@@ -409,8 +407,8 @@ class TestActionableTriggeredCollection:
         mock_coordinator._frozen_queue = [
             QueueEntry(issue_number=10, collected_state="blocked", waiting_state=None),
         ]
-        mock_coordinator._promote_progressed_entries = MagicMock()
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
+        mock_coordinator._queue_persistence.persist = MagicMock()
         mock_coordinator._probe_for_non_blocked_candidates = AsyncMock()
 
         def mock_dispatch_loop(_tick_id: int = 0) -> int:
@@ -437,8 +435,8 @@ class TestActionableTriggeredCollection:
         """Paused dispatch shouldnt keep recollecting while only blocked work exists."""
         mock_coordinator._dispatch_paused = True
         mock_coordinator._frozen_queue = []
-        mock_coordinator._promote_progressed_entries = MagicMock()
-        mock_coordinator._persist_queue = MagicMock()
+        mock_coordinator._queue_persistence.promote = MagicMock(return_value=False)
+        mock_coordinator._queue_persistence.persist = MagicMock()
         mock_coordinator._collect_frozen_queue = AsyncMock()
         mock_coordinator._probe_for_non_blocked_candidates = AsyncMock(
             return_value=False

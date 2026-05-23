@@ -30,14 +30,12 @@ from vibe3.orchestra.issue_loader import (
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import (
     collect_raw_issues_without_qualify,
     select_ready_issues,
 )
-from vibe3.orchestra.queue_persistence_mixin import (
-    QueueEntry,
-    QueuePersistenceMixin,
-)
+from vibe3.orchestra.queue_persistence_service import QueuePersistenceService
 from vibe3.roles.registry import build_label_dispatch_event
 from vibe3.services.check_service import CheckService
 from vibe3.services.flow_service import FlowService
@@ -55,7 +53,7 @@ if TYPE_CHECKING:
 MAX_INTENTS_PER_TICK = 10
 
 
-class GlobalDispatchCoordinator(QueuePersistenceMixin):
+class GlobalDispatchCoordinator:
     """Frozen queue with state-change requeue semantics."""
 
     def __init__(
@@ -84,6 +82,16 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
 
+        # Initialize queue persistence service
+        self._queue_persistence = QueuePersistenceService(
+            store=store,
+            config=config,
+            github=github,
+            registry=registry,
+            supervisor_label=self._supervisor_label,
+            load_issue=self._load_issue,
+        )
+
         # Queue is lazily restored on first coordinate() call
         # (not eagerly in __init__ to avoid startup I/O and keep
         # coordinate() as the single queue-lifecycle owner)
@@ -92,6 +100,11 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         """Shutdown the executor if we own it."""
         if self._owns_executor and self._executor:
             self._executor.shutdown(wait=True)
+
+    def get_queued_issue_numbers(self) -> set[int]:
+        """Get the set of issue numbers currently in the frozen queue."""
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        return self._queue_persistence.get_queued_issue_numbers()
 
     async def _poll_issues_by_state(self, state: IssueState) -> list[IssueInfo]:
         """Poll GitHub for issues with a specific state label."""
@@ -174,6 +187,52 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
     def _load_issue(self, issue_number: int) -> IssueInfo | None:
         """Load issue snapshot (backward compatibility)."""
         return load_issue(issue_number, self._config, self._github)
+
+    async def _collect_frozen_queue(self) -> list[QueueEntry]:
+        """Collect a new frozen queue only when the current one is empty."""
+        queue: list[QueueEntry] = []
+        seen_issue_numbers: set[int] = set()
+        append_orchestra_event(
+            "dispatcher",
+            "GlobalDispatchCoordinator: starting queue collection",
+        )
+        for state in (
+            IssueState.REVIEW,
+            IssueState.MERGE_READY,
+            IssueState.IN_PROGRESS,
+            IssueState.CLAIMED,
+            IssueState.HANDOFF,
+            IssueState.BLOCKED,
+            IssueState.READY,
+        ):
+            try:
+                issues = await self._poll_issues_by_state(state)
+                for issue in issues:
+                    if issue.number in seen_issue_numbers:
+                        continue
+                    seen_issue_numbers.add(issue.number)
+                    queue.append(
+                        QueueEntry(
+                            issue_number=issue.number,
+                            collected_state=state.value,
+                        )
+                    )
+            except Exception as exc:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: collect_ready_issues failed for "
+                    f"{state.value}: {exc}",
+                )
+                logger.bind(
+                    domain="global_dispatch",
+                    state=state.value,
+                ).error(f"poll_issues_by_state failed for {state.value}: {exc}")
+        append_orchestra_event(
+            "dispatcher",
+            f"GlobalDispatchCoordinator: queue collection complete, "
+            f"total={len(queue)} issues",
+        )
+        return queue
 
     def _health_check_before_dispatch(self, issue: IssueInfo) -> bool:
         """Check structural health before dispatch.
@@ -530,15 +589,23 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         """
         # Step 1: Restore queue from persistence if None
         if self._frozen_queue is None:
-            restored = self._restore_queue()
+            self._queue_persistence.frozen_queue = None
+            self._queue_persistence.load_issue = self._load_issue
+            restored = self._queue_persistence.restore()
             self._frozen_queue = restored if restored is not None else []
+            self._queue_persistence.frozen_queue = self._frozen_queue
             self._check_service = None  # Invalidate cache on restore
 
         # Step 2: Promote progressed entries (state changes)
-        self._promote_progressed_entries()
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        self._queue_persistence.load_issue = self._load_issue
+        cleared_all = self._queue_persistence.promote()
+        if cleared_all:
+            self._check_service = None  # Invalidate when queue is cleared
+        self._frozen_queue = self._queue_persistence.frozen_queue
 
-        # Normalize after promotion: _promote_progressed_entries() may set
-        # self._frozen_queue = None when all entries are removed
+        # Normalize after promotion: promote() may set
+        # frozen_queue = None when all entries are removed
         if self._frozen_queue is None:
             self._frozen_queue = []
 
@@ -561,7 +628,8 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                         "GlobalDispatchCoordinator: dispatch paused "
                         "(all collected candidates remain blocked)",
                     )
-                    self._persist_queue()
+                    self._queue_persistence.frozen_queue = self._frozen_queue
+                    self._queue_persistence.persist()
                     return
                 self._dispatch_paused = False
 
@@ -596,4 +664,5 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
                 self._frozen_queue = self._merge_queue(self._frozen_queue or [], fresh)
 
         # Step 6: Persist queue state
-        self._persist_queue()
+        self._queue_persistence.frozen_queue = self._frozen_queue
+        self._queue_persistence.persist()
