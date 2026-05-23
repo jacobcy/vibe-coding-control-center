@@ -263,6 +263,9 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_failed_gate.py"
         limit: 470
         reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop），合并后内聚度高，拆分会破坏测试场景完整性"
+      - path: "tests/vibe3/orchestra/test_serve.py"
+        limit: 500
+        reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑等紧密耦合场景，新增 2 个 resume 回归测试"
       - path: "tests/vibe3/commands/test_scan.py"
         limit: 410
         reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"
