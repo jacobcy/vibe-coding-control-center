@@ -533,3 +533,35 @@ class ErrorTrackingService:
             "threshold": self.THRESHOLD_COUNT,
             "time_window_minutes": self.TIME_WINDOW_MINUTES,
         }
+
+    def get_all_errors_status(self) -> dict[str, Any]:
+        """Get error tracking status for ALL errors in database.
+
+        This returns counts for all errors regardless of time window,
+        for visibility into historical errors.
+
+        Returns:
+            Dict with error statistics for all errors in database
+        """
+        # Severity-based counts (all errors, no time filter)
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT severity, COUNT(*) as count
+                FROM error_log
+                GROUP BY severity
+                """,
+            ).fetchall()
+
+        severity_counts = {row[0] or "ERROR": row[1] for row in rows}
+        critical_count = severity_counts.get("CRITICAL", 0)
+        error_count = severity_counts.get("ERROR", 0)
+        warning_count = severity_counts.get("WARNING", 0)
+        total_errors = critical_count + error_count + warning_count
+
+        return {
+            "total_errors": total_errors,
+            "critical_count": critical_count,
+            "error_count": error_count,
+            "warning_count": warning_count,
+        }
