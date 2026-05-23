@@ -130,7 +130,7 @@ class QueuePersistenceService:
         if not self.frozen_queue:
             return False
 
-        promoted, retained, removed = promote_progressed_entries(
+        promoted, retained, _removed = promote_progressed_entries(
             self.frozen_queue,
             self.config,
             self.github,
