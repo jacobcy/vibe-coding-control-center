@@ -18,7 +18,7 @@ class TestPlannerCommitDetection:
             "vibe3.execution.codeagent_runner.GitClient"
         ) as mock_git_client_class:
             mock_git_client = MagicMock()
-            mock_git_client.run.return_value = "5"  # Same count before and after
+            mock_git_client._run.return_value = "5"  # Same count before and after
             mock_git_client_class.return_value = mock_git_client
 
             # Should not raise any exception
@@ -72,7 +72,7 @@ class TestPlannerCommitDetection:
                 "vibe3.execution.codeagent_runner.GitClient"
             ) as mock_git_client_class,
             patch(
-                "vibe3.services.handoff_service.HandoffService"
+                "vibe3.execution.codeagent_runner.HandoffService"
             ) as mock_handoff_class,
         ):
             mock_git_client = MagicMock()
@@ -116,7 +116,7 @@ class TestPlannerCommitDetection:
                 "vibe3.execution.codeagent_runner.GitClient"
             ) as mock_git_client_class,
             patch(
-                "vibe3.services.handoff_service.HandoffService"
+                "vibe3.execution.codeagent_runner.HandoffService"
             ) as mock_handoff_class,
         ):
             mock_git_client = MagicMock()
@@ -199,7 +199,7 @@ class TestPlannerCommitDetection:
                 "vibe3.execution.codeagent_runner.GitClient"
             ) as mock_git_client_class,
             patch(
-                "vibe3.services.handoff_service.HandoffService"
+                "vibe3.execution.codeagent_runner.HandoffService"
             ) as mock_handoff_class,
         ):
             mock_git_client = MagicMock()

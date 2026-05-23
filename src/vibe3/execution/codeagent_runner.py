@@ -96,6 +96,7 @@ class CodeagentExecutionService:
         branch: str | None,
         actor: str,
         log: "Logger",
+        execution_cwd: Path | None = None,
     ) -> None:
         """Check for unauthorized commits by planner.
 
@@ -107,7 +108,7 @@ class CodeagentExecutionService:
 
         try:
             # Get current commit count
-            result = GitClient()._run(["rev-list", "--count", "HEAD"])
+            result = GitClient(cwd=execution_cwd)._run(["rev-list", "--count", "HEAD"])
             commit_count_after = int(result.strip())
 
             if commit_count_after > commit_count_before:
@@ -120,7 +121,7 @@ class CodeagentExecutionService:
 
                 # Get the list of changed files in new commits
                 # Use HEAD~N..HEAD to get changes in last N commits
-                result = GitClient()._run(
+                result = GitClient(cwd=execution_cwd)._run(
                     [
                         "diff",
                         f"HEAD~{commits_diff}",
@@ -146,11 +147,10 @@ class CodeagentExecutionService:
                     )
 
                     # Record finding to handoff
-                    from vibe3.services.handoff_service import HandoffService
-
                     finding_message = (
                         f"Planner created {commits_diff} unauthorized commit(s) "
-                        f"with files outside docs/plans/: {unauthorized_files}"
+                        f"with files outside docs/plans/ and docs/reports/: "
+                        f"{unauthorized_files}"
                     )
                     try:
                         HandoffService().append_current_handoff(
@@ -242,7 +242,9 @@ class CodeagentExecutionService:
         commit_count_before: int | None = None
         if command.role == "planner":
             try:
-                result = GitClient()._run(["rev-list", "--count", "HEAD"])
+                result = GitClient(cwd=execution_cwd)._run(
+                    ["rev-list", "--count", "HEAD"]
+                )
                 commit_count_before = int(result.strip())
             except Exception as exc:
                 log.warning(f"Failed to record commit count before execution: {exc}")
@@ -300,6 +302,7 @@ class CodeagentExecutionService:
                     ctx.branch,
                     ctx.actor,
                     log,
+                    execution_cwd=ctx.execution_cwd,
                 )
 
             # Unified no-op gate: single hard logic check after agent completion.

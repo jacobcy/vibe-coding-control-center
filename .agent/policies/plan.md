@@ -21,6 +21,7 @@
 
 **你唯一被允许的文件操作**：
 - ✅ 在 `docs/plans/` 下创建计划 Markdown 文件
+- ✅ 在 `docs/reports/` 下创建报告 Markdown 文件
 - ✅ 通过 `vibe3 handoff plan <path>` 注册计划
 
 **完成计划后**：
