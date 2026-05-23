@@ -322,12 +322,21 @@ class CodeagentExecutionService:
                     flow_state=flow_state,
                 )
 
-                # Persist transition_count after gate call
-                if flow_state and "transition_count" in flow_state:
-                    ctx.store.update_flow_state(
-                        ctx.branch,
-                        transition_count=flow_state["transition_count"],
-                    )
+                # Persist transition_count and retry counters after gate call
+                if flow_state:
+                    updates = {}
+                    if "transition_count" in flow_state:
+                        updates["transition_count"] = flow_state["transition_count"]
+                    if "noop_gate_github_retry_count" in flow_state:
+                        updates["noop_gate_github_retry_count"] = flow_state[
+                            "noop_gate_github_retry_count"
+                        ]
+                    if "noop_gate_malformed_retry_count" in flow_state:
+                        updates["noop_gate_malformed_retry_count"] = flow_state[
+                            "noop_gate_malformed_retry_count"
+                        ]
+                    if updates:
+                        ctx.store.update_flow_state(ctx.branch, **updates)
 
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
             # Agent is expected to close the issue, but we ensure label cleanup.
@@ -464,10 +473,12 @@ class CodeagentExecutionService:
                     event_type=f"codeagent_{execution_prefix(command.role)}_aborted",
                 )
 
-            # Block the issue with error code.
-            # Supervisor (L2) uses lightweight failure: remove handoff label
-            # instead of calling fail_issue() which requires a task flow.
-            # Use severity-aware contract to decide issue action.
+            # Runtime error handling: record to error_log only.
+            # Supervisor (L2) uses lightweight failure: remove handoff label.
+            # All runtime errors do NOT trigger flow block.
+            # Flow block is determined by business logic only
+            # (noop_gate, dependencies, loops).
+            # FailedGate controls dispatch based on error severity.
             if command.issue_number is not None:
                 if command.role == "supervisor":
                     self._cleanup_supervisor_handoff_label(

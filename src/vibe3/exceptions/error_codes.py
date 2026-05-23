@@ -26,6 +26,7 @@ E_EXEC_INVALID_HANDOFF: Final[str] = "E_EXEC_INVALID_HANDOFF"
 E_EXEC_MISSING_REF: Final[str] = "E_EXEC_MISSING_REF"
 E_EXEC_AUTO_SCENE_RESET: Final[str] = "E_EXEC_AUTO_SCENE_RESET"
 E_EXEC_UNKNOWN: Final[str] = "E_EXEC_UNKNOWN"
+E_DISPATCH_FAILURE: Final[str] = "E_DISPATCH_FAILURE"  # Dispatch failures
 
 # Capacity control - normal skip (not an error)
 E_CAPACITY_SKIP: Final[str] = "E_CAPACITY_SKIP"

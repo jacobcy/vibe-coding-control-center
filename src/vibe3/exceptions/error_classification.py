@@ -18,6 +18,7 @@ from vibe3.exceptions.error_codes import (
     E_API_UNAVAILABLE,
     E_API_UNKNOWN,
     E_CAPACITY_SKIP,
+    E_DISPATCH_FAILURE,
     E_EXEC_NO_OUTPUT,
     E_EXEC_UNKNOWN,
     E_MODEL_CONFIG,
@@ -263,6 +264,16 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         gate_action="ignore",
         description="Agent execution produced no output",
     ),
+    E_DISPATCH_FAILURE: ErrorHandlingContract(
+        code=E_DISPATCH_FAILURE,
+        severity=ErrorSeverity.ERROR,
+        counts_toward_threshold=True,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="threshold",
+        description="Dispatch failure (launch_failed, worktree_unavailable, etc.)",
+    ),
     E_CAPACITY_SKIP: ErrorHandlingContract(
         code=E_CAPACITY_SKIP,
         severity=ErrorSeverity.WARNING,
@@ -290,12 +301,14 @@ def get_error_handling_contract(error_code: str) -> ErrorHandlingContract:
         compatibility during migration.
     """
     if error_code not in ERROR_REGISTRY:
-        # Default to ERROR for backward compatibility during migration
+        # Fallback for unregistered codes: record_only (no flow block)
+        # Runtime errors never trigger flow block regardless of registry status
         logger.bind(
             domain="error_tracking",
             error_code=error_code,
         ).warning(
-            f"Unregistered error code {error_code}, using fallback ERROR contract"
+            f"Unregistered error code {error_code}, "
+            "using fallback ERROR contract (record_only)"
         )
         return ErrorHandlingContract(
             code=error_code,
@@ -303,7 +316,7 @@ def get_error_handling_contract(error_code: str) -> ErrorHandlingContract:
             counts_toward_threshold=True,
             record_in_error_log=True,
             write_timeline_event=True,
-            issue_action="block_flow",
+            issue_action="record_only",
             gate_action="threshold",
             description=f"Unregistered error code: {error_code}",
         )

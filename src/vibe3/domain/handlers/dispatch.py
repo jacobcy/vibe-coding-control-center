@@ -87,21 +87,49 @@ def _dispatch_role_intent(
             return
 
         # Not launched, not skipped:
-        # - capacity_full / duplicate_dispatch → normal skip
-        # - all other failures → log and continue
+        # - capacity_full / duplicate_dispatch → normal throttling (info)
+        # - all other failures → warning (FailedGate will control)
         # Dispatch failures do NOT trigger flow block.
         # Flow block is determined by business logic only
         # (noop_gate, dependencies, loops).
         # FailedGate controls dispatch based on error severity.
         reason_code = result.reason_code or "unknown"
-        logger.bind(
-            domain=handler_domain,
-            issue_number=issue_number,
-            reason_code=reason_code,
-        ).warning(
-            f"{role.capitalize()} dispatch failed: {result.reason} - "
-            "FailedGate will control dispatch"
-        )
+
+        if reason_code in ("capacity_full", "duplicate_dispatch"):
+            # Normal throttling/dedup - log at info level
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
+        else:
+            # Unexpected failure - record to error_log and log warning
+            # FailedGate will control dispatch based on threshold
+            from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+            error_message = f"{role} dispatch failed: {result.reason}"
+            try:
+                error_svc = ErrorTrackingService()
+                error_svc.record_error(
+                    error_code="E_DISPATCH_FAILURE",
+                    error_message=error_message,
+                    issue_number=issue_number,
+                    branch=branch,
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain=handler_domain,
+                    issue_number=issue_number,
+                ).warning(f"Failed to record dispatch error: {exc}")
+
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).warning(
+                f"{role.capitalize()} dispatch failed: {result.reason} - "
+                "FailedGate will control dispatch"
+            )
 
 
 @register_handler("PlannerDispatchIntent")
