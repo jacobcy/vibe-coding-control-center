@@ -109,7 +109,7 @@ def _dispatch_role_intent(
 
             error_message = f"{role} dispatch failed: {result.reason}"
             try:
-                error_svc = ErrorTrackingService()
+                error_svc = ErrorTrackingService.get_instance(store=store)
                 error_svc.record_error(
                     error_code="E_DISPATCH_FAILURE",
                     error_message=error_message,

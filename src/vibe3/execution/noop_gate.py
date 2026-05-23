@@ -108,15 +108,18 @@ def apply_unified_noop_gate(
             flow_state.get("noop_gate_github_retry_count", 0) if flow_state else 0
         )
         if retry_count >= 3:
-            # Exceeded retry limit, block to prevent infinite loop
+            # CRITICAL: GitHub API failure is a RUNTIME ERROR, not business logic
+            # Record to error_log for FailedGate control, do NOT trigger flow block
+            from vibe3.exceptions.error_tracking import ErrorTrackingService
+
             logger.bind(
                 domain="codeagent",
                 role=role,
                 issue_number=issue_number,
                 branch=branch,
             ).error(
-                f"No-op gate BLOCK: GitHub API failed after "
-                f"{retry_count} retries: {exc}"
+                f"No-op gate ERROR: GitHub API failed after "
+                f"{retry_count} retries - recording to error_log"
             )
             store.add_event(
                 branch,
@@ -133,17 +136,40 @@ def apply_unified_noop_gate(
                     "retry_count": str(retry_count),
                 },
             )
-            _block_fn(
-                issue_number=issue_number,
-                repo=repo,
-                reason=f"GitHub API failed after {retry_count} retries: {exc}",
-                actor=actor,
-            )
-            return
+            # Record to error_log, let FailedGate control dispatch
+            # DO NOT call _block_fn() - this is not a flow block
+            try:
+                from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+                error_svc = ErrorTrackingService.get_instance(store=store)
+                error_svc.record_error(
+                    error_code="E_API_UNAVAILABLE",
+                    error_message=(
+                        f"GitHub API failed after {retry_count} retries: {exc}"
+                    ),
+                    issue_number=issue_number,
+                    branch=branch,
+                )
+            except Exception as record_exc:
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(f"Failed to record error to error_log: {record_exc}")
+            raise RuntimeError(
+                f"Cannot verify remote state for #{issue_number} "
+                f"after {retry_count} retries: {exc}"
+            ) from exc
         else:
             # Record retry count and raise to trigger retry
             if flow_state is not None:
-                flow_state["noop_gate_github_retry_count"] = retry_count + 1
+                retry_count_new = retry_count + 1
+                flow_state["noop_gate_github_retry_count"] = retry_count_new
+                # PERSIST IMMEDIATELY: Don't wait for codeagent_runner
+                store.update_flow_state(
+                    branch, noop_gate_github_retry_count=retry_count_new
+                )
             logger.bind(
                 domain="codeagent",
                 role=role,
@@ -163,15 +189,18 @@ def apply_unified_noop_gate(
             flow_state.get("noop_gate_malformed_retry_count", 0) if flow_state else 0
         )
         if retry_count >= 3:
-            # Exceeded retry limit, block to prevent infinite loop
+            # CRITICAL: Malformed response is a RUNTIME ERROR, not business logic
+            # Record to error_log for FailedGate control, do NOT trigger flow block
+            from vibe3.exceptions.error_tracking import ErrorTrackingService
+
             logger.bind(
                 domain="codeagent",
                 role=role,
                 issue_number=issue_number,
                 branch=branch,
             ).error(
-                f"No-op gate BLOCK: GitHub returned malformed response after "
-                f"{retry_count} retries"
+                f"No-op gate ERROR: GitHub returned malformed response after "
+                f"{retry_count} retries - recording to error_log"
             )
             store.add_event(
                 branch,
@@ -187,17 +216,40 @@ def apply_unified_noop_gate(
                     "retry_count": str(retry_count),
                 },
             )
-            _block_fn(
-                issue_number=issue_number,
-                repo=repo,
-                reason=f"Malformed GitHub response after {retry_count} retries",
-                actor=actor,
+            # Record to error_log, let FailedGate control dispatch
+            # DO NOT call _block_fn() - this is not a flow block
+            try:
+                from vibe3.exceptions.error_tracking import ErrorTrackingService
+
+                error_svc = ErrorTrackingService.get_instance(store=store)
+                error_svc.record_error(
+                    error_code="E_API_UNAVAILABLE",
+                    error_message=(
+                        f"Malformed GitHub response after {retry_count} retries"
+                    ),
+                    issue_number=issue_number,
+                    branch=branch,
+                )
+            except Exception as record_exc:
+                logger.bind(
+                    domain="codeagent",
+                    role=role,
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(f"Failed to record error to error_log: {record_exc}")
+            raise RuntimeError(
+                f"Malformed GitHub response for #{issue_number} "
+                f"after {retry_count} retries"
             )
-            return
         else:
             # Record retry count and raise to trigger retry
             if flow_state is not None:
-                flow_state["noop_gate_malformed_retry_count"] = retry_count + 1
+                retry_count_new = retry_count + 1
+                flow_state["noop_gate_malformed_retry_count"] = retry_count_new
+                # PERSIST IMMEDIATELY: Don't wait for codeagent_runner
+                store.update_flow_state(
+                    branch, noop_gate_malformed_retry_count=retry_count_new
+                )
             logger.bind(
                 domain="codeagent",
                 role=role,
@@ -211,8 +263,15 @@ def apply_unified_noop_gate(
 
     # Clear retry counts on success
     if flow_state is not None:
-        flow_state.pop("noop_gate_github_retry_count", None)
-        flow_state.pop("noop_gate_malformed_retry_count", None)
+        # PERSIST CLEAR IMMEDIATELY: Don't wait for codeagent_runner
+        store.update_flow_state(
+            branch,
+            noop_gate_github_retry_count=0,
+            noop_gate_malformed_retry_count=0,
+        )
+        # Also update memory dict for consistency
+        flow_state["noop_gate_github_retry_count"] = 0
+        flow_state["noop_gate_malformed_retry_count"] = 0
 
     after_state_label = extract_state_label(issue_payload)
 

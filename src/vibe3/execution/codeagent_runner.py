@@ -322,21 +322,12 @@ class CodeagentExecutionService:
                     flow_state=flow_state,
                 )
 
-                # Persist transition_count and retry counters after gate call
-                if flow_state:
-                    updates = {}
-                    if "transition_count" in flow_state:
-                        updates["transition_count"] = flow_state["transition_count"]
-                    if "noop_gate_github_retry_count" in flow_state:
-                        updates["noop_gate_github_retry_count"] = flow_state[
-                            "noop_gate_github_retry_count"
-                        ]
-                    if "noop_gate_malformed_retry_count" in flow_state:
-                        updates["noop_gate_malformed_retry_count"] = flow_state[
-                            "noop_gate_malformed_retry_count"
-                        ]
-                    if updates:
-                        ctx.store.update_flow_state(ctx.branch, **updates)
+                # Persist transition_count after gate call
+                # Note: retry counters are persisted inside noop_gate itself
+                if flow_state and "transition_count" in flow_state:
+                    ctx.store.update_flow_state(
+                        ctx.branch, transition_count=flow_state["transition_count"]
+                    )
 
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
             # Agent is expected to close the issue, but we ensure label cleanup.
