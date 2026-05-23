@@ -44,8 +44,8 @@ code_limits:
         reason: "Task resume 操作聚合，包含 reset、label resume、failed_reason 清除等内聚操作；_clear_flow_reasons 新增 github_client/label_service 注入和 failed_reason 清除逻辑"
       # Exceptions 聚合 —— 允许 550
       - path: "src/vibe3/exceptions/error_tracking.py"
-        limit: 590
-        reason: "Error tracking 核心服务，新增 get_critical_error_codes() 用于 severity-based CRITICAL 检查（替代硬编码前缀），severity-aware 计数、windowed status 统计，错误分类逻辑紧密耦合；clear_instance() 增强：db_path 匹配时同步清理 _instance/_default_instance；新增 get_all_errors_status() 用于全量错误统计（无时间过滤）"
+        limit: 650
+        reason: "Error tracking 核心服务，新增 get_critical_error_codes() 用于 severity-based CRITICAL 检查（替代硬编码前缀），severity-aware 计数、windowed status 统计，错误分类逻辑紧密耦合；clear_instance() 增强：db_path 匹配时同步清理 _instance/_default_instance；新增 get_all_errors_status() 用于全量错误统计（无时间过滤）；新增 source 参数区分 manual_scan 与 orchestra_tick 来源，get_threshold_error_count 支持 source_filter 过滤"
       - path: "src/vibe3/domain/qualify_gate.py"
         limit: 480
         reason: "Qualify gate 域服务，包含 truth-first 决策流程、blocked 对齐、auto-resume、worktree 健康检查、依赖检查等紧密耦合逻辑"
