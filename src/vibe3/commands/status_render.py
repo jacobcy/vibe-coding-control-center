@@ -192,6 +192,26 @@ def render_issue_progress(
         console.print("  [dim](none)[/]")
 
 
+def render_remote_items(remote_items: list[dict[str, object]]) -> None:
+    """Render Remote Tasks (no local flow) section."""
+    console.print("[bold cyan]Remote Tasks (no local flow):[/]")
+    if remote_items:
+        for item in remote_items:
+            number = cast(int, item["number"])
+            title = cast(str, item["title"])
+            state = cast(IssueState, item["state"])
+            assignee = cast(str | None, item.get("assignee"))
+            display_title = title[:48] + "..." if len(title) > 48 else title
+            state_str = state.value.upper()
+            assignee_str = f" [dim]({assignee})[/]" if assignee else ""
+            console.print(
+                f"  #{number:4}  [{state_str}][remote]{assignee_str}"
+                f"  {display_title}"
+            )
+    else:
+        console.print("  [dim](none)[/]")
+
+
 def render_supervisor_issues(supervisor_items: list[dict[str, object]]) -> None:
     """Render Supervisor Issues section."""
     console.print("[bold cyan]Supervisor Issues:[/]")

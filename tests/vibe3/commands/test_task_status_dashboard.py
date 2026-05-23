@@ -73,6 +73,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
             "roadmap": None,
             "priority": 0,
             "labels": [],
+            "remote": False,
         },
         {
             "number": 202,
@@ -88,6 +89,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
             "roadmap": None,
             "priority": 0,
             "labels": [],
+            "remote": False,
         },
         {
             "number": 303,
@@ -103,6 +105,7 @@ def test_task_status_splits_assignee_ready_and_anomaly(
             "roadmap": None,
             "priority": 0,
             "labels": [],
+            "remote": False,
         },
     ]
     mock_status_service_cls.return_value = status_service
@@ -159,6 +162,7 @@ def test_task_status_shows_flows_with_prs(
             "flow": flow_with_pr,
             "queued": False,
             "labels": [],
+            "remote": False,
         }
     ]
     mock_status_service_cls.return_value = status_service
@@ -274,3 +278,92 @@ class TestComputeEffectiveServerRunning:
     def test_snapshot_false_pid_invalid(self) -> None:
         """Snapshot says down and PID invalid → effective False."""
         assert self._call(snapshot_running=False, pid_valid=False) is False
+
+
+@patch("vibe3.commands.status.load_orchestra_config")
+@patch("vibe3.commands.status.OrchestraStatusService.fetch_live_snapshot")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status.StatusQueryService")
+def test_task_status_shows_remote_tasks_section(
+    mock_status_service_cls,
+    mock_flow_service_cls,
+    mock_fetch_live_snapshot,
+    mock_load_orchestra_config,
+) -> None:
+    """task status should show remote tasks in a separate section."""
+    config_mock = MagicMock()
+    config_mock.pid_file = "/tmp/vibe3.pid"
+    config_mock.repo = "openai/vibe-center"
+    config_mock.port = 1234
+    config_mock.supervisor_handoff = MagicMock(issue_label="supervisor")
+    config_mock.manager_usernames = ["manager-bot"]
+    config_mock.get_manager_usernames.return_value = ["manager-bot"]
+    mock_load_orchestra_config.return_value = config_mock
+    mock_fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1234567890.0,
+        server_running=True,
+        active_issues=tuple(),
+        active_flows=0,
+        active_worktrees=0,
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    status_service = MagicMock()
+    status_service.fetch_worktree_map.return_value = {}
+    status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 505,
+            "title": "Remote task on another machine",
+            "state": IssueState.CLAIMED,
+            "assignee": "manager-bot",
+            "flow": None,  # No local flow
+            "queued": False,
+            "failed_reason": None,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "remote": True,  # Marked as remote
+        },
+        {
+            "number": 606,
+            "title": "Local task",
+            "state": IssueState.CLAIMED,
+            "assignee": "manager-bot",
+            "flow": _make_flow(606),  # Has local flow
+            "queued": False,
+            "failed_reason": None,
+            "blocked_by": None,
+            "blocked_reason": None,
+            "milestone": None,
+            "roadmap": None,
+            "priority": 0,
+            "labels": [],
+            "remote": False,
+        },
+    ]
+    mock_status_service_cls.return_value = status_service
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    output = result.output
+    # Remote tasks section should appear
+    assert "Remote Tasks (no local flow):" in output
+    # Remote issue should be in remote section
+    assert "# 505" in output
+    assert "Remote task on another machine" in output
+    # Local task should still be in Assignee Intake
+    assert "Assignee Intake:" in output
+    assert "# 606" in output
+    # Remote task should NOT be in Assignee Intake
+    # (it should only appear in Remote Tasks section)
+    intake_section = output[
+        output.index("Assignee Intake:") : output.index("Ready Queue:")
+    ]
+    assert "# 505" not in intake_section
