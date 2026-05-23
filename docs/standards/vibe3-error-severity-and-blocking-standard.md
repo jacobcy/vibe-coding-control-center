@@ -295,7 +295,62 @@ When reviewing code against this standard, verify:
 - no-op and no-output are not presented as root-cause infrastructure failures
 - every runtime code is resolved by explicit registry metadata rather than prefix inference
 
-## 11. Authority
+## 11. ERROR/BLOCK Orthogonality (Phase 1-3 Refactor)
+
+### 11.1 Architectural Separation
+
+After the Phase 1-3 refactor (2026-05-23), ERROR and BLOCK systems are **completely orthogonal**:
+
+| System | Purpose | Data Store | Triggers |
+|--------|---------|------------|----------|
+| **ERROR** | Runtime infrastructure health | `error_log` table | FailedGate dispatch control |
+| **BLOCK** | Business flow state | `blocked_reason` field | Business logic decisions |
+
+### 11.2 Exception Type Hierarchy
+
+```
+VibeError (base)
+├── RuntimeInfrastructureError  → error_log only, NO block_flow
+│   ├── GitHubAPIError
+│   ├── DatabaseError
+│   ├── ModelError
+│   └── APIError
+└── BusinessViolation  → may trigger block_flow
+    ├── NoOpViolation
+    ├── DependencyViolation
+    ├── TransitionLoopViolation
+    └── RequiredRefViolation
+```
+
+### 11.3 Key Invariants
+
+1. **`fail_*_issue()`** → `mark_issue(action="fail")` → records to `error_log` only
+2. **`block_*_issue()`** → `mark_issue(action="block")` → calls `block_flow()`
+3. **`GitHubAPIError`** → propagates to `codeagent_runner` → records to `error_log`, NO block
+4. **`FailedGate`** → blocks **dispatch coordination**, NOT business flow
+
+### 11.4 StateVerificationService
+
+GitHub API state verification is isolated in `StateVerificationService`:
+- Handles retry logic with limits
+- Raises `GitHubAPIError` on failure (runtime error)
+- Never triggers `block_flow()`
+- External I/O is separated from business logic in `noop_gate`
+
+### 11.5 Audit Results (Phase 3)
+
+All `block_flow()` call sites audited:
+- 9 call sites verified
+- No error strings passed as `reason` parameter
+- All `reason` values are business logic descriptions
+
+All `error_log` consumers audited:
+- FailedGate: dispatch-level blocking only
+- Status services: display only
+- No consumer triggers `block_flow()`
+
+## 12. Authority
 
 If existing code conflicts with this document, this standard governs the Orchestra
-runtime refactor introduced on 2026-05-21.
+runtime refactor introduced on 2026-05-21 and the ERROR/BLOCK decoupling refactor
+completed on 2026-05-23.
