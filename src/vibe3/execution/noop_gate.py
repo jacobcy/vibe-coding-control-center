@@ -102,61 +102,122 @@ def apply_unified_noop_gate(
 
         issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
     except Exception as exc:
-        # Fail-safe: if we cannot verify state, block rather than skip
-        logger.bind(
-            domain="codeagent",
-            role=role,
-            issue_number=issue_number,
-            branch=branch,
-        ).warning(f"No-op gate BLOCK: cannot read issue state: {exc}")
-        store.add_event(
-            branch,
-            EVENT_CANNOT_VERIFY_REMOTE_STATE,
-            actor,
-            detail=f"Gate cannot verify state (GitHub read failed): {exc}",
-            refs={
-                "state": str(before_state_label or ""),
-                "issue": str(issue_number),
-                "error": str(exc),
-            },
+        # GitHub API failure: runtime error, retry with limit
+        # Check retry count to avoid infinite loop
+        retry_count = (
+            flow_state.get("noop_gate_github_retry_count", 0) if flow_state else 0
         )
-        _block_fn(
-            issue_number=issue_number,
-            repo=repo,
-            reason=f"cannot verify remote state: {exc}",
-            actor=actor,
-        )
-        return
+        if retry_count >= 3:
+            # Exceeded retry limit, block to prevent infinite loop
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).error(
+                f"No-op gate BLOCK: GitHub API failed after "
+                f"{retry_count} retries: {exc}"
+            )
+            store.add_event(
+                branch,
+                EVENT_CANNOT_VERIFY_REMOTE_STATE,
+                actor,
+                detail=(
+                    f"Gate cannot verify state (GitHub API failed after "
+                    f"{retry_count} retries): {exc}"
+                ),
+                refs={
+                    "state": str(before_state_label or ""),
+                    "issue": str(issue_number),
+                    "error": str(exc),
+                    "retry_count": str(retry_count),
+                },
+            )
+            _block_fn(
+                issue_number=issue_number,
+                repo=repo,
+                reason=f"GitHub API failed after {retry_count} retries: {exc}",
+                actor=actor,
+            )
+            return
+        else:
+            # Record retry count and raise to trigger retry
+            if flow_state is not None:
+                flow_state["noop_gate_github_retry_count"] = retry_count + 1
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"No-op gate RETRY ({retry_count + 1}/3): GitHub API failed, "
+                f"cannot verify state: {exc}"
+            )
+            raise RuntimeError(
+                f"Cannot verify remote state for #{issue_number}: {exc}"
+            ) from exc
 
     if not isinstance(issue_payload, dict):
-        # Fail-safe: malformed response, block
-        logger.bind(
-            domain="codeagent",
-            role=role,
-            issue_number=issue_number,
-            branch=branch,
-        ).warning("No-op gate BLOCK: GitHub returned non-dict payload")
-        store.add_event(
-            branch,
-            EVENT_CANNOT_VERIFY_REMOTE_STATE,
-            actor,
-            detail="Gate cannot verify state (malformed GitHub response)",
-            refs={
-                "state": str(before_state_label or ""),
-                "issue": str(issue_number),
-            },
+        # Malformed response: runtime error, retry with limit
+        retry_count = (
+            flow_state.get("noop_gate_malformed_retry_count", 0) if flow_state else 0
         )
-        _block_fn(
-            issue_number=issue_number,
-            repo=repo,
-            reason="cannot verify remote state: malformed GitHub response",
-            actor=actor,
-        )
-        return
+        if retry_count >= 3:
+            # Exceeded retry limit, block to prevent infinite loop
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).error(
+                f"No-op gate BLOCK: GitHub returned malformed response after "
+                f"{retry_count} retries"
+            )
+            store.add_event(
+                branch,
+                EVENT_CANNOT_VERIFY_REMOTE_STATE,
+                actor,
+                detail=(
+                    f"Gate cannot verify state (malformed GitHub response after "
+                    f"{retry_count} retries)"
+                ),
+                refs={
+                    "state": str(before_state_label or ""),
+                    "issue": str(issue_number),
+                    "retry_count": str(retry_count),
+                },
+            )
+            _block_fn(
+                issue_number=issue_number,
+                repo=repo,
+                reason=f"Malformed GitHub response after {retry_count} retries",
+                actor=actor,
+            )
+            return
+        else:
+            # Record retry count and raise to trigger retry
+            if flow_state is not None:
+                flow_state["noop_gate_malformed_retry_count"] = retry_count + 1
+            logger.bind(
+                domain="codeagent",
+                role=role,
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                f"No-op gate RETRY ({retry_count + 1}/3): GitHub returned "
+                f"malformed response"
+            )
+            raise RuntimeError(f"Malformed GitHub response for #{issue_number}")
+
+    # Clear retry counts on success
+    if flow_state is not None:
+        flow_state.pop("noop_gate_github_retry_count", None)
+        flow_state.pop("noop_gate_malformed_retry_count", None)
 
     after_state_label = extract_state_label(issue_payload)
 
     # Fail-safe: if state label disappeared after agent, block
+    # This is a BUSINESS BLOCK, not a runtime error
     if not after_state_label:
         logger.bind(
             domain="codeagent",

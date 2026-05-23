@@ -181,9 +181,10 @@ class TestApplyUnifiedNoopGate:
 
         mock_block.assert_called_once()
 
-    def test_blocks_when_github_returns_none(self) -> None:
-        """Gate blocks when GitHub returns None (fail-safe)."""
+    def test_retries_when_github_returns_none(self) -> None:
+        """Gate retries when GitHub returns None (runtime error with retry limit)."""
         store = _make_mock_store()
+        flow_state = {}  # Track retry count
 
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
@@ -192,23 +193,62 @@ class TestApplyUnifiedNoopGate:
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = None
-            apply_unified_noop_gate(
-                store=store,
-                issue_number=42,
-                branch="task/issue-42",
-                actor="agent:plan",
-                role="planner",
-                before_state_label="state/plan",
-            )
+            # First retry: should raise RuntimeError, not block
+            try:
+                apply_unified_noop_gate(
+                    store=store,
+                    issue_number=42,
+                    branch="task/issue-42",
+                    actor="agent:plan",
+                    role="planner",
+                    before_state_label="state/plan",
+                    flow_state=flow_state,
+                )
+                assert False, "Expected RuntimeError"
+            except RuntimeError as e:
+                assert "Malformed GitHub response" in str(e)
 
-        mock_block.assert_called_once()
-        assert "cannot verify remote state" in mock_block.call_args.kwargs["reason"]
-        store.add_event.assert_called_once()
-        assert store.add_event.call_args[0][1] == "cannot_verify_remote_state"
+        # Should NOT block on first retry
+        mock_block.assert_not_called()
+        # Should increment retry count
+        assert flow_state.get("noop_gate_malformed_retry_count") == 1
 
-    def test_blocks_when_github_raises(self) -> None:
-        """Gate blocks when GitHub call raises (fail-safe)."""
+    def test_retries_when_github_raises(self) -> None:
+        """Gate retries when GitHub call raises (runtime error with retry limit)."""
         store = _make_mock_store()
+        flow_state = {}  # Track retry count
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.side_effect = Exception("timeout")
+            # First retry: should raise RuntimeError, not block
+            try:
+                apply_unified_noop_gate(
+                    store=store,
+                    issue_number=42,
+                    branch="task/issue-42",
+                    actor="agent:plan",
+                    role="planner",
+                    before_state_label="state/plan",
+                    flow_state=flow_state,
+                )
+                assert False, "Expected RuntimeError"
+            except RuntimeError as e:
+                assert "Cannot verify remote state" in str(e)
+
+        # Should NOT block on first retry
+        mock_block.assert_not_called()
+        # Should increment retry count
+        assert flow_state.get("noop_gate_github_retry_count") == 1
+
+    def test_blocks_after_github_api_retry_limit(self) -> None:
+        """Gate blocks after 3 retries for GitHub API failures."""
+        store = _make_mock_store()
+        flow_state = {"noop_gate_github_retry_count": 3}  # Already at limit
 
         with (
             patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
@@ -224,10 +264,45 @@ class TestApplyUnifiedNoopGate:
                 actor="agent:plan",
                 role="planner",
                 before_state_label="state/plan",
+                flow_state=flow_state,
             )
 
+        # Should block after retry limit exceeded
         mock_block.assert_called_once()
-        assert "cannot verify remote state" in mock_block.call_args.kwargs["reason"]
+        assert (
+            "GitHub API failed after 3 retries" in mock_block.call_args.kwargs["reason"]
+        )
+        store.add_event.assert_called_once()
+        assert store.add_event.call_args[0][1] == "cannot_verify_remote_state"
+
+    def test_blocks_after_malformed_response_retry_limit(self) -> None:
+        """Gate blocks after 3 retries for malformed GitHub responses."""
+        store = _make_mock_store()
+        flow_state = {"noop_gate_malformed_retry_count": 3}  # Already at limit
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue_failure_service.block_planner_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = None
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:plan",
+                role="planner",
+                before_state_label="state/plan",
+                flow_state=flow_state,
+            )
+
+        # Should block after retry limit exceeded
+        mock_block.assert_called_once()
+        assert (
+            "Malformed GitHub response after 3 retries"
+            in mock_block.call_args.kwargs["reason"]
+        )
         store.add_event.assert_called_once()
         assert store.add_event.call_args[0][1] == "cannot_verify_remote_state"
 

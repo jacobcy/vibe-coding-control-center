@@ -158,13 +158,15 @@ def classify_error(error_output: str) -> str:
 # Error registry: maps error codes to handling contracts
 ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
     # CRITICAL: Model configuration errors - immediate failed gate
+    # NOTE: CRITICAL severity only affects FailedGate, NOT flow block
+    # Flow block is determined by business logic, not runtime errors
     E_MODEL_NOT_FOUND: ErrorHandlingContract(
         code=E_MODEL_NOT_FOUND,
         severity=ErrorSeverity.CRITICAL,
         counts_toward_threshold=False,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="fail_issue",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="immediate",
         description="Model not found or unavailable",
     ),
@@ -174,7 +176,7 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         counts_toward_threshold=False,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="fail_issue",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="immediate",
         description="Permission denied for model access",
     ),
@@ -184,18 +186,19 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         counts_toward_threshold=False,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="fail_issue",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="immediate",
         description="Model configuration error",
     ),
     # ERROR: API errors - threshold-based failed gate
+    # NOTE: ERROR severity only affects FailedGate, NOT flow block
     E_API_RATE_LIMIT: ErrorHandlingContract(
         code=E_API_RATE_LIMIT,
         severity=ErrorSeverity.ERROR,
         counts_toward_threshold=True,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="block_flow",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="threshold",
         description="API rate limit exceeded",
     ),
@@ -205,7 +208,7 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         counts_toward_threshold=True,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="block_flow",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="threshold",
         description="API request timeout",
     ),
@@ -215,7 +218,7 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         counts_toward_threshold=True,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="block_flow",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="threshold",
         description="API service unavailable",
     ),
@@ -225,7 +228,7 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         counts_toward_threshold=True,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="block_flow",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="threshold",
         description="Network connection error",
     ),
@@ -235,7 +238,7 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         counts_toward_threshold=True,
         record_in_error_log=True,
         write_timeline_event=True,
-        issue_action="block_flow",
+        issue_action="record_only",  # No flow block for runtime errors
         gate_action="threshold",
         description="Unknown API error",
     ),

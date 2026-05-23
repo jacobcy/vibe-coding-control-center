@@ -88,35 +88,20 @@ def _dispatch_role_intent(
 
         # Not launched, not skipped:
         # - capacity_full / duplicate_dispatch → normal skip
-        # - worktree_unavailable / all others → blocked_reason (catch-all)
-        if result.reason_code in ("capacity_full", "duplicate_dispatch"):
-            logger.bind(
-                domain=handler_domain,
-                issue_number=issue_number,
-            ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
-            return
-
-        # Blocking failure: write blocked_reason to prevent infinite retry
+        # - all other failures → log and continue
+        # Dispatch failures do NOT trigger flow block.
+        # Flow block is determined by business logic only
+        # (noop_gate, dependencies, loops).
+        # FailedGate controls dispatch based on error severity.
+        reason_code = result.reason_code or "unknown"
         logger.bind(
             domain=handler_domain,
             issue_number=issue_number,
-            reason_code=result.reason_code,
-        ).error(f"{role.capitalize()} dispatch blocking failure: {result.reason}")
-
-        if branch:
-            try:
-                from vibe3.services.flow_service import FlowService
-
-                FlowService().block_flow(
-                    branch=branch,
-                    reason=f"[{result.reason_code}] {result.reason}",
-                    actor=actor,
-                )
-            except Exception as exc:
-                logger.bind(
-                    domain=handler_domain,
-                    issue_number=issue_number,
-                ).warning(f"Failed to write blocked_reason: {exc}")
+            reason_code=reason_code,
+        ).warning(
+            f"{role.capitalize()} dispatch failed: {result.reason} - "
+            "FailedGate will control dispatch"
+        )
 
 
 @register_handler("PlannerDispatchIntent")

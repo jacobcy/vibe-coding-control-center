@@ -475,8 +475,12 @@ class CodeagentExecutionService:
                         ctx.actor,
                         log,
                     )
-                elif error_contract.issue_action == "record_only":
-                    # WARNING: Record and continue, let noop_gate decide
+                # All runtime errors only record to error_log.
+                # They do NOT trigger flow block.
+                # Flow block is determined by business logic only
+                # (noop_gate, dependencies, loops).
+                # FailedGate controls dispatch based on error severity.
+                if error_contract.issue_action == "record_only":
                     logger.bind(
                         domain="codeagent",
                         role=command.role,
@@ -484,26 +488,26 @@ class CodeagentExecutionService:
                         error_code=error_code,
                         severity=error_contract.severity.value,
                     ).info(
-                        f"Execution warning recorded: {error_code} - "
-                        "not blocking issue, letting noop_gate decide"
+                        f"Runtime error recorded: {error_code} "
+                        f"({error_contract.severity.value}) - "
+                        "FailedGate controls dispatch, "
+                        "noop_gate checks business progress"
                     )
                 else:
-                    # ERROR or CRITICAL: Block/fail the issue
-                    from vibe3.services.issue_failure_service import fail_issue
-
-                    blocked_reason = f"{error_code}: {exc}"
-
-                    try:
-                        fail_issue(
-                            issue_number=command.issue_number,
-                            reason=blocked_reason,
-                            role=command.role,
-                            actor=ctx.actor,
-                        )
-                    except Exception as block_exc:
-                        logger.warning(
-                            f"Failed to block issue: {block_exc}", exc_info=True
-                        )
+                    # Should not reach here: all runtime errors
+                    # now use "record_only" since flow block and
+                    # error tracking are orthogonal systems.
+                    logger.bind(
+                        domain="codeagent",
+                        role=command.role,
+                        issue_number=command.issue_number,
+                        error_code=error_code,
+                        issue_action=error_contract.issue_action,
+                    ).warning(
+                        f"Unexpected issue_action "
+                        f"'{error_contract.issue_action}' for "
+                        f"{error_code}, treating as record_only"
+                    )
 
             raise
 
