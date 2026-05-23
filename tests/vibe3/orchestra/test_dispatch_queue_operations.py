@@ -5,10 +5,14 @@ from __future__ import annotations
 import pytest
 
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.global_dispatch_coordinator import QueueEntry
+from vibe3.orchestra.global_dispatch_coordinator import (
+    QueueEntry,
+)
 
 
 class TestQueueOperations:
+    """Tests for GlobalDispatchCoordinator queue operations."""
+
     @pytest.mark.asyncio
     async def test_dispatch_all_when_capacity_available(
         self, make_issue, make_capacity, make_coordinator, install_issue_loader

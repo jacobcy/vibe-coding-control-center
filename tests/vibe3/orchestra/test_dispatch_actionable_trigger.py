@@ -1,13 +1,6 @@
-"""Tests for actionable-triggered queue collection.
+"""Tests for GlobalDispatchCoordinator actionable-triggered collection.
 
-Task 1 of issue #1206: Change collect trigger from
-"queue empty" to "actionable exhausted".
-
-Test Strategy:
-1. Test _merge_queue deduplication logic
-2. Test _dispatch_loop extraction (returns dispatched_count)
-3. Test coordinate() only collects when actionable candidates exhausted
-4. Test queue restoration when _frozen_queue is None
+Merged from actionable trigger tests and dispatch pause logic.
 """
 
 from __future__ import annotations
@@ -17,8 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.global_dispatch_coordinator import GlobalDispatchCoordinator
-from vibe3.orchestra.queue_persistence_mixin import QueueEntry
+from vibe3.orchestra.global_dispatch_coordinator import (
+    GlobalDispatchCoordinator,
+    QueueEntry,
+)
 
 
 @pytest.fixture
@@ -276,12 +271,11 @@ class TestActionableTriggeredCollection:
         mock_coordinator._dispatch_loop = MagicMock(return_value=0)
 
         # Mock collect to return fresh entries
-        async def mock_collect() -> list[QueueEntry]:
-            return [
+        mock_coordinator._collect_frozen_queue = AsyncMock(
+            return_value=[
                 QueueEntry(issue_number=2, collected_state="ready", waiting_state=None),
             ]
-
-        mock_coordinator._collect_frozen_queue = mock_collect
+        )
 
         mock_coordinator._persist_queue = MagicMock()
 
@@ -289,6 +283,7 @@ class TestActionableTriggeredCollection:
 
         # Should have called _collect_frozen_queue
         # (because all entries were blocked)
+        mock_coordinator._collect_frozen_queue.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_collect_when_actionable_available(self, mock_coordinator):
