@@ -185,6 +185,8 @@ class TestApplyUnifiedNoopGate:
 
     def test_retries_when_github_returns_none(self) -> None:
         """Gate retries when GitHub returns None (runtime error with retry limit)."""
+        from vibe3.exceptions.runtime_errors import GitHubAPIError
+
         store = _make_mock_store()
         flow_state = {}  # Track retry count
 
@@ -195,7 +197,7 @@ class TestApplyUnifiedNoopGate:
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.return_value = None
-            # First retry: should raise RuntimeError, not block
+            # First retry: should raise GitHubAPIError, not block
             try:
                 apply_unified_noop_gate(
                     store=store,
@@ -206,8 +208,8 @@ class TestApplyUnifiedNoopGate:
                     before_state_label="state/plan",
                     flow_state=flow_state,
                 )
-                assert False, "Expected RuntimeError"
-            except RuntimeError as e:
+                assert False, "Expected GitHubAPIError"
+            except GitHubAPIError as e:
                 assert "Malformed GitHub response" in str(e)
 
         # Should NOT block on first retry
@@ -217,6 +219,8 @@ class TestApplyUnifiedNoopGate:
 
     def test_retries_when_github_raises(self) -> None:
         """Gate retries when GitHub call raises (runtime error with retry limit)."""
+        from vibe3.exceptions.runtime_errors import GitHubAPIError
+
         store = _make_mock_store()
         flow_state = {}  # Track retry count
 
@@ -227,7 +231,7 @@ class TestApplyUnifiedNoopGate:
             ) as mock_block,
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("timeout")
-            # First retry: should raise RuntimeError, not block
+            # First retry: should raise GitHubAPIError, not block
             try:
                 apply_unified_noop_gate(
                     store=store,
@@ -238,8 +242,8 @@ class TestApplyUnifiedNoopGate:
                     before_state_label="state/plan",
                     flow_state=flow_state,
                 )
-                assert False, "Expected RuntimeError"
-            except RuntimeError as e:
+                assert False, "Expected GitHubAPIError"
+            except GitHubAPIError as e:
                 assert "Cannot verify remote state" in str(e)
 
         # Should NOT block on first retry
@@ -249,6 +253,8 @@ class TestApplyUnifiedNoopGate:
 
     def test_records_error_after_github_api_retry_limit(self) -> None:
         """Gate records error (not blocks) after 3 retries for GitHub API failures."""
+        from vibe3.exceptions.runtime_errors import GitHubAPIError
+
         store = _make_mock_store()
         flow_state = {"noop_gate_github_retry_count": 3}  # Already at limit
 
@@ -260,7 +266,7 @@ class TestApplyUnifiedNoopGate:
         ):
             mock_gh.return_value.view_issue.side_effect = Exception("timeout")
 
-            # NEW: Should raise RuntimeError (not block flow)
+            # NEW: Should raise GitHubAPIError (not block flow)
             try:
                 apply_unified_noop_gate(
                     store=store,
@@ -271,8 +277,8 @@ class TestApplyUnifiedNoopGate:
                     before_state_label="state/plan",
                     flow_state=flow_state,
                 )
-                pytest.fail("Should have raised RuntimeError")
-            except RuntimeError as e:
+                pytest.fail("Should have raised GitHubAPIError")
+            except GitHubAPIError as e:
                 assert "Cannot verify remote state" in str(e)
                 assert "after 3 retries" in str(e)
 
@@ -283,6 +289,8 @@ class TestApplyUnifiedNoopGate:
 
     def test_records_error_after_malformed_response_retry_limit(self) -> None:
         """Gate records error (not blocks) after 3 retries for malformed responses."""
+        from vibe3.exceptions.runtime_errors import GitHubAPIError
+
         store = _make_mock_store()
         flow_state = {"noop_gate_malformed_retry_count": 3}  # Already at limit
 
@@ -294,7 +302,6 @@ class TestApplyUnifiedNoopGate:
         ):
             mock_gh.return_value.view_issue.return_value = None  # Malformed
 
-            # NEW: Should raise RuntimeError (not block flow)
             try:
                 apply_unified_noop_gate(
                     store=store,
@@ -305,15 +312,13 @@ class TestApplyUnifiedNoopGate:
                     before_state_label="state/plan",
                     flow_state=flow_state,
                 )
-                pytest.fail("Should have raised RuntimeError")
-            except RuntimeError as e:
+                pytest.fail("Should have raised GitHubAPIError")
+            except GitHubAPIError as e:
                 assert "Malformed GitHub response" in str(e)
                 assert "after 3 retries" in str(e)
 
-        # NEW: Should NOT block flow (runtime error, not business logic)
+        # Should NOT block flow (runtime error, not business logic)
         mock_block.assert_not_called()
-        # NEW: Error recorded (FailedGate will control dispatch)
-        # Note: ErrorTrackingService recording tested in integration tests
 
     def test_blocks_when_state_label_disappears(self) -> None:
         """Gate blocks when state label disappears from issue after agent."""
