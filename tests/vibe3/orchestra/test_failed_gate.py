@@ -270,7 +270,7 @@ def test_clear_instance_with_db_path_clears_matching_singleton(
     tmp_path: Path,
 ) -> None:
     """clear_instance(db_path) should also clear _instance if it matches."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create a test database
     db_path = tmp_path / "test.db"
@@ -389,7 +389,7 @@ class TestFailedGateIntegration:
 
     def test_serve_start_preflight_blocked(self, temp_store: SQLiteClient) -> None:
         """serve start should fail if FailedGate reports blocked."""
-        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.error_tracking_service import ErrorTrackingService
 
         # Create ErrorTrackingService with test database
         ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -427,7 +427,7 @@ class TestFailedGateIntegration:
         self, temp_store: SQLiteClient
     ) -> None:
         """Heartbeat runtime should skip on_tick() when FailedGate is ACTIVE."""
-        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.error_tracking_service import ErrorTrackingService
 
         # Create ErrorTrackingService with test database
         ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
