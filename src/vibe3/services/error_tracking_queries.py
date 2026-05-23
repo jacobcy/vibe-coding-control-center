@@ -9,8 +9,13 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
+from loguru import logger
+
 from vibe3.exceptions.error_codes import is_api_error, is_model_error
 from vibe3.exceptions.error_severity import ErrorSeverity
+
+# Known canonical severity values
+_KNOWN_SEVERITIES = {"CRITICAL", "ERROR", "WARNING"}
 
 
 def get_error_counts(db_path: str) -> dict[str, int]:
@@ -309,11 +314,26 @@ def get_all_errors_status(db_path: str) -> dict[str, Any]:
     critical_count = severity_counts.get("CRITICAL", 0)
     error_count = severity_counts.get("ERROR", 0)
     warning_count = severity_counts.get("WARNING", 0)
-    total_errors = critical_count + error_count + warning_count
+
+    # Fix: total_errors = sum of ALL grouped counts, not just known severities
+    total_errors = sum(severity_counts.values())
+
+    # Surface unknown severity values for observability
+    unknown_severity_counts = {
+        sev: count
+        for sev, count in severity_counts.items()
+        if sev not in _KNOWN_SEVERITIES
+    }
+
+    if unknown_severity_counts:
+        logger.warning(
+            f"error_log contains unknown severity values: {unknown_severity_counts}"
+        )
 
     return {
         "total_errors": total_errors,
         "critical_count": critical_count,
         "error_count": error_count,
         "warning_count": warning_count,
+        "unknown_severity_counts": unknown_severity_counts,
     }
