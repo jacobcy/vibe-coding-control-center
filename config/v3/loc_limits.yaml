@@ -261,8 +261,8 @@ code_limits:
         limit: 460
         reason: "Actionable trigger + dispatch pause 测试集 (#1206)，覆盖 collect/merge/dispatch loop 的 actionable 判断、dispatch_paused 状态管理、blocked-only rebuild 逻辑，共享 fixture，拆分收益低"
       - path: "tests/vibe3/orchestra/test_failed_gate.py"
-        limit: 470
-        reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop），合并后内聚度高，拆分会破坏测试场景完整性"
+        limit: 570
+        reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop、manual_scan 排除逻辑），合并后内聚度高，拆分会破坏测试场景完整性"
       - path: "tests/vibe3/commands/test_scan.py"
         limit: 410
         reason: "Scan 命令测试集，覆盖 governance/supervisor/all 三个完整命令的 dry-run 和实际执行场景，每个测试需要完整的 mock 设置和验证逻辑，拆分收益低"
