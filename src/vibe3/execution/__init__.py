@@ -3,8 +3,8 @@
 Public interface for the Vibe3 execution layer. All external consumers
 should import from ``vibe3.execution`` rather than internal submodules.
 
-Import concrete modules explicitly from ``vibe3.execution.*`` to keep
-package boundaries explicit and avoid re-export compatibility layers.
+Internal code may import from submodules directly to avoid circular
+dependencies or reduce import cost.
 
 Core classes:
     - :class:`ExecutionCoordinator`: Orchestrates role execution lifecycle,
@@ -26,6 +26,17 @@ Functions:
       and timeline events.
     - :func:`run_governance_sync`: Run governance scan synchronously.
     - :func:`run_governance_async`: Run governance scan asynchronously.
+
+Note on ExecutionRole:
+    Two ExecutionRole types exist for different purposes:
+    - ``vibe3.agents.models.ExecutionRole``: Roles for codeagent commands
+      (planner, executor, reviewer, manager)
+    - ``vibe3.execution.execution_lifecycle.ExecutionRole``: Roles for
+      lifecycle events (planner, executor, reviewer, manager, supervisor,
+      governance)
+
+    Import from the appropriate module based on your use case. This package
+    does not re-export ExecutionRole to avoid ambiguity.
 """
 
 from __future__ import annotations
@@ -37,7 +48,6 @@ from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.execution_lifecycle import (
     ExecutionLifecycleEvent,
     ExecutionLifecycleService,
-    ExecutionRole,
     execution_prefix,
     persist_execution_lifecycle_event,
 )
@@ -56,7 +66,6 @@ __all__: list[str] = [
     "ExecutionRequest",
     "ExecutionLaunchResult",
     # Types
-    "ExecutionRole",
     "ExecutionLifecycleEvent",
     # Functions
     "execution_prefix",
