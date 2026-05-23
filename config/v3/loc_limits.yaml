@@ -33,12 +33,14 @@ code_limits:
         limit: 600
         reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
       - path: "src/vibe3/services/blocked_state_service.py"
-        limit: 650
+        limit: 700
         reason: |
           Blocked state 统一管理服务，单一真相源架构核心：
           - 三重状态原子操作（block/unblock/sync）
           - Truth hierarchy：body → DB → labels
           - 一致性验证与降级处理
+          - 公共 API 暴露（write_cache）
+          - event_type 参数支持区分 fail/block
           - 40% 代码为文档注释（关键架构代码标准）
           拆分会破坏状态一致性和事务原子性保证
       - path: "src/vibe3/services/task_resume_operations.py"
