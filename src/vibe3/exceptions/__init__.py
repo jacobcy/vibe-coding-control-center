@@ -222,11 +222,10 @@ class InvalidTransitionError(UserError):
 
 # ========== Error Tracking and Classification ==========
 
-# Import error tracking utilities (lazy import to avoid circular dependencies)
+# Import error classification utilities (lazy import to avoid circular dependencies)
 # These are imported when needed, not at module level
 #
 # Usage:
-#   from vibe3.exceptions.error_tracking import ErrorTrackingService
 #   from vibe3.exceptions.error_classification import (
 #       classify_error
 #   )

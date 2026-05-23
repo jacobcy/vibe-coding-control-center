@@ -24,7 +24,7 @@ from vibe3.server.app import app
 def reset_error_tracking() -> Iterator[None]:
     """Reset ErrorTrackingService singleton between tests to prevent state leakage."""
     yield
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     db_paths = [
         instance.db_path for instance in ErrorTrackingService._registry.values()
@@ -59,7 +59,7 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
 
 def test_failed_gate_open(temp_store: SQLiteClient) -> None:
     """Gate should be open when no errors are recorded."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -73,7 +73,7 @@ def test_failed_gate_open(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
     """Gate should block immediately on model config errors."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -90,7 +90,7 @@ def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     """Gate should block when ERROR-severity error threshold is reached."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -110,7 +110,7 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
     """Gate should clear and allow operation after manual resume."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -132,7 +132,7 @@ def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_persists_state(temp_store: SQLiteClient) -> None:
     """Gate state should persist across instances."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -155,7 +155,7 @@ def test_failed_gate_persists_state(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_increment_blocked_ticks(temp_store: SQLiteClient) -> None:
     """Gate should increment blocked_ticks when active."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create ErrorTrackingService with test database
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -179,7 +179,7 @@ def test_failed_gate_increment_blocked_ticks(temp_store: SQLiteClient) -> None:
 
 def test_per_db_path_instance_isolation(tmp_path: Path) -> None:
     """Different db_path instances should be isolated."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create two separate databases
     db_path1 = tmp_path / "test1.db"
@@ -226,7 +226,7 @@ def test_per_db_path_instance_isolation(tmp_path: Path) -> None:
 
 def test_clear_instance_specific_db_path(tmp_path: Path) -> None:
     """clear_instance(db_path) should only clear that instance."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create two separate databases
     db_path1 = tmp_path / "test1.db"
@@ -270,7 +270,7 @@ def test_clear_instance_with_db_path_clears_matching_singleton(
     tmp_path: Path,
 ) -> None:
     """clear_instance(db_path) should also clear _instance if it matches."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Create a test database
     db_path = tmp_path / "test.db"
@@ -300,7 +300,7 @@ def test_clear_instance_with_db_path_clears_matching_singleton(
 
 def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
     """get_instance() without store should return default instance."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     # Clear any existing state
     ErrorTrackingService.clear_instance()
@@ -344,8 +344,8 @@ def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
 
 def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:
     """Test that WARNING severity errors don't close the gate."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
     from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
@@ -365,8 +365,8 @@ def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:
 
 def test_critical_closes_gate_immediately(temp_store: SQLiteClient) -> None:
     """Test that CRITICAL severity closes gate immediately."""
-    from vibe3.exceptions.error_tracking import ErrorTrackingService
     from vibe3.orchestra.failed_gate import FailedGate
+    from vibe3.services.error_tracking_service import ErrorTrackingService
 
     ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
 
@@ -389,7 +389,7 @@ class TestFailedGateIntegration:
 
     def test_serve_start_preflight_blocked(self, temp_store: SQLiteClient) -> None:
         """serve start should fail if FailedGate reports blocked."""
-        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.error_tracking_service import ErrorTrackingService
 
         # Create ErrorTrackingService with test database
         ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
@@ -427,7 +427,7 @@ class TestFailedGateIntegration:
         self, temp_store: SQLiteClient
     ) -> None:
         """Heartbeat runtime should skip on_tick() when FailedGate is ACTIVE."""
-        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.error_tracking_service import ErrorTrackingService
 
         # Create ErrorTrackingService with test database
         ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)

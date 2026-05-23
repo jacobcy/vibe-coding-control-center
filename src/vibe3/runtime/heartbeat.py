@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.exceptions.error_tracking import ErrorTrackingService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_orchestra_event,
@@ -18,6 +17,7 @@ from vibe3.orchestra.logging import (
 )
 from vibe3.runtime.periodic_check_executor import execute_periodic_check
 from vibe3.runtime.service_protocol import ServiceBase
+from vibe3.services.error_tracking_service import ErrorTrackingService
 
 if TYPE_CHECKING:
     from vibe3.orchestra.failed_gate import FailedGate
