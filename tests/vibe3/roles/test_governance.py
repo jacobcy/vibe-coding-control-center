@@ -6,7 +6,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.domain.events import (
+    ExecutorDispatchIntent,
+    ManagerDispatchIntent,
+    PlannerDispatchIntent,
+    ReviewerDispatchIntent,
+)
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.governance import (
     GOVERNANCE_ROLE,
     build_governance_execution_name,
@@ -15,7 +22,13 @@ from vibe3.roles.governance import (
     build_governance_snapshot_context,
     render_governance_prompt,
 )
+from vibe3.roles.manager import MANAGER_ROLE
+from vibe3.roles.plan import PLANNER_ROLE
+from vibe3.roles.registry import build_label_dispatch_event
+from vibe3.roles.review import REVIEWER_ROLE
+from vibe3.roles.run import EXECUTOR_ROLE
 from vibe3.services.orchestra_status_service import (
+    IssueStatusEntry,
     OrchestraSnapshot,
 )
 
@@ -45,6 +58,16 @@ def _make_config(**overrides) -> OrchestraConfig:
     return OrchestraConfig(
         governance=GovernanceConfig(**{**gov_defaults, **gov_overrides}),
         **overrides,
+    )
+
+
+def _issue(number: int = 42) -> IssueInfo:
+    return IssueInfo(
+        number=number,
+        title=f"Issue {number}",
+        state=IssueState.CLAIMED,
+        labels=[],
+        assignees=[],
     )
 
 
@@ -267,3 +290,406 @@ class TestGovernanceRoleDefinition:
         from vibe3.execution.role_contracts import WorktreeRequirement
 
         assert GOVERNANCE_ROLE.worktree == WorktreeRequirement.NONE
+
+
+class TestBuildSnapshotContext:
+    """Tests for build_governance_snapshot_context."""
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_empty_issues(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
+        snapshot = _make_snapshot()
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        assert ctx["server_status"] == "running"
+        assert ctx["issue_scope_name"] == "assignee issue pool"
+        assert ctx["active_count"] == 0
+        assert ctx["running_issue_count"] == 0
+        assert ctx["suggested_issue_count"] == 0
+        assert ctx["circuit_breaker_state"] == "closed"
+        assert "(无活跃 issue)" in ctx["issue_list"]
+        assert "(无 running issues)" in ctx["running_issue_details"]
+        assert "(无建议 issue)" in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_with_running_and_suggested_issues(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
+        running = IssueStatusEntry(
+            number=42,
+            title="Running",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=True,
+            flow_branch="task/issue-42",
+            has_worktree=True,
+            worktree_path="/repo/wt",
+            has_pr=True,
+            pr_number=401,
+            blocked_by=(),
+        )
+        suggested = IssueStatusEntry(
+            number=43,
+            title="Suggested",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        snapshot = _make_snapshot(
+            active_issues=(running, suggested),
+            active_flows=1,
+            active_worktrees=1,
+        )
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        assert ctx["active_count"] == 2
+        assert ctx["running_issue_count"] == 1
+        assert ctx["suggested_issue_count"] == 1
+        assert "#42" in ctx["running_issue_details"]
+        assert "#43" in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_server_stopped(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
+        snapshot = _make_snapshot(server_running=False)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        assert ctx["server_status"] == "stopped"
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_truncation_note(self, mock_github_cls):
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = []  # No vibe-task issues
+        mock_github_cls.return_value = mock_github
+
+        issues = tuple(
+            IssueStatusEntry(
+                number=i,
+                title=f"Issue {i}",
+                state=None,
+                assignee="a",
+                has_flow=False,
+                flow_branch=None,
+                has_worktree=False,
+                worktree_path=None,
+                has_pr=False,
+                pr_number=None,
+                blocked_by=(),
+            )
+            for i in range(25)
+        )
+        snapshot = _make_snapshot(active_issues=issues)
+        ctx = build_governance_snapshot_context(snapshot, config=_make_config())
+        assert "已截断" in ctx["truncated_note"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_roadmap_intake_uses_broader_repo_candidates(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        # tick_count=1 selects roadmap-intake from recipe catalog
+        config = _make_config()
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 101,
+                "title": "fix: small bug",
+                "body": "clear repro steps",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            },
+            {
+                "number": 102,
+                "title": "already in pool",
+                "body": "",
+                "assignees": [{"login": "vibe-manager-agent"}],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert ctx["active_count"] == 1
+        assert "#101" in ctx["suggested_issue_details"]
+        assert "#102" not in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_cron_supervisor_filters_to_docs_candidates(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        # tick_count=2 selects cron-supervisor from recipe catalog
+        config = _make_config()
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 201,
+                "title": "docs: align README",
+                "body": "documentation drift",
+                "assignees": [],
+                "labels": [{"name": "type/docs"}],
+                "milestone": None,
+            },
+            {
+                "number": 202,
+                "title": "not docs",
+                "body": "not docs",
+                "assignees": [],
+                "labels": [{"name": "type/feature"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=2)
+
+        # After migration, scope and filtering work based on recipe catalog material
+        assert ctx["issue_scope_name"] == "broader repo docs scope"
+        # Verify context is built correctly
+        assert "suggested_issue_details" in ctx
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_material_override_uses_matching_scope(self, mock_github_cls):
+        snapshot = _make_snapshot()
+        config = _make_config()
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 301,
+                "title": "fix: intake candidate",
+                "body": "clear scope",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],
+                "milestone": None,
+            }
+        ]
+        mock_github_cls.return_value = mock_github
+
+        ctx = build_governance_snapshot_context(
+            snapshot,
+            config=config,
+            tick_count=0,
+            material_override="roadmap-intake",
+        )
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert "#301" in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_vibe_task_issues_filtered_from_assignee_pool(self, mock_github_cls):
+        """Issues with vibe-task label should be filtered from assignee pool."""
+        snapshot = _make_snapshot()
+        config = _make_config()
+        mock_github = MagicMock()
+
+        # Mock vibe-task labeled issues (should be filtered)
+        mock_github.list_issues.return_value = [
+            {
+                "number": 100,
+                "title": "Already reviewed",
+                "body": "",
+                "assignees": [],
+                "labels": [{"name": "vibe-task"}],
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        # Create snapshot with both vibe-task and normal issues
+        reviewed = IssueStatusEntry(
+            number=100,
+            title="Already reviewed",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        normal = IssueStatusEntry(
+            number=101,
+            title="Needs review",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        snapshot = _make_snapshot(active_issues=(reviewed, normal))
+
+        ctx = build_governance_snapshot_context(snapshot, config=config)
+
+        # Only non-vibe-task issue should appear
+        assert ctx["active_count"] == 1
+        assert "#101" in ctx["suggested_issue_details"]
+        assert "#100" not in ctx["suggested_issue_details"]
+
+    @patch("vibe3.roles.governance.GitHubClient")
+    def test_broader_repo_filters_vibe_task(self, mock_github_cls):
+        """Broader repo candidates should filter vibe-task labeled issues."""
+        snapshot = _make_snapshot()
+        config = _make_config()
+        mock_github = MagicMock()
+        mock_github.list_issues.return_value = [
+            {
+                "number": 201,
+                "title": "Fix bug",
+                "body": "Clear scope",
+                "assignees": [],
+                "labels": [{"name": "vibe-task"}],  # Should be filtered
+                "milestone": None,
+            },
+            {
+                "number": 202,
+                "title": "New feature",
+                "body": "Clear scope",
+                "assignees": [],
+                "labels": [{"name": "type/fix"}],  # Should pass through
+                "milestone": None,
+            },
+        ]
+        mock_github_cls.return_value = mock_github
+
+        # Use roadmap-intake material
+        ctx = build_governance_snapshot_context(snapshot, config=config, tick_count=1)
+
+        assert ctx["issue_scope_name"] == "broader repo issue pool"
+        assert ctx["active_count"] == 1
+        assert "#202" in ctx["suggested_issue_details"]
+        assert "#201" not in ctx["suggested_issue_details"]
+
+    def test_no_vibe_task_issues_no_filtering(self):
+        """When no vibe-task issues exist, all candidates should pass through."""
+        snapshot = _make_snapshot()
+        config = _make_config()
+
+        with patch("vibe3.roles.governance.GitHubClient") as mock_github_cls:
+            mock_github = MagicMock()
+            mock_github.list_issues.return_value = []  # No vibe-task issues
+            mock_github_cls.return_value = mock_github
+
+            issue1 = IssueStatusEntry(
+                number=1,
+                title="Issue 1",
+                state=None,
+                assignee="vibe-manager-agent",
+                has_flow=False,
+                flow_branch=None,
+                has_worktree=False,
+                worktree_path=None,
+                has_pr=False,
+                pr_number=None,
+                blocked_by=(),
+            )
+            issue2 = IssueStatusEntry(
+                number=2,
+                title="Issue 2",
+                state=None,
+                assignee="vibe-manager-agent",
+                has_flow=False,
+                flow_branch=None,
+                has_worktree=False,
+                worktree_path=None,
+                has_pr=False,
+                pr_number=None,
+                blocked_by=(),
+            )
+            snapshot = _make_snapshot(active_issues=(issue1, issue2))
+
+            ctx = build_governance_snapshot_context(snapshot, config=config)
+
+            # Both issues should appear
+            assert ctx["active_count"] == 2
+
+
+class TestBuildLabelDispatchEvent:
+    """Tests for role registry dispatch helpers."""
+
+    def test_build_label_dispatch_event_for_manager(self):
+        event = build_label_dispatch_event(
+            MANAGER_ROLE,
+            _issue(),
+            branch="task/issue-42",
+        )
+
+        assert isinstance(event, ManagerDispatchIntent)
+        assert event.issue_number == 42
+        assert event.branch == "task/issue-42"
+        assert event.trigger_state == IssueState.READY.value
+
+    def test_build_label_dispatch_event_for_plan(self):
+        event = build_label_dispatch_event(
+            PLANNER_ROLE,
+            _issue(),
+            branch="task/issue-42",
+        )
+
+        assert isinstance(event, PlannerDispatchIntent)
+        assert event.branch == "task/issue-42"
+        assert event.trigger_state == IssueState.CLAIMED.value
+
+    def test_build_label_dispatch_event_for_run(self):
+        event = build_label_dispatch_event(
+            EXECUTOR_ROLE,
+            _issue(),
+            branch="task/issue-42",
+        )
+
+        assert isinstance(event, ExecutorDispatchIntent)
+        assert event.trigger_state == IssueState.IN_PROGRESS.value
+        # Executor-specific context is NOT on the dispatch intent
+        assert not hasattr(event, "plan_ref")
+        assert not hasattr(event, "commit_mode")
+
+    def test_build_label_dispatch_event_for_review(self):
+        event = build_label_dispatch_event(
+            REVIEWER_ROLE,
+            _issue(),
+            branch="task/issue-42",
+        )
+
+        assert isinstance(event, ReviewerDispatchIntent)
+        assert event.trigger_state == IssueState.REVIEW.value
+        # Reviewer-specific context is NOT on the dispatch intent
+        assert not hasattr(event, "report_ref")
+
+
+class TestDispatchPredicates:
+    """Tests for role dispatch predicates."""
+
+    def test_planner_dispatch_predicate_ignores_plan_ref(self) -> None:
+        assert PLANNER_ROLE.dispatch_predicate({}, False) is True
+        assert PLANNER_ROLE.dispatch_predicate({"plan_ref": "plan.md"}, False) is True
+        assert PLANNER_ROLE.dispatch_predicate({}, True) is False
+
+    def test_executor_dispatch_predicate_ignores_report_ref(self) -> None:
+        assert EXECUTOR_ROLE.dispatch_predicate({}, False) is True
+        assert (
+            EXECUTOR_ROLE.dispatch_predicate({"report_ref": "report.md"}, False) is True
+        )
+        assert EXECUTOR_ROLE.dispatch_predicate({}, True) is False
+
+    def test_reviewer_dispatch_predicate_ignores_audit_ref(self) -> None:
+        assert REVIEWER_ROLE.dispatch_predicate({}, False) is True
+        assert (
+            REVIEWER_ROLE.dispatch_predicate({"audit_ref": "audit.md"}, False) is True
+        )
+        assert REVIEWER_ROLE.dispatch_predicate({}, True) is False

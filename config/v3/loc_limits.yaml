@@ -215,8 +215,8 @@ code_limits:
         limit: 480
         reason: "Worktree branch-from-PR 测试，多场景覆盖 pre-existing branch、PR base、状态标签等，共享 fixture"
       - path: "tests/vibe3/roles/test_governance.py"
-        limit: 500
-        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景"
+        limit: 700
+        reason: "Governance 角色测试集，覆盖 supervisor 材料组装、issue 扫描、dispatch 逻辑等多个紧密耦合场景；合并 governance_context + registry 测试后包含 37 个测试，共享 fixture，拆分收益低"
       - path: "tests/vibe3/roles/test_manager.py"
         limit: 500
         reason: "Manager 角色测试集，覆盖 dispatch blocking、prompt assembly、state transition、failure handling 四个紧密耦合场景，拆分收益低"
