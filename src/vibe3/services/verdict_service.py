@@ -17,9 +17,9 @@ from vibe3.models.verdict import VerdictRecord
 from vibe3.models.verdict_types import VerdictValue
 from vibe3.services.actor_support import extract_role_from_actor
 from vibe3.services.flow_service import FlowService
+from vibe3.services.git_path_client import GitPathProtocol
 from vibe3.services.handoff_storage import HandoffStorage
 from vibe3.services.signature_service import SignatureService
-from vibe3.utils.git_path_client import GitPathProtocol
 
 
 class VerdictService:

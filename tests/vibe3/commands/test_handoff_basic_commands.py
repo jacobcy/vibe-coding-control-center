@@ -17,7 +17,7 @@ class TestHandoffBasicCommands:
 
     @pytest.mark.parametrize("force,expected_force", [(False, False), (True, True)])
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.utils.branch_arg.GitClient")
+    @patch("vibe3.services.branch_arg.GitClient")
     def test_handoff_init_command(
         self, mock_git_class, mock_service_class, force, expected_force
     ):

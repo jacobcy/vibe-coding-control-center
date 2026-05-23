@@ -284,7 +284,7 @@ class TestEnsurePlanFileExists:
 
         # Mock the import inside ensure_plan_file_exists
         monkeypatch.setattr(
-            "vibe3.utils.path_helpers.resolve_handoff_target",
+            "vibe3.services.path_helpers.resolve_handoff_target",
             mock_resolve,
         )
 

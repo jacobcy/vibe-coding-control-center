@@ -9,7 +9,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
-from vibe3.utils.git_path_client import GitPathProtocol, get_git_common_dir
+from vibe3.services.git_path_client import GitPathProtocol, get_git_common_dir
 
 
 class FlowReadMixin:

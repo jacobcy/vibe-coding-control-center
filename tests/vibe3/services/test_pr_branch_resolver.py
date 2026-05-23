@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.exceptions import UserError
-from vibe3.utils.pr_branch_resolver import (
+from vibe3.services.pr_branch_resolver import (
     resolve_branch_from_pr,
     resolve_command_branch,
 )
@@ -72,7 +72,7 @@ class TestResolveCommandBranch:
 
         # Mock resolve_issue_branch_input
         with patch(
-            "vibe3.utils.pr_branch_resolver.resolve_issue_branch_input"
+            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
         ) as mock_resolve:
             mock_resolve.return_value = "dev/issue-476"
 
@@ -110,7 +110,7 @@ class TestResolveCommandBranch:
         mock_flow_service = Mock()
 
         with patch(
-            "vibe3.utils.pr_branch_resolver.resolve_issue_branch_input"
+            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
         ) as mock_resolve:
             mock_resolve.return_value = "task/issue-999"
 

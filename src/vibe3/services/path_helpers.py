@@ -7,7 +7,7 @@ For handoff target resolution, see handoff_resolution module.
 import re
 from pathlib import Path
 
-from vibe3.utils.git_path_client import (
+from vibe3.services.git_path_client import (
     GitPathProtocol,
     _get_git_client,
     find_worktree_path_for_branch,
@@ -16,7 +16,7 @@ from vibe3.utils.git_path_client import (
 )
 
 # Import handoff resolution functions from dedicated module
-from vibe3.utils.handoff_resolution import (
+from vibe3.services.handoff_resolution import (
     _SHARED_HANDOFF_PREFIX,
     resolve_handoff_target,
 )
