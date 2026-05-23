@@ -348,7 +348,11 @@ def register_query_commands(app: typer.Typer) -> None:
         if trace:
             trace_output = create_trace_output("pr show", start_time)
 
-        ctx = trace_context(command="pr show", domain="pr") if trace else noop_context()
+        ctx = (
+            trace_context(command="pr show", domain="pr", tier="Shell Layer")
+            if trace
+            else noop_context()
+        )
         with ctx:
             logger.bind(command="pr show", pr_number=pr_number, branch=branch).info(
                 "Fetching PR details"

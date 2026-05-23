@@ -113,7 +113,7 @@ def show(
         typer.echo(_HANDOFF_SHOW_HELP)
         raise typer.Exit(0)
 
-    with trace_scope(trace, "handoff show", domain="handoff"):
+    with trace_scope(trace, "handoff show", domain="handoff", tier="Shell Layer"):
         # Resolve numeric issue ID → canonical branch name before path lookup
         resolved_branch: str | None = None
         if branch is not None:
@@ -174,7 +174,7 @@ def status(
         )
         output_format = "json"
 
-    with trace_scope(trace, "handoff status", domain="handoff"):
+    with trace_scope(trace, "handoff status", domain="handoff", tier="Shell Layer"):
         flow_service = FlowService()
         try:
             target_branch = resolve_command_branch(

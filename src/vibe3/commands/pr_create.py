@@ -138,7 +138,9 @@ def register_create_command(app: typer.Typer) -> None:
             setup_logging(verbose=2)
 
         ctx = (
-            trace_context(command="pr create", domain="pr", title=title)
+            trace_context(
+                command="pr create", domain="pr", tier="Shell Layer", title=title
+            )
             if trace
             else noop_context()
         )

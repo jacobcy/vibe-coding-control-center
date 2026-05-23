@@ -94,6 +94,7 @@ class Tracer:
 def trace_context(
     command: str,
     domain: str,
+    tier: str = "Skill Layer",
     **metadata: Any,
 ) -> Iterator[None]:
     """Context manager for tracing a command execution.
@@ -101,23 +102,32 @@ def trace_context(
     Args:
         command: Command name (e.g., "pr draft")
         domain: Business domain (e.g., "pr", "flow", "task")
+        tier: Architecture tier (default: "Skill Layer")
+            - "Skill Layer": Orchestration commands (flow, task)
+            - "Shell Layer": Capability commands (handoff, inspect, pr)
+            - "Agent Execution": Agent commands (run, plan, review)
+            - "Infrastructure": Infrastructure commands (serve, mcp, scan)
         **metadata: Additional trace metadata
 
     Yields:
         None
 
     Example:
-        with TraceContext(command="pr draft", domain="pr"):
+        with TraceContext(command="pr draft", domain="pr", tier="Shell Layer"):
             # Execute command
             pass
     """
-    logger.bind(command=command, domain=domain, **metadata).info(f"Starting: {command}")
+    logger.bind(tier=tier, command=command, domain=domain, **metadata).info(
+        f"[{tier}] Starting: {command}"
+    )
 
     try:
         yield
-        logger.bind(command=command).success(f"Completed: {command}")
+        logger.bind(tier=tier, command=command).success(
+            f"[{tier}] Completed: {command}"
+        )
     except Exception:
-        logger.bind(command=command).exception(f"Failed: {command}")
+        logger.bind(tier=tier, command=command).exception(f"[{tier}] Failed: {command}")
         raise
 
 

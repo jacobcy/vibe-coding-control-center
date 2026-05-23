@@ -85,7 +85,7 @@ def show(
         )
         output_format = "json"
 
-    with trace_scope(trace, "flow show", domain="flow"):
+    with trace_scope(trace, "flow show", domain="flow", tier="Skill Layer"):
         service = FlowService()
         try:
             target_branch = resolve_command_branch(
@@ -308,7 +308,7 @@ def status(
             err=True,
         )
         output_format = "json"
-    with trace_scope(trace, "flow status", domain="flow"):
+    with trace_scope(trace, "flow status", domain="flow", tier="Skill Layer"):
         if check:
             run_full_check_shortcut()
 

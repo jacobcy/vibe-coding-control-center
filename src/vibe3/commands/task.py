@@ -107,7 +107,9 @@ def show(
         setup_logging(verbose=2)
 
     ctx = (
-        trace_context(command="task show", domain="task", branch=target_branch)
+        trace_context(
+            command="task show", domain="task", tier="Skill Layer", branch=target_branch
+        )
         if trace
         else _noop()
     )

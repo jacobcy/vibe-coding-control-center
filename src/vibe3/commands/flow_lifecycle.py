@@ -42,7 +42,7 @@ def blocked(
         typer.echo("Error: 不能同时指定 --reason 与 --task", err=True)
         raise typer.Exit(1)
 
-    with trace_scope(trace, "flow blocked", domain="flow"):
+    with trace_scope(trace, "flow blocked", domain="flow", tier="Skill Layer"):
         service = FlowService()
 
         # Early handling for issue number: resolve to canonical branch

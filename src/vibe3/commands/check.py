@@ -218,7 +218,11 @@ def check(
         typer.echo("Error: --branch requires a non-empty branch name.", err=True)
         raise typer.Exit(code=1)
 
-    trace_ctx = trace_context(command="check", domain="check") if trace else None
+    trace_ctx = (
+        trace_context(command="check", domain="check", tier="Infrastructure")
+        if trace
+        else None
+    )
     if trace_ctx:
         trace_ctx.__enter__()
 

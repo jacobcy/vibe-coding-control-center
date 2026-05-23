@@ -24,7 +24,7 @@ def _record_handoff_reference(
     branch: str | None = None,
     **extra_kw: object,
 ) -> None:
-    with trace_scope(trace, command, domain="handoff"):
+    with trace_scope(trace, command, domain="handoff", tier="Shell Layer"):
         specific_ref_key = f"{ref_label.lower()}_ref"
         logger.bind(
             command=command,

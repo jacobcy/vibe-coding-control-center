@@ -109,7 +109,12 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             raise typer.Exit(1) from error
 
         ctx = (
-            trace_context(command="pr ready", domain="pr", pr_number=target_pr_number)
+            trace_context(
+                command="pr ready",
+                domain="pr",
+                tier="Shell Layer",
+                pr_number=target_pr_number,
+            )
             if trace
             else noop_context()
         )
