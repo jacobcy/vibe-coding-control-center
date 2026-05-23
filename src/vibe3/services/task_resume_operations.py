@@ -404,13 +404,23 @@ class TaskResumeOperations:
 
             issue_number = self.flow_service.store.get_task_issue_number(branch)
 
-            service = BlockedStateService(store=self.flow_service.store)
+            service = BlockedStateService(
+                github_client=self.github_client,
+                label_service=self.label_service,
+                store=self.flow_service.store,
+            )
             service.unblock(
                 branch=branch,
                 target_state=IssueState.CLAIMED,
                 actor="human:resume",
                 issue_number=issue_number,
             )
+
+            if resume_kind in ("failed", "all"):
+                self.flow_service.store.update_flow_state(
+                    branch,
+                    failed_reason=None,
+                )
 
         except Exception as exc:
             logger.bind(

@@ -146,13 +146,21 @@ class BlockedStateIO:
         issue_number: int,
         target_state: IssueState,
         actor: str = "system",
+        force: bool = False,
     ) -> None:
-        """Write state to issue labels."""
+        """Write state to issue labels.
+
+        Args:
+            issue_number: Issue number
+            target_state: Target state to set
+            actor: Actor performing the transition
+            force: If True, bypass transition validation (for unblock/resume)
+        """
         self.label_service.confirm_issue_state(
             issue_number,
             target_state,
             actor=actor,
-            force=True,
+            force=force,
         )
 
     # ========================================================================
@@ -197,7 +205,7 @@ class BlockedStateIO:
                 blocked_by=(
                     [flow_state["blocked_by_issue"]]
                     if flow_state.get("blocked_by_issue")
-                    else None
+                    else []
                 ),
                 state=flow_state.get("flow_status"),
             )

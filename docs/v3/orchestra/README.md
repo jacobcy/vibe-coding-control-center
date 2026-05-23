@@ -92,7 +92,6 @@ related_docs:
 - [github-issue-draft.md](github-issue-draft.md) - follow-up issue 拆分草稿
 - [release-handoff.md](release-handoff.md) - 发布接手手册（给后续 agent）
 - [debug-reviewer-webhook.md](debug-reviewer-webhook.md) - reviewer webhook 调试与验收手册
-- [multi-machine-setup.md](multi-machine-setup.md) - 多机部署指南
 
 ## 快速开始
 

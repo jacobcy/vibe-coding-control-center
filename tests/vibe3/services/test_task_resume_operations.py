@@ -114,6 +114,7 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
+    operations.github_client.get_issue_body.return_value = "User content"
 
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
@@ -136,20 +137,15 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        with patch("vibe3.services.blocked_state_io.GitHubClient") as mock_github_class:
-            mock_github = MagicMock()
-            mock_github.get_issue_body.return_value = "User content"
-            mock_github_class.return_value = mock_github
-
-            operations.reset_issue_to_ready(
-                issue_number=303,
-                resume_kind="blocked",
-                flow=mock_flow,
-                repo=None,
-                reason="test resume",
-                worktree_path="/tmp/issue-303",
-                label_state="",  # ← --label auto (converted to empty string internally)
-            )
+        operations.reset_issue_to_ready(
+            issue_number=303,
+            resume_kind="blocked",
+            flow=mock_flow,
+            repo=None,
+            reason="test resume",
+            worktree_path="/tmp/issue-303",
+            label_state="",  # ← --label auto (converted to empty string internally)
+        )
 
         # Verify: worktree NOT deleted (reset_task_scene NOT called)
         operations.git_client.remove_worktree.assert_not_called()
@@ -167,6 +163,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
+    operations.github_client.get_issue_body.return_value = "User content"
     operations.flow_service.store.get_task_issue_number.return_value = 303
 
     mock_flow = MagicMock()
@@ -177,20 +174,15 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        with patch("vibe3.services.blocked_state_io.GitHubClient") as mock_github_class:
-            mock_github = MagicMock()
-            mock_github.get_issue_body.return_value = "User content"
-            mock_github_class.return_value = mock_github
-
-            operations.reset_issue_to_ready(
-                issue_number=303,
-                resume_kind="blocked",
-                flow=mock_flow,
-                repo=None,
-                reason="test resume",
-                worktree_path="/tmp/issue-303",
-                label_state="ready",  # ← --label ready
-            )
+        operations.reset_issue_to_ready(
+            issue_number=303,
+            resume_kind="blocked",
+            flow=mock_flow,
+            repo=None,
+            reason="test resume",
+            worktree_path="/tmp/issue-303",
+            label_state="ready",  # ← --label ready
+        )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
@@ -199,7 +191,10 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         mock_label_instance.confirm_issue_state.assert_called_once()
 
     # Verify: reasons cleared and flow_status restored to active
-    operations.flow_service.store.update_flow_state.assert_called_once()
+    operations.flow_service.store.update_flow_state.assert_called()
+    call_kwargs = operations.flow_service.store.update_flow_state.call_args[1]
+    assert call_kwargs.get("blocked_reason") is None
+    assert call_kwargs.get("blocked_by_issue") is None
 
 
 def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
@@ -207,6 +202,7 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
     operations = _make_operations()
     operations.label_service.get_state.return_value = IssueState.BLOCKED
     operations.github_client.view_issue.return_value = {"comments": []}
+    operations.github_client.get_issue_body.return_value = "User content"
     operations.flow_service.store.get_task_issue_number.return_value = 303
 
     mock_flow = MagicMock()
@@ -217,20 +213,15 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
         mock_label_instance.confirm_issue_state = MagicMock()
         mock_label_cls.return_value = mock_label_instance
 
-        with patch("vibe3.services.blocked_state_io.GitHubClient") as mock_github_class:
-            mock_github = MagicMock()
-            mock_github.get_issue_body.return_value = "User content"
-            mock_github_class.return_value = mock_github
-
-            operations.reset_issue_to_ready(
-                issue_number=303,
-                resume_kind="blocked",
-                flow=mock_flow,
-                repo=None,
-                reason="test resume",
-                worktree_path="/tmp/issue-303",
-                label_state="handoff",  # ← --label handoff (explicit)
-            )
+        operations.reset_issue_to_ready(
+            issue_number=303,
+            resume_kind="blocked",
+            flow=mock_flow,
+            repo=None,
+            reason="test resume",
+            worktree_path="/tmp/issue-303",
+            label_state="handoff",  # ← --label handoff (explicit)
+        )
 
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()

@@ -358,6 +358,5 @@ class ConsistencyReport:
 
 ## References
 
-- [Triple State Synchronization Analysis](./blocked-state-triple-sync-analysis.md)
 - [Qualify Gate Design](../standards/v3/qualify-gate.md)
 - [Issue Body Projection Format](../standards/v3/issue-body-projection.md)

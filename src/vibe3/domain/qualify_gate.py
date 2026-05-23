@@ -249,6 +249,7 @@ class QualifyGateService:
         """
         from vibe3.models.flow import FlowState
         from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.label_service import LabelService
 
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
@@ -258,6 +259,7 @@ class QualifyGateService:
 
         service = BlockedStateService(
             github_client=self._github,
+            label_service=LabelService(repo=self.config.repo),
             store=self._store,
         )
         service.unblock(

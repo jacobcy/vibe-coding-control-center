@@ -109,11 +109,14 @@ class BlockedStateService:
         if self.store and issue_number:
             try:
                 timeline = FlowTimelineService(store=self.store)
+                detail = reason if reason else None
+                if detail or blocked_by_issue:
+                    detail = detail or f"Blocked by issue #{blocked_by_issue}"
                 timeline.record_timeline_event(
                     branch=branch,
                     event_type=event_type,
                     actor=actor,
-                    detail=reason or "",
+                    detail=detail or "",
                     issue_number=issue_number,
                 )
             except Exception as exc:
@@ -158,6 +161,7 @@ class BlockedStateService:
                     issue_number=issue_number,
                     target_state=target_state,
                     actor=actor,
+                    force=True,
                 )
             except Exception as exc:
                 logger.bind(

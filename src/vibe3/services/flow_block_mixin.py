@@ -188,6 +188,7 @@ class FlowLifecycleMixin:
             reason=reason,
             actor=effective_actor,
             issue_number=issue_number,
+            event_type="flow_failed",
         )
 
         logger.bind(branch=branch).success("Flow marked as failed (blocked_reason)")
