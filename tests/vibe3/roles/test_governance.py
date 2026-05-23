@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.governance import (
     GOVERNANCE_ROLE,
     build_governance_execution_name,
@@ -47,16 +46,6 @@ def _make_config(**overrides) -> OrchestraConfig:
     return OrchestraConfig(
         governance=GovernanceConfig(**{**gov_defaults, **gov_overrides}),
         **overrides,
-    )
-
-
-def _issue(number: int = 42) -> IssueInfo:
-    return IssueInfo(
-        number=number,
-        title=f"Issue {number}",
-        state=IssueState.CLAIMED,
-        labels=[],
-        assignees=[],
     )
 
 
