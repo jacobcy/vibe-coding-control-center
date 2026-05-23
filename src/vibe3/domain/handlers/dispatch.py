@@ -87,36 +87,49 @@ def _dispatch_role_intent(
             return
 
         # Not launched, not skipped:
-        # - capacity_full / duplicate_dispatch → normal skip
-        # - worktree_unavailable / all others → blocked_reason (catch-all)
-        if result.reason_code in ("capacity_full", "duplicate_dispatch"):
+        # - capacity_full / duplicate_dispatch → normal throttling (info)
+        # - all other failures → warning (FailedGate will control)
+        # Dispatch failures do NOT trigger flow block.
+        # Flow block is determined by business logic only
+        # (noop_gate, dependencies, loops).
+        # FailedGate controls dispatch based on error severity.
+        reason_code = result.reason_code or "unknown"
+
+        if reason_code in ("capacity_full", "duplicate_dispatch"):
+            # Normal throttling/dedup - log at info level
             logger.bind(
                 domain=handler_domain,
                 issue_number=issue_number,
+                reason_code=reason_code,
             ).info(f"{role.capitalize()} dispatch deferred: {result.reason}")
-            return
+        else:
+            # Unexpected failure - record to error_log and log warning
+            # FailedGate will control dispatch based on threshold
+            from vibe3.exceptions.error_tracking import ErrorTrackingService
 
-        # Blocking failure: write blocked_reason to prevent infinite retry
-        logger.bind(
-            domain=handler_domain,
-            issue_number=issue_number,
-            reason_code=result.reason_code,
-        ).error(f"{role.capitalize()} dispatch blocking failure: {result.reason}")
-
-        if branch:
+            error_message = f"{role} dispatch failed: {result.reason}"
             try:
-                from vibe3.services.flow_service import FlowService
-
-                FlowService().block_flow(
+                error_svc = ErrorTrackingService.get_instance(store=store)
+                error_svc.record_error(
+                    error_code="E_DISPATCH_FAILURE",
+                    error_message=error_message,
+                    issue_number=issue_number,
                     branch=branch,
-                    reason=f"[{result.reason_code}] {result.reason}",
-                    actor=actor,
                 )
             except Exception as exc:
                 logger.bind(
                     domain=handler_domain,
                     issue_number=issue_number,
-                ).warning(f"Failed to write blocked_reason: {exc}")
+                ).warning(f"Failed to record dispatch error: {exc}")
+
+            logger.bind(
+                domain=handler_domain,
+                issue_number=issue_number,
+                reason_code=reason_code,
+            ).warning(
+                f"{role.capitalize()} dispatch failed: {result.reason} - "
+                "FailedGate will control dispatch"
+            )
 
 
 @register_handler("PlannerDispatchIntent")

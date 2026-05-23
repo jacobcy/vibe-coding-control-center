@@ -417,27 +417,39 @@ class TestSeverityAwareErrorHandling:
         assert contract.gate_action == "ignore"
 
     def test_critical_fails_issue_immediately(self) -> None:
-        """Test that CRITICAL severity fails issue immediately."""
+        """Test that CRITICAL severity triggers immediate FailedGate.
+
+        NOTE: CRITICAL severity does NOT trigger flow block.
+        Runtime errors and flow blocks are orthogonal systems:
+        - ERROR system: controls FailedGate (dispatch)
+        - FLOW BLOCK system: controls business progress (noop_gate, dependencies)
+        """
         from vibe3.exceptions.error_classification import get_error_handling_contract
         from vibe3.exceptions.error_severity import ErrorSeverity
 
         # Get the handling contract for E_MODEL_NOT_FOUND (CRITICAL)
         contract = get_error_handling_contract("E_MODEL_NOT_FOUND")
 
-        # Verify it's CRITICAL and fails issue
+        # Verify it's CRITICAL and triggers FailedGate immediately
+        # But does NOT trigger flow block
         assert contract.severity == ErrorSeverity.CRITICAL
-        assert contract.issue_action == "fail_issue"
+        assert contract.issue_action == "record_only"
         assert contract.gate_action == "immediate"
 
     def test_error_uses_threshold_gating(self) -> None:
-        """Test that ERROR severity uses threshold-based gating."""
+        """Test that ERROR severity uses threshold-based FailedGate.
+
+        NOTE: ERROR severity does NOT trigger flow block.
+        Runtime errors and flow blocks are orthogonal systems.
+        """
         from vibe3.exceptions.error_classification import get_error_handling_contract
         from vibe3.exceptions.error_severity import ErrorSeverity
 
         # Get the handling contract for E_API_RATE_LIMIT (ERROR)
         contract = get_error_handling_contract("E_API_RATE_LIMIT")
 
-        # Verify it's ERROR and uses threshold
+        # Verify it's ERROR and uses threshold for FailedGate
+        # But does NOT trigger flow block
         assert contract.severity == ErrorSeverity.ERROR
-        assert contract.issue_action in ["block_flow", "fail_issue"]
+        assert contract.issue_action == "record_only"
         assert contract.gate_action == "threshold"

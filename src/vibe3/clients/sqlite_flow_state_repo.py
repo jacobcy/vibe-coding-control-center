@@ -45,6 +45,8 @@ class SQLiteFlowStateRepo(_HasConnection):
         "transition_count",  # State transition counter for no-op gate
         "deleted_at",  # Soft delete timestamp (ISO 8601 or NULL)
         "worktree_path",  # Canonical worktree path for flow execution
+        "noop_gate_github_retry_count",  # GitHub API retry counter
+        "noop_gate_malformed_retry_count",  # Malformed response retry counter
     }
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
