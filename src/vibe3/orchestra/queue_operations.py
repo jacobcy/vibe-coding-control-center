@@ -14,6 +14,7 @@ from vibe3.orchestra.issue_loader import (
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.services.label_utils import normalize_labels, should_skip_from_queue
 
@@ -127,13 +128,13 @@ def select_ready_issues(
 
 
 def promote_progressed_entries(
-    frozen_queue: list[dict],
+    frozen_queue: list[QueueEntry],
     config: OrchestraConfig,
     github: "GitHubClient",
     registry: "SessionRegistryService | None",
     supervisor_label: str,
     load_issue_func: Callable[[int], IssueInfo | None] | None = None,
-) -> tuple[list[dict], list[dict], list[dict]]:
+) -> tuple[list[QueueEntry], list[QueueEntry], list[QueueEntry]]:
     """Process frozen queue entries and categorize them.
 
     Args:
@@ -148,19 +149,19 @@ def promote_progressed_entries(
         Tuple of (promoted, retained, removed) entries
     """
 
-    promoted: list[dict] = []
-    retained: list[dict] = []
-    removed: list[dict] = []
+    promoted: list[QueueEntry] = []
+    retained: list[QueueEntry] = []
+    removed: list[QueueEntry] = []
 
     # Use provided loader or default
     issue_loader = load_issue_func or (lambda num: load_issue(num, config, github))
 
     for entry in frozen_queue:
-        if entry.get("waiting_state") is None:
+        if entry.waiting_state is None:
             retained.append(entry)
             continue
 
-        issue = issue_loader(entry["issue_number"])
+        issue = issue_loader(entry.issue_number)
         if issue is None or issue.state is None:
             continue
 
@@ -173,24 +174,24 @@ def promote_progressed_entries(
             removed.append(entry)
             append_orchestra_event(
                 "dispatcher",
-                f"GlobalDispatchCoordinator: removed #{entry['issue_number']} "
+                f"GlobalDispatchCoordinator: removed #{entry.issue_number} "
                 "from queue (supervisor or assignee check failed)",
             )
             continue
 
         current_state = issue.state.value
-        if current_state == entry["waiting_state"]:
+        if current_state == entry.waiting_state:
             # State unchanged - retain entry for next tick
             retained.append(entry)
             continue
 
         # Progress detected (state changed to non-terminal) - promote to front
-        entry["waiting_state"] = None
-        entry["collected_state"] = current_state  # Sync with current state
+        entry.waiting_state = None
+        entry.collected_state = current_state  # Sync with current state
         promoted.append(entry)
         append_orchestra_event(
             "dispatcher",
-            f"GlobalDispatchCoordinator: requeued #{entry['issue_number']} "
+            f"GlobalDispatchCoordinator: requeued #{entry.issue_number} "
             f"to front after state change to {current_state}",
         )
 
