@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import sqlite3
+import subprocess
 from pathlib import Path
 
 ERROR_PATTERNS = [
@@ -29,23 +30,49 @@ ERROR_PATTERNS = [
 ]
 
 
+def get_default_db_path() -> str:
+    """Get default database path using git common dir.
+
+    In linked worktrees, .git is a file not a directory.
+    Use git rev-parse --git-common-dir to find the shared db location.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        git_common_dir = result.stdout.strip()
+        if git_common_dir:
+            return str(Path(git_common_dir) / "vibe3" / "handoff.db")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    # Fallback for non-worktree scenarios
+    return ".git/vibe3/handoff.db"
+
+
 def find_error_blocked_reasons(db_path: str) -> list[dict]:
-    """Find blocked_reason entries containing error messages."""
+    """Find blocked_reason entries containing error messages.
+
+    Uses parameterized queries to avoid SQL injection issues.
+    """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    where_clauses = " OR ".join(
-        [f"blocked_reason LIKE '%{p}%'" for p in ERROR_PATTERNS]
-    )
+    # Build parameterized query: blocked_reason LIKE ? OR blocked_reason LIKE ? ...
+    placeholders = " OR ".join(["blocked_reason LIKE ?"] * len(ERROR_PATTERNS))
+    params = [f"%{p}%" for p in ERROR_PATTERNS]
+
     query = f"""
         SELECT branch, blocked_reason, flow_status
         FROM flow_state
         WHERE blocked_reason IS NOT NULL
-        AND ({where_clauses})
+        AND ({placeholders})
     """
 
-    cursor.execute(query)
+    cursor.execute(query, params)
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
@@ -54,6 +81,10 @@ def find_error_blocked_reasons(db_path: str) -> list[dict]:
 def cleanup_error_blocked_reasons(db_path: str, dry_run: bool = True) -> int:
     """Clear blocked_reason for entries containing error messages.
 
+    Note: We do NOT change flow_status. Per Copilot review, 'failed' is not
+    a valid flow_status value (valid: active, blocked, done, stale, aborted).
+    Runtime failure semantics are tracked via error_log, not flow_status.
+
     Returns count of records that would be/were updated.
     """
     rows = find_error_blocked_reasons(db_path)
@@ -61,62 +92,57 @@ def cleanup_error_blocked_reasons(db_path: str, dry_run: bool = True) -> int:
     if dry_run:
         print(f"[DRY RUN] Would clear blocked_reason for {len(rows)} records:\n")
         for row in rows:
-            print(f"  - {row['branch']}: {row['blocked_reason'][:80]}...")
+            reason = row["blocked_reason"] or ""
+            print(f"  - {row['branch']}: {reason[:80]}...")
         return len(rows)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    where_clauses = " OR ".join(
-        [f"blocked_reason LIKE '%{p}%'" for p in ERROR_PATTERNS]
-    )
+    # Build parameterized query
+    placeholders = " OR ".join(["blocked_reason LIKE ?"] * len(ERROR_PATTERNS))
+    params = [f"%{p}%" for p in ERROR_PATTERNS]
+
     query = f"""
         UPDATE flow_state
-        SET blocked_reason = NULL,
-            flow_status = 'failed'
+        SET blocked_reason = NULL
         WHERE blocked_reason IS NOT NULL
-        AND ({where_clauses})
+        AND ({placeholders})
     """
 
-    cursor.execute(query)
+    cursor.execute(query, params)
     affected = cursor.rowcount
     conn.commit()
     conn.close()
 
-    print(
-        f"Cleared blocked_reason for {affected} records "
-        "(set flow_status to 'failed')"
-    )
+    print(f"Cleared blocked_reason for {affected} records")
     return affected
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Clean up error messages in blocked_reason"
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
         "--dry-run", action="store_true", help="Show what would be cleaned"
     )
-    parser.add_argument(
+    group.add_argument(
         "--execute", action="store_true", help="Actually clean the data"
     )
     parser.add_argument(
         "--db-path",
-        default=".git/vibe3/handoff.db",
-        help="Database path",
+        default=None,
+        help="Database path (default: auto-detect from git common dir)",
     )
     args = parser.parse_args()
 
-    db_path = Path(args.db_path)
+    db_path = Path(args.db_path) if args.db_path else Path(get_default_db_path())
     if not db_path.exists():
         print(f"Database not found: {db_path}")
         return 1
 
-    if args.execute:
-        cleanup_error_blocked_reasons(str(db_path), dry_run=False)
-    else:
-        cleanup_error_blocked_reasons(str(db_path), dry_run=True)
-
+    cleanup_error_blocked_reasons(str(db_path), dry_run=args.dry_run)
     return 0
 
 
