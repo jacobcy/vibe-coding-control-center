@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions.error_tracking import ErrorTrackingService
+from vibe3.services.error_tracking_service import ErrorTrackingService
 
 
 @pytest.fixture(autouse=True)

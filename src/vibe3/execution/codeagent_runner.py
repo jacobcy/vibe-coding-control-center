@@ -415,7 +415,7 @@ class CodeagentExecutionService:
                 classify_error_hybrid,
                 get_error_handling_contract,
             )
-            from vibe3.exceptions.error_tracking import ErrorTrackingService
+            from vibe3.services.error_tracking_service import ErrorTrackingService
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.

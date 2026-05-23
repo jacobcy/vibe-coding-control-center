@@ -171,7 +171,7 @@ class TestGovernanceSyncRunner:
 
         # Patch at the source module where ErrorTrackingService is imported
         with patch(
-            "vibe3.exceptions.error_tracking.ErrorTrackingService"
+            "vibe3.services.error_tracking_service.ErrorTrackingService"
         ) as mock_tracking_cls:
             mock_tracking = MagicMock()
             mock_tracking_cls.get_instance.return_value = mock_tracking

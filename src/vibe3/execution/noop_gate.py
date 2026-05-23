@@ -9,7 +9,8 @@ from vibe3.agents.models import ExecutionRole
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.role_policy import get_role_block_function
 from vibe3.models.verdict import VerdictRecord
-from vibe3.services.verdict_policy import VerdictValue, requires_audit_ref
+from vibe3.models.verdict_types import VerdictValue
+from vibe3.services.verdict_policy import requires_audit_ref
 
 # Loop prevention constants
 SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair
@@ -110,7 +111,7 @@ def apply_unified_noop_gate(
         if retry_count >= 3:
             # CRITICAL: GitHub API failure is a RUNTIME ERROR, not business logic
             # Record to error_log for FailedGate control, do NOT trigger flow block
-            from vibe3.exceptions.error_tracking import ErrorTrackingService
+            from vibe3.services.error_tracking_service import ErrorTrackingService
 
             logger.bind(
                 domain="codeagent",
@@ -139,7 +140,7 @@ def apply_unified_noop_gate(
             # Record to error_log, let FailedGate control dispatch
             # DO NOT call _block_fn() - this is not a flow block
             try:
-                from vibe3.exceptions.error_tracking import ErrorTrackingService
+                from vibe3.services.error_tracking_service import ErrorTrackingService
 
                 error_svc = ErrorTrackingService.get_instance(store=store)
                 error_svc.record_error(
@@ -191,7 +192,7 @@ def apply_unified_noop_gate(
         if retry_count >= 3:
             # CRITICAL: Malformed response is a RUNTIME ERROR, not business logic
             # Record to error_log for FailedGate control, do NOT trigger flow block
-            from vibe3.exceptions.error_tracking import ErrorTrackingService
+            from vibe3.services.error_tracking_service import ErrorTrackingService
 
             logger.bind(
                 domain="codeagent",
@@ -219,7 +220,7 @@ def apply_unified_noop_gate(
             # Record to error_log, let FailedGate control dispatch
             # DO NOT call _block_fn() - this is not a flow block
             try:
-                from vibe3.exceptions.error_tracking import ErrorTrackingService
+                from vibe3.services.error_tracking_service import ErrorTrackingService
 
                 error_svc = ErrorTrackingService.get_instance(store=store)
                 error_svc.record_error(

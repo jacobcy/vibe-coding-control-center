@@ -1,8 +1,8 @@
 """Central verdict policy for review and merge behavior."""
 
-from typing import Final, Literal
+from typing import Final
 
-VerdictValue = Literal["PASS", "MINOR", "MAJOR", "BLOCK", "REFUSE", "UNKNOWN"]
+from vibe3.models.verdict_types import VerdictValue
 
 ALL_VERDICTS: Final[tuple[VerdictValue, ...]] = (
     "PASS",

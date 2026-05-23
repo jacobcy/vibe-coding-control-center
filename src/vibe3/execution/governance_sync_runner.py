@@ -111,7 +111,7 @@ def run_governance_sync(
         from vibe3.exceptions.error_classification import (
             classify_error_hybrid,
         )
-        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.error_tracking_service import ErrorTrackingService
 
         error_code = classify_error_hybrid(exc)
 
