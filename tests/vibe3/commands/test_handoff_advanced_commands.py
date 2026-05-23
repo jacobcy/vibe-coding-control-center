@@ -54,7 +54,7 @@ class TestHandoffAdvancedCommands:
         assert result.exit_code == 0
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.utils.branch_arg.GitClient")
+    @patch("vibe3.services.branch_arg.GitClient")
     def test_handoff_append_command(self, mock_git_class, mock_service_class):
         """Test handoff append command."""
         mock_git = MagicMock()
@@ -88,7 +88,7 @@ class TestHandoffAdvancedCommands:
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.utils.branch_arg.GitClient")
+    @patch("vibe3.services.branch_arg.GitClient")
     def test_handoff_plan_command(self, mock_git_class, mock_service_class):
         """Test handoff plan command."""
         mock_git = MagicMock()
@@ -119,7 +119,7 @@ class TestHandoffAdvancedCommands:
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.utils.branch_arg.GitClient")
+    @patch("vibe3.services.branch_arg.GitClient")
     def test_handoff_report_command(self, mock_git_class, mock_service_class):
         """Test handoff report command."""
         mock_git = MagicMock()
@@ -150,7 +150,7 @@ class TestHandoffAdvancedCommands:
         )
 
     @patch("vibe3.commands.handoff_write.HandoffService")
-    @patch("vibe3.utils.branch_arg.GitClient")
+    @patch("vibe3.services.branch_arg.GitClient")
     def test_handoff_audit_command(self, mock_git_class, mock_service_class):
         """Test handoff audit command."""
         mock_git = MagicMock()
@@ -251,7 +251,7 @@ class TestHandoffAdvancedCommands:
         mock_flow_service.store = mock_store
 
         with patch(
-            "vibe3.utils.branch_arg.FlowService", return_value=mock_flow_service
+            "vibe3.services.branch_arg.FlowService", return_value=mock_flow_service
         ):
             result = runner.invoke(
                 app,
@@ -293,7 +293,7 @@ def test_handoff_next_sets_next_step_for_numeric_branch() -> None:
 
     with (
         patch("vibe3.commands.handoff_write.HandoffService", return_value=service),
-        patch("vibe3.utils.branch_arg.FlowService", return_value=mock_flow_service),
+        patch("vibe3.services.branch_arg.FlowService", return_value=mock_flow_service),
     ):
         result = runner.invoke(
             app,
@@ -332,7 +332,7 @@ def test_handoff_next_rejects_nonexistent_flow() -> None:
 
     with (
         patch("vibe3.commands.handoff_write.HandoffService", return_value=service),
-        patch("vibe3.utils.branch_arg.FlowService", return_value=mock_flow_service),
+        patch("vibe3.services.branch_arg.FlowService", return_value=mock_flow_service),
     ):
         result = runner.invoke(
             app,
