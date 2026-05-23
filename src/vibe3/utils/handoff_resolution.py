@@ -112,7 +112,14 @@ def _resolve_shared_artifact(
                 branch = git_client.get_current_branch()
             except Exception:
                 raise FileNotFoundError(
-                    f"Cannot resolve @current without branch specification: {target}"
+                    f"Cannot resolve @current without branch "
+                    f"specification: {target}\n\n"
+                    "@current requires a branch context to locate "
+                    "per-branch handoff file.\n"
+                    "Specify branch: vibe3 handoff show @current "
+                    "--branch <branch-name>\n"
+                    "Or run from a branch: git checkout <branch> "
+                    "&& vibe3 handoff show @current"
                 )
 
         # Validate branch name to prevent path traversal attacks
@@ -133,7 +140,9 @@ def _resolve_shared_artifact(
         current_md = handoff_dir / "current.md"
         if not current_md.exists():
             raise FileNotFoundError(
-                f"current.md not found for branch '{branch}': {target}"
+                f"current.md not found for branch '{branch}': {target}\n\n"
+                "No handoff file has been created for this branch yet.\n"
+                "Create one: vibe3 handoff init --branch {branch}"
             )
         if not current_md.is_file():
             raise FileNotFoundError(f"Not a file: {target}")
@@ -147,7 +156,9 @@ def _resolve_shared_artifact(
     git_common = get_git_common_dir(git_client)
     if not git_common:
         raise FileNotFoundError(
-            f"Cannot resolve shared artifact without git common dir: {target}"
+            f"Cannot resolve shared artifact without git common dir: {target}\n\n"
+            "Git repository not initialized or .git directory not found.\n"
+            "Run this command inside a git repository."
         )
 
     # Validate key to prevent path traversal attacks
@@ -159,9 +170,20 @@ def _resolve_shared_artifact(
     _verify_handoff_dir_boundary(resolved, git_common)
 
     if not resolved.exists():
-        raise FileNotFoundError(f"Artifact not found: {target}")
+        raise FileNotFoundError(
+            f"Artifact not found: {target}\n\n"
+            "Handoff targets support three namespaces:\n"
+            "  @key              Shared artifact (.git/vibe3/handoff/)\n"
+            "  relative/path     Worktree ref (requires --branch for other branches)\n"
+            "  /abs/path         Absolute path (debugging fallback)\n\n"
+            "View available artifacts: vibe3 handoff status"
+        )
     if not resolved.is_file():
-        raise FileNotFoundError(f"Not a file: {target}")
+        raise FileNotFoundError(
+            f"Not a file: {target}\n\n"
+            "Handoff targets must point to files, not directories.\n"
+            "View available artifacts: vibe3 handoff status"
+        )
     return resolved
 
 
@@ -192,7 +214,12 @@ def _resolve_artifact_alias(
         branch = git_client.get_current_branch()
         if not branch:
             raise FileNotFoundError(
-                f"Cannot resolve @{alias} without branch: no current branch"
+                f"Cannot resolve @{alias} without branch: no current branch\n\n"
+                f"@{alias} requires branch context to look up flow state.\n"
+                "Specify branch: vibe3 handoff show @{alias} "
+                "--branch <branch-name>\n"
+                "Or run from a branch: git checkout <branch> "
+                "&& vibe3 handoff show @{alias}"
             )
 
     _validate_branch_name(branch)
@@ -200,11 +227,21 @@ def _resolve_artifact_alias(
     store = SQLiteClient()
     flow = store.get_flow_state(branch)
     if not flow:
-        raise FileNotFoundError(f"No flow found for branch '{branch}'")
+        raise FileNotFoundError(
+            f"No flow found for branch '{branch}'\n\n"
+            f"@{alias} requires an active flow to resolve the artifact path.\n"
+            "Create a flow: vibe3 flow update --branch {branch}\n"
+            "Or view available flows: vibe3 flow status"
+        )
 
     ref_value = flow.get(ref_field)
     if not ref_value:
-        raise FileNotFoundError(f"No {ref_field} recorded for branch '{branch}'")
+        raise FileNotFoundError(
+            f"No {ref_field} recorded for branch '{branch}'\n\n"
+            f"This flow has not created a {alias} artifact yet.\n"
+            "Check flow status: vibe3 flow show --branch {branch}\n"
+            "View all handoff events: vibe3 handoff status --branch {branch}"
+        )
 
     # Guard against self-referential alias values (e.g., plan_ref='@plan')
     # which would cause infinite recursion via resolve_handoff_target
@@ -241,11 +278,19 @@ def _resolve_worktree_artifact(
         # as that would silently return a file from the wrong flow.
         wt_path = find_worktree_path_for_branch(branch, git_client)
         if wt_path is None:
-            raise FileNotFoundError(f"No worktree found for branch '{branch}'")
+            raise FileNotFoundError(
+                f"No worktree found for branch '{branch}'\n\n"
+                "The specified branch does not have a worktree.\n"
+                "Create worktree: git worktree add <path> {branch}\n"
+                "Or use current branch: vibe3 handoff show {target}"
+            )
         resolved = wt_path / target
         if not resolved.exists():
             raise FileNotFoundError(
-                f"File not found in branch '{branch}' worktree: {target}"
+                f"File not found in branch '{branch}' worktree: {target}\n\n"
+                "The file does not exist in the specified branch's worktree.\n"
+                "Check file path or view handoff status: "
+                "vibe3 handoff status --branch {branch}"
             )
         if not resolved.is_file():
             raise FileNotFoundError(f"Not a file: {target}")
