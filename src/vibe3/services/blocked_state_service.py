@@ -98,6 +98,7 @@ class BlockedStateService:
                     issue_number=issue_number,
                     target_state=IssueState.BLOCKED,
                     actor=actor,
+                    force=True,
                 )
             except Exception as exc:
                 logger.bind(
