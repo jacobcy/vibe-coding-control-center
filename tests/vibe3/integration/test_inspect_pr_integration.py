@@ -186,14 +186,48 @@ def test_build_pr_analysis_error_handling():
             build_pr_analysis(42)
 
 
-def test_build_pr_analysis_commit_count_error(mock_all_dependencies):
-    """Test graceful handling of commit count errors."""
-    mock_all_dependencies["count"].return_value = 0
+def test_build_pr_analysis_commit_count_error():
+    """Test graceful handling when _get_pr_commit_count encounters an error."""
+    with (
+        patch(
+            "vibe3.services.pr_analysis_service._get_pr_changed_files",
+            return_value=["file.py"],
+        ),
+        patch(
+            "vibe3.services.pr_analysis_service._filter_critical_files", return_value=[]
+        ),
+        patch(
+            "vibe3.services.pr_analysis_service._analyze_critical_files",
+            return_value=({}, {}),
+        ),
+        patch(
+            "vibe3.services.pr_analysis_service.dag_service.expand_impacted_modules"
+        ) as mock_dag,
+        patch(
+            "vibe3.services.pr_analysis_service._calculate_risk_score",
+            return_value={"score": 1},
+        ),
+        patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
+        # Mock _fetch_pr_commit_shas to raise (called inside real _get_pr_commit_count)
+        patch(
+            "vibe3.services.pr_analysis_service._fetch_pr_commit_shas",
+            side_effect=Exception("API timeout"),
+        ),
+    ):
+        mock_dag_result = MagicMock()
+        mock_dag_result.impacted_modules = []
+        mock_dag.return_value = mock_dag_result
 
-    result = build_pr_analysis(42)
+        mock_git_client = MagicMock()
+        mock_git_client.get_diff.return_value = "+line1\n-line2"
+        mock_git_client_class.return_value = mock_git_client
 
-    # Should still succeed with 0 commits
-    assert result.total_commits == 0
+        # _get_pr_commit_count is NOT mocked -- real function runs,
+        # catches the _fetch_pr_commit_shas exception, returns 0
+        result = build_pr_analysis(42)
+
+        # Should still succeed with 0 commits (exception caught by _get_pr_commit_count)
+        assert result.total_commits == 0
 
 
 def test_build_pr_analysis_dataclass_fields():
@@ -243,3 +277,4 @@ def test_build_pr_analysis_dataclass_fields():
         assert hasattr(result, "critical_file_dags")
         assert hasattr(result, "score")
         assert hasattr(result, "recent_commits")
+        assert hasattr(result, "skipped_files_count")
