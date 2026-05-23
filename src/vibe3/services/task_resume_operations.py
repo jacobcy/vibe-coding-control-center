@@ -388,11 +388,16 @@ class TaskResumeOperations:
     def _clear_flow_reasons(self, branch: str, resume_kind: str) -> None:
         """Clear blocked_reason/failed_reason from FlowState.
 
+        Directly clears DB fields and issue body projection without intermediate
+        state transitions. Preserves timeline comment for audit trail.
+
         Args:
             branch: Branch name
-            resume_kind: Resume kind (failed, blocked, all)
+            resume_kind: Resume kind (failed, blocked, all) — preserved for signature
+                compatibility but no longer used for conditional clearing.
         """
-        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.blocked_state_io import BlockedStateIO
+        from vibe3.services.flow_timeline_service import FlowTimelineService
 
         try:
             logger.bind(
@@ -404,22 +409,32 @@ class TaskResumeOperations:
 
             issue_number = self.flow_service.store.get_task_issue_number(branch)
 
-            service = BlockedStateService(
-                github_client=self.github_client,
-                label_service=self.label_service,
-                store=self.flow_service.store,
-            )
-            service.unblock(
-                branch=branch,
-                target_state=IssueState.CLAIMED,
-                actor="human:resume",
-                issue_number=issue_number,
+            # 1. Directly clear all reason fields in DB (unconditional)
+            self.flow_service.store.update_flow_state(
+                branch,
+                flow_status="active",
+                blocked_reason=None,
+                blocked_by_issue=None,
+                failed_reason=None,
             )
 
-            if resume_kind in ("failed", "all"):
-                self.flow_service.store.update_flow_state(
-                    branch,
-                    failed_reason=None,
+            # 2. Clear issue body projection (if issue number available)
+            if issue_number:
+                io = BlockedStateIO(
+                    github_client=self.github_client,
+                    label_service=self.label_service,
+                    store=self.flow_service.store,
+                )
+                io.clear_body_projection(issue_number=issue_number)
+
+                # 3. Record timeline event (preserves existing behavior)
+                timeline = FlowTimelineService(store=self.flow_service.store)
+                timeline.record_timeline_event(
+                    branch=branch,
+                    event_type="resumed",
+                    actor="human:resume",
+                    detail="Resumed to active",
+                    issue_number=issue_number,
                 )
 
         except Exception as exc:

@@ -358,27 +358,45 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
 
 
 def test_clear_flow_reasons_clears_both_reasons() -> None:
-    """_clear_flow_reasons should use BlockedStateService.unblock."""
+    """_clear_flow_reasons should directly clear all reason fields in DB."""
     operations = _make_operations()
 
     with (
         patch.object(
             operations.flow_service.store, "get_task_issue_number"
         ) as mock_get_issue,
+        patch.object(
+            operations.flow_service.store, "update_flow_state"
+        ) as mock_update_flow,
+        patch("vibe3.services.blocked_state_io.BlockedStateIO") as mock_io_cls,
         patch(
-            "vibe3.services.blocked_state_service.BlockedStateService"
-        ) as mock_blocked_service_cls,
+            "vibe3.services.flow_timeline_service.FlowTimelineService"
+        ) as mock_timeline_cls,
     ):
         mock_get_issue.return_value = 303
-        mock_blocked_instance = MagicMock()
-        mock_blocked_service_cls.return_value = mock_blocked_instance
+        mock_io_instance = MagicMock()
+        mock_io_cls.return_value = mock_io_instance
+        mock_timeline_instance = MagicMock()
+        mock_timeline_cls.return_value = mock_timeline_instance
 
         operations._clear_flow_reasons("task/issue-303", "blocked")
 
-        mock_blocked_instance.unblock.assert_called_once_with(
+        # Verify: all reason fields cleared unconditionally
+        mock_update_flow.assert_called_once_with(
+            "task/issue-303",
+            flow_status="active",
+            blocked_reason=None,
+            blocked_by_issue=None,
+            failed_reason=None,
+        )
+        # Verify: issue body projection cleared
+        mock_io_instance.clear_body_projection.assert_called_once_with(issue_number=303)
+        # Verify: timeline event recorded
+        mock_timeline_instance.record_timeline_event.assert_called_once_with(
             branch="task/issue-303",
-            target_state=IssueState.CLAIMED,
+            event_type="resumed",
             actor="human:resume",
+            detail="Resumed to active",
             issue_number=303,
         )
 
@@ -412,32 +430,44 @@ def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> N
             )
 
 
-def test_clear_flow_reasons_uses_blocked_state_service() -> None:
-    """Test that _clear_flow_reasons uses BlockedStateService.unblock."""
+def test_clear_flow_reasons_direct_clear_without_intermediate_state() -> None:
+    """Test that _clear_flow_reasons clears fields directly without intermediate
+    state."""
     operations = _make_operations()
 
     with (
         patch.object(
             operations.flow_service.store, "get_task_issue_number"
         ) as mock_get_issue,
+        patch.object(
+            operations.flow_service.store, "update_flow_state"
+        ) as mock_update_flow,
+        patch("vibe3.services.blocked_state_io.BlockedStateIO") as mock_io_cls,
         patch(
-            "vibe3.services.blocked_state_service.BlockedStateService"
-        ) as mock_blocked_service_cls,
+            "vibe3.services.flow_timeline_service.FlowTimelineService"
+        ) as mock_timeline_cls,
     ):
         mock_get_issue.return_value = 123
-        mock_blocked_instance = MagicMock()
-        mock_blocked_service_cls.return_value = mock_blocked_instance
+        mock_io_instance = MagicMock()
+        mock_io_cls.return_value = mock_io_instance
+        mock_timeline_instance = MagicMock()
+        mock_timeline_cls.return_value = mock_timeline_instance
 
         # Execute
-        operations._clear_flow_reasons("task/issue-123", "blocked")
+        operations._clear_flow_reasons("task/issue-123", "failed")
 
-        # Verify BlockedStateService.unblock called with correct args
-        mock_blocked_instance.unblock.assert_called_once_with(
-            branch="task/issue-123",
-            target_state=IssueState.CLAIMED,
-            actor="human:resume",
-            issue_number=123,
+        # Verify: direct DB update with all fields cleared
+        mock_update_flow.assert_called_once_with(
+            "task/issue-123",
+            flow_status="active",
+            blocked_reason=None,
+            blocked_by_issue=None,
+            failed_reason=None,
         )
+        # Verify: body projection cleared
+        mock_io_instance.clear_body_projection.assert_called_once_with(issue_number=123)
+        # Verify: timeline recorded
+        mock_timeline_instance.record_timeline_event.assert_called_once()
 
 
 def test_clear_blocked_projection_updates_issue_body() -> None:
