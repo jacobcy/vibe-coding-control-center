@@ -539,7 +539,7 @@ class CheckService(CheckRemote):
 
         # ref files exist
         if flow_status not in self.INACTIVE_FLOW_STATUSES:
-            from vibe3.utils.path_helpers import check_ref_exists
+            from vibe3.services.path_helpers import check_ref_exists
 
             for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
                 ref_value = flow_data.get(ref_field)

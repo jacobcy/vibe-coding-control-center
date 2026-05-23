@@ -5,7 +5,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_block_mixin import FlowLifecycleMixin
 from vibe3.services.flow_transition import FlowTransitionMixin
-from vibe3.utils.git_path_client import GitPathProtocol
+from vibe3.services.git_path_client import GitPathProtocol
 
 
 class FlowService(FlowLifecycleMixin, FlowTransitionMixin):

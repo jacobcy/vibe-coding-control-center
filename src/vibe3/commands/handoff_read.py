@@ -107,7 +107,7 @@ def show(
     ] = False,
 ) -> None:
     """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
-    from vibe3.utils.path_helpers import resolve_handoff_target
+    from vibe3.services.path_helpers import resolve_handoff_target
 
     if target is None:
         typer.echo(_HANDOFF_SHOW_HELP)

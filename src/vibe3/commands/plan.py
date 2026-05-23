@@ -18,7 +18,7 @@ from vibe3.roles.plan import (
 )
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.handoff_resolution import resolve_handoff_target
+from vibe3.services.handoff_resolution import resolve_handoff_target
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
