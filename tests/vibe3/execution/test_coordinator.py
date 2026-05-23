@@ -254,7 +254,7 @@ def test_sync_skips_when_live_session_exists_for_target(
     monkeypatch,
 ):
     """Regular sync dispatches should be deduped by live session for same target."""
-    # Ensure VIBE3_ASYNC_CHILD is not set to avoid skipping the dedup check
+    # Ensure VIBE3_ASYNC_CHILD is not set from previous tests
     monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
 
     config, store, backend, capacity = mock_dependencies

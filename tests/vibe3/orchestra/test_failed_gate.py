@@ -468,6 +468,8 @@ class TestFailedGateIntegration:
         # Gate is ACTIVE → on_tick skipped, blocked_ticks incremented
         assert tick_calls == []
         mock_gate.increment_blocked_ticks.assert_called_once()
+
+
 def test_manual_scan_errors_do_not_trigger_gate(temp_store: SQLiteClient) -> None:
     """Test that manual_scan source errors do not trigger FailedGate threshold.
 

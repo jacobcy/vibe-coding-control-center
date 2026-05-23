@@ -53,7 +53,7 @@ def test_internal_governance_dispatch_forwards_tick_and_material():
 
         assert result.exit_code == 0
         mock_dispatch.assert_called_once_with(
-            tick_count=8, material_override="roadmap-intake"
+            tick_count=8, material_override="roadmap-intake", source=None
         )
 
 
