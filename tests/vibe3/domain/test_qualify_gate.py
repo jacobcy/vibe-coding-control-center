@@ -235,21 +235,25 @@ class TestRunQualifyGate:
                 "vibe3.domain.qualify_gate.GhIssueLabelPort",
                 return_value=mock_label_port,
             ):
-                flow_state = {"status": "active"}
+                with patch(
+                    "vibe3.services.blocked_state_io.GitHubClient",
+                    return_value=mock_github,
+                ):
+                    flow_state = {"status": "active"}
 
-                result = qualify_gate_service.run_qualify_gate(
-                    issue=sample_issue,
-                    branch="task/issue-123-test",
-                    flow_state=flow_state,
-                    labels=["state/in-progress"],
-                    trigger_state=IssueState.IN_PROGRESS,
-                )
+                    result = qualify_gate_service.run_qualify_gate(
+                        issue=sample_issue,
+                        branch="task/issue-123-test",
+                        flow_state=flow_state,
+                        labels=["state/in-progress"],
+                        trigger_state=IssueState.IN_PROGRESS,
+                    )
 
-                assert result is None
-                mock_store.update_flow_state.assert_called()
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                    assert result is None
+                    mock_store.update_flow_state.assert_called()
+                    mock_label_port.add_issue_label.assert_called_once_with(
+                        123, "state/blocked"
+                    )
             mock_store.add_event.assert_called()
 
     def test_dependency_satisfied(self, qualify_gate_service, sample_issue, mock_store):
