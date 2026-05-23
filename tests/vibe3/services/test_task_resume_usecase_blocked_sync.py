@@ -20,6 +20,7 @@ def usecase():
     # Use a single mock instance so get_issue_body and update_issue_body
     # are on the same object the operations module uses.
     mock_github = Mock()
+    mock_github.get_issue_body.return_value = "User content"
 
     with (
         patch("vibe3.services.task_resume_usecase.StatusQueryService") as mock_status,
@@ -28,6 +29,10 @@ def usecase():
         patch("vibe3.services.task_resume_usecase.GitClient") as mock_git,
         patch(
             "vibe3.services.task_resume_usecase.GitHubClient",
+            return_value=mock_github,
+        ) as _,
+        patch(
+            "vibe3.services.blocked_state_io.GitHubClient",
             return_value=mock_github,
         ) as _,
         patch("vibe3.services.task_resume_usecase.IssueFlowService") as mock_issue_flow,
