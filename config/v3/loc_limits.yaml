@@ -313,3 +313,4 @@ code_limits:
       - "tests/vibe2/"
     v3_python:             # Python 测试路径
       - "tests/vibe3/"
+
