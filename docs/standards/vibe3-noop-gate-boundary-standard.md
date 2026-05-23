@@ -149,6 +149,12 @@ gate 同时检查 required_ref 存在性和 state change：
 
 manager 角色不受 ref 检查约束（只有 state change 检查）。
 
+**BlockedStateService 集成**:
+Gate 触发的 block 动作统一通过 `BlockedStateService` 执行，确保“三位一体”同步：
+- **Issue Body**: 写入 authoritative projection。
+- **Issue Label**: 设置对应状态标签。
+- **Database**: 更新本地缓存。
+
 保留原有的 “authoritative ref 不是成功推进的替代品” 原则不变。
 
 ### 3.2 manager 不再保留独立的 must-change completion gate
@@ -328,7 +334,15 @@ ref 验证只在统一 worker 执行壳中执行，该路径：
 - 实现三分支 no-op gate 逻辑
 - domain event handler 只做日志记录，不做业务判断
 
-### 7.4 已删除的旧抽象，不得恢复
+### 7.5 Qualify Gate 与自动对齐
+
+在 Agent 启动前的 Qualify 阶段，系统利用 `BlockedStateService` 执行自动对齐：
+
+- **Truth-First 对齐**: 调用 `sync_cache_from_truth()` 强制本地数据库缓存与远程 Issue Body (Truth) 同步。这解决了“远程已手动解封但本地仍显示阻塞”的问题。
+- **Auto-Resume 判断**: 如果 Truth 显示已解封，Qualify Gate 将自动清除本地阻塞状态并允许 dispatch，不再需要人工执行 `vibe3 task resume`。
+- **一致性地图 (Consistency Map)**: 校验 Database、Body、Label 是否满足预定义的一致性矩阵。若检测到严重背离（如 Body 阻塞但 Label 正常），将触发告警并拒绝 dispatch 以保护环境。
+
+### 7.6 已删除的旧抽象，不得恢复
 
 以下 worker 路径旧抽象已经视为删除，不再是现行标准：
 

@@ -220,14 +220,16 @@ tmux capture-pane -t vibe3-manager-issue-XXX -p
 # 真源三件套
 uv run python src/vibe3/cli.py task show <target-branch> --comments
 uv run python src/vibe3/cli.py handoff show <target-branch>
-gh issue view <issue-number> --json labels,state
+gh issue view <issue-number> --json labels,state,body  # 包含 Issue Body projection 状态投影
+
+# 计划解析验证
+uv run python src/vibe3/cli.py plan --spec <issue-number>  # 验证从 issue 提取 plan 语义
 
 # 验证 flow lifecycle integrity（状态变更事件记录）
 uv run python src/vibe3/cli.py flow show <target-branch>
 ```
 
 ### 3.6 日志标准要求
-
 - agent 执行必须通过 async/tmux，CLI 输出必须显示 `Session log: temp/logs/...`
 - 新增 service 必须在 `on_tick()` 中调用 `append_orchestra_event()` 记录关键事件
 - 日志文件不进入 git（`temp/` 在 `.gitignore` 中）

@@ -78,6 +78,18 @@ exceptions:
 - Reviewer evaluates if refactoring is feasible
 - If approved, exception is merged with the PR
 
+### Current Documented Exceptions
+
+The following files are granted exceptions based on architectural necessity:
+
+| Path | Limit | Reason |
+|------|-------|--------|
+| `src/vibe3/exceptions/error_tracking.py` | 590 | Error tracking core service, including severity-based classification and aggregate status reporting. |
+| `src/vibe3/services/check_service.py` | 680 | Core validation aggregation for PRs and flows. |
+| `src/vibe3/clients/sqlite_client.py` | 650 | Unified persistence entry point. |
+
+*Note: The definitive source of truth for all current exceptions is `config/v3/loc_limits.yaml`.*
+
 ### Exception Maintenance
 
 - Exceptions should be reviewed periodically
