@@ -105,7 +105,7 @@ class AutoSceneRecoveryService:
         error_msg: str,
     ) -> ExecutionLaunchResult | None:
         from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
-        from vibe3.exceptions.error_tracking import ErrorTrackingService
+        from vibe3.services.error_tracking_service import ErrorTrackingService
         from vibe3.services.flow_cleanup_service import (
             FlowCleanupService,
             LiveSessionsDetectedError,

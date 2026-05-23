@@ -7,6 +7,7 @@ from vibe3.services.bootstrap_context_service import (
     BootstrapContextService,
     BootstrapPlan,
 )
+from vibe3.services.error_tracking_service import ErrorTrackingService
 
 __all__ = [
     "SerenaService",
@@ -14,4 +15,5 @@ __all__ = [
     "BootstrapActionKind",
     "BootstrapContextService",
     "BootstrapPlan",
+    "ErrorTrackingService",
 ]
