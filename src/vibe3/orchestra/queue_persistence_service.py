@@ -13,7 +13,7 @@ from loguru import logger
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.queue_entry import QueueEntry
 from vibe3.orchestra.queue_operations import promote_progressed_entries
-from vibe3.utils.label_utils import should_skip_from_queue
+from vibe3.services.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -85,8 +85,6 @@ class QueuePersistenceService:
                     issue_number=issue_number,
                     collected_state=entry.get("collected_state"),
                     waiting_state=None,  # Reset to trigger re-dispatch
-                    retry_count=entry.get("retry_count", 0),
-                    last_attempted_at=entry.get("last_attempted_at"),
                 )
             )
 
@@ -112,8 +110,6 @@ class QueuePersistenceService:
                 "issue_number": e.issue_number,
                 "collected_state": e.collected_state,
                 "waiting_state": e.waiting_state,
-                "retry_count": e.retry_count,
-                "last_attempted_at": e.last_attempted_at,
             }
             for e in self.frozen_queue
         ]
@@ -141,7 +137,6 @@ class QueuePersistenceService:
             self.registry,
             self.supervisor_label,
             load_issue_func=self.load_issue,
-            max_retry_budget=self.config.max_retry_budget,
         )
 
         # Update frozen queue

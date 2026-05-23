@@ -10,5 +10,3 @@ class QueueEntry:
     issue_number: int
     collected_state: str | None = None
     waiting_state: str | None = None
-    retry_count: int = 0
-    last_attempted_at: str | None = None
