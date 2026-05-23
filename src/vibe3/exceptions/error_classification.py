@@ -240,6 +240,16 @@ ERROR_REGISTRY: dict[str, ErrorHandlingContract] = {
         description="Unknown API error",
     ),
     # WARNING: Execution diagnostics - recorded/surfaced, no gate activation
+    E_EXEC_UNKNOWN: ErrorHandlingContract(
+        code=E_EXEC_UNKNOWN,
+        severity=ErrorSeverity.WARNING,
+        counts_toward_threshold=False,
+        record_in_error_log=True,
+        write_timeline_event=True,
+        issue_action="record_only",
+        gate_action="ignore",
+        description="Unrecognized execution error (test leak or transient)",
+    ),
     E_EXEC_NO_OUTPUT: ErrorHandlingContract(
         code=E_EXEC_NO_OUTPUT,
         severity=ErrorSeverity.WARNING,
