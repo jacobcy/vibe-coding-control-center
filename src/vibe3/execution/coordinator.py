@@ -23,6 +23,22 @@ from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import append_orchestra_event
 
+# Reason code invariant for duplicate session handling:
+#
+# Both pre-launch (line ~222) and post-launch (line ~397) duplicate
+# detection return reason_code="duplicate_dispatch" (soft-skip).
+# This ensures the same "session already exists" problem produces
+# consistent downstream behavior regardless of timing.
+#
+# The generic catch-all (line ~417) returns "launch_failed" only for
+# genuine failures that are NOT duplicate session conflicts.
+#
+# Semantic contract:
+# - duplicate_dispatch = "a live session already exists, no new work needed"
+#   (soft-skip, applies to both pre-launch DB check and post-launch race condition)
+# - launch_failed = "genuine failure: work was attempted and failed" (blocking)
+_DUPLICATE_DISPATCH_CODES = frozenset({"duplicate_dispatch"})
+
 
 class ExecutionCoordinator:
     """Coordinator for launching and tracking role executions."""
