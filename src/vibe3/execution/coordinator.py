@@ -37,7 +37,6 @@ from vibe3.orchestra.logging import append_orchestra_event
 # - duplicate_dispatch = "a live session already exists, no new work needed"
 #   (soft-skip, applies to both pre-launch DB check and post-launch race condition)
 # - launch_failed = "genuine failure: work was attempted and failed" (blocking)
-_DUPLICATE_DISPATCH_CODES = frozenset({"duplicate_dispatch"})
 
 
 class ExecutionCoordinator:
