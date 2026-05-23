@@ -34,6 +34,11 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     state = cast(IssueState, item["state"])
 
     if flow is None:
+        # Include issues without flow if they are remote (claimed by manager)
+        # or in states that should show even without flow
+        is_remote = cast(bool, item.get("remote", False))
+        if is_remote:
+            return True
         return state in {
             IssueState.READY,
             IssueState.HANDOFF,
@@ -87,6 +92,7 @@ def status(
         render_completed_flows,
         render_issue_progress,
         render_pr_ref_items,
+        render_remote_items,
         render_scene_sections,
         render_supervisor_issues,
     )
@@ -136,6 +142,16 @@ def status(
             service = FlowService()
             flows = service.list_flows(status=None if all_flows else "active")
 
+            # Fetch orchestrated issues for JSON/YAML output
+            queued_set = set(orch_snapshot.queued_issues)
+            query_service = StatusQueryService(repo=config.repo)
+            orchestrated_issues = query_service.fetch_orchestrated_issues(
+                flows,
+                queued_set,
+                stale_flows=[],
+                manager_usernames=config.get_manager_usernames(),
+            )
+
             output_data = {
                 "orchestra": (
                     orch_snapshot.model_dump()
@@ -143,6 +159,7 @@ def status(
                     else str(orch_snapshot)
                 ),
                 "flows": [f.model_dump() for f in flows],
+                "orchestrated_issues": orchestrated_issues,
             }
 
             if output_format == "json":
@@ -201,7 +218,10 @@ def status(
         queued_set = set(orch_snapshot.queued_issues)
         query_service = StatusQueryService(repo=config.repo)
         orchestrated_issues = query_service.fetch_orchestrated_issues(
-            flows, queued_set, stale_flows=stale_flows
+            flows,
+            queued_set,
+            stale_flows=stale_flows,
+            manager_usernames=config.get_manager_usernames(),
         )
 
         supervisor_label = config.supervisor_handoff.issue_label
@@ -218,13 +238,22 @@ def status(
             if _include_issue_in_task_progress(item)
             and cast(int, item["number"]) not in supervisor_numbers
         ]
+
+        # Separate remote and non-remote items for rendering
+        remote_items = [
+            item for item in task_progress_items if cast(bool, item.get("remote"))
+        ]
+        non_remote_items = [
+            item for item in task_progress_items if not cast(bool, item.get("remote"))
+        ]
+
         bucketed_items: dict[TaskStatusBucket, list[dict[str, object]]] = {
             TaskStatusBucket.ASSIGNEE_INTAKE: [],
             TaskStatusBucket.READY_QUEUE: [],
             TaskStatusBucket.READY_ANOMALY: [],
             TaskStatusBucket.OTHER: [],
         }
-        for item in task_progress_items:
+        for item in non_remote_items:
             state = cast(IssueState | None, item["state"])
             if state == IssueState.DONE:
                 continue
@@ -237,6 +266,9 @@ def status(
             bucketed_items[bucket].append(item)
 
         render_issue_progress(bucketed_items, config)
+        console.print()
+
+        render_remote_items(remote_items)
         console.print()
 
         render_supervisor_issues(supervisor_items)

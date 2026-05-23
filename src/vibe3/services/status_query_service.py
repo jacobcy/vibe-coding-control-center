@@ -215,6 +215,7 @@ class StatusQueryService:
         flows: list[FlowStatusResponse],
         queued_set: set[int],
         stale_flows: list[FlowStatusResponse] | None = None,
+        manager_usernames: list[str] | None = None,
     ) -> list[dict[str, object]]:
         """Fetch GitHub issues and cross-reference with flow state.
 
@@ -222,9 +223,10 @@ class StatusQueryService:
             flows: Active flow status responses
             queued_set: Set of issue numbers in the queue
             stale_flows: Stale flow status responses
+            manager_usernames: List of manager usernames for remote task detection
 
         Returns:
-            Sorted list of issue dicts with number, title, state, flow, queued
+            Sorted list of issue dicts with number, title, state, flow, queued, remote
         """
 
         # stale flows first, active flows overwrite (active priority)
@@ -319,6 +321,22 @@ class StatusQueryService:
                     pr_number = pr.number
                     pr_state = pr.state.value
 
+            # Calculate remote flag: issue claimed by manager but no local flow
+            # Only mark as remote for active states (not BLOCKED, not DONE)
+            is_remote = (
+                state
+                in {
+                    IssueState.CLAIMED,
+                    IssueState.IN_PROGRESS,
+                    IssueState.HANDOFF,
+                    IssueState.REVIEW,
+                    IssueState.MERGE_READY,
+                }
+                and assignee is not None
+                and assignee in (manager_usernames or [])
+                and flow is None
+            )
+
             orchestrated_issues.append(
                 {
                     "number": number,
@@ -337,6 +355,8 @@ class StatusQueryService:
                     "roadmap": roadmap,
                     "priority": priority,
                     "labels": labels,
+                    # Remote task flag
+                    "remote": is_remote,
                 }
             )
 
