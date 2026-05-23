@@ -47,3 +47,69 @@ class TestFlowStatusMigration:
         """Test that 'stale' status is not modified."""
         flow = FlowState(branch="test-branch", flow_slug="test", flow_status="stale")
         assert flow.flow_status == "stale"
+
+
+class TestFlowStatusResponse:
+    """Tests for FlowStatusResponse data_source field (merged from test_flow.py)."""
+
+    def test_flow_status_response_has_data_source_field(self):
+        """FlowStatusResponse includes data_source for provenance tracking."""
+        from vibe3.models.data_source import DataSource
+        from vibe3.models.flow import FlowStatusResponse
+
+        response = FlowStatusResponse(
+            branch="dev/issue-123",
+            flow_slug="issue-123",
+            flow_status="active",
+            data_source=DataSource.LOCAL_SQLITE,
+        )
+        assert response.data_source == DataSource.LOCAL_SQLITE
+
+    def test_flow_status_response_data_source_optional(self):
+        """data_source is optional (None for backward compatibility)."""
+        from vibe3.models.flow import FlowStatusResponse
+
+        response = FlowStatusResponse(
+            branch="dev/issue-123",
+            flow_slug="issue-123",
+            flow_status="active",
+        )
+        assert response.data_source is None
+
+
+class TestOrchestraConfigMapping:
+    """Tests for orchestra config mapping (merged from test_orchestra_config.py)."""
+
+    def test_from_settings_maps_supervisor_prompt_template(self) -> None:
+        from unittest.mock import patch
+
+        from vibe3.config.orchestra_settings import load_orchestra_config
+        from vibe3.config.settings import VibeConfig
+
+        settings = VibeConfig.get_defaults()
+        settings.orchestra.supervisor_handoff.prompt_template = (
+            "orchestra.supervisor.apply"
+        )
+
+        with patch(
+            "vibe3.config.settings.VibeConfig.get_defaults", return_value=settings
+        ):
+            config = load_orchestra_config()
+
+        assert config.supervisor_handoff.prompt_template == "orchestra.supervisor.apply"
+
+    def test_orchestra_config_default_retry_budget_is_three(self) -> None:
+        """Default retry budget should be 3 (not 20) to fail fast on stuck entries."""
+        from unittest.mock import patch
+
+        from vibe3.config.orchestra_settings import load_orchestra_config
+        from vibe3.config.settings import VibeConfig
+
+        settings = VibeConfig.get_defaults()
+
+        with patch(
+            "vibe3.config.settings.VibeConfig.get_defaults", return_value=settings
+        ):
+            config = load_orchestra_config()
+
+        assert config.max_retry_budget == 3
