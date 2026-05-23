@@ -32,9 +32,16 @@ code_limits:
       - path: "src/vibe3/services/issue_failure_service.py"
         limit: 600
         reason: "Issue 状态异常转换聚合，职责单一 (fail/block/resume/confirm)，辅助函数共享，与测试对称"
+      - path: "src/vibe3/services/blocked_state_service.py"
+        limit: 350
+        reason: |
+          Blocked state 统一管理服务（主入口），拆分后只含公共 API：
+          - block/unblock 原子操作
+          - sync/resolve/validate 查询
+          - I/O 委托给 blocked_state_io.py
       - path: "src/vibe3/services/task_resume_operations.py"
-        limit: 470
-        reason: "Task resume 操作聚合，包含 reset、label resume 等内聚操作；_clear_blocked_projection 改进后增加显式字段清除逻辑"
+        limit: 480
+        reason: "Task resume 操作聚合，包含 reset、label resume、failed_reason 清除等内聚操作；_clear_flow_reasons 新增 github_client/label_service 注入和 failed_reason 清除逻辑"
       # Exceptions 聚合 —— 允许 550
       - path: "src/vibe3/exceptions/error_tracking.py"
         limit: 590
@@ -236,8 +243,8 @@ code_limits:
         limit: 540
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 2 个测试后略微超标"
       - path: "tests/vibe3/services/test_task_resume_operations.py"
-        limit: 650
-        reason: "Task resume 操作测试集，覆盖 reset、label resume 等所有场景，合并 legacy test_services 目录后测试覆盖更全面，共享 fixture，拆分收益低"
+        limit: 700
+        reason: "Task resume 操作测试集，覆盖 reset、label resume、failed_reason 清除等所有场景，合并 legacy test_services 目录后测试覆盖更全面，共享 fixture，拆分收益低；follow-up issue 将拆分"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 540
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标"

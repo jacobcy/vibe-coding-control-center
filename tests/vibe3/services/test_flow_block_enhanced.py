@@ -32,21 +32,21 @@ def mock_store():
 @pytest.fixture
 def mock_label_service():
     """Mock LabelService."""
-    with patch("vibe3.services.flow_block_mixin.LabelService") as mock:
+    with patch("vibe3.services.blocked_state_io.LabelService") as mock:
         yield mock.return_value
 
 
 @pytest.fixture
 def mock_flow_timeline_service():
     """Mock FlowTimelineService."""
-    with patch("vibe3.services.flow_block_mixin.FlowTimelineService") as mock:
+    with patch("vibe3.services.blocked_state_service.FlowTimelineService") as mock:
         yield mock.return_value
 
 
 @pytest.fixture
 def mock_github_client():
     """Mock GitHubClient."""
-    with patch("vibe3.services.flow_block_mixin.GitHubClient") as mock:
+    with patch("vibe3.services.blocked_state_io.GitHubClient") as mock:
         mock_instance = mock.return_value
         mock_instance.get_issue_body.return_value = "Test issue body"
         yield mock_instance
@@ -86,9 +86,9 @@ class TestBlockFlowEnhanced:
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
 
-        # Assert - Issue state transition
-        mock_label_service.transition.assert_called_once_with(
-            42, IssueState.BLOCKED, "test-actor", force=False
+        # Assert - Issue state transition (via confirm_issue_state)
+        mock_label_service.confirm_issue_state.assert_called_once_with(
+            42, IssueState.BLOCKED, actor=actor, force=True
         )
 
         # Assert - Timeline comment added
@@ -130,7 +130,7 @@ class TestBlockFlowEnhanced:
         service.block_flow(branch=branch, reason=reason, actor=actor)
 
         # Assert - No issue state transition (no issue number)
-        mock_label_service.transition.assert_not_called()
+        mock_label_service.confirm_issue_state.assert_not_called()
 
         # Assert - No timeline comment added (no issue number)
         mock_flow_timeline_service.record_timeline_event.assert_not_called()
@@ -163,15 +163,22 @@ class TestBlockFlowEnhanced:
         # Act
         service.block_flow(branch=branch, reason=reason, actor=actor)
 
-        # Assert - Issue state transition still happens
-        mock_label_service.transition.assert_called_once_with(
-            42, IssueState.BLOCKED, "test-actor", force=False
+        # Assert - Issue state transition still happens (via confirm_issue_state)
+        mock_label_service.confirm_issue_state.assert_called_once_with(
+            42, IssueState.BLOCKED, actor=actor, force=True
         )
 
-        # Assert - No timeline comment added (reason is None)
-        mock_flow_timeline_service.record_timeline_event.assert_not_called()
+        # Assert - Timeline comment added with empty reason
+        # (reason becomes "" in block() for timeline detail)
+        mock_flow_timeline_service.record_timeline_event.assert_called_once_with(
+            branch=branch,
+            event_type="flow_blocked",
+            actor=actor,
+            detail="",  # reason is None becomes "" for timeline
+            issue_number=42,
+        )
 
-        # Assert - Flow state updated with None reason
+        # Assert - Flow state updated with None reason (preserved)
         mock_store.update_flow_state.assert_called_once()
         update_kwargs = mock_store.update_flow_state.call_args[1]
         assert update_kwargs["blocked_reason"] is None

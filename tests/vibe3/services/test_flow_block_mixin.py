@@ -1,12 +1,12 @@
 """Tests for flow block with body projection."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from vibe3.services.flow_service import FlowService
 
 
-def test_block_flow_calls_project_blocked_state() -> None:
-    """Test that block_flow calls _project_blocked_state method."""
+def test_block_flow_calls_blocked_state_service() -> None:
+    """Test that block_flow calls BlockedStateService.block method."""
     service = FlowService()
 
     with (
@@ -14,10 +14,10 @@ def test_block_flow_calls_project_blocked_state() -> None:
         patch.object(service.store, "get_issue_links") as mock_get_links,
         patch.object(service.store, "update_flow_state"),
         patch.object(service.store, "add_event"),
-        patch.object(service, "_project_blocked_state") as mock_project,
         patch("vibe3.services.task_service.TaskService"),
-        patch("vibe3.services.label_service.LabelService"),
-        patch("vibe3.clients.github_client.GitHubClient") as mock_client_cls,
+        patch(
+            "vibe3.services.blocked_state_service.BlockedStateService"
+        ) as mock_blocked_service_cls,
     ):
 
         # Setup mocks
@@ -30,8 +30,8 @@ def test_block_flow_calls_project_blocked_state() -> None:
         # Mock get_issue_links to return task issue link
         mock_get_links.return_value = [{"issue_number": 123, "issue_role": "task"}]
 
-        mock_client_inst = mock_client_cls.return_value
-        mock_client_inst.add_comment.return_value = True
+        mock_blocked_instance = MagicMock()
+        mock_blocked_service_cls.return_value = mock_blocked_instance
 
         # Execute
         service.block_flow(
@@ -41,11 +41,14 @@ def test_block_flow_calls_project_blocked_state() -> None:
             actor="claude/sonnet-4.6",
         )
 
-        # Verify _project_blocked_state called with correct args
-        mock_project.assert_called_once_with(
-            123,  # issue_number
-            blocked_by_issue=456,
+        # Verify BlockedStateService.block called with correct args
+        mock_blocked_instance.block.assert_called_once_with(
+            branch="dev/issue-123",
             reason="API design pending",
+            blocked_by_issue=456,
+            actor="claude/sonnet-4.6",
+            issue_number=123,
+            event_type="flow_blocked",
         )
 
 

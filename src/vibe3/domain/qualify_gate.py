@@ -175,14 +175,20 @@ class QualifyGateService:
         Ensures local flow_state has flow_status='blocked' and blocked fields
         match the remote truth. Adds state/blocked label if missing.
         """
+        from vibe3.services.blocked_state_service import BlockedStateService
+
         blocked_label = self._convention.state_label(self._convention.blocked_label)
 
         if not flow_state or flow_state.get("flow_status") != "blocked":
-            self._store.update_flow_state(
-                branch,
-                flow_status="blocked",
-                blocked_reason=truth.blocked_reason,
+            service = BlockedStateService(
+                github_client=self._github,
+                store=self._store,
+            )
+            service.write_cache(
+                branch=branch,
+                reason=truth.blocked_reason,
                 blocked_by_issue=truth.blocked_by_issue,
+                actor="system:qualify_gate",
             )
             append_orchestra_event(
                 "dispatcher",
@@ -242,43 +248,31 @@ class QualifyGateService:
         Clears local blocked cache and removes state/blocked label.
         """
         from vibe3.models.flow import FlowState
+        from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.label_service import LabelService
 
-        # Determine target label BEFORE clearing (use original flow_state)
         if flow_state:
             fs_obj = FlowState.model_validate(flow_state)
             target_label = infer_resume_label(fs_obj)
         else:
             target_label = IssueState.CLAIMED
 
-        self._store.update_flow_state(
-            branch,
-            flow_status="active",
-            blocked_reason=None,
-            blocked_by_issue=None,
+        service = BlockedStateService(
+            github_client=self._github,
+            label_service=LabelService(repo=self.config.repo),
+            store=self._store,
         )
-        self._store.add_event(
-            branch,
-            "flow_unblocked",
-            "orchestra:qualify",
-            detail=f"Auto-resume: body truth not blocked for #{issue_number}",
+        service.unblock(
+            branch=branch,
+            target_state=target_label,
+            actor="orchestra:qualify",
+            issue_number=issue_number,
         )
-
-        blocked_label = self._convention.state_label(self._convention.blocked_label)
-        if blocked_label in labels:
-            try:
-                label_port = GhIssueLabelPort(repo=self.config.repo)
-                label_port.remove_issue_label(issue_number, blocked_label)
-                if target_label.to_label() not in labels:
-                    label_port.add_issue_label(issue_number, target_label.to_label())
-            except Exception as exc:
-                logger.bind(domain="orchestra").warning(
-                    f"Failed to sync unblock labels for #{issue_number}: {exc}"
-                )
 
         append_orchestra_event(
             "dispatcher",
             f"qualify_gate auto_resume #{issue_number}: "
-            f"cleared stale blocked state, restored to {target_label.value}",
+            f"unblocked to {target_label.value}",
         )
 
         return target_label
