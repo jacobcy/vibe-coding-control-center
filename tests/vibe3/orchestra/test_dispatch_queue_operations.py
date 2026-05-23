@@ -2,59 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.global_dispatch_coordinator import (
-    GlobalDispatchCoordinator,
     QueueEntry,
 )
-
-
-@pytest.fixture
-def mock_coordinator() -> GlobalDispatchCoordinator:
-    """Create a GlobalDispatchCoordinator with all dependencies mocked."""
-    config = MagicMock()
-    config.repo = "owner/repo"
-    config.manager_usernames = ["manager-bot"]
-    config.supervisor_handoff.issue_label = "supervisor"
-    config.max_concurrent_flows = 10
-    config.get_manager_usernames = MagicMock(return_value=["manager-bot"])
-
-    capacity = MagicMock()
-    capacity.get_capacity_status = MagicMock(
-        return_value={
-            "remaining": 10,
-            "active_count": 0,
-            "max_capacity": 10,
-        }
-    )
-
-    github = MagicMock()
-    store = MagicMock()
-    store.db_path = ":memory:"
-    store.get_flow_state = MagicMock(return_value=None)
-    store.get_flows_by_issue = MagicMock(return_value=[])
-
-    flow_manager = MagicMock()
-    flow_manager.get_flow_for_issue = MagicMock(return_value=None)
-
-    coordinator = GlobalDispatchCoordinator(
-        config=config,
-        capacity=capacity,
-        github=github,
-        store=store,
-        flow_manager=flow_manager,
-        registry=None,
-    )
-
-    # Mock methods that would require complex setup
-    coordinator._health_check_before_dispatch = MagicMock(return_value=True)
-    coordinator._emit_dispatch_intent = MagicMock()
-
-    return coordinator
 
 
 class TestQueueOperations:

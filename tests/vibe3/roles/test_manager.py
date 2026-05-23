@@ -5,8 +5,9 @@
 2. blocked → handoff 转换应该被阻止
 3. blocked_reason 字段正确写入
 
-Note: Dispatch queue filtering tests moved to test_dispatch_queue_management.py
-after StateLabelDispatchService deletion in issue-462 refactoring.
+Note: Dispatch queue filtering tests moved to
+test_dispatch_queue_operations.py after StateLabelDispatchService
+deletion in issue-462 refactoring.
 """
 
 from pathlib import Path
