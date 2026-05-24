@@ -6,10 +6,34 @@ Separated from commands/common.py to avoid circular imports.
 
 import functools
 import os
+import sys
 import time
+from contextvars import ContextVar
 from typing import Any, Callable, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+# ContextVar to track call depth across async boundaries
+_call_depth: ContextVar[int] = ContextVar("call_depth", default=0)
+
+
+class Color:
+    """ANSI color codes for trace output."""
+
+    CYAN = "\033[36m"
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    RESET = "\033[0m"
+
+
+def _format_duration(seconds: float) -> str:
+    """Format duration with appropriate unit (µs, ms, or s)."""
+    if seconds < 0.001:
+        return f"{seconds * 1_000_000:.0f}µs"
+    elif seconds < 1.0:
+        return f"{seconds * 1_000:.1f}ms"
+    else:
+        return f"{seconds:.1f}s"
 
 
 def trace_method(
@@ -28,6 +52,7 @@ def trace_method(
     Note:
         只有当环境变量 VIBE3_TRACE=1 时才会启用 trace。
         这是避免生产环境性能影响的保护措施。
+        输出到 stderr，使用缩进显示调用层级。
 
     Example:
         @trace_method("FlowService.show", layer="service")
@@ -42,22 +67,53 @@ def trace_method(
             if os.environ.get("VIBE3_TRACE", "0") != "1":
                 return func(*args, **kwargs)
 
-            from loguru import logger
+            # Increment call depth
+            depth = _call_depth.get()
+            _call_depth.set(depth + 1)
+
+            # Build indentation
+            indent = "│   " * depth
+
+            # Check if stderr is a terminal for color output
+            use_color = sys.stderr.isatty()
 
             start_time = time.time()
-            logger.bind(trace=name, layer=layer).debug(f"→ {name}")
+
+            # Print entry
+            call_indicator = (
+                f"{Color.CYAN}\u2192{Color.RESET}" if use_color else "\u2192"
+            )
+            print(f"{indent}{call_indicator} {name}", file=sys.stderr)
 
             try:
                 result = func(*args, **kwargs)
                 elapsed = time.time() - start_time
-                logger.bind(trace=name, layer=layer).debug(f"✓ {name} ({elapsed:.3f}s)")
+
+                # Print exit
+                return_indicator = (
+                    f"{Color.GREEN}\u2190{Color.RESET}" if use_color else "\u2190"
+                )
+                print(
+                    f"{indent}{return_indicator} {name} "
+                    f"[{_format_duration(elapsed)}]",
+                    file=sys.stderr,
+                )
                 return result
             except Exception as e:
                 elapsed = time.time() - start_time
-                logger.bind(trace=name, layer=layer).debug(
-                    f"✗ {name} ({elapsed:.3f}s): {e}"
+
+                # Print error
+                error_indicator = (
+                    f"{Color.RED}\u2717{Color.RESET}" if use_color else "\u2717"
+                )
+                print(
+                    f"{indent}{error_indicator} {name} raised "
+                    f"{type(e).__name__} [{_format_duration(elapsed)}]",
+                    file=sys.stderr,
                 )
                 raise
+            finally:
+                _call_depth.set(depth)
 
         return wrapper  # type: ignore
 
