@@ -34,8 +34,8 @@ class LabelsConvention(BaseModel):
         description="Label for vibe-task identification",
     )
 
-    manager_usernames: list[str] = Field(
-        default_factory=lambda: [],
+    manager_usernames: tuple[str, ...] = Field(
+        default_factory=tuple,
         description="GitHub usernames for manager dispatch (empty = disabled)",
     )
 
@@ -47,7 +47,7 @@ class LabelsConvention(BaseModel):
             handoff_label="handoff",
             blocked_label="blocked",
             vibe_task="vibe-task",
-            manager_usernames=[],
+            manager_usernames=(),
         )
 
     @classmethod
@@ -58,7 +58,7 @@ class LabelsConvention(BaseModel):
             handoff_label="handoff",
             blocked_label="blocked",
             vibe_task="vibe-task",
-            manager_usernames=["vibe-manager-agent"],
+            manager_usernames=("vibe-manager-agent",),
         )
 
 
@@ -93,8 +93,13 @@ class ProfileConvention(BaseModel):
         description="Label for blocked state (without state_prefix)",
     )
 
-    manager_usernames: list[str] = Field(
-        default_factory=lambda: [],
+    vibe_task: str = Field(
+        default="vibe-task",
+        description="Label for vibe-task identification",
+    )
+
+    manager_usernames: tuple[str, ...] = Field(
+        default_factory=tuple,
         description="GitHub usernames for manager dispatch (empty = disabled)",
     )
 
@@ -111,7 +116,8 @@ class ProfileConvention(BaseModel):
             state_prefix="state/",
             handoff_label="handoff",
             blocked_label="blocked",
-            manager_usernames=["vibe-manager-agent"],
+            vibe_task="vibe-task",
+            manager_usernames=("vibe-manager-agent",),
             supervisor_prompt="orchestra.supervisor.apply",
         )
 
@@ -137,6 +143,6 @@ class ProfileConvention(BaseModel):
             state_prefix=self.state_prefix,
             handoff_label=self.handoff_label,
             blocked_label=self.blocked_label,
-            vibe_task="vibe-task",
-            manager_usernames=list(self.manager_usernames),
+            vibe_task=self.vibe_task,
+            manager_usernames=self.manager_usernames,
         )

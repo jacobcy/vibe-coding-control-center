@@ -215,7 +215,7 @@ class StatusQueryService:
         flows: list[FlowStatusResponse],
         queued_set: set[int],
         stale_flows: list[FlowStatusResponse] | None = None,
-        manager_usernames: list[str] | None = None,
+        manager_usernames: tuple[str, ...] | None = None,
     ) -> list[dict[str, object]]:
         """Fetch GitHub issues and cross-reference with flow state.
 
@@ -223,7 +223,7 @@ class StatusQueryService:
             flows: Active flow status responses
             queued_set: Set of issue numbers in the queue
             stale_flows: Stale flow status responses
-            manager_usernames: List of manager usernames for remote task detection
+            manager_usernames: Tuple of manager usernames for remote task detection
 
         Returns:
             Sorted list of issue dicts with number, title, state, flow, queued, remote

@@ -1,5 +1,8 @@
+import pytest
+from pydantic import ValidationError
+
+from vibe3.config.branch_convention import BranchConvention
 from vibe3.config.profile_convention import LabelsConvention, ProfileConvention
-from vibe3.models.branch_convention import BranchConvention
 
 
 def test_labels_convention_minimal_defaults():
@@ -9,7 +12,7 @@ def test_labels_convention_minimal_defaults():
     assert labels.handoff_label == "handoff"
     assert labels.blocked_label == "blocked"
     assert labels.vibe_task == "vibe-task"
-    assert labels.manager_usernames == []
+    assert labels.manager_usernames == ()
 
 
 def test_labels_convention_vibe_center():
@@ -19,7 +22,7 @@ def test_labels_convention_vibe_center():
     assert labels.handoff_label == "handoff"
     assert labels.blocked_label == "blocked"
     assert labels.vibe_task == "vibe-task"
-    assert labels.manager_usernames == ["vibe-manager-agent"]
+    assert labels.manager_usernames == ("vibe-manager-agent",)
 
 
 def test_profile_convention_labels_property_minimal():
@@ -32,7 +35,7 @@ def test_profile_convention_labels_property_minimal():
     assert convention.labels.handoff_label == "handoff"
     assert convention.labels.blocked_label == "blocked"
     assert convention.labels.vibe_task == "vibe-task"
-    assert convention.labels.manager_usernames == []
+    assert convention.labels.manager_usernames == ()
 
 
 def test_profile_convention_labels_property_vibe_center():
@@ -45,7 +48,7 @@ def test_profile_convention_labels_property_vibe_center():
     assert convention.labels.handoff_label == "handoff"
     assert convention.labels.blocked_label == "blocked"
     assert convention.labels.vibe_task == "vibe-task"
-    assert convention.labels.manager_usernames == ["vibe-manager-agent"]
+    assert convention.labels.manager_usernames == ("vibe-manager-agent",)
 
 
 def test_profile_convention_custom_labels():
@@ -56,12 +59,12 @@ def test_profile_convention_custom_labels():
         state_prefix="",
         handoff_label="ready",
         blocked_label="stuck",
-        manager_usernames=["my-bot"],
+        manager_usernames=("my-bot",),
     )
     assert convention.labels.state_prefix == ""
     assert convention.labels.handoff_label == "ready"
     assert convention.labels.blocked_label == "stuck"
-    assert convention.labels.manager_usernames == ["my-bot"]
+    assert convention.labels.manager_usernames == ("my-bot",)
 
 
 def test_labels_property_returns_fresh_instance():
@@ -78,13 +81,9 @@ def test_labels_property_returns_fresh_instance():
 def test_labels_convention_is_frozen():
     """Test that LabelsConvention is frozen (immutable)."""
     labels = LabelsConvention.minimal()
-    # Attempting to modify should raise an error
-    try:
+    # Attempting to modify should raise ValidationError
+    with pytest.raises(ValidationError):
         labels.state_prefix = "modified/"
-        assert False, "Should not be able to modify frozen model"
-    except Exception:
-        # Expected - frozen model cannot be modified
-        pass
 
 
 def test_minimal_convention_defaults():
@@ -92,7 +91,7 @@ def test_minimal_convention_defaults():
     convention = ProfileConvention()
     assert convention.branch.task_prefix == "issue-"
     assert convention.handoff_label == "handoff"
-    assert convention.manager_usernames == []
+    assert convention.manager_usernames == ()
 
 
 def test_vibe_center_convention():
@@ -100,7 +99,7 @@ def test_vibe_center_convention():
     convention = ProfileConvention.vibe_center()
     assert convention.branch.task_prefix == "task/issue-"
     assert convention.branch.dev_prefix == "dev/issue-"
-    assert convention.manager_usernames == ["vibe-manager-agent"]
+    assert convention.manager_usernames == ("vibe-manager-agent",)
 
 
 def test_state_label_generation():
@@ -121,8 +120,8 @@ def test_custom_convention():
     """Test custom convention configuration."""
     custom_branch = BranchConvention(task_prefix="feature/", dev_prefix="feature/")
     convention = ProfileConvention(
-        branch=custom_branch, handoff_label="ready", manager_usernames=["my-bot"]
+        branch=custom_branch, handoff_label="ready", manager_usernames=("my-bot",)
     )
     assert convention.branch.canonical_branch(789) == "feature/789"
     assert convention.handoff_label == "ready"
-    assert convention.manager_usernames == ["my-bot"]
+    assert convention.manager_usernames == ("my-bot",)
