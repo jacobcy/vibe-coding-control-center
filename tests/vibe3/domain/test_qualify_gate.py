@@ -1,4 +1,9 @@
-"""Unit tests for QualifyGateService domain logic."""
+"""Unit tests for QualifyGateService domain logic.
+
+Tests for core run_qualify_gate, qualify_blocked_issue, and dependency checking.
+Remote coordination and blocked state tests are in test_qualify_gate_remote.py
+and test_qualify_gate_service_calls.py respectively.
+"""
 
 from unittest.mock import MagicMock, Mock, patch
 
