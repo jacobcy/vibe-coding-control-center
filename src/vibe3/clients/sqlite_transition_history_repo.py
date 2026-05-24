@@ -3,13 +3,10 @@
 import sqlite3
 from typing import Literal
 
-from vibe3.observability.trace_method import trace_method
-
 
 class SQLiteTransitionHistoryRepo:
     """Mixin providing transition_history query methods."""
 
-    @trace_method("SQLiteTransitionHistoryRepo.count_transition_pairs", layer="client")
     def count_transition_pairs(
         self, conn: sqlite3.Connection, branch: str
     ) -> dict[tuple[str, str], int]:
@@ -33,9 +30,6 @@ class SQLiteTransitionHistoryRepo:
 
         return {(row[0], row[1]): row[2] for row in rows}
 
-    @trace_method(
-        "SQLiteTransitionHistoryRepo.get_top_transition_pairs", layer="client"
-    )
     def get_top_transition_pairs(
         self,
         conn: sqlite3.Connection,
@@ -68,7 +62,6 @@ class SQLiteTransitionHistoryRepo:
             {"from_state": row[0], "to_state": row[1], "count": row[2]} for row in rows
         ]
 
-    @trace_method("SQLiteTransitionHistoryRepo.count_specific_pair", layer="client")
     def count_specific_pair(
         self,
         conn: sqlite3.Connection,
@@ -98,7 +91,6 @@ class SQLiteTransitionHistoryRepo:
 
         return row[0] if row else 0
 
-    @trace_method("SQLiteTransitionHistoryRepo.record_transition", layer="client")
     def record_transition(
         self,
         conn: sqlite3.Connection,

@@ -84,7 +84,6 @@ from vibe3.models.change_source import (
     CommitSource,
     PRSource,
 )
-from vibe3.observability.trace_method import trace_method
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -158,12 +157,10 @@ class GitClient:
         except subprocess.CalledProcessError as e:
             raise GitError(" ".join(args), e.stderr.strip()) from e
 
-    @trace_method("GitClient.get_current_branch", layer="client")
     def get_current_branch(self) -> str:
         """获取当前分支名."""
         return _get_current_branch(self._run)
 
-    @trace_method("GitClient.get_commit_subjects", layer="client")
     def get_commit_subjects(self, base_ref: str, head_ref: str = "HEAD") -> list[str]:
         """Get commit subjects between base and head refs."""
         output = self._run(
@@ -171,42 +168,34 @@ class GitClient:
         )
         return [line.strip() for line in output.splitlines() if line.strip()]
 
-    @trace_method("GitClient.get_current_commit", layer="client")
     def get_current_commit(self) -> str:
         """Get current HEAD commit SHA."""
         return _get_current_commit(self._run)
 
-    @trace_method("GitClient.get_git_common_dir", layer="client")
     def get_git_common_dir(self) -> str:
         """Get the shared .git directory path (for worktrees)."""
         return _get_git_common_dir(self._run)
 
-    @trace_method("GitClient.get_worktree_root", layer="client")
     def get_worktree_root(self) -> str:
         """Get the top-level path of the current worktree."""
         return _get_worktree_root(self._run)
 
-    @trace_method("GitClient.get_safe_main_branch_name", layer="client")
     def get_safe_main_branch_name(self) -> str:
         """Get the worktree-specific safe branch name."""
         return _get_safe_main_branch_name(self._run)
 
-    @trace_method("GitClient.is_branch_occupied_by_worktree", layer="client")
     def is_branch_occupied_by_worktree(self, branch_name: str) -> bool:
         """Check whether any worktree already has this branch checked out."""
         return _is_branch_occupied_by_worktree(self._run, branch_name)
 
-    @trace_method("GitClient.find_worktree_path_for_branch", layer="client")
     def find_worktree_path_for_branch(self, branch: str) -> Path | None:
         """Find worktree path whose checked-out branch matches ``branch``."""
         return _find_worktree_path_for_branch(self._run, branch)
 
-    @trace_method("GitClient.get_worktrees_for_branch", layer="client")
     def get_worktrees_for_branch(self, branch_name: str) -> list[str]:
         """Return paths of worktrees that have the given branch checked out."""
         return _get_worktrees_for_branch(self._run, branch_name)
 
-    @trace_method("GitClient.list_worktrees", layer="client")
     def list_worktrees(self, cwd: Path | str | None = None) -> list[tuple[str, str]]:
         """List all worktrees.
 
@@ -222,7 +211,6 @@ class GitClient:
             output = self._run(["worktree", "list", "--porcelain"], cwd=cwd)
         return parse_worktree_list(output)
 
-    @trace_method("GitClient.remove_worktree", layer="client")
     def remove_worktree(self, wt_path: Path | str, force: bool = False) -> None:
         """Remove a worktree.
 
@@ -232,17 +220,14 @@ class GitClient:
         """
         _remove_worktree(Path(wt_path), force=force)
 
-    @trace_method("GitClient.get_changed_files", layer="client")
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
         return _get_changed_files(self._run, source, self._github_client)
 
-    @trace_method("GitClient.get_diff", layer="client")
     def get_diff(self, source: ChangeSource) -> str:
         """统一接口：获取 diff 内容."""
         return _get_diff(self._run, source, self._github_client, self._pr_diff_cache)
 
-    @trace_method("GitClient.get_numstat", layer="client")
     def get_numstat(self, source: ChangeSource) -> str:
         """Get git diff --numstat output for a change source."""
         return _get_numstat(
@@ -253,36 +238,30 @@ class GitClient:
             self._pr_numstat_cache,
         )
 
-    @trace_method("GitClient.get_untracked_files", layer="client")
     def get_untracked_files(self) -> list[str]:
         """Return untracked files in the worktree."""
         return _get_untracked_files(self._run)
 
-    @trace_method("GitClient.has_uncommitted_changes", layer="client")
     def has_uncommitted_changes(self) -> bool:
         """Check if working directory is dirty."""
         return _has_uncommitted_changes(self._run)
 
     # ── 分支管理方法（委托给 git_branch_ops）──────────────────
 
-    @trace_method("GitClient.create_branch", layer="client")
     def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
         """Create a new branch from start_ref and switch to it."""
         _create_branch(branch_name, start_ref)
 
-    @trace_method("GitClient.create_branch_ref", layer="client")
     def create_branch_ref(
         self, branch_name: str, start_ref: str = "origin/main"
     ) -> None:
         """Create a branch ref without checking it out."""
         _create_branch_ref(branch_name, start_ref)
 
-    @trace_method("GitClient.switch_branch", layer="client")
     def switch_branch(self, branch_name: str) -> None:
         """Switch to existing branch."""
         _switch_branch(branch_name)
 
-    @trace_method("GitClient.delete_branch", layer="client")
     def delete_branch(
         self,
         branch_name: str,
@@ -292,29 +271,24 @@ class GitClient:
         """Delete local branch."""
         _delete_branch(branch_name, force=force, skip_if_worktree=skip_if_worktree)
 
-    @trace_method("GitClient.delete_remote_branch", layer="client")
     def delete_remote_branch(self, branch_name: str) -> None:
         """Delete remote branch."""
         _delete_remote_branch(branch_name)
 
-    @trace_method("GitClient.get_merge_base", layer="client")
     def get_merge_base(self, branch1: str, branch2: str) -> str:
         """Get merge-base commit between two branches."""
         return _get_merge_base(branch1, branch2)
 
-    @trace_method("GitClient.branch_exists", layer="client")
     def branch_exists(self, branch_name: str) -> bool:
         """Check if branch exists (local or remote)."""
         return _branch_exists(branch_name)
 
-    @trace_method("GitClient.get_all_branches_with_timestamps", layer="client")
     def get_all_branches_with_timestamps(
         self, remote: bool = False
     ) -> list[dict[str, str]]:
         """Get all branches with last commit timestamps."""
         return get_all_branches_with_timestamps(self._run, remote=remote)
 
-    @trace_method("GitClient.push_branch", layer="client")
     def push_branch(
         self,
         branch_name: str,
@@ -334,7 +308,6 @@ class GitClient:
         args.extend([remote, branch_name])
         self._run(args)
 
-    @trace_method("GitClient.fetch", layer="client")
     def fetch(self, remote: str = "origin", ref: str | None = None) -> None:
         """Fetch from remote.
 
@@ -347,12 +320,10 @@ class GitClient:
             args.append(ref)
         self._run(args)
 
-    @trace_method("GitClient.check_merge_conflicts", layer="client")
     def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
         """Dry-run merge to detect conflicts without modifying working tree."""
         return _check_merge_conflicts(self._run, target_ref)
 
-    @trace_method("GitClient.get_config", layer="client")
     def get_config(self, key: str) -> str | None:
         """Get git config value.
 
@@ -369,7 +340,6 @@ class GitClient:
 
     # ── Diff Hunk 解析方法 ──────────────────────────────────────
 
-    @trace_method("GitClient.get_diff_hunk_ranges", layer="client")
     def get_diff_hunk_ranges(
         self, file_path: str, source: ChangeSource
     ) -> list[tuple[int, int]]:

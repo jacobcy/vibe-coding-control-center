@@ -7,7 +7,6 @@ from loguru import logger
 
 from vibe3.clients.ai_client import AIClient
 from vibe3.config.settings import AIConfig
-from vibe3.observability.trace_method import trace_method
 
 DEFAULT_PROMPTS = {
     "pr": {
@@ -70,7 +69,6 @@ class AISuggestionClient:
 
         return DEFAULT_PROMPTS.copy()
 
-    @trace_method("AISuggestionClient.suggest_pr_content", layer="client")
     def suggest_pr_content(
         self,
         commits: list[str],

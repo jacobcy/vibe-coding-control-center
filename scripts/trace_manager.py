@@ -143,12 +143,28 @@ def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) 
 
 
 def remove_trace_decorator(lines: list[str]) -> list[str]:
-    """移除文件中的 @trace_method 装饰器。"""
-    return [
-        line for line in lines
-        if "from vibe3.observability.trace_method import trace_method" not in line
-        and not re.match(r'^\s*@trace_method\(', line)
-    ]
+    """移除文件中的 @trace_method 装饰器（支持多行）。"""
+    new_lines = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if "from vibe3.observability.trace_method import trace_method" in line:
+            i += 1
+            continue
+
+        if re.match(r'^\s*@trace_method\(', line):
+            paren_count = line.count("(") - line.count(")")
+            i += 1
+            while i < len(lines) and paren_count > 0:
+                paren_count += lines[i].count("(") - lines[i].count(")")
+                i += 1
+            continue
+
+        new_lines.append(line)
+        i += 1
+
+    return new_lines
 
 
 def process_file(

@@ -7,7 +7,6 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.sqlite_base import _HasConnection
-from vibe3.observability.trace_method import trace_method
 
 
 class SQLiteSessionRepo(_HasConnection):
@@ -32,7 +31,6 @@ class SQLiteSessionRepo(_HasConnection):
         "updated_at",
     }
 
-    @trace_method("SQLiteSessionRepo.create_runtime_session", layer="client")
     def create_runtime_session(
         self,
         *,
@@ -82,7 +80,6 @@ class SQLiteSessionRepo(_HasConnection):
         ).debug("Created runtime session")
         return session_id
 
-    @trace_method("SQLiteSessionRepo.get_runtime_session", layer="client")
     def get_runtime_session(self, session_id: int) -> dict[str, Any] | None:
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row
@@ -96,7 +93,6 @@ class SQLiteSessionRepo(_HasConnection):
             return dict(row)
         return None
 
-    @trace_method("SQLiteSessionRepo.update_runtime_session", layer="client")
     def update_runtime_session(self, session_id: int, **kwargs: Any) -> None:
         invalid = set(kwargs.keys()) - self.VALID_RUNTIME_SESSION_FIELDS
         if invalid:
@@ -120,7 +116,6 @@ class SQLiteSessionRepo(_HasConnection):
             fields=list(kwargs.keys()),
         ).debug("Updated runtime session")
 
-    @trace_method("SQLiteSessionRepo.list_live_runtime_sessions", layer="client")
     def list_live_runtime_sessions(
         self, *, role: str | None = None
     ) -> list[dict[str, Any]]:
@@ -143,7 +138,6 @@ class SQLiteSessionRepo(_HasConnection):
         ).debug("Listed live runtime sessions")
         return rows
 
-    @trace_method("SQLiteSessionRepo.list_live_sessions_by_worktree", layer="client")
     def list_live_sessions_by_worktree(
         self, worktree_path: str
     ) -> list[dict[str, Any]]:
@@ -174,9 +168,6 @@ class SQLiteSessionRepo(_HasConnection):
         ).debug("Listed live sessions for worktree")
         return rows
 
-    @trace_method(
-        "SQLiteSessionRepo.get_terminated_target_ids_for_role", layer="client"
-    )
     def get_terminated_target_ids_for_role(
         self, role: str, target_ids: set[int]
     ) -> set[int]:

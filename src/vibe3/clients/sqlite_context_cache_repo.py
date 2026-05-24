@@ -6,7 +6,6 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.sqlite_base import _HasConnection
-from vibe3.observability.trace_method import trace_method
 
 
 class SQLiteContextCacheRepo(_HasConnection):
@@ -14,7 +13,6 @@ class SQLiteContextCacheRepo(_HasConnection):
 
     db_path: str
 
-    @trace_method("SQLiteContextCacheRepo.upsert_flow_context_cache", layer="client")
     def upsert_flow_context_cache(
         self,
         branch: str,
@@ -49,7 +47,6 @@ class SQLiteContextCacheRepo(_HasConnection):
             branch=branch,
         ).debug("Upserted flow context cache")
 
-    @trace_method("SQLiteContextCacheRepo.get_flow_context_cache", layer="client")
     def get_flow_context_cache(self, branch: str) -> dict[str, Any] | None:
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -67,7 +64,6 @@ class SQLiteContextCacheRepo(_HasConnection):
             return result
         return None
 
-    @trace_method("SQLiteContextCacheRepo.delete_flow_context_cache", layer="client")
     def delete_flow_context_cache(self, branch: str) -> None:
         conn = self._get_connection()
         with conn:
