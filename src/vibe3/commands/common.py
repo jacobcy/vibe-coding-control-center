@@ -1,5 +1,6 @@
 """Common utilities for command layer."""
 
+import os
 from contextlib import nullcontext
 from typing import Any
 
@@ -8,6 +9,15 @@ import typer
 from vibe3.commands.check_support import execute_check_mode
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+
+
+def enable_method_trace() -> None:
+    """Enable method-level tracing via @trace_method decorator.
+
+    Sets VIBE3_TRACE=1 environment variable and configures DEBUG logging.
+    """
+    os.environ["VIBE3_TRACE"] = "1"
+    setup_logging(verbose=2)
 
 
 def trace_scope(trace: bool, command: str, domain: str = "flow", **kwargs: Any) -> Any:

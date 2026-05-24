@@ -8,6 +8,7 @@ import typer
 import yaml
 from loguru import logger
 
+from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base_helpers import (
     build_json_output,
     count_changed_lines_in_code_paths,
@@ -15,7 +16,6 @@ from vibe3.commands.inspect_base_helpers import (
     validate_base_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
-from vibe3.utils.trace import enable_trace
 
 
 def register(app: typer.Typer) -> None:
@@ -62,7 +62,7 @@ def register(app: typer.Typer) -> None:
         from vibe3.utils.git_helpers import get_current_branch
 
         if trace:
-            enable_trace()
+            enable_method_trace()
 
         current_branch = get_current_branch()
         resolved = build_base_resolution_usecase().resolve_inspect_base(

@@ -8,10 +8,10 @@ import yaml
 
 from vibe3.analysis import command_analyzer, dag_service, structure_service
 from vibe3.analysis.command_analyzer_helpers import find_command_file
+from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
 from vibe3.commands.inspect_symbols import register as register_symbols
-from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="inspect",
@@ -86,7 +86,7 @@ def files_(
         vibe3 inspect files                    # Analyze all Python files
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     if file:
         result = structure_service.analyze_file(file)
@@ -176,7 +176,7 @@ def commands(
         vibe inspect commands pr show --mermaid
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     if not command:
         names = _list_analyzable_top_level_commands()
@@ -260,7 +260,7 @@ def dead_code(
         vibe3 inspect dead-code --yaml
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     from vibe3.analysis.serena_service import SerenaService
     from vibe3.exceptions import SerenaError
