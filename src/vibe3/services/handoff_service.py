@@ -248,11 +248,12 @@ class HandoffService:
         if actor_field:
             flow_updates[actor_field] = effective_actor
 
-        # Clear blocked_reason when required refs are written
-        # This handles the case where gate was skipped (e.g., no state label)
-        # but executor/planner successfully wrote the required artifact
-        if ref_field in ("plan_ref", "report_ref"):
-            flow_updates["blocked_reason"] = None
+        # NOTE: blocked_reason management is handled by BlockedStateService.
+        # Handoff service does NOT clear blocked_reason automatically because:
+        # 1. ERROR and BLOCK systems are now separated (PR #1366)
+        # 2. blocked_reason is managed by BlockedStateService for consistency
+        # 3. User-set blocked_reason should only be cleared via unblock command
+        # 4. No transient blocked_reason patterns exist in current architecture
 
         if verdict:
             role = extract_role_from_actor(effective_actor)
