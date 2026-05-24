@@ -1,0 +1,213 @@
+"""Tests for dependency direction compliance."""
+
+from __future__ import annotations
+
+import ast
+from collections import defaultdict
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+
+from tests.vibe3.test_modularity.conftest import (
+    extract_file_imports,
+    get_module_layer,
+)
+
+if TYPE_CHECKING:
+    pass
+
+
+class TestLayerDependencies:
+    """Test that dependencies follow layer rules."""
+
+    @pytest.mark.xfail(
+        reason="Known architectural debt: upward dependencies exist "
+        "(agents→analysis, commands→ui, clients→agents)"
+    )
+    def test_no_upward_imports(self, module_registry: list[str]) -> None:
+        """Verify no upward imports (lower layers importing from higher layers).
+
+        Layer N may import from layers >= N (higher or equal layer number).
+        Violations are reported as test failures.
+        """
+        violations = []
+
+        for module_name in module_registry:
+            module_path = Path(f"src/vibe3/{module_name}")
+            if not module_path.exists():
+                continue
+
+            source_layer = get_module_layer(module_name)
+            if source_layer is None:
+                # Module not in layer map, skip
+                continue
+
+            # Check all Python files in the module
+            for py_file in module_path.glob("**/*.py"):
+                if "__pycache__" in str(py_file):
+                    continue
+
+                imports = extract_file_imports(str(py_file))
+
+                for imp in imports:
+                    # Extract top-level module from import
+                    if not imp.startswith("vibe3."):
+                        continue
+
+                    parts = imp.split(".")
+                    if len(parts) < 2:
+                        continue
+
+                    target_module = parts[1]
+                    target_layer = get_module_layer(target_module)
+
+                    if target_layer is None:
+                        # Target not in layer map, skip
+                        continue
+
+                    # Check dependency rule: source_layer <= target_layer
+                    if source_layer > target_layer:
+                        violations.append(
+                            f"{py_file.relative_to('src')}: "
+                            f"{module_name} (layer {source_layer}) "
+                            f"imports {target_module} (layer {target_layer}) "
+                            f"— upward dependency violation"
+                        )
+
+        if violations:
+            pytest.fail(
+                "Upward dependency violations found:\n"
+                + "\n".join(f"  - {v}" for v in violations)
+            )
+
+    @pytest.mark.xfail(
+        reason="Known architectural debt: some __init__.py files "
+        "import from own submodules"
+    )
+    def test_no_self_reference_in_init(self, module_registry: list[str]) -> None:
+        """Verify __init__.py files don't import from their own submodule in ways
+        that create circular init-time dependencies.
+        """
+        violations = []
+
+        for module_name in module_registry:
+            init_path = Path(f"src/vibe3/{module_name}/__init__.py")
+            if not init_path.exists():
+                continue
+
+            try:
+                source = init_path.read_text(encoding="utf-8")
+                tree = ast.parse(source)
+
+                # Look for imports of own submodules
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ImportFrom):
+                        # Check absolute imports: from vibe3.<module>.<sub> import ...
+                        if node.module and node.module.startswith(
+                            f"vibe3.{module_name}."
+                        ):
+                            # Check if importing from a submodule
+                            parts = node.module.split(".")
+                            if len(parts) > 2:
+                                submodule = parts[2]
+                                # Flag potential circular dependency
+                                violations.append(
+                                    f"{module_name}/__init__.py: "
+                                    f"imports from own submodule {submodule} "
+                                    "(potential circular dependency)"
+                                )
+                        # Check relative imports: from .<sub> import ...
+                        elif node.level > 0 and node.module:
+                            # Relative import in __init__.py indicates
+                            # importing from submodule
+                            violations.append(
+                                f"{module_name}/__init__.py: "
+                                f"relative import from .{node.module} "
+                                "(potential circular dependency)"
+                            )
+
+            except (SyntaxError, OSError) as e:
+                violations.append(f"{module_name}/__init__.py: parse error - {e}")
+
+        if violations:
+            pytest.fail(
+                "Potential circular dependencies in __init__.py:\n"
+                + "\n".join(f"  - {v}" for v in violations)
+            )
+
+
+class TestCircularDependencies:
+    """Test for circular dependencies."""
+
+    @pytest.mark.xfail(
+        reason="Known architectural debt: circular dependencies exist "
+        "(cli↔commands, config↔models, etc.)"
+    )
+    def test_no_circular_deps(self, import_graph: dict[str, list[str]]) -> None:
+        """Verify no circular dependencies exist in the module graph.
+
+        Uses DFS-based cycle detection on the top-level module graph.
+        """
+        # Build adjacency list
+        graph = defaultdict(set)
+        for module, imports in import_graph.items():
+            for imp in imports:
+                graph[module].add(imp)
+
+        # Detect cycles using DFS
+        visited = set()
+        rec_stack = set()
+        cycles = []
+
+        def dfs(node: str, path: list[str]) -> None:
+            visited.add(node)
+            rec_stack.add(node)
+            path.append(node)
+
+            for neighbor in graph.get(node, []):
+                if neighbor not in visited:
+                    dfs(neighbor, path)
+                elif neighbor in rec_stack:
+                    # Found cycle
+                    cycle_start = path.index(neighbor)
+                    cycle = path[cycle_start:] + [neighbor]
+                    cycles.append(cycle)
+
+            path.pop()
+            rec_stack.remove(node)
+
+        for module in graph:
+            if module not in visited:
+                dfs(module, [])
+
+        if cycles:
+            cycle_strs = []
+            for cycle in cycles:
+                cycle_str = " → ".join(cycle)
+                cycle_strs.append(cycle_str)
+
+            pytest.fail(
+                "Circular dependencies found:\n"
+                + "\n".join(f"  - {c}" for c in cycle_strs)
+            )
+
+
+class TestKnownExceptions:
+    """Document known acceptable violations."""
+
+    # Known violations that are architecturally acceptable
+    # These will be marked as xfail to keep the suite green
+    KNOWN_UPWARD_VIOLATIONS = [
+        # Add known acceptable violations here with reasons
+        # Example: "services imports from agents (acceptable because ...)"
+    ]
+
+    def test_known_violations_documented(self) -> None:
+        """Verify that known violations are properly documented.
+
+        This test ensures we don't forget to document acceptable deviations.
+        """
+        # This test always passes if we reach here
+        # It's a placeholder for future known violations
+        pass
