@@ -186,9 +186,9 @@ related_docs:
 
 ### Phase 01: CLI Skeleton & Contract
 
-- [ ] `bin/vibe3 flow --help` 返回正确输出
-- [ ] `bin/vibe3 task --help` 返回正确输出
-- [ ] `bin/vibe3 pr --help` 返回正确输出
+- [ ] `vibe3 flow --help` 返回正确输出
+- [ ] `vibe3 task --help` 返回正确输出
+- [ ] `vibe3 pr --help` 返回正确输出
 - [ ] `mypy src/vibe3/ --strict` 无错误
 
 ### Phase 02: Flow & Task State (SQLite)
@@ -211,7 +211,7 @@ related_docs:
 
 ### Phase 05: Verification & Cleanup
 
-- [ ] `time bin/vibe3 flow status` < 1.0s
+- [ ] `time vibe3 flow status` < 1.0s
 - [ ] 清理所有 TODO 和 print()
 - [ ] 所有冒烟测试通过
 
