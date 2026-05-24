@@ -56,7 +56,9 @@ def mark_issue(
     """Unified issue state marking interface.
 
     Args:
-        action: "fail" for runtime failures (error_log only),
+        action: "fail" for runtime failures (writes flow_failed timeline event
+            only; error_log is recorded upstream by the caller, e.g.,
+            codeagent_runner via ErrorTrackingService.record_error),
             "block" for business blocks (blocked_reason + label).
     """
     role = _ROLE_MAP.get(role, role)
@@ -113,7 +115,10 @@ def fail_issue(
 ) -> None:
     """Generic fail issue handler.
 
-    Records runtime failure to error_log and flow_failed timeline event only.
+    Writes a flow_failed timeline event only. The runtime error itself is
+    recorded to error_log upstream by the caller (e.g., codeagent_runner via
+    ErrorTrackingService.record_error); this handler does NOT write to
+    error_log to avoid duplicate entries.
     Does NOT write blocked_reason or change flow_status.
     Runtime errors are handled by ERROR system, not BLOCK system.
     """
