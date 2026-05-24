@@ -1,6 +1,7 @@
 """Common utilities for command layer."""
 
 import os
+import sys
 
 import typer
 
@@ -14,6 +15,14 @@ def enable_method_trace() -> None:
     Use -v or -vv separately to control log verbosity.
     """
     os.environ["VIBE3_TRACE"] = "1"
+
+    if "VIBE3_TRACE_HINT_SHOWN" not in os.environ:
+        os.environ["VIBE3_TRACE_HINT_SHOWN"] = "1"
+        print(
+            "Trace enabled. To add method tracing, run:\n"
+            "  uv run python scripts/trace_manager.py --add",
+            file=sys.stderr,
+        )
 
 
 def run_full_check_shortcut() -> None:
