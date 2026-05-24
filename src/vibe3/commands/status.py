@@ -10,9 +10,14 @@ import typer
 from vibe3.commands.command_options import (
     AllOption,
     FormatOption,
+    TraceMinMsOption,
     TraceOption,
 )
-from vibe3.commands.common import enable_method_trace, run_full_check_shortcut
+from vibe3.commands.common import (
+    enable_method_trace,
+    run_full_check_shortcut,
+    validate_trace_options,
+)
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -78,6 +83,7 @@ def status(
     ] = False,
     output_format: FormatOption = "table",
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     json_output: Annotated[
         bool,
         typer.Option(
@@ -88,8 +94,9 @@ def status(
     ] = False,
 ) -> None:
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
+    validate_trace_options(trace, min_ms)
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     from vibe3.commands.status_render import (
         render_blocked_items,

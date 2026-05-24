@@ -8,9 +8,10 @@ from loguru import logger
 
 from vibe3.commands.command_options import (
     FormatOption,
+    TraceMinMsOption,
     TraceOption,
 )
-from vibe3.commands.common import enable_method_trace
+from vibe3.commands.common import enable_method_trace, validate_trace_options
 from vibe3.models.flow import IssueLink
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -141,6 +142,7 @@ def update(
     actor: ActorOption = None,
     spec: SpecOption = None,
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     output_format: FormatOption = "table",
     json_output: Annotated[
         bool,
@@ -157,8 +159,9 @@ def update(
     the corresponding branch doesn't exist in git, automatically creates the
     branch before registering flow.
     """
+    validate_trace_options(trace, min_ms)
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
@@ -271,6 +274,7 @@ def bind(
     branch: BindBranchOption = None,
     role: BindRoleOption = "task",
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     output_format: FormatOption = "table",
     json_output: Annotated[
         bool,
@@ -282,8 +286,9 @@ def bind(
     ] = False,
 ) -> None:
     """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
+    validate_trace_options(trace, min_ms)
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -437,10 +442,12 @@ def restore_flow(
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
 ) -> None:
     """Restore a soft-deleted flow."""
+    validate_trace_options(trace, min_ms)
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     branch = branch_opt or branch_arg
     if branch is None:

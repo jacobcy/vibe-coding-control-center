@@ -10,8 +10,13 @@ from vibe3.commands.command_options import (
     ActorFilterOption,
     FormatOption,
     RemoteOption,
+    TraceMinMsOption,
 )
-from vibe3.commands.common import enable_method_trace, run_full_check_shortcut
+from vibe3.commands.common import (
+    enable_method_trace,
+    run_full_check_shortcut,
+    validate_trace_options,
+)
 from vibe3.commands.flow_status_helpers import (
     _collect_timeline_issue_numbers,
     _fetch_issue_titles_for_status,
@@ -61,6 +66,7 @@ def show(
     ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     output_format: FormatOption = "table",
     remote: RemoteOption = False,
     show_all: Annotated[
@@ -77,8 +83,9 @@ def show(
     ] = False,
 ) -> None:
     """Show flow details with source-aware reads."""
+    validate_trace_options(trace, min_ms)
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -289,6 +296,7 @@ def status(
     ] = False,
     output_format: FormatOption = "table",
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     json_output: Annotated[
         bool,
         typer.Option(
@@ -302,6 +310,10 @@ def status(
 
     By default only shows active flows. Use --all to include done/aborted/stale.
     """
+    validate_trace_options(trace, min_ms)
+    if trace:
+        enable_method_trace(min_ms=min_ms)
+
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
