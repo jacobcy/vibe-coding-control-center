@@ -175,8 +175,8 @@ code_limits:
         limit: 520
         reason: "Session 生命周期聚合，包含状态对账、容量统计、活跃检查、批量查询优化（get_all_branches_with_live_sessions 性能优化避免重复查询）等紧密耦合逻辑"
       - path: "src/vibe3/execution/coordinator.py"
-        limit: 480
-        reason: "执行协调器聚合，包含容量控制、执行生命周期、worktree 解析错误捕获、dispatch_execution 核心流程等紧密耦合逻辑"
+        limit: 520
+        reason: "执行协调器聚合，包含容量控制、执行生命周期、worktree 解析错误捕获、dispatch_execution 核心流程、AsyncLauncherProtocol 依赖注入重构等紧密耦合逻辑；rebase后新增20行"
       - path: "src/vibe3/execution/noop_gate.py"
         limit: 650
         reason: "No-op gate 聚合，包含 verdict-aware ref 检查（PASS 可省略 audit_ref，MINOR/MAJOR/BLOCK 仍需）、单步转换限制检查、全局转换计数检查、state 验证、GitHub API 错误处理、retry counter 机制（3次重试 + 即时持久化）、error/block 分离（GitHub API 失败记录 error_log 不触发 flow block）等多层防御机制，职责单一但紧密耦合"
