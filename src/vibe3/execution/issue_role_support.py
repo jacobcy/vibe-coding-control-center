@@ -10,10 +10,11 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.execution.role_interfaces import IssueRoleSyncSpec
 from vibe3.execution.session_service import SessionRole
 from vibe3.models.orchestration import IssueInfo
 from vibe3.models.review_runner import AgentOptions
-from vibe3.roles.definitions import IssueRoleSyncSpec
+from vibe3.roles.definitions import IssueRoleSyncSpec as IssueRoleSyncSpecImpl
 
 
 def resolve_orchestra_repo_root() -> Path:
@@ -256,7 +257,7 @@ def build_issue_sync_spec(
     failure_handler: Callable[..., None],
 ) -> IssueRoleSyncSpec:
     """Build the minimal sync spec shared by issue-scoped roles."""
-    return IssueRoleSyncSpec(
+    return IssueRoleSyncSpecImpl(
         role_name=role_name,
         resolve_options=resolve_options,
         resolve_branch=resolve_branch,

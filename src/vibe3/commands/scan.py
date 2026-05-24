@@ -63,6 +63,8 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
         material_override: Optional governance role to override material rotation
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.orchestra.logging import append_governance_event
+    from vibe3.roles.governance import build_default_governance_fns
 
     # Call internal governance runner with dry_run=True
     # This uses real snapshot instead of synthetic dry-run context
@@ -72,6 +74,8 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
         dry_run=True,
         show_prompt=True,
         session_id=None,
+        governance_fns=build_default_governance_fns(),
+        append_event=append_governance_event,
     )
 
 

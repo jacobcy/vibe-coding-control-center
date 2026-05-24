@@ -7,6 +7,7 @@ ensuring API errors are captured for FailedGate threshold checking.
 from __future__ import annotations
 
 import os
+from typing import Any, Callable
 
 from loguru import logger
 from typer import echo
@@ -16,14 +17,7 @@ from vibe3.clients.store_context import get_store
 from vibe3.config.orchestra_settings import load_orchestra_config
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
-from vibe3.orchestra.flow_dispatch import FlowManager
-from vibe3.orchestra.logging import append_governance_event
-from vibe3.roles.governance import (
-    build_governance_snapshot_context,
-    render_governance_prompt,
-    resolve_governance_options,
-)
-from vibe3.services.orchestra_status_service import OrchestraStatusService
+from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 
 
 def run_governance_sync(
@@ -33,6 +27,8 @@ def run_governance_sync(
     dry_run: bool = False,
     show_prompt: bool = False,
     session_id: str | None = None,
+    governance_fns: GovernanceFunctions | None = None,
+    append_event: GovernanceEventLogger | None = None,
 ) -> None:
     """Run governance scan synchronously with error tracking.
 
@@ -46,23 +42,87 @@ def run_governance_sync(
         dry_run: If True, print command without executing
         show_prompt: If True, print prompt content in dry-run mode
         session_id: Optional session ID for resume
+        governance_fns: Optional injected governance functions (for decoupling)
+        append_event: Optional injected event logger (for decoupling)
     """
+    # Default fallback via lazy import for backward compatibility
+    if governance_fns is None:
+        from vibe3.roles.governance import (
+            build_governance_execution_name,
+            build_governance_snapshot_context,
+            render_governance_prompt,
+            resolve_governance_options,
+        )
+
+        class _DefaultGovernanceFns:
+            """Default implementation wrapping governance role functions."""
+
+            def build_snapshot_context(
+                self,
+                snapshot: Any,
+                *,
+                config: Any = None,
+                tick_count: int = 0,
+                material_override: str | None = None,
+                **kwargs: Any,
+            ) -> dict[str, Any]:
+                return build_governance_snapshot_context(
+                    snapshot,
+                    config=config,
+                    tick_count=tick_count,
+                    material_override=material_override,
+                    **kwargs,
+                )
+
+            def render_prompt(
+                self,
+                config: Any,
+                snapshot_context: dict[str, Any],
+                *,
+                tick_count: int = 0,
+                material_override: str | None = None,
+                **kwargs: Any,
+            ) -> Any:
+                return render_governance_prompt(
+                    config,
+                    snapshot_context,
+                    tick_count=tick_count,
+                    material_override=material_override,
+                    **kwargs,
+                )
+
+            def resolve_options(self, config: Any) -> Any:
+                return resolve_governance_options(config)
+
+            def build_execution_name(self, tick_count: int) -> str:
+                return build_governance_execution_name(tick_count)
+
+        governance_fns = _DefaultGovernanceFns()
+
+    if append_event is None:
+        from vibe3.orchestra.logging import append_governance_event as _ae
+
+        append_event = _ae
+
     config = load_orchestra_config()
+    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+
     flow_manager = FlowManager(config)
     status_service = OrchestraStatusService(config, orchestrator=flow_manager)
     snapshot = status_service.snapshot()
 
     # Resolve agent options
-    options = resolve_governance_options(config)
+    options = governance_fns.resolve_options(config)
 
     # Build prompt via snapshot context and prompt assembler
-    snapshot_context = build_governance_snapshot_context(
+    snapshot_context = governance_fns.build_snapshot_context(
         snapshot,
         config=config,
         tick_count=tick_count,
         material_override=material_override,
     )
-    render_result = render_governance_prompt(
+    render_result = governance_fns.render_prompt(
         config,
         snapshot_context,
         tick_count=tick_count,
@@ -98,7 +158,7 @@ def run_governance_sync(
         )
 
         # Log successful completion
-        append_governance_event(
+        append_event(
             f"governance scan completed tick={tick_count} "
             f"exit_code={result.exit_code}"
         )
@@ -128,7 +188,7 @@ def run_governance_sync(
         logger.bind(domain="governance", tick=tick_count).error(
             f"Governance scan failed: {error_code} - {exc}"
         )
-        append_governance_event(
+        append_event(
             f"governance scan failed tick={tick_count} " f"error={error_code}: {exc}"
         )
 
@@ -140,6 +200,7 @@ def run_governance_async(
     *,
     tick_count: int = 0,
     material_override: str | None = None,
+    build_execution_name: Callable[[int], str] | None = None,
 ) -> None:
     """Run governance scan in background tmux session (async).
 
@@ -150,6 +211,7 @@ def run_governance_async(
     Args:
         tick_count: Tick number for governance material rotation
         material_override: Optional governance role to override material rotation
+        build_execution_name: Optional injected execution name builder (for decoupling)
     """
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.coordinator import ExecutionCoordinator
@@ -157,7 +219,16 @@ def run_governance_async(
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.roles.governance import build_governance_execution_name
+
+    # Default fallback via lazy import
+    if build_execution_name is None:
+        from vibe3.roles.governance import build_governance_execution_name as _ben
+
+        build_execution_name = _ben
+
+    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.orchestra.logging import append_governance_event
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
     config = load_orchestra_config()
 
@@ -201,7 +272,7 @@ def run_governance_async(
         echo("Governance dispatch skipped: circuit breaker is OPEN")
         return
 
-    execution_name = build_governance_execution_name(tick_count)
+    execution_name = build_execution_name(tick_count)
 
     # Build CLI self-invocation command
     command_root = resolve_async_cli_project_root(root)
