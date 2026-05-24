@@ -190,11 +190,17 @@ class TestModuleExports:
                 imported_names = set()
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ImportFrom):
-                        if node.module:
-                            # Check if importing from same module's subdirectory
-                            if node.module.startswith(f"vibe3.{module_name}"):
-                                for alias in node.names:
-                                    imported_names.add(alias.name)
+                        # Check absolute imports: from vibe3.<module>.<sub> import X
+                        if node.module and node.module.startswith(
+                            f"vibe3.{module_name}"
+                        ):
+                            for alias in node.names:
+                                # Use the exported name (handle 'as' aliases)
+                                imported_names.add(alias.asname or alias.name)
+                        # Check relative imports: from .submodule import X
+                        elif node.level > 0:
+                            for alias in node.names:
+                                imported_names.add(alias.asname or alias.name)
 
                 # Check for missing exports
                 missing = imported_names - all_names
@@ -218,7 +224,8 @@ class TestImportContract:
     ) -> None:
         """Verify that 'from vibe3.module import X' works for all modules.
 
-        This validates the __init__.py re-export contract.
+        This validates the __init__.py re-export contract by importing
+        one symbol from __all__ (if defined).
         """
         failures = []
 
@@ -228,12 +235,25 @@ class TestImportContract:
                 continue
 
             try:
-                # Try to import the module
+                # Import the module
                 full_module_name = f"vibe3.{module_name}"
-                importlib.import_module(full_module_name)
+                module = importlib.import_module(full_module_name)
+
+                # If module has __all__, test importing a symbol
+                if hasattr(module, "__all__") and module.__all__:
+                    # Pick the first symbol from __all__
+                    symbol_name = module.__all__[0]
+                    # Test: verify the symbol can be accessed via module
+                    # This validates that re-export works
+                    symbol = getattr(module, symbol_name)
+                    # Verify it's not None (would indicate missing re-export)
+                    if symbol is None:
+                        failures.append(f"{module_name}: symbol {symbol_name} is None")
 
             except ImportError as e:
                 failures.append(f"{module_name}: import failed - {e}")
+            except (AttributeError, IndexError) as e:
+                failures.append(f"{module_name}: __all__ error - {e}")
             except Exception as e:
                 failures.append(f"{module_name}: unexpected error - {e}")
 

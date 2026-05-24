@@ -103,6 +103,7 @@ class TestLayerDependencies:
                 # Look for imports of own submodules
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ImportFrom):
+                        # Check absolute imports: from vibe3.<module>.<sub> import ...
                         if node.module and node.module.startswith(
                             f"vibe3.{module_name}."
                         ):
@@ -116,6 +117,15 @@ class TestLayerDependencies:
                                     f"imports from own submodule {submodule} "
                                     "(potential circular dependency)"
                                 )
+                        # Check relative imports: from .<sub> import ...
+                        elif node.level > 0 and node.module:
+                            # Relative import in __init__.py indicates
+                            # importing from submodule
+                            violations.append(
+                                f"{module_name}/__init__.py: "
+                                f"relative import from .{node.module} "
+                                "(potential circular dependency)"
+                            )
 
             except (SyntaxError, OSError) as e:
                 violations.append(f"{module_name}/__init__.py: parse error - {e}")
