@@ -59,9 +59,12 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - 关键词：`Depends on`、`blocked by`、`基于`、`依赖`、`依赖 #`、`depends on #`
 
 若发现潜在依赖：
-1. 用 `gh issue view <issue_number> --json number,title,state` 确认目标 issue 是否存在且未关闭
-2. 若 issue 不存在或已关闭：提示用户该依赖已解决或无效，不必登记
-3. 若 issue 存在且 open：引导用户把依赖标准化写入 issue body 的 `## Dependencies` section
+1. 用 `gh issue view <issue_number> --json number,title,state` 确认目标 issue 状态
+2. 若 issue 不存在：
+   - 提示用户「依赖引用无效: #<number> 不存在，请检查编号是否正确」
+3. 若 issue 已关闭：
+   - 提示用户「依赖已满足: #<number> 已完成，不必重复登记」
+4. 若 issue 存在且 open：引导用户把依赖标准化写入 issue body 的 `## Dependencies` section
    - 格式：一行一条 `- Depends on #<id> — <短描述>`
    - 示例：`- Depends on #1097 — 统一依赖语义`
 
