@@ -10,6 +10,10 @@
 
 👉 **[docs/standards/v3/command-standard.md](v3/command-standard.md)**
 
+**项目全局导航与 Agent 协作入口请参考：**
+
+👉 **[AGENTS.md](../../AGENTS.md)**
+
 ---
 
 原因：
@@ -20,14 +24,13 @@
 
 其他参考入口：
 
-1. [docs/standards/v3/command-standard.md](v3/command-standard.md)
-2. [docs/standards/v3/handoff-store-standard.md](v3/handoff-store-standard.md)
-3. [docs/standards/issue-standard.md](issue-standard.md)
-4. [docs/standards/roadmap-label-management.md](roadmap-label-management.md)
+1. [docs/standards/v3/handoff-store-standard.md](v3/handoff-store-standard.md)
+2. [docs/standards/issue-standard.md](issue-standard.md)
+3. [docs/standards/roadmap-label-management.md](roadmap-label-management.md)
 
 语义收敛说明：
 
-- branch 生命周期优先直接使用 `git`
-- issue / PR / project 的远端读取与写入优先直接使用 `gh`
+- branch 生命周期管理：直接使用 `git`
+- issue / PR / project 远端操作：直接使用 `gh`
 - `vibe3` 负责本地 flow scene、issue 绑定、events 与 handoff 增强
-- `task` 保留为 execution bridge 语义，不再对应独立公共顶层 CLI
+- `task` 保留为 execution bridge 语义，通过 `vibe3 task status` 统一呈现
