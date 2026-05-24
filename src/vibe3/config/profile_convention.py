@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from vibe3.models.branch_convention import BranchConvention
+from vibe3.config.branch_convention import BranchConvention
 
 
 class ProfileConvention(BaseModel):
