@@ -94,12 +94,21 @@ class BlockedStateService:
 
         if issue_number:
             try:
-                self._io.write_label_state(
+                result = self._io.write_label_state(
                     issue_number=issue_number,
                     target_state=IssueState.BLOCKED,
                     actor=actor,
-                    force=True,
                 )
+                if result == "blocked":
+                    logger.bind(
+                        domain="blocked_state",
+                        action="block",
+                        branch=branch,
+                        issue_number=issue_number,
+                    ).warning(
+                        "Label state machine blocked transition to BLOCKED; "
+                        "label may be out of sync with body/DB"
+                    )
             except Exception as exc:
                 logger.bind(
                     domain="blocked_state",
@@ -158,12 +167,22 @@ class BlockedStateService:
 
         if issue_number:
             try:
-                self._io.write_label_state(
+                result = self._io.write_label_state(
                     issue_number=issue_number,
                     target_state=target_state,
                     actor=actor,
                     force=True,
                 )
+                if result == "blocked":
+                    logger.bind(
+                        domain="blocked_state",
+                        action="unblock",
+                        branch=branch,
+                        issue_number=issue_number,
+                    ).warning(
+                        "Label state machine blocked transition from BLOCKED; "
+                        "label may be out of sync with body/DB"
+                    )
             except Exception as exc:
                 logger.bind(
                     domain="blocked_state",

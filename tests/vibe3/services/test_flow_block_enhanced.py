@@ -88,7 +88,7 @@ class TestBlockFlowEnhanced:
 
         # Assert - Issue state transition (via confirm_issue_state)
         mock_label_service.confirm_issue_state.assert_called_once_with(
-            42, IssueState.BLOCKED, actor=actor, force=True
+            42, IssueState.BLOCKED, actor=actor, force=False
         )
 
         # Assert - Timeline comment added
@@ -165,7 +165,7 @@ class TestBlockFlowEnhanced:
 
         # Assert - Issue state transition still happens (via confirm_issue_state)
         mock_label_service.confirm_issue_state.assert_called_once_with(
-            42, IssueState.BLOCKED, actor=actor, force=True
+            42, IssueState.BLOCKED, actor=actor, force=False
         )
 
         # Assert - Timeline comment added with empty reason
