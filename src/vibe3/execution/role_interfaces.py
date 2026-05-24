@@ -7,12 +7,10 @@ role implementations.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Literal, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
-# Re-export SessionRole for use in Protocol
-SessionRole = Literal[
-    "manager", "planner", "executor", "reviewer", "supervisor", "governance"
-]
+# Import SessionRole from canonical source instead of redefining
+from vibe3.execution.session_service import SessionRole
 
 
 @runtime_checkable

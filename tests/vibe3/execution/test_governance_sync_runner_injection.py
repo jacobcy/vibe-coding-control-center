@@ -204,12 +204,13 @@ class TestGovernanceAsyncRunnerWithInjection:
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
                 lambda: mock_config,
             )
+            mock_store_ctx = MagicMock()
+            mock_store = MagicMock()
+            mock_store.__enter__ = MagicMock(return_value=mock_store_ctx)
+            mock_store.__exit__ = MagicMock(return_value=False)
             m.setattr(
                 "vibe3.execution.governance_sync_runner.get_store",
-                lambda: MagicMock(
-                    __enter__=lambda self: self,
-                    __exit__=lambda self, *args: False,
-                ),
+                lambda: mock_store,
             )
             m.setattr(
                 "vibe3.execution.governance_sync_runner.CodeagentBackend",
@@ -247,12 +248,13 @@ class TestGovernanceAsyncRunnerWithInjection:
                 "vibe3.execution.governance_sync_runner.load_orchestra_config",
                 lambda: mock_config,
             )
+            mock_store_ctx = MagicMock()
+            mock_store = MagicMock()
+            mock_store.__enter__ = MagicMock(return_value=mock_store_ctx)
+            mock_store.__exit__ = MagicMock(return_value=False)
             m.setattr(
                 "vibe3.execution.governance_sync_runner.get_store",
-                lambda: MagicMock(
-                    __enter__=lambda self: self,
-                    __exit__=lambda self, *args: False,
-                ),
+                lambda: mock_store,
             )
             m.setattr(
                 "vibe3.execution.governance_sync_runner.CodeagentBackend",

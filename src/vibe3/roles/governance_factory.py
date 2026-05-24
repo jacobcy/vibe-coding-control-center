@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from vibe3.roles.governance import (
     build_governance_execution_name,
@@ -11,8 +11,11 @@ from vibe3.roles.governance import (
     resolve_governance_options,
 )
 
+if TYPE_CHECKING:
+    from vibe3.execution.role_interfaces import GovernanceFunctions
 
-def build_default_governance_fns() -> Any:
+
+def build_default_governance_fns() -> GovernanceFunctions:
     """Build default GovernanceFunctions implementation.
 
     Returns an object that implements the GovernanceFunctions protocol

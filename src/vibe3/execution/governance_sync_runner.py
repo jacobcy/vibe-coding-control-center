@@ -7,7 +7,7 @@ ensuring API errors are captured for FailedGate threshold checking.
 from __future__ import annotations
 
 import os
-from typing import Any, Callable
+from typing import Callable
 
 from loguru import logger
 from typer import echo
@@ -47,57 +47,9 @@ def run_governance_sync(
     """
     # Default fallback via lazy import for backward compatibility
     if governance_fns is None:
-        from vibe3.roles.governance import (
-            build_governance_execution_name,
-            build_governance_snapshot_context,
-            render_governance_prompt,
-            resolve_governance_options,
-        )
+        from vibe3.roles.governance_factory import build_default_governance_fns
 
-        class _DefaultGovernanceFns:
-            """Default implementation wrapping governance role functions."""
-
-            def build_snapshot_context(
-                self,
-                snapshot: Any,
-                *,
-                config: Any = None,
-                tick_count: int = 0,
-                material_override: str | None = None,
-                **kwargs: Any,
-            ) -> dict[str, Any]:
-                return build_governance_snapshot_context(
-                    snapshot,
-                    config=config,
-                    tick_count=tick_count,
-                    material_override=material_override,
-                    **kwargs,
-                )
-
-            def render_prompt(
-                self,
-                config: Any,
-                snapshot_context: dict[str, Any],
-                *,
-                tick_count: int = 0,
-                material_override: str | None = None,
-                **kwargs: Any,
-            ) -> Any:
-                return render_governance_prompt(
-                    config,
-                    snapshot_context,
-                    tick_count=tick_count,
-                    material_override=material_override,
-                    **kwargs,
-                )
-
-            def resolve_options(self, config: Any) -> Any:
-                return resolve_governance_options(config)
-
-            def build_execution_name(self, tick_count: int) -> str:
-                return build_governance_execution_name(tick_count)
-
-        governance_fns = _DefaultGovernanceFns()
+        governance_fns = build_default_governance_fns()
 
     if append_event is None:
         from vibe3.orchestra.logging import append_governance_event as _ae
