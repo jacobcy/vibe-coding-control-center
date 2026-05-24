@@ -64,7 +64,7 @@ def _run_governance_scan_dry_run(material_override: str | None = None) -> None:
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
     from vibe3.orchestra.logging import append_governance_event
-    from vibe3.roles.governance import build_default_governance_fns
+    from vibe3.roles.governance_factory import build_default_governance_fns
 
     # Call internal governance runner with dry_run=True
     # This uses real snapshot instead of synthetic dry-run context

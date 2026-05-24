@@ -33,12 +33,11 @@ from vibe3.prompts.models import (
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
-from vibe3.services.label_utils import normalize_assignees, normalize_labels
-from vibe3.services.orchestra_status_service import (
-    IssueStatusEntry,
-    format_issue_runtime_line,
-    format_issue_summary_line,
-    is_running_issue,
+from vibe3.roles.governance_utils import (
+    build_broader_repo_entries,
+    build_issue_context,
+    find_material_in_catalog,
+    get_vibe_task_issue_numbers,
 )
 
 GOVERNANCE_ROLE = RoleDefinition(
@@ -74,67 +73,12 @@ _GOVERNANCE_RUNTIME_VARS = (
 )
 
 
-def _build_issue_context(
-    active_entries: tuple[Any, ...],
-    *,
-    server_running: bool,
-    active_flows: int,
-    active_worktrees: int,
-    queued_issues: tuple[int, ...],
-    circuit_breaker_state: str,
-    circuit_breaker_failures: int,
-    issue_scope_name: str,
-    scope_note: str,
-) -> dict[str, Any]:
-    active_count = len(active_entries)
-    running_entries = tuple(
-        entry for entry in active_entries if is_running_issue(entry)
-    )
-    suggested_entries = tuple(
-        entry for entry in active_entries if not is_running_issue(entry)
-    )
-    issue_list = (
-        "\n".join(format_issue_summary_line(entry) for entry in active_entries[:20])
-        or "(无活跃 issue)"
-    )
-    running_issue_details = (
-        "\n".join(format_issue_runtime_line(entry) for entry in running_entries[:20])
-        or "(无 running issues)"
-    )
-    suggested_issue_details = (
-        "\n".join(format_issue_runtime_line(entry) for entry in suggested_entries[:20])
-        or "(无建议 issue)"
-    )
-    truncated_note = (
-        f"\n(已截断，仅显示前 20 条 / 共 {active_count} 条活跃 issue)"
-        if active_count > 20
-        else ""
-    )
-    return {
-        "issue_scope_name": issue_scope_name,
-        "scope_note": scope_note,
-        "server_status": "running" if server_running else "stopped",
-        "active_count": active_count,
-        "active_flows": active_flows,
-        "active_worktrees": active_worktrees,
-        "running_issue_count": len(running_entries),
-        "queued_issue_count": len(queued_issues),
-        "suggested_issue_count": len(suggested_entries),
-        "circuit_breaker_state": circuit_breaker_state,
-        "circuit_breaker_failures": circuit_breaker_failures,
-        "issue_list": issue_list,
-        "running_issue_details": running_issue_details,
-        "suggested_issue_details": suggested_issue_details,
-        "truncated_note": truncated_note,
-    }
-
-
 def _resolve_governance_material(
     config: OrchestraConfig,
     tick_count: int,
 ) -> str:
     _ = config
-    catalog = _load_governance_material_catalog()
+    catalog = load_governance_material_catalog()
     return catalog[tick_count % len(catalog)].name
 
 
@@ -157,99 +101,6 @@ def load_governance_material_catalog() -> tuple[PromptMaterialSpec, ...]:
     return catalog
 
 
-# Backward compatibility alias
-_load_governance_material_catalog = load_governance_material_catalog
-
-
-def _is_doc_candidate(title: str, body: str, labels: list[str]) -> bool:
-    if any(label in {"type/docs", "scope/documentation"} for label in labels):
-        return True
-    normalized_title = title.lower()
-    keywords = ("doc", "docs", "documentation", "readme", "文档", "说明")
-    return any(keyword in normalized_title for keyword in keywords)
-
-
-def _build_broader_repo_entries(
-    config: OrchestraConfig,
-    *,
-    current_material: str,
-    github: GitHubClient | None = None,
-) -> tuple[Any, ...]:
-    github = github or GitHubClient()
-    raw_issues = github.list_issues(
-        limit=100,
-        state="open",
-        assignee=None,
-        repo=config.repo,
-    )
-    material_name = Path(current_material).name
-    entries: list[Any] = []
-    for item in raw_issues:
-        number = item.get("number")
-        title = item.get("title")
-        if not isinstance(number, int) or not isinstance(title, str):
-            continue
-
-        labels = normalize_labels(item.get("labels"))
-        if "supervisor" in labels or "vibe-task" in labels:
-            continue
-
-        assignees = normalize_assignees(item.get("assignees"))
-        is_assignee_issue = any(
-            assignee in config.get_manager_usernames() for assignee in assignees
-        )
-
-        if material_name == "roadmap-intake.md" and is_assignee_issue:
-            continue
-
-        body = str(item.get("body") or "")
-        if material_name == "cron-supervisor.md":
-            if is_assignee_issue or not _is_doc_candidate(title, body, labels):
-                continue
-
-        issue = IssueStatusEntry(
-            number=number,
-            title=title,
-            state=None,
-            assignee=assignees[0] if assignees else None,
-            has_flow=False,
-            flow_branch=None,
-            has_worktree=False,
-            worktree_path=None,
-            has_pr=False,
-            pr_number=None,
-            blocked_by=(),
-        )
-        entries.append(issue)
-    return tuple(entries)
-
-
-def _get_vibe_task_issue_numbers(
-    github: GitHubClient, config: OrchestraConfig
-) -> set[int]:
-    """Fetch issue numbers that have the vibe-task label.
-
-    Args:
-        github: GitHubClient instance for API calls
-        config: OrchestraConfig with repo information
-
-    Returns:
-        Set of issue numbers that have vibe-task label
-    """
-    vibe_task_issues = github.list_issues(
-        label="vibe-task",
-        state="all",
-        repo=config.repo,
-        limit=5000,  # Fetch all vibe-task issues to avoid truncation
-    )
-    numbers: set[int] = set()
-    for item in vibe_task_issues:
-        number = item.get("number")
-        if isinstance(number, int):
-            numbers.add(number)
-    return numbers
-
-
 def build_governance_snapshot_context(
     snapshot: Any,
     *,
@@ -262,7 +113,7 @@ def build_governance_snapshot_context(
     config = config or load_orchestra_config()
     if material_override:
         catalog = load_governance_material_catalog()
-        selected = _find_material_in_catalog(catalog, material_override)
+        selected = find_material_in_catalog(catalog, material_override)
         if not selected:
             raise ValueError(
                 f"Material '{material_override}' not found in governance catalog"
@@ -273,12 +124,12 @@ def build_governance_snapshot_context(
     material_name = Path(current_material).name
 
     if material_name == "roadmap-intake.md":
-        broader_entries = _build_broader_repo_entries(
+        broader_entries = build_broader_repo_entries(
             config,
             current_material=current_material,
             github=github,
         )
-        return _build_issue_context(
+        return build_issue_context(
             broader_entries,
             server_running=snapshot.server_running,
             active_flows=snapshot.active_flows,
@@ -294,12 +145,12 @@ def build_governance_snapshot_context(
         )
 
     if material_name == "cron-supervisor.md":
-        broader_entries = _build_broader_repo_entries(
+        broader_entries = build_broader_repo_entries(
             config,
             current_material=current_material,
             github=github,
         )
-        return _build_issue_context(
+        return build_issue_context(
             broader_entries,
             server_running=snapshot.server_running,
             active_flows=snapshot.active_flows,
@@ -316,7 +167,7 @@ def build_governance_snapshot_context(
 
     # Default: assignee-pool path
     github = github or GitHubClient()
-    vibe_task_numbers = _get_vibe_task_issue_numbers(github, config)
+    vibe_task_numbers = get_vibe_task_issue_numbers(github, config)
 
     # Filter out vibe-task labeled issues from the active issues
     active_entries = tuple(snapshot.active_issues)
@@ -330,7 +181,7 @@ def build_governance_snapshot_context(
             f"Filtered {skipped_count} vibe-task labeled issues from governance scan"
         )
 
-    return _build_issue_context(
+    return build_issue_context(
         filtered_entries,
         server_running=snapshot.server_running,
         active_flows=snapshot.active_flows,
@@ -360,48 +211,6 @@ def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:
     return registry
 
 
-def _normalize_material_name(material_name: str) -> str:
-    """Normalize material name to canonical form for comparison.
-
-    Converts various input formats to canonical form:
-    - "roadmap-intake" → "roadmap-intake"
-    - "roadmap-intake.md" → "roadmap-intake"
-    - "supervisor/governance/roadmap-intake" → "roadmap-intake"
-    - "supervisor/governance/roadmap-intake.md" → "roadmap-intake"
-    """
-    path = Path(material_name)
-    # Get the filename without directory
-    stem = path.stem if path.suffix == ".md" else path.name
-    # If stem still has .md suffix, remove it
-    if stem.endswith(".md"):
-        stem = stem[:-3]
-    return stem
-
-
-def _find_material_in_catalog(
-    catalog: tuple[PromptMaterialSpec, ...], material_override: str
-) -> PromptMaterialSpec | None:
-    """Find material in catalog using flexible matching.
-
-    Attempts multiple matching strategies:
-    1. Exact name match (for advanced users who provide full path)
-    2. Normalized match (handles partial names, missing suffixes, etc.)
-    """
-    # Strategy 1: Exact match
-    for material in catalog:
-        if material.name == material_override:
-            return material
-
-    # Strategy 2: Normalized match
-    normalized_target = _normalize_material_name(material_override)
-    for material in catalog:
-        normalized_catalog_name = _normalize_material_name(material.name)
-        if normalized_catalog_name == normalized_target:
-            return material
-
-    return None
-
-
 def build_governance_recipe(
     config: OrchestraConfig, tick_count: int = 0, material_override: str | None = None
 ) -> PromptRecipe:
@@ -416,10 +225,12 @@ def build_governance_recipe(
     # Override material if specified, otherwise use tick-based rotation
     if material_override:
         # Find the matching material in catalog using flexible matching
-        current = _find_material_in_catalog(catalog, material_override)
+        current = find_material_in_catalog(catalog, material_override)
         if not current:
             # Generate helpful error with available materials
-            available = sorted(set(_normalize_material_name(m.name) for m in catalog))
+            from vibe3.roles.governance_utils import normalize_material_name
+
+            available = sorted(set(normalize_material_name(m.name) for m in catalog))
             raise ValueError(
                 f"Material '{material_override}' not found in catalog.\n"
                 f"Available materials: {', '.join(available)}\n"
@@ -572,56 +383,3 @@ def _write_dry_run_plan(
     ) as handle:
         handle.write(plan_content)
         return Path(handle.name)
-
-
-def build_default_governance_fns() -> Any:
-    """Build default GovernanceFunctions implementation.
-
-    Returns an object that implements the GovernanceFunctions protocol
-    by wrapping the concrete governance role functions.
-    """
-
-    class _DefaultGovernanceFns:
-        """Default implementation wrapping governance role functions."""
-
-        def build_snapshot_context(
-            self,
-            snapshot: Any,
-            *,
-            config: Any = None,
-            tick_count: int = 0,
-            material_override: str | None = None,
-            **kwargs: Any,
-        ) -> dict[str, Any]:
-            return build_governance_snapshot_context(
-                snapshot,
-                config=config,
-                tick_count=tick_count,
-                material_override=material_override,
-                **kwargs,
-            )
-
-        def render_prompt(
-            self,
-            config: Any,
-            snapshot_context: dict[str, Any],
-            *,
-            tick_count: int = 0,
-            material_override: str | None = None,
-            **kwargs: Any,
-        ) -> Any:
-            return render_governance_prompt(
-                config,
-                snapshot_context,
-                tick_count=tick_count,
-                material_override=material_override,
-                **kwargs,
-            )
-
-        def resolve_options(self, config: Any) -> Any:
-            return resolve_governance_options(config)
-
-        def build_execution_name(self, tick_count: int) -> str:
-            return build_governance_execution_name(tick_count)
-
-    return _DefaultGovernanceFns()
