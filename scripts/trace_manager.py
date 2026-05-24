@@ -11,8 +11,16 @@
 import argparse
 import re
 from pathlib import Path
+from typing import TypedDict
 
-LAYER_CONFIG = {
+
+class LayerConfig(TypedDict):
+    dir: str
+    suffixes: list[str]
+    layer_name: str
+
+
+LAYER_CONFIG: dict[str, LayerConfig] = {
     "services": {
         "dir": "services",
         "suffixes": ["Service", "Usecase"],
@@ -71,7 +79,9 @@ LAYER_CONFIG = {
 }
 
 
-def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) -> list[str]:
+def add_trace_decorator(
+    lines: list[str], layer_name: str, suffixes: list[str]
+) -> list[str]:
     """给指定模块公共方法添加 trace 装饰器。"""
     new_lines = []
     i = 0
@@ -84,7 +94,9 @@ def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) 
     while i < len(lines):
         line = lines[i]
 
-        if not import_inserted and (line.startswith("from vibe3") or line.startswith("import ")):
+        if not import_inserted and (
+            line.startswith("from vibe3") or line.startswith("import ")
+        ):
             if line.startswith("from vibe3"):
                 new_lines.append(line)
                 j = i + 1
@@ -106,13 +118,15 @@ def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) 
                 while j < len(lines) and lines[j].startswith("import "):
                     new_lines.append(lines[j])
                     j += 1
-            new_lines.append("from vibe3.observability.trace_method import trace_method")
+            new_lines.append(
+                "from vibe3.observability.trace_method import trace_method"
+            )
             new_lines.append("")
             i = j
             import_inserted = True
             continue
 
-        class_match = re.match(r'^class (\w+).*:', line)
+        class_match = re.match(r"^class (\w+).*:", line)
         if class_match:
             class_name = class_match.group(1)
 
@@ -126,17 +140,17 @@ def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) 
 
             while i < len(lines):
                 current_line = lines[i]
-                method_match = re.match(r'^(\s*)def (\w+)\(', current_line)
+                method_match = re.match(r"^(\s*)def (\w+)\(", current_line)
 
                 if method_match:
                     indent, method_name = method_match.groups()
 
-                    if i > 0 and '@' in lines[i - 1]:
+                    if i > 0 and "@" in lines[i - 1]:
                         new_lines.append(current_line)
                         i += 1
                         continue
 
-                    if method_name.startswith('_'):
+                    if method_name.startswith("_"):
                         new_lines.append(current_line)
                         i += 1
                         continue
@@ -149,7 +163,7 @@ def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) 
                     i += 1
                     continue
 
-                if re.match(r'^class \w+', current_line) or i == len(lines) - 1:
+                if re.match(r"^class \w+", current_line) or i == len(lines) - 1:
                     break
 
                 new_lines.append(current_line)
@@ -173,7 +187,7 @@ def remove_trace_decorator(lines: list[str]) -> list[str]:
             i += 1
             continue
 
-        if re.match(r'^\s*@trace_method\(', line):
+        if re.match(r"^\s*@trace_method\(", line):
             paren_count = line.count("(") - line.count(")")
             i += 1
             while i < len(lines) and paren_count > 0:
@@ -206,7 +220,7 @@ def process_file(
 
     if dry_run:
         print(f"  [DRY RUN] 会修改: {file_path.name}")
-        for idx, (old, new) in enumerate(zip(lines, new_lines)):
+        for old, new in zip(lines, new_lines):
             if old != new:
                 if mode == "add" and "@trace_method" in new:
                     print(f"    + {new}")
@@ -220,9 +234,7 @@ def process_file(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="管理不同模块的 @trace_method 装饰器"
-    )
+    parser = argparse.ArgumentParser(description="管理不同模块的 @trace_method 装饰器")
     parser.add_argument("--add", action="store_true", help="插入装饰器")
     parser.add_argument("--remove", action="store_true", help="删除装饰器")
     parser.add_argument(
