@@ -44,7 +44,7 @@ Examples:
 
 _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
 _TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+    bool, typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)")
 ]
 
 

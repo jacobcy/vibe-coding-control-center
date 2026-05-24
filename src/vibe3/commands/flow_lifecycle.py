@@ -23,7 +23,7 @@ def blocked(
         int | None, typer.Option("--task", help="Dependency issue number")
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Mark flow as blocked.

@@ -88,7 +88,7 @@ def register_create_command(app: typer.Typer) -> None:
             ),
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+            bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")

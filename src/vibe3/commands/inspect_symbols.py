@@ -32,7 +32,8 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--quiet", help="Suppress next step suggestions")
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+            bool,
+            typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
         ] = False,
     ) -> None:
         """Show symbol references with detailed locations.

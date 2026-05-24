@@ -77,7 +77,7 @@ def trace_method(
             # Check if stderr is a terminal for color output
             use_color = sys.stderr.isatty()
 
-            start_time = time.time()
+            start_time = time.perf_counter()
 
             # Print entry
             call_indicator = (
@@ -87,7 +87,7 @@ def trace_method(
 
             try:
                 result = func(*args, **kwargs)
-                elapsed = time.time() - start_time
+                elapsed = time.perf_counter() - start_time
 
                 # Print exit
                 return_indicator = (
@@ -100,7 +100,7 @@ def trace_method(
                 )
                 return result
             except Exception as e:
-                elapsed = time.time() - start_time
+                elapsed = time.perf_counter() - start_time
 
                 # Print error
                 error_indicator = (

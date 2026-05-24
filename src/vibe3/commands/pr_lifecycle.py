@@ -67,7 +67,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             bool, typer.Option("-y", "--yes", help="自动确认并发布 PR")
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+            bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")

@@ -10,6 +10,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.commands.command_options import FormatOption, VerboseOption
+from vibe3.commands.common import enable_method_trace
 from vibe3.commands.handoff_render import (
     _render_handoff_events,
 )
@@ -102,10 +103,13 @@ def show(
         typer.Option("--branch", help="Branch for canonical ref resolution"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
+    if trace:
+        enable_method_trace()
+
     from vibe3.services.path_helpers import resolve_handoff_target
 
     if target is None:
@@ -150,7 +154,7 @@ def status(
     ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
     output_format: FormatOption = "table",
     verbose: VerboseOption = False,
@@ -164,6 +168,9 @@ def status(
     ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
+    if trace:
+        enable_method_trace()
+
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(

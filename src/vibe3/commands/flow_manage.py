@@ -10,6 +10,7 @@ from vibe3.commands.command_options import (
     FormatOption,
     TraceOption,
 )
+from vibe3.commands.common import enable_method_trace
 from vibe3.models.flow import IssueLink
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -156,6 +157,9 @@ def update(
     the corresponding branch doesn't exist in git, automatically creates the
     branch before registering flow.
     """
+    if trace:
+        enable_method_trace()
+
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -278,6 +282,9 @@ def bind(
     ] = False,
 ) -> None:
     """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
+    if trace:
+        enable_method_trace()
+
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -432,6 +439,9 @@ def restore_flow(
     trace: TraceOption = False,
 ) -> None:
     """Restore a soft-deleted flow."""
+    if trace:
+        enable_method_trace()
+
     branch = branch_opt or branch_arg
     if branch is None:
         typer.echo("Error: Branch is required for flow restore", err=True)

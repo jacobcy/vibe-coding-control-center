@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
+from vibe3.commands.common import enable_method_trace
 from vibe3.models.verdict_types import VerdictValue
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.handoff_service import HandoffService
@@ -23,6 +24,9 @@ def _record_handoff_reference(
     branch: str | None = None,
     **extra_kw: object,
 ) -> None:
+    if trace:
+        enable_method_trace()
+
     specific_ref_key = f"{ref_label.lower()}_ref"
     logger.bind(
         command=command,
@@ -49,10 +53,12 @@ def init(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Initialize handoff file for a branch."""
+    if trace:
+        enable_method_trace()
 
     target_branch = resolve_branch_arg(branch)
 
@@ -90,10 +96,12 @@ def append(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Append lightweight update to handoff file for a branch."""
+    if trace:
+        enable_method_trace()
 
     target_branch = resolve_branch_arg(branch)
 
@@ -128,7 +136,7 @@ def plan(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record plan handoff for a branch."""
@@ -164,7 +172,7 @@ def report(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record report handoff for a branch."""
@@ -203,7 +211,7 @@ def indicate(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record manager indicate handoff for a branch.
@@ -243,7 +251,7 @@ def audit(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record audit handoff for a branch."""
@@ -269,10 +277,13 @@ def next_step(
     ] = None,
     actor: Annotated[str | None, typer.Option("--actor", "-a")] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Write next step to flow state for a target branch."""
+    if trace:
+        enable_method_trace()
+
     target_branch = resolve_branch_arg(branch)
     service = HandoffService()
 
@@ -307,7 +318,7 @@ def verdict(
         str | None, typer.Argument(help="Target branch (current if not specified)")
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Write verdict to handoff chain and flow state.
@@ -328,6 +339,8 @@ def verdict(
         vibe3 handoff verdict PASS --reason "Code looks good"
         vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
     """
+    if trace:
+        enable_method_trace()
 
     target_branch = resolve_branch_arg(branch)
 
