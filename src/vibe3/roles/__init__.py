@@ -272,3 +272,17 @@ __all__ = [
     "render_governance_prompt",
     "resolve_governance_options",
 ]
+
+# Consistency check: ensure __all__ matches eager + lazy symbols
+# This catches drift when adding/renaming symbols during development
+_eager_exports = {
+    "IssueRoleSyncSpec",
+    "RoleDefinition",
+    "TriggerName",
+    "TriggerableRoleDefinition",
+}
+_lazy_exports = set(_LAZY_IMPORTS.keys())
+assert set(__all__) == _eager_exports | _lazy_exports, (
+    f"Export list mismatch: __all__ ({len(__all__)} symbols) != "
+    f"eager ({len(_eager_exports)}) + lazy ({len(_lazy_exports)})"
+)
