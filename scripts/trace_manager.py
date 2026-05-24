@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Trace Manager - 双向管理不同层的 @trace_method 装饰器。
+"""Trace Manager - 双向管理不同模块的 @trace_method 装饰器。
 
 使用：
-    uv run python scripts/trace_manager.py --add --layer services --dry-run
-    uv run python scripts/trace_manager.py --add --layer clients
-    uv run python scripts/trace_manager.py --add --layer all
-    uv run python scripts/trace_manager.py --remove --layer services
+    uv run python scripts/trace_manager.py --add --module services --dry-run
+    uv run python scripts/trace_manager.py --add --module clients
+    uv run python scripts/trace_manager.py --add --module all
+    uv run python scripts/trace_manager.py --remove --module services
 """
 
 import argparse
@@ -23,11 +23,36 @@ LAYER_CONFIG = {
         "suffixes": ["Client", "Repo", "Ops"],
         "layer_name": "client",
     },
+    "agents": {
+        "dir": "agents",
+        "suffixes": ["Agent", "Runner", "Executor"],
+        "layer_name": "agent",
+    },
+    "analysis": {
+        "dir": "analysis",
+        "suffixes": ["Analyzer", "Service"],
+        "layer_name": "analysis",
+    },
+    "orchestra": {
+        "dir": "orchestra",
+        "suffixes": ["Manager", "Service", "Scheduler"],
+        "layer_name": "orchestra",
+    },
+    "execution": {
+        "dir": "execution",
+        "suffixes": ["Executor", "Runner", "Handler"],
+        "layer_name": "execution",
+    },
+    "adapters": {
+        "dir": "adapters",
+        "suffixes": ["Adapter", "Wrapper"],
+        "layer_name": "adapter",
+    },
 }
 
 
 def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) -> list[str]:
-    """给指定层公共方法添加 trace 装饰器。"""
+    """给指定模块公共方法添加 trace 装饰器。"""
     new_lines = []
     i = 0
     has_trace_import = any(
@@ -160,15 +185,15 @@ def process_file(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="管理不同层的 @trace_method 装饰器"
+        description="管理不同模块的 @trace_method 装饰器"
     )
     parser.add_argument("--add", action="store_true", help="插入装饰器")
     parser.add_argument("--remove", action="store_true", help="删除装饰器")
     parser.add_argument(
-        "--layer",
-        choices=["services", "clients", "all"],
+        "--module",
+        choices=list(LAYER_CONFIG.keys()) + ["all"],
         default="services",
-        help="目标层: services, clients, 或 all (默认: services)",
+        help=f"目标模块: {', '.join(LAYER_CONFIG.keys())}, 或 all (默认: services)",
     )
     parser.add_argument("--dry-run", action="store_true", help="只预览，不修改文件")
     args = parser.parse_args()
@@ -181,18 +206,18 @@ def main() -> None:
     mode = "add" if args.add else "remove"
     base_path = Path(__file__).parent.parent / "src" / "vibe3"
 
-    layers = list(LAYER_CONFIG.keys()) if args.layer == "all" else [args.layer]
+    modules = list(LAYER_CONFIG.keys()) if args.module == "all" else [args.module]
 
     total_modified = 0
-    for layer in layers:
-        config = LAYER_CONFIG[layer]
+    for module in modules:
+        config = LAYER_CONFIG[module]
         target_dir = base_path / config["dir"]
 
         if not target_dir.exists():
             print(f"❌ 目录不存在: {target_dir}")
             continue
 
-        print(f"\n处理层: {layer} ({config['dir']}/)")
+        print(f"\n处理模块: {module} ({config['dir']}/)")
         modified_count = 0
         for py_file in target_dir.glob("*.py"):
             if py_file.name in ["__init__.py", "protocols.py"]:
