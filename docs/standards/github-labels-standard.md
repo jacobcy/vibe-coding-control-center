@@ -122,23 +122,22 @@
 
 **职责**: 让 GitHub 视图能通过标签快速识别"曾被 vibe3 flow bind 管理的 issue"。
 
-**映射规则**:
-- 由 `vibe3 flow bind` 在 issue 进入 flow 时自动添加（副作用）。
-- 不作为 governance 的判定依据。
-- 当前 governance 使用 SQLite `flow_issue_links` 表作为 assignee pool 的真源。
-- `state/*` 标签为可选镜像，flow 状态以 SQLite `flow_state` 表为准。
-
+**真源与映射规则**:
+- **生命周期绑定**：由 `vibe3 flow bind` 在 issue 进入 flow 时自动添加；在 `vibe3 flow unbind` 或 flow 销毁时自动移除。
+- **单向镜像**：标签仅作为 SQLite `flow_issue_links` 真源记录的远端展示。
+- **非控制位**：不作为 governance 或执行引擎的判定依据。
+- **手动操作后果**：手动添加/移除此标签不会改变 issue 的执行角色。系统在下次同步时会尝试根据真源状态纠正此标签。
 
 ### 3.4 编排状态标签语义 (state/*)
 
 **语义**: 说明"当前处于 flow 循环的哪一阶段"
 
 **使用原则**:
-- 编排状态标签是多 agent 协作的远端状态机真源
-- 一个 issue 任一时刻只能有一个 `state/*` 标签
-- 状态变更优先发生在 issue 上，而不是 Project 字段上
-
-#### 状态集合
+- **状态镜像**：编排状态标签是多 agent 协作的远端状态机镜像。
+- **真源位置**：本地 SQLite `flow_state` 表是执行状态的绝对真源。
+- **自动同步**：由 `vibe3` 在状态迁移事件发生时自动更新 GitHub 标签。
+- **单值约束**：一个 issue 任一时刻只能有一个 `state/*` 标签。
+- **同步方向**：状态变更应通过 flow 命令触发（如 `vibe3 flow move`），然后由系统同步到标签，而非通过修改标签来改变执行态。
 
 | 标签名称 | 语义 | 使用场景 |
 |---------|------|----------|
