@@ -1,10 +1,13 @@
-"""PR Scoring service - 根据多维度指标计算 PR 风险分数."""
+"""PR Scoring service - 根据多维度指标计算 PR 风险分数.
 
-from enum import Enum
+This module provides PR scoring logic. The data models (PRDimensions, RiskLevel,
+RiskScore) are defined in vibe3.analysis.pr_scoring to avoid bidirectional
+dependencies between analysis and services layers.
+"""
 
 from loguru import logger
-from pydantic import BaseModel
 
+from vibe3.analysis.pr_scoring import PRDimensions, RiskLevel, RiskScore
 from vibe3.config.loader import get_config
 from vibe3.exceptions import VibeError
 
@@ -14,36 +17,6 @@ class PRScoringError(VibeError):
 
     def __init__(self, details: str) -> None:
         super().__init__(f"PR scoring failed: {details}", recoverable=False)
-
-
-class RiskLevel(str, Enum):
-    """风险等级."""
-
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-    CRITICAL = "CRITICAL"
-
-
-class PRDimensions(BaseModel):
-    """PR 评分维度输入."""
-
-    changed_lines: int = 0
-    changed_files: int = 0
-    impacted_modules: int = 0
-    critical_path_touch: bool = False
-    public_api_touch: bool = False
-    cross_module_symbol_change: bool = False
-    codex_verdict: str | None = None  # "MAJOR" | "CRITICAL" | None
-
-
-class RiskScore(BaseModel):
-    """PR 风险评分结果."""
-
-    score: int
-    level: RiskLevel
-    breakdown: dict[str, int]
-    block: bool
 
 
 def _format_trigger_factor(key: str, points: int) -> str:
@@ -245,3 +218,14 @@ def generate_score_report(dimensions: PRDimensions) -> dict[str, object]:
     }
     log.bind(score=score.score, level=score.level).success("Score report generated")
     return report
+
+
+__all__ = [
+    "PRDimensions",
+    "PRScoringError",
+    "RiskLevel",
+    "RiskScore",
+    "calculate_risk_score",
+    "determine_risk_level",
+    "generate_score_report",
+]

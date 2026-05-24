@@ -12,12 +12,13 @@ from typing import Union
 
 from loguru import logger
 
-from vibe3.analysis import dag_service
+from vibe3.analysis import dag_service as dag_service_module
 from vibe3.analysis.change_scope_service import (
     classify_changed_files,
     collect_changed_symbols,
     count_changed_lines,
 )
+from vibe3.analysis.pr_scoring import PRDimensions
 from vibe3.analysis.serena_service import SerenaService
 from vibe3.config.loader import get_config
 from vibe3.models.change_source import (
@@ -26,7 +27,7 @@ from vibe3.models.change_source import (
     PRSource,
     UncommittedSource,
 )
-from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
+from vibe3.services.pr_scoring_service import generate_score_report
 
 
 def build_change_analysis(source_type: str, identifier: str) -> dict[str, object]:
@@ -104,7 +105,7 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
             total_symbols=sum(len(syms) for syms in changed_symbols_by_file.values()),
         ).info("Extracted changed symbols from diff")
 
-        dag = dag_service.expand_impacted_modules(changed_files)
+        dag = dag_service_module.expand_impacted_modules(changed_files)
         changed_lines = count_changed_lines(git_client.get_diff(source))
         if untracked_files:
             for file in changed_files:
