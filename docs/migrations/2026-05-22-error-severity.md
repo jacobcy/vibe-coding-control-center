@@ -18,28 +18,38 @@ may skip migration if they already have `migration_version=1` in `schema_meta`.
 
 Run migration manually for existing databases:
 
+V3 uses a single `handoff.db` database stored under the git common directory,
+which is shared across all worktrees.
+
 ```python
+import subprocess
 import sqlite3
 from vibe3.clients.sqlite_schema import init_schema
 
-# Migrate all databases
-for db_name in ['vibe.db', 'handoff.db']:
-    db_path = f'/path/to/.git/vibe3/{db_name}'
-    conn = sqlite3.connect(db_path)
-    init_schema(conn)
+# Get the shared database path (worktree-aware)
+git_common_dir = subprocess.check_output(
+    ["git", "rev-parse", "--git-common-dir"], text=True
+).strip()
+db_path = f"{git_common_dir}/vibe3/handoff.db"
+
+conn = sqlite3.connect(db_path)
+init_schema(conn)
 ```
 
 ## Verification
 
 ```bash
+# Set database path (worktree-aware)
+DB_PATH="$(git rev-parse --git-common-dir)/vibe3/handoff.db"
+
 # Check error_log schema
-sqlite3 .git/vibe3/vibe.db "PRAGMA table_info(error_log)"
+sqlite3 "$DB_PATH" "PRAGMA table_info(error_log)"
 
 # Should include severity field:
 # 7|severity|TEXT|0||0
 
 # Check migration version
-sqlite3 .git/vibe3/vibe.db "SELECT * FROM schema_meta"
+sqlite3 "$DB_PATH" "SELECT * FROM schema_meta"
 
 # Should include:
 # migration_version|1
