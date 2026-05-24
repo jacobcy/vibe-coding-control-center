@@ -6,9 +6,13 @@
 
 ## 📖 现行真源 (Current Truth)
 
-**所有 Vibe 3.0 操作指南请以此文档为准：**
+**所有 Vibe 3.0 操作指南与命令规范请以此文档为准：**
 
 👉 **[docs/standards/v3/command-standard.md](v3/command-standard.md)**
+
+**项目全局导航与 Agent 协作入口请参考：**
+
+👉 **[AGENTS.md](../../AGENTS.md)**
 
 ---
 
@@ -21,15 +25,14 @@
 其他参考入口：
 
 1. [README.md](../README.md)
-2. [AGENTS.md](../../AGENTS.md)
-3. [docs/standards/v3/handoff-store-standard.md](v3/handoff-store-standard.md)
-4. [docs/standards/issue-standard.md](issue-standard.md)
-5. [docs/standards/roadmap-label-management.md](roadmap-label-management.md)
+2. [docs/standards/v3/handoff-store-standard.md](v3/handoff-store-standard.md)
+3. [docs/standards/issue-standard.md](issue-standard.md)
+4. [docs/standards/roadmap-label-management.md](roadmap-label-management.md)
 
 当前推荐操作模型：
 
-- branch 创建、切换、merge、删除：直接使用 `git`
-- issue / PR / project 的远端读取与写入：直接使用 `gh`
+- branch 生命周期管理：直接使用 `git`
+- issue / PR / project 远端操作：直接使用 `gh`
 - 本地 flow 注册与绑定：使用 `vibe3 flow update`、`vibe3 flow bind`
-- 本地现场读取：使用 `vibe3 flow show`、`vibe3 flow status`、`vibe3 task status`
-- 本地协作增强：使用 `vibe3 handoff`
+- 本地现场与任务状态读取：使用 `vibe3 task status`、`vibe3 flow show`
+- 本地协作与交接增强：使用 `vibe3 handoff`
