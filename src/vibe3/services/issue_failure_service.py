@@ -83,17 +83,6 @@ def mark_issue(
         return
 
     if action == "fail":
-        from vibe3.exceptions.error_codes import E_EXEC_FLOW_FAILURE
-        from vibe3.services.error_tracking_service import ErrorTrackingService
-
-        error_tracking = ErrorTrackingService.get_instance(store=store)
-        error_tracking.record_error(
-            error_code=E_EXEC_FLOW_FAILURE,
-            error_message=reason,
-            branch=branch,
-            issue_number=issue_number,
-        )
-
         timeline = FlowTimelineService(store=store)
         timeline.record_timeline_event(
             branch=branch,
