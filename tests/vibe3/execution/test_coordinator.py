@@ -1,5 +1,6 @@
 """Tests for execution coordinator."""
 
+import dataclasses
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -520,6 +521,101 @@ def test_sync_failure_appends_orchestra_event(mock_dependencies):
     assert result.launched is False
     assert result.reason_code == "launch_failed"
     assert "sync execution failed" in mock_event.call_args.args[1]
+
+
+def test_no_async_env_var_overrides_mode_to_sync(mock_dependencies, monkeypatch):
+    """VIBE3_NO_ASYNC=1 should override async mode to sync for prompt-based requests."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+    )
+
+    # Set the env var
+    monkeypatch.setenv("VIBE3_NO_ASYNC", "1")
+
+    # Create an async request with prompt and options
+    request = ExecutionRequest(
+        role="planner",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-planner-issue-42",
+        prompt="make a plan",
+        options=MagicMock(),
+        mode="async",  # Should be overridden to sync
+        refs={"task": "plan issue #42"},
+        actor="agent:planner",
+    )
+
+    # Mock CodeagentExecutionService (sync path)
+    with patch(
+        "vibe3.execution.coordinator.CodeagentExecutionService"
+    ) as mock_service_cls:
+        mock_result = MagicMock(
+            success=True,
+            stdout="plan output",
+            stderr="",
+        )
+        mock_service = mock_service_cls.return_value
+        mock_service.execute_sync_request.return_value = mock_result
+
+        result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    # Verify sync path was used
+    # The coordinator modifies the request to mode='sync' before passing to
+    # execute_sync_request
+    expected_request = dataclasses.replace(request, mode="sync")
+    mock_service.execute_sync_request.assert_called_once_with(
+        expected_request, cwd=None
+    )
+
+
+def test_no_async_env_var_ignored_without_prompt(mock_dependencies, monkeypatch):
+    """VIBE3_NO_ASYNC=1 should not override mode for cmd-based requests."""
+    config, store, backend, capacity = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+    )
+    coordinator.registry.reserve = MagicMock(return_value=123)
+    coordinator.registry.mark_started = MagicMock()
+
+    # Set the env var
+    monkeypatch.setenv("VIBE3_NO_ASYNC", "1")
+
+    # Create an async request with only cmd (no prompt/options)
+    handle = MagicMock()
+    handle.tmux_session = "test-session-456"
+    handle.log_path = Path("/tmp/test.log")
+
+    # Mock the async launcher by setting _async_launcher directly
+    mock_start = MagicMock(return_value=handle)
+    coordinator._async_launcher = mock_start
+
+    request = ExecutionRequest(
+        role="planner",
+        target_branch="task/issue-42",
+        target_id=42,
+        execution_name="vibe3-planner-issue-42",
+        cmd=["echo", "hello"],  # Only cmd, no prompt/options
+        cwd="/tmp/wt",
+        env={"FOO": "bar"},
+    )
+
+    result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    # Verify async path was used (start_async_command called)
+    mock_start.assert_called_once()
 
 
 @patch("vibe3.execution.coordinator.WorktreeManager")
