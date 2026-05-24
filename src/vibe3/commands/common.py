@@ -5,16 +5,15 @@ import os
 import typer
 
 from vibe3.commands.check_support import execute_check_mode
-from vibe3.observability.logger import setup_logging
 
 
 def enable_method_trace() -> None:
     """Enable method-level tracing via @trace_method decorator.
 
-    Sets VIBE3_TRACE=1 environment variable and configures DEBUG logging.
+    Sets VIBE3_TRACE=1 environment variable.
+    Use -v or -vv separately to control log verbosity.
     """
     os.environ["VIBE3_TRACE"] = "1"
-    setup_logging(verbose=2)
 
 
 def run_full_check_shortcut() -> None:
