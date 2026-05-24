@@ -514,3 +514,98 @@ def test_migration_backfills_severity_column(tmp_path: Path) -> None:
     assert rows[2] == ("E_EXEC_NO_OUTPUT", "WARNING")
 
     conn.close()
+
+
+# Tests for get_all_errors_status() - Issue #1331
+
+
+def test_get_all_errors_status_total_includes_unknown_severity(
+    temp_store: SQLiteClient,
+) -> None:
+    """get_all_errors_status() should count ALL severity values in total_errors."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Insert known severity errors via service
+    ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT", "Error 1", severity=ErrorSeverity.ERROR
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_EXEC_NO_OUTPUT", "Warning 1", severity=ErrorSeverity.WARNING
+    )
+
+    # Insert unknown severity error via direct SQL (simulating future severity values)
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute("""
+            INSERT INTO error_log (tick_id, error_code, error_message, severity)
+            VALUES (1, 'E_CUSTOM', 'Info severity error', 'INFO')
+        """)
+        conn.commit()
+
+    # Call get_all_errors_status via the query function
+    from vibe3.services.error_tracking_queries import get_all_errors_status
+
+    status = get_all_errors_status(temp_store.db_path)
+
+    # total_errors should include ALL severity values
+    assert status["total_errors"] == 3  # 1 ERROR + 1 WARNING + 1 INFO
+    assert status["error_count"] == 1
+    assert status["warning_count"] == 1
+    # Unknown severity should be surfaced
+    assert status["unknown_severity_counts"] == {"INFO": 1}
+
+
+def test_get_all_errors_status_null_severity_defaults_to_error(
+    temp_store: SQLiteClient,
+) -> None:
+    """NULL severity should be counted under ERROR (existing behavior preserved)."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    # Insert row with NULL severity via direct SQL
+    with sqlite3.connect(temp_store.db_path) as conn:
+        conn.execute("""
+            INSERT INTO error_log (tick_id, error_code, error_message, severity)
+            VALUES (1, 'E_CUSTOM', 'Null severity', NULL)
+        """)
+        conn.commit()
+
+    from vibe3.services.error_tracking_queries import get_all_errors_status
+
+    status = get_all_errors_status(temp_store.db_path)
+
+    # NULL severity should be treated as ERROR
+    assert status["total_errors"] == 1
+    assert status["error_count"] == 1
+    assert status["unknown_severity_counts"] == {}
+
+
+def test_get_all_errors_status_no_unknown_severity_returns_empty_dict(
+    temp_store: SQLiteClient,
+) -> None:
+    """When no unknown severities exist, unknown_severity_counts should be empty."""
+    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+
+    from vibe3.exceptions.error_severity import ErrorSeverity
+
+    # Insert only known severity errors
+    ErrorTrackingService._instance.record_error(
+        "E_MODEL_NOT_FOUND", "Critical", severity=ErrorSeverity.CRITICAL
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_API_RATE_LIMIT", "Error", severity=ErrorSeverity.ERROR
+    )
+    ErrorTrackingService._instance.record_error(
+        "E_EXEC_NO_OUTPUT", "Warning", severity=ErrorSeverity.WARNING
+    )
+
+    from vibe3.services.error_tracking_queries import get_all_errors_status
+
+    status = get_all_errors_status(temp_store.db_path)
+
+    # All severities are known
+    assert status["total_errors"] == 3
+    assert status["critical_count"] == 1
+    assert status["error_count"] == 1
+    assert status["warning_count"] == 1
+    assert status["unknown_severity_counts"] == {}
