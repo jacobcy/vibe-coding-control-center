@@ -109,27 +109,26 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
 
         if trace:
             enable_method_trace()
-            logger.bind(command="pr ready", pr_number=target_pr_number, yes=yes).info(
-                "Marking PR as ready for review"
+
+        logger.bind(command="pr ready", pr_number=target_pr_number, yes=yes).info(
+            "Marking PR as ready for review"
+        )
+
+        try:
+            pr = _build_pr_ready_usecase(pr_service=pr_service).mark_ready(
+                pr_number=target_pr_number, yes=yes, requested_reviewers=review
             )
+        except PrReadyAbortedError:
+            logger.info("Aborted by user")
+            raise typer.Exit(0) from None
 
-            try:
-                pr = _build_pr_ready_usecase(pr_service=pr_service).mark_ready(
-                    pr_number=target_pr_number, yes=yes, requested_reviewers=review
-                )
-            except PrReadyAbortedError:
-                logger.info("Aborted by user")
-                raise typer.Exit(0) from None
+        if json_output:
+            typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))
+        elif yaml_output:
+            import yaml
 
-            if json_output:
-                typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))
-            elif yaml_output:
-                import yaml
-
-                typer.echo(
-                    yaml.dump(
-                        pr.model_dump(), default_flow_style=False, allow_unicode=True
-                    )
-                )
-            else:
-                render_pr_ready(pr, requested_reviewers=review)
+            typer.echo(
+                yaml.dump(pr.model_dump(), default_flow_style=False, allow_unicode=True)
+            )
+        else:
+            render_pr_ready(pr, requested_reviewers=review)
