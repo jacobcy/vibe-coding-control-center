@@ -1,5 +1,5 @@
+from vibe3.config.branch_convention import BranchConvention
 from vibe3.config.profile_convention import ProfileConvention
-from vibe3.models.branch_convention import BranchConvention
 
 
 def test_minimal_convention_defaults():

@@ -4,10 +4,12 @@ Connects profile selection to adapter resource lookup,
 providing a unified API for accessing policy/skill/workflow paths.
 """
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
 
-from vibe3.adapters import get_adapter
-from vibe3.config.adapter_manifest import AdapterManifest
+if TYPE_CHECKING:
+    from vibe3.config.adapter_manifest import AdapterManifest
 
 
 class ProfileConfig(BaseModel):
@@ -18,12 +20,14 @@ class ProfileConfig(BaseModel):
 
     profile: str = Field(default="minimal", description="Profile name")
 
-    def _get_adapter(self) -> AdapterManifest | None:
+    def _get_adapter(self) -> "AdapterManifest | None":
         """Get adapter for current profile.
 
         Returns:
             Adapter manifest or None if profile has no adapter
         """
+        from vibe3.adapters import get_adapter
+
         # Map profile names to adapter names
         adapter_map: dict[str, str] = {
             "vibe-center": "vibe-center",
