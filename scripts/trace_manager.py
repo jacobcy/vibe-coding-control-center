@@ -48,6 +48,26 @@ LAYER_CONFIG = {
         "suffixes": ["Adapter", "Wrapper"],
         "layer_name": "adapter",
     },
+    "environment": {
+        "dir": "environment",
+        "suffixes": ["Manager", "Service"],
+        "layer_name": "environment",
+    },
+    "prompts": {
+        "dir": "prompts",
+        "suffixes": ["Service"],
+        "layer_name": "prompts",
+    },
+    "domain": {
+        "dir": "domain",
+        "suffixes": ["Service", "Gate"],
+        "layer_name": "domain",
+    },
+    "runtime": {
+        "dir": "runtime",
+        "suffixes": ["Executor", "Manager"],
+        "layer_name": "runtime",
+    },
 }
 
 
