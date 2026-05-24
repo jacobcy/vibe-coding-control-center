@@ -289,6 +289,9 @@ code_limits:
       - path: "tests/vibe3/commands/test_handoff_advanced_commands.py"
         limit: 420
         reason: "Handoff 高级命令测试集（从 test_handoff_commands.py 拆分），覆盖 append/plan/report/audit 命令、next step 逻辑、real service path 测试等紧密耦合场景"
+      - path: "tests/vibe3/services/test_handoff_service.py"
+        limit: 500
+        reason: "Handoff service 测试集，覆盖 handoff 记录管理、路径解析、blocked_reason 清除逻辑等紧密耦合场景，rebase后略微超标"
 
 
   total_file_loc:
