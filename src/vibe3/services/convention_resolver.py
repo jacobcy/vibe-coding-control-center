@@ -185,10 +185,11 @@ class ConventionResolver:
         Returns:
             ProfileConfig instance with detected or explicit profile.
         """
+        from vibe3.adapters import get_adapter
         from vibe3.config.profile_config import ProfileConfig
 
         detected_profile = self.profile or self._detect_profile()
-        return ProfileConfig(profile=detected_profile)
+        return ProfileConfig(profile=detected_profile, adapter_resolver=get_adapter)
 
     @classmethod
     def from_repo(cls, profile: str | None = None) -> "ConventionResolver":
