@@ -56,6 +56,7 @@ def make_context_builder(
     body_fn: Callable[[], str],
     prompts_path: Path | None = None,
     variable_name: str | None = None,
+    skill_path_resolver: Callable[[str], str | None] | None = None,
 ) -> PromptContextBuilder:
     """Create a PromptContextBuilder for a single-variable body recipe.
 
@@ -67,6 +68,7 @@ def make_context_builder(
         variable_name: Override for the variable name in the template. By default,
             derived from body_provider_key as ``{prefix}_prompt_body``. Use this
             when the template expects a different name (e.g. ``skill_content``).
+        skill_path_resolver: Optional callable to resolve skill name to path.
 
     Returns:
         PromptContextBuilder ready to be used as CodeagentCommand.context_builder.
@@ -89,5 +91,9 @@ def make_context_builder(
         return body_fn()
 
     registry.register(body_provider_key, provider)
-    assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
+    assembler = PromptAssembler(
+        prompts_path=prompts_path,
+        registry=registry,
+        skill_path_resolver=skill_path_resolver,
+    )
     return PromptContextBuilder(assembler, recipe)
