@@ -1,7 +1,6 @@
 """Common utilities for command layer."""
 
 import os
-import sys
 
 import typer
 
@@ -16,6 +15,7 @@ def enable_method_trace(min_ms: float | None = None) -> None:
 
     Args:
         min_ms: Minimum duration in milliseconds to show in trace.
+            Must be non-negative. Negative values are ignored.
     """
     os.environ["VIBE3_TRACE"] = "1"
 
@@ -23,19 +23,6 @@ def enable_method_trace(min_ms: float | None = None) -> None:
         from vibe3.observability.trace_method import set_trace_min_ms
 
         set_trace_min_ms(min_ms)
-
-    if "VIBE3_TRACE_HINT_SHOWN" not in os.environ:
-        os.environ["VIBE3_TRACE_HINT_SHOWN"] = "1"
-        hint = "Trace enabled (output on stderr)."
-        if min_ms:
-            hint += f" Filtering calls < {min_ms}ms."
-        hint += "\nTo add method tracing:\n"
-        hint += (
-            "  uv run python scripts/trace_manager.py --add --module services\n"
-            "  uv run python scripts/trace_manager.py --add --module clients\n"
-            "  uv run python scripts/trace_manager.py --add --module all"
-        )
-        print(hint, file=sys.stderr)
 
 
 def run_full_check_shortcut() -> None:

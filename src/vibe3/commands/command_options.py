@@ -71,7 +71,11 @@ TraceOption = Annotated[
 
 TraceMinMsOption = Annotated[
     float | None,
-    typer.Option("--min-ms", help="Min duration (ms) to show in trace"),
+    typer.Option(
+        "--min-ms",
+        min=0.0,
+        help="Min duration (ms) to show in trace (use with --trace)",
+    ),
 ]
 
 

@@ -16,7 +16,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 _call_depth: ContextVar[int] = ContextVar("call_depth", default=0)
 
-_trace_stats: list[dict[str, Any]] = []
+_trace_stats: dict[tuple[str, str], dict[str, Any]] = {}
 _trace_line_count: int = 0
 _trace_min_ms: float = 0.0
 _trace_max_lines: int = 100
@@ -46,13 +46,13 @@ def _format_duration(seconds: float) -> str:
 def set_trace_min_ms(min_ms: float) -> None:
     """Set minimum duration threshold for trace output."""
     global _trace_min_ms
-    _trace_min_ms = min_ms
+    _trace_min_ms = max(0.0, min_ms)
 
 
 def set_trace_max_lines(max_lines: int) -> None:
     """Set maximum line count for trace output."""
     global _trace_max_lines
-    _trace_max_lines = max_lines
+    _trace_max_lines = max(1, max_lines)
 
 
 def _print_summary() -> None:
@@ -66,8 +66,9 @@ def _print_summary() -> None:
             )
         return
 
-    total_time = sum(s["duration"] for s in _trace_stats)
-    sorted_stats = sorted(_trace_stats, key=lambda s: s["duration"], reverse=True)[:5]
+    stats_list = list(_trace_stats.values())
+    total_time = sum(s["duration"] for s in stats_list)
+    sorted_stats = sorted(stats_list, key=lambda s: s["duration"], reverse=True)[:5]
 
     use_color = sys.stderr.isatty()
     yellow = Color.YELLOW if use_color else ""
@@ -141,45 +142,56 @@ def trace_method(
 
             global _trace_line_count, _trace_truncated
 
+            entry_printed = False
             if _trace_line_count < _trace_max_lines:
                 call_indicator = (
                     f"{Color.CYAN}\u2192{Color.RESET}" if use_color else "\u2192"
                 )
                 print(f"{indent}{call_indicator} {label}", file=sys.stderr)
                 _trace_line_count += 1
+                entry_printed = True
+            else:
+                _trace_truncated = True
 
             try:
                 result = func(*args, **kwargs)
                 elapsed = time.perf_counter() - start_time
 
                 key = (name, layer)
-                existing = next(
-                    (s for s in _trace_stats if (s["name"], s["layer"]) == key),
-                    None,
-                )
-                if existing:
-                    existing["duration"] += elapsed
-                    existing["calls"] += 1
+                if key in _trace_stats:
+                    _trace_stats[key]["duration"] += elapsed
+                    _trace_stats[key]["calls"] += 1
                 else:
-                    _trace_stats.append(
-                        {
-                            "name": name,
-                            "layer": layer,
-                            "duration": elapsed,
-                            "calls": 1,
-                        }
-                    )
+                    _trace_stats[key] = {
+                        "name": name,
+                        "layer": layer,
+                        "duration": elapsed,
+                        "calls": 1,
+                    }
 
                 elapsed_ms = elapsed * 1000
-                if _trace_min_ms > 0 and elapsed_ms < _trace_min_ms:
-                    pass
-                elif _trace_line_count < _trace_max_lines:
+                should_print_exit = (
+                    _trace_min_ms <= 0 or elapsed_ms >= _trace_min_ms
+                ) and _trace_line_count < _trace_max_lines
+
+                if should_print_exit:
                     return_indicator = (
                         f"{Color.GREEN}\u2190{Color.RESET}" if use_color else "\u2190"
                     )
                     print(
                         f"{indent}{return_indicator} {label} "
                         f"[{_format_duration(elapsed)}]",
+                        file=sys.stderr,
+                    )
+                    _trace_line_count += 1
+                elif entry_printed and _trace_min_ms > 0 and elapsed_ms < _trace_min_ms:
+                    return_indicator = (
+                        f"{Color.GREEN}\u2190{Color.RESET}" if use_color else "\u2190"
+                    )
+                    threshold_hint = f"< {_trace_min_ms:.0f}ms threshold"
+                    print(
+                        f"{indent}{return_indicator} {label} "
+                        f"[{_format_duration(elapsed)} {threshold_hint}]",
                         file=sys.stderr,
                     )
                     _trace_line_count += 1
@@ -192,22 +204,16 @@ def trace_method(
                 elapsed = time.perf_counter() - start_time
 
                 key = (name, layer)
-                existing = next(
-                    (s for s in _trace_stats if (s["name"], s["layer"]) == key),
-                    None,
-                )
-                if existing:
-                    existing["duration"] += elapsed
-                    existing["calls"] += 1
+                if key in _trace_stats:
+                    _trace_stats[key]["duration"] += elapsed
+                    _trace_stats[key]["calls"] += 1
                 else:
-                    _trace_stats.append(
-                        {
-                            "name": name,
-                            "layer": layer,
-                            "duration": elapsed,
-                            "calls": 1,
-                        }
-                    )
+                    _trace_stats[key] = {
+                        "name": name,
+                        "layer": layer,
+                        "duration": elapsed,
+                        "calls": 1,
+                    }
 
                 if _trace_line_count < _trace_max_lines:
                     error_indicator = (
