@@ -38,14 +38,6 @@ class StubLabelService:
         """Return values matching real LabelService.confirm_issue_state behavior."""
         if self.current_state == state:
             return "confirmed"
-        # Simulate state machine: allow most transitions, block invalid ones
-        # BLOCKED -> BLOCKED is not allowed unless force=True
-        if (
-            self.current_state == IssueState.BLOCKED
-            and state == IssueState.BLOCKED
-            and not force
-        ):
-            return "blocked"
         self.current_state = state
         return "advanced"
 

@@ -8,7 +8,7 @@ This module handles reading/writing blocked state to individual sources:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
@@ -147,7 +147,7 @@ class BlockedStateIO:
         target_state: IssueState,
         actor: str = "system",
         force: bool = False,
-    ) -> None:
+    ) -> Literal["confirmed", "advanced", "blocked"]:
         """Write state to issue labels.
 
         Args:
@@ -155,8 +155,13 @@ class BlockedStateIO:
             target_state: Target state to set
             actor: Actor performing the transition
             force: If True, bypass transition validation (for unblock/resume)
+
+        Returns:
+            "confirmed": Already in target state
+            "advanced": Transition succeeded
+            "blocked": Transition rejected by state machine
         """
-        self.label_service.confirm_issue_state(
+        return self.label_service.confirm_issue_state(
             issue_number,
             target_state,
             actor=actor,
