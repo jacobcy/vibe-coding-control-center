@@ -102,9 +102,10 @@
 |---------|------|----------|
 | `vibe-task` | 执行项镜像标签 | 自动镜像，不建议手动维护 |
 
-**说明**：
-- `vibe-task` 是 `vibe3 flow bind` 绑定的自动镜像（副作用）。
-- 它不是 Governance 判定的真源，仅用于 GitHub 视角过滤。
+**说明 (Truth Source)**：
+- `vibe-task` 是 `vibe3 flow bind` 成功的**自动镜像（副作用）**。
+- **非真源**：它不是 Governance 或执行引擎判定的真源。真源位于本地 SQLite `flow_issue_links`。
+- **可视化用途**：仅用于 GitHub 视角（如 Projects 视图）过滤和识别已绑定的任务。
 
 ### 2.5 编排状态标签 (state/*)
 
@@ -119,9 +120,10 @@
 | `state/merge-ready` | 已满足合并条件 | 通常由自动化镜像，不建议手工维护 |
 | `state/done` | 已完成 | 通常由自动化镜像，不建议手工维护 |
 
-**说明**：
-- `state/*` 标签是执行状态的**可选镜像**，不是执行态主真源。
-- `assignee issue` 的真实执行状态优先以 flow 状态与 orchestration scene 为准。
+**说明 (State Mirroring)**：
+- `state/*` 标签是执行状态的**可选镜像**。
+- **真源分离**：`assignee issue` 的真实执行状态优先以本地 SQLite `flow_state` 表与 orchestration scene 为准。
+- **自动同步**：由 `vibe3` 在状态迁移时自动更新 GitHub 标签。
 
 ### 2.6 触发器标签 (trigger/*)
 

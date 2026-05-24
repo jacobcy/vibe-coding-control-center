@@ -217,12 +217,12 @@ gh issue edit <issue_number> --milestone "Phase 1: 基础设施"
 ```bash
 # 绑定到 Flow（开始执行）
 uv run python src/vibe3/cli.py flow bind <issue_number>
-# 自动镜像 vibe-task 标签（副作用，不作为真源）
 ```
 
-**注意**：
-- `flow bind` 是 issue 进入执行现场的正式绑定入口。
-- `vibe-task` 与 `state/*` 标签是由绑定和执行状态自动镜像的副作用，**不建议作为手工主入口**。
+**注意 (Truth Source Boundary)**：
+- `flow bind` 是 issue 进入执行现场的正式绑定入口，它会在 SQLite `flow_issue_links` 中建立真源记录。
+- **`vibe-task` 是自动镜像标签**：一旦 `flow bind` 成功，系统会自动为 issue 添加 `vibe-task` 标签。这只是一个可视化副作用，用于在 GitHub 界面识别任务，**不作为控制逻辑的真源**。手动添加/移除此标签不会改变 issue 的执行角色。
+- **`state/*` 标签是状态镜像**：执行状态的真源在 SQLite 的 `flow_state` 中。`state/*` 标签由 `vibe3` 根据 flow 状态自动同步到 GitHub。手动修改标签不会改变实际执行状态。
 - 一旦绑定，issue 进入 manager 主执行闭环，由 Manager/Plan/Run/Review 推进。
 
 ### 3.2 版本管理流程
