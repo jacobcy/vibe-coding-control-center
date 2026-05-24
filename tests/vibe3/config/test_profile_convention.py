@@ -1,5 +1,90 @@
-from vibe3.config.branch_convention import BranchConvention
-from vibe3.config.profile_convention import ProfileConvention
+from vibe3.config.profile_convention import LabelsConvention, ProfileConvention
+from vibe3.models.branch_convention import BranchConvention
+
+
+def test_labels_convention_minimal_defaults():
+    """Test LabelsConvention.minimal() has safe defaults for generic repos."""
+    labels = LabelsConvention.minimal()
+    assert labels.state_prefix == "state/"
+    assert labels.handoff_label == "handoff"
+    assert labels.blocked_label == "blocked"
+    assert labels.vibe_task == "vibe-task"
+    assert labels.manager_usernames == []
+
+
+def test_labels_convention_vibe_center():
+    """Test LabelsConvention.vibe_center() has opinionated defaults."""
+    labels = LabelsConvention.vibe_center()
+    assert labels.state_prefix == "state/"
+    assert labels.handoff_label == "handoff"
+    assert labels.blocked_label == "blocked"
+    assert labels.vibe_task == "vibe-task"
+    assert labels.manager_usernames == ["vibe-manager-agent"]
+
+
+def test_profile_convention_labels_property_minimal():
+    """Test ProfileConvention.labels returns correct LabelsConvention.
+
+    For minimal profile.
+    """
+    convention = ProfileConvention()
+    assert convention.labels.state_prefix == "state/"
+    assert convention.labels.handoff_label == "handoff"
+    assert convention.labels.blocked_label == "blocked"
+    assert convention.labels.vibe_task == "vibe-task"
+    assert convention.labels.manager_usernames == []
+
+
+def test_profile_convention_labels_property_vibe_center():
+    """Test ProfileConvention.labels returns correct LabelsConvention.
+
+    For vibe-center profile.
+    """
+    convention = ProfileConvention.vibe_center()
+    assert convention.labels.state_prefix == "state/"
+    assert convention.labels.handoff_label == "handoff"
+    assert convention.labels.blocked_label == "blocked"
+    assert convention.labels.vibe_task == "vibe-task"
+    assert convention.labels.manager_usernames == ["vibe-manager-agent"]
+
+
+def test_profile_convention_custom_labels():
+    """Test ProfileConvention with custom state_prefix propagates to labels."""
+    custom_branch = BranchConvention(task_prefix="feature/", dev_prefix="feature/")
+    convention = ProfileConvention(
+        branch=custom_branch,
+        state_prefix="",
+        handoff_label="ready",
+        blocked_label="stuck",
+        manager_usernames=["my-bot"],
+    )
+    assert convention.labels.state_prefix == ""
+    assert convention.labels.handoff_label == "ready"
+    assert convention.labels.blocked_label == "stuck"
+    assert convention.labels.manager_usernames == ["my-bot"]
+
+
+def test_labels_property_returns_fresh_instance():
+    """Test that labels property returns a fresh instance each call."""
+    convention = ProfileConvention()
+    labels1 = convention.labels
+    labels2 = convention.labels
+    # Should not be the same instance
+    assert labels1 is not labels2
+    # But should have equal values
+    assert labels1 == labels2
+
+
+def test_labels_convention_is_frozen():
+    """Test that LabelsConvention is frozen (immutable)."""
+    labels = LabelsConvention.minimal()
+    # Attempting to modify should raise an error
+    try:
+        labels.state_prefix = "modified/"
+        assert False, "Should not be able to modify frozen model"
+    except Exception:
+        # Expected - frozen model cannot be modified
+        pass
 
 
 def test_minimal_convention_defaults():
