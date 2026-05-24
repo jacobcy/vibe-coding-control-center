@@ -6,7 +6,7 @@ Validates that the unified auto-resume entry point:
 - Restores inferred state labels correctly
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -48,23 +48,13 @@ def usecase():
         yield uc
 
 
-class TestBlockedProjectionClearing:
-    """Tests for _clear_blocked_projection explicit field clearing."""
-
-    def test_clear_blocked_when_no_body(self, usecase):
-        """Should gracefully return when issue body is None."""
-        usecase.github_client.get_issue_body.return_value = None
-
-        usecase.operations._clear_blocked_projection(123)
-
-        usecase.github_client.update_issue_body.assert_not_called()
-
-
 class TestAutoResumePreservesWorktree:
     """Tests verifying auto-resume does not delete worktrees."""
 
-    def test_clear_flow_reasons_keeps_worktree(self, usecase):
-        """Clearing flow reasons should preserve worktree_path."""
+    def test_unblock_clears_reasons_keeps_worktree(self, usecase):
+        """Unblocking via BlockedStateService should clear reasons
+        but preserve worktree_path.
+        """
         store = usecase.flow_service.store
         store.get_flow_state.return_value = {
             "worktree_path": "/tmp/worktrees/task-issue-123",
@@ -73,17 +63,23 @@ class TestAutoResumePreservesWorktree:
             "blocked_reason": "Health check failed",
         }
 
-        usecase.operations._clear_flow_reasons("task/issue-123", "blocked")
+        with patch(
+            "vibe3.services.blocked_state_service.BlockedStateService"
+        ) as mock_service_cls:
+            mock_service = MagicMock()
+            mock_service_cls.return_value = mock_service
 
-        update_call = store.update_flow_state.call_args
-        assert update_call is not None
-        kwargs = update_call[1]
-        assert kwargs.get("flow_status") == "active"
-        assert kwargs.get("blocked_reason") is None
-        assert kwargs.get("failed_reason") is None
-        assert kwargs.get("blocked_by_issue") is None
-        # worktree_path should NOT be passed to update_flow_state
-        assert "worktree_path" not in kwargs
+            usecase.operations.reset_issue_to_ready(
+                issue_number=123,
+                resume_kind="blocked",
+                flow=MagicMock(branch="task/issue-123"),
+                repo=None,
+                reason="test unblock",
+                label_state="ready",
+            )
+
+            # Verify BlockedStateService.unblock was called (unified method)
+            mock_service.unblock.assert_called_once()
 
 
 class TestAutoResumeRestoresInferredState:

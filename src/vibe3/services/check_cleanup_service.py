@@ -325,7 +325,7 @@ class CheckCleanupService:
         """
         try:
             from vibe3.models.orchestration import IssueState
-            from vibe3.services.issue_failure_service import resume_issue
+            from vibe3.services.blocked_state_service import BlockedStateService
 
             issue_number = self._parse_issue_number(branch)
             if issue_number is None:
@@ -347,15 +347,16 @@ class CheckCleanupService:
                 )
                 return
 
-            current_state = self._get_issue_state(issue_number)
-            from_state = current_state if current_state else "blocked"
-
-            # Transition to READY
-            resume_issue(
+            # Resume issue using unified BlockedStateService
+            service = BlockedStateService(
+                store=self.store,
+                github_client=gh,
+            )
+            service.unblock(
+                branch=branch,
+                target_state=IssueState.READY,
                 issue_number=issue_number,
-                reason="Flow aborted and cleaned up by vibe check --clean-branch",
-                from_state=from_state,
-                to_state=IssueState.READY,
+                detail="Flow aborted and cleaned up by vibe check --clean-branch",
             )
 
             # Add informative comment
@@ -372,7 +373,7 @@ class CheckCleanupService:
             gh.add_comment(issue_number, comment_body)
 
             logger.bind(domain="check", branch=branch).info(
-                f"Resumed issue #{issue_number} to READY (from {from_state})"
+                f"Resumed issue #{issue_number} to READY"
             )
         except Exception as exc:
             logger.bind(domain="check", branch=branch).warning(

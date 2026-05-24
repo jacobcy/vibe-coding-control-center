@@ -405,6 +405,7 @@ class TestRunQualifyGate:
                             "task/issue-123-test",
                             flow_status="active",
                             blocked_reason=None,
+                            failed_reason=None,  # Also cleared for consistency
                             blocked_by_issue=None,
                             latest_actor="orchestra:qualify",
                         )

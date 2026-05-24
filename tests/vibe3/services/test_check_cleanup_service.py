@@ -439,21 +439,18 @@ def test_clean_terminal_flows_resumes_aborted_to_ready() -> None:
         mock_cleanup_cls.return_value = mock_cleanup
 
         with patch(
-            "vibe3.services.issue_failure_service.LabelService"
-        ) as mock_label_cls:
-            mock_label = MagicMock()
-            mock_label_cls.return_value = mock_label
-
-            # Mock get_state to return None (no current state)
-            mock_label.get_state.return_value = None
+            "vibe3.services.blocked_state_service.BlockedStateService"
+        ) as mock_service_cls:
+            mock_service = MagicMock()
+            mock_service_cls.return_value = mock_service
 
             results = service._clean_terminal_flows()
 
-    # Verify issue resumed to READY
-    mock_label.confirm_issue_state.assert_called_once()
-    call_args = mock_label.confirm_issue_state.call_args
-    assert call_args[0][0] == 200  # issue_number
-    assert call_args[0][1] == IssueState.READY
+    # Verify BlockedStateService.unblock was called
+    mock_service.unblock.assert_called_once()
+    call_args = mock_service.unblock.call_args
+    assert call_args.kwargs["target_state"] == IssueState.READY
+    assert call_args.kwargs["issue_number"] == 200
 
     # Verify cleanup happened
     assert "Cleaned 1 aborted flows" in results["summary"]
@@ -475,7 +472,7 @@ def test_resume_blocked_issue_adds_cleanup_comment() -> None:
         "state": "open",
     }
 
-    with patch("vibe3.services.issue_failure_service.LabelService"):
+    with patch("vibe3.services.blocked_state_service.BlockedStateService"):
         service._resume_blocked_issue("task/issue-300")
 
     # Verify comment added
