@@ -1,6 +1,5 @@
 """Tests for reset_task_scene operation."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from tests.vibe3.services.conftest import _make_operations
@@ -9,10 +8,6 @@ from tests.vibe3.services.conftest import _make_operations
 def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
     """Test that reset_task_scene uses FlowCleanupService for complete cleanup."""
     operations = _make_operations()
-    operations.git_client.find_worktree_path_for_branch.return_value = Path(
-        "/tmp/issue-329"
-    )
-    operations.git_client.branch_exists.return_value = True
 
     with patch(
         "vibe3.services.flow_cleanup_service.FlowCleanupService"
@@ -44,10 +39,6 @@ def test_reset_task_scene_deletes_branch_handoff_and_flow_truth() -> None:
 def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
     """Test that reset_task_scene calls cleanup service for tombstone creation."""
     operations = _make_operations()
-    operations.git_client.find_worktree_path_for_branch.return_value = Path(
-        "/tmp/issue-999"
-    )
-    operations.git_client.branch_exists.return_value = True
 
     branch = "task/issue-999"
 
@@ -86,10 +77,6 @@ def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
 def test_reset_task_scene_with_remote_keeps_remote_branch() -> None:
     """Test reset_task_scene with include_remote=False (--remote mode)."""
     operations = _make_operations()
-    operations.git_client.find_worktree_path_for_branch.return_value = Path(
-        "/tmp/issue-123"
-    )
-    operations.git_client.branch_exists.return_value = True
 
     with patch(
         "vibe3.services.flow_cleanup_service.FlowCleanupService"
