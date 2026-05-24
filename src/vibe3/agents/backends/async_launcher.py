@@ -10,8 +10,9 @@ import os
 import re
 import shlex
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
+
+from vibe3.models.execution_handle import AsyncExecutionHandle
 
 CRITICAL_ENV_PASSTHROUGH = {
     "HOME",
@@ -22,15 +23,6 @@ CRITICAL_ENV_PASSTHROUGH = {
     "TMPDIR",
     "USER",
 }
-
-
-@dataclass(frozen=True)
-class AsyncExecutionHandle:
-    """Async execution metadata returned by the wrapper adapter."""
-
-    tmux_session: str
-    log_path: Path
-    prompt_file_path: Path
 
 
 def build_tmux_log_filter(session_id: str) -> str:
