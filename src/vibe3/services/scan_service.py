@@ -51,6 +51,8 @@ def dispatch_governance_execution(
         material_override: Optional governance role to override material rotation
     """
     from vibe3.execution.governance_sync_runner import run_governance_sync
+    from vibe3.orchestra.logging import append_governance_event
+    from vibe3.roles.governance_factory import build_default_governance_fns
 
     run_governance_sync(
         tick_count=tick_count,
@@ -58,6 +60,8 @@ def dispatch_governance_execution(
         dry_run=False,  # Execution-only, no dry-run
         show_prompt=False,
         session_id=None,
+        governance_fns=build_default_governance_fns(),
+        append_event=append_governance_event,
     )
 
 
@@ -169,13 +173,11 @@ def governance_material_exists(material_name: str) -> bool:
     Accepts either short names like ``roadmap-intake`` or full material paths.
     """
     try:
-        from vibe3.roles.governance import (
-            _find_material_in_catalog,
-            load_governance_material_catalog,
-        )
+        from vibe3.roles.governance import load_governance_material_catalog
+        from vibe3.roles.governance_utils import find_material_in_catalog
 
         catalog = load_governance_material_catalog()
-        return _find_material_in_catalog(catalog, material_name) is not None
+        return find_material_in_catalog(catalog, material_name) is not None
     except Exception:
         return False
 
