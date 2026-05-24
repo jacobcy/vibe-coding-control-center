@@ -112,6 +112,7 @@ def status_command(
     ] = False,
     output_format: FormatOption = "table",
     trace: status.TraceOption = False,
+    min_ms: status.TraceMinMsOption = None,
     json_output: Annotated[
         bool,
         typer.Option(
@@ -127,6 +128,7 @@ def status_command(
         check=check,
         output_format=output_format,
         trace=trace,
+        min_ms=min_ms,
         json_output=json_output,
     )
 

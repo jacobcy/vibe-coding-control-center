@@ -69,6 +69,11 @@ TraceOption = Annotated[
     typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
 ]
 
+TraceMinMsOption = Annotated[
+    float | None,
+    typer.Option("--min-ms", help="Min duration (ms) to show in trace"),
+]
+
 
 def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
     """Auto-ensure flow for non-main branches.

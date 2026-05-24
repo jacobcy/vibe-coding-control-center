@@ -8,6 +8,7 @@ from loguru import logger
 
 from vibe3.commands.command_options import (
     FormatOption,
+    TraceMinMsOption,
     TraceOption,
 )
 from vibe3.commands.common import enable_method_trace
@@ -141,6 +142,7 @@ def update(
     actor: ActorOption = None,
     spec: SpecOption = None,
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     output_format: FormatOption = "table",
     json_output: Annotated[
         bool,
@@ -158,7 +160,7 @@ def update(
     branch before registering flow.
     """
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
@@ -271,6 +273,7 @@ def bind(
     branch: BindBranchOption = None,
     role: BindRoleOption = "task",
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
     output_format: FormatOption = "table",
     json_output: Annotated[
         bool,
@@ -283,7 +286,7 @@ def bind(
 ) -> None:
     """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -437,10 +440,11 @@ def restore_flow(
         str | None, typer.Option("--branch", help="Branch name or issue number")
     ] = None,
     trace: TraceOption = False,
+    min_ms: TraceMinMsOption = None,
 ) -> None:
     """Restore a soft-deleted flow."""
     if trace:
-        enable_method_trace()
+        enable_method_trace(min_ms=min_ms)
 
     branch = branch_opt or branch_arg
     if branch is None:
