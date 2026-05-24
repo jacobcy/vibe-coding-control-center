@@ -133,8 +133,17 @@ class BlockedStateService:
         target_state: IssueState,
         actor: str = "human:resume",
         issue_number: int | None = None,
+        detail: str | None = None,
     ) -> None:
-        """Atomically clear blocked state in all three sources."""
+        """Atomically clear blocked state in all three sources.
+
+        Args:
+            branch: Branch name
+            target_state: Target issue state
+            actor: Actor name for events
+            issue_number: GitHub issue number
+            detail: Custom timeline detail message (optional)
+        """
         if issue_number:
             try:
                 self._io.clear_body_projection(issue_number=issue_number)
@@ -178,7 +187,7 @@ class BlockedStateService:
                     branch=branch,
                     event_type="resumed",
                     actor=actor,
-                    detail=f"Resumed to {target_state.value}",
+                    detail=detail or f"Resumed to {target_state.value}",
                     issue_number=issue_number,
                 )
             except Exception as exc:

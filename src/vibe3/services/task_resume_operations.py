@@ -15,7 +15,6 @@ from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
-    resume_issue,
 )
 
 if TYPE_CHECKING:
@@ -148,22 +147,28 @@ class TaskResumeOperations:
                 target_state = valid_states.get(label_state, IssueState.CLAIMED)
 
             # --label: minimal cleanup only. The agent did work but the label
-            # wasn't updated correctly, causing a block.  Clear the reason
-            # fields so the next dispatch picks it up; the flow record, refs,
-            # and worktree are all valid and should be preserved.
+            # wasn't updated correctly, causing a block.  Clear blocked state
+            # and resume issue using unified BlockedStateService.
+            from vibe3.services.blocked_state_service import BlockedStateService
+
             if isinstance(branch, str):
                 emit_progress(f"clearing reasons for branch {branch}")
-                self._clear_flow_reasons(branch, resume_kind)
+            else:
+                emit_progress("clearing reasons (no branch)")
 
-            # Use unified resume_issue for event registration and state transition
-            emit_progress(f"resuming via unified handler to {target_state.value}")
-            resume_issue(
-                issue_number=issue_number,
-                reason=reason,
-                from_state=resume_kind,
-                to_state=target_state,
-                repo=repo,
+            service = BlockedStateService(
+                github_client=self.github_client,
+                label_service=self.label_service,
+                store=self.flow_service.store,
             )
+
+            service.unblock(
+                branch=branch or "",  # Empty string if no branch
+                target_state=target_state,
+                issue_number=issue_number,
+                detail=f"Resumed from {resume_kind} to {target_state.value}: {reason}",
+            )
+
             emit_progress("label resume done", status="done")
 
             # DO NOT call reset_task_scene (keep worktree)
@@ -356,46 +361,3 @@ class TaskResumeOperations:
                 branch=branch,
             ).warning(f"Failed to reactivate aborted flow: {exc}")
             raise
-
-    def _clear_flow_reasons(self, branch: str, resume_kind: str) -> None:
-        """Clear blocked_reason/failed_reason from FlowState.
-
-        Directly clears DB fields and issue body projection without intermediate
-        state transitions. Does NOT record timeline event (caller handles that).
-        """
-        from vibe3.services.blocked_state_io import BlockedStateIO
-
-        try:
-            logger.bind(
-                domain="resume",
-                action="clear_flow_reasons",
-                branch=branch,
-                resume_kind=resume_kind,
-            ).info("Clearing flow reason fields")
-
-            issue_number = self.flow_service.store.get_task_issue_number(branch)
-
-            # Directly clear all reason fields in DB (unconditional)
-            self.flow_service.store.update_flow_state(
-                branch,
-                flow_status="active",
-                blocked_reason=None,
-                blocked_by_issue=None,
-                failed_reason=None,
-            )
-
-            # Clear issue body projection
-            if issue_number:
-                io = BlockedStateIO(
-                    github_client=self.github_client,
-                    label_service=self.label_service,
-                    store=self.flow_service.store,
-                )
-                io.clear_body_projection(issue_number=issue_number)
-
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="clear_flow_reasons",
-                branch=branch,
-            ).warning(f"Failed to clear flow reasons: {exc}")

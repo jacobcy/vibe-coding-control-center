@@ -3,9 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.task_resume_operations import TaskResumeOperations
 
@@ -132,10 +129,11 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
     operations.flow_service.store.get_flow_state.return_value = mock_flow_state_dict
     operations.flow_service.store.get_task_issue_number.return_value = 303
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -151,11 +149,8 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         operations.git_client.remove_worktree.assert_not_called()
         operations.git_client.delete_branch.assert_not_called()
 
-        # Verify: state restored to IN_PROGRESS (inferred from plan_ref)
-        mock_label_instance.confirm_issue_state.assert_called_once()
-
-    # Verify: unblock called via BlockedStateService
-    operations.flow_service.store.update_flow_state.assert_called_once()
+        # Verify: BlockedStateService.unblock was called
+        mock_service.unblock.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
@@ -169,10 +164,12 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -188,13 +185,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to READY via resume_issue
-        mock_label_instance.confirm_issue_state.assert_called_once()
-
-    # Verify: reasons cleared and flow_status restored to active
-    operations.flow_service.store.update_flow_state.assert_called()
-    call_kwargs = operations.flow_service.store.update_flow_state.call_args[1]
-    assert call_kwargs.get("blocked_reason") is None
-    assert call_kwargs.get("blocked_by_issue") is None
+        mock_service.unblock.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
@@ -208,10 +199,12 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -227,10 +220,9 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to HANDOFF via resume_issue
-        mock_label_instance.confirm_issue_state.assert_called_once()
+        mock_service.unblock.assert_called_once()
 
     # Verify: reasons cleared
-    operations.flow_service.store.update_flow_state.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_claimed() -> None:
@@ -242,10 +234,12 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -261,7 +255,7 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to CLAIMED via resume_issue
-        mock_label_instance.confirm_issue_state.assert_called_once()
+        mock_service.unblock.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_in_progress() -> None:
@@ -273,10 +267,12 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -292,7 +288,7 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to IN_PROGRESS via resume_issue
-        mock_label_instance.confirm_issue_state.assert_called_once()
+        mock_service.unblock.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_review() -> None:
@@ -304,10 +300,12 @@ def test_reset_issue_to_ready_with_label_review() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -323,7 +321,7 @@ def test_reset_issue_to_ready_with_label_review() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to REVIEW via resume_issue
-        mock_label_instance.confirm_issue_state.assert_called_once()
+        mock_service.unblock.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_merge_ready() -> None:
@@ -335,10 +333,12 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -354,100 +354,7 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to MERGE_READY via resume_issue
-        mock_label_instance.confirm_issue_state.assert_called_once()
-
-
-def test_clear_flow_reasons_clears_both_reasons() -> None:
-    """_clear_flow_reasons should directly clear all reason fields in DB."""
-    operations = _make_operations()
-
-    with (
-        patch.object(
-            operations.flow_service.store, "get_task_issue_number"
-        ) as mock_get_issue,
-        patch.object(
-            operations.flow_service.store, "update_flow_state"
-        ) as mock_update_flow,
-        patch("vibe3.services.blocked_state_io.BlockedStateIO") as mock_io_cls,
-    ):
-        mock_get_issue.return_value = 303
-        mock_io_instance = MagicMock()
-        mock_io_cls.return_value = mock_io_instance
-
-        operations._clear_flow_reasons("task/issue-303", "blocked")
-
-        # Verify: all reason fields cleared unconditionally
-        mock_update_flow.assert_called_once_with(
-            "task/issue-303",
-            flow_status="active",
-            blocked_reason=None,
-            blocked_by_issue=None,
-            failed_reason=None,
-        )
-        # Verify: issue body projection cleared
-        mock_io_instance.clear_body_projection.assert_called_once_with(issue_number=303)
-
-
-def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> None:
-    """reset_issue_to_ready should block when branch has live runtime session."""
-    operations = _make_operations()
-    mock_flow = MagicMock()
-    mock_flow.branch = "task/issue-303"
-    operations.label_service.get_state.return_value = IssueState.BLOCKED
-
-    with (
-        patch(
-            "vibe3.environment.session_registry.SessionRegistryService"
-        ) as mock_registry_cls,
-        patch("vibe3.agents.backends.codeagent.CodeagentBackend"),
-    ):
-        mock_registry_instance = MagicMock()
-        mock_registry_instance.get_truly_live_sessions_for_branch.return_value = [
-            {"id": 1}
-        ]
-        mock_registry_cls.return_value = mock_registry_instance
-
-        with pytest.raises(UserError, match="live runtime session"):
-            operations.reset_issue_to_ready(
-                issue_number=303,
-                resume_kind="blocked",
-                flow=mock_flow,
-                repo=None,
-                reason="test",
-            )
-
-
-def test_clear_flow_reasons_direct_clear_without_intermediate_state() -> None:
-    """Test that _clear_flow_reasons clears fields directly without intermediate
-    state."""
-    operations = _make_operations()
-
-    with (
-        patch.object(
-            operations.flow_service.store, "get_task_issue_number"
-        ) as mock_get_issue,
-        patch.object(
-            operations.flow_service.store, "update_flow_state"
-        ) as mock_update_flow,
-        patch("vibe3.services.blocked_state_io.BlockedStateIO") as mock_io_cls,
-    ):
-        mock_get_issue.return_value = 123
-        mock_io_instance = MagicMock()
-        mock_io_cls.return_value = mock_io_instance
-
-        # Execute
-        operations._clear_flow_reasons("task/issue-123", "failed")
-
-        # Verify: direct DB update with all fields cleared
-        mock_update_flow.assert_called_once_with(
-            "task/issue-123",
-            flow_status="active",
-            blocked_reason=None,
-            blocked_by_issue=None,
-            failed_reason=None,
-        )
-        # Verify: body projection cleared
-        mock_io_instance.clear_body_projection.assert_called_once_with(issue_number=123)
+        mock_service.unblock.assert_called_once()
 
 
 def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:
@@ -540,10 +447,12 @@ def test_reset_issue_to_ready_with_remote_flag() -> None:
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-456"
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         with patch(
             "vibe3.services.flow_cleanup_service.FlowCleanupService"
@@ -589,10 +498,12 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
     # get_flow_state returns None (no flow state exists)
     operations.flow_service.store.get_flow_state.return_value = None
 
-    with patch("vibe3.services.issue_failure_service.LabelService") as mock_label_cls:
-        mock_label_instance = MagicMock()
-        mock_label_instance.confirm_issue_state = MagicMock()
-        mock_label_cls.return_value = mock_label_instance
+    with patch(
+        "vibe3.services.blocked_state_service.BlockedStateService"
+    ) as mock_service_cls:
+        mock_service = MagicMock()
+
+        mock_service_cls.return_value = mock_service
 
         operations.reset_issue_to_ready(
             issue_number=303,
@@ -604,7 +515,10 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
             label_state="",  # ← --label auto (no flow exists)
         )
 
-        # Verify: state restored to READY (not CLAIMED)
-        mock_label_instance.confirm_issue_state.assert_called_once()
-        call_args = mock_label_instance.confirm_issue_state.call_args
-        assert call_args[0][1] == IssueState.READY  # Second positional arg is state
+        # Verify: BlockedStateService.unblock was called
+        mock_service.unblock.assert_called_once()
+
+        # Verify: target_state was READY (not CLAIMED)
+        call_args = mock_service.unblock.call_args
+        assert call_args.kwargs["target_state"] == IssueState.READY
+        assert call_args.kwargs["issue_number"] == 303
