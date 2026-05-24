@@ -1,10 +1,13 @@
 """Shared fixtures for services tests."""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from vibe3.analysis.coverage_service import CoverageService
+from vibe3.models.orchestration import IssueState
+from vibe3.services.task_resume_operations import TaskResumeOperations
 
 
 @pytest.fixture(autouse=True)
@@ -77,3 +80,29 @@ def sample_coverage_data() -> dict:
             },
         }
     }
+
+
+def _make_operations() -> TaskResumeOperations:
+    """Create a TaskResumeOperations instance with mocked dependencies."""
+    git_client = MagicMock()
+    github_client = MagicMock()
+    flow_service = MagicMock()
+    flow_service.store = MagicMock()
+    label_service = MagicMock()
+    issue_flow_service = MagicMock()
+    issue_flow_service.is_task_branch.return_value = True
+    return TaskResumeOperations(
+        git_client=git_client,
+        github_client=github_client,
+        flow_service=flow_service,
+        label_service=label_service,
+        issue_flow_service=issue_flow_service,
+    )
+
+
+def _mock_label_service():
+    """Create a mock LabelService for BlockedStateService.unblock tests."""
+    mock_label = MagicMock()
+    mock_label.confirm_issue_state = MagicMock()
+    mock_label.get_state = MagicMock(return_value=IssueState.READY)
+    return mock_label
