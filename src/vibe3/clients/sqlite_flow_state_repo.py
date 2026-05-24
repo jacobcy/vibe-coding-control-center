@@ -7,6 +7,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.observability.trace_method import trace_method
 
 
 class SQLiteFlowStateRepo(_HasConnection):
@@ -49,6 +50,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         "noop_gate_malformed_retry_count",  # Malformed response retry counter
     }
 
+    @trace_method("SQLiteFlowStateRepo.get_flow_state", layer="client")
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
         """Get flow state for branch (excludes soft-deleted flows)."""
         conn = self._get_connection()
@@ -66,6 +68,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             return dict(row)
         return None
 
+    @trace_method("SQLiteFlowStateRepo.update_flow_state", layer="client")
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
         """Update flow state fields. Raises ValueError for invalid fields."""
         if "updated_at" not in kwargs:
@@ -99,6 +102,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             fields=fields,
         ).debug("Updated flow state")
 
+    @trace_method("SQLiteFlowStateRepo.add_issue_link", layer="client")
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         now = datetime.datetime.now().isoformat()
         conn = self._get_connection()
@@ -118,6 +122,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             role=role,
         ).debug("Added issue link")
 
+    @trace_method("SQLiteFlowStateRepo.update_issue_link_role", layer="client")
     def update_issue_link_role(
         self,
         branch: str,
@@ -145,6 +150,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Updated issue link role")
         return bool(updated)
 
+    @trace_method("SQLiteFlowStateRepo.get_issue_links", layer="client")
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row
@@ -159,6 +165,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved issue links")
         return links
 
+    @trace_method("SQLiteFlowStateRepo.get_dependency_links", layer="client")
     def get_dependency_links(self, branch: str) -> list[int]:
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -176,6 +183,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved dependency links")
         return deps
 
+    @trace_method("SQLiteFlowStateRepo.get_task_issue_number", layer="client")
     def get_task_issue_number(self, branch: str) -> int | None:
         """Get task issue number for a branch from flow_issue_links.
 
@@ -202,6 +210,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved task issue number")
         return result
 
+    @trace_method("SQLiteFlowStateRepo.get_all_flows", layer="client")
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows (excludes soft-deleted flows)."""
         conn = self._get_connection()
@@ -214,6 +223,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved all flows")
         return flows
 
+    @trace_method("SQLiteFlowStateRepo.get_active_flow_count", layer="client")
     def get_active_flow_count(self) -> int:
         """Get count of active flows (excludes soft-deleted flows)."""
         conn = self._get_connection()
@@ -228,6 +238,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved active flow count")
         return int(count)
 
+    @trace_method("SQLiteFlowStateRepo.get_active_auto_flow_count", layer="client")
     def get_active_auto_flow_count(self) -> int:
         """Get count of active auto flows (excludes soft-deleted flows)."""
         conn = self._get_connection()
@@ -245,6 +256,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved active auto flow count")
         return int(count)
 
+    @trace_method("SQLiteFlowStateRepo.soft_delete_flow", layer="client")
     def soft_delete_flow(self, branch: str) -> None:
         """Soft delete flow and normalize to tombstone state.
 
@@ -297,6 +309,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             branch=branch,
         ).info("Soft deleted flow record and normalized to tombstone state")
 
+    @trace_method("SQLiteFlowStateRepo.hard_delete_flow", layer="client")
     def hard_delete_flow(self, branch: str) -> None:
         """Hard delete flow with cascade, removing all related records."""
         conn = self._get_connection()
@@ -313,6 +326,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             branch=branch,
         ).info("Hard deleted flow records and cache")
 
+    @trace_method("SQLiteFlowStateRepo.delete_flow", layer="client")
     def delete_flow(self, branch: str, force: bool = False) -> None:
         """Delete flow (soft by default, hard if force=True)."""
         if force:
@@ -320,6 +334,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         else:
             self.soft_delete_flow(branch)
 
+    @trace_method("SQLiteFlowStateRepo.restore_flow", layer="client")
     def restore_flow(self, branch: str) -> None:
         """Restore soft-deleted flow by clearing deleted_at.
 
@@ -340,6 +355,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             branch=branch,
         ).info("Restored soft-deleted flow")
 
+    @trace_method("SQLiteFlowStateRepo.get_deleted_flows", layer="client")
     def get_deleted_flows(self) -> list[dict[str, Any]]:
         """Get all soft-deleted flows."""
         conn = self._get_connection()
@@ -355,6 +371,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved deleted flows")
         return flows
 
+    @trace_method("SQLiteFlowStateRepo.get_flow_state_include_deleted", layer="client")
     def get_flow_state_include_deleted(self, branch: str) -> dict[str, Any] | None:
         """Get flow state including soft-deleted flows (for recovery check)."""
         conn = self._get_connection()
@@ -366,6 +383,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             return dict(row)
         return None
 
+    @trace_method("SQLiteFlowStateRepo.get_flows_by_issue", layer="client")
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
         """Get flows linked to an issue with specified role (excludes soft-deleted)."""
         conn = self._get_connection()
@@ -389,6 +407,7 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Retrieved flows by issue")
         return flows
 
+    @trace_method("SQLiteFlowStateRepo.get_flow_dependents", layer="client")
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get dependent flows (excludes soft-deleted flows)."""
         task_issue_number: int | None = None

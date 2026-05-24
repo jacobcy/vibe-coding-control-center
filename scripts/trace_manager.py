@@ -39,12 +39,28 @@ def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) 
     while i < len(lines):
         line = lines[i]
 
-        if not import_inserted and line.startswith("from vibe3"):
-            new_lines.append(line)
-            j = i + 1
-            while j < len(lines) and lines[j].startswith(("from ", "import ")):
-                new_lines.append(lines[j])
-                j += 1
+        if not import_inserted and (line.startswith("from vibe3") or line.startswith("import ")):
+            if line.startswith("from vibe3"):
+                new_lines.append(line)
+                j = i + 1
+                paren_count = line.count("(") - line.count(")")
+                while j < len(lines):
+                    if paren_count > 0:
+                        new_lines.append(lines[j])
+                        paren_count += lines[j].count("(") - lines[j].count(")")
+                        j += 1
+                    elif lines[j].startswith(("from ", "import ")):
+                        new_lines.append(lines[j])
+                        paren_count += lines[j].count("(") - lines[j].count(")")
+                        j += 1
+                    else:
+                        break
+            else:
+                new_lines.append(line)
+                j = i + 1
+                while j < len(lines) and lines[j].startswith("import "):
+                    new_lines.append(lines[j])
+                    j += 1
             new_lines.append("from vibe3.observability.trace_method import trace_method")
             new_lines.append("")
             i = j

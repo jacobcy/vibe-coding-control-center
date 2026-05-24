@@ -8,6 +8,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.sqlite_base import _HasConnection
+from vibe3.observability.trace_method import trace_method
 
 
 class SQLiteEventRepo(_HasConnection):
@@ -15,6 +16,7 @@ class SQLiteEventRepo(_HasConnection):
 
     db_path: str
 
+    @trace_method("SQLiteEventRepo.add_event", layer="client")
     def add_event(
         self,
         branch: str,
@@ -41,6 +43,7 @@ class SQLiteEventRepo(_HasConnection):
             event_type=event_type,
         ).debug("Added event")
 
+    @trace_method("SQLiteEventRepo.get_events", layer="client")
     def get_events(
         self,
         branch: str | None = None,
