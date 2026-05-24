@@ -1,22 +1,33 @@
 #!/usr/bin/env python3
-"""Trace Manager - 双向管理 services 层 @trace_method 装饰器。
+"""Trace Manager - 双向管理不同层的 @trace_method 装饰器。
 
 使用：
-    uv run python scripts/trace_manager.py --add --dry-run    # 预览插入
-    uv run python scripts/trace_manager.py --add              # 执行插入
-    uv run python scripts/trace_manager.py --remove --dry-run # 预览删除
-    uv run python scripts/trace_manager.py --remove           # 执行删除
+    uv run python scripts/trace_manager.py --add --layer services --dry-run
+    uv run python scripts/trace_manager.py --add --layer clients
+    uv run python scripts/trace_manager.py --add --layer all
+    uv run python scripts/trace_manager.py --remove --layer services
 """
 
 import argparse
 import re
 from pathlib import Path
 
-SERVICE_SUFFIXES = ["Service", "Usecase"]
+LAYER_CONFIG = {
+    "services": {
+        "dir": "services",
+        "suffixes": ["Service", "Usecase"],
+        "layer_name": "service",
+    },
+    "clients": {
+        "dir": "clients",
+        "suffixes": ["Client", "Repo", "Ops"],
+        "layer_name": "client",
+    },
+}
 
 
-def add_trace_decorator(lines: list[str]) -> list[str]:
-    """给 services 层公共方法添加 trace 装饰器。"""
+def add_trace_decorator(lines: list[str], layer_name: str, suffixes: list[str]) -> list[str]:
+    """给指定层公共方法添加 trace 装饰器。"""
     new_lines = []
     i = 0
     has_trace_import = any(
@@ -44,7 +55,7 @@ def add_trace_decorator(lines: list[str]) -> list[str]:
         if class_match:
             class_name = class_match.group(1)
 
-            if not any(class_name.endswith(suffix) for suffix in SERVICE_SUFFIXES):
+            if not any(class_name.endswith(suffix) for suffix in suffixes):
                 new_lines.append(line)
                 i += 1
                 continue
@@ -70,7 +81,9 @@ def add_trace_decorator(lines: list[str]) -> list[str]:
                         continue
 
                     trace_name = f"{class_name}.{method_name}"
-                    new_lines.append(f'{indent}@trace_method("{trace_name}", layer="service")')
+                    new_lines.append(
+                        f'{indent}@trace_method("{trace_name}", layer="{layer_name}")'
+                    )
                     new_lines.append(current_line)
                     i += 1
                     continue
@@ -97,12 +110,18 @@ def remove_trace_decorator(lines: list[str]) -> list[str]:
     ]
 
 
-def process_file(file_path: Path, mode: str, dry_run: bool) -> bool:
+def process_file(
+    file_path: Path, mode: str, dry_run: bool, layer_name: str, suffixes: list[str]
+) -> bool:
     """处理单个文件，返回是否有修改。"""
     content = file_path.read_text()
     lines = content.split("\n")
 
-    new_lines = add_trace_decorator(lines) if mode == "add" else remove_trace_decorator(lines)
+    new_lines = (
+        add_trace_decorator(lines, layer_name, suffixes)
+        if mode == "add"
+        else remove_trace_decorator(lines)
+    )
     new_content = "\n".join(new_lines)
 
     if new_content == content:
@@ -124,9 +143,17 @@ def process_file(file_path: Path, mode: str, dry_run: bool) -> bool:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="管理 services 层 @trace_method 装饰器")
+    parser = argparse.ArgumentParser(
+        description="管理不同层的 @trace_method 装饰器"
+    )
     parser.add_argument("--add", action="store_true", help="插入装饰器")
     parser.add_argument("--remove", action="store_true", help="删除装饰器")
+    parser.add_argument(
+        "--layer",
+        choices=["services", "clients", "all"],
+        default="services",
+        help="目标层: services, clients, 或 all (默认: services)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="只预览，不修改文件")
     args = parser.parse_args()
 
@@ -137,25 +164,36 @@ def main() -> None:
 
     mode = "add" if args.add else "remove"
     base_path = Path(__file__).parent.parent / "src" / "vibe3"
-    services_dir = base_path / "services"
 
-    if not services_dir.exists():
-        print(f"❌ 目录不存在: {services_dir}")
-        return
+    layers = list(LAYER_CONFIG.keys()) if args.layer == "all" else [args.layer]
 
-    modified_count = 0
-    for py_file in services_dir.glob("*.py"):
-        if py_file.name in ["__init__.py", "protocols.py"]:
+    total_modified = 0
+    for layer in layers:
+        config = LAYER_CONFIG[layer]
+        target_dir = base_path / config["dir"]
+
+        if not target_dir.exists():
+            print(f"❌ 目录不存在: {target_dir}")
             continue
 
-        if mode == "remove" and "@trace_method" not in py_file.read_text():
-            continue
+        print(f"\n处理层: {layer} ({config['dir']}/)")
+        modified_count = 0
+        for py_file in target_dir.glob("*.py"):
+            if py_file.name in ["__init__.py", "protocols.py"]:
+                continue
 
-        print(f"处理: {py_file.relative_to(base_path)}")
-        if process_file(py_file, mode, args.dry_run):
-            modified_count += 1
+            if mode == "remove" and "@trace_method" not in py_file.read_text():
+                continue
 
-    print(f"\n{'[DRY RUN] ' if args.dry_run else ''}共修改 {modified_count} 个文件")
+            if process_file(
+                py_file, mode, args.dry_run, config["layer_name"], config["suffixes"]
+            ):
+                modified_count += 1
+
+        print(f"  {'[DRY RUN] ' if args.dry_run else ''}修改 {modified_count} 个文件")
+        total_modified += modified_count
+
+    print(f"\n{'[DRY RUN] ' if args.dry_run else ''}总计修改 {total_modified} 个文件")
 
 
 if __name__ == "__main__":

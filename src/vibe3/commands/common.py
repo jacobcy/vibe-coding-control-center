@@ -19,8 +19,10 @@ def enable_method_trace() -> None:
     if "VIBE3_TRACE_HINT_SHOWN" not in os.environ:
         os.environ["VIBE3_TRACE_HINT_SHOWN"] = "1"
         print(
-            "Trace enabled. To add method tracing, run:\n"
-            "  uv run python scripts/trace_manager.py --add",
+            "Trace enabled. To add method tracing:\n"
+            "  uv run python scripts/trace_manager.py --add --layer services\n"
+            "  uv run python scripts/trace_manager.py --add --layer clients\n"
+            "  uv run python scripts/trace_manager.py --add --layer all",
             file=sys.stderr,
         )
 
