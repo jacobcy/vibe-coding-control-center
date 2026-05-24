@@ -5,7 +5,11 @@ via CLI self-invocation (internal governance) to ensure ErrorTrackingService
 captures API errors in the sync chain.
 """
 
+from __future__ import annotations
+
 import os
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -16,29 +20,65 @@ from vibe3.domain.handler_registry import register_handler
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 
+if TYPE_CHECKING:
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.config.orchestra_config import OrchestraConfig
+    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+
+@dataclass(frozen=True)
+class GovernanceScanDependencies:
+    """Pre-built service bundle for governance scan handler."""
+
+    registry: SessionRegistryService
+    status_service: OrchestraStatusService
+
+    @staticmethod
+    def build(
+        config: OrchestraConfig, store: SQLiteClient
+    ) -> GovernanceScanDependencies:
+        """Build dependencies with required services.
+
+        Args:
+            config: OrchestraConfig instance
+            store: SQLiteClient instance from get_store()
+
+        Returns:
+            GovernanceScanDependencies with registry and status_service
+        """
+        from vibe3.agents.backends.codeagent import CodeagentBackend
+        from vibe3.environment.session_registry import SessionRegistryService
+        from vibe3.orchestra.flow_dispatch import FlowManager
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        backend = CodeagentBackend()
+        registry = SessionRegistryService(store, backend)
+        flow_manager = FlowManager(config)
+        status_service = OrchestraStatusService(config, orchestrator=flow_manager)
+        return GovernanceScanDependencies(
+            registry=registry, status_service=status_service
+        )
+
 
 @register_handler("GovernanceScanStarted")
-def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
+def handle_governance_scan_started(
+    event: GovernanceScanStarted, /, deps: GovernanceScanDependencies | None = None
+) -> None:
     """Dispatch governance scan via CLI self-invocation."""
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.execution.coordinator import ExecutionCoordinator
     from vibe3.execution.issue_role_support import (
         resolve_async_cli_project_root,
         resolve_orchestra_repo_root,
     )
-    from vibe3.orchestra.flow_dispatch import FlowManager
     from vibe3.orchestra.logging import append_governance_event
     from vibe3.roles.governance import build_governance_execution_name
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
     config = load_orchestra_config()
 
     with get_store() as store:
-        backend = CodeagentBackend()
-        registry = SessionRegistryService(store, backend)
-        registry.mark_governance_sessions_done_when_tmux_gone()
-        live_governance = registry.list_live_governance_sessions()
+        resolved = deps or GovernanceScanDependencies.build(config, store)
+        resolved.registry.mark_governance_sessions_done_when_tmux_gone()
+        live_governance = resolved.registry.list_live_governance_sessions()
         if len(live_governance) >= config.governance_max_concurrent:
             session_names = ", ".join(
                 str(session.get("tmux_session") or session.get("session_name") or "?")
@@ -68,9 +108,7 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
             )
             return
 
-    flow_manager = FlowManager(config)
-    status_service = OrchestraStatusService(config, orchestrator=flow_manager)
-    snapshot = status_service.snapshot()
+    snapshot = resolved.status_service.snapshot()
 
     # Resolve repo root once (used for circuit breaker skip log and CLI command)
     root = resolve_orchestra_repo_root()
@@ -119,8 +157,9 @@ def handle_governance_scan_started(event: GovernanceScanStarted, /) -> None:
     )
 
     with get_store() as store:
-        backend = CodeagentBackend()
-        coordinator = ExecutionCoordinator(config, store, backend)
+        from vibe3.execution.coordinator import ExecutionCoordinator
+
+        coordinator = ExecutionCoordinator(config, store)
 
         try:
             result = coordinator.dispatch_execution(request)
