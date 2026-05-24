@@ -11,7 +11,7 @@ from vibe3.commands.command_options import (
     TraceMinMsOption,
     TraceOption,
 )
-from vibe3.commands.common import enable_method_trace
+from vibe3.commands.common import enable_method_trace, validate_trace_options
 from vibe3.models.flow import IssueLink
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -159,6 +159,7 @@ def update(
     the corresponding branch doesn't exist in git, automatically creates the
     branch before registering flow.
     """
+    validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
 
@@ -285,6 +286,7 @@ def bind(
     ] = False,
 ) -> None:
     """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
+    validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
 
@@ -443,6 +445,7 @@ def restore_flow(
     min_ms: TraceMinMsOption = None,
 ) -> None:
     """Restore a soft-deleted flow."""
+    validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
 

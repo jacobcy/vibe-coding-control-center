@@ -12,7 +12,11 @@ from vibe3.commands.command_options import (
     RemoteOption,
     TraceMinMsOption,
 )
-from vibe3.commands.common import enable_method_trace, run_full_check_shortcut
+from vibe3.commands.common import (
+    enable_method_trace,
+    run_full_check_shortcut,
+    validate_trace_options,
+)
 from vibe3.commands.flow_status_helpers import (
     _collect_timeline_issue_numbers,
     _fetch_issue_titles_for_status,
@@ -79,6 +83,7 @@ def show(
     ] = False,
 ) -> None:
     """Show flow details with source-aware reads."""
+    validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
 
@@ -305,6 +310,7 @@ def status(
 
     By default only shows active flows. Use --all to include done/aborted/stale.
     """
+    validate_trace_options(trace, min_ms)
     if trace:
         enable_method_trace(min_ms=min_ms)
 

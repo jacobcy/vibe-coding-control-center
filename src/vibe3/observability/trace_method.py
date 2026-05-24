@@ -21,6 +21,7 @@ _trace_line_count: int = 0
 _trace_min_ms: float = 0.0
 _trace_max_lines: int = 100
 _trace_truncated: bool = False
+_atexit_registered: bool = False
 
 
 class Color:
@@ -95,8 +96,9 @@ def _print_summary() -> None:
 
 def _register_atexit() -> None:
     """Register summary printer at program exit (once)."""
-    if "VIBE3_TRACE_ATEXIT" not in os.environ:
-        os.environ["VIBE3_TRACE_ATEXIT"] = "1"
+    global _atexit_registered
+    if not _atexit_registered:
+        _atexit_registered = True
         atexit.register(_print_summary)
 
 
@@ -142,17 +144,6 @@ def trace_method(
 
             global _trace_line_count, _trace_truncated
 
-            entry_printed = False
-            if _trace_line_count < _trace_max_lines:
-                call_indicator = (
-                    f"{Color.CYAN}\u2192{Color.RESET}" if use_color else "\u2192"
-                )
-                print(f"{indent}{call_indicator} {label}", file=sys.stderr)
-                _trace_line_count += 1
-                entry_printed = True
-            else:
-                _trace_truncated = True
-
             try:
                 result = func(*args, **kwargs)
                 elapsed = time.perf_counter() - start_time
@@ -170,11 +161,15 @@ def trace_method(
                     }
 
                 elapsed_ms = elapsed * 1000
-                should_print_exit = (
-                    _trace_min_ms <= 0 or elapsed_ms >= _trace_min_ms
-                ) and _trace_line_count < _trace_max_lines
+                should_show = _trace_min_ms <= 0 or elapsed_ms >= _trace_min_ms
 
-                if should_print_exit:
+                if should_show and _trace_line_count < _trace_max_lines:
+                    call_indicator = (
+                        f"{Color.CYAN}\u2192{Color.RESET}" if use_color else "\u2192"
+                    )
+                    print(f"{indent}{call_indicator} {label}", file=sys.stderr)
+                    _trace_line_count += 1
+
                     return_indicator = (
                         f"{Color.GREEN}\u2190{Color.RESET}" if use_color else "\u2190"
                     )
@@ -184,18 +179,7 @@ def trace_method(
                         file=sys.stderr,
                     )
                     _trace_line_count += 1
-                elif entry_printed and _trace_min_ms > 0 and elapsed_ms < _trace_min_ms:
-                    return_indicator = (
-                        f"{Color.GREEN}\u2190{Color.RESET}" if use_color else "\u2190"
-                    )
-                    threshold_hint = f"< {_trace_min_ms:.0f}ms threshold"
-                    print(
-                        f"{indent}{return_indicator} {label} "
-                        f"[{_format_duration(elapsed)} {threshold_hint}]",
-                        file=sys.stderr,
-                    )
-                    _trace_line_count += 1
-                elif not _trace_truncated:
+                elif not _trace_truncated and _trace_line_count >= _trace_max_lines:
                     _trace_truncated = True
 
                 return result
@@ -216,6 +200,12 @@ def trace_method(
                     }
 
                 if _trace_line_count < _trace_max_lines:
+                    call_indicator = (
+                        f"{Color.CYAN}\u2192{Color.RESET}" if use_color else "\u2192"
+                    )
+                    print(f"{indent}{call_indicator} {label}", file=sys.stderr)
+                    _trace_line_count += 1
+
                     error_indicator = (
                         f"{Color.RED}\u2717{Color.RESET}" if use_color else "\u2717"
                     )
