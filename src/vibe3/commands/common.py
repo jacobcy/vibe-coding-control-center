@@ -1,14 +1,11 @@
 """Common utilities for command layer."""
 
 import os
-from contextlib import nullcontext
-from typing import Any
 
 import typer
 
 from vibe3.commands.check_support import execute_check_mode
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 
 
 def enable_method_trace() -> None:
@@ -18,28 +15,6 @@ def enable_method_trace() -> None:
     """
     os.environ["VIBE3_TRACE"] = "1"
     setup_logging(verbose=2)
-
-
-def trace_scope(trace: bool, command: str, domain: str = "flow", **kwargs: Any) -> Any:
-    """Create trace context for command execution.
-
-    Args:
-        trace: Enable trace mode
-        command: Command name
-        domain: Domain name (default: flow)
-        **kwargs: Additional context fields
-
-    Returns:
-        Trace context manager or nullcontext
-
-    Example:
-        >>> with trace_scope(True, "flow show", flow_name="my-feature"):
-        ...     pass
-    """
-    if trace:
-        setup_logging(verbose=2)
-        return trace_context(command=command, domain=domain, **kwargs)
-    return nullcontext()
 
 
 def run_full_check_shortcut() -> None:

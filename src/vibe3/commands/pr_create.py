@@ -9,11 +9,11 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.commands.pr_helpers import build_base_resolution_usecase, noop_context
+from vibe3.commands.common import enable_method_trace
+from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
@@ -137,12 +137,8 @@ def register_create_command(app: typer.Typer) -> None:
         if trace:
             setup_logging(verbose=2)
 
-        ctx = (
-            trace_context(command="pr create", domain="pr", title=title)
-            if trace
-            else noop_context()
-        )
-        with ctx:
+        if trace:
+            enable_method_trace()
             base_resolver = build_base_resolution_usecase()
             flow_service = FlowService()
             branch = _resolve_branch_for_ai_context(flow_service.get_current_branch())

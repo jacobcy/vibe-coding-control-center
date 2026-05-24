@@ -26,16 +26,14 @@ from vibe3.analysis.local_review_report import (
     LocalReviewReport,
     find_latest_prepush_report,
 )
+from vibe3.commands.common import enable_method_trace
 from vibe3.commands.output_format import (
     add_execution_step,
     create_trace_output,
     output_result,
 )
-from vibe3.commands.pr_helpers import noop_context
 from vibe3.models.pr import PRResponse
 from vibe3.models.trace import TraceOutput
-from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.branch_resolver import resolve_branch_from_pr
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
@@ -340,7 +338,7 @@ def register_query_commands(app: typer.Typer) -> None:
             raise typer.Exit(1)
 
         if trace:
-            setup_logging(verbose=2)
+            enable_method_trace()
 
         trace_output: TraceOutput | None = None
         start_time = datetime.now()
@@ -348,176 +346,168 @@ def register_query_commands(app: typer.Typer) -> None:
         if trace:
             trace_output = create_trace_output("pr show", start_time)
 
-        ctx = trace_context(command="pr show", domain="pr") if trace else noop_context()
-        with ctx:
-            logger.bind(command="pr show", pr_number=pr_number, branch=branch).info(
-                "Fetching PR details"
+        logger.bind(command="pr show", pr_number=pr_number, branch=branch).info(
+            "Fetching PR details"
+        )
+
+        if trace_output:
+            add_execution_step(
+                trace_output,
+                time=start_time.strftime("%H:%M:%S"),
+                level="INFO",
+                module="vibe3.commands.pr",
+                function="show",
+                line=99,
+                message="Fetching PR details",
             )
 
-            if trace_output:
-                add_execution_step(
-                    trace_output,
-                    time=start_time.strftime("%H:%M:%S"),
-                    level="INFO",
-                    module="vibe3.commands.pr",
-                    function="show",
-                    line=99,
-                    message="Fetching PR details",
-                )
+        pr_svc = PRService()
+        target = _resolve_pr_target(pr_svc, pr_number, branch)
+        pr_number = target.pr_number
+        branch = target.branch
+        if target.from_flow and target.current_branch is not None:
+            logger.bind(
+                branch=target.current_branch,
+                pr_number=pr_number,
+            ).debug("Found PR number in flow state")
 
-            pr_svc = PRService()
-            target = _resolve_pr_target(pr_svc, pr_number, branch)
-            pr_number = target.pr_number
-            branch = target.branch
-            if target.from_flow and target.current_branch is not None:
-                logger.bind(
-                    branch=target.current_branch,
-                    pr_number=pr_number,
-                ).debug("Found PR number in flow state")
-
-            try:
-                pr = _fetch_pr_or_raise(
+        try:
+            pr = _fetch_pr_or_raise(
+                pr_svc,
+                pr_number,
+                branch,
+                current_branch=target.current_branch,
+            )
+        except LookupError:
+            typer.echo(
+                _build_missing_pr_message(
                     pr_svc,
-                    pr_number,
-                    branch,
+                    pr_number=pr_number,
+                    branch=branch,
                     current_branch=target.current_branch,
-                )
-            except LookupError:
-                typer.echo(
-                    _build_missing_pr_message(
-                        pr_svc,
-                        pr_number=pr_number,
-                        branch=branch,
-                        current_branch=target.current_branch,
-                    ),
-                    err=True,
-                )
-                raise typer.Exit(1) from None
+                ),
+                err=True,
+            )
+            raise typer.Exit(1) from None
 
-            analysis_summary = None
-            if pr_number:
-                analysis_summary = _load_pr_analysis_summary(pr_number)
-                logger.debug("Successfully retrieved change analysis")
+        analysis_summary = None
+        if pr_number:
+            analysis_summary = _load_pr_analysis_summary(pr_number)
+            logger.debug("Successfully retrieved change analysis")
 
-            # Find local pre-push review report
-            local_review = find_latest_prepush_report()
-            if local_review:
-                logger.debug(
-                    f"Found local review report: {local_review.report_path.name}"
-                )
+        # Find local pre-push review report
+        local_review = find_latest_prepush_report()
+        if local_review:
+            logger.debug(f"Found local review report: {local_review.report_path.name}")
 
-            # Resolve branch from PR (compute once, reuse later)
-            resolved_branch: str | None = None
-            try:
-                if pr and pr_number:
-                    # Standard path: PR → Issue → Flow → Branch
-                    # Pass pre-fetched PR to avoid duplicate API call
-                    resolved_branch = resolve_branch_from_pr(pr_number, pr_svc, pr)
-            except Exception as exc:
-                logger.bind(domain="pr", action="resolve_branch").warning(
-                    f"Failed to resolve branch from PR: {exc}"
-                )
+        # Resolve branch from PR (compute once, reuse later)
+        resolved_branch: str | None = None
+        try:
+            if pr and pr_number:
+                # Standard path: PR → Issue → Flow → Branch
+                # Pass pre-fetched PR to avoid duplicate API call
+                resolved_branch = resolve_branch_from_pr(pr_number, pr_svc, pr)
+        except Exception as exc:
+            logger.bind(domain="pr", action="resolve_branch").warning(
+                f"Failed to resolve branch from PR: {exc}"
+            )
 
-            # Record external events (best-effort, non-blocking)
-            try:
-                if pr and pr_number:
-                    effective_branch = (
-                        branch or target.current_branch or resolved_branch
-                    )
-                    if effective_branch:
-                        _fetch_and_record_external_events(
-                            pr_number=pr_number,
-                            branch=effective_branch,
-                            github_client=pr_svc.github_client,
-                            handoff_svc=HandoffService(store=pr_svc.store),
-                        )
-            except Exception as exc:
-                logger.bind(domain="pr", action="record_external_events").warning(
-                    f"Failed to record external events: {exc}"
-                )
-
-            if trace_output or json_output or yaml_output:
-                result = _build_pr_output_payload(pr, analysis_summary, local_review)
-                output_result(
-                    result=result,
-                    trace_output=trace_output,
-                    json_output=json_output,
-                    yaml_output=yaml_output,
-                )
-            else:
-                # Human-readable output
-                render_pr_details(pr)
-
-                # Show bound tasks from flow truth
-                # Fallback chain:
-                # resolved_branch → branch → target.current_branch → current branch
+        # Record external events (best-effort, non-blocking)
+        try:
+            if pr and pr_number:
                 effective_branch = branch or target.current_branch or resolved_branch
-                if not effective_branch and pr:
-                    # Final fallback: get current branch from git
-                    # (if PR is from current worktree)
-                    try:
-                        effective_branch = pr_svc.git_client.get_current_branch()
-                    except Exception as e:
-                        logger.bind(
-                            domain="pr",
-                            action="get_current_branch",
-                            error_type=type(e).__name__,
-                            error_msg=str(e),
-                        ).debug(f"Failed to get current branch: {e}")
-
                 if effective_branch:
-                    bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
-                    if bound_tasks:
-                        console = Console()
-                        console.print("\n[bold]### Bound Task(s)[/]")
-                        for task_num in bound_tasks:
-                            console.print(f"  - #{task_num}")
+                    _fetch_and_record_external_events(
+                        pr_number=pr_number,
+                        branch=effective_branch,
+                        github_client=pr_svc.github_client,
+                        handoff_svc=HandoffService(store=pr_svc.store),
+                    )
+        except Exception as exc:
+            logger.bind(domain="pr", action="record_external_events").warning(
+                f"Failed to record external events: {exc}"
+            )
 
-                # Show change analysis
-                if analysis_summary:
-                    analysis = analysis_summary.get("raw")
-                    if not isinstance(analysis, dict):
-                        analysis = {}
+        if trace_output or json_output or yaml_output:
+            result = _build_pr_output_payload(pr, analysis_summary, local_review)
+            output_result(
+                result=result,
+                trace_output=trace_output,
+                json_output=json_output,
+                yaml_output=yaml_output,
+            )
+        else:
+            # Human-readable output
+            render_pr_details(pr)
 
+            # Show bound tasks from flow truth
+            # Fallback chain:
+            # resolved_branch → branch → target.current_branch → current branch
+            effective_branch = branch or target.current_branch or resolved_branch
+            if not effective_branch and pr:
+                # Final fallback: get current branch from git
+                # (if PR is from current worktree)
+                try:
+                    effective_branch = pr_svc.git_client.get_current_branch()
+                except Exception as e:
+                    logger.bind(
+                        domain="pr",
+                        action="get_current_branch",
+                        error_type=type(e).__name__,
+                        error_msg=str(e),
+                    ).debug(f"Failed to get current branch: {e}")
+
+            if effective_branch:
+                bound_tasks = _resolve_task_from_flow(pr_svc, effective_branch)
+                if bound_tasks:
                     console = Console()
+                    console.print("\n[bold]### Bound Task(s)[/]")
+                    for task_num in bound_tasks:
+                        console.print(f"  - #{task_num}")
 
-                    console.print("\n[bold]### Change Analysis[/]")
-                    score_items = score(analysis)
-                    console.print(
-                        f"- [cyan]Risk Level[/]: {score_items.get('level', 'N/A')}"
-                    )
-                    console.print(
-                        f"- [cyan]Risk Score[/]: {score_items.get('score', 'N/A')}"
-                    )
-                    reason = score_items.get("reason")
-                    if reason:
-                        console.print(f"- [cyan]Reason[/]: {reason}")
-                    trigger_factors = as_list(score_items.get("trigger_factors"))
-                    if trigger_factors:
-                        console.print("- [cyan]Trigger Factors[/]:")
-                        for factor in trigger_factors:
-                            console.print(f"  - {factor}")
+            # Show change analysis
+            if analysis_summary:
+                analysis = analysis_summary.get("raw")
+                if not isinstance(analysis, dict):
+                    analysis = {}
 
-                    impact_items = impact(analysis)
-                    changed_files = as_list(impact_items.get("changed_files"))
-                    console.print(f"- [cyan]Changed Files[/]: {len(changed_files)}")
+                console = Console()
 
-                    dag_items = dag(analysis)
-                    impacted_modules = as_list(dag_items.get("impacted_modules"))
-                    console.print(
-                        f"- [cyan]Impacted Modules[/]: {len(impacted_modules)}"
-                    )
-                    recommendations = as_list(score_items.get("recommendations"))
-                    if recommendations:
-                        console.print("- [cyan]Recommendations[/]:")
-                        for item in recommendations:
-                            console.print(f"  - {item}")
+                console.print("\n[bold]### Change Analysis[/]")
+                score_items = score(analysis)
+                console.print(
+                    f"- [cyan]Risk Level[/]: {score_items.get('level', 'N/A')}"
+                )
+                console.print(
+                    f"- [cyan]Risk Score[/]: {score_items.get('score', 'N/A')}"
+                )
+                reason = score_items.get("reason")
+                if reason:
+                    console.print(f"- [cyan]Reason[/]: {reason}")
+                trigger_factors = as_list(score_items.get("trigger_factors"))
+                if trigger_factors:
+                    console.print("- [cyan]Trigger Factors[/]:")
+                    for factor in trigger_factors:
+                        console.print(f"  - {factor}")
 
-                    # Show top changed files
-                    if changed_files:
-                        console.print("\n[bold]### Top Changed Files[/]")
-                        for file in changed_files[:5]:
-                            console.print(f"  - {file}")
+                impact_items = impact(analysis)
+                changed_files = as_list(impact_items.get("changed_files"))
+                console.print(f"- [cyan]Changed Files[/]: {len(changed_files)}")
 
-                # Show local review summary
-                render_local_review_summary(local_review)
+                dag_items = dag(analysis)
+                impacted_modules = as_list(dag_items.get("impacted_modules"))
+                console.print(f"- [cyan]Impacted Modules[/]: {len(impacted_modules)}")
+                recommendations = as_list(score_items.get("recommendations"))
+                if recommendations:
+                    console.print("- [cyan]Recommendations[/]:")
+                    for item in recommendations:
+                        console.print(f"  - {item}")
+
+                # Show top changed files
+                if changed_files:
+                    console.print("\n[bold]### Top Changed Files[/]")
+                    for file in changed_files[:5]:
+                        console.print(f"  - {file}")
+
+            # Show local review summary
+            render_local_review_summary(local_review)

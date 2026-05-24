@@ -8,10 +8,10 @@ from typing import Annotated, Iterator
 import typer
 
 from vibe3.commands.command_options import FormatOption
+from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
@@ -106,12 +106,8 @@ def show(
     if trace:
         setup_logging(verbose=2)
 
-    ctx = (
-        trace_context(command="task show", domain="task", branch=target_branch)
-        if trace
-        else _noop()
-    )
-    with ctx:
+    if trace:
+        enable_method_trace()
         # Resolve issue number from branch using standard resolver
         resolved_branch = (
             resolve_issue_branch_input(target_branch, task_svc.flow_service)

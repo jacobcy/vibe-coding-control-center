@@ -6,8 +6,8 @@ import typer
 from rich.console import Console
 
 from vibe3.commands.check_support import execute_check_mode
+from vibe3.commands.common import enable_method_trace
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.check_service import CheckService
 
 app = typer.Typer(
@@ -218,9 +218,8 @@ def check(
         typer.echo("Error: --branch requires a non-empty branch name.", err=True)
         raise typer.Exit(code=1)
 
-    trace_ctx = trace_context(command="check", domain="check") if trace else None
-    if trace_ctx:
-        trace_ctx.__enter__()
+    if trace:
+        enable_method_trace()
 
     try:
         service = CheckService()
@@ -264,5 +263,4 @@ def check(
                 "use 'vibe3 check --clean-branch'[/]"
             )
     finally:
-        if trace_ctx:
-            trace_ctx.__exit__(None, None, None)
+        pass

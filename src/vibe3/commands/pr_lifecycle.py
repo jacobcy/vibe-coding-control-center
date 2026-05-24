@@ -11,10 +11,9 @@ from typing import Annotated, List
 import typer
 from loguru import logger
 
-from vibe3.commands.pr_helpers import noop_context
+from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import UserError
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
 from vibe3.services.pr_service import PRService
@@ -108,12 +107,8 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             typer.echo(f"Error: {error}", err=True)
             raise typer.Exit(1) from error
 
-        ctx = (
-            trace_context(command="pr ready", domain="pr", pr_number=target_pr_number)
-            if trace
-            else noop_context()
-        )
-        with ctx:
+        if trace:
+            enable_method_trace()
             logger.bind(command="pr ready", pr_number=target_pr_number, yes=yes).info(
                 "Marking PR as ready for review"
             )
