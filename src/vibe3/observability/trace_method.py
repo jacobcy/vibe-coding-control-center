@@ -78,12 +78,13 @@ def trace_method(
             use_color = sys.stderr.isatty()
 
             start_time = time.perf_counter()
+            label = f"[{layer}] {name}"
 
             # Print entry
             call_indicator = (
                 f"{Color.CYAN}\u2192{Color.RESET}" if use_color else "\u2192"
             )
-            print(f"{indent}{call_indicator} {name}", file=sys.stderr)
+            print(f"{indent}{call_indicator} {label}", file=sys.stderr)
 
             try:
                 result = func(*args, **kwargs)
@@ -94,7 +95,7 @@ def trace_method(
                     f"{Color.GREEN}\u2190{Color.RESET}" if use_color else "\u2190"
                 )
                 print(
-                    f"{indent}{return_indicator} {name} "
+                    f"{indent}{return_indicator} {label} "
                     f"[{_format_duration(elapsed)}]",
                     file=sys.stderr,
                 )
@@ -107,7 +108,7 @@ def trace_method(
                     f"{Color.RED}\u2717{Color.RESET}" if use_color else "\u2717"
                 )
                 print(
-                    f"{indent}{error_indicator} {name} raised "
+                    f"{indent}{error_indicator} {label} raised "
                     f"{type(e).__name__} [{_format_duration(elapsed)}]",
                     file=sys.stderr,
                 )

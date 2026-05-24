@@ -21,6 +21,17 @@ from vibe3.services.handoff_resolution import (
     resolve_handoff_target,
 )
 
+__all__ = [
+    "GitClientProtocol",
+    "_SHARED_HANDOFF_PREFIX",
+    "check_ref_exists",
+    "normalize_ref_path",
+    "ref_to_handoff_cmd",
+    "resolve_handoff_target",
+    "resolve_ref_path",
+    "sanitize_event_detail_paths",
+]
+
 # Backward compatibility alias
 GitClientProtocol = GitPathProtocol
 

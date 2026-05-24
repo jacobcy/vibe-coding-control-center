@@ -1,6 +1,7 @@
 """Status command - unified dashboard for flows and orchestra."""
 
 import json
+from dataclasses import asdict
 from datetime import timezone
 from typing import Annotated, cast
 
@@ -155,11 +156,7 @@ def status(
         )
 
         output_data = {
-            "orchestra": (
-                orch_snapshot.model_dump()
-                if hasattr(orch_snapshot, "model_dump")
-                else str(orch_snapshot)
-            ),
+            "orchestra": asdict(orch_snapshot),
             "flows": [f.model_dump() for f in flows],
             "orchestrated_issues": orchestrated_issues,
         }
