@@ -13,11 +13,6 @@ from loguru import logger
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
-from vibe3.services.issue_body_service import (
-    FlowStateProjection,
-    merge_projection,
-    parse_projection,
-)
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
     resume_issue,
@@ -339,29 +334,6 @@ class TaskResumeOperations:
                 previous_state=previous_state.value,
             ).warning("Failed to rollback issue state after resume error: " f"{exc}")
 
-    def cleanup_stale_flow(self, branch: str) -> None:
-        """Clean up stale flow metadata after blocked resume.
-
-        Args:
-            branch: Branch name for the flow to clean up
-        """
-        try:
-            logger.bind(
-                domain="resume",
-                action="cleanup_stale_flow",
-                branch=branch,
-            ).info("Cleaning up stale flow")
-
-            # Reactivate the stale flow (change status from "stale" to "active")
-            self.flow_service.reactivate_flow(branch)
-        except Exception as exc:
-            # Log but don't fail the resume operation
-            logger.bind(
-                domain="resume",
-                action="cleanup_stale_flow",
-                branch=branch,
-            ).warning(f"Failed to clean up stale flow: {exc}")
-
     def reactivate_aborted_flow(self, branch: str) -> None:
         """Reactivate an aborted flow.
 
@@ -389,14 +361,16 @@ class TaskResumeOperations:
         """Clear blocked_reason/failed_reason from FlowState.
 
         Directly clears DB fields and issue body projection without intermediate
-        state transitions. Preserves timeline comment for audit trail.
+        state transitions. Does NOT record timeline event (caller handles that).
         """
         from vibe3.services.blocked_state_io import BlockedStateIO
-        from vibe3.services.flow_timeline_service import FlowTimelineService
 
         try:
             logger.bind(
-                domain="resume", action="clear_flow_reasons", branch=branch
+                domain="resume",
+                action="clear_flow_reasons",
+                branch=branch,
+                resume_kind=resume_kind,
             ).info("Clearing flow reason fields")
 
             issue_number = self.flow_service.store.get_task_issue_number(branch)
@@ -410,7 +384,7 @@ class TaskResumeOperations:
                 failed_reason=None,
             )
 
-            # Clear issue body projection and record timeline event
+            # Clear issue body projection
             if issue_number:
                 io = BlockedStateIO(
                     github_client=self.github_client,
@@ -419,60 +393,9 @@ class TaskResumeOperations:
                 )
                 io.clear_body_projection(issue_number=issue_number)
 
-                timeline = FlowTimelineService(store=self.flow_service.store)
-                timeline.record_timeline_event(
-                    branch=branch,
-                    event_type="resumed",
-                    actor="human:resume",
-                    detail="Resumed to active",
-                    issue_number=issue_number,
-                )
-
         except Exception as exc:
             logger.bind(
                 domain="resume",
                 action="clear_flow_reasons",
                 branch=branch,
             ).warning(f"Failed to clear flow reasons: {exc}")
-
-    def _clear_blocked_projection(self, issue_number: int) -> None:
-        """Clear blocked state from issue body projection.
-
-        Explicitly clears blocked fields (state, blocked_by, blocked_reason)
-        while preserving non-blocked projection data like dependencies.
-        Future-proof: new projection fields won't be accidentally wiped.
-
-        Args:
-            issue_number: GitHub issue number
-        """
-        try:
-            logger.bind(
-                domain="resume",
-                action="clear_blocked_projection",
-                issue_number=issue_number,
-            ).info("Clearing blocked projection from issue body")
-
-            current_body = self.github_client.get_issue_body(issue_number)
-            if current_body is None:
-                return
-
-            # Parse existing projection to preserve non-blocked fields
-            body_projection = parse_projection(current_body)
-
-            # Explicitly clear blocked fields, preserve everything else
-            cleared = FlowStateProjection(
-                state="active",
-                blocked_by=[],
-                blocked_reason=None,
-                dependencies=body_projection.dependencies,
-            )
-            merged = merge_projection(current_body, cleared)
-
-            self.github_client.update_issue_body(issue_number, merged)
-
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="clear_blocked_projection",
-                issue_number=issue_number,
-            ).warning(f"Failed to clear blocked projection: {exc}")

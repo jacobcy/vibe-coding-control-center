@@ -369,15 +369,10 @@ def test_clear_flow_reasons_clears_both_reasons() -> None:
             operations.flow_service.store, "update_flow_state"
         ) as mock_update_flow,
         patch("vibe3.services.blocked_state_io.BlockedStateIO") as mock_io_cls,
-        patch(
-            "vibe3.services.flow_timeline_service.FlowTimelineService"
-        ) as mock_timeline_cls,
     ):
         mock_get_issue.return_value = 303
         mock_io_instance = MagicMock()
         mock_io_cls.return_value = mock_io_instance
-        mock_timeline_instance = MagicMock()
-        mock_timeline_cls.return_value = mock_timeline_instance
 
         operations._clear_flow_reasons("task/issue-303", "blocked")
 
@@ -391,14 +386,6 @@ def test_clear_flow_reasons_clears_both_reasons() -> None:
         )
         # Verify: issue body projection cleared
         mock_io_instance.clear_body_projection.assert_called_once_with(issue_number=303)
-        # Verify: timeline event recorded
-        mock_timeline_instance.record_timeline_event.assert_called_once_with(
-            branch="task/issue-303",
-            event_type="resumed",
-            actor="human:resume",
-            detail="Resumed to active",
-            issue_number=303,
-        )
 
 
 def test_reset_issue_to_ready_blocks_when_branch_has_live_runtime_session() -> None:
@@ -443,15 +430,10 @@ def test_clear_flow_reasons_direct_clear_without_intermediate_state() -> None:
             operations.flow_service.store, "update_flow_state"
         ) as mock_update_flow,
         patch("vibe3.services.blocked_state_io.BlockedStateIO") as mock_io_cls,
-        patch(
-            "vibe3.services.flow_timeline_service.FlowTimelineService"
-        ) as mock_timeline_cls,
     ):
         mock_get_issue.return_value = 123
         mock_io_instance = MagicMock()
         mock_io_cls.return_value = mock_io_instance
-        mock_timeline_instance = MagicMock()
-        mock_timeline_cls.return_value = mock_timeline_instance
 
         # Execute
         operations._clear_flow_reasons("task/issue-123", "failed")
@@ -466,64 +448,6 @@ def test_clear_flow_reasons_direct_clear_without_intermediate_state() -> None:
         )
         # Verify: body projection cleared
         mock_io_instance.clear_body_projection.assert_called_once_with(issue_number=123)
-        # Verify: timeline recorded
-        mock_timeline_instance.record_timeline_event.assert_called_once()
-
-
-def test_clear_blocked_projection_updates_issue_body() -> None:
-    """Test that _clear_blocked_projection correctly clears managed section."""
-    operations = _make_operations()
-
-    # Mock issue body with blocked state
-    blocked_body = """User content here.
-
-<!-- vibe3-flow-state-start -->
-
-**Vibe3 Flow State**
-
-- **State**: blocked
-- **Blocked by**: #456
-- **Blocked reason**: API design pending
-
-<!-- vibe3-flow-state-end -->"""
-
-    with patch.object(operations.github_client, "get_issue_body") as mock_get:
-        mock_get.return_value = blocked_body
-
-        with patch.object(operations.github_client, "update_issue_body") as mock_update:
-            mock_update.return_value = True
-
-            # Execute
-            operations._clear_blocked_projection(123)
-
-            # Verify get_issue_body called
-            mock_get.assert_called_once_with(123)
-
-            # Verify update_issue_body called
-            mock_update.assert_called_once()
-            call_args = mock_update.call_args
-            assert call_args[0][0] == 123  # issue_number
-            merged_body = call_args[0][1]
-
-            # Verify managed section is cleared (empty projection)
-            assert "User content here" in merged_body
-            assert "**Vibe3 Flow State**" not in merged_body
-            assert "- **State**: blocked" not in merged_body
-
-
-def test_clear_blocked_projection_handles_none_body() -> None:
-    """Test that _clear_blocked_projection handles missing issue body."""
-    operations = _make_operations()
-
-    with patch.object(operations.github_client, "get_issue_body") as mock_get:
-        mock_get.return_value = None
-
-        with patch.object(operations.github_client, "update_issue_body") as mock_update:
-            # Execute
-            operations._clear_blocked_projection(123)
-
-            # Verify update_issue_body not called when body is None
-            mock_update.assert_not_called()
 
 
 def test_reset_task_scene_creates_tombstone_after_full_rebuild() -> None:

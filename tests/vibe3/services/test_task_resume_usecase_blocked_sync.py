@@ -48,18 +48,6 @@ def usecase():
         yield uc
 
 
-class TestBlockedProjectionClearing:
-    """Tests for _clear_blocked_projection explicit field clearing."""
-
-    def test_clear_blocked_when_no_body(self, usecase):
-        """Should gracefully return when issue body is None."""
-        usecase.github_client.get_issue_body.return_value = None
-
-        usecase.operations._clear_blocked_projection(123)
-
-        usecase.github_client.update_issue_body.assert_not_called()
-
-
 class TestAutoResumePreservesWorktree:
     """Tests verifying auto-resume does not delete worktrees."""
 
