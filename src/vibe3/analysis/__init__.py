@@ -38,17 +38,11 @@ from vibe3.analysis.inspect_output_adapter import (
     score,
 )
 from vibe3.analysis.inspect_query_service import build_change_analysis
+from vibe3.analysis.pr_scoring import PRDimensions, RiskLevel
 from vibe3.analysis.serena_service import SerenaService
 
 # Snapshot diff
 from vibe3.analysis.snapshot_diff import compute_diff
-
-# PR scoring models (cross-layer shared types from services)
-from vibe3.services.pr_scoring_service import (
-    PRDimensions,
-    RiskLevel,
-    generate_score_report,
-)
 
 __all__ = [
     # Core services
@@ -68,7 +62,6 @@ __all__ = [
     # PR scoring models
     "PRDimensions",
     "RiskLevel",
-    "generate_score_report",
     # Output adapters
     "as_list",
     "as_mapping",

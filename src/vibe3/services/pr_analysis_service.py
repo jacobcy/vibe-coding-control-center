@@ -9,7 +9,8 @@ from typing import cast
 
 from loguru import logger
 
-from vibe3.analysis import PRDimensions, dag_service, generate_score_report
+from vibe3.analysis import dag_service
+from vibe3.analysis.pr_scoring import PRDimensions
 from vibe3.analysis.serena_service import SerenaService
 from vibe3.config.loader import get_config
 from vibe3.models.change_source import PRSource
@@ -18,6 +19,7 @@ from vibe3.models.pr_analysis import (
     CriticalFileInfo,
     PRCriticalAnalysis,
 )
+from vibe3.services.pr_scoring_service import generate_score_report
 
 
 def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalysis:
