@@ -181,6 +181,7 @@ class TaskResumeOperations:
                     issue_number=issue_number,
                     repo=repo,
                     reason=reason,
+                    github_client=self.github_client,
                 )
             else:
                 emit_progress("setting issue state to ready")

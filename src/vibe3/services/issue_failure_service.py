@@ -6,7 +6,7 @@ executor or manager runs fail or make no progress.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
@@ -14,6 +14,9 @@ from vibe3.clients import SQLiteClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_flow_service import IssueFlowService
+
+if TYPE_CHECKING:
+    from vibe3.clients.github_client import GitHubClient
 
 _ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
 
@@ -265,7 +268,12 @@ def block_reviewer_noop_issue(
 
 
 def resume_blocked_issue_to_ready(
-    *, issue_number: int, repo: str | None, reason: str, actor: str = "human:resume"
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "human:resume",
+    github_client: GitHubClient | None = None,
 ) -> None:
     """Resume blocked issue to READY state using unified BlockedStateService."""
     from vibe3.services.blocked_state_service import BlockedStateService
@@ -289,7 +297,7 @@ def resume_blocked_issue_to_ready(
 
     # Use unified BlockedStateService
     # Even without a branch, we still update the issue label to READY
-    service = BlockedStateService(store=store)
+    service = BlockedStateService(store=store, github_client=github_client)
     service.unblock(
         branch=branch or "",  # Empty string if no branch (DB ops skipped)
         target_state=IssueState.READY,
