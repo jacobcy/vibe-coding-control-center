@@ -52,7 +52,7 @@ options = AgentOptions(agent="vibe-reviewer")
 角色通过 `TriggerableRoleDefinition` 定义，并在 `registry.py` 中注册。
 
 ```python
-from vibe3.roles.definitions import TriggerableRoleDefinition
+from vibe3.roles import TriggerableRoleDefinition
 from vibe3.models.orchestration import IssueState
 
 # 角色定义示例
@@ -92,9 +92,12 @@ task_service.link_issue(branch="dev/issue-1", issue_number=1277, role="related")
 
 V3 倾向于显式导入以保持模块边界清晰，减少 `__init__.py` 带来的副作用。
 
-- **优先从具体模块导入**：
+- **优先从具体模块导入**（适用于 `execution`、`agents`、`services` 等层）：
   - ✅ `from vibe3.execution.coordinator import ExecutionCoordinator`
   - ❌ `from vibe3.execution import ExecutionCoordinator`
+- **Roles 层支持统一入口导入**：
+  - ✅ `from vibe3.roles import MANAGER_ROLE, TriggerableRoleDefinition`
+  - ✅ `from vibe3.roles.manager import MANAGER_ROLE`（仍兼容）
 - **避免相对导入**：在 `src/vibe3` 内部也应使用绝对路径导入。
 
 ### 何时使用依赖注入
