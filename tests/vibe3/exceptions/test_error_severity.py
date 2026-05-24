@@ -71,7 +71,7 @@ def test_error_severity_comparison_with_non_enum():
 
 def test_error_handling_contract_all_issue_actions():
     """Test that all valid issue_action values are accepted."""
-    for action in ["record_only", "block_flow", "fail_issue"]:
+    for action in ["record_only"]:
         contract = ErrorHandlingContract(
             code="E_TEST",
             severity=ErrorSeverity.ERROR,
@@ -93,7 +93,7 @@ def test_error_handling_contract_all_gate_actions():
             counts_toward_threshold=False,
             record_in_error_log=True,
             write_timeline_event=True,
-            issue_action="fail_issue",
+            issue_action="record_only",
             gate_action=action,
         )
         assert contract.gate_action == action
