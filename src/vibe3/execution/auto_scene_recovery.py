@@ -110,7 +110,6 @@ class AutoSceneRecoveryService:
             FlowCleanupService,
             LiveSessionsDetectedError,
         )
-        from vibe3.services.label_service import LabelService
 
         detail = "; ".join(damage_signals)
         recovery_actor = "orchestra:auto-recover"
@@ -216,11 +215,17 @@ class AutoSceneRecoveryService:
                 reason_code="auto_scene_reset_incomplete",
             )
 
-        LabelService().confirm_issue_state(
-            request.target_id,
-            IssueState.READY,
+        # Use BlockedStateService to unblock and restore to READY
+        # This ensures all three sources (body, DB, labels) are cleared
+        from vibe3.services.blocked_state_service import BlockedStateService
+
+        service = BlockedStateService(store=self.store)
+        service.unblock(
+            branch=branch,
+            target_state=IssueState.READY,
+            issue_number=request.target_id,
             actor=recovery_actor,
-            force=True,
+            detail="Auto scene reset completed - issue returned to READY",
         )
         self.store.add_event(
             branch,

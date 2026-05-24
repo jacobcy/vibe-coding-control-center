@@ -13,9 +13,6 @@ from loguru import logger
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
-from vibe3.services.issue_failure_service import (
-    resume_blocked_issue_to_ready,
-)
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -175,22 +172,23 @@ class TaskResumeOperations:
         else:
             # Original logic: delete worktree/branch for full rebuild
             emit_progress("full rebuild mode")
-            if resume_kind == "blocked":
-                emit_progress("clearing blocked state")
-                resume_blocked_issue_to_ready(
-                    issue_number=issue_number,
-                    repo=repo,
-                    reason=reason,
-                    github_client=self.github_client,
-                )
-            else:
-                emit_progress("setting issue state to ready")
-                self.label_service.confirm_issue_state(
-                    issue_number,
-                    IssueState.READY,
-                    actor="human:resume",
-                    force=True,
-                )
+
+            # Always use BlockedStateService.unblock() for consistent state clearing
+            # Both blocked and non-blocked resume need to clear any stale metadata
+            from vibe3.services.blocked_state_service import BlockedStateService
+
+            service = BlockedStateService(
+                github_client=self.github_client,
+                label_service=self.label_service,
+                store=self.flow_service.store,
+            )
+            service.unblock(
+                branch=branch or "",  # Empty string if no branch (DB ops skipped)
+                target_state=IssueState.READY,
+                issue_number=issue_number,
+                detail=f"Resumed from {resume_kind}: {reason}",
+            )
+            emit_progress("state unblocked", status="done")
 
             if isinstance(branch, str):
                 try:

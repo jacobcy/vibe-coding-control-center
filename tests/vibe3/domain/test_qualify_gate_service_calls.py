@@ -25,9 +25,9 @@ class TestAlignBlockedState:
             blocked_by_issue=200,
         )
 
-        mock_label_port = MagicMock()
+        mock_label_service = MagicMock()
         with patch(
-            "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=mock_label_port
+            "vibe3.services.label_service.LabelService", return_value=mock_label_service
         ):
             service._align_blocked_state(
                 issue_number=100,
@@ -37,14 +37,15 @@ class TestAlignBlockedState:
                 flow_state={"flow_status": "active"},
             )
 
-        service._store.update_flow_state.assert_called_once_with(
-            "test-branch",
-            flow_status="blocked",
-            blocked_reason="dependency issue",
-            blocked_by_issue=200,
-            latest_actor="system:qualify_gate",
+        # BlockedStateService.write_cache updates the flow state
+        service._store.update_flow_state.assert_called_once()
+        call_kwargs = service._store.update_flow_state.call_args[1]
+        assert call_kwargs["flow_status"] == "blocked"
+        assert call_kwargs["blocked_reason"] == "dependency issue"
+        assert call_kwargs["blocked_by_issue"] == 200
+        mock_label_service.confirm_issue_state.assert_called_once_with(
+            100, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
         )
-        mock_label_port.add_issue_label.assert_called_once_with(100, "state/blocked")
 
     def test_does_not_rewrite_when_already_blocked_and_labeled(self):
         """Already-synced blocked state should not write local cache again."""
@@ -62,9 +63,9 @@ class TestAlignBlockedState:
             blocked_by_issue=None,
         )
 
-        mock_label_port = MagicMock()
+        mock_label_service = MagicMock()
         with patch(
-            "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=mock_label_port
+            "vibe3.services.label_service.LabelService", return_value=mock_label_service
         ):
             service._align_blocked_state(
                 issue_number=100,
@@ -75,7 +76,7 @@ class TestAlignBlockedState:
             )
 
         service._store.update_flow_state.assert_not_called()
-        mock_label_port.add_issue_label.assert_not_called()
+        mock_label_service.confirm_issue_state.assert_not_called()
 
 
 class TestAutoResumeBlocked:

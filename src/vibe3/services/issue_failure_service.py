@@ -11,12 +11,8 @@ from typing import TYPE_CHECKING, Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_timeline_service import FlowTimelineService
 from vibe3.services.issue_flow_service import IssueFlowService
-
-if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
 
 _ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
 
@@ -56,7 +52,9 @@ def mark_issue(
     """Unified issue state marking interface.
 
     Args:
-        action: "fail" for runtime failures (error_log only),
+        action: "fail" for runtime failures (writes flow_failed timeline event
+            only; error_log is recorded upstream by the caller, e.g.,
+            codeagent_runner via ErrorTrackingService.record_error),
             "block" for business blocks (blocked_reason + label).
     """
     role = _ROLE_MAP.get(role, role)
@@ -83,17 +81,6 @@ def mark_issue(
         return
 
     if action == "fail":
-        from vibe3.exceptions.error_codes import E_EXEC_FLOW_FAILURE
-        from vibe3.services.error_tracking_service import ErrorTrackingService
-
-        error_tracking = ErrorTrackingService.get_instance(store=store)
-        error_tracking.record_error(
-            error_code=E_EXEC_FLOW_FAILURE,
-            error_message=reason,
-            branch=branch,
-            issue_number=issue_number,
-        )
-
         timeline = FlowTimelineService(store=store)
         timeline.record_timeline_event(
             branch=branch,
@@ -124,7 +111,10 @@ def fail_issue(
 ) -> None:
     """Generic fail issue handler.
 
-    Records runtime failure to error_log and flow_failed timeline event only.
+    Writes a flow_failed timeline event only. The runtime error itself is
+    recorded to error_log upstream by the caller (e.g., codeagent_runner via
+    ErrorTrackingService.record_error); this handler does NOT write to
+    error_log to avoid duplicate entries.
     Does NOT write blocked_reason or change flow_status.
     Runtime errors are handled by ERROR system, not BLOCK system.
     """
@@ -267,40 +257,5 @@ def block_reviewer_noop_issue(
     )
 
 
-def resume_blocked_issue_to_ready(
-    *,
-    issue_number: int,
-    repo: str | None,
-    reason: str,
-    actor: str = "human:resume",
-    github_client: GitHubClient | None = None,
-) -> None:
-    """Resume blocked issue to READY state using unified BlockedStateService."""
-    from vibe3.services.blocked_state_service import BlockedStateService
-
-    # Get branch from issue
-    branch: str | None = None
-    store: SQLiteClient | None = None
-    try:
-        issue_flow_service = _get_issue_flow_service()
-        store = issue_flow_service.store
-        flows = issue_flow_service.store.get_flows_by_issue(issue_number, role="task")
-        if flows:
-            branch = str(flows[0].get("branch") or "").strip()
-    except Exception as e:
-        logger.bind(
-            domain="flow",
-            action="resume_blocked_issue_to_ready",
-            issue_number=issue_number,
-            error=str(e),
-        ).warning(f"Failed to get branch for issue #{issue_number}")
-
-    # Use unified BlockedStateService
-    # Even without a branch, we still update the issue label to READY
-    service = BlockedStateService(store=store, github_client=github_client)
-    service.unblock(
-        branch=branch or "",  # Empty string if no branch (DB ops skipped)
-        target_state=IssueState.READY,
-        issue_number=issue_number,
-        detail=f"Resumed from blocked to ready: {reason}",
-    )
+if TYPE_CHECKING:
+    pass

@@ -61,7 +61,24 @@ class BlockedStateService:
         issue_number: int | None = None,
         event_type: str = "flow_blocked",
     ) -> None:
-        """Atomically set blocked state in all three sources."""
+        """Atomically set blocked state in all three sources.
+
+        This method respects the state machine and does NOT force state transitions.
+        If the state machine blocks the transition, a warning is logged but the
+        operation continues (body and DB are still updated).
+
+        For alignment scenarios where you need to force the BLOCKED state
+        (e.g., synchronizing stale labels to body truth), bypass this method
+        and call LabelService.confirm_issue_state(force=True) directly.
+
+        Args:
+            branch: Git branch to mark as blocked
+            reason: Human-readable reason for blocking
+            blocked_by_issue: Issue number causing the block (optional)
+            actor: Who initiated the block (default: "system")
+            issue_number: Issue to label as BLOCKED (optional)
+            event_type: Timeline event type (default: "flow_blocked")
+        """
         if issue_number:
             try:
                 self._io.write_body_projection(

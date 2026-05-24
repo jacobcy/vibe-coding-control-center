@@ -88,10 +88,10 @@ class TestRemoteBlockedReason:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
 
@@ -111,8 +111,8 @@ class TestRemoteBlockedReason:
                     blocked_by_issue=None,
                     latest_actor="system:qualify_gate",
                 )
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
+                mock_label_service.confirm_issue_state.assert_called_once_with(
+                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
                 )
 
                 # Verify CoordinationResolver was called
@@ -141,10 +141,10 @@ class TestRemoteBlockedReason:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
 
@@ -164,8 +164,8 @@ class TestRemoteBlockedReason:
                     blocked_by_issue=None,
                     latest_actor="system:qualify_gate",
                 )
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
+                mock_label_service.confirm_issue_state.assert_called_once_with(
+                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
                 )
 
 
@@ -202,11 +202,12 @@ class TestRemoteDependencies:
                 "flow_status": "active",
             }
             mock_store.get_issue_links.return_value = []
+            mock_github.get_issue_body.return_value = "User content"
 
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
 
@@ -221,9 +222,7 @@ class TestRemoteDependencies:
                 # Verify blocked by remote dependencies
                 assert result is None
                 mock_store.update_flow_state.assert_called()
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # BlockedStateService handles label updates internally
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -260,11 +259,12 @@ class TestRemoteDependencies:
                 "flow_status": "active",
             }
             mock_store.get_issue_links.return_value = []
+            mock_github.get_issue_body.return_value = "User content"
 
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
 
@@ -279,9 +279,7 @@ class TestRemoteDependencies:
                 # Verify still blocked by local dependencies
                 assert result is None
                 mock_store.update_flow_state.assert_called()
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # BlockedStateService handles label updates internally
 
     def test_qualify_gate_remote_blocked_by_issue(
         self, qualify_gate_service, sample_issue, mock_store
@@ -307,10 +305,10 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 flow_state = {"status": "active"}
 
@@ -330,8 +328,8 @@ class TestRemoteDependencies:
                     blocked_by_issue=456,
                     latest_actor="system:qualify_gate",
                 )
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
+                mock_label_service.confirm_issue_state.assert_called_once_with(
+                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
                 )
 
 
@@ -357,7 +355,7 @@ class TestProvenanceTracking:
             return_value=mock_truth,
         ):
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=Mock()
+                "vibe3.services.label_service.LabelService", return_value=Mock()
             ):
                 flow_state = {"status": "active"}
 
@@ -401,9 +399,10 @@ class TestProvenanceTracking:
                 "flow_status": "active",
             }
             qualify_gate_service._store.get_issue_links.return_value = []
+            qualify_gate_service._github.get_issue_body.return_value = "User content"
 
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                "vibe3.services.label_service.LabelService",
                 return_value=Mock(),
             ):
                 flow_state = {"status": "active"}
@@ -463,10 +462,10 @@ class TestE2EBlockedReconciliation:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 result = qualify_gate.run_qualify_gate(
                     issue=sample_issue,
@@ -484,8 +483,8 @@ class TestE2EBlockedReconciliation:
                     blocked_by_issue=None,
                     latest_actor="system:qualify_gate",
                 )
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
+                mock_label_service.confirm_issue_state.assert_called_once_with(
+                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
                 )
 
     def test_blocked_label_body_active_with_cache(self, mock_store, sample_issue):
@@ -533,10 +532,10 @@ class TestE2EBlockedReconciliation:
                     "vibe3.domain.qualify_gate.infer_resume_label",
                     return_value=IssueState.IN_PROGRESS,
                 ):
-                    mock_label_port = Mock()
+                    mock_label_service = Mock()
                     with patch(
-                        "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                        return_value=mock_label_port,
+                        "vibe3.services.label_service.LabelService",
+                        return_value=mock_label_service,
                     ):
                         result = qualify_gate.run_qualify_gate(
                             issue=sample_issue,
@@ -578,10 +577,10 @@ class TestE2EBlockedReconciliation:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 result = qualify_gate.run_qualify_gate(
                     issue=sample_issue,
@@ -599,6 +598,6 @@ class TestE2EBlockedReconciliation:
                     blocked_by_issue=456,
                     latest_actor="system:qualify_gate",
                 )
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
+                mock_label_service.confirm_issue_state.assert_called_once_with(
+                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
                 )

@@ -25,7 +25,7 @@ def _make_operations() -> TaskResumeOperations:
 
 
 def _mock_label_service():
-    """Create a mock LabelService for resume_issue tests."""
+    """Create a mock LabelService for BlockedStateService.unblock tests."""
     mock_label = MagicMock()
     mock_label.confirm_issue_state = MagicMock()
     mock_label.get_state = MagicMock(return_value=IssueState.READY)
@@ -185,7 +185,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: state restored to READY via resume_issue
+        # Verify: state restored to READY via BlockedStateService.unblock()
         mock_service.unblock.assert_called_once()
 
 
@@ -220,7 +220,7 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: state restored to HANDOFF via resume_issue
+        # Verify: state restored to HANDOFF via BlockedStateService.unblock()
         mock_service.unblock.assert_called_once()
 
     # Verify: reasons cleared
@@ -255,7 +255,7 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: state restored to CLAIMED via resume_issue
+        # Verify: state restored to CLAIMED via BlockedStateService.unblock()
         mock_service.unblock.assert_called_once()
 
 
@@ -288,7 +288,7 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: state restored to IN_PROGRESS via resume_issue
+        # Verify: state restored to IN_PROGRESS via BlockedStateService.unblock()
         mock_service.unblock.assert_called_once()
 
 
@@ -321,7 +321,7 @@ def test_reset_issue_to_ready_with_label_review() -> None:
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: state restored to REVIEW via resume_issue
+        # Verify: state restored to REVIEW via BlockedStateService.unblock()
         mock_service.unblock.assert_called_once()
 
 
@@ -354,7 +354,7 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: state restored to MERGE_READY via resume_issue
+        # Verify: state restored to MERGE_READY via BlockedStateService.unblock()
         mock_service.unblock.assert_called_once()
 
 
