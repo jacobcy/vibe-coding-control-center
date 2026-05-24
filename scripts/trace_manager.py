@@ -11,7 +11,7 @@
 import argparse
 import re
 from pathlib import Path
-from typing import TypedDict
+from typing import Sequence, TypedDict
 
 
 class LayerConfig(TypedDict):
@@ -79,53 +79,72 @@ LAYER_CONFIG: dict[str, LayerConfig] = {
 }
 
 
+def _has_target_class(lines: list[str], suffixes: Sequence[str]) -> bool:
+    """文件中是否存在 suffix 匹配的 class？"""
+    for line in lines:
+        match = re.match(r"^class (\w+).*:", line)
+        if match and any(match.group(1).endswith(s) for s in suffixes):
+            return True
+    return False
+
+
+def _find_import_insert_index(lines: list[str]) -> int:
+    """返回应在哪一行之前插入新的 module-level import。
+
+    扫描所有顶层（无缩进）import 语句，找到最后一个的结束行。
+    支持多行 import（带括号）。这样可以跳过 ``if TYPE_CHECKING:`` 块
+    内的缩进 import，避免插入位置错位或漏插。
+    """
+    last_after = -1
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        is_top_level = bool(line) and not line[0].isspace()
+        if is_top_level and (line.startswith("from ") or line.startswith("import ")):
+            paren_count = line.count("(") - line.count(")")
+            j = i + 1
+            while j < len(lines) and paren_count > 0:
+                paren_count += lines[j].count("(") - lines[j].count(")")
+                j += 1
+            last_after = j
+            i = j
+        else:
+            i += 1
+    return last_after
+
+
 def add_trace_decorator(
     lines: list[str], layer_name: str, suffixes: list[str]
 ) -> list[str]:
-    """给指定模块公共方法添加 trace 装饰器。"""
-    new_lines = []
-    i = 0
+    """给匹配 suffix 的 class 公共方法添加 trace 装饰器。
+
+    无匹配 class 的文件直接返回原内容，避免插入 dead import。
+    支持 ``@staticmethod`` / ``@classmethod`` — trace 装饰器插在它们之下。
+    """
+    if not _has_target_class(lines, suffixes):
+        return lines
+
     has_trace_import = any(
         "from vibe3.observability.trace_method import trace_method" in line
         for line in lines
     )
-    import_inserted = has_trace_import
 
-    while i < len(lines):
-        line = lines[i]
+    if has_trace_import:
+        working = list(lines)
+    else:
+        insert_at = _find_import_insert_index(lines)
+        if insert_at < 0:
+            insert_at = 0
+        working = (
+            list(lines[:insert_at])
+            + ["from vibe3.observability.trace_method import trace_method"]
+            + list(lines[insert_at:])
+        )
 
-        if not import_inserted and (
-            line.startswith("from vibe3") or line.startswith("import ")
-        ):
-            if line.startswith("from vibe3"):
-                new_lines.append(line)
-                j = i + 1
-                paren_count = line.count("(") - line.count(")")
-                while j < len(lines):
-                    if paren_count > 0:
-                        new_lines.append(lines[j])
-                        paren_count += lines[j].count("(") - lines[j].count(")")
-                        j += 1
-                    elif lines[j].startswith(("from ", "import ")):
-                        new_lines.append(lines[j])
-                        paren_count += lines[j].count("(") - lines[j].count(")")
-                        j += 1
-                    else:
-                        break
-            else:
-                new_lines.append(line)
-                j = i + 1
-                while j < len(lines) and lines[j].startswith("import "):
-                    new_lines.append(lines[j])
-                    j += 1
-            new_lines.append(
-                "from vibe3.observability.trace_method import trace_method"
-            )
-            new_lines.append("")
-            i = j
-            import_inserted = True
-            continue
-
+    new_lines: list[str] = []
+    i = 0
+    while i < len(working):
+        line = working[i]
         class_match = re.match(r"^class (\w+).*:", line)
         if class_match:
             class_name = class_match.group(1)
@@ -138,19 +157,28 @@ def add_trace_decorator(
             new_lines.append(line)
             i += 1
 
-            while i < len(lines):
-                current_line = lines[i]
+            while i < len(working):
+                current_line = working[i]
                 method_match = re.match(r"^(\s*)def (\w+)\(", current_line)
 
                 if method_match:
                     indent, method_name = method_match.groups()
 
-                    if i > 0 and "@" in lines[i - 1]:
+                    if method_name.startswith("_"):
                         new_lines.append(current_line)
                         i += 1
                         continue
 
-                    if method_name.startswith("_"):
+                    # Scan all preceding decorators (e.g. @staticmethod) for
+                    # an existing @trace_method to avoid double-wrapping.
+                    k = len(new_lines) - 1
+                    already_traced = False
+                    while k >= 0 and new_lines[k].strip().startswith("@"):
+                        if "@trace_method" in new_lines[k]:
+                            already_traced = True
+                            break
+                        k -= 1
+                    if already_traced:
                         new_lines.append(current_line)
                         i += 1
                         continue
@@ -163,7 +191,7 @@ def add_trace_decorator(
                     i += 1
                     continue
 
-                if re.match(r"^class \w+", current_line) or i == len(lines) - 1:
+                if re.match(r"^class \w+", current_line) or i == len(working) - 1:
                     break
 
                 new_lines.append(current_line)
@@ -271,7 +299,7 @@ def main() -> None:
             if py_file.name in ["__init__.py", "protocols.py"]:
                 continue
 
-            if mode == "remove" and "@trace_method" not in py_file.read_text():
+            if mode == "remove" and "trace_method" not in py_file.read_text():
                 continue
 
             if process_file(
