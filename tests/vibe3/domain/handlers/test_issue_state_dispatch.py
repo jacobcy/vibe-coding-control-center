@@ -24,12 +24,10 @@ class TestIssueStateDispatchHandler:
             )
         )
 
-    @patch("vibe3.domain.handlers.issue_state_dispatch.build_dispatch_context")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_ready_state_dispatches_manager(
         self,
         mock_config_cls: MagicMock,
-        mock_build_context: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
@@ -68,12 +66,10 @@ class TestIssueStateDispatchHandler:
 
         mock_ctx.coordinator.dispatch_execution.assert_called_once()
 
-    @patch("vibe3.domain.handlers.issue_state_dispatch.build_dispatch_context")
     @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
     def test_handoff_state_dispatches_manager(
         self,
         mock_config_cls: MagicMock,
-        mock_build_context: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.issue_state_dispatch import (
             handle_manager_dispatch_intent,
@@ -321,3 +317,54 @@ class TestIssueStateDispatchHandler:
                 # It should just return early (defer)
                 mock_ctx.coordinator.dispatch_execution.assert_not_called()
                 mock_block_issue.assert_not_called()
+
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_dispatch_context")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.load_orchestra_config")
+    def test_default_path_uses_factory(
+        self,
+        mock_config_cls: MagicMock,
+        mock_build_context: MagicMock,
+    ) -> None:
+        """Test that not passing dispatch_context triggers the factory path."""
+        from vibe3.domain.handlers.issue_state_dispatch import (
+            handle_manager_dispatch_intent,
+        )
+        from vibe3.execution.contracts import ExecutionLaunchResult
+
+        mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
+        mock_config_cls.return_value = mock_config
+
+        mock_request = MagicMock()
+        mock_request.role = "manager"
+
+        # Create mock context with all required services
+        mock_ctx = MagicMock()
+        mock_ctx.config = mock_config
+        mock_ctx.capacity.can_dispatch.return_value = True
+        mock_ctx.registry = MagicMock()
+        mock_ctx.coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True,
+        )
+
+        # Mock build_dispatch_context to return our mock context
+        mock_build_context.return_value = mock_ctx
+
+        # Mock build_manager_request to return a valid request
+        with patch(
+            "vibe3.domain.handlers.issue_state_dispatch.build_manager_request",
+            return_value=mock_request,
+        ):
+            handle_manager_dispatch_intent(
+                ManagerDispatchIntent(
+                    issue_number=42,
+                    branch="task/issue-42",
+                    trigger_state="ready",
+                    issue_title="Test Issue",
+                )
+                # Note: NOT passing dispatch_context, so factory should be used
+            )
+
+        # Verify factory was called
+        mock_build_context.assert_called_once()
+        mock_ctx.coordinator.dispatch_execution.assert_called_once()

@@ -20,17 +20,18 @@ from vibe3.services.issue_failure_service import block_manager_noop_issue
 if TYPE_CHECKING:
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.config.orchestra_settings import OrchestraConfig
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.execution.coordinator import ExecutionCoordinator
-    from vibe3.infra.store import SQLiteClient
 
 
 @dataclass
 class DispatchContext:
     """Pre-configured services for manager dispatch."""
 
+    config: "OrchestraConfig"
     backend: "CodeagentBackend"
     capacity: "CapacityService"
     github_client: "GitHubClient"
@@ -50,6 +51,7 @@ def build_dispatch_context(
 
     backend = CodeagentBackend()
     return DispatchContext(
+        config=config,
         backend=backend,
         capacity=CapacityService(config, store, backend),
         github_client=_lazy_github_client(),
@@ -109,7 +111,6 @@ def handle_manager_dispatch_intent(
             )
 
         loop = asyncio.get_running_loop()
-        config = load_orchestra_config()
 
         # Early capacity check BEFORE expensive work (GitHub fetch, coordinator setup)
         # to avoid wasteful network/DB operations when system is at capacity
@@ -157,7 +158,7 @@ def handle_manager_dispatch_intent(
             request = await loop.run_in_executor(
                 None,
                 lambda: build_manager_request(
-                    config,
+                    ctx.config,
                     issue_info,
                     registry=ctx.registry,
                     tick_id=event.tick_id,
