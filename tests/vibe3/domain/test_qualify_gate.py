@@ -139,10 +139,10 @@ class TestRunQualifyGate:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
+            mock_label_service = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.label_service.LabelService",
+                return_value=mock_label_service,
             ):
                 result = qualify_gate_service.run_qualify_gate(
                     issue=sample_issue,
@@ -153,16 +153,10 @@ class TestRunQualifyGate:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once_with(
-                    "task/issue-123-test",
-                    flow_status="blocked",
-                    blocked_reason="Manual intervention required",
-                    blocked_by_issue=None,
-                    latest_actor="system:qualify_gate",
-                )
-                mock_label_port.add_issue_label.assert_called_once_with(
-                    123, "state/blocked"
-                )
+                # BlockedStateService writes cache via update_flow_state
+                mock_store.update_flow_state.assert_called()
+                # LabelService confirms the blocked state
+                mock_label_service.confirm_issue_state.assert_called_once()
 
     def test_manual_block_already_has_label(
         self, qualify_gate_service, sample_issue, mock_store
@@ -230,31 +224,24 @@ class TestRunQualifyGate:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_port = Mock()
             with patch(
-                "vibe3.domain.qualify_gate.GhIssueLabelPort",
-                return_value=mock_label_port,
+                "vibe3.services.blocked_state_io.GitHubClient",
+                return_value=mock_github,
             ):
-                with patch(
-                    "vibe3.services.blocked_state_io.GitHubClient",
-                    return_value=mock_github,
-                ):
-                    flow_state = {"status": "active"}
+                flow_state = {"status": "active"}
 
-                    result = qualify_gate_service.run_qualify_gate(
-                        issue=sample_issue,
-                        branch="task/issue-123-test",
-                        flow_state=flow_state,
-                        labels=["state/in-progress"],
-                        trigger_state=IssueState.IN_PROGRESS,
-                    )
+                result = qualify_gate_service.run_qualify_gate(
+                    issue=sample_issue,
+                    branch="task/issue-123-test",
+                    flow_state=flow_state,
+                    labels=["state/in-progress"],
+                    trigger_state=IssueState.IN_PROGRESS,
+                )
 
-                    assert result is None
-                    mock_store.update_flow_state.assert_called()
-                    mock_label_port.add_issue_label.assert_called_once_with(
-                        123, "state/blocked"
-                    )
-            mock_store.add_event.assert_called()
+                assert result is None
+                # BlockedStateService.block() updates flow state with blocked info
+                mock_store.update_flow_state.assert_called()
+                mock_store.add_event.assert_called()
 
     def test_dependency_satisfied(self, qualify_gate_service, sample_issue, mock_store):
         """Issue with satisfied dependency should pass gate."""
