@@ -8,6 +8,7 @@ Public API:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -56,9 +57,11 @@ class PromptValidationService:
         self,
         prompts_path: Path | None = None,
         registry: ProviderRegistry | None = None,
+        skill_path_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         self._registry = registry or ProviderRegistry()
+        self._skill_path_resolver = skill_path_resolver
 
     def validate_template_key(self, template_key: str) -> PromptValidationResult:
         """Validate that a template key exists and report its required variables."""
@@ -215,7 +218,11 @@ class PromptValidationService:
             from vibe3.prompts.builtin_providers import resolve_skill_content
 
             skill_name = source.skill or ""
-            skill_content = resolve_skill_content(skill_name) if skill_name else None
+            skill_content = (
+                resolve_skill_content(skill_name, self._skill_path_resolver)
+                if skill_name
+                else None
+            )
             if skill_content is None:
                 return "", ValidationIssue(
                     kind="skill_not_found",

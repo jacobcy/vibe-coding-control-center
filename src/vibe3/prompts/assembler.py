@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -43,9 +44,11 @@ class PromptAssembler:
         self,
         prompts_path: Path | None = None,
         registry: ProviderRegistry | None = None,
+        skill_path_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         self._registry = registry or ProviderRegistry()
+        self._skill_path_resolver = skill_path_resolver
 
     def render(
         self,
@@ -72,7 +75,9 @@ class PromptAssembler:
 
         for var in sorted(required_vars):
             source = recipe.variables[var]
-            value = resolve_source(source, runtime_context, self._registry)
+            value = resolve_source(
+                source, runtime_context, self._registry, self._skill_path_resolver
+            )
             resolved[var] = value
             resolved_from = _describe_source(source)
             provenance_list.append(

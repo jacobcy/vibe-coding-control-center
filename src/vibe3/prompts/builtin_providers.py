@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -11,20 +12,26 @@ from loguru import logger
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
-from vibe3.services.convention_resolver import ConventionResolver
 
 
-def resolve_skill_content(skill_name: str) -> str | None:
+def resolve_skill_content(
+    skill_name: str,
+    skill_path_resolver: Callable[[str], str | None] | None = None,
+) -> str | None:
     """Resolve skill SKILL.md content through profile.
 
     Args:
         skill_name: Skill name
+        skill_path_resolver: Optional callable to resolve skill name to path.
+            If None, returns None (cannot resolve skill).
 
     Returns:
         Skill content or None if not found
     """
-    resolver = ConventionResolver.from_repo()
-    skill_path = resolver.get_skill_path(skill_name)
+    if skill_path_resolver is None:
+        return None
+
+    skill_path = skill_path_resolver(skill_name)
     if skill_path is None:
         return None
 
@@ -67,10 +74,13 @@ def _resolve_file(src: PromptVariableSource) -> str:
         return ""
 
 
-def _resolve_skill(src: PromptVariableSource) -> str:
+def _resolve_skill(
+    src: PromptVariableSource,
+    skill_path_resolver: Callable[[str], str | None] | None = None,
+) -> str:
     if not src.skill:
         return ""
-    skill_content = resolve_skill_content(src.skill)
+    skill_content = resolve_skill_content(src.skill, skill_path_resolver)
     if skill_content is None:
         logger.bind(domain="prompt_assembly").warning(f"Skill not found: {src.skill}")
         return ""
@@ -122,6 +132,7 @@ def resolve_source(
     src: PromptVariableSource,
     runtime_context: dict[str, Any],
     registry: ProviderRegistry,
+    skill_path_resolver: Callable[[str], str | None] | None = None,
 ) -> str:
     """Resolve a single variable source to its string value."""
     if src.kind == VariableSourceKind.LITERAL:
@@ -129,7 +140,7 @@ def resolve_source(
     if src.kind == VariableSourceKind.FILE:
         return _resolve_file(src)
     if src.kind == VariableSourceKind.SKILL:
-        return _resolve_skill(src)
+        return _resolve_skill(src, skill_path_resolver)
     if src.kind == VariableSourceKind.COMMAND:
         return _resolve_command(src)
     if src.kind == VariableSourceKind.PROVIDER:

@@ -287,11 +287,18 @@ def build_manager_sync_request(
             registry = ProviderRegistry()
             runtime_context: dict[str, Any] = {}
 
+            # Create skill path resolver callback for prompts layer
+            def skill_path_resolver(skill_name: str) -> str | None:
+                return ConventionResolver.from_repo().get_skill_path(skill_name)
+
             for section_spec in variant_spec.sections:
                 if section_spec.source is not None:
                     # Section has explicit source - resolve it
                     content = resolve_source(
-                        section_spec.source, runtime_context, registry
+                        section_spec.source,
+                        runtime_context,
+                        registry,
+                        skill_path_resolver,
                     )
 
                     def _make_provider(c: str = content) -> str:
