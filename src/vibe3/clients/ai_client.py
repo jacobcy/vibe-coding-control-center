@@ -7,6 +7,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.config.settings import AIConfig
+from vibe3.observability.trace_method import trace_method
 
 # Check if litellm is available without importing
 HAS_LITELLM = importlib.util.find_spec("litellm") is not None
@@ -48,6 +49,7 @@ class AIClient:
             f"AI client initialized: model={config.model}"
         )
 
+    @trace_method("AIClient.generate_text", layer="client")
     def generate_text(
         self,
         system_prompt: str,
