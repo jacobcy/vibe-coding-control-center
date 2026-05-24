@@ -203,7 +203,6 @@ class TestRemoteDependencies:
             }
             mock_store.get_issue_links.return_value = []
             mock_github.get_issue_body.return_value = "User content"
-            mock_github.get_issue_body.return_value = "User content"
 
             mock_label_service = Mock()
             with patch(

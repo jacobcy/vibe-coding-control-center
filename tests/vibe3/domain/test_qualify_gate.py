@@ -194,7 +194,7 @@ class TestRunQualifyGate:
                 )
 
                 assert result is None
-                mock_label_port.add_issue_label.assert_not_called()
+                mock_label_port.confirm_issue_state.assert_not_called()
 
     def test_dependency_block(
         self, qualify_gate_service, sample_issue, mock_store, mock_github

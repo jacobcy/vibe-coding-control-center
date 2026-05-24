@@ -302,10 +302,12 @@ class QualifyGateService:
         if not wt_path.exists():
             reason = f"Worktree path does not exist: {worktree_path}"
             from vibe3.services.blocked_state_service import BlockedStateService
+            from vibe3.services.label_service import LabelService
 
             service = BlockedStateService(
                 store=self._store,
                 github_client=self._github,
+                label_service=LabelService(repo=self.config.repo),
             )
             service.block(
                 branch=branch,
@@ -338,10 +340,12 @@ class QualifyGateService:
                     f"got {actual_branch}"
                 )
                 from vibe3.services.blocked_state_service import BlockedStateService
+                from vibe3.services.label_service import LabelService
 
                 service = BlockedStateService(
                     store=self._store,
                     github_client=self._github,
+                    label_service=LabelService(repo=self.config.repo),
                 )
                 service.block(
                     branch=branch,
@@ -383,10 +387,12 @@ class QualifyGateService:
 
         # Use BlockedStateService for consistent three-source blocking
         from vibe3.services.blocked_state_service import BlockedStateService
+        from vibe3.services.label_service import LabelService
 
         service = BlockedStateService(
             store=self._store,
             github_client=self._github,
+            label_service=LabelService(repo=self.config.repo),
         )
         service.block(
             branch=branch,
