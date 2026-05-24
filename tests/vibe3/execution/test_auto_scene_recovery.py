@@ -70,7 +70,9 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
         patch(
             "vibe3.services.flow_cleanup_service.FlowCleanupService"
         ) as mock_cleanup_cls,
-        patch("vibe3.services.label_service.LabelService") as mock_label_cls,
+        patch(
+            "vibe3.services.blocked_state_service.BlockedStateService"
+        ) as mock_blocked_cls,
     ):
         mock_cleanup = MagicMock()
         mock_cleanup.cleanup_flow_scene.return_value = {
@@ -81,8 +83,8 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
             "flow_record": True,
         }
         mock_cleanup_cls.return_value = mock_cleanup
-        mock_label = MagicMock()
-        mock_label_cls.return_value = mock_label
+        mock_blocked = MagicMock()
+        mock_blocked_cls.return_value = mock_blocked
 
         result = service.maybe_reset_damaged_scene(
             request,
@@ -101,11 +103,12 @@ def test_auto_scene_reset_recovers_damaged_auto_worktree(
         terminate_sessions=True,
         keep_flow_record=False,
     )
-    mock_label.confirm_issue_state.assert_called_once_with(
-        42,
-        IssueState.READY,
+    mock_blocked.unblock.assert_called_once_with(
+        branch="task/issue-42",
+        target_state=IssueState.READY,
+        issue_number=42,
         actor="orchestra:auto-recover",
-        force=True,
+        detail="Auto scene reset completed - issue returned to READY",
     )
     assert store.add_event.call_count == 2
 

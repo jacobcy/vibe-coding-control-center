@@ -172,7 +172,7 @@ class TestRunQualifyGate:
 
         mock_label_port = Mock()
         with patch(
-            "vibe3.domain.qualify_gate.GhIssueLabelPort", return_value=mock_label_port
+            "vibe3.services.label_service.LabelService", return_value=mock_label_port
         ):
             mock_truth = Mock()
             mock_truth.is_blocked = True
@@ -376,7 +376,7 @@ class TestRunQualifyGate:
                 ):
                     mock_label_port = Mock()
                     with patch(
-                        "vibe3.domain.qualify_gate.GhIssueLabelPort",
+                        "vibe3.services.label_service.LabelService",
                         return_value=mock_label_port,
                     ):
                         result = qualify_gate_service.run_qualify_gate(
