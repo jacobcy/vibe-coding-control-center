@@ -38,9 +38,9 @@ related_docs:
 
 **Inputs**: `docs/v3/handoff/01-command-and-skeleton.md`
 **Success Criteria**:
-- [ ] `bin/vibe3 flow --help` returns zero exit code + domain usage.
-- [ ] `bin/vibe3 task --help` returns zero exit code + domain usage.
-- [ ] `bin/vibe3 pr --help` returns zero exit code + domain usage.
+- [ ] `vibe3 flow --help` returns zero exit code + domain usage.
+- [ ] `vibe3 task --help` returns zero exit code + domain usage.
+- [ ] `vibe3 pr --help` returns zero exit code + domain usage.
 - [ ] `mypy src/vibe3/ --strict` returns no errors.
 
 ---
@@ -83,13 +83,13 @@ related_docs:
 - [x] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
 
 **Implementation Status** (2026-03-21):
-- ✅ `vibe handoff init` - Create shared handoff file
-- ✅ `vibe handoff show` - Display handoff content
-- ✅ `vibe handoff append` - Append lightweight update block to shared handoff
-- ✅ `vibe handoff plan <ref>` - Record plan handoff
-- ✅ `vibe handoff report <ref>` - Record report handoff
-- ✅ `vibe handoff audit <ref>` - Record audit handoff
-- ✅ `vibe check` - Verify handoff store consistency
+- ✅ `vibe3 handoff init` - Create shared handoff file
+- ✅ `vibe3 handoff show` - Display handoff content
+- ✅ `vibe3 handoff append` - Append lightweight update block to shared handoff
+- ✅ `vibe3 handoff plan <ref>` - Record plan handoff
+- ✅ `vibe3 handoff report <ref>` - Record report handoff
+- ✅ `vibe3 handoff audit <ref>` - Record audit handoff
+- ✅ `vibe3 check` - Verify handoff store consistency
 - ✅ Unit tests: 92% coverage (28/28 tests passing)
 - ✅ Integration tests: All CLI commands functional
 
@@ -101,7 +101,7 @@ related_docs:
 
 **Inputs**: `docs/v3/handoff/05-polish-and-cleanup.md`
 **Success Criteria**:
-- [ ] `time bin/vibe3 flow status` reports execution time < 1.0s.
+- [ ] `time vibe3 flow status` reports execution time < 1.0s.
 - [ ] No `TODO` comments or `print()` debugs remain in `src/`.
 - [ ] All smoke tests in `tests3/` pass.
 
@@ -128,7 +128,7 @@ related_docs:
 - [ ] Verify that `vibe3` commands are not "hallucinated" but actually implemented in `src/`.
 
 ### 2. Integration Verification
-- [ ] Run `bin/vibe flow status` and confirm it uses the `vibe3` logic path.
+- [ ] Run `vibe3 flow status` and confirm it uses the `vibe3` logic path.
 - [ ] Check `src/vibe3/clients/sqlite_client.py` for generic type safety and SQL injection guards.
 
 ### 3. Consistency Check
