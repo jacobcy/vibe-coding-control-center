@@ -77,8 +77,8 @@ def test_migrated_loc_config_loads_total_limits() -> None:
     new_settings = module.load_loc_settings("config/v3/loc_limits.yaml")
 
     assert new_settings.total_v2_shell == 3000
-    # Temporary increase to 60000 to handle PR backlog (see config/v3/loc_limits.yaml)
-    assert new_settings.total_v3_python == 60000
+    # Temp 65000 for refactor prep (see config/v3/loc_limits.yaml)
+    assert new_settings.total_v3_python == 65000
     assert new_settings.warning_threshold_percent == 90
     assert new_settings.last_reviewed != ""
     assert new_settings.exceptions
