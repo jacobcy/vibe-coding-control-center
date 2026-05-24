@@ -75,6 +75,7 @@ def test_reset_issue_to_ready_without_label_deletes_worktree() -> None:
     )
     operations.git_client.branch_exists.return_value = True
     operations.label_service.get_state.return_value = IssueState.BLOCKED
+    operations.github_client.get_issue_body.return_value = "User content"
 
     mock_flow = MagicMock()
     mock_flow.branch = "task/issue-303"
