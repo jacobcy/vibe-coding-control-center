@@ -287,13 +287,11 @@ def resume_blocked_issue_to_ready(
             error=str(e),
         ).warning(f"Failed to get branch for issue #{issue_number}")
 
-    if not branch or not store:
-        return
-
     # Use unified BlockedStateService
+    # Even without a branch, we still update the issue label to READY
     service = BlockedStateService(store=store)
     service.unblock(
-        branch=branch,
+        branch=branch or "",  # Empty string if no branch (DB ops skipped)
         target_state=IssueState.READY,
         issue_number=issue_number,
         detail=f"Resumed from blocked to ready: {reason}",

@@ -138,12 +138,15 @@ class BlockedStateService:
         """Atomically clear blocked state in all three sources.
 
         Args:
-            branch: Branch name
+            branch: Branch name (empty string if no flow exists;
+                DB operations are skipped in that case)
             target_state: Target issue state
             actor: Actor name for events
             issue_number: GitHub issue number
             detail: Custom timeline detail message (optional)
         """
+        has_branch = bool(branch)  # Skip DB ops for empty branch
+
         if issue_number:
             try:
                 self._io.clear_body_projection(issue_number=issue_number)
@@ -155,7 +158,7 @@ class BlockedStateService:
                 ).error(f"Failed to clear issue body projection: {exc}")
                 raise
 
-        if self.store:
+        if has_branch and self.store:
             try:
                 self._io.clear_database_cache(branch=branch, actor=actor)
             except Exception as exc:
@@ -180,7 +183,7 @@ class BlockedStateService:
                     branch=branch,
                 ).warning(f"Failed to write label state: {exc}")
 
-        if self.store and issue_number:
+        if has_branch and self.store and issue_number:
             try:
                 timeline = FlowTimelineService(store=self.store)
                 timeline.record_timeline_event(
