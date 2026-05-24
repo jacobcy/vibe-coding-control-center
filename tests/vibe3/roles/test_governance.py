@@ -371,7 +371,7 @@ class TestBuildSnapshotContext:
         ctx = build_governance_snapshot_context(snapshot, config=_make_config())
         assert "已截断" in ctx["truncated_note"]
 
-    @patch("vibe3.roles.governance.GitHubClient")
+    @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_roadmap_intake_uses_broader_repo_candidates(self, mock_github_cls):
         snapshot = _make_snapshot()
         # tick_count=1 selects roadmap-intake from recipe catalog
@@ -404,7 +404,7 @@ class TestBuildSnapshotContext:
         assert "#101" in ctx["suggested_issue_details"]
         assert "#102" not in ctx["suggested_issue_details"]
 
-    @patch("vibe3.roles.governance.GitHubClient")
+    @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_cron_supervisor_filters_to_docs_candidates(self, mock_github_cls):
         snapshot = _make_snapshot()
         # tick_count=2 selects cron-supervisor from recipe catalog
@@ -437,7 +437,7 @@ class TestBuildSnapshotContext:
         # Verify context is built correctly
         assert "suggested_issue_details" in ctx
 
-    @patch("vibe3.roles.governance.GitHubClient")
+    @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_material_override_uses_matching_scope(self, mock_github_cls):
         snapshot = _make_snapshot()
         config = _make_config()
@@ -520,7 +520,7 @@ class TestBuildSnapshotContext:
         assert "#101" in ctx["suggested_issue_details"]
         assert "#100" not in ctx["suggested_issue_details"]
 
-    @patch("vibe3.roles.governance.GitHubClient")
+    @patch("vibe3.roles.governance_utils.GitHubClient")
     def test_broader_repo_filters_vibe_task(self, mock_github_cls):
         """Broader repo candidates should filter vibe-task labeled issues."""
         snapshot = _make_snapshot()
