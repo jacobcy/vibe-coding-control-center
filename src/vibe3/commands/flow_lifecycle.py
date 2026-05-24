@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
+from vibe3.commands.common import enable_method_trace
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.convention_resolver import ConventionResolver
 from vibe3.services.flow_service import FlowService
@@ -37,6 +38,9 @@ def blocked(
         vibe3 flow blocked --task 218
         vibe3 flow blocked --branch task/issue-1212 --task 467
     """
+    if trace:
+        enable_method_trace()
+
     if reason is not None and task is not None:
         typer.echo("Error: 不能同时指定 --reason 与 --task", err=True)
         raise typer.Exit(1)
