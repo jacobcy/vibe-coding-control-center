@@ -10,7 +10,7 @@ import yaml
 from loguru import logger
 
 from vibe3.analysis.serena_service import SerenaService
-from vibe3.utils.trace import enable_trace
+from vibe3.commands.common import enable_method_trace
 
 
 def register(app: typer.Typer) -> None:
@@ -32,7 +32,8 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--quiet", help="Suppress next step suggestions")
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+            bool,
+            typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
         ] = False,
     ) -> None:
         """Show symbol references with detailed locations.
@@ -59,7 +60,7 @@ def register(app: typer.Typer) -> None:
             vibe inspect symbols src/vibe3/commands/inspect.py --json
         """
         if trace:
-            enable_trace()
+            enable_method_trace()
 
         # Suppress Serena warnings by redirecting stderr temporarily
         old_stderr = sys.stderr

@@ -10,7 +10,7 @@ from vibe3.commands.command_options import (
     FormatOption,
     TraceOption,
 )
-from vibe3.commands.common import trace_scope
+from vibe3.commands.common import enable_method_trace
 from vibe3.models.flow import IssueLink
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -157,6 +157,9 @@ def update(
     the corresponding branch doesn't exist in git, automatically creates the
     branch before registering flow.
     """
+    if trace:
+        enable_method_trace()
+
     branch = branch_opt or branch_arg
     # Handle deprecated --json flag
     if json_output and output_format == "table":
@@ -202,65 +205,64 @@ def update(
             )
 
     flow_service = FlowService()
-    with trace_scope(trace, "flow update", branch=target_branch):
-        _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
+    _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
 
-        # Register/Ensure flow
-        flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
+    # Register/Ensure flow
+    flow = flow_service.ensure_flow_for_branch(branch=target_branch, slug=name)
 
-        # Update metadata if explicitly provided — keep name and actor separate
-        # to avoid silently writing worktree identity when only --name is given.
-        if name or actor:
-            updates: dict[str, object] = {}
-            if name:
-                updates["flow_slug"] = name
-            if actor:
-                from vibe3.services.signature_service import SignatureService
+    # Update metadata if explicitly provided — keep name and actor separate
+    # to avoid silently writing worktree identity when only --name is given.
+    if name or actor:
+        updates: dict[str, object] = {}
+        if name:
+            updates["flow_slug"] = name
+        if actor:
+            from vibe3.services.signature_service import SignatureService
 
-                updates["latest_actor"] = SignatureService.resolve_actor(
-                    explicit_actor=actor
-                )
-            if updates:
-                flow_service.update_flow_metadata(target_branch, **updates)
-            # Re-fetch flow state
-            updated = flow_service.get_flow_status(target_branch)
-            if updated:
-                flow = updated
+            updates["latest_actor"] = SignatureService.resolve_actor(
+                explicit_actor=actor
+            )
+        if updates:
+            flow_service.update_flow_metadata(target_branch, **updates)
+        # Re-fetch flow state
+        updated = flow_service.get_flow_status(target_branch)
+        if updated:
+            flow = updated
 
-        if spec is not None:
-            # spec provided (may be empty string to clear)
-            if spec == "":
-                # Clear spec_ref
-                flow_service.store.update_flow_state(flow.branch, spec_ref=None)
-            else:
-                # Validate file path exists
-                from pathlib import Path
-
-                spec_path = Path(spec)
-                if not spec_path.exists() or not spec_path.is_file():
-                    typer.echo(f"Error: Spec file not found: {spec}", err=True)
-                    typer.echo(
-                        "Use a valid file path (e.g., docs/spec.md). "
-                        "For issue binding, use 'vibe flow bind <issue> --role task'.",
-                        err=True,
-                    )
-                    raise typer.Exit(1)
-                # Bind spec (absolute path)
-                flow_service.bind_spec(flow.branch, str(spec_path.resolve()), actor)
-
-        if output_format in ("json", "yaml"):
-            if output_format == "json":
-                typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
-            else:  # yaml
-                import yaml
-
-                typer.echo(
-                    yaml.dump(
-                        flow.model_dump(), default_flow_style=False, allow_unicode=True
-                    )
-                )
+    if spec is not None:
+        # spec provided (may be empty string to clear)
+        if spec == "":
+            # Clear spec_ref
+            flow_service.store.update_flow_state(flow.branch, spec_ref=None)
         else:
-            render_flow_created(flow)
+            # Validate file path exists
+            from pathlib import Path
+
+            spec_path = Path(spec)
+            if not spec_path.exists() or not spec_path.is_file():
+                typer.echo(f"Error: Spec file not found: {spec}", err=True)
+                typer.echo(
+                    "Use a valid file path (e.g., docs/spec.md). "
+                    "For issue binding, use 'vibe flow bind <issue> --role task'.",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            # Bind spec (absolute path)
+            flow_service.bind_spec(flow.branch, str(spec_path.resolve()), actor)
+
+    if output_format in ("json", "yaml"):
+        if output_format == "json":
+            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
+        else:  # yaml
+            import yaml
+
+            typer.echo(
+                yaml.dump(
+                    flow.model_dump(), default_flow_style=False, allow_unicode=True
+                )
+            )
+    else:
+        render_flow_created(flow)
 
 
 def bind(
@@ -280,6 +282,9 @@ def bind(
     ] = False,
 ) -> None:
     """Bind issue(s) to a flow branch. (Usage: vibe flow bind <issue-ref>)"""
+    if trace:
+        enable_method_trace()
+
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -293,77 +298,74 @@ def bind(
     if issue_refs is None:  # pragma: no cover - defensive
         raise typer.BadParameter("Missing issue reference")
     refs: List[str] = [issue_refs] if isinstance(issue_refs, str) else issue_refs
-    with trace_scope(trace, "flow bind", issue=issue_refs, role=role, branch=branch):
-        logger.bind(
-            command="flow bind", issue=issue_refs, role=role, branch=branch
-        ).info("Binding issue to flow")
-        try:
-            flow_service = FlowService()
-            task_service = TaskService()
-            target_branch = _resolve_bind_branch(flow_service, branch)
-            _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
+    logger.bind(command="flow bind", issue=issue_refs, role=role, branch=branch).info(
+        "Binding issue to flow"
+    )
+    try:
+        flow_service = FlowService()
+        task_service = TaskService()
+        target_branch = _resolve_bind_branch(flow_service, branch)
+        _ensure_branch_has_no_live_runtime_session(flow_service, target_branch)
 
-            links = []
-            for ref in refs:
-                issue_number = parse_issue_number(ref)
+        links = []
+        for ref in refs:
+            issue_number = parse_issue_number(ref)
 
-                if role == "dependency":
-                    # Compatibility path:
-                    # `flow bind --role dependency` no longer performs independent
-                    # dependency writes. It delegates to blocked dependency logic
-                    # for a single source of behavior.
-                    # Multi-ref compatibility remains ordered and per-ref:
-                    # each dependency delegates to `block_flow()` in sequence,
-                    # while the outward CLI output is synthesized from IssueLink.
-                    # With blocked_by accumulation fix, all dependency refs are
-                    # now accumulated in the issue body's blocked_by field.
-                    flow_service.block_flow(
-                        target_branch, blocked_by_issue=issue_number, actor=None
-                    )
-                    links.append(
-                        IssueLink(
-                            branch=target_branch,
-                            issue_number=issue_number,
-                            issue_role="dependency",
-                        )
-                    )
-                    continue
-
-                # Create the persistent link in flow_issue_links (Source of Truth)
-                link = task_service.link_issue(
-                    target_branch,
-                    issue_number,
-                    role,
-                    actor=None,
+            if role == "dependency":
+                # Compatibility path:
+                # `flow bind --role dependency` no longer performs independent
+                # dependency writes. It delegates to blocked dependency logic
+                # for a single source of behavior.
+                # Multi-ref compatibility remains ordered and per-ref:
+                # each dependency delegates to `block_flow()` in sequence,
+                # while the outward CLI output is synthesized from IssueLink.
+                # With blocked_by accumulation fix, all dependency refs are
+                # now accumulated in the issue body's blocked_by field.
+                flow_service.block_flow(
+                    target_branch, blocked_by_issue=issue_number, actor=None
                 )
-                links.append(link)
-
-            if output_format in ("json", "yaml"):
-                output_data = (
-                    links[0].model_dump()
-                    if len(links) == 1
-                    else [link.model_dump() for link in links]
+                links.append(
+                    IssueLink(
+                        branch=target_branch,
+                        issue_number=issue_number,
+                        issue_role="dependency",
+                    )
                 )
-                if output_format == "json":
-                    typer.echo(json.dumps(output_data, indent=2, default=str))
-                else:  # yaml
-                    import yaml
+                continue
 
-                    typer.echo(
-                        yaml.dump(
-                            output_data, default_flow_style=False, allow_unicode=True
-                        )
-                    )
-            else:
-                for link in links:
-                    message = (
-                        f"[green]✓[/] Issue #{link.issue_number} linked as {role} "
-                        f"to flow {link.branch}"
-                    )
-                    console.print(message)
-        except ValueError:
-            logger.error(f"Invalid issue format: {issue_refs}")
-            raise typer.BadParameter(f"Invalid issue format: {issue_refs}")
+            # Create the persistent link in flow_issue_links (Source of Truth)
+            link = task_service.link_issue(
+                target_branch,
+                issue_number,
+                role,
+                actor=None,
+            )
+            links.append(link)
+
+        if output_format in ("json", "yaml"):
+            output_data = (
+                links[0].model_dump()
+                if len(links) == 1
+                else [link.model_dump() for link in links]
+            )
+            if output_format == "json":
+                typer.echo(json.dumps(output_data, indent=2, default=str))
+            else:  # yaml
+                import yaml
+
+                typer.echo(
+                    yaml.dump(output_data, default_flow_style=False, allow_unicode=True)
+                )
+        else:
+            for link in links:
+                message = (
+                    f"[green]✓[/] Issue #{link.issue_number} linked as {role} "
+                    f"to flow {link.branch}"
+                )
+                console.print(message)
+    except ValueError:
+        logger.error(f"Invalid issue format: {issue_refs}")
+        raise typer.BadParameter(f"Invalid issue format: {issue_refs}")
 
 
 def list_deleted(
@@ -437,6 +439,9 @@ def restore_flow(
     trace: TraceOption = False,
 ) -> None:
     """Restore a soft-deleted flow."""
+    if trace:
+        enable_method_trace()
+
     branch = branch_opt or branch_arg
     if branch is None:
         typer.echo("Error: Branch is required for flow restore", err=True)
@@ -446,25 +451,24 @@ def restore_flow(
 
     target_branch = resolve_branch_arg(branch)
 
-    with trace_scope(trace, "flow restore", branch=target_branch):
-        from vibe3.clients import SQLiteClient
+    from vibe3.clients import SQLiteClient
 
-        store = SQLiteClient()
+    store = SQLiteClient()
 
-        # Check if flow exists and is deleted
-        flow = store.get_flow_state_include_deleted(target_branch)
-        if flow is None:
-            console.print(f"[red]Error: Flow '{target_branch}' not found[/]")
-            raise typer.Exit(1)
+    # Check if flow exists and is deleted
+    flow = store.get_flow_state_include_deleted(target_branch)
+    if flow is None:
+        console.print(f"[red]Error: Flow '{target_branch}' not found[/]")
+        raise typer.Exit(1)
 
-        if flow.get("deleted_at") is None:
-            console.print(f"[yellow]Flow '{target_branch}' is not deleted[/]")
-            raise typer.Exit(0)
+    if flow.get("deleted_at") is None:
+        console.print(f"[yellow]Flow '{target_branch}' is not deleted[/]")
+        raise typer.Exit(0)
 
-        # Restore the flow
-        store.restore_flow(target_branch)
-        console.print(f"[green]✓[/] Flow '{target_branch}' restored successfully")
-        console.print(f"[dim]Run 'vibe flow show {target_branch}' to verify[/]")
+    # Restore the flow
+    store.restore_flow(target_branch)
+    console.print(f"[green]✓[/] Flow '{target_branch}' restored successfully")
+    console.print(f"[dim]Run 'vibe flow show {target_branch}' to verify[/]")
 
 
 def register_manage_commands(app: typer.Typer) -> None:

@@ -172,7 +172,7 @@ def run_command(
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+        bool, typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)")
     ] = False,
     dry_run: Annotated[
         bool,

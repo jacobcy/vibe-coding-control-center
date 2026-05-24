@@ -7,7 +7,7 @@ import typer
 
 from vibe3.analysis import snapshot_service
 from vibe3.analysis.snapshot_diff import compute_diff
-from vibe3.utils.trace import enable_trace
+from vibe3.commands.common import enable_method_trace
 
 app = typer.Typer(
     name="snapshot",
@@ -39,7 +39,7 @@ Examples:
 
 _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
 _TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+    bool, typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)")
 ]
 
 
@@ -63,7 +63,7 @@ def build(
         vibe3 snapshot build --json
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     try:
         snapshot = snapshot_service.build_snapshot()
@@ -110,7 +110,7 @@ def save(
     from vibe3.clients.git_client import GitClient
 
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     try:
         if as_baseline:
@@ -163,7 +163,7 @@ def list_snapshots(
         vibe3 snapshot list --include-baselines
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     ids = snapshot_service.list_snapshots(include_baselines=include_baselines)
 
@@ -207,7 +207,7 @@ def show(
         vibe3 snapshot show --json
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     try:
         if branch:
@@ -278,7 +278,7 @@ def diff(
     from vibe3.clients.git_client import GitClient
 
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     try:
         # Get baseline snapshot

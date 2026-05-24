@@ -1,35 +1,30 @@
 """Common utilities for command layer."""
 
-from contextlib import nullcontext
-from typing import Any
+import os
+import sys
 
 import typer
 
 from vibe3.commands.check_support import execute_check_mode
-from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 
 
-def trace_scope(trace: bool, command: str, domain: str = "flow", **kwargs: Any) -> Any:
-    """Create trace context for command execution.
+def enable_method_trace() -> None:
+    """Enable method-level tracing via @trace_method decorator.
 
-    Args:
-        trace: Enable trace mode
-        command: Command name
-        domain: Domain name (default: flow)
-        **kwargs: Additional context fields
-
-    Returns:
-        Trace context manager or nullcontext
-
-    Example:
-        >>> with trace_scope(True, "flow show", flow_name="my-feature"):
-        ...     pass
+    Sets VIBE3_TRACE=1 environment variable.
+    Use -v or -vv separately to control log verbosity.
     """
-    if trace:
-        setup_logging(verbose=2)
-        return trace_context(command=command, domain=domain, **kwargs)
-    return nullcontext()
+    os.environ["VIBE3_TRACE"] = "1"
+
+    if "VIBE3_TRACE_HINT_SHOWN" not in os.environ:
+        os.environ["VIBE3_TRACE_HINT_SHOWN"] = "1"
+        print(
+            "Trace enabled. To add method tracing:\n"
+            "  uv run python scripts/trace_manager.py --add --module services\n"
+            "  uv run python scripts/trace_manager.py --add --module clients\n"
+            "  uv run python scripts/trace_manager.py --add --module all",
+            file=sys.stderr,
+        )
 
 
 def run_full_check_shortcut() -> None:

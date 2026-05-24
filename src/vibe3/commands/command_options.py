@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
 
 _TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+    bool, typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)")
 ]
 _DRY_RUN_OPT = Annotated[
     bool, typer.Option("--dry-run", help="Print command without executing")
@@ -66,7 +66,7 @@ ActorFilterOption = Annotated[
 
 TraceOption = Annotated[
     bool,
-    typer.Option("--trace", help="Enable call tracing + DEBUG logs"),
+    typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
 ]
 
 

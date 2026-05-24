@@ -11,6 +11,7 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
 )
+from vibe3.commands.common import enable_method_trace
 from vibe3.roles.plan import (
     execute_spec_plan_async,
     execute_spec_plan_sync,
@@ -19,7 +20,6 @@ from vibe3.roles.plan import (
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_resolution import resolve_handoff_target
-from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="plan",
@@ -43,7 +43,7 @@ def _plan_for_branch(
 ) -> None:
     """Create implementation plan for a branch with spec_ref."""
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -102,7 +102,7 @@ def _plan_spec_impl(
 ) -> None:
     """Create implementation plan from a specification file."""
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)

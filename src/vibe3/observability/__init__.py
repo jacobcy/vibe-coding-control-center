@@ -1,8 +1,8 @@
 """Observability module for Vibe 3.0.
 
-This module provides unified management of logging, tracing, and auditing:
+This module provides unified management of logging and tracing:
 - logger.py: Structured logging configuration
-- trace.py: Runtime call chain tracing (--trace support)
+- trace_method.py: Method-level tracing via @trace_method decorator
 - audit.py: Audit logging (future use)
 
 Design Principles:
@@ -13,10 +13,7 @@ Design Principles:
 """
 
 from .logger import setup_logging
-from .trace import Tracer, trace_context
 
 __all__ = [
     "setup_logging",
-    "Tracer",
-    "trace_context",
 ]

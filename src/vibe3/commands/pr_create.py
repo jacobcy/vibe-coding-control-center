@@ -9,11 +9,11 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.commands.pr_helpers import build_base_resolution_usecase, noop_context
+from vibe3.commands.common import enable_method_trace
+from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
@@ -88,7 +88,7 @@ def register_create_command(app: typer.Typer) -> None:
             ),
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+            bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
@@ -137,93 +137,90 @@ def register_create_command(app: typer.Typer) -> None:
         if trace:
             setup_logging(verbose=2)
 
-        ctx = (
-            trace_context(command="pr create", domain="pr", title=title)
-            if trace
-            else noop_context()
+        if trace:
+            enable_method_trace()
+
+        base_resolver = build_base_resolution_usecase()
+        flow_service = FlowService()
+        branch = _resolve_branch_for_ai_context(flow_service.get_current_branch())
+        resolved_base = base_resolver.resolve_pr_create_base(base)
+        logger.bind(command="pr create", title=title, base=resolved_base).info(
+            "Creating PR"
         )
-        with ctx:
-            base_resolver = build_base_resolution_usecase()
-            flow_service = FlowService()
-            branch = _resolve_branch_for_ai_context(flow_service.get_current_branch())
-            resolved_base = base_resolver.resolve_pr_create_base(base)
-            logger.bind(command="pr create", title=title, base=resolved_base).info(
-                "Creating PR"
+        # Agent mode is always non-interactive
+        interactive = _is_interactive(json_output, yaml_output) and not agent
+
+        usecase = PRCreateUsecase(
+            flow_service=flow_service,
+            base_resolver=base_resolver,
+        )
+        pr_service = PRService()
+
+        # Use standard branch→PR query path
+        try:
+            existing_pr = pr_service.get_open_pr_for_branch(branch)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            existing_pr = None
+
+        if existing_pr is not None:
+            pr_service.sync_pr_state_from_remote(existing_pr, actor=None)
+            _emit_pr_result(
+                existing_pr,
+                json_output,
+                yaml_output,
+                existing=True,
             )
-            # Agent mode is always non-interactive
-            interactive = _is_interactive(json_output, yaml_output) and not agent
+            return
 
-            usecase = PRCreateUsecase(
-                flow_service=flow_service,
-                base_resolver=base_resolver,
+        try:
+            # Bypass task binding check for agent mode (--agent or --yes)
+            usecase.check_flow_task(branch, yes=yes or agent)
+        except (UserError, MissingTaskIssueError) as error:
+            typer.echo(str(error), err=True)
+            raise typer.Exit(1) from error
+
+        ai_title, ai_body = ("", "")
+        if ai and not title:
+            ai_title, ai_body = usecase.suggest_content(
+                branch, resolved_base, interactive
             )
-            pr_service = PRService()
-
-            # Use standard branch→PR query path
-            try:
-                existing_pr = pr_service.get_open_pr_for_branch(branch)
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                existing_pr = None
-
-            if existing_pr is not None:
-                pr_service.sync_pr_state_from_remote(existing_pr, actor=None)
-                _emit_pr_result(
-                    existing_pr,
-                    json_output,
-                    yaml_output,
-                    existing=True,
-                )
-                return
-
-            try:
-                # Bypass task binding check for agent mode (--agent or --yes)
-                usecase.check_flow_task(branch, yes=yes or agent)
-            except (UserError, MissingTaskIssueError) as error:
-                typer.echo(str(error), err=True)
-                raise typer.Exit(1) from error
-
-            ai_title, ai_body = ("", "")
-            if ai and not title:
-                ai_title, ai_body = usecase.suggest_content(
-                    branch, resolved_base, interactive
-                )
-                # If --ai requested but no suggestions generated, provide clear error
-                if not ai_title and not title:
-                    typer.echo(
-                        "Error: --ai mode requires commits to generate suggestions.\n"
-                        "Options:\n"
-                        "  1. Commit your changes first, then retry\n"
-                        "  2. Provide title explicitly with -t option",
-                        err=True,
-                    )
-                    raise typer.Exit(1)
-
-            # Agent mode requires explicit title and body
-            if agent and not title:
+            # If --ai requested but no suggestions generated, provide clear error
+            if not ai_title and not title:
                 typer.echo(
-                    "Error: --agent mode requires -t (title) and -b (body)",
+                    "Error: --ai mode requires commits to generate suggestions.\n"
+                    "Options:\n"
+                    "  1. Commit your changes first, then retry\n"
+                    "  2. Provide title explicitly with -t option",
                     err=True,
                 )
                 raise typer.Exit(1)
 
-            try:
-                pr_title = usecase.resolve_title(title, ai_title, interactive)
-            except ValueError:
-                typer.echo("Error: PR title is required", err=True)
-                raise typer.Exit(1)
-
-            pr_body = ai_body if ai_body else body
-            # Actor determination:
-            # - AI suggestion mode: "ai-assistant"
-            # - Agent mode: None (will be resolved by PRService from flow state)
-            # - Human mode: None
-            actor = "ai-assistant" if ai else None
-
-            pr = pr_service.create_pr(
-                title=pr_title,
-                body=pr_body,
-                base_branch=resolved_base,
-                actor=actor,
+        # Agent mode requires explicit title and body
+        if agent and not title:
+            typer.echo(
+                "Error: --agent mode requires -t (title) and -b (body)",
+                err=True,
             )
+            raise typer.Exit(1)
 
-            _emit_pr_result(pr, json_output, yaml_output)
+        try:
+            pr_title = usecase.resolve_title(title, ai_title, interactive)
+        except ValueError:
+            typer.echo("Error: PR title is required", err=True)
+            raise typer.Exit(1)
+
+        pr_body = ai_body if ai_body else body
+        # Actor determination:
+        # - AI suggestion mode: "ai-assistant"
+        # - Agent mode: None (will be resolved by PRService from flow state)
+        # - Human mode: None
+        actor = "ai-assistant" if ai else None
+
+        pr = pr_service.create_pr(
+            title=pr_title,
+            body=pr_body,
+            base_branch=resolved_base,
+            actor=actor,
+        )
+
+        _emit_pr_result(pr, json_output, yaml_output)

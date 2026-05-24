@@ -11,10 +11,9 @@ from typing import Annotated, List
 import typer
 from loguru import logger
 
-from vibe3.commands.pr_helpers import noop_context
+from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import UserError
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
 from vibe3.services.pr_service import PRService
@@ -68,7 +67,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             bool, typer.Option("-y", "--yes", help="自动确认并发布 PR")
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+            bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
@@ -108,33 +107,28 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             typer.echo(f"Error: {error}", err=True)
             raise typer.Exit(1) from error
 
-        ctx = (
-            trace_context(command="pr ready", domain="pr", pr_number=target_pr_number)
-            if trace
-            else noop_context()
+        if trace:
+            enable_method_trace()
+
+        logger.bind(command="pr ready", pr_number=target_pr_number, yes=yes).info(
+            "Marking PR as ready for review"
         )
-        with ctx:
-            logger.bind(command="pr ready", pr_number=target_pr_number, yes=yes).info(
-                "Marking PR as ready for review"
+
+        try:
+            pr = _build_pr_ready_usecase(pr_service=pr_service).mark_ready(
+                pr_number=target_pr_number, yes=yes, requested_reviewers=review
             )
+        except PrReadyAbortedError:
+            logger.info("Aborted by user")
+            raise typer.Exit(0) from None
 
-            try:
-                pr = _build_pr_ready_usecase(pr_service=pr_service).mark_ready(
-                    pr_number=target_pr_number, yes=yes, requested_reviewers=review
-                )
-            except PrReadyAbortedError:
-                logger.info("Aborted by user")
-                raise typer.Exit(0) from None
+        if json_output:
+            typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))
+        elif yaml_output:
+            import yaml
 
-            if json_output:
-                typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))
-            elif yaml_output:
-                import yaml
-
-                typer.echo(
-                    yaml.dump(
-                        pr.model_dump(), default_flow_style=False, allow_unicode=True
-                    )
-                )
-            else:
-                render_pr_ready(pr, requested_reviewers=review)
+            typer.echo(
+                yaml.dump(pr.model_dump(), default_flow_style=False, allow_unicode=True)
+            )
+        else:
+            render_pr_ready(pr, requested_reviewers=review)

@@ -10,7 +10,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.commands.command_options import FormatOption, VerboseOption
-from vibe3.commands.common import trace_scope
+from vibe3.commands.common import enable_method_trace
 from vibe3.commands.handoff_render import (
     _render_handoff_events,
 )
@@ -103,42 +103,44 @@ def show(
         typer.Option("--branch", help="Branch for canonical ref resolution"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Show a handoff artifact. Supports @key, relative/path, and /abs/path targets."""
+    if trace:
+        enable_method_trace()
+
     from vibe3.services.path_helpers import resolve_handoff_target
 
     if target is None:
         typer.echo(_HANDOFF_SHOW_HELP)
         raise typer.Exit(0)
 
-    with trace_scope(trace, "handoff show", domain="handoff"):
-        # Resolve numeric issue ID → canonical branch name before path lookup
-        resolved_branch: str | None = None
-        if branch is not None:
-            try:
-                resolved_branch = (
-                    resolve_issue_branch_input(branch, FlowService()) or branch
-                )
-            except (UserError, SystemError) as exc:
-                typer.echo(f"Error: {exc}", err=True)
-                raise typer.Exit(1)
+    # Resolve numeric issue ID → canonical branch name before path lookup
+    resolved_branch: str | None = None
+    if branch is not None:
         try:
-            resolved_artifact = resolve_handoff_target(
-                target, resolved_branch, git_client=GitClient()
+            resolved_branch = (
+                resolve_issue_branch_input(branch, FlowService()) or branch
             )
-        except FileNotFoundError as exc:
+        except (UserError, SystemError) as exc:
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(1)
-        if not resolved_artifact.is_file():
-            typer.echo(f"Error: artifact is not a file: {resolved_artifact}", err=True)
-            raise typer.Exit(1)
-        try:
-            render_handoff_detail(resolved_artifact)
-        except (OSError, UnicodeDecodeError) as exc:
-            typer.echo(f"Error: failed to read artifact: {exc}", err=True)
-            raise typer.Exit(1)
+    try:
+        resolved_artifact = resolve_handoff_target(
+            target, resolved_branch, git_client=GitClient()
+        )
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+    if not resolved_artifact.is_file():
+        typer.echo(f"Error: artifact is not a file: {resolved_artifact}", err=True)
+        raise typer.Exit(1)
+    try:
+        render_handoff_detail(resolved_artifact)
+    except (OSError, UnicodeDecodeError) as exc:
+        typer.echo(f"Error: failed to read artifact: {exc}", err=True)
+        raise typer.Exit(1)
 
 
 def status(
@@ -152,7 +154,7 @@ def status(
     ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
     output_format: FormatOption = "table",
     verbose: VerboseOption = False,
@@ -166,6 +168,9 @@ def status(
     ] = False,
 ) -> None:
     """Show current flow handoff status and recent records."""
+    if trace:
+        enable_method_trace()
+
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
@@ -174,121 +179,120 @@ def status(
         )
         output_format = "json"
 
-    with trace_scope(trace, "handoff status", domain="handoff"):
-        flow_service = FlowService()
-        try:
-            target_branch = resolve_command_branch(
-                branch_opt=branch_opt,
-                pr_opt=pr_opt,
-                position_arg=branch_arg,
-                flow_service=flow_service,
-            )
-        except (UserError, SystemError) as error:
-            typer.echo(f"Error: {error}", err=True)
-            raise typer.Exit(1) from error
-
-        logger.bind(command="handoff status", branch=target_branch).info(
-            "Showing handoff details"
+    flow_service = FlowService()
+    try:
+        target_branch = resolve_command_branch(
+            branch_opt=branch_opt,
+            pr_opt=pr_opt,
+            position_arg=branch_arg,
+            flow_service=flow_service,
         )
+    except (UserError, SystemError) as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
-        # Aggregate handoff status from service
-        status_service = HandoffStatusService(flow_service=flow_service)
-        limit = None if show_all else 2
-        try:
-            result = status_service.get_handoff_status(target_branch, limit=limit)
-        except ValueError as error:
-            typer.echo(f"Error: {error}", err=True)
-            raise typer.Exit(1) from error
+    logger.bind(command="handoff status", branch=target_branch).info(
+        "Showing handoff details"
+    )
 
-        if output_format == "json":
-            output = {
-                "state": result.state.model_dump(),
-                "events": [e.model_dump() for e in result.events],
-                "recent_updates": result.recent_updates,
-            }
-            typer.echo(json.dumps(output, indent=2, default=str))
-            return
+    # Aggregate handoff status from service
+    status_service = HandoffStatusService(flow_service=flow_service)
+    limit = None if show_all else 2
+    try:
+        result = status_service.get_handoff_status(target_branch, limit=limit)
+    except ValueError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
-        if output_format == "yaml":
-            output = {
-                "state": result.state.model_dump(),
-                "events": [e.model_dump() for e in result.events],
-                "recent_updates": result.recent_updates,
-            }
-            typer.echo(
-                _get_yaml().dump(output, default_flow_style=False, allow_unicode=True)
-            )
-            return
+    if output_format == "json":
+        output = {
+            "state": result.state.model_dump(),
+            "events": [e.model_dump() for e in result.events],
+            "recent_updates": result.recent_updates,
+        }
+        typer.echo(json.dumps(output, indent=2, default=str))
+        return
 
-        # Table format (default)
-        console.print(f"\n[bold cyan]flow[/]: {result.flow_slug}")
+    if output_format == "yaml":
+        output = {
+            "state": result.state.model_dump(),
+            "events": [e.model_dump() for e in result.events],
+            "recent_updates": result.recent_updates,
+        }
+        typer.echo(
+            _get_yaml().dump(output, default_flow_style=False, allow_unicode=True)
+        )
+        return
 
-        # Show worktree path for context (where files actually live)
-        if result.worktree_root:
-            console.print(f"[dim]worktree: {result.worktree_root}[/]")
+    # Table format (default)
+    console.print(f"\n[bold cyan]flow[/]: {result.flow_slug}")
+
+    # Show worktree path for context (where files actually live)
+    if result.worktree_root:
+        console.print(f"[dim]worktree: {result.worktree_root}[/]")
+    console.print()
+
+    # Show recent updates from handoff file
+    if result.recent_updates:
+        console.print("[bold]--- Recent Handoff Updates ---[/]")
         console.print()
-
-        # Show recent updates from handoff file
-        if result.recent_updates:
-            console.print("[bold]--- Recent Handoff Updates ---[/]")
-            console.print()
-            for update in reversed(result.recent_updates):
-                timestamp = update["timestamp"][:19].replace("T", " ")
-                actor = update["actor"]
-                kind = update["kind"]
-                message = update["message"].split("\n")[0]  # First line only
-                console.print(f"[dim]{timestamp}[/]  [cyan]{kind}[/]  [dim]{actor}[/]")
-                console.print(f"  {message}")
-                console.print()
-
-        # Show latest verdict at the top
-        if result.latest_verdict:
-            console.print("[bold]## Latest Verdict[/]")
-            console.print(f"  [cyan]verdict:[/] {result.latest_verdict.verdict}")
-            console.print(f"  [cyan]actor:[/] {result.latest_verdict.actor}")
-            console.print(f"  [cyan]role:[/] {result.latest_verdict.role}")
-            # Human-friendly timestamp (relative time)
-            timestamp_str = _format_relative_time(result.latest_verdict.timestamp)
-            console.print(f"  [cyan]timestamp:[/] {timestamp_str}")
-            if result.latest_verdict.reason:
-                console.print(f"  [cyan]reason:[/] {result.latest_verdict.reason}")
-            if result.latest_verdict.issues:
-                console.print(f"  [cyan]issues:[/] {result.latest_verdict.issues}")
+        for update in reversed(result.recent_updates):
+            timestamp = update["timestamp"][:19].replace("T", " ")
+            actor = update["actor"]
+            kind = update["kind"]
+            message = update["message"].split("\n")[0]  # First line only
+            console.print(f"[dim]{timestamp}[/]  [cyan]{kind}[/]  [dim]{actor}[/]")
+            console.print(f"  {message}")
             console.print()
 
-        # Show resume hints from registry only (registry is source of truth)
-        if result.live_sessions:
-            hints_shown = False
-            for sess in result.live_sessions:
-                backend_session_id = sess.get("backend_session_id")
-                if backend_session_id:
-                    if not hints_shown:
-                        console.print("[bold]Resume Hints[/]")
-                        hints_shown = True
-                    console.print(
-                        f'  [dim]codeagent-wrapper resume {backend_session_id} "..."[/]'
-                    )
-            if hints_shown:
-                console.print()
-
-        console.print("[bold]--- Successful Handoff Events ---[/]")
+    # Show latest verdict at the top
+    if result.latest_verdict:
+        console.print("[bold]## Latest Verdict[/]")
+        console.print(f"  [cyan]verdict:[/] {result.latest_verdict.verdict}")
+        console.print(f"  [cyan]actor:[/] {result.latest_verdict.actor}")
+        console.print(f"  [cyan]role:[/] {result.latest_verdict.role}")
+        # Human-friendly timestamp (relative time)
+        timestamp_str = _format_relative_time(result.latest_verdict.timestamp)
+        console.print(f"  [cyan]timestamp:[/] {timestamp_str}")
+        if result.latest_verdict.reason:
+            console.print(f"  [cyan]reason:[/] {result.latest_verdict.reason}")
+        if result.latest_verdict.issues:
+            console.print(f"  [cyan]issues:[/] {result.latest_verdict.issues}")
         console.print()
-        _render_handoff_events(
-            result.events,
-            worktree_root=result.worktree_root,
-            branch=target_branch,
-            verbose=verbose,
+
+    # Show resume hints from registry only (registry is source of truth)
+    if result.live_sessions:
+        hints_shown = False
+        for sess in result.live_sessions:
+            backend_session_id = sess.get("backend_session_id")
+            if backend_session_id:
+                if not hints_shown:
+                    console.print("[bold]Resume Hints[/]")
+                    hints_shown = True
+                console.print(
+                    f'  [dim]codeagent-wrapper resume {backend_session_id} "..."[/]'
+                )
+        if hints_shown:
+            console.print()
+
+    console.print("[bold]--- Successful Handoff Events ---[/]")
+    console.print()
+    _render_handoff_events(
+        result.events,
+        worktree_root=result.worktree_root,
+        branch=target_branch,
+        verbose=verbose,
+    )
+    if not show_all and (result.events or result.recent_updates):
+        # Conditionally add --branch hint if viewing different branch
+        current_branch = flow_service.get_current_branch()
+        tip_cmd = "vibe3 handoff show @current"
+        if target_branch != current_branch:
+            tip_cmd += f" --branch {target_branch}"
+        console.print(
+            f"[dim]Tip: use '{tip_cmd}' to view full handoff content, "
+            "or 'vibe3 handoff status --all' to show all events.[/]"
         )
-        if not show_all and (result.events or result.recent_updates):
-            # Conditionally add --branch hint if viewing different branch
-            current_branch = flow_service.get_current_branch()
-            tip_cmd = "vibe3 handoff show @current"
-            if target_branch != current_branch:
-                tip_cmd += f" --branch {target_branch}"
-            console.print(
-                f"[dim]Tip: use '{tip_cmd}' to view full handoff content, "
-                "or 'vibe3 handoff status --all' to show all events.[/]"
-            )
 
 
 def register_read_commands(app: typer.Typer) -> None:

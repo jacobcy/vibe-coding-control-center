@@ -8,10 +8,10 @@ from typing import Annotated, Iterator
 import typer
 
 from vibe3.commands.command_options import FormatOption
+from vibe3.commands.common import enable_method_trace
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
@@ -106,40 +106,35 @@ def show(
     if trace:
         setup_logging(verbose=2)
 
-    ctx = (
-        trace_context(command="task show", domain="task", branch=target_branch)
-        if trace
-        else _noop()
+    if trace:
+        enable_method_trace()
+
+    # Resolve issue number from branch using standard resolver
+    resolved_branch = (
+        resolve_issue_branch_input(target_branch, task_svc.flow_service)
+        or target_branch
     )
-    with ctx:
-        # Resolve issue number from branch using standard resolver
-        resolved_branch = (
-            resolve_issue_branch_input(target_branch, task_svc.flow_service)
-            or target_branch
-        )
-        task_result = task_svc.show_task(resolved_branch)
+    task_result = task_svc.show_task(resolved_branch)
 
-        issue_number = None
-        if task_result.local_task and task_result.local_task.task_issue_number:
-            issue_number = task_result.local_task.task_issue_number
-        elif resolved_branch.isdigit():
-            # Branch resolved to numeric issue (no flow exists)
-            issue_number = int(resolved_branch)
+    issue_number = None
+    if task_result.local_task and task_result.local_task.task_issue_number:
+        issue_number = task_result.local_task.task_issue_number
+    elif resolved_branch.isdigit():
+        # Branch resolved to numeric issue (no flow exists)
+        issue_number = int(resolved_branch)
 
-        render_task_show(task_result, output_format, full=full)
+    render_task_show(task_result, output_format, full=full)
 
-        # Always show recent comments (if issue exists and not json/yaml output)
-        if issue_number and output_format == "table":
-            issue_data = task_svc.fetch_issue_with_comments(issue_number)
-            if issue_data == "network_error":
-                typer.echo("\nIssue comments unavailable: network/auth error")
-            elif issue_data is None:
-                typer.echo(
-                    f"\nIssue comments unavailable: issue #{issue_number} not found"
-                )
-            else:
-                assert isinstance(issue_data, dict)
-                render_task_comments(issue_data)
+    # Always show recent comments (if issue exists and not json/yaml output)
+    if issue_number and output_format == "table":
+        issue_data = task_svc.fetch_issue_with_comments(issue_number)
+        if issue_data == "network_error":
+            typer.echo("\nIssue comments unavailable: network/auth error")
+        elif issue_data is None:
+            typer.echo(f"\nIssue comments unavailable: issue #{issue_number} not found")
+        else:
+            assert isinstance(issue_data, dict)
+            render_task_comments(issue_data)
 
 
 @app.command()

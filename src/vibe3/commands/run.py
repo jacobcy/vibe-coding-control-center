@@ -15,6 +15,7 @@ from vibe3.commands.command_options import (
     _SHOW_PROMPT_OPT,
     _TRACE_OPT,
 )
+from vibe3.commands.common import enable_method_trace
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import UserError
 from vibe3.roles.run import (
@@ -27,7 +28,6 @@ from vibe3.roles.run_command import resolve_skill_path
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_resolution import resolve_handoff_target
-from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="run",
@@ -82,7 +82,7 @@ def run_command(
 ) -> None:
     """Execute implementation plan or skill."""
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     # Register EDA event handlers for run command (may publish events)
     from vibe3.domain.handlers import register_event_handlers

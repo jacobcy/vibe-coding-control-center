@@ -7,7 +7,7 @@ import typer
 import yaml
 
 from vibe3.analysis.inspect_query_service import build_change_analysis
-from vibe3.utils.trace import enable_trace
+from vibe3.commands.common import enable_method_trace
 
 
 def register(app: typer.Typer) -> None:
@@ -22,13 +22,14 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="Output as YAML")
         ] = False,
         trace: Annotated[
-            bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+            bool,
+            typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
         ] = False,
     ) -> None:
         """Run analysis for uncommitted working tree changes."""
 
         if trace:
-            enable_trace()
+            enable_method_trace()
 
         result = build_change_analysis("uncommit", "working-tree")
 

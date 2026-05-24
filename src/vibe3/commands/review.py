@@ -12,6 +12,7 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
+from vibe3.commands.common import enable_method_trace
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.exceptions import UserError
 from vibe3.execution.issue_role_sync_runner import (
@@ -27,7 +28,6 @@ from vibe3.roles.review import (
 )
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
@@ -61,7 +61,7 @@ def _review_branch_impl(
 ) -> None:
     """Review implementation for a branch via role sync runner."""
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     flow_service = FlowService()
     try:
@@ -166,7 +166,7 @@ def base(
     Example: vibe3 review base origin/main "Focus on behavior changes"
     """
     if trace:
-        enable_trace()
+        enable_method_trace()
 
     flow_service, current_branch = ensure_flow_for_current_branch()
     try:

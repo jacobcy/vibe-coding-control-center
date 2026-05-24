@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.commands.common import trace_scope
+from vibe3.commands.common import enable_method_trace
 from vibe3.models.verdict_types import VerdictValue
 from vibe3.services.branch_arg import resolve_branch_arg
 from vibe3.services.handoff_service import HandoffService
@@ -24,24 +24,26 @@ def _record_handoff_reference(
     branch: str | None = None,
     **extra_kw: object,
 ) -> None:
-    with trace_scope(trace, command, domain="handoff"):
-        specific_ref_key = f"{ref_label.lower()}_ref"
-        logger.bind(
-            command=command,
-            actor=actor,
-            ref=ref_value,
-            branch=branch,
-            **{specific_ref_key: ref_value},
-        ).info(f"Recording {ref_label} handoff")
+    if trace:
+        enable_method_trace()
 
-        service = HandoffService()
-        method = getattr(service, method_name)
-        # Support optional 'action' kwarg for indicate command
-        # Branch is resolved to non-None string at command level
-        extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
-        extra_kwargs["branch"] = branch
-        method(ref_value, actor, **extra_kwargs)
-        console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
+    specific_ref_key = f"{ref_label.lower()}_ref"
+    logger.bind(
+        command=command,
+        actor=actor,
+        ref=ref_value,
+        branch=branch,
+        **{specific_ref_key: ref_value},
+    ).info(f"Recording {ref_label} handoff")
+
+    service = HandoffService()
+    method = getattr(service, method_name)
+    # Support optional 'action' kwarg for indicate command
+    # Branch is resolved to non-None string at command level
+    extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
+    extra_kwargs["branch"] = branch
+    method(ref_value, actor, **extra_kwargs)
+    console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
 def init(
@@ -51,24 +53,25 @@ def init(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Initialize handoff file for a branch."""
+    if trace:
+        enable_method_trace()
 
     target_branch = resolve_branch_arg(branch)
 
-    with trace_scope(trace, "handoff init", domain="handoff"):
-        logger.bind(command="handoff init", force=force, branch=target_branch).info(
-            "Initializing handoff"
-        )
+    logger.bind(command="handoff init", force=force, branch=target_branch).info(
+        "Initializing handoff"
+    )
 
-        service = HandoffService()
-        handoff_path = service.storage.ensure_current_handoff(
-            force=force, branch=target_branch
-        )
+    service = HandoffService()
+    handoff_path = service.storage.ensure_current_handoff(
+        force=force, branch=target_branch
+    )
 
-        console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
+    console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
 
 
 def append(
@@ -93,25 +96,26 @@ def append(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Append lightweight update to handoff file for a branch."""
+    if trace:
+        enable_method_trace()
 
     target_branch = resolve_branch_arg(branch)
 
-    with trace_scope(trace, "handoff append", domain="handoff"):
-        logger.bind(
-            command="handoff append", actor=actor, kind=kind, branch=target_branch
-        ).info("Appending handoff update")
+    logger.bind(
+        command="handoff append", actor=actor, kind=kind, branch=target_branch
+    ).info("Appending handoff update")
 
-        service = HandoffService()
-        handoff_path = service.append_current_handoff(
-            message, actor, kind, branch=target_branch
-        )
+    service = HandoffService()
+    handoff_path = service.append_current_handoff(
+        message, actor, kind, branch=target_branch
+    )
 
-        console.print("[green]✓[/] Appended handoff update")
-        console.print(f"  [dim]File: {handoff_path}[/]")
+    console.print("[green]✓[/] Appended handoff update")
+    console.print(f"  [dim]File: {handoff_path}[/]")
 
 
 def plan(
@@ -132,7 +136,7 @@ def plan(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record plan handoff for a branch."""
@@ -168,7 +172,7 @@ def report(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record report handoff for a branch."""
@@ -207,7 +211,7 @@ def indicate(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record manager indicate handoff for a branch.
@@ -247,7 +251,7 @@ def audit(
         typer.Option("--branch", "-b", help="Branch name or issue number"),
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Record audit handoff for a branch."""
@@ -273,26 +277,28 @@ def next_step(
     ] = None,
     actor: Annotated[str | None, typer.Option("--actor", "-a")] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Write next step to flow state for a target branch."""
-    with trace_scope(trace, "handoff next", domain="handoff"):
-        target_branch = resolve_branch_arg(branch)
-        service = HandoffService()
+    if trace:
+        enable_method_trace()
 
-        # Validate flow exists before writing next_step
-        flow_state = service.store.get_flow_state(target_branch)
-        if not flow_state:
-            typer.echo(
-                f"Error: 目标分支 '{target_branch}' 没有 flow\n"
-                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
-                err=True,
-            )
-            raise typer.Exit(1)
+    target_branch = resolve_branch_arg(branch)
+    service = HandoffService()
 
-        service.record_next_step(target_branch, message, actor)
-        console.print(f"[green]✓[/] Next step updated: {message}")
+    # Validate flow exists before writing next_step
+    flow_state = service.store.get_flow_state(target_branch)
+    if not flow_state:
+        typer.echo(
+            f"Error: 目标分支 '{target_branch}' 没有 flow\n"
+            "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    service.record_next_step(target_branch, message, actor)
+    console.print(f"[green]✓[/] Next step updated: {message}")
 
 
 def verdict(
@@ -312,7 +318,7 @@ def verdict(
         str | None, typer.Argument(help="Target branch (current if not specified)")
     ] = None,
     trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
     ] = False,
 ) -> None:
     """Write verdict to handoff chain and flow state.
@@ -333,30 +339,31 @@ def verdict(
         vibe3 handoff verdict PASS --reason "Code looks good"
         vibe3 handoff verdict BLOCK --reason "Security vulnerability found"
     """
+    if trace:
+        enable_method_trace()
 
     target_branch = resolve_branch_arg(branch)
 
-    with trace_scope(trace, "handoff verdict", domain="handoff"):
-        logger.bind(
-            command="handoff verdict",
-            verdict=verdict_value,
-            reason=reason,
-            branch=target_branch,
-        ).info("Writing verdict")
+    logger.bind(
+        command="handoff verdict",
+        verdict=verdict_value,
+        reason=reason,
+        branch=target_branch,
+    ).info("Writing verdict")
 
-        service = VerdictService()
-        record = service.write_verdict(
-            verdict=verdict_value,
-            reason=reason,
-            issues=issues,
-            branch=target_branch,
-        )
+    service = VerdictService()
+    record = service.write_verdict(
+        verdict=verdict_value,
+        reason=reason,
+        issues=issues,
+        branch=target_branch,
+    )
 
-        console.print(f"[green]✓[/] Verdict written: {verdict_value}")
-        if reason:
-            console.print(f"  [dim]Reason: {reason}[/]")
-        console.print(f"  [dim]Actor: {record.actor}[/]")
-        console.print(f"  [dim]Role: {record.role}[/]")
+    console.print(f"[green]✓[/] Verdict written: {verdict_value}")
+    if reason:
+        console.print(f"  [dim]Reason: {reason}[/]")
+    console.print(f"  [dim]Actor: {record.actor}[/]")
+    console.print(f"  [dim]Role: {record.role}[/]")
 
 
 def register_write_commands(app: typer.Typer) -> None:
