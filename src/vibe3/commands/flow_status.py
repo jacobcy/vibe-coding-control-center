@@ -11,7 +11,7 @@ from vibe3.commands.command_options import (
     FormatOption,
     RemoteOption,
 )
-from vibe3.commands.common import run_full_check_shortcut
+from vibe3.commands.common import enable_method_trace, run_full_check_shortcut
 from vibe3.commands.flow_status_helpers import (
     _collect_timeline_issue_numbers,
     _fetch_issue_titles_for_status,
@@ -77,6 +77,9 @@ def show(
     ] = False,
 ) -> None:
     """Show flow details with source-aware reads."""
+    if trace:
+        enable_method_trace()
+
     # Handle deprecated --json flag
     if json_output and output_format == "table":
         typer.echo(
