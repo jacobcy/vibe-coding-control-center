@@ -12,7 +12,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from vibe3.models.execution_handle import AsyncExecutionHandle  # noqa: F401
+from vibe3.models.execution_handle import AsyncExecutionHandle
 
 CRITICAL_ENV_PASSTHROUGH = {
     "HOME",
