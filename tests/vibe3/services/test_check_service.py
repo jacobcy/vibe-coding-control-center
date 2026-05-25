@@ -5,27 +5,30 @@ from unittest.mock import MagicMock, patch
 from vibe3.models.pr import PRState
 
 
-def _make_check_service():
-    """Create a CheckService instance with mocked dependencies."""
-    from vibe3.clients import SQLiteClient
+def _make_check_pr_service():
+    """Create a CheckPRService instance with mocked dependencies."""
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.services.check_service import CheckService
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.services.check_pr_service import CheckPRService
+    from vibe3.services.flow_status_service import FlowStatusService
 
     store = MagicMock(spec=SQLiteClient)
     git_client = MagicMock(spec=GitClient)
     github_client = MagicMock(spec=GitHubClient)
+    flow_status_service = MagicMock(spec=FlowStatusService)
 
-    return CheckService(
+    return CheckPRService(
         store=store,
         git_client=git_client,
         github_client=github_client,
+        flow_status_service=flow_status_service,
     )
 
 
 def test_handle_closed_pr_resets_issue_to_ready() -> None:
     """When PR is closed (not merged), issue should be reset to READY."""
-    service = _make_check_service()
+    service = _make_check_pr_service()
 
     # Mock PR closed (not merged)
     mock_pr = MagicMock()
@@ -49,7 +52,7 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         mock_resume_ops = MagicMock()
         mock_resume_ops_cls.return_value = mock_resume_ops
 
-        result = service._handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
         # Verify reset_issue_to_ready was called
         mock_resume_ops.reset_issue_to_ready.assert_called_once()
@@ -57,13 +60,14 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         assert call_kwargs["issue_number"] == 456
         assert call_kwargs["resume_kind"] == "pr_closed"
 
-        # Verify check result is valid
-        assert result.is_valid is True
+        # Verify result is valid and handled
+        assert handled is True
+        assert len(issues) == 0
 
 
 def test_handle_closed_pr_reports_reset_failure() -> None:
     """When reset fails, check should report the closed PR cleanup as invalid."""
-    service = _make_check_service()
+    service = _make_check_pr_service()
 
     mock_pr = MagicMock()
     mock_pr.number = 123
@@ -86,22 +90,22 @@ def test_handle_closed_pr_reports_reset_failure() -> None:
         )
         mock_resume_ops_cls.return_value = mock_resume_ops
 
-        result = service._handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
-    assert result is not None
-    assert result.is_valid is False
-    assert result.issues == [
+    assert handled is True
+    assert issues == [
         "Failed to reset issue #456 after PR #123 closed: scene cleanup failed"
     ]
 
 
 def test_handle_closed_pr_skips_already_closed_issue() -> None:
     """When issue already closed, skip reset."""
-    service = _make_check_service()
+    service = _make_check_pr_service()
 
     mock_pr = MagicMock()
     mock_pr.number = 123
     mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None  # Not merged
 
     service.store.get_issue_links.return_value = [
         {"issue_role": "task", "issue_number": 456}
@@ -118,8 +122,9 @@ def test_handle_closed_pr_skips_already_closed_issue() -> None:
         mock_resume_ops = MagicMock()
         mock_resume_ops_cls.return_value = mock_resume_ops
 
-        result = service._handle_closed_pr("task/issue-456", mock_pr)
+        handled, issues, warnings = service.handle_closed_pr("task/issue-456", mock_pr)
 
         # Should not try to reset closed issue
         mock_resume_ops.reset_issue_to_ready.assert_not_called()
-        assert result.is_valid is True
+        assert handled is True
+        assert len(issues) == 0

@@ -211,8 +211,10 @@ def test_verify_branch_handles_closed_pr(tmp_path: Path) -> None:
     service._branch_to_pr = {branch: closed_pr}
 
     # Mock _reset_issue_after_pr_closed to avoid side effects
-    with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
-        mock_reset.return_value = None
+    with patch.object(
+        service._check_pr_service, "_reset_issue_after_pr_closed"
+    ) as mock_reset:
+        mock_reset.return_value = (None, [])
         result = service.verify_branch(branch)
 
         # Should call _reset_issue_after_pr_closed
