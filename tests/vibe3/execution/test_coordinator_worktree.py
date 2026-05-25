@@ -27,9 +27,8 @@ def mock_dependencies():
 
 
 @patch("vibe3.execution.coordinator.WorktreeManager")
-@patch("vibe3.execution.coordinator.start_async_command")
 def test_coordinator_resolves_permanent_worktree_for_manager(
-    mock_start_async, mock_worktree_cls, mock_dependencies, tmp_path
+    mock_worktree_cls, mock_dependencies, tmp_path
 ):
     """Coordinator should own permanent worktree resolution for manager-like roles."""
     config, store, backend, capacity = mock_dependencies
@@ -38,18 +37,20 @@ def test_coordinator_resolves_permanent_worktree_for_manager(
     handle = MagicMock()
     handle.tmux_session = "manager-session"
     handle.log_path = Path("/tmp/manager.log")
-    mock_start_async.return_value = handle
 
-    mock_worktree = MagicMock()
-    mock_worktree.resolve_manager_cwd.return_value = (tmp_path, False)
-    mock_worktree_cls.return_value = mock_worktree
-
+    mock_start_async = MagicMock(return_value=handle)
     coordinator = ExecutionCoordinator(
         config=config,
         store=store,
         backend=backend,
         capacity=capacity,
+        start_async=mock_start_async,
     )
+
+    mock_worktree = MagicMock()
+    mock_worktree.resolve_manager_cwd.return_value = (tmp_path, False)
+    mock_worktree_cls.return_value = mock_worktree
+
     request = ExecutionRequest(
         role="manager",
         target_branch="task/issue-7",
