@@ -1,5 +1,6 @@
-"""Tests for reviewer role audit artifact helpers."""
+"""Tests for reviewer role audit artifact helpers and dispatch."""
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -191,3 +192,43 @@ def test_build_issue_review_request_retry_resume_provides_bootstrap_fallback() -
     assert request.dry_run_summary["fallback_context_mode"] == "bootstrap"
     assert request.include_global_notice is False
     assert request.fallback_prompt is not None
+
+
+class TestDispatchAsyncManualReviewWorktreeRequirement:
+    """_dispatch_async_manual_review must set worktree_requirement=PERMANENT."""
+
+    def test_sets_worktree_requirement_permanent(self) -> None:
+        """ExecutionRequest must include worktree_requirement=PERMANENT."""
+        from vibe3.execution.role_contracts import WorktreeRequirement
+
+        with (
+            patch(
+                "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+                return_value=Path("/fake/repo"),
+            ),
+            patch("vibe3.roles.review.load_orchestra_config"),
+            patch("vibe3.clients.sqlite_client.SQLiteClient"),
+            patch("vibe3.roles.review.ExecutionCoordinator") as mock_coord_cls,
+        ):
+            mock_coord = MagicMock()
+            mock_coord.dispatch_execution.return_value = MagicMock(launched=True)
+            mock_coord_cls.return_value = mock_coord
+
+            from vibe3.models.review import ReviewRequest, ReviewScope
+            from vibe3.roles.review import _dispatch_async_manual_review
+
+            request = ReviewRequest(
+                scope=ReviewScope(kind="base", base_branch="main"),
+            )
+            _dispatch_async_manual_review(
+                request=request,
+                branch="dev/issue-42",
+                issue_number=42,
+                pr_number=None,
+                instructions="review this",
+            )
+
+            exec_request = mock_coord.dispatch_execution.call_args[0][0]
+            assert exec_request.worktree_requirement == WorktreeRequirement.PERMANENT
+            assert exec_request.cwd is None
+            assert exec_request.repo_path == "/fake/repo"
