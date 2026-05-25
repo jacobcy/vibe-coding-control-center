@@ -85,9 +85,9 @@ def render_task_show(
                         markup=False,
                     )
                 else:
-                    console.print(f"[yellow]No flow found for issue #{branch}[/]")
-                    console.print()
+                    # Table mode: show issue info without misleading "No flow" message
                     console.print("[bold]Issue Info[/]")
+                    console.print(f"Number: #{branch}")
                     if task_result.issue_title:
                         console.print(f"Title:  {task_result.issue_title}")
                     if task_result.issue_state:

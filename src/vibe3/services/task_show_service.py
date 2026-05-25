@@ -107,8 +107,43 @@ class TaskShowService:
     def fetch_issue_with_comments(
         self, issue_number: int
     ) -> dict[str, object] | str | None:
-        """Fetch issue data including comments from GitHub."""
-        return self.github_client.view_issue(issue_number)
+        """Fetch issue data including comments from GitHub.
+
+        Also checks if the issue_number is actually a PR and adds a flag.
+        """
+        import subprocess
+
+        issue_data = self.github_client.view_issue(issue_number)
+
+        # Check if this issue_number is actually a PR
+        if isinstance(issue_data, dict):
+            try:
+                result = subprocess.run(
+                    [
+                        "gh",
+                        "pr",
+                        "view",
+                        str(issue_number),
+                        "--json",
+                        "headRefName",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    # Parse JSON to check if headRefName exists
+                    import json
+
+                    pr_data = json.loads(result.stdout)
+                    if pr_data.get("headRefName"):
+                        # This is a real PR (has head branch)
+                        issue_data["_is_pull_request"] = True
+            except (subprocess.TimeoutExpired, Exception):
+                # Ignore errors in PR detection
+                pass
+
+        return issue_data
 
     def resolve_branch(
         self,

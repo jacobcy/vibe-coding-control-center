@@ -137,6 +137,18 @@ def show(
             typer.echo(f"\nIssue comments unavailable: issue #{issue_number} not found")
         else:
             assert isinstance(issue_data, dict)
+            # Check if this is a PR and show helpful hints
+            if issue_data.get("_is_pull_request"):
+                from vibe3.ui.console import console
+
+                console.print(f"\n[cyan]提示：#{issue_number} 是一个 Pull Request[/]")
+                console.print(
+                    f"  - 使用 [bold]vibe3 pr show {issue_number}[/] 查看 PR 详情"
+                )
+                console.print(
+                    f"  - 使用 [bold]vibe3 task show --pr {issue_number}[/] "
+                    "查看 PR 关联的 issue 详情\n"
+                )
             render_task_comments(issue_data)
 
 
