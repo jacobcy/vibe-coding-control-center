@@ -85,9 +85,8 @@ def render_task_show(
                         markup=False,
                     )
                 else:
-                    console.print(f"[yellow]No flow found for issue #{branch}[/]")
+                    console.print(f"Remote issue #{branch} (no local flow)")
                     console.print()
-                    console.print("[bold]Issue Info[/]")
                     if task_result.issue_title:
                         console.print(f"Title:  {task_result.issue_title}")
                     if task_result.issue_state:

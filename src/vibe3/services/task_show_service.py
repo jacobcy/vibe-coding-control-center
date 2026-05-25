@@ -116,6 +116,7 @@ class TaskShowService:
         *,
         pr_number: int | None = None,
         position_arg: str | None = None,
+        allow_no_flow: bool = False,
     ) -> str:
         """Resolve explicit or current branch for task commands.
 
@@ -123,11 +124,9 @@ class TaskShowService:
             branch: Branch name or issue number (--branch option)
             pr_number: PR number to resolve branch from
             position_arg: Positional argument (issue number or branch)
-
-        Returns:
-            Resolved branch name
+            allow_no_flow: If True, return raw numeric string instead of raising
+                UserError when no flows exist for an issue number.
         """
-        # Import here to avoid circular dependency
         from vibe3.services.pr_branch_resolver import resolve_command_branch
 
         return resolve_command_branch(
@@ -136,6 +135,7 @@ class TaskShowService:
             position_arg=position_arg,
             flow_service=self.flow_service,
             github_client=self.github_client,
+            allow_no_flow=allow_no_flow,
         )
 
     @staticmethod
@@ -226,36 +226,22 @@ class TaskShowService:
     ) -> TaskRefSummary | None:
         """Select the latest ref from previous round based on state transitions.
 
-        Uses state machine logic to determine which role worked in the
-        previous round:
-        - reviewer_status == done → show audit_ref (most recent completed work)
-        - executor_status == done → show report_ref
-        - planner_status == done → show plan_ref
-        - Otherwise, fallback to most recent ref by mtime
-
-        Args:
-            branch: Branch name
-            flow: Flow status response
-
-        Returns:
-            TaskRefSummary for the previous round's work, or None if not found
+        Uses state machine logic: reviewer_status==done → audit_ref,
+        executor_status==done → report_ref, planner_status==done → plan_ref.
+        Falls back to most recent ref by mtime if no status is done.
         """
         worktree_root = flow.worktree_root
 
-        # State transition mapping: execution_status → ref_kind
-        # Check in reverse order (reviewer → executor → planner) to show
-        # the most recent completed work
+        # Check state transitions in reverse order: reviewer → executor → planner
         status_to_ref = {
             "reviewer_status": ("audit_ref", "audit"),
             "executor_status": ("report_ref", "report"),
             "planner_status": ("plan_ref", "plan"),
         }
 
-        # Check state transitions in reverse order: reviewer → executor → planner
         for status_field, (ref_field, kind) in status_to_ref.items():
             status_value = getattr(flow, status_field, None)
             if status_value == "done":
-                # This role completed in previous round
                 ref_value = getattr(flow, ref_field, None)
                 if ref_value:
                     summary = self._build_ref_summary(kind, ref_value, worktree_root)
@@ -328,7 +314,11 @@ class TaskShowService:
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state plus quick remote summary."""
-        target_branch = self.resolve_branch(branch)
+        # Skip re-resolution if branch is already provided (resolved by command layer)
+        if branch is None:
+            target_branch = self.resolve_branch()
+        else:
+            target_branch = branch
         local_task = self.flow_service.get_flow_status(target_branch)
 
         issue_links = self.store.get_issue_links(target_branch)

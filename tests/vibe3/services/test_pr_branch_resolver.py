@@ -82,7 +82,9 @@ class TestResolveCommandBranch:
             )
 
             # 应该调用 resolve_issue_branch_input
-            mock_resolve.assert_called_once_with("dev/issue-476", mock_flow_service)
+            mock_resolve.assert_called_once_with(
+                "dev/issue-476", mock_flow_service, allow_no_flow=False
+            )
             # 返回解析后的分支
             assert result == "dev/issue-476"
 
@@ -119,7 +121,9 @@ class TestResolveCommandBranch:
                 flow_service=mock_flow_service,
             )
 
-            mock_resolve.assert_called_once_with("999", mock_flow_service)
+            mock_resolve.assert_called_once_with(
+                "999", mock_flow_service, allow_no_flow=False
+            )
             assert result == "task/issue-999"
 
     def test_fallback_current_branch(self):
