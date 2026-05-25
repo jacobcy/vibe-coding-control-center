@@ -74,3 +74,36 @@ class SQLiteContextCacheRepo(_HasConnection):
             operation="delete_flow_context_cache",
             branch=branch,
         ).debug("Deleted flow context cache")
+
+    def upsert_flow_context_cache_bulk(
+        self,
+        entries: list[tuple[str, int | None, str | None, int | None, str | None]],
+    ) -> None:
+        """Bulk upsert flow context cache entries in a single transaction.
+
+        Args:
+            entries: List of (branch, task_issue_number, issue_title,
+                     pr_number, pr_title) tuples.
+        """
+        if not entries:
+            return
+
+        updated_at = datetime.datetime.now().isoformat()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            rows = [(b, tin, it, pn, pt, updated_at) for b, tin, it, pn, pt in entries]
+            cursor.executemany(
+                """
+                INSERT OR REPLACE INTO flow_context_cache
+                    (branch, task_issue_number, issue_title,
+                     pr_number, pr_title, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+        logger.bind(
+            external="sqlite",
+            operation="upsert_flow_context_cache_bulk",
+            count=len(entries),
+        ).debug("Bulk upserted flow context cache")

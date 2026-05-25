@@ -367,3 +367,61 @@ def test_pr_create_usecase_preserves_falsey_injected_dependencies() -> None:
 
     assert usecase._flow_service is flow_service
     assert usecase._base_resolver is base_resolver
+
+
+def test_get_pr_caches_result(pr_service: PRService) -> None:
+    """Test that get_pr caches result for same PR number."""
+    gh_instance = pr_service.github_client
+    mock_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+    gh_instance.get_pr.return_value = mock_pr
+    gh_instance.list_pr_comments.return_value = []
+    gh_instance.list_pr_review_comments.return_value = []
+    gh_instance.list_pr_reviews.return_value = []
+
+    # First call
+    result1 = pr_service.get_pr(pr_number=123)
+    assert result1.number == 123
+    assert gh_instance.get_pr.call_count == 1
+
+    # Second call within TTL - should use cache
+    result2 = pr_service.get_pr(pr_number=123)
+    assert result2.number == 123
+    assert gh_instance.get_pr.call_count == 1  # No additional call
+
+
+def test_get_pr_bypasses_cache_with_flag(pr_service: PRService) -> None:
+    """Test that get_pr bypasses cache when use_cache=False."""
+    gh_instance = pr_service.github_client
+    mock_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+    gh_instance.get_pr.return_value = mock_pr
+    gh_instance.list_pr_comments.return_value = []
+    gh_instance.list_pr_review_comments.return_value = []
+    gh_instance.list_pr_reviews.return_value = []
+
+    # First call
+    result1 = pr_service.get_pr(pr_number=123, use_cache=False)
+    assert result1.number == 123
+    assert gh_instance.get_pr.call_count == 1
+
+    # Second call with bypass - should hit API again
+    result2 = pr_service.get_pr(pr_number=123, use_cache=False)
+    assert result2.number == 123
+    assert gh_instance.get_pr.call_count == 2  # Additional call made

@@ -8,7 +8,7 @@ Issue number conversion should ONLY happen at command layer, not in cache servic
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -201,6 +201,50 @@ class IssueTitleCacheService:
             branch=branch,
             pr_number=pr_number,
         ).debug("Updated PR cache")
+
+    def update_prs_bulk(
+        self,
+        prs: list[tuple[str, int, str]],
+    ) -> None:
+        """Bulk update cache with PR information for multiple branches.
+
+        Args:
+            prs: List of tuples (branch, pr_number, pr_title).
+        """
+        if not prs:
+            return
+
+        # Collect all branches that need cache lookup
+        branches = [branch for branch, _, _ in prs]
+
+        # Batch get existing cache entries
+        existing_cache: dict[str, dict[str, Any]] = {}
+        for branch in branches:
+            cache = self.store.get_flow_context_cache(branch)
+            if cache:
+                existing_cache[branch] = cache
+
+        # Prepare bulk entries
+        entries: list[tuple[str, int | None, str | None, int | None, str | None]] = []
+        for branch, pr_number, pr_title in prs:
+            existing = existing_cache.get(branch)
+            entries.append(
+                (
+                    branch,
+                    existing.get("task_issue_number") if existing else None,
+                    existing.get("issue_title") if existing else None,
+                    pr_number,
+                    pr_title,
+                )
+            )
+
+        # Single transaction for all updates
+        self.store.upsert_flow_context_cache_bulk(entries)
+
+        logger.bind(
+            domain="issue_title_cache",
+            count=len(prs),
+        ).debug("Bulk updated PR cache")
 
     def invalidate(self, branch: str) -> None:
         """Invalidate cache entry for a branch.

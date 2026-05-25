@@ -47,9 +47,6 @@ from vibe3.clients.git_status_ops import (
     has_uncommitted_changes as _has_uncommitted_changes,
 )
 from vibe3.clients.git_worktree_ops import (
-    find_worktree_path_for_branch as _find_worktree_path_for_branch,
-)
-from vibe3.clients.git_worktree_ops import (
     get_current_branch as _get_current_branch,
 )
 from vibe3.clients.git_worktree_ops import (
@@ -120,6 +117,8 @@ class GitClient:
         self._cwd = Path(cwd) if cwd else None
         self._pr_diff_cache: dict[int, str] = {}
         self._pr_numstat_cache: dict[int, str] = {}
+        self._git_common_dir: str | None = None
+        self._worktree_list_cache: list[tuple[str, str]] | None = None
 
     def _run(self, args: list[str], cwd: Path | str | None = None) -> str:
         """执行 git 命令，统一错误处理.
@@ -174,7 +173,9 @@ class GitClient:
 
     def get_git_common_dir(self) -> str:
         """Get the shared .git directory path (for worktrees)."""
-        return _get_git_common_dir(self._run)
+        if self._git_common_dir is None:
+            self._git_common_dir = _get_git_common_dir(self._run)
+        return self._git_common_dir
 
     def get_worktree_root(self) -> str:
         """Get the top-level path of the current worktree."""
@@ -190,7 +191,13 @@ class GitClient:
 
     def find_worktree_path_for_branch(self, branch: str) -> Path | None:
         """Find worktree path whose checked-out branch matches ``branch``."""
-        return _find_worktree_path_for_branch(self._run, branch)
+        if self._worktree_list_cache is None:
+            self._worktree_list_cache = self.list_worktrees()
+        ref = f"refs/heads/{branch}"
+        for wt_path, wt_branch in self._worktree_list_cache:
+            if wt_branch == ref:
+                return Path(wt_path)
+        return None
 
     def get_worktrees_for_branch(self, branch_name: str) -> list[str]:
         """Return paths of worktrees that have the given branch checked out."""

@@ -1,5 +1,6 @@
 """PR service implementation."""
 
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import cast
@@ -57,6 +58,8 @@ class PRService:
         )
         self._recent_pr_cache_map: dict[str, PRResponse] = {}
         self._recent_pr_cache_client: RecentPRCache | None = None
+        self._pr_cache: dict[int, tuple[PRResponse, float]] = {}
+        self._pr_cache_ttl: float = 60.0
 
     @property
     def recent_pr_cache(self) -> RecentPRCache:
@@ -112,12 +115,8 @@ class PRService:
         from vibe3.services.issue_title_cache_service import IssueTitleCacheService
 
         title_cache = IssueTitleCacheService(self.store)
-        for pr in prs.values():
-            title_cache.update_pr(
-                branch=pr.head_branch,
-                pr_number=pr.number,
-                pr_title=pr.title,
-            )
+        pr_entries = [(pr.head_branch, pr.number, pr.title) for pr in prs.values()]
+        title_cache.update_prs_bulk(pr_entries)
 
     def refresh_recent_pr_cache(
         self,
@@ -319,12 +318,20 @@ class PRService:
         return pr
 
     def get_pr(
-        self, pr_number: int | None = None, branch: str | None = None
+        self,
+        pr_number: int | None = None,
+        branch: str | None = None,
+        use_cache: bool = True,
     ) -> PRResponse | None:
         """Get PR details."""
         logger.bind(
             domain="pr", action="get", pr_number=pr_number, branch=branch
         ).debug("Getting PR")
+
+        if use_cache and pr_number is not None:
+            cached = self._pr_cache.get(pr_number)
+            if cached and (time.monotonic() - cached[1]) < self._pr_cache_ttl:
+                return cached[0]
 
         if branch is None and pr_number is None:
             branch = self.git_client.get_current_branch()
@@ -334,6 +341,8 @@ class PRService:
             pr.comments = self.github_client.list_pr_comments(pr.number)
             pr.review_comments = self.github_client.list_pr_review_comments(pr.number)
             pr.reviews = self.github_client.list_pr_reviews(pr.number)
+            if use_cache and pr_number is not None:
+                self._pr_cache[pr_number] = (pr, time.monotonic())
         return pr
 
     def mark_ready(
