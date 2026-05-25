@@ -21,6 +21,21 @@ git status
 - 如果已有活跃 flow 但需要恢复已有 branch → 改用 `/vibe-continue`
 - 如果有明确 issue number 或用户已通过 `/vibe-issue` 完成 intake → 继续
 
+**Epic 入口阻断检查**（在确认目标 issue 后）：
+
+```bash
+gh issue view <issue-number> --json labels,body
+```
+
+检查逻辑：
+- 如果 issue 有 `roadmap/rfc` 标签 **且** body 包含 `## Sub-issues` 或 `## 子任务` section：
+  - 打印 Sub-issues 列表
+  - 告知用户："该 issue 是 epic，请选择具体 sub-issue 进入 /vibe-new"
+  - 停止 — 不继续 bootstrap
+- 否则继续正常流程
+
+**注意**：必须同时满足标签和 section 两个条件才阻断（有些非 epic issue 可能有 Sub-issues section 但无标签）。
+
 禁止跳过 `vibe3 flow show` 直接进入 bootstrap。
 
 ## 2. 询问两件事
@@ -38,6 +53,35 @@ git status
 ## 3. Bootstrap flow scene
 
 **强制要求**：必须使用 `vibe3 internal bootstrap` 作为唯一 bootstrap 路径，禁止手工拼接。
+
+**自动解析依赖关系**（在 bootstrap 前）：
+
+1. 读取目标 issue body（已在 Step 1 获取，或重新获取）：
+   ```bash
+   gh issue view <issue-number> --json body
+   ```
+
+2. 解析 `## Dependencies` 或 `## 依赖` section
+
+3. 提取依赖关系（匹配以下任一格式）：
+   - `Depends on #<id>`
+   - `依赖 #<id>`
+   - `blocked by #<id>`
+   
+   对每个匹配项，提取 issue number
+
+4. 检查依赖状态：
+   ```bash
+   gh issue view <dep-id> --json state
+   ```
+   
+   - 如果任何依赖状态为 `open`：
+     - 警告用户："当前 issue 存在未关闭的依赖 #<id>，bootstrap 后 flow 将立即进入 blocked 状态。是否继续？"
+     - 等待用户确认
+   - 如果所有依赖已关闭或无依赖：继续
+
+5. 组装 bootstrap 命令：
+   - 对每个解析到的依赖添加 `--dependency <id>` 参数
 
 ✅ **正确做法**：
 
