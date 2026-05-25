@@ -129,7 +129,7 @@ Properties:
 - must be recorded
 - must be visible in status and timeline
 - must not activate `failed_gate`
-- must not, by themselves, imply `fail_issue()`
+- must not, by themselves, imply `mark_issue(action="fail")`
 
 Examples:
 
