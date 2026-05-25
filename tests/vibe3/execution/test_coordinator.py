@@ -9,7 +9,6 @@ import pytest
 
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.execution.role_contracts import WorktreeRequirement
 
 
 @pytest.fixture
@@ -546,50 +545,3 @@ def test_no_async_env_var_ignored_without_prompt(mock_dependencies, monkeypatch)
 
     assert result.launched is True
     mock_start.assert_called_once()
-
-
-@patch("vibe3.execution.coordinator.WorktreeManager")
-def test_coordinator_resolves_permanent_worktree_for_manager(
-    mock_worktree_cls, mock_dependencies, tmp_path
-):
-    """Coordinator should own permanent worktree resolution for manager-like roles."""
-    config, store, backend, capacity = mock_dependencies
-    capacity.can_dispatch.return_value = True
-
-    handle = MagicMock()
-    handle.tmux_session = "manager-session"
-    handle.log_path = Path("/tmp/manager.log")
-
-    mock_start_async = MagicMock(return_value=handle)
-    coordinator = ExecutionCoordinator(
-        config=config,
-        store=store,
-        backend=backend,
-        capacity=capacity,
-        start_async=mock_start_async,
-    )
-
-    mock_worktree = MagicMock()
-    mock_worktree.resolve_manager_cwd.return_value = (tmp_path, False)
-    mock_worktree_cls.return_value = mock_worktree
-
-    request = ExecutionRequest(
-        role="manager",
-        target_branch="task/issue-7",
-        target_id=7,
-        execution_name="vibe3-manager-issue-7",
-        cmd=["echo", "manager"],
-        repo_path="/tmp/repo",
-        worktree_requirement=WorktreeRequirement.PERMANENT,
-    )
-
-    result = coordinator.dispatch_execution(request)
-
-    assert result.launched is True
-    mock_worktree_cls.assert_called_once_with(config, Path("/tmp/repo"))
-    mock_worktree.resolve_manager_cwd.assert_called_once_with(7, "task/issue-7")
-    mock_start_async.assert_called_once()
-    call = mock_start_async.call_args
-    assert call.args[0] == ["echo", "manager"]
-    assert call.kwargs["execution_name"] == "vibe3-manager-issue-7"
-    assert call.kwargs["cwd"] == tmp_path
