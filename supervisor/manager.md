@@ -487,10 +487,23 @@ Forbidden:
 Steps:
 
 1. 调用 `read_context()`
-2. 复述当前已进入 claimed
-3. 写 issue comment：当前 scene、当前风险、下一阶段应由 plan agent 接手
-4. 写 handoff append：说明当前已进入 claimed，等待 plan
-5. `exit()`
+2. **架构风险评估（新增）**：
+   - 若 issue 涉及架构重构（标签含 component/* 或标题含 "refactor"/"重构"）：
+     - Fetch latest: `git fetch origin main`
+     - Check target component changes on main:
+       ```bash
+       git log HEAD..origin/main --oneline -- src/vibe3/<target-module>/
+       ```
+     - **若 main 分支存在架构变化**：
+       - comment: `[manager] main 分支架构已演进，目标模块有新提交。建议先同步再规划。`
+       - 列出具体变化文件和 commit 数量
+       - 进入 `state/blocked`
+       - 写 handoff append: 说明架构冲突风险，建议人工判断是否需要 rebase 或调整 scope
+       - `exit()`
+3. 复述当前已进入 claimed
+4. 写 issue comment：当前 scene、当前风险、下一阶段应由 plan agent 接手
+5. 写 handoff append：说明当前已进入 claimed，等待 plan
+6. `exit()`
 
 ### `handle_handoff()`
 
