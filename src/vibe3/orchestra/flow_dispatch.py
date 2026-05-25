@@ -5,7 +5,7 @@ It was moved out of manager/ so manager can keep shrinking toward a role shell.
 """
 
 import subprocess
-from typing import Any, cast
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
@@ -16,6 +16,13 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+
+if TYPE_CHECKING:
+    from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
+    from vibe3.services.flow_service import FlowService
+    from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.label_service import LabelService
+    from vibe3.services.task_service import TaskService
 
 
 class FlowManager:
@@ -29,11 +36,11 @@ class FlowManager:
         git: GitClient | None = None,
         github: GitHubClient | None = None,
         registry: SessionRegistryService | None = None,
-        flow_service: Any = None,
-        task_service: Any = None,
-        label_service: Any = None,
-        issue_flow_service: Any = None,
-        bootstrap_service: Any = None,
+        flow_service: "FlowService | None" = None,
+        task_service: "TaskService | None" = None,
+        label_service: "LabelService | None" = None,
+        issue_flow_service: "IssueFlowService | None" = None,
+        bootstrap_service: "FlowOrchestratorService | None" = None,
     ) -> None:
         self.config = config
         self.store = SQLiteClient() if store is None else store
