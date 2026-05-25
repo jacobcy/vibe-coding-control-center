@@ -15,17 +15,43 @@ from vibe3.orchestra.issue_loader import (
 )
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
-from vibe3.services.label_utils import normalize_labels, should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.orchestra.flow_dispatch import FlowManager
+    from vibe3.orchestra.protocols import FlowManagerPort
+
+
+# Default implementations (lazy import to avoid circular dependency)
+def _default_normalize_labels(raw_labels: object) -> list[str]:
+    """Default implementation using services.label_utils."""
+    from vibe3.services.label_utils import normalize_labels
+
+    return normalize_labels(raw_labels)
+
+
+def _default_should_skip_from_queue(
+    issue: IssueInfo,
+    *,
+    supervisor_label: str,
+    manager_usernames: list[str] | tuple[str, ...],
+    require_manager_assignee: bool = True,
+) -> bool:
+    """Default implementation using services.label_utils."""
+    from vibe3.services.label_utils import should_skip_from_queue
+
+    return should_skip_from_queue(
+        issue,
+        supervisor_label=supervisor_label,
+        manager_usernames=manager_usernames,
+        require_manager_assignee=require_manager_assignee,
+    )
 
 
 def collect_raw_issues_without_qualify(
     raw_issues: list[dict[str, object]],
+    normalize_labels_fn: Callable[[object], list[str]] | None = None,
 ) -> list[IssueInfo]:
     """Apply collection-time filters without running the qualify gate.
 
@@ -41,9 +67,10 @@ def collect_raw_issues_without_qualify(
     behavior where issues flow through qualify gate first for side effects
     (blocked-label alignment, auto-resume).
     """
+    _normalize_labels = normalize_labels_fn or _default_normalize_labels
     selected: list[IssueInfo] = []
     for item in raw_issues:
-        labels = normalize_labels(item.get("labels"))
+        labels = _normalize_labels(item.get("labels"))
         if not any(lbl.startswith("state/") for lbl in labels):
             continue
         issue = IssueInfo.from_github_payload(item)
@@ -59,9 +86,11 @@ def select_ready_issues(
     config: OrchestraConfig,
     github: "GitHubClient",
     store: "SQLiteClient",
-    flow_manager: "FlowManager",
+    flow_manager: "FlowManagerPort",
     qualify_gate: QualifyGateService,
     supervisor_label: str,
+    should_skip_fn: Callable[..., bool] | None = None,
+    normalize_labels_fn: Callable[[object], list[str]] | None = None,
 ) -> list[IssueInfo]:
     """Select ready issues by filtering through qualify gate and other checks.
 
@@ -74,21 +103,26 @@ def select_ready_issues(
         flow_manager: Flow manager
         qualify_gate: Qualify gate service
         supervisor_label: Supervisor label to check
+        should_skip_fn: Optional custom should_skip_from_queue function
+        normalize_labels_fn: Optional custom normalize_labels function
 
     Returns:
         Filtered and sorted ready issues
     """
+    _should_skip = should_skip_fn or _default_should_skip_from_queue
     selected: list[IssueInfo] = []
     role = find_role_for_state(trigger_state)
     if role is None:
         return selected
 
-    raw_selected = collect_raw_issues_without_qualify(raw_issues)
+    raw_selected = collect_raw_issues_without_qualify(
+        raw_issues, normalize_labels_fn=normalize_labels_fn
+    )
 
     for issue in raw_selected:
         # Verify assignee/supervisor filters
         # Always require manager assignee for all dispatch stages
-        if should_skip_from_queue(
+        if _should_skip(
             issue,
             supervisor_label=supervisor_label,
             manager_usernames=config.get_manager_usernames(),
@@ -133,6 +167,7 @@ def promote_progressed_entries(
     registry: "SessionRegistryService | None",
     supervisor_label: str,
     load_issue_func: Callable[[int], IssueInfo | None] | None = None,
+    should_skip_fn: Callable[..., bool] | None = None,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """Process frozen queue entries and categorize them.
 
@@ -143,10 +178,13 @@ def promote_progressed_entries(
         registry: Session registry (optional)
         supervisor_label: Supervisor label to check
         load_issue_func: Optional function to load issues (for backward compatibility)
+        should_skip_fn: Optional custom should_skip_from_queue function
 
     Returns:
         Tuple of (promoted, retained, removed) entries
     """
+
+    _should_skip = should_skip_fn or _default_should_skip_from_queue
 
     promoted: list[dict] = []
     retained: list[dict] = []
@@ -164,7 +202,7 @@ def promote_progressed_entries(
         if issue is None or issue.state is None:
             continue
 
-        if should_skip_from_queue(
+        if _should_skip(
             issue,
             supervisor_label=supervisor_label,
             manager_usernames=config.get_manager_usernames(),

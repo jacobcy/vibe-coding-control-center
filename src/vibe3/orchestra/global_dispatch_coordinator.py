@@ -12,24 +12,23 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.domain import publish
 from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.execution.capacity_service import CapacityService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.observability.degraded_mode import get_degraded_manager
-from vibe3.orchestra.flow_dispatch import FlowManager
 from vibe3.orchestra.issue_loader import (
     find_role_for_state,
     get_flow_context,
     load_issue,
 )
 from vibe3.orchestra.logging import append_orchestra_event
+from vibe3.orchestra.protocols import FlowManagerPort
 from vibe3.orchestra.queue_operations import (
     collect_raw_issues_without_qualify,
     select_ready_issues,
@@ -38,9 +37,6 @@ from vibe3.orchestra.queue_persistence_mixin import (
     QueueEntry,
     QueuePersistenceMixin,
 )
-from vibe3.roles.registry import build_label_dispatch_event
-from vibe3.services.check_service import CheckService
-from vibe3.services.flow_service import FlowService
 from vibe3.services.label_utils import (
     clean_old_state_labels,
     should_skip_from_queue,
@@ -50,6 +46,7 @@ if TYPE_CHECKING:
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.roles.definitions import TriggerableRoleDefinition
+    from vibe3.services.check_service import CheckService
 
 # Hard limit to prevent extreme tick duration in edge cases
 MAX_INTENTS_PER_TICK = 10
@@ -61,12 +58,14 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
     def __init__(
         self,
         config: OrchestraConfig,
-        capacity: CapacityService,
+        capacity: Any,
         github: GitHubClient,
         store: "SQLiteClient",
-        flow_manager: FlowManager,
+        flow_manager: FlowManagerPort,
         registry: "SessionRegistryService | None" = None,
         executor: ThreadPoolExecutor | None = None,
+        check_service_factory: Callable[..., Any] | None = None,
+        block_flow_fn: Callable[..., Any] | None = None,
     ) -> None:
         self._config = config
         self._capacity = capacity
@@ -80,7 +79,9 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         self._owns_executor = executor is None
         self._frozen_queue: list[QueueEntry] | None = None
         self._qualify_gate = QualifyGateService(config, github, store, flow_manager)
-        self._check_service: CheckService | None = None
+        self._check_service: "CheckService | None" = None
+        self._check_service_factory = check_service_factory
+        self._block_flow_fn = block_flow_fn
         self._dispatch_paused = False
         self._supervisor_label = config.supervisor_handoff.issue_label
 
@@ -163,6 +164,8 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
+        from vibe3.roles.registry import build_label_dispatch_event
+
         publish(build_label_dispatch_event(role, issue, branch=branch, tick_id=tick_id))
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
@@ -201,11 +204,16 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
 
         # Use CheckService for unified health check
         if self._check_service is None:
-            self._check_service = CheckService(
-                store=self._store,
-                git_client=self._flow_manager.git,
-                github_client=self._github,
-            )
+            if self._check_service_factory is not None:
+                self._check_service = self._check_service_factory()
+            else:
+                from vibe3.services.check_service import CheckService as _CheckService
+
+                self._check_service = _CheckService(
+                    store=self._store,
+                    git_client=self._flow_manager.git,
+                    github_client=self._github,
+                )
         result = self._check_service.verify_branch(branch)
 
         # Get flow status to determine if dispatch should proceed
@@ -243,9 +251,20 @@ class GlobalDispatchCoordinator(QueuePersistenceMixin):
             reason = f"Health check failed: {', '.join(result.issues)}"
             block_succeeded = False
             try:
-                FlowService(
-                    store=self._store, git_client=self._flow_manager.git
-                ).block_flow(branch=branch, reason=reason, actor="orchestra:dispatcher")
+                if self._block_flow_fn is not None:
+                    self._block_flow_fn(
+                        branch=branch,
+                        reason=reason,
+                        actor="orchestra:dispatcher",
+                    )
+                else:
+                    from vibe3.services.flow_service import FlowService
+
+                    FlowService(
+                        store=self._store, git_client=self._flow_manager.git
+                    ).block_flow(
+                        branch=branch, reason=reason, actor="orchestra:dispatcher"
+                    )
                 block_succeeded = True
             except Exception as exc:
                 logger.bind(domain="orchestra", action="health_check").warning(

@@ -24,6 +24,7 @@ from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.service_protocol import ServiceBase
 
 if TYPE_CHECKING:
+    from vibe3.clients.git_client import GitClient
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.execution.capacity_service import CapacityService
     from vibe3.orchestra.failed_gate import FailedGate
@@ -86,7 +87,7 @@ class OrchestrationFacade(ServiceBase):
         self._coordinator: GlobalDispatchCoordinator | None = None
         self._failed_gate = failed_gate
         self._github = github or GitHubClient()
-        self._flow_manager = flow_manager or FlowManager(self._config)
+        self._flow_manager: FlowManager | None = None
         self._registry: SessionRegistryService | None = registry
 
         if self._capacity is not None:
@@ -94,11 +95,65 @@ class OrchestrationFacade(ServiceBase):
             from vibe3.orchestra.global_dispatch_coordinator import (
                 GlobalDispatchCoordinator,
             )
+            from vibe3.services.check_service import CheckService
+            from vibe3.services.flow_orchestrator_service import (
+                FlowOrchestratorService,
+            )
+            from vibe3.services.flow_service import FlowService
+            from vibe3.services.issue_flow_service import IssueFlowService
+            from vibe3.services.label_service import LabelService
+            from vibe3.services.task_service import TaskService
 
             actual_store = store or SQLiteClient()
+            git = flow_manager.git if flow_manager else None
+            git = git or self._create_git_client()
+
             self._registry = registry or SessionRegistryService(
                 actual_store, self._capacity._backend
             )
+
+            # Create concrete services for injection
+            flow_service = FlowService(store=actual_store, git_client=git)
+            task_service = TaskService(store=actual_store)
+            label_service = LabelService(repo=self._config.repo)
+            issue_flow_service = IssueFlowService(store=actual_store)
+            bootstrap_service = FlowOrchestratorService(
+                self._config,
+                store=actual_store,
+                git=git,
+                github=self._github,
+            )
+
+            # Inject services into FlowManager
+            self._flow_manager = flow_manager or FlowManager(
+                self._config,
+                flow_service=flow_service,
+                task_service=task_service,
+                label_service=label_service,
+                issue_flow_service=issue_flow_service,
+                bootstrap_service=bootstrap_service,
+                store=actual_store,
+                git=git,
+                github=self._github,
+                registry=self._registry,
+            )
+
+            # Create CheckService factory for injection
+            def check_service_factory() -> CheckService:
+                assert self._flow_manager is not None  # Set above
+                return CheckService(
+                    store=actual_store,
+                    git_client=self._flow_manager.git,
+                    github_client=self._github,
+                )
+
+            # Create block_flow function for injection
+            def block_flow_fn(branch: str, reason: str, actor: str) -> None:
+                assert self._flow_manager is not None  # Set above
+                FlowService(
+                    store=actual_store, git_client=self._flow_manager.git
+                ).block_flow(branch=branch, reason=reason, actor=actor)
+
             self._coordinator = GlobalDispatchCoordinator(
                 config=self._config,
                 capacity=self._capacity,
@@ -106,12 +161,23 @@ class OrchestrationFacade(ServiceBase):
                 store=actual_store,
                 flow_manager=self._flow_manager,
                 registry=self._registry,
+                check_service_factory=check_service_factory,
+                block_flow_fn=block_flow_fn,
             )
+        else:
+            # Fallback to legacy path without capacity-aware dispatch
+            self._flow_manager = flow_manager or FlowManager(self._config)
 
     def shutdown(self) -> None:
         """Cleanup resources owned by the facade."""
         if self._coordinator:
             self._coordinator.shutdown()
+
+    def _create_git_client(self) -> "GitClient":
+        """Create a GitClient instance."""
+        from vibe3.clients.git_client import GitClient
+
+        return GitClient()
 
     def get_queued_issue_numbers(self) -> set[int]:
         """Get issue numbers currently in the dispatch queue."""

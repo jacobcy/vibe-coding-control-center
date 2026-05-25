@@ -5,7 +5,7 @@ It was moved out of manager/ so manager can keep shrinking toward a role shell.
 """
 
 import subprocess
-from typing import cast
+from typing import Any, cast
 
 from loguru import logger
 
@@ -16,12 +16,6 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.flow_orchestrator_service import FlowOrchestratorService
-from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_flow_service import IssueFlowService
-from vibe3.services.label_service import LabelService
-from vibe3.services.pr_service import PRService
-from vibe3.services.task_service import TaskService
 
 
 class FlowManager:
@@ -35,22 +29,63 @@ class FlowManager:
         git: GitClient | None = None,
         github: GitHubClient | None = None,
         registry: SessionRegistryService | None = None,
+        flow_service: Any = None,
+        task_service: Any = None,
+        label_service: Any = None,
+        issue_flow_service: Any = None,
+        bootstrap_service: Any = None,
     ) -> None:
         self.config = config
         self.store = SQLiteClient() if store is None else store
         self.git = GitClient() if git is None else git
-        self.flow_service = FlowService(store=self.store, git_client=self.git)
-        self.task_service = TaskService(store=self.store)
         self.github = GitHubClient() if github is None else github
-        self.label_service = LabelService(repo=config.repo)
-        self.issue_flow_service = IssueFlowService(store=self.store)
         self._registry = registry
-        self._bootstrap_service = FlowOrchestratorService(
-            config,
-            store=self.store,
-            git=self.git,
-            github=self.github,
-        )
+
+        # Services are injected; fallback to concrete implementations
+        # for backward compatibility with direct instantiation.
+        if flow_service is not None:
+            self.flow_service = flow_service
+        else:
+            from vibe3.services.flow_service import FlowService as _FlowService
+
+            self.flow_service = _FlowService(store=self.store, git_client=self.git)
+
+        if task_service is not None:
+            self.task_service = task_service
+        else:
+            from vibe3.services.task_service import TaskService as _TaskService
+
+            self.task_service = _TaskService(store=self.store)
+
+        if label_service is not None:
+            self.label_service = label_service
+        else:
+            from vibe3.services.label_service import LabelService as _LabelService
+
+            self.label_service = _LabelService(repo=config.repo)
+
+        if issue_flow_service is not None:
+            self.issue_flow_service = issue_flow_service
+        else:
+            from vibe3.services.issue_flow_service import (
+                IssueFlowService as _IssueFlowService,
+            )
+
+            self.issue_flow_service = _IssueFlowService(store=self.store)
+
+        if bootstrap_service is not None:
+            self._bootstrap_service = bootstrap_service
+        else:
+            from vibe3.services.flow_orchestrator_service import (
+                FlowOrchestratorService as _FlowOrchestratorService,
+            )
+
+            self._bootstrap_service = _FlowOrchestratorService(
+                config,
+                store=self.store,
+                git=self.git,
+                github=self.github,
+            )
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
         """Find the latest flow for an issue, regardless of active status.
@@ -230,6 +265,8 @@ class FlowManager:
             branch = self.issue_flow_service.canonical_branch_name(issue_number)
 
         try:
+            from vibe3.services.pr_service import PRService
+
             pr = PRService(
                 github_client=cast(GitHubClientProtocol, self.github),
                 git_client=self.git,

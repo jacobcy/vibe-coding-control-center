@@ -13,7 +13,6 @@ from loguru import logger
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_operations import promote_progressed_entries
-from vibe3.services.label_utils import should_skip_from_queue
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -21,6 +20,25 @@ if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.models.orchestra_config import OrchestraConfig
     from vibe3.services.check_service import CheckService
+
+
+# Default implementation (lazy import to avoid circular dependency)
+def _default_should_skip_from_queue(
+    issue: IssueInfo,
+    *,
+    supervisor_label: str,
+    manager_usernames: list[str] | tuple[str, ...],
+    require_manager_assignee: bool = True,
+) -> bool:
+    """Default implementation using services.label_utils."""
+    from vibe3.services.label_utils import should_skip_from_queue
+
+    return should_skip_from_queue(
+        issue,
+        supervisor_label=supervisor_label,
+        manager_usernames=manager_usernames,
+        require_manager_assignee=require_manager_assignee,
+    )
 
 
 @dataclass
@@ -95,7 +113,7 @@ class QueuePersistenceMixin:
                 continue
 
             # Skip supervisor-labeled issues
-            if should_skip_from_queue(
+            if _default_should_skip_from_queue(
                 issue,
                 supervisor_label=self._supervisor_label,
                 manager_usernames=self._config.get_manager_usernames(),

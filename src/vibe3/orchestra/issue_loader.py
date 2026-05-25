@@ -7,25 +7,22 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
-from vibe3.roles.registry import LABEL_DISPATCH_ROLES
+from vibe3.orchestra.role_mapping import find_role_for_state
+
+# Re-export find_role_for_state for backward compatibility
+# (previously defined in this module, now in role_mapping.py)
+__all__ = [
+    "find_role_for_state",
+    "is_auto_task_branch",
+    "get_flow_context",
+    "load_issue",
+]
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.models.orchestration import IssueInfo
-    from vibe3.orchestra.flow_dispatch import FlowManager
-    from vibe3.roles.definitions import TriggerableRoleDefinition
-
-
-def find_role_for_state(
-    state: IssueState,
-) -> "TriggerableRoleDefinition | None":
-    """Find the role definition for a state label."""
-    for role in LABEL_DISPATCH_ROLES:
-        if role.trigger_state == state:
-            return role
-    return None
+    from vibe3.orchestra.protocols import FlowManagerPort
 
 
 def is_auto_task_branch(branch: str) -> bool:
@@ -45,7 +42,7 @@ def get_flow_context(
     config: OrchestraConfig,
     github: "GitHubClient",
     store: "SQLiteClient",
-    flow_manager: "FlowManager",
+    flow_manager: "FlowManagerPort",
 ) -> tuple[str, dict[str, object] | None]:
     """Get flow context (branch and state) for an issue.
 

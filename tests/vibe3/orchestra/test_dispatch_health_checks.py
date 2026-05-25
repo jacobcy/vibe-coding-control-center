@@ -59,9 +59,7 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid result (non-transient)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=False,
@@ -119,9 +117,7 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return valid result
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=True,
@@ -178,9 +174,7 @@ class TestPreDispatchHealthChecks:
 
         # Mock CheckService to return valid (CheckService handles PR check
         # internally and marks flow as done, then returns valid)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=True,
@@ -236,9 +230,7 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return valid (open PR is not a failure)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=True,
@@ -294,9 +286,7 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid with transient error
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=False,
@@ -354,9 +344,7 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid with genuine error (no worktree)
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=False,
@@ -368,9 +356,7 @@ class TestPreDispatchHealthChecks:
             )
 
             # Mock FlowService to verify constructor and block_flow call
-            with patch(
-                "vibe3.orchestra.global_dispatch_coordinator.FlowService"
-            ) as mock_flow_service:
+            with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
                 mock_flow = mock_flow_service.return_value
                 result = coordinator._health_check_before_dispatch(issue)
 
@@ -434,9 +420,7 @@ class TestPreDispatchHealthChecks:
         }
 
         # Mock CheckService to return invalid with transient error
-        with patch(
-            "vibe3.orchestra.global_dispatch_coordinator.CheckService"
-        ) as mock_check_service:
+        with patch("vibe3.services.check_service.CheckService") as mock_check_service:
             mock_service = mock_check_service.return_value
             mock_service.verify_branch.return_value = CheckResult(
                 is_valid=False,
@@ -445,9 +429,7 @@ class TestPreDispatchHealthChecks:
             )
 
             # Mock FlowService.block_flow to ensure it's NOT called
-            with patch(
-                "vibe3.orchestra.global_dispatch_coordinator.FlowService"
-            ) as mock_flow_service:
+            with patch("vibe3.services.flow_service.FlowService") as mock_flow_service:
                 mock_flow = mock_flow_service.return_value
                 result = coordinator._health_check_before_dispatch(issue)
 
