@@ -23,7 +23,35 @@ git status
 
 禁止跳过 `vibe3 flow show` 直接进入 bootstrap。
 
-## 2. 询问两件事
+## 2. Pre-Bootstrap Sync Check（强制）
+
+在 bootstrap 前，**必须**确保从最新的 origin/main 创建分支：
+
+```bash
+# 1. Fetch latest main
+git fetch origin main
+
+# 2. 检查本地 main 是否落后
+git log main..origin/main --oneline | wc -l
+```
+
+**决策逻辑**：
+- **如果落后 > 0 commits**：
+  - 提示用户：`本地 main 分支落后 origin/main {N} commits，建议先更新再创建新分支`
+  - **推荐做法**（快速更新，不影响当前分支）：
+    ```bash
+    git checkout main
+    git pull origin main
+    git checkout -
+    ```
+  - **用户选择**：
+    - 同意更新 → 执行上述命令，然后继续 bootstrap
+    - 拒绝更新 → 记录风险并询问是否继续：`vibe3 handoff append "跳过 main 同步，新分支基于落后代码创建"`
+- **如果 origin/main 与本地 main 一致**：直接继续 bootstrap
+
+**原因**：避免 Issue #1250 类型的问题——长时间重构期间 main 已演进，新分支从一开始就落后会导致后续严重冲突。
+
+## 3. 询问两件事
 
 只需要确认：
 - 用当前仓库还是新建 worktree
@@ -35,7 +63,7 @@ git status
 - `openspec:ff`
 - repo-native `vibe3 plan/run/review`
 
-## 3. Bootstrap flow scene
+## 4. Bootstrap flow scene
 
 **强制要求**：必须使用 `vibe3 internal bootstrap` 作为唯一 bootstrap 路径，禁止手工拼接。
 
@@ -67,7 +95,7 @@ vibe3 internal bootstrap <issue-number> \
 - dependency issue 阻塞登记
 - worktree context 准备（如果传了 `--worktree`）
 
-## 4. 记录 handoff
+## 5. 记录 handoff
 
 bootstrap 成功后记录稳定恢复点：
 
@@ -75,7 +103,7 @@ bootstrap 成功后记录稳定恢复点：
 vibe3 handoff append "vibe-new: flow ready" --actor vibe-new --kind milestone
 ```
 
-## 5. 按需继续
+## 6. 按需继续
 
 如果已经具备条件，可以继续：
 
