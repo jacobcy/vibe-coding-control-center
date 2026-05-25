@@ -61,6 +61,40 @@ def test_handle_closed_pr_resets_issue_to_ready() -> None:
         assert result.is_valid is True
 
 
+def test_handle_closed_pr_reports_reset_failure() -> None:
+    """When reset fails, check should report the closed PR cleanup as invalid."""
+    service = _make_check_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+    }
+
+    with patch(
+        "vibe3.services.task_resume_operations.TaskResumeOperations"
+    ) as mock_resume_ops_cls:
+        mock_resume_ops = MagicMock()
+        mock_resume_ops.reset_issue_to_ready.side_effect = RuntimeError(
+            "scene cleanup failed"
+        )
+        mock_resume_ops_cls.return_value = mock_resume_ops
+
+        result = service._handle_closed_pr("task/issue-456", mock_pr)
+
+    assert result is not None
+    assert result.is_valid is False
+    assert result.issues == [
+        "Failed to reset issue #456 after PR #123 closed: scene cleanup failed"
+    ]
+
+
 def test_handle_closed_pr_skips_already_closed_issue() -> None:
     """When issue already closed, skip reset."""
     service = _make_check_service()

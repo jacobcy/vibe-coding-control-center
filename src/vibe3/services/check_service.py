@@ -185,14 +185,16 @@ class CheckService(CheckRemote):
 
         if pr.state == PRState.CLOSED:
             # PR closed without merge → clean up and return to READY
-            self._reset_issue_after_pr_closed(branch, pr.number)
+            reset_error = self._reset_issue_after_pr_closed(branch, pr.number)
             self._update_pr_cache(branch, pr)
 
+            if reset_error:
+                return CheckResult(is_valid=False, branch=branch, issues=[reset_error])
             return CheckResult(is_valid=True, branch=branch, issues=result_issues)
 
         return None
 
-    def _reset_issue_after_pr_closed(self, branch: str, pr_number: int) -> None:
+    def _reset_issue_after_pr_closed(self, branch: str, pr_number: int) -> str | None:
         """Reset issue to READY after PR closed without merge.
 
         Cleans up flow scene (worktree, branch, flow record) and
@@ -224,7 +226,7 @@ class CheckService(CheckRemote):
             self._flow_status_service.mark_flow_aborted(
                 branch, f"PR #{pr_number} closed without merge (no issue link)"
             )
-            return
+            return None
 
         # Check if issue already closed
         gh_issue = self.github_client.view_issue(task_issue_number)
@@ -237,7 +239,7 @@ class CheckService(CheckRemote):
                     branch=branch,
                     issue_number=task_issue_number,
                 ).info(f"Issue #{task_issue_number} already closed, skip reset")
-                return
+                return None
 
         # Build minimal FlowStatusResponse for task resume
         flow = FlowStatusResponse(
@@ -290,6 +292,12 @@ class CheckService(CheckRemote):
                 branch=branch,
                 issue_number=task_issue_number,
             ).warning(f"Failed to reset issue: {exc}")
+            return (
+                f"Failed to reset issue #{task_issue_number} after PR "
+                f"#{pr_number} closed: {exc}"
+            )
+
+        return None
 
     def _check_multiple_state_labels(
         self, issue_number: int, issue_payload: dict
