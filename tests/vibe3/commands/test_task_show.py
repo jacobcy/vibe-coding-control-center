@@ -340,3 +340,112 @@ def test_task_show_json_includes_task_issue_numbers(
     payload = json.loads(result.stdout)
     # Should include task_issue_numbers array
     assert payload["task_issue_numbers"] == [123, 456]
+
+
+@patch("vibe3.commands.task.resolve_issue_branch_input")
+@patch("vibe3.commands.task.render_task_comments")
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_issue_number_no_flow(
+    mock_task_service_cls,
+    mock_render_task_comments,
+    mock_resolve_issue_branch_input,
+) -> None:
+    """测试 task show <issue_number> 在没有 flow 时也能工作"""
+    task_service = MagicMock()
+
+    # Mock resolve_branch to return the issue number
+    task_service.resolve_branch.return_value = "1357"
+
+    # Mock show_task to return result with no local_task
+    mock_task_result = MagicMock()
+    mock_task_result.branch = "1357"  # Set branch attribute
+    mock_task_result.local_task = None
+    mock_task_result.task_issue_numbers = []
+    mock_task_result.related_issue_numbers = []
+    mock_task_result.dependency_issue_numbers = []
+    mock_task_result.issue_title = "Test Issue"
+    mock_task_result.issue_state = "open"
+    mock_task_result.latest_ref = None
+    mock_task_result.latest_human_instruction = None
+    mock_task_result.latest_comment = None
+    mock_task_result.pr_summary = None
+    task_service.show_task.return_value = mock_task_result
+
+    # Mock fetch_issue_with_comments
+    task_service.fetch_issue_with_comments.return_value = {
+        "number": 1357,
+        "title": "Test Issue",
+        "comments": [],
+    }
+
+    # Mock flow_service
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_current_branch.return_value = "main"
+    task_service.flow_service = mock_flow_service
+
+    mock_task_service_cls.return_value = task_service
+
+    # Mock resolve_issue_branch_input to return None (no branch exists)
+    mock_resolve_issue_branch_input.return_value = None
+
+    # Run command
+    result = runner.invoke(app, ["task", "show", "1357"])
+
+    # Should not fail
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    # Should show issue information
+    assert "1357" in result.output
+
+
+@patch("vibe3.commands.task.resolve_issue_branch_input")
+@patch("vibe3.commands.task.render_task_comments")
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_issue_number_with_flow(
+    mock_task_service_cls,
+    mock_render_task_comments,
+    mock_resolve_issue_branch_input,
+) -> None:
+    """测试 task show <issue_number> 在有 flow 时解析到分支"""
+    task_service = MagicMock()
+
+    # Mock resolve_branch to return the branch
+    task_service.resolve_branch.return_value = "dev/issue-1357"
+
+    # Mock show_task
+    mock_task_result = MagicMock()
+    mock_task_result.branch = "dev/issue-1357"  # Set branch attribute
+    mock_task_result.local_task = MagicMock()
+    mock_task_result.local_task.task_issue_number = 1357
+    mock_task_result.task_issue_numbers = [1357]
+    mock_task_result.related_issue_numbers = []
+    mock_task_result.dependency_issue_numbers = []
+    mock_task_result.issue_title = "Test Issue"
+    mock_task_result.issue_state = "open"
+    mock_task_result.latest_ref = None
+    mock_task_result.latest_human_instruction = None
+    mock_task_result.latest_comment = None
+    mock_task_result.pr_summary = None
+    task_service.show_task.return_value = mock_task_result
+
+    # Mock fetch_issue_with_comments
+    task_service.fetch_issue_with_comments.return_value = {
+        "number": 1357,
+        "title": "Test Issue",
+        "comments": [],
+    }
+
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_current_branch.return_value = "main"
+    task_service.flow_service = mock_flow_service
+
+    mock_task_service_cls.return_value = task_service
+
+    # Mock resolve_issue_branch_input to return the branch
+    mock_resolve_issue_branch_input.return_value = "dev/issue-1357"
+
+    # Run command
+    result = runner.invoke(app, ["task", "show", "1357"])
+
+    # Should succeed
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    assert "1357" in result.output

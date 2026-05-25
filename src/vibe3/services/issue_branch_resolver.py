@@ -55,7 +55,9 @@ def resolve_issue_branch_input(
 
     if candidates:
         # Step 3: Resolve with conflict detection
-        return _resolve_best_flow_from_candidates(candidates, issue_number)
+        return _resolve_best_flow_from_candidates(
+            candidates, issue_number, allow_no_flow=allow_no_flow
+        )
 
     # Step 4: Check unbound candidates (smart warning)
     unbound_candidates = []
@@ -112,17 +114,20 @@ def _format_flow_details(flow: Mapping[str, Any]) -> str:
 def _resolve_best_flow_from_candidates(
     candidates: list[dict[str, Any]],
     issue_number: int,
-) -> str:
+    allow_no_flow: bool = False,
+) -> str | None:
     """Select best flow or raise UserError for conflicts.
 
     Args:
         candidates: List of flow dicts from get_flows_by_issue()
         issue_number: Issue number being resolved
+        allow_no_flow: If True, return None instead of raising for aborted flows
     Returns:
-        Selected branch name
+        Selected branch name, or None if allow_no_flow=True and all flows aborted
 
     Raises:
         UserError: When multiple active flows conflict or all aborted
+        (if allow_no_flow=False)
     """
     # Priority 1: Non-aborted flows
     non_aborted = [f for f in candidates if f["flow_status"] != "aborted"]
@@ -149,6 +154,8 @@ def _resolve_best_flow_from_candidates(
 
     # Priority 4: All flows are aborted
     if not non_aborted and candidates:
+        if allow_no_flow:
+            return None
         details = "\n  - ".join(_format_flow_details(f) for f in candidates)
         raise UserError(
             f"All flows for issue #{issue_number} are aborted:\n"

@@ -116,6 +116,7 @@ class TaskShowService:
         *,
         pr_number: int | None = None,
         position_arg: str | None = None,
+        allow_no_flow: bool = False,
     ) -> str:
         """Resolve explicit or current branch for task commands.
 
@@ -123,6 +124,7 @@ class TaskShowService:
             branch: Branch name or issue number (--branch option)
             pr_number: PR number to resolve branch from
             position_arg: Positional argument (issue number or branch)
+            allow_no_flow: If True, return raw issue number when no flow exists
 
         Returns:
             Resolved branch name
@@ -136,6 +138,7 @@ class TaskShowService:
             position_arg=position_arg,
             flow_service=self.flow_service,
             github_client=self.github_client,
+            allow_no_flow=allow_no_flow,
         )
 
     @staticmethod

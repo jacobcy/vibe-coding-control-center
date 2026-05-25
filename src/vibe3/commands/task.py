@@ -96,8 +96,9 @@ def show(
 
     try:
         # Pass branch_opt and issue separately for conflict detection
+        # Use allow_no_flow=True because task show works pre-flow-creation
         target_branch = task_svc.resolve_branch(
-            branch_opt, pr_number=pr_opt, position_arg=issue
+            branch_opt, pr_number=pr_opt, position_arg=issue, allow_no_flow=True
         )
     except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)

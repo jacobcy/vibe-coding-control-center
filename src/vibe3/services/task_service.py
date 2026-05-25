@@ -410,6 +410,7 @@ class TaskService:
         *,
         pr_number: int | None = None,
         position_arg: str | None = None,
+        allow_no_flow: bool = False,
     ) -> str:
         """Resolve explicit or current branch for task commands.
 
@@ -417,12 +418,16 @@ class TaskService:
             branch: --branch option value
             pr_number: PR number to resolve branch from
             position_arg: Positional argument (issue number or branch)
+            allow_no_flow: If True, return raw issue number when no flow exists
 
         Returns:
             Resolved branch name
         """
         return self._show_service.resolve_branch(
-            branch, pr_number=pr_number, position_arg=position_arg
+            branch,
+            pr_number=pr_number,
+            position_arg=position_arg,
+            allow_no_flow=allow_no_flow,
         )
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
