@@ -105,7 +105,7 @@ def _dispatch_role_intent(
         else:
             # Unexpected failure - record to error_log and log warning
             # FailedGate will control dispatch based on threshold
-            from vibe3.exceptions.error_helpers import record_error
+            from vibe3.services.error_helpers import record_error
 
             error_message = f"{role} dispatch failed: {result.reason}"
             try:

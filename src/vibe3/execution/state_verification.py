@@ -179,7 +179,7 @@ class StateVerificationService:
             return
 
         try:
-            from vibe3.exceptions.error_helpers import record_error
+            from vibe3.services.error_helpers import record_error
 
             record_error(
                 error_code="E_API_UNAVAILABLE",

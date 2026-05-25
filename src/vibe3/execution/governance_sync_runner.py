@@ -123,7 +123,7 @@ def run_governance_sync(
         from vibe3.exceptions.error_classification import (
             classify_error_hybrid,
         )
-        from vibe3.exceptions.error_helpers import record_error
+        from vibe3.services.error_helpers import record_error
 
         error_code = classify_error_hybrid(exc)
 

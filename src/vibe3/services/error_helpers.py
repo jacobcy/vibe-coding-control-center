@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.exceptions.error_severity import ErrorSeverity
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.exceptions.error_severity import ErrorSeverity
+from vibe3.services.error_tracking_service import ErrorTrackingService
 
 
 def record_error(
@@ -32,8 +30,6 @@ def record_error(
     Returns:
         (threshold_reached, error_count_in_window)
     """
-    from vibe3.services.error_tracking_service import ErrorTrackingService
-
     error_svc = ErrorTrackingService.get_instance(store=store)
     return error_svc.record_error(
         error_code=error_code,

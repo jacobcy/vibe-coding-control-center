@@ -11,20 +11,6 @@ ERROR tracking and BLOCK management are two orthogonal systems that serve differ
 | **Trigger** | Exceptions, API failures, recovery events | Manual block, auto-block via FailedGate |
 | **Output** | Error count, threshold reached flag | Blocked/unblocked state, fail issue |
 
-## Module Placement Trade-off
-
-The `record_error()` helper is placed in `exceptions/error_helpers.py` rather than `services/` for ergonomic reasons:
-
-**Design Goal**: Provide a unified entry point for error recording at the same level as exception definitions (`vibe3.exceptions`), making it easy to discover and use.
-
-**Trade-off**: This placement creates a reverse dependency from `exceptions/` → `services/` (via lazy import of `ErrorTrackingService`). While technically violating the standard layer direction (`CLI → Commands → Services → Clients → Models`), this is a conscious trade-off:
-
-1. **Usage ergonomics**: Developers naturally look in `vibe3.exceptions` for error-related utilities
-2. **Lazy import**: Circular dependency avoided by importing inside function
-3. **Thin façade**: `record_error()` is a pure delegation to `ErrorTrackingService.record_error()`, no business logic
-
-**Alternative considered**: Placing in `services/error_helpers.py` would follow layering rules but hurt discoverability. The current design prioritizes developer experience over architectural purity for this specific helper.
-
 ## ERROR System
 
 ### Storage
@@ -42,10 +28,10 @@ Errors are stored in the `error_log` SQLite table via `ErrorTrackingService`.
 
 ### Recording Errors
 
-Use the `record_error()` convenience function from `error_helpers`:
+Use the `record_error()` convenience function from `services.error_helpers`:
 
 ```python
-from vibe3.exceptions.error_helpers import record_error
+from vibe3.services.error_helpers import record_error
 
 # Minimal call
 record_error(

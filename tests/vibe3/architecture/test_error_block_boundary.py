@@ -45,12 +45,16 @@ class TestErrorModulesDoNotImportBlockModules:
         # exceptions/error_*.py
         exceptions_dir = PROJECT_ROOT / "src/vibe3/exceptions"
         files.extend(exceptions_dir.glob("error_*.py"))
-        # services/error_tracking_*.py
+        # services/error_tracking_*.py and error_helpers.py
         services_dir = PROJECT_ROOT / "src/vibe3/services"
         files.extend(services_dir.glob("error_tracking_*.py"))
+        error_helpers = services_dir / "error_helpers.py"
+        if error_helpers.exists():
+            files.append(error_helpers)
         assert files, (
             f"No error files found. Check paths: "
-            f"{exceptions_dir}/error_*.py, {services_dir}/error_tracking_*.py"
+            f"{exceptions_dir}/error_*.py, {services_dir}/error_tracking_*.py, "
+            f"{services_dir}/error_helpers.py"
         )
         return files
 
@@ -144,8 +148,8 @@ class TestBlockModulesDoNotImportErrorModules:
         """BLOCK modules should not import record_error helper."""
         for file_path in block_files:
             content = get_file_content(file_path)
-            if "from vibe3.exceptions.error_helpers import record_error" in content:
+            if "from vibe3.services.error_helpers import record_error" in content:
                 pytest.fail(
                     f"{file_path.name} imports record_error "
-                    f"from error_helpers (ERROR module)"
+                    f"from services.error_helpers (ERROR module)"
                 )
