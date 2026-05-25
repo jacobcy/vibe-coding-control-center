@@ -1,18 +1,12 @@
 # Claude Code Hooks
 
-本项目提供 Claude Code hooks，用于增强安全性和防止误操作。
+本项目提供 Claude Code hooks，用于增强安全性，阻止真正危险的系统级命令。
 
-## 安装
+## 配置
 
-hooks 会在 `scripts/install.sh` 安装时自动同步到 `~/.claude/hooks/` 目录。
+Hooks 自动通过项目级 `.claude/settings.json` 启用，无需手动安装。
 
-如果需要手动更新 hooks：
-
-```bash
-# 从项目同步到全局
-cp -R .claude/hooks/. ~/.claude/hooks/
-chmod +x ~/.claude/hooks/*.sh
-```
+如需禁用特定 hook，编辑 `.claude/settings.json`，移除对应的 hook 配置。
 
 ## Hooks 说明
 
@@ -28,7 +22,6 @@ chmod +x ~/.claude/hooks/*.sh
 
 **例外**：
 - ✅ 允许编辑模板文件（`*.template.*`, `*.example*`）
-- ✅ 允许编辑包含 `template` 字样的文件
 
 **示例**：
 - ❌ 阻止：编辑 `config/.env`（真实密钥文件）
@@ -53,89 +46,12 @@ chmod +x ~/.claude/hooks/*.sh
 
 ### block-destructive.sh
 
-**作用**：阻止破坏性命令执行
+**作用**：阻止破坏性系统命令和绕过质量检查的操作
 
 **阻止范围**：
 - `rm -rf /` 或 `rm -rf ~`
 - `rm -rf ... /` 或 `rm -rf ... ~`
-- `git push -f` 或 `git push --force`
+- `git commit --no-verify`（禁止绕过 pre-commit hooks）
 - `DROP TABLE` 或 `TRUNCATE TABLE`
 
 **行为**：阻塞操作（exit 2）
-
-## 自定义配置
-
-### 添加新的保护模式
-
-编辑 `protect-files.sh`，修改 `PROTECTED` 数组：
-
-```bash
-PROTECTED=(".env" "secrets/" "credentials")
-# 添加新的保护模式
-PROTECTED+=("my-sensitive-dir/")
-```
-
-### 调整检测规则
-
-编辑 `detect-secrets.sh`，修改 grep 正则：
-
-```bash
-if echo "$NEW_TEXT" | grep -qiE '(API_KEY|SECRET|TOKEN)...\s*[=:]\s*["\x27]?[A-Za-z0-9_\-]{16,}'; then
-```
-
-### 禁用特定 hook
-
-删除对应的 `.sh` 文件：
-
-```bash
-rm ~/.claude/hooks/protect-files.sh
-```
-
-## 开发新 Hook
-
-### Hook 规范
-
-1. **输入**：通过 stdin 接收 JSON 格式的工具调用信息
-2. **输出**：
-   - `exit 0`：允许操作
-   - `exit 2`：阻塞操作（打印错误信息到 stderr）
-3. **格式**：使用 `jq` 解析 JSON 输入
-
-### 示例 Hook 结构
-
-```bash
-#!/bin/bash
-INPUT=$(cat)
-FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
-
-if [ -z "$FILE" ]; then
-  exit 0
-fi
-
-# 你的检查逻辑
-if [[ "$FILE" == *sensitive* ]]; then
-  echo "[security] BLOCKED: $FILE" >&2
-  exit 2
-fi
-
-exit 0
-```
-
-### 测试 Hook
-
-手动测试 hook 是否正常工作：
-
-```bash
-# 测试 protect-files.sh
-echo '{"tool_input":{"file_path":"config/.env"}}' | ~/.claude/hooks/protect-files.sh
-# 应返回 exit 2 并打印错误信息
-
-echo '{"tool_input":{"file_path":"config/keys.template.env"}}' | ~/.claude/hooks/protect-files.sh
-# 应返回 exit 0（允许）
-```
-
-## 相关文档
-
-- [Claude Code Hooks 官方文档](https://docs.anthropic.com/claude-code/hooks)
-- [项目配置文件](../config/settings.yaml)
-- [密钥模板](../config/keys.template.env)
