@@ -157,104 +157,6 @@ class CheckService(CheckRemote):
         except Exception:
             return None
 
-    def _block_issue_for_pr_closed(self, branch: str, pr_number: int) -> None:
-        """Block issue when PR closed without merge.
-
-        Calls standard FlowService.block_flow() to ensure flow state
-        and issue state are synchronized, then adds guidance comment.
-
-        Args:
-            branch: Branch name (e.g., "task/issue-456")
-            pr_number: Closed PR number
-        """
-        # Find task issue from flow
-        issue_links = self.store.get_issue_links(branch)
-        task_issue_number: int | None = None
-        for link in issue_links:
-            if link.get("issue_role") == "task":
-                task_issue_number = link.get("issue_number")
-                if isinstance(task_issue_number, int):
-                    break
-
-        if not task_issue_number:
-            logger.bind(
-                domain="check",
-                action="block_pr_closed",
-                branch=branch,
-            ).debug("No task issue linked, skipping issue blocking")
-            return
-
-        # Check if issue already closed
-        gh_issue = self.github_client.view_issue(task_issue_number)
-        if isinstance(gh_issue, dict):
-            issue_state = str(gh_issue.get("state", "")).upper()
-            if issue_state == "CLOSED":
-                logger.bind(
-                    domain="check",
-                    action="block_pr_closed",
-                    branch=branch,
-                    issue_number=task_issue_number,
-                ).info(f"Issue #{task_issue_number} already closed, skip blocking")
-                return
-
-        # Transition issue state to BLOCKED while keeping flow_status as "aborted"
-        # This allows --clean-branch to properly clean up these flows
-        from vibe3.services.label_service import LabelService
-
-        label_service = LabelService()
-
-        try:
-            label_service.transition(
-                task_issue_number, IssueState.BLOCKED, actor="vibe:check"
-            )
-
-            logger.bind(
-                domain="check",
-                action="block_pr_closed",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).info(
-                f"Transitioned issue #{task_issue_number} to BLOCKED for "
-                f"closed PR #{pr_number}"
-            )
-        except Exception as exc:
-            logger.bind(
-                domain="check",
-                action="block_pr_closed",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).warning(f"Failed to block flow: {exc}")
-            # Continue to add comment even if blocking failed
-
-        # Add guidance comment
-        comment_body = f"""PR #{pr_number} 已关闭（未合并）。
-
-**建议方案：**
-
-1. **关闭此 issue** - 如果需求已不再需要或已被其他方式解决
-2. **创建 follow-up issue** - 如果需要继续开发，建议创建新 issue 重新规划
-3. **评估 scope 变化** - 根据最新代码确定是否需要调整范围
-
-**恢复执行选项：**
-
-- `vibe task resume --label ready` - 恢复执行（建议先评估 scope）
-- `vibe check --clean-branch` - 清理旧 flow 并重新开始
-
-**注意：** 不建议在已关闭 PR 的基础上继续开发。"""
-
-        try:
-            self.github_client.add_comment(
-                task_issue_number,
-                comment_body,
-            )
-        except Exception as exc:
-            logger.bind(
-                domain="check",
-                action="block_pr_closed",
-                branch=branch,
-                issue_number=task_issue_number,
-            ).warning(f"Failed to add comment: {exc}")
-
     def _handle_closed_pr(self, branch: str, pr: "PRResponse") -> CheckResult | None:
         """Handle PR state changes detected during check.
 
@@ -281,19 +183,108 @@ class CheckService(CheckRemote):
             return CheckResult(is_valid=True, branch=branch, issues=result_issues)
 
         if pr.state == PRState.CLOSED:
-            # PR closed without merge → aborted (task abandoned)
-            self._flow_status_service.mark_flow_aborted(
-                branch,
-                f"PR #{pr.number} closed without merge (detected from GitHub)",
-            )
+            # PR closed without merge → clean up and return to READY
+            self._reset_issue_after_pr_closed(branch, pr.number)
             self._update_pr_cache(branch, pr)
-
-            # Block issue with guidance comment
-            self._block_issue_for_pr_closed(branch, pr.number)
 
             return CheckResult(is_valid=True, branch=branch, issues=result_issues)
 
         return None
+
+    def _reset_issue_after_pr_closed(self, branch: str, pr_number: int) -> None:
+        """Reset issue to READY after PR closed without merge.
+
+        Cleans up flow scene (worktree, branch, flow record) and
+        restores issue to READY state so it can be dispatched again.
+
+        Args:
+            branch: Branch name (e.g., "task/issue-456")
+            pr_number: Closed PR number
+        """
+        from vibe3.models.flow import FlowStatusResponse
+        from vibe3.services.task_resume_operations import TaskResumeOperations
+
+        # Find task issue number
+        issue_links = self.store.get_issue_links(branch)
+        task_issue_number: int | None = None
+        for link in issue_links:
+            if link.get("issue_role") == "task":
+                task_issue_number = link.get("issue_number")
+                if isinstance(task_issue_number, int):
+                    break
+
+        if not task_issue_number:
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+            ).debug("No task issue linked, skipping issue reset")
+            return
+
+        # Check if issue already closed
+        gh_issue = self.github_client.view_issue(task_issue_number)
+        if isinstance(gh_issue, dict):
+            issue_state = str(gh_issue.get("state", "")).upper()
+            if issue_state == "CLOSED":
+                logger.bind(
+                    domain="check",
+                    action="reset_pr_closed",
+                    branch=branch,
+                    issue_number=task_issue_number,
+                ).info(f"Issue #{task_issue_number} already closed, skip reset")
+                return
+
+        # Build minimal FlowStatusResponse for task resume
+        flow = FlowStatusResponse(
+            branch=branch,
+            flow_slug=branch,
+            flow_status="active",
+            latest_actor="vibe:check",
+            task_issue_number=task_issue_number,
+        )
+
+        # Create TaskResumeOperations and reset to READY
+        from vibe3.services.flow_service import FlowService
+        from vibe3.services.issue_flow_service import IssueFlowService
+        from vibe3.services.label_service import LabelService
+
+        label_service = LabelService()
+        flow_service = FlowService(store=self.store)
+        issue_flow_service = IssueFlowService(store=self.store)
+
+        resume_ops = TaskResumeOperations(
+            git_client=self.git_client,
+            github_client=self.github_client,
+            flow_service=flow_service,
+            label_service=label_service,
+            issue_flow_service=issue_flow_service,
+        )
+
+        try:
+            resume_ops.reset_issue_to_ready(
+                issue_number=task_issue_number,
+                resume_kind="pr_closed",
+                flow=flow,
+                repo=None,
+                reason=f"PR #{pr_number} closed without merge, resetting to READY",
+            )
+
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).info(
+                f"Reset issue #{task_issue_number} to READY after "
+                f"PR #{pr_number} closed"
+            )
+        except Exception as exc:
+            logger.bind(
+                domain="check",
+                action="reset_pr_closed",
+                branch=branch,
+                issue_number=task_issue_number,
+            ).warning(f"Failed to reset issue: {exc}")
 
     def _check_multiple_state_labels(
         self, issue_number: int, issue_payload: dict
