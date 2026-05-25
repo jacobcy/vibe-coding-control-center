@@ -42,7 +42,11 @@ class TestCheckBranchBehind:
         from vibe3.clients.git_client import GitError
 
         mock_git = MagicMock()
-        mock_git._run.side_effect = GitError("rev-list", "fatal: bad revision")
+        # First call (fetch) succeeds, second call (rev-list) fails
+        mock_git._run.side_effect = [
+            "",  # fetch succeeds
+            GitError("rev-list", "fatal: bad revision"),  # rev-list fails
+        ]
 
         result = check_branch_behind(mock_git, "nonexistent", "main")
 
@@ -63,6 +67,19 @@ class TestCheckBranchBehind:
 
         assert result is not None
         assert result.behind_count == 3
+
+    def test_invalid_output_returns_none(self) -> None:
+        """When git rev-list returns invalid output, return None."""
+        mock_git = MagicMock()
+        # First call (fetch) succeeds, second call (rev-list) returns invalid output
+        mock_git._run.side_effect = [
+            "",  # fetch succeeds
+            "not-a-number",  # rev-list returns invalid output
+        ]
+
+        result = check_branch_behind(mock_git, "feature", "main")
+
+        assert result is None
 
 
 class TestFormatBranchBehindBody:

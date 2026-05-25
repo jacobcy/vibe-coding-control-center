@@ -52,7 +52,18 @@ def check_branch_behind(
         output = git_client._run(
             ["rev-list", "--count", f"origin/{head_branch}..origin/{base_branch}"]
         )
-        behind_count = int(output.strip())
+
+        try:
+            behind_count = int(output.strip())
+        except ValueError:
+            logger.bind(
+                domain="pr",
+                action="check_branch_behind_parse",
+                output=output,
+                head_branch=head_branch,
+                base_branch=base_branch,
+            ).warning(f"Unexpected git rev-list output: {output}")
+            return None
 
         if behind_count == 0:
             return None
