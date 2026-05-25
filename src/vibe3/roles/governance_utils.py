@@ -104,7 +104,7 @@ def build_broader_repo_entries(
             continue
 
         labels = normalize_labels(item.get("labels"))
-        if "supervisor" in labels or "vibe-task" in labels:
+        if "supervisor" in labels or "orchestra" in labels:
             continue
 
         assignees = normalize_assignees(item.get("assignees"))
@@ -137,26 +137,29 @@ def build_broader_repo_entries(
     return tuple(entries)
 
 
-def get_vibe_task_issue_numbers(
+def get_orchestra_labeled_issue_numbers(
     github: GitHubClient, config: OrchestraConfig
 ) -> set[int]:
-    """Fetch issue numbers that have the vibe-task label.
+    """Fetch issue numbers that have the orchestra label.
+
+    The orchestra label marks issues that have been reviewed by governance
+    and should be skipped in future governance scans.
 
     Args:
         github: GitHubClient instance for API calls
         config: OrchestraConfig with repo information
 
     Returns:
-        Set of issue numbers that have vibe-task label
+        Set of issue numbers that have orchestra label
     """
-    vibe_task_issues = github.list_issues(
-        label="vibe-task",
+    orchestra_issues = github.list_issues(
+        label="orchestra",
         state="all",
         repo=config.repo,
-        limit=5000,  # Fetch all vibe-task issues to avoid truncation
+        limit=5000,  # Fetch all orchestra-labeled issues to avoid truncation
     )
     numbers: set[int] = set()
-    for item in vibe_task_issues:
+    for item in orchestra_issues:
         number = item.get("number")
         if isinstance(number, int):
             numbers.add(number)
