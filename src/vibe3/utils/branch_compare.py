@@ -16,7 +16,6 @@ class BranchBehindInfo:
     head_branch: str
     base_branch: str
     behind_count: int
-    behind_commits: list[str]
 
 
 def check_branch_behind(
@@ -34,24 +33,36 @@ def check_branch_behind(
     Returns:
         BranchBehindInfo if behind, None if up-to-date or error
     """
+    from vibe3.clients.git_client import GitError
+
     try:
+        # Fetch base branch to ensure up-to-date refs
+        try:
+            git_client._run(["fetch", "origin", base_branch])
+        except GitError as fetch_err:
+            logger.bind(
+                domain="pr",
+                action="check_branch_behind_fetch",
+                base_branch=base_branch,
+                error=str(fetch_err),
+            ).warning("Failed to fetch base branch, refs may be stale")
+
         # origin/head_branch..origin/base_branch = commits in base
         # that are NOT in head (i.e., behind count)
-        behind_commits = git_client.get_commit_subjects(
-            base_ref=f"origin/{head_branch}",
-            head_ref=f"origin/{base_branch}",
+        output = git_client._run(
+            ["rev-list", "--count", f"origin/{head_branch}..origin/{base_branch}"]
         )
+        behind_count = int(output.strip())
 
-        if not behind_commits:
+        if behind_count == 0:
             return None
 
         return BranchBehindInfo(
             head_branch=head_branch,
             base_branch=base_branch,
-            behind_count=len(behind_commits),
-            behind_commits=behind_commits,
+            behind_count=behind_count,
         )
-    except Exception as e:
+    except GitError as e:
         logger.bind(
             domain="pr",
             action="check_branch_behind",

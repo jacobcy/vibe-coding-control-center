@@ -212,17 +212,6 @@ def register_create_command(app: typer.Typer) -> None:
 
         pr_body = ai_body if ai_body else body
 
-        # Check if branch is behind base and add warning to PR body
-        behind_info = check_branch_behind(
-            git_client=pr_service.git_client,
-            head_branch=branch,
-            base_branch=resolved_base,
-        )
-        if behind_info:
-            behind_warning = format_branch_behind_body(behind_info)
-            # Prepend warning to PR body
-            pr_body = f"{behind_warning}\n\n---\n\n{pr_body}"
-
         # Actor determination:
         # - AI suggestion mode: "ai-assistant"
         # - Agent mode: None (will be resolved by PRService from flow state)
@@ -235,5 +224,23 @@ def register_create_command(app: typer.Typer) -> None:
             base_branch=resolved_base,
             actor=actor,
         )
+
+        # Check if branch is behind base and update PR body
+        behind_info = check_branch_behind(
+            git_client=pr_service.git_client,
+            head_branch=pr.head_branch,
+            base_branch=pr.base_branch,
+        )
+        if behind_info:
+            behind_warning = format_branch_behind_body(behind_info)
+            updated_body = f"{behind_warning}\n\n---\n\n{pr.body}"
+            # Update PR body via gh CLI
+            subprocess.run(
+                ["gh", "pr", "edit", str(pr.number), "--body", updated_body],
+                check=True,
+                capture_output=True,
+            )
+            # Update local PR object
+            pr = pr.model_copy(update={"body": updated_body})
 
         _emit_pr_result(pr, json_output, yaml_output)
