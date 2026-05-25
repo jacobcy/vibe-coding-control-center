@@ -275,12 +275,18 @@ Forbidden:
    - bug fix
    - 方案明确的 small feature
    - **边界明确的 refactor / cleanup**
-4. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
-5. 对可纳入对象执行最小动作：
+4. **事实确认（强制）**：在决定对某个 issue 写 `[governance suggest]` comment 前，必须先运行：
+   ```bash
+   vibe3 task show <issue-number>
+   ```
+   查看该 issue 最近的 2-3 条评论。如果最近已有 `[governance suggest]` 或 `[governance]` 开头的评论（无论是你自己还是其他 agent 写的），**一律跳过，不再重复写 comment**。靠事实判断，不靠猜测。
+5. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
+6. 对可纳入对象执行最小动作：
    - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `{manager_bot}`，禁止使用人类用户名）
    - 如有必要补最小 routing labels
-6. 对不适合纳入的对象记录简短原因
-7. **扫描 `supervisor + state/ready` issues**，对每个执行：
+7. 对不适合纳入的对象记录简短原因
+8. **扫描 `supervisor + state/ready` issues**，对每个执行：
+   - 先运行 `vibe3 task show <issue-number>` 确认最近没有重复 governance comment
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
    - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
      ```bash
@@ -292,11 +298,11 @@ Forbidden:
      gh issue close <issue-number> --comment "关闭理由：<具体理由>"
      ```
    - 不确定：保守等待，记录到 Actions
-8. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
+9. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
    - 是因为候选确实都不满足三级审查
    - 还是因为当前材料把”实现选择”误当成了”人类拍板”
    - 若 ready queue 偏浅，优先重新检查是否存在被误判可纳入的 bounded refactor / bugfix
-9. 输出结论后停止
+10. 输出结论后停止
 
 ## Comment Contract
 
