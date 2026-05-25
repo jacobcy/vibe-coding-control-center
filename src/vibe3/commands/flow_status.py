@@ -267,12 +267,13 @@ def show(
     # Do NOT call service.get_flow_timeline (reads from local)
     from vibe3.models.data_source import DataSource
 
-    if (
-        flow_status.timeline
-        and flow_status.data_source == DataSource.ISSUE_BODY_FALLBACK
-    ):
+    # Use data_source alone to decide timeline source
+    # For remote-sourced data (ISSUE_BODY_FALLBACK), always use remote timeline
+    # even if empty - never fall back to local events
+    if flow_status.data_source == DataSource.ISSUE_BODY_FALLBACK:
         events = _timeline_to_flow_events(flow_status.timeline, target_branch)
     else:
+        # Local mode: read from SQLite
         events_data = service.store.get_events(target_branch, limit=100)
         from vibe3.models.flow import FlowEvent
 

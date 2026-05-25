@@ -46,34 +46,41 @@ def test_remote_no_local_db_uses_remote_timeline() -> None:
             "vibe3.services.flow_status_resolver.FlowStatusResolver"
         ) as mock_resolver_class:
             with patch(
-                "vibe3.commands.flow_status.render_flow_timeline"
-            ) as mock_render:
-                mock_service = MagicMock()
-                mock_service_class.return_value = mock_service
+                "vibe3.commands.flow_status.FlowProjectionService"
+            ) as mock_projection_class:
+                with patch(
+                    "vibe3.commands.flow_status.render_flow_timeline"
+                ) as mock_render:
+                    mock_service = MagicMock()
+                    mock_service_class.return_value = mock_service
 
-                mock_resolver = MagicMock()
-                mock_resolver.resolve.return_value = flow_status
-                mock_resolver_class.return_value = mock_resolver
+                    mock_resolver = MagicMock()
+                    mock_resolver.resolve.return_value = flow_status
+                    mock_resolver_class.return_value = mock_resolver
 
-                result = runner.invoke(
-                    app, ["flow", "show", "--remote", str(issue_number)]
-                )
+                    mock_projection = MagicMock()
+                    mock_projection.get_issue_titles.return_value = ({}, None)
+                    mock_projection_class.return_value = mock_projection
 
-                assert result.exit_code == 0
-                # Verify resolver was called with remote=True
-                mock_resolver.resolve.assert_called_once()
-                call_kwargs = mock_resolver.resolve.call_args.kwargs
-                assert call_kwargs["remote"] is True
-                assert call_kwargs["issue_number"] == issue_number
+                    result = runner.invoke(
+                        app, ["flow", "show", "--remote", str(issue_number)]
+                    )
 
-                # Verify timeline was rendered (not local events)
-                mock_render.assert_called_once()
-                rendered_events = mock_render.call_args.args[1]
-                assert len(rendered_events) == 2
-                assert rendered_events[0].event_type == "flow_created"
-                assert rendered_events[0].actor == "alice"
-                assert rendered_events[1].event_type == "state_transitioned"
-                assert rendered_events[1].actor == "bob"
+                    assert result.exit_code == 0
+                    # Verify resolver was called with remote=True
+                    mock_resolver.resolve.assert_called_once()
+                    call_kwargs = mock_resolver.resolve.call_args.kwargs
+                    assert call_kwargs["remote"] is True
+                    assert call_kwargs["issue_number"] == issue_number
+
+                    # Verify timeline was rendered (not local events)
+                    mock_render.assert_called_once()
+                    rendered_events = mock_render.call_args.args[1]
+                    assert len(rendered_events) == 2
+                    assert rendered_events[0].event_type == "flow_created"
+                    assert rendered_events[0].actor == "alice"
+                    assert rendered_events[1].event_type == "state_transitioned"
+                    assert rendered_events[1].actor == "bob"
 
 
 def test_remote_ignores_stale_local_events() -> None:
@@ -105,40 +112,47 @@ def test_remote_ignores_stale_local_events() -> None:
             "vibe3.services.flow_status_resolver.FlowStatusResolver"
         ) as mock_resolver_class:
             with patch(
-                "vibe3.commands.flow_status.render_flow_timeline"
-            ) as mock_render:
-                mock_service = MagicMock()
-                # Simulate local DB with stale events
-                mock_store = MagicMock()
-                mock_store.get_events.return_value = [
-                    {
-                        "branch": branch,
-                        "event_type": "flow_created",
-                        "actor": "old_actor",
-                        "detail": "Stale local event",
-                        "created_at": "2024-01-01T00:00:00Z",
-                    }
-                ]
-                mock_service.store = mock_store
-                mock_service_class.return_value = mock_service
+                "vibe3.commands.flow_status.FlowProjectionService"
+            ) as mock_projection_class:
+                with patch(
+                    "vibe3.commands.flow_status.render_flow_timeline"
+                ) as mock_render:
+                    mock_service = MagicMock()
+                    # Simulate local DB with stale events
+                    mock_store = MagicMock()
+                    mock_store.get_events.return_value = [
+                        {
+                            "branch": branch,
+                            "event_type": "flow_created",
+                            "actor": "old_actor",
+                            "detail": "Stale local event",
+                            "created_at": "2024-01-01T00:00:00Z",
+                        }
+                    ]
+                    mock_service.store = mock_store
+                    mock_service_class.return_value = mock_service
 
-                mock_resolver = MagicMock()
-                mock_resolver.resolve.return_value = flow_status
-                mock_resolver_class.return_value = mock_resolver
+                    mock_resolver = MagicMock()
+                    mock_resolver.resolve.return_value = flow_status
+                    mock_resolver_class.return_value = mock_resolver
 
-                result = runner.invoke(
-                    app, ["flow", "show", "--remote", str(issue_number)]
-                )
+                    mock_projection = MagicMock()
+                    mock_projection.get_issue_titles.return_value = ({}, None)
+                    mock_projection_class.return_value = mock_projection
 
-                assert result.exit_code == 0
-                # Verify remote timeline was used, not local DB
-                mock_render.assert_called_once()
-                rendered_events = mock_render.call_args.args[1]
-                assert len(rendered_events) == 1
-                assert rendered_events[0].actor == "alice"
-                assert rendered_events[0].detail == "Flow created (remote)"
-                # Local DB should NOT have been queried
-                mock_store.get_events.assert_not_called()
+                    result = runner.invoke(
+                        app, ["flow", "show", "--remote", str(issue_number)]
+                    )
+
+                    assert result.exit_code == 0
+                    # Verify remote timeline was used, not local DB
+                    mock_render.assert_called_once()
+                    rendered_events = mock_render.call_args.args[1]
+                    assert len(rendered_events) == 1
+                    assert rendered_events[0].actor == "alice"
+                    assert rendered_events[0].detail == "Flow created (remote)"
+                    # Local DB should NOT have been queried
+                    mock_store.get_events.assert_not_called()
 
 
 def test_non_remote_uses_local_events() -> None:
@@ -159,44 +173,51 @@ def test_non_remote_uses_local_events() -> None:
             "vibe3.services.flow_status_resolver.FlowStatusResolver"
         ) as mock_resolver_class:
             with patch(
-                "vibe3.commands.flow_status.render_flow_timeline"
-            ) as mock_render:
+                "vibe3.commands.flow_status.FlowProjectionService"
+            ) as mock_projection_class:
                 with patch(
-                    "vibe3.commands.flow_status.resolve_command_branch"
-                ) as mock_resolve_branch:
-                    mock_service = MagicMock()
-                    mock_store = MagicMock()
-                    mock_store.get_issue_links.return_value = [
-                        {"issue_role": "task", "issue_number": 123}
-                    ]
-                    mock_store.get_events.return_value = [
-                        {
-                            "branch": branch,
-                            "event_type": "flow_created",
-                            "actor": "local_actor",
-                            "detail": "Local event",
-                            "created_at": "2024-01-01T00:00:00Z",
-                        }
-                    ]
-                    mock_service.store = mock_store
-                    mock_service_class.return_value = mock_service
+                    "vibe3.commands.flow_status.render_flow_timeline"
+                ) as mock_render:
+                    with patch(
+                        "vibe3.commands.flow_status.resolve_command_branch"
+                    ) as mock_resolve_branch:
+                        mock_service = MagicMock()
+                        mock_store = MagicMock()
+                        mock_store.get_issue_links.return_value = [
+                            {"issue_role": "task", "issue_number": 123}
+                        ]
+                        mock_store.get_events.return_value = [
+                            {
+                                "branch": branch,
+                                "event_type": "flow_created",
+                                "actor": "local_actor",
+                                "detail": "Local event",
+                                "created_at": "2024-01-01T00:00:00Z",
+                            }
+                        ]
+                        mock_service.store = mock_store
+                        mock_service_class.return_value = mock_service
 
-                    mock_resolve_branch.return_value = branch
+                        mock_resolve_branch.return_value = branch
 
-                    mock_resolver = MagicMock()
-                    mock_resolver.resolve.return_value = flow_status
-                    mock_resolver_class.return_value = mock_resolver
+                        mock_resolver = MagicMock()
+                        mock_resolver.resolve.return_value = flow_status
+                        mock_resolver_class.return_value = mock_resolver
 
-                    result = runner.invoke(app, ["flow", "show"])
+                        mock_projection = MagicMock()
+                        mock_projection.get_issue_titles.return_value = ({}, None)
+                        mock_projection_class.return_value = mock_projection
 
-                    assert result.exit_code == 0
-                    # Verify local events were queried
-                    mock_store.get_events.assert_called_once_with(branch, limit=100)
-                    # Verify local events were used for rendering
-                    mock_render.assert_called_once()
-                    rendered_events = mock_render.call_args.args[1]
-                    assert len(rendered_events) == 1
-                    assert rendered_events[0].actor == "local_actor"
+                        result = runner.invoke(app, ["flow", "show"])
+
+                        assert result.exit_code == 0
+                        # Verify local events were queried
+                        mock_store.get_events.assert_called_once_with(branch, limit=100)
+                        # Verify local events were used for rendering
+                        mock_render.assert_called_once()
+                        rendered_events = mock_render.call_args.args[1]
+                        assert len(rendered_events) == 1
+                        assert rendered_events[0].actor == "local_actor"
 
 
 def test_remote_json_output_includes_timeline() -> None:
@@ -226,25 +247,33 @@ def test_remote_json_output_includes_timeline() -> None:
         with patch(
             "vibe3.services.flow_status_resolver.FlowStatusResolver"
         ) as mock_resolver_class:
-            mock_service = MagicMock()
-            mock_service_class.return_value = mock_service
+            with patch(
+                "vibe3.commands.flow_status.FlowProjectionService"
+            ) as mock_projection_class:
+                mock_service = MagicMock()
+                mock_service_class.return_value = mock_service
 
-            mock_resolver = MagicMock()
-            mock_resolver.resolve.return_value = flow_status
-            mock_resolver_class.return_value = mock_resolver
+                mock_resolver = MagicMock()
+                mock_resolver.resolve.return_value = flow_status
+                mock_resolver_class.return_value = mock_resolver
 
-            result = runner.invoke(
-                app, ["flow", "show", "--remote", str(issue_number), "--format", "json"]
-            )
+                mock_projection = MagicMock()
+                mock_projection.get_issue_titles.return_value = ({}, None)
+                mock_projection_class.return_value = mock_projection
 
-            assert result.exit_code == 0
-            import json
+                result = runner.invoke(
+                    app,
+                    ["flow", "show", "--remote", str(issue_number), "--format", "json"],
+                )
 
-            output = json.loads(result.output)
-            assert "events" in output
-            assert len(output["events"]) == 1
-            assert output["events"][0]["event_type"] == "flow_created"
-            assert output["events"][0]["actor"] == "alice"
+                assert result.exit_code == 0
+                import json
+
+                output = json.loads(result.output)
+                assert "events" in output
+                assert len(output["events"]) == 1
+                assert output["events"][0]["event_type"] == "flow_created"
+                assert output["events"][0]["actor"] == "alice"
 
 
 def test_remote_yaml_output_includes_timeline() -> None:
@@ -274,20 +303,28 @@ def test_remote_yaml_output_includes_timeline() -> None:
         with patch(
             "vibe3.services.flow_status_resolver.FlowStatusResolver"
         ) as mock_resolver_class:
-            mock_service = MagicMock()
-            mock_service_class.return_value = mock_service
+            with patch(
+                "vibe3.commands.flow_status.FlowProjectionService"
+            ) as mock_projection_class:
+                mock_service = MagicMock()
+                mock_service_class.return_value = mock_service
 
-            mock_resolver = MagicMock()
-            mock_resolver.resolve.return_value = flow_status
-            mock_resolver_class.return_value = mock_resolver
+                mock_resolver = MagicMock()
+                mock_resolver.resolve.return_value = flow_status
+                mock_resolver_class.return_value = mock_resolver
 
-            result = runner.invoke(
-                app, ["flow", "show", "--remote", str(issue_number), "--format", "yaml"]
-            )
+                mock_projection = MagicMock()
+                mock_projection.get_issue_titles.return_value = ({}, None)
+                mock_projection_class.return_value = mock_projection
 
-            assert result.exit_code == 0
-            assert "flow_created" in result.output
-            assert "alice" in result.output
+                result = runner.invoke(
+                    app,
+                    ["flow", "show", "--remote", str(issue_number), "--format", "yaml"],
+                )
+
+                assert result.exit_code == 0
+                assert "flow_created" in result.output
+                assert "alice" in result.output
 
 
 def test_remote_without_issue_number_errors() -> None:
