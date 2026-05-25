@@ -24,16 +24,12 @@ def mock_dependencies():
 def test_coordinator_dispatch_success(mock_dependencies):
     """Test successful async dispatch."""
     config, store, backend, capacity = mock_dependencies
-
-    # Setup capacity
     capacity.can_dispatch.return_value = True
 
-    # Mock the async launcher
     handle = MagicMock()
     handle.tmux_session = "test-session-123"
     handle.log_path = Path("/tmp/test.log")
 
-    # Create coordinator with mocked async launcher
     mock_start_async = MagicMock(return_value=handle)
     coordinator = ExecutionCoordinator(
         config=config,
@@ -61,11 +57,8 @@ def test_coordinator_dispatch_success(mock_dependencies):
     assert result.launched is True
     assert result.tmux_session == "test-session-123"
     assert result.log_path == "/tmp/test.log"
-
-    # Verify capacity checked (no target_id parameter)
     capacity.can_dispatch.assert_called_once_with("planner")
 
-    # Verify start_async called correctly
     mock_start_async.assert_called_once_with(
         ["echo", "hello"],
         execution_name="vibe3-planner-issue-42",
@@ -100,8 +93,6 @@ def test_coordinator_dispatch_success(mock_dependencies):
 def test_coordinator_dispatch_capacity_full(mock_dependencies):
     """Test dispatch rejected when capacity full."""
     config, store, backend, capacity = mock_dependencies
-
-    # Setup capacity
     capacity.can_dispatch.return_value = False
 
     coordinator = ExecutionCoordinator(
@@ -135,7 +126,6 @@ def test_governance_dispatch_bypasses_capacity_pool(mock_dependencies):
     handle.tmux_session = "vibe3-gov-1"
     handle.log_path = Path("/tmp/gov.log")
 
-    # Create coordinator with mocked async launcher
     mock_start_async = MagicMock(return_value=handle)
     coordinator = ExecutionCoordinator(
         config=config,
@@ -187,7 +177,6 @@ def test_sync_child_bypasses_parent_live_session_guard(mock_dependencies, monkey
         refs={"task": "Manage issue #42"},
     )
 
-    # Manager now routes through CodeagentExecutionService (unified shell)
     with patch("vibe3.execution.coordinator.CodeagentExecutionService") as mock_svc_cls:
         mock_svc = MagicMock()
         mock_result = MagicMock()
@@ -250,21 +239,12 @@ def test_sync_child_clears_async_marker_before_entering_sync_shell(
     assert os.environ.get("VIBE3_ASYNC_CHILD") == "1"
 
 
-def test_sync_skips_when_live_session_exists_for_target(
-    mock_dependencies,
-    monkeypatch,
-):
+def test_sync_skips_when_live_session_exists_for_target(mock_dependencies, monkeypatch):
     """Regular sync dispatches should be deduped by live session for same target."""
-    # Ensure VIBE3_ASYNC_CHILD is not set to avoid skipping the dedup check
     monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
-
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
-    # Ensure VIBE3_ASYNC_CHILD is not set (cleanup from previous tests)
-    monkeypatch.delenv("VIBE3_ASYNC_CHILD", raising=False)
-
-    # Mock SessionRegistryService to return a registry with live sessions
     mock_registry = MagicMock()
     mock_registry.get_truly_live_sessions_for_target.return_value = [
         {"id": 99, "role": "manager", "branch": "task/issue-42", "target_id": "42"},
@@ -272,7 +252,7 @@ def test_sync_skips_when_live_session_exists_for_target(
 
     with patch(
         "vibe3.execution.coordinator.SessionRegistryService", return_value=mock_registry
-    ) as mock_cls:
+    ):
         coordinator = ExecutionCoordinator(
             config=config,
             store=store,
@@ -292,16 +272,13 @@ def test_sync_skips_when_live_session_exists_for_target(
 
         result = coordinator.dispatch_execution(request)
 
-        # Verify the mock was called
-        mock_cls.assert_called()
-
-        assert result.launched is False
-        assert result.reason_code == "duplicate_dispatch"
-        mock_registry.get_truly_live_sessions_for_target.assert_called_once_with(
-            role="manager",
-            branch="task/issue-42",
-            target_id="42",
-        )
+    assert result.launched is False
+    assert result.reason_code == "duplicate_dispatch"
+    mock_registry.get_truly_live_sessions_for_target.assert_called_once_with(
+        role="manager",
+        branch="task/issue-42",
+        target_id="42",
+    )
 
 
 def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
@@ -331,11 +308,7 @@ def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
     with patch(
         "vibe3.execution.coordinator.CodeagentExecutionService"
     ) as mock_service_cls:
-        mock_result = MagicMock(
-            success=True,
-            stdout="plan output",
-            stderr="",
-        )
+        mock_result = MagicMock(success=True, stdout="plan output", stderr="")
         mock_service = mock_service_cls.return_value
         mock_service.execute_sync_request.return_value = mock_result
 
@@ -344,15 +317,10 @@ def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
     assert result.launched is True
     assert result.stdout == "plan output"
     backend.run.assert_not_called()
-    mock_service.execute_sync_request.assert_called_once_with(
-        request,
-        cwd=None,
-    )
+    mock_service.execute_sync_request.assert_called_once_with(request, cwd=None)
 
 
-def test_sync_reviewer_uses_unified_execution_shell(
-    mock_dependencies,
-):
+def test_sync_reviewer_uses_unified_execution_shell(mock_dependencies):
     """Reviewer sync requests use the unified execution shell."""
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
@@ -379,11 +347,7 @@ def test_sync_reviewer_uses_unified_execution_shell(
     with patch(
         "vibe3.execution.coordinator.CodeagentExecutionService"
     ) as mock_service_cls:
-        mock_result = MagicMock(
-            success=True,
-            stdout="review output",
-            stderr="",
-        )
+        mock_result = MagicMock(success=True, stdout="review output", stderr="")
         mock_service = mock_service_cls.return_value
         mock_service.execute_sync_request.return_value = mock_result
 
@@ -392,20 +356,14 @@ def test_sync_reviewer_uses_unified_execution_shell(
     assert result.launched is True
     assert result.stdout == "review output"
     backend.run.assert_not_called()
-    mock_service.execute_sync_request.assert_called_once_with(
-        request,
-        cwd=None,
-    )
+    mock_service.execute_sync_request.assert_called_once_with(request, cwd=None)
 
 
 def test_coordinator_dispatch_launch_fails(mock_dependencies):
     """Test dispatch fails and records failure if launch throws."""
     config, store, backend, capacity = mock_dependencies
-
-    # Setup capacity
     capacity.can_dispatch.return_value = True
 
-    # Create coordinator with mocked async launcher that raises exception
     mock_start_async = MagicMock(side_effect=Exception("Tmux failed to start"))
     with patch("vibe3.execution.coordinator.append_orchestra_event") as mock_event:
         coordinator = ExecutionCoordinator(
@@ -450,7 +408,6 @@ def test_coordinator_dispatch_launch_failed_duplicate_tmux_gets_context(
     config, store, backend, capacity = mock_dependencies
     capacity.can_dispatch.return_value = True
 
-    # Create coordinator with mocked async launcher that raises duplicate tmux error
     mock_start_async = MagicMock(
         side_effect=RuntimeError(
             "Tmux session 'vibe3-planner-issue-303' already exists"
@@ -534,11 +491,8 @@ def test_no_async_env_var_overrides_mode_to_sync(mock_dependencies, monkeypatch)
         backend=backend,
         capacity=capacity,
     )
-
-    # Set the env var
     monkeypatch.setenv("VIBE3_NO_ASYNC", "1")
 
-    # Create an async request with prompt and options
     request = ExecutionRequest(
         role="planner",
         target_branch="task/issue-42",
@@ -546,29 +500,21 @@ def test_no_async_env_var_overrides_mode_to_sync(mock_dependencies, monkeypatch)
         execution_name="vibe3-planner-issue-42",
         prompt="make a plan",
         options=MagicMock(),
-        mode="async",  # Should be overridden to sync
+        mode="async",
         refs={"task": "plan issue #42"},
         actor="agent:planner",
     )
 
-    # Mock CodeagentExecutionService (sync path)
     with patch(
         "vibe3.execution.coordinator.CodeagentExecutionService"
     ) as mock_service_cls:
-        mock_result = MagicMock(
-            success=True,
-            stdout="plan output",
-            stderr="",
-        )
+        mock_result = MagicMock(success=True, stdout="plan output", stderr="")
         mock_service = mock_service_cls.return_value
         mock_service.execute_sync_request.return_value = mock_result
 
         result = coordinator.dispatch_execution(request)
 
     assert result.launched is True
-    # Verify sync path was used
-    # The coordinator modifies the request to mode='sync' before passing to
-    # execute_sync_request
     expected_request = dataclasses.replace(request, mode="sync")
     mock_service.execute_sync_request.assert_called_once_with(
         expected_request, cwd=None
@@ -588,16 +534,12 @@ def test_no_async_env_var_ignored_without_prompt(mock_dependencies, monkeypatch)
     )
     coordinator.registry.reserve = MagicMock(return_value=123)
     coordinator.registry.mark_started = MagicMock()
-
-    # Set the env var
     monkeypatch.setenv("VIBE3_NO_ASYNC", "1")
 
-    # Create an async request with only cmd (no prompt/options)
     handle = MagicMock()
     handle.tmux_session = "test-session-456"
     handle.log_path = Path("/tmp/test.log")
 
-    # Mock the async launcher by setting _async_launcher directly
     mock_start = MagicMock(return_value=handle)
     coordinator._async_launcher = mock_start
 
@@ -606,7 +548,7 @@ def test_no_async_env_var_ignored_without_prompt(mock_dependencies, monkeypatch)
         target_branch="task/issue-42",
         target_id=42,
         execution_name="vibe3-planner-issue-42",
-        cmd=["echo", "hello"],  # Only cmd, no prompt/options
+        cmd=["echo", "hello"],
         cwd="/tmp/wt",
         env={"FOO": "bar"},
     )
@@ -614,7 +556,6 @@ def test_no_async_env_var_ignored_without_prompt(mock_dependencies, monkeypatch)
     result = coordinator.dispatch_execution(request)
 
     assert result.launched is True
-    # Verify async path was used (start_async_command called)
     mock_start.assert_called_once()
 
 
@@ -630,7 +571,6 @@ def test_coordinator_resolves_permanent_worktree_for_manager(
     handle.tmux_session = "manager-session"
     handle.log_path = Path("/tmp/manager.log")
 
-    # Create coordinator with mocked async launcher
     mock_start_async = MagicMock(return_value=handle)
     coordinator = ExecutionCoordinator(
         config=config,
