@@ -72,18 +72,28 @@ new → active ↔ blocked
 
 ### 2.2 Issue State 统一模型
 
-**FAILED → BLOCKED 统一**：
+**ERROR 与 BLOCK 的正交化 (Decoupling)**：
 
-- **设计原则**：FAILED 是可能的原因之一，BLOCKED 是工作流结果
-- **语义边界**：`blocked` 是 workflow state，不是错误等级
-- **实现统一**：执行失败、contract deviation、依赖未满足等场景都可能进入 `state/blocked`
+见 [vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md) §11。
+
+- **ERROR 系统**：关注运行时基础设施健康（Runtime Infrastructure Health）。
+  - 触发：`mark_issue(action="fail")` 或 `fail_issue()` (Legacy)。
+  - 存储：`error_log` 表。
+  - 影响：控制 FailedGate 派发，**不直接改变** Flow 业务状态。
+- **BLOCK 系统**：关注业务流状态（Business Flow State）。
+  - 触发：`mark_issue(action="block")` 或 `block_flow()`。
+  - 存储：`flow_state.flow_status = "blocked"` 和 `blocked_reason`。
+  - 影响：流程暂停，需要手动或自动 unblock。
+
+**语义统一**：
+
+- **设计原则**：`failed` 是执行过程的属性（发生了错误），`blocked` 是工作流的结果（流程停下了）。
+- **语义边界**：`blocked` 是 workflow state，不是错误等级。
+- **实现统一**：执行失败、contract deviation、依赖未满足等场景都进入 `state/blocked`。
 - **数据模型**：
-  - `failed_reason` 字段已废弃
-  - 统一使用 `blocked_reason` 字段记录阻塞原因
-  - `IssueState.FAILED` 枚举保留用于兼容遗留数据
-
-关于运行时 `CRITICAL / ERROR / WARNING` 语义，见
-[vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md)。
+  - `failed_reason` 字段已废弃，其内容应反映到 `error_log` 或 `blocked_reason`。
+  - 统一使用 `blocked_reason` 字段记录阻塞原因。
+  - `IssueState.FAILED` 标签已废弃，系统自动将其映射为 `state/blocked`。
 
 **遗留数据处理**：
 

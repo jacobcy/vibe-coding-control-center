@@ -24,7 +24,7 @@ Supervisor 是 Vibe Center 的**轻量治理链路**，负责处理带有 `super
 | Worktree | 临时（session orphaned 后清理） | 永久（直到 flow done） |
 | State 管理 | GitHub labels | GitHub labels + `flow_status` |
 | 质量门禁 | 跳过 noop gate | Noop gate 检查 state 变化 |
-| 失败处理 | 系统移除 `state/handoff` label | `fail_issue()` → `state/blocked` |
+| 失败处理 | 系统移除 `state/handoff` label | `mark_issue(action="fail")` → `error_log` |
 | 扫描频率 | 每 `interval_ticks` tick（默认 4） | 每 tick（frozen queue） |
 | 产物 | GitHub comment / issue close / PR | `plan_ref` / `audit_ref` / PR |
 
@@ -135,14 +135,14 @@ Noop gate 检查 GitHub issue 的 `state/` label 是否发生变化。对 Superv
 - issue 关闭后，`state/handoff` label 仍存在 → gate 检测"未变化"→ block
 - **任何情况都会误判为 noop**，因此 supervisor 完全跳过 gate
 
-## 为什么不调用 fail_issue()
+### 为什么不调用 mark_issue(action="fail") 进行阻塞
 
-`fail_issue()` 内部查找 `get_flows_by_issue(N, role="task")`，Supervisor 无 task flow：
-- 查询返回空列表
-- `_ensure_flow_state_for_issue()` 直接 return
-- `blocked_reason` 静默丢失
+Supervisor 失败时通过 `ErrorTrackingService` 记录到 `error_log`（ERROR 系统），但**不调用** `block_flow()`（BLOCK 系统）：
 
-Supervisor 失败时系统直接移除 handoff label，让 issue 脱离自动派发循环。
+1. **无 Flow 记录**：`block_flow()` 依赖 SQLite `flow_state` 记录，Supervisor 无此记录。
+2. **场景差异**：Supervisor 是原子化的同步执行，失败即中止并移除 handoff 标签，不需要维持一个“阻塞中”的长程状态。
+3. **系统处理**：`codeagent_runner.py` 捕获异常后会统一进行错误记录和清理工作。
+
 
 ## 容量控制
 

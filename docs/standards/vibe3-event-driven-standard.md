@@ -163,8 +163,8 @@ Apply agent executes
 | 事件 | 触发时机 | 关键字段 | 说明 |
 |------|---------|---------|------|
 | `IssueStateChanged` | Issue 状态转换 | `from_state`, `to_state` | 标签变迁 |
-| `IssueFailed` | Agent 执行失败 | `reason` | 失败记录 |
-| `IssueBlocked` | Issue 被阻塞 | `reason` | 缺少前置条件 |
+| `IssueFailed` | 发生运行时错误 | `reason`, `severity` | **ERROR 系统**：记录错误日志，不改变 Flow 状态 |
+| `IssueBlocked` | Flow 进入阻塞态 | `reason`, `blocked_by` | **BLOCK 系统**：改变 flow_status 为 blocked |
 | `ManagerDispatchIntent` | Manager 调度意图 | `issue_number`, `branch` | 管理分发意图 |
 | `PlannerDispatchIntent` | Planner 调度意图 | `issue_number`, `branch` | 计划分发意图 |
 | `ExecutorDispatchIntent` | Executor 调度意图 | `issue_number`, `branch` | 执行分发意图 |
