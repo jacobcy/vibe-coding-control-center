@@ -1,5 +1,7 @@
 """Helpers for resolving issue numbers to canonical flow branches."""
 
+import json
+import subprocess
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -77,34 +79,32 @@ def resolve_issue_branch_input(
         )
 
     # Step 5: No flows at all
-    if allow_no_flow:
-        return None
-
-    # Check if this might be a PR number before raising error
-    # Try to fetch PR info to provide better hint
-    import json
-    import subprocess
-
+    # Check if this might be a PR number before returning/raising
     try:
-        result = subprocess.run(
-            ["gh", "pr", "view", str(issue_number), "--json", "headRefName,number"],
+        pr_result = subprocess.run(
+            ["gh", "pr", "view", str(issue_number), "--json", "headRefName"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        if result.returncode == 0:
-            pr_data = json.loads(result.stdout)
+        if pr_result.returncode == 0:
+            pr_data = json.loads(pr_result.stdout)
             if pr_data.get("headRefName"):
-                # This is a PR, provide PR-specific hint
+                # This is a PR, not an issue — provide helpful error
                 raise UserError(
                     f"#{issue_number} 是一个 Pull Request，不是 issue。\n"
                     f"请使用以下命令：\n"
                     f"  - vibe3 pr show {issue_number} 查看 PR 详情\n"
                     f"  - vibe3 task show --pr {issue_number} 查看 PR 关联的 issue 详情"
                 )
+    except UserError:
+        raise  # Re-raise PR detection error
     except (subprocess.TimeoutExpired, Exception):
-        # Ignore errors in PR detection, fall through to default error
+        # Ignore errors in PR detection
         pass
+
+    if allow_no_flow:
+        return None
 
     raise UserError(
         f"No flow found for issue #{issue_number}. "

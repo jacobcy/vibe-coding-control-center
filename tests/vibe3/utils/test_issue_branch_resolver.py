@@ -1,6 +1,6 @@
 """Tests for issue_branch_resolver conflict detection."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -240,3 +240,70 @@ class TestResolveIssueBranchInputAllowNoFlow:
         )
 
         assert result == "dev/issue-1357"
+
+
+class TestResolveIssueBranchInputPrDetection:
+    """测试位置参数传入 PR 号时的检测和提示"""
+
+    def test_position_arg_pr_number_detected_allow_no_flow_true(self):
+        """测试 allow_no_flow=True 时，传入 PR 号抛出 UserError 并提示使用 --pr"""
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = []
+        mock_store.get_flow_state.return_value = None
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+
+        # Mock subprocess to return PR data
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = '{"headRefName": "dev/issue-1414", "number": 1422}'
+
+        with patch(
+            "vibe3.services.issue_branch_resolver.subprocess.run",
+            return_value=mock_result,
+        ):
+            with pytest.raises(UserError) as exc_info:
+                resolve_issue_branch_input(
+                    "1422", mock_flow_service, allow_no_flow=True
+                )
+
+        error_msg = str(exc_info.value)
+        assert "Pull Request" in error_msg or "PR" in error_msg
+        assert "--pr" in error_msg
+
+    def test_position_arg_real_issue_no_pr_hint(self):
+        """测试传入真实 issue 号（不是 PR），不提示 PR"""
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = []
+        mock_store.get_flow_state.return_value = None
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+
+        # Mock subprocess to return not-a-PR (headRefName is None or fails)
+        mock_result = Mock()
+        mock_result.returncode = 1  # gh pr view fails, not a PR
+        mock_result.stdout = ""
+
+        with patch(
+            "vibe3.services.issue_branch_resolver.subprocess.run",
+            return_value=mock_result,
+        ):
+            result = resolve_issue_branch_input(
+                "1419", mock_flow_service, allow_no_flow=True
+            )
+
+        # Should return None (no flow, allow_no_flow=True)
+        assert result is None
+
+    def test_position_arg_branch_name_not_detected_as_pr(self):
+        """测试传入 branch 名（非数字），不触发 PR 检测"""
+        mock_flow_service = Mock()
+
+        result = resolve_issue_branch_input(
+            "dev/issue-1414", mock_flow_service, allow_no_flow=True
+        )
+
+        # Non-digit input returned as-is, no PR check
+        assert result == "dev/issue-1414"
