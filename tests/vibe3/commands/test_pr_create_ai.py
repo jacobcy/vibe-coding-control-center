@@ -82,6 +82,9 @@ class TestPRCreateCommandAI:
             ),
             patch("vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"),
             patch("vibe3.commands.pr_create.PRService") as mock_service,
+            patch(
+                "vibe3.commands.pr_create.check_branch_behind", return_value=None
+            ),  # Mock branch behind check
         ):
             mock_service.return_value.get_open_pr_for_branch.return_value = None
             mock_service.return_value.create_pr.return_value = MagicMock(
@@ -155,6 +158,10 @@ class TestPRCreateCommandAI:
                                 patch(
                                     "vibe3.commands.pr_create.PRService"
                                 ) as mock_service,
+                                patch(
+                                    "vibe3.commands.pr_create.check_branch_behind",
+                                    return_value=None,
+                                ),  # Mock branch behind check
                             ):
                                 pr_service = mock_service.return_value
                                 pr_service.get_open_pr_for_branch.return_value = None
