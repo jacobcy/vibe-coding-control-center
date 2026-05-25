@@ -355,7 +355,7 @@ class VibeConfig(BaseModel):
     @classmethod
     def _load_supplementary(cls, data: dict) -> dict:
         """Merge LOC limits and prompt content from their migrated config files."""
-        import yaml  # type: ignore[import-untyped]
+        import yaml
         from loguru import logger
 
         # Load loc_limits.yaml for code_limits and doc_limits
@@ -461,7 +461,7 @@ class VibeConfig(BaseModel):
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
         """Load configuration from YAML file."""
-        import yaml  # type: ignore[import-untyped]
+        import yaml
 
         with open(config_path) as f:
             data = yaml.safe_load(f)
