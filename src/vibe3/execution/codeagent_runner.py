@@ -422,7 +422,7 @@ class CodeagentExecutionService:
                 classify_error_hybrid,
                 get_error_handling_contract,
             )
-            from vibe3.services.error_tracking_service import ErrorTrackingService
+            from vibe3.exceptions.error_helpers import record_error
 
             # Classify error and record to SQLite for threshold tracking.
             # FailedGate.check() reads SQLite error_log on next heartbeat tick.
@@ -432,12 +432,12 @@ class CodeagentExecutionService:
             error_contract = get_error_handling_contract(error_code)
 
             # Use store-specific instance to ensure consistency with FailedGate
-            error_tracking = ErrorTrackingService.get_instance(store=ctx.store)
             # Record error with severity from contract
-            error_tracking.record_error(
+            record_error(
                 error_code=error_code,
                 error_message=str(exc),
-                tick_id=command.tick_id,  # Use tick_id from command
+                store=ctx.store,
+                tick_id=command.tick_id,
                 issue_number=command.issue_number,
                 branch=command.branch,
                 severity=error_contract.severity,

@@ -123,18 +123,15 @@ def run_governance_sync(
         from vibe3.exceptions.error_classification import (
             classify_error_hybrid,
         )
-        from vibe3.services.error_tracking_service import ErrorTrackingService
+        from vibe3.exceptions.error_helpers import record_error
 
         error_code = classify_error_hybrid(exc)
 
-        error_tracking = ErrorTrackingService.get_instance()
         # Record error with tick_id (governance has no specific issue/branch)
-        error_tracking.record_error(
+        record_error(
             error_code=error_code,
             error_message=str(exc),
-            tick_id=tick_count,  # Governance runs in tick context
-            issue_number=None,  # Governance is global, not issue-specific
-            branch=None,
+            tick_id=tick_count,
         )
 
         logger.bind(domain="governance", tick=tick_count).error(

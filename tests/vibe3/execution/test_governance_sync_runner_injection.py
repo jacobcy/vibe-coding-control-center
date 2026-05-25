@@ -157,7 +157,7 @@ class TestGovernanceSyncRunnerWithInjection:
             mock_tracking = MagicMock()
             m.setattr(
                 "vibe3.services.error_tracking_service.ErrorTrackingService.get_instance",
-                lambda: mock_tracking,
+                lambda store=None: mock_tracking,
             )
 
             with pytest.raises(RuntimeError):

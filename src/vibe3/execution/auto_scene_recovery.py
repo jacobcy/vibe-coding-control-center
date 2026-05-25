@@ -105,7 +105,7 @@ class AutoSceneRecoveryService:
         error_msg: str,
     ) -> ExecutionLaunchResult | None:
         from vibe3.exceptions.error_codes import E_EXEC_AUTO_SCENE_RESET
-        from vibe3.services.error_tracking_service import ErrorTrackingService
+        from vibe3.exceptions.error_helpers import record_error
         from vibe3.services.flow_cleanup_service import (
             FlowCleanupService,
             LiveSessionsDetectedError,
@@ -118,12 +118,13 @@ class AutoSceneRecoveryService:
             f"Original launch error: {error_msg}"
         )
 
-        ErrorTrackingService.get_instance(store=self.store).record_error(
+        record_error(
             error_code=E_EXEC_AUTO_SCENE_RESET,
             error_message=recovery_reason,
             tick_id=request.tick_id,
             issue_number=request.target_id,
             branch=branch,
+            store=self.store,
         )
 
         append_orchestra_event(

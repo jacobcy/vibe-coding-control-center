@@ -179,14 +179,14 @@ class StateVerificationService:
             return
 
         try:
-            from vibe3.services.error_tracking_service import ErrorTrackingService
+            from vibe3.exceptions.error_helpers import record_error
 
-            error_svc = ErrorTrackingService.get_instance(store=self.store)
-            error_svc.record_error(
+            record_error(
                 error_code="E_API_UNAVAILABLE",
                 error_message=error_message,
                 issue_number=issue_number,
                 branch=branch,
+                store=self.store,
             )
         except Exception as record_exc:
             logger.bind(
