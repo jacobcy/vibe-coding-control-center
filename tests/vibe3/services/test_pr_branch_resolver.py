@@ -61,6 +61,28 @@ class TestResolveBranchFromPr:
 
         assert "无法从 PR #1183 获取分支名" in str(exc_info.value)
 
+    def test_gh_not_installed_which_check(self):
+        """Test gh CLI not found by shutil.which raises UserError."""
+        mock_client = Mock()
+
+        with patch("shutil.which", return_value=None):
+            with pytest.raises(UserError) as exc_info:
+                resolve_branch_from_pr(1183, github_client=mock_client)
+
+        assert "gh CLI 未安装" in str(exc_info.value)
+        mock_client.get_pr.assert_not_called()
+
+    def test_gh_not_installed_file_not_found(self):
+        """Test FileNotFoundError from get_pr raises descriptive UserError."""
+        mock_client = Mock()
+        mock_client.get_pr.side_effect = FileNotFoundError("gh not found")
+
+        with patch("shutil.which", return_value="/usr/local/bin/gh"):
+            with pytest.raises(UserError) as exc_info:
+                resolve_branch_from_pr(1183, github_client=mock_client)
+
+        assert "gh CLI 不可用" in str(exc_info.value)
+
 
 class TestResolveCommandBranch:
     """测试统一命令分支解析"""
