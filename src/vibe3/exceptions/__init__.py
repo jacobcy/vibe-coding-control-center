@@ -232,3 +232,6 @@ class InvalidTransitionError(UserError):
 #
 # Error tracking service (in services layer):
 #   from vibe3.services.error_tracking_service import ErrorTrackingService
+#
+# Error recording helper (convenience function in services layer):
+#   from vibe3.services.error_helpers import record_error
