@@ -182,3 +182,61 @@ def test_format_flow_details_without_pr():
     result = _format_flow_details(flow)
 
     assert result == "task/issue-976 (status: aborted, pr: none)"
+
+
+class TestResolveIssueBranchInputAllowNoFlow:
+    """测试 allow_no_flow 参数"""
+
+    def test_allow_no_flow_returns_none_for_no_flow(self):
+        """测试当没有 flow 时，allow_no_flow=True 返回 None 而不是抛出异常"""
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = []  # No flows
+        mock_store.get_flow_state.return_value = None  # No candidates
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+
+        result = resolve_issue_branch_input(
+            "1357",
+            mock_flow_service,
+            allow_no_flow=True,
+        )
+
+        assert result is None
+        mock_store.get_flows_by_issue.assert_called_once_with(1357, role="task")
+
+    def test_allow_no_flow_false_raises_user_error(self):
+        """测试当没有 flow 时，allow_no_flow=False 抛出 UserError（默认行为）"""
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = []
+        mock_store.get_flow_state.return_value = None
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+
+        with pytest.raises(UserError) as exc_info:
+            resolve_issue_branch_input(
+                "1357",
+                mock_flow_service,
+                allow_no_flow=False,
+            )
+
+        assert "No flow found for issue #1357" in str(exc_info.value)
+
+    def test_allow_no_flow_returns_branch_when_flow_exists(self):
+        """测试当 flow 存在时，allow_no_flow 参数不影响正常解析"""
+        mock_store = Mock()
+        mock_store.get_flows_by_issue.return_value = [
+            {"branch": "dev/issue-1357", "flow_status": "active", "pr_ref": None}
+        ]
+
+        mock_flow_service = Mock()
+        mock_flow_service.store = mock_store
+
+        result = resolve_issue_branch_input(
+            "1357",
+            mock_flow_service,
+            allow_no_flow=True,
+        )
+
+        assert result == "dev/issue-1357"
