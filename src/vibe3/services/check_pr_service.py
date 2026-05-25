@@ -77,7 +77,7 @@ class CheckPRService:
         Returns:
             Tuple of (handled=True, issues, warnings).
         """
-        issues: list[str] = []
+        warnings: list[str] = []
 
         suggestions = self._flow_status_service.mark_flow_done(
             branch,
@@ -86,12 +86,13 @@ class CheckPRService:
         self._update_pr_cache(branch, pr)
 
         if suggestions.get("issue_to_close"):
-            issues.append(
+            # Informational message, not an error
+            warnings.append(
                 f"Issue #{suggestions['issue_to_close']} was still OPEN — "
                 "auto-closed because PR was merged."
             )
 
-        return (True, issues, [])
+        return (True, [], warnings)
 
     def _handle_closed_pr(
         self, branch: str, pr: "PRResponse"
@@ -151,33 +152,50 @@ class CheckPRService:
             )
 
             # Clean up physical resources (worktree, branches, flow record)
-            from vibe3.services.flow_cleanup_service import FlowCleanupService
+            from vibe3.services.flow_cleanup_service import (
+                FlowCleanupService,
+                LiveSessionsDetectedError,
+            )
 
             cleanup_service = FlowCleanupService(
                 store=self.store,
                 git_client=self.git_client,
             )
-            cleanup_result = cleanup_service.cleanup_flow_scene(
-                branch, include_remote=True, keep_flow_record=False
-            )
 
-            # Build warning message from cleanup results
-            cleaned_items = []
-            if cleanup_result.get("worktree"):
-                cleaned_items.append("worktree")
-            if cleanup_result.get("local_branch"):
-                cleaned_items.append("local branch")
-            if cleanup_result.get("remote_branch"):
-                cleaned_items.append("remote branch")
-            if cleanup_result.get("flow_record"):
-                cleaned_items.append("flow record")
+            try:
+                cleanup_result = cleanup_service.cleanup_flow_scene(
+                    branch, include_remote=True, keep_flow_record=False
+                )
 
-            warning_msg = (
-                f"Flow '{branch}' marked aborted; cleaned: {', '.join(cleaned_items)}"
-                if cleaned_items
-                else f"Flow '{branch}' marked aborted (no cleanup needed)"
-            )
-            return (None, [warning_msg])
+                # Build warning message from cleanup results
+                # Only report items that were actually cleaned (True means removed)
+                cleaned_items = []
+                if cleanup_result.get("worktree") is True:
+                    cleaned_items.append("worktree")
+                if cleanup_result.get("local_branch") is True:
+                    cleaned_items.append("local branch")
+                if cleanup_result.get("remote_branch") is True:
+                    cleaned_items.append("remote branch")
+                if cleanup_result.get("flow_record") is True:
+                    cleaned_items.append("flow record")
+
+                warning_msg = (
+                    f"Flow '{branch}' marked aborted; "
+                    f"cleaned: {', '.join(cleaned_items)}"
+                    if cleaned_items
+                    else f"Flow '{branch}' marked aborted (no cleanup needed)"
+                )
+                return (None, [warning_msg])
+
+            except LiveSessionsDetectedError as exc:
+                # Live sessions detected - skip cleanup but continue
+                warning_msg = f"Flow '{branch}' marked aborted; cleanup skipped: {exc}"
+                logger.bind(
+                    domain="check",
+                    action="reset_pr_closed",
+                    branch=branch,
+                ).warning(warning_msg)
+                return (None, [warning_msg])
 
         # Check if issue already closed
         gh_issue = self.github_client.view_issue(task_issue_number)
