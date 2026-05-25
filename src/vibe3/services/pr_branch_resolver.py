@@ -68,6 +68,7 @@ def resolve_command_branch(
     position_arg: str | None = None,
     flow_service: FlowService,
     github_client: GitHubClient | None = None,
+    allow_no_flow: bool = False,
 ) -> str:
     """Unified branch resolution for flow/handoff/task commands.
 
@@ -83,6 +84,9 @@ def resolve_command_branch(
         position_arg: Positional argument (issue/branch)
         flow_service: FlowService for issue resolution
         github_client: Optional GitHub client (for testing)
+        allow_no_flow: If True, return raw issue number when no flow exists.
+                      If False (default), raise UserError when no flow exists.
+                      Only applies to --branch and position_arg resolution.
 
     Returns:
         Resolved branch name
@@ -111,7 +115,10 @@ def resolve_command_branch(
 
     # Step 2: Priority 1 - Explicit --branch
     if branch_opt is not None:
-        return resolve_issue_branch_input(branch_opt, flow_service) or branch_opt
+        result = resolve_issue_branch_input(
+            branch_opt, flow_service, allow_no_flow=allow_no_flow
+        )
+        return result or branch_opt
 
     # Step 3: Priority 2 - --pr option
     if pr_opt is not None:
@@ -122,7 +129,10 @@ def resolve_command_branch(
 
     # Step 4: Priority 3 - Positional argument
     if position_arg is not None:
-        return resolve_issue_branch_input(position_arg, flow_service) or position_arg
+        result = resolve_issue_branch_input(
+            position_arg, flow_service, allow_no_flow=allow_no_flow
+        )
+        return result or position_arg
 
     # Step 5: Priority 4 - Current branch (fallback)
     return flow_service.get_current_branch()

@@ -16,7 +16,9 @@ def iter_issue_branch_candidates(issue_number: int) -> Iterable[str]:
 
 
 def resolve_issue_branch_input(
-    branch: str | None, flow_service: Any, allow_no_flow: bool = False
+    branch: str | None,
+    flow_service: Any,
+    allow_no_flow: bool = False,
 ) -> str | None:
     """Resolve numeric issue input with conflict detection.
 

@@ -82,7 +82,9 @@ class TestResolveCommandBranch:
             )
 
             # 应该调用 resolve_issue_branch_input
-            mock_resolve.assert_called_once_with("dev/issue-476", mock_flow_service)
+            mock_resolve.assert_called_once_with(
+                "dev/issue-476", mock_flow_service, allow_no_flow=False
+            )
             # 返回解析后的分支
             assert result == "dev/issue-476"
 
@@ -119,7 +121,9 @@ class TestResolveCommandBranch:
                 flow_service=mock_flow_service,
             )
 
-            mock_resolve.assert_called_once_with("999", mock_flow_service)
+            mock_resolve.assert_called_once_with(
+                "999", mock_flow_service, allow_no_flow=False
+            )
             assert result == "task/issue-999"
 
     def test_fallback_current_branch(self):
@@ -220,3 +224,61 @@ class TestCommandIntegration:
         # 验证参数解析成功
         assert result.exit_code != 2
         assert "No such option: --pr" not in result.output
+
+
+class TestResolveCommandBranchAllowNoFlow:
+    """测试 allow_no_flow 参数传播"""
+
+    def test_position_arg_allow_no_flow_returns_raw_when_no_flow(self):
+        """测试位置参数在 allow_no_flow=True 时返回原始值"""
+        mock_flow_service = Mock()
+
+        with patch(
+            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
+        ) as mock_resolve:
+            mock_resolve.return_value = None  # No flow found
+
+            result = resolve_command_branch(
+                position_arg="1357",
+                flow_service=mock_flow_service,
+                allow_no_flow=True,
+            )
+
+            mock_resolve.assert_called_once_with(
+                "1357", mock_flow_service, allow_no_flow=True
+            )
+            # 当 resolve_issue_branch_input 返回 None 时，应该返回原始值
+            assert result == "1357"
+
+    def test_position_arg_allow_no_flow_false_raises(self):
+        """测试位置参数在 allow_no_flow=False 时抛出异常"""
+        mock_flow_service = Mock()
+
+        with patch(
+            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
+        ) as mock_resolve:
+            mock_resolve.side_effect = UserError("No flow found")
+
+            with pytest.raises(UserError):
+                resolve_command_branch(
+                    position_arg="1357",
+                    flow_service=mock_flow_service,
+                    allow_no_flow=False,
+                )
+
+    def test_position_arg_allow_no_flow_preserves_branch_when_exists(self):
+        """测试当 flow 存在时，allow_no_flow 不影响正常解析"""
+        mock_flow_service = Mock()
+
+        with patch(
+            "vibe3.services.pr_branch_resolver.resolve_issue_branch_input"
+        ) as mock_resolve:
+            mock_resolve.return_value = "dev/issue-1357"
+
+            result = resolve_command_branch(
+                position_arg="1357",
+                flow_service=mock_flow_service,
+                allow_no_flow=True,
+            )
+
+            assert result == "dev/issue-1357"
