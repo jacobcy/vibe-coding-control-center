@@ -17,6 +17,10 @@ related_docs:
   - docs/standards/action-verbs.md
   - docs/standards/v3/command-standard.md
   - docs/standards/v3/worktree-lifecycle-standard.md
+  - skills/vibe-new/SKILL.md
+  - skills/vibe-continue/SKILL.md
+  - skills/vibe-commit/SKILL.md
+  - skills/vibe-done/SKILL.md
 ---
 
 # Git Workflow Standard

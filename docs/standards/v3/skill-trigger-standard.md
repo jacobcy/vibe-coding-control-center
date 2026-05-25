@@ -21,6 +21,8 @@ related_docs:
   - skills/vibe-roadmap/SKILL.md
   - skills/vibe-task/SKILL.md
   - skills/vibe-check/SKILL.md
+  - skills/vibe-new/SKILL.md
+  - skills/vibe-continue/SKILL.md
   - skills/vibe-skill-audit/SKILL.md
   - skills/vibe-skills-manager/SKILL.md
 ---
