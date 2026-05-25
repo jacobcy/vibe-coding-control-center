@@ -164,7 +164,8 @@ class CheckService(CheckRemote):
 
         - PR MERGED: flow is successfully completed → mark done.
           Also auto-closes any linked task issues when no other active flows exist.
-        - PR CLOSED (without merge): PR was abandoned → mark aborted.
+        - PR CLOSED (without merge): flow was abandoned → reset issue to READY
+          and clean up flow scene (worktree, branch, flow record).
         """
         result_issues: list[str] = []
 
@@ -218,7 +219,11 @@ class CheckService(CheckRemote):
                 domain="check",
                 action="reset_pr_closed",
                 branch=branch,
-            ).debug("No task issue linked, skipping issue reset")
+            ).debug("No task issue linked, marking flow as aborted instead")
+            # No issue link → just mark flow as aborted (PR abandoned)
+            self._flow_status_service.mark_flow_aborted(
+                branch, f"PR #{pr_number} closed without merge (no issue link)"
+            )
             return
 
         # Check if issue already closed
