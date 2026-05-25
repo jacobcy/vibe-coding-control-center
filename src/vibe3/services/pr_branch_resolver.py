@@ -72,14 +72,6 @@ def resolve_command_branch(
 ) -> str:
     """Unified branch resolution for flow/handoff/task commands.
 
-    Args:
-        branch_opt: --branch option value
-        pr_opt: PR number option value
-        position_arg: Positional argument (issue number or branch)
-        flow_service: FlowService instance
-        github_client: GitHub client for PR lookup
-        allow_no_flow: If True, return raw issue number when no flow exists
-
     Priority order:
     1. --branch <value> (explicit, highest priority)
     2. --pr <number> (resolve PR → branch)
@@ -89,10 +81,10 @@ def resolve_command_branch(
     Args:
         branch_opt: Value from --branch option
         pr_opt: Value from --pr option
-        position_arg: Positional argument (issue/branch)
+        position_arg: Positional argument (issue number or branch name)
         flow_service: FlowService for issue resolution
-        github_client: Optional GitHub client (for testing)
-        allow_no_flow: If True, return raw issue number when no flow exists.
+        github_client: Optional GitHub client (for PR lookup / testing)
+        allow_no_flow: If True, return raw input when no flow exists.
                       If False (default), raise UserError when no flow exists.
                       Only applies to --branch and position_arg resolution.
 
