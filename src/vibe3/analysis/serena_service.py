@@ -34,6 +34,7 @@ class SerenaService:
         """
         self.client = client or SerenaClient()
         self.git_client = git_client or GitClient()
+        self._file_cache: dict[str, tuple[float, dict]] = {}
         logger.bind(domain="serena", action="init").debug("Serena service initialized")
 
     def analyze_symbol(self, name_path: str, relative_file: str) -> dict:
@@ -162,7 +163,36 @@ class SerenaService:
         """
         from vibe3.analysis.serena_file_analyzer import analyze_file as _analyze_file
 
-        return _analyze_file(relative_file, self.client, self._is_cli_file)
+        # Check mtime cache
+        try:
+            file_path = Path(relative_file)
+            if file_path.exists():
+                mtime = file_path.stat().st_mtime
+                cached = self._file_cache.get(relative_file)
+                if cached and cached[0] == mtime:
+                    logger.bind(
+                        domain="serena",
+                        action="analyze_file",
+                        file=relative_file,
+                    ).debug("Using cached file analysis")
+                    return cached[1]
+        except Exception:
+            # If mtime check fails, continue with analysis
+            pass
+
+        result = _analyze_file(relative_file, self.client, self._is_cli_file)
+
+        # Cache the result
+        try:
+            file_path = Path(relative_file)
+            if file_path.exists():
+                mtime = file_path.stat().st_mtime
+                self._file_cache[relative_file] = (mtime, result)
+        except Exception:
+            # If caching fails, just return result
+            pass
+
+        return result
 
     def analyze_files(self, files: list[str]) -> dict:
         """Analyze multiple files.

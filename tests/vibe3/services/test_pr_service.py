@@ -367,3 +367,73 @@ def test_pr_create_usecase_preserves_falsey_injected_dependencies() -> None:
 
     assert usecase._flow_service is flow_service
     assert usecase._base_resolver is base_resolver
+
+
+def test_get_pr_caches_result(pr_service: PRService) -> None:
+    """Test that get_pr caches result for same PR number."""
+    gh_instance = pr_service.github_client
+    mock_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+    gh_instance.get_pr.return_value = mock_pr
+    gh_instance.list_pr_comments.return_value = []
+    gh_instance.list_pr_review_comments.return_value = []
+    gh_instance.list_pr_reviews.return_value = []
+
+    # First call
+    result1 = pr_service.get_pr(pr_number=123)
+    assert result1.number == 123
+    assert gh_instance.get_pr.call_count == 1
+
+    # Second call within TTL - should use cache
+    result2 = pr_service.get_pr(pr_number=123)
+    assert result2.number == 123
+    assert gh_instance.get_pr.call_count == 1  # No additional call
+
+
+def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
+    """Test that get_pr re-fetches after TTL expires."""
+    gh_instance = pr_service.github_client
+    mock_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+    gh_instance.get_pr.return_value = mock_pr
+    gh_instance.list_pr_comments.return_value = []
+    gh_instance.list_pr_review_comments.return_value = []
+    gh_instance.list_pr_reviews.return_value = []
+
+    clock = [0.0]
+
+    with patch(
+        "vibe3.services.pr_service.time.monotonic",
+        side_effect=lambda: clock[0],
+    ):
+        # First call — populates cache at t=0
+        result1 = pr_service.get_pr(pr_number=123)
+        assert result1.number == 123
+        assert gh_instance.get_pr.call_count == 1
+
+        # Second call within TTL — uses cache
+        result2 = pr_service.get_pr(pr_number=123)
+        assert result2.number == 123
+        assert gh_instance.get_pr.call_count == 1
+
+        # Advance clock past TTL (> 60s)
+        clock[0] = 120.0
+        result3 = pr_service.get_pr(pr_number=123)
+        assert result3.number == 123
+        assert gh_instance.get_pr.call_count == 2

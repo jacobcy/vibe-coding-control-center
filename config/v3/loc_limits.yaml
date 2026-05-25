@@ -295,6 +295,9 @@ code_limits:
       - path: "tests/vibe3/services/test_handoff_service.py"
         limit: 500
         reason: "Handoff service 测试集，覆盖 handoff 记录管理、路径解析、blocked_reason 清除逻辑等紧密耦合场景，rebase后略微超标"
+      - path: "tests/vibe3/services/test_pr_service.py"
+        limit: 450
+        reason: "PRService 测试集，新增 cache 行为测试（56行）验证 60s TTL 缓存和过期恢复逻辑，与 PRService fixture 紧密耦合，拆分收益低"
 
 
   total_file_loc:

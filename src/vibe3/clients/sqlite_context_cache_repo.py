@@ -64,6 +64,35 @@ class SQLiteContextCacheRepo(_HasConnection):
             return result
         return None
 
+    def get_flow_context_cache_bulk(
+        self, branches: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Batch retrieve flow context cache entries for multiple branches.
+
+        Args:
+            branches: List of branch names to fetch.
+
+        Returns:
+            Dict mapping branch -> cache entry. Missing branches are omitted.
+        """
+        if not branches:
+            return {}
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in branches)
+        cursor.execute(
+            f"SELECT * FROM flow_context_cache WHERE branch IN ({placeholders})",
+            tuple(branches),
+        )
+        columns = [col[0] for col in cursor.description]
+        result: dict[str, dict[str, Any]] = {}
+        for row in cursor.fetchall():
+            entry = dict(zip(columns, row))
+            branch = entry.get("branch")
+            if branch:
+                result[branch] = entry
+        return result
+
     def delete_flow_context_cache(self, branch: str) -> None:
         conn = self._get_connection()
         with conn:
@@ -74,3 +103,36 @@ class SQLiteContextCacheRepo(_HasConnection):
             operation="delete_flow_context_cache",
             branch=branch,
         ).debug("Deleted flow context cache")
+
+    def upsert_flow_context_cache_bulk(
+        self,
+        entries: list[tuple[str, int | None, str | None, int | None, str | None]],
+    ) -> None:
+        """Bulk upsert flow context cache entries in a single transaction.
+
+        Args:
+            entries: List of (branch, task_issue_number, issue_title,
+                     pr_number, pr_title) tuples.
+        """
+        if not entries:
+            return
+
+        updated_at = datetime.datetime.now().isoformat()
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            rows = [(b, tin, it, pn, pt, updated_at) for b, tin, it, pn, pt in entries]
+            cursor.executemany(
+                """
+                INSERT OR REPLACE INTO flow_context_cache
+                    (branch, task_issue_number, issue_title,
+                     pr_number, pr_title, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+        logger.bind(
+            external="sqlite",
+            operation="upsert_flow_context_cache_bulk",
+            count=len(entries),
+        ).debug("Bulk upserted flow context cache")
