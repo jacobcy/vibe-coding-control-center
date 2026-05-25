@@ -37,7 +37,7 @@ def test_resolver_returns_minimal_defaults_by_default():
         resolver = ConventionResolver.from_repo()
         convention = resolver.resolve()
         assert convention.branch.task_prefix == "issue-"
-        assert convention.manager_usernames == []
+        assert convention.manager_usernames == ()
         assert convention.state_prefix == "state/"
 
 
@@ -46,7 +46,7 @@ def test_resolver_returns_vibe_center_when_profile_specified():
     resolver = ConventionResolver.from_repo(profile="vibe-center")
     convention = resolver.resolve()
     assert convention.branch.task_prefix == "task/issue-"
-    assert convention.manager_usernames == ["vibe-manager-agent"]
+    assert convention.manager_usernames == ("vibe-manager-agent",)
 
 
 def test_resolver_returns_minimal_when_profile_specified():
@@ -54,7 +54,7 @@ def test_resolver_returns_minimal_when_profile_specified():
     resolver = ConventionResolver.from_repo(profile="minimal")
     convention = resolver.resolve()
     assert convention.branch.task_prefix == "issue-"
-    assert convention.manager_usernames == []
+    assert convention.manager_usernames == ()
 
 
 def test_resolver_unknown_profile_falls_back_to_minimal():
@@ -62,7 +62,7 @@ def test_resolver_unknown_profile_falls_back_to_minimal():
     resolver = ConventionResolver.from_repo(profile="unknown")
     convention = resolver.resolve()
     assert convention.branch.task_prefix == "issue-"
-    assert convention.manager_usernames == []
+    assert convention.manager_usernames == ()
 
 
 def test_resolver_uses_vibe_profile_env_var():

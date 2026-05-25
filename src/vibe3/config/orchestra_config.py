@@ -272,11 +272,11 @@ class OrchestraConfig(BaseModel):
             "The GitHub username of the bot itself, used to avoid self-triggering loops"
         ),
     )
-    manager_usernames: list[str] = Field(
-        default_factory=list,
+    manager_usernames: tuple[str, ...] = Field(
+        default_factory=tuple,
         description=(
             "GitHub usernames whose assignment signals manager dispatch. "
-            "Empty list uses ConventionResolver to resolve from profile."
+            "Empty tuple uses ConventionResolver to resolve from profile."
         ),
     )
     polling: PollingConfig = Field(default_factory=PollingConfig)
@@ -304,16 +304,16 @@ class OrchestraConfig(BaseModel):
         ),
     )
 
-    def get_manager_usernames(self) -> list[str]:
+    def get_manager_usernames(self) -> tuple[str, ...]:
         """Resolve manager usernames with fallback to ConventionResolver.
 
         Returns:
-            List of manager usernames (e.g., ['vibe-manager-agent']).
+            Tuple of manager usernames (e.g., ('vibe-manager-agent',)).
 
         Example:
             >>> config = OrchestraConfig()
             >>> config.get_manager_usernames()
-            ['vibe-manager-agent']
+            ('vibe-manager-agent',)
         """
         if self.manager_usernames:
             return self.manager_usernames
