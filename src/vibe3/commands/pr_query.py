@@ -32,7 +32,7 @@ from vibe3.commands.output_format import (
     create_trace_output,
     output_result,
 )
-from vibe3.models.pr import PRResponse
+from vibe3.models.pr import PRResponse, PRState
 from vibe3.models.trace import TraceOutput
 from vibe3.services.branch_resolver import resolve_branch_from_pr
 from vibe3.services.flow_service import FlowService
@@ -40,6 +40,7 @@ from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_local_review_summary, render_pr_details
+from vibe3.utils.branch_compare import check_branch_behind, format_branch_behind_console
 
 
 def _resolve_task_from_flow(pr_svc: PRService, branch: str) -> list[int]:
@@ -439,6 +440,21 @@ def register_query_commands(app: typer.Typer) -> None:
         else:
             # Human-readable output
             render_pr_details(pr)
+
+            # Check if PR branch is behind base branch (only for OPEN PRs)
+            console = Console()
+            if pr.state == PRState.OPEN:
+                behind_info = check_branch_behind(
+                    git_client=pr_svc.git_client,
+                    head_branch=pr.head_branch,
+                    base_branch=pr.base_branch,
+                )
+                if behind_info:
+                    console.print()
+                    console.rule("[bold red]⚠️  Branch Behind Base[/]", style="red")
+                    console.print()
+                    console.print(format_branch_behind_console(behind_info))
+                    console.print()
 
             # Show bound tasks from flow truth
             # Fallback chain:

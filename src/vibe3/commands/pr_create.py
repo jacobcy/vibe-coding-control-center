@@ -19,6 +19,7 @@ from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.services.task_binding_guard import MissingTaskIssueError
 from vibe3.ui.pr_ui import render_pr_confirmed, render_pr_created
+from vibe3.utils.branch_compare import check_branch_behind, format_branch_behind_body
 
 
 def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
@@ -210,6 +211,18 @@ def register_create_command(app: typer.Typer) -> None:
             raise typer.Exit(1)
 
         pr_body = ai_body if ai_body else body
+
+        # Check if branch is behind base and add warning to PR body
+        behind_info = check_branch_behind(
+            git_client=pr_service.git_client,
+            head_branch=branch,
+            base_branch=resolved_base,
+        )
+        if behind_info:
+            behind_warning = format_branch_behind_body(behind_info)
+            # Prepend warning to PR body
+            pr_body = f"{behind_warning}\n\n---\n\n{pr_body}"
+
         # Actor determination:
         # - AI suggestion mode: "ai-assistant"
         # - Agent mode: None (will be resolved by PRService from flow state)
