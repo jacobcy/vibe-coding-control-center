@@ -35,8 +35,8 @@ Three independent sources track blocked state:
 ### Issues
 
 1. **Inconsistent writes**: Different code paths update different subsets
-   - `block_flow()` → writes all three ✅
-   - `fail_flow()` → writes DB only ❌
+   - `block()` → writes all three ✅
+   - `fail_flow()` → (Retired) legacy mechanism ❌
    - `task resume --label` → writes all three ✅
    - `qualify_gate` alignment → writes all three ✅
 
@@ -216,11 +216,11 @@ class BlockedStateService:
         ...
 ```
 
-### Phase 2: Fix Existing Issues (High Priority)
+### Phase 2: Retire Legacy Mechanisms (High Priority)
 
-1. **Fix `fail_flow()`**: Add missing issue body write
+1. **Retire `fail_flow()`**: Remove legacy calls and migrate to `BlockedStateService.block()`
 2. **Remove PR 1314 changes**: Revert incorrect `handoff_service.py` modification
-3. **Add validation**: Ensure `block_flow()` always writes all three sources
+3. **Add validation**: Ensure `block()` always writes all three sources
 
 ### Phase 3: Refactor Consumers (Medium Priority)
 
@@ -351,8 +351,8 @@ class ConsistencyReport:
 2. **Q**: How to handle `dependencies` vs `blocked_by` semantic overlap?
    **A**: Document that `dependencies` = managed deps, `blocked_by` = blocking deps.
 
-3. **Q**: Should `fail_flow()` set `flow_status="blocked"` in DB?
-   **A**: Yes, for consistency. Previously it only set `blocked_reason`.
+3. **Q**: Should `BlockedStateService.block()` set `flow_status="blocked"` in DB?
+   **A**: Yes, for consistency. This ensures the local cache matches the authoritative truth.
 
 ---
 

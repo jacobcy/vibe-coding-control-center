@@ -147,7 +147,7 @@ Effect:
 - record and display
 - write timeline evidence
 - do **not** trigger `failed_gate`
-- do **not** by themselves imply `fail_issue()`
+- do **not** by themselves imply automatic flow blocking
 
 ### 2. Execution Outcome
 
@@ -290,9 +290,9 @@ Every runtime signal must map to a handling contract with these fields:
 
 | Severity | Record | Timeline | Issue Action | Gate Action |
 |----------|--------|----------|--------------|-------------|
-| `CRITICAL` | Yes | Yes | local flow may block/fail as needed | immediate `failed_gate` |
-| `ERROR` | Yes | Yes | local flow may block/fail as needed | threshold-based `failed_gate` |
-| `WARNING` | Yes | Yes | no automatic `fail_issue()` solely from warning | no gate activation |
+| `CRITICAL` | Yes | Yes | local flow may block as needed | immediate `failed_gate` |
+| `ERROR` | Yes | Yes | local flow may block as needed | threshold-based `failed_gate` |
+| `WARNING` | Yes | Yes | no automatic flow blocking solely from warning | no gate activation |
 
 Important constraint:
 

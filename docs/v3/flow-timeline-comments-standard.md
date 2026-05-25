@@ -47,13 +47,15 @@ AUTOMATED_MARKERS: Final[tuple[str, ...]] = (
 
 **All flow state changes must use `[flow]` marker**:
 
-| Event Type | Display Text | Comment Format |
-|------------|--------------|----------------|
-| `flow_blocked` | "Flow blocked" | `[flow] Flow blocked\n\n{detail}` |
-| `flow_failed` | "Flow failed" | `[flow] Flow failed\n\n{detail}` |
-| `flow_aborted` | "Flow aborted" | `[flow] Flow aborted\n\n{detail}` |
-| `resumed` | "Flow resumed" | `[flow] Flow resumed\n\n{detail}` |
-| `state_transitioned` | "State transitioned" | `[flow] State transitioned\n\n{detail}` |
+| Event Type | Display Text | Comment Format | 备注 |
+|------------|--------------|----------------|------|
+| `flow_blocked` | "Flow blocked" | `[flow] Flow blocked\n\n{detail}` | 业务阻塞 (BLOCK 系统) |
+| `flow_failed` | "Flow failed" | (None) | 运行时错误 (ERROR 系统)，仅记录 DB |
+| `flow_aborted` | "Flow aborted" | `[flow] Flow aborted\n\n{detail}` | 流程中止 |
+| `resumed` | "Flow resumed" | `[flow] Flow resumed\n\n{detail}` | 流程恢复 |
+| `state_transitioned` | "State transitioned" | `[flow] State transitioned\n\n{detail}` | 状态迁移 |
+
+**Note**: According to the [Error Severity Standard](../standards/vibe3-error-severity-and-blocking-standard.md), runtime infrastructure failures (`flow_failed`) are recorded in the SQLite `error_log` and `events` table but do **not** post GitHub comments to avoid noise. Only business-level blocks that require human intervention post `[flow]` comments.
 
 **Example**:
 
@@ -203,26 +205,30 @@ timeline_service.record_timeline_event(
 
 ### 2. issue_failure_service.py
 
-**Before**:
-
-```python
-# Role-based markers
-comment = f"[{role}] {role_failure_copy}\n\n原因:{reason}"
-github_client.add_comment(issue_number, comment)
-```
-
 **After**:
 
 ```python
 # Unified [flow] marker via FlowTimelineService
 timeline_service = FlowTimelineService(store=store)
-timeline_service.record_timeline_event(
-    branch=branch,
-    event_type="flow_failed",  # or "flow_blocked"
-    actor=actor,
-    detail=reason,
-    issue_number=issue_number,
-)
+
+if action == "fail":
+    # Runtime failures do NOT post GitHub comments
+    timeline_service.record_timeline_event(
+        branch=branch,
+        event_type="flow_failed",
+        actor=actor,
+        detail=reason,
+        # issue_number omitted
+    )
+else:
+    # Business blocks DO post GitHub comments
+    timeline_service.record_timeline_event(
+        branch=branch,
+        event_type="flow_blocked",
+        actor=actor,
+        detail=reason,
+        issue_number=issue_number,
+    )
 ```
 
 ### 3. task_resume_operations.py
@@ -361,8 +367,7 @@ except Exception as e:
 
 | Operation | event_type |
 |-----------|------------|
-| `block_flow()` | `"flow_blocked"` |
-| `fail_flow()` | `"flow_failed"` |
+| `block()` | `"flow_blocked"` |
 | `abort_flow()` | `"flow_aborted"` |
 | `resume_issue()` | `"resumed"` |
 | State transition | `"state_transitioned"` |

@@ -77,11 +77,11 @@ new → active ↔ blocked
 见 [vibe3-error-severity-and-blocking-standard.md](./vibe3-error-severity-and-blocking-standard.md) §11。
 
 - **ERROR 系统**：关注运行时基础设施健康（Runtime Infrastructure Health）。
-  - 触发：`mark_issue(action="fail")` 或 `fail_issue()` (Legacy)。
+  - 触发：`mark_issue(action="fail")` 或 `error_tracking.record_error()`。
   - 存储：`error_log` 表。
   - 影响：控制 FailedGate 派发，**不直接改变** Flow 业务状态。
 - **BLOCK 系统**：关注业务流状态（Business Flow State）。
-  - 触发：`mark_issue(action="block")` 或 `block_flow()`。
+  - 触发：`mark_issue(action="block")` 或 `BlockedStateService.block()`。
   - 存储：`flow_state.flow_status = "blocked"` 和 `blocked_reason`。
   - 影响：流程暂停，需要手动或自动 unblock。
 
@@ -147,18 +147,18 @@ Manager 创建 flow
 
 ## 4. 阻塞与恢复
 
-### 4.1 阻塞 API：`FlowService.block_flow()`
+### 4.1 阻塞 API：`BlockedStateService.block()`
 
 阻塞 flow 的标准入口：
 
 ```python
-def block_flow(
+def block(
     self,
     branch: str,
-    reason: str | None = None,
+    reason: str | None,
     blocked_by_issue: int | None = None,
-    actor: str | None = None,
-    repo: str | None = None,
+    actor: str = "system",
+    issue_number: int | None = None,
     event_type: str = "flow_blocked",
 ) -> None
 ```
@@ -166,18 +166,18 @@ def block_flow(
 **副作用**（原子执行）：
 
 1. SQLite：写入 `flow_state.blocked_by_issue`，可选写入 `blocked_reason`
-2. GitHub：task issue label 转为 `state/blocked`
-3. 若提供 `blocked_by_issue`：写入 `flow_issue_links(role='dependency')`
-4. Event：写入 `flow_blocked` 事件
+2. GitHub：写入 Issue Body Projection (Truth Source)
+3. GitHub：task issue label 转为 `state/blocked` (Signal)
+4. Event：通过 `FlowTimelineService` 写入 `flow_blocked` 事件
 
 ### 4.2 何时使用 block vs abort vs stale
 
 | 场景 | 动作 | API | 恢复路径 |
 |------|------|-----|----------|
-| 派发失败 | `block_flow(reason=...)` | `block_flow()` | `task resume` 或自动解封 |
-| Health check 失败 | `block_flow(reason=...)` | `block_flow()` | `task resume` |
-| 依赖未满足 | `block_flow(blocked_by_issue=N)` | `block_flow()` | 依赖 issue 关闭后自动解封 |
-| 手动阻塞 | `block_flow(reason=..., actor=...)` | `block_flow()` | 仅 `task resume` |
+| 派发失败 | `block(reason=...)` | `BlockedStateService.block()` | `task resume` 或自动解封 |
+| Health check 失败 | `block(reason=...)` | `BlockedStateService.block()` | `task resume` |
+| 依赖未满足 | `block(blocked_by_issue=N)` | `BlockedStateService.block()` | 依赖 issue 关闭后自动解封 |
+| 手动阻塞 | `block(reason=..., actor=...)` | `BlockedStateService.block()` | 仅 `task resume` |
 | Issue 关闭 / Branch 丢失 | `mark_flow_aborted()` | `mark_flow_aborted()` | 无恢复（终端状态） |
 | 空 ready flow / 孤儿 flow | `mark_flow_stale()` | `mark_flow_stale()` | Governance 重建 ready flow |
 
