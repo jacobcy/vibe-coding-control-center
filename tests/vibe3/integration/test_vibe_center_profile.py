@@ -66,7 +66,7 @@ def test_minimal_profile_convention():
     assert convention.branch.task_prefix == "issue-"
 
     # Minimal profile should have no manager usernames
-    assert convention.manager_usernames == []
+    assert convention.manager_usernames == ()
 
     # Minimal profile should have default state labels
     assert convention.state_prefix == "state/"
