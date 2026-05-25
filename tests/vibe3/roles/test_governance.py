@@ -465,26 +465,28 @@ class TestBuildSnapshotContext:
         assert "#301" in ctx["suggested_issue_details"]
 
     @patch("vibe3.roles.governance.GitHubClient")
-    def test_vibe_task_issues_filtered_from_assignee_pool(self, mock_github_cls):
-        """Issues with vibe-task label should be filtered from assignee pool."""
+    def test_orchestra_labeled_issues_filtered_from_assignee_pool(
+        self, mock_github_cls
+    ):
+        """Issues with orchestra label should be filtered from assignee pool."""
         snapshot = _make_snapshot()
         config = _make_config()
         mock_github = MagicMock()
 
-        # Mock vibe-task labeled issues (should be filtered)
+        # Mock orchestra-labeled issues (should be filtered)
         mock_github.list_issues.return_value = [
             {
                 "number": 100,
                 "title": "Already reviewed",
                 "body": "",
                 "assignees": [],
-                "labels": [{"name": "vibe-task"}],
+                "labels": [{"name": "orchestra"}],
                 "milestone": None,
             },
         ]
         mock_github_cls.return_value = mock_github
 
-        # Create snapshot with both vibe-task and normal issues
+        # Create snapshot with both orchestra-labeled and normal issues
         reviewed = IssueStatusEntry(
             number=100,
             title="Already reviewed",
@@ -515,14 +517,14 @@ class TestBuildSnapshotContext:
 
         ctx = build_governance_snapshot_context(snapshot, config=config)
 
-        # Only non-vibe-task issue should appear
+        # Only non-orchestra issue should appear
         assert ctx["active_count"] == 1
         assert "#101" in ctx["suggested_issue_details"]
         assert "#100" not in ctx["suggested_issue_details"]
 
     @patch("vibe3.roles.governance_utils.GitHubClient")
-    def test_broader_repo_filters_vibe_task(self, mock_github_cls):
-        """Broader repo candidates should filter vibe-task labeled issues."""
+    def test_broader_repo_filters_orchestra_labeled(self, mock_github_cls):
+        """Broader repo candidates should filter orchestra-labeled issues."""
         snapshot = _make_snapshot()
         config = _make_config()
         mock_github = MagicMock()
@@ -532,7 +534,7 @@ class TestBuildSnapshotContext:
                 "title": "Fix bug",
                 "body": "Clear scope",
                 "assignees": [],
-                "labels": [{"name": "vibe-task"}],  # Should be filtered
+                "labels": [{"name": "orchestra"}],  # Should be filtered
                 "milestone": None,
             },
             {
@@ -554,14 +556,14 @@ class TestBuildSnapshotContext:
         assert "#202" in ctx["suggested_issue_details"]
         assert "#201" not in ctx["suggested_issue_details"]
 
-    def test_no_vibe_task_issues_no_filtering(self):
-        """When no vibe-task issues exist, all candidates should pass through."""
+    def test_no_orchestra_labeled_issues_no_filtering(self):
+        """When no orchestra-labeled issues exist, all candidates pass through."""
         snapshot = _make_snapshot()
         config = _make_config()
 
         with patch("vibe3.roles.governance.GitHubClient") as mock_github_cls:
             mock_github = MagicMock()
-            mock_github.list_issues.return_value = []  # No vibe-task issues
+            mock_github.list_issues.return_value = []  # No orchestra-labeled issues
             mock_github_cls.return_value = mock_github
 
             issue1 = IssueStatusEntry(

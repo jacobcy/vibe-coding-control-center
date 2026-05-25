@@ -71,13 +71,14 @@
 | `component/pr` | PR 相关 | `gh issue edit 123 --add-label "component/pr"` |
 | `component/client` | Client 层 | `gh issue edit 123 --add-label "component/client"` |
 | `component/config` | 配置层 | `gh issue edit 123 --add-label "component/config"` |
+| `component/orchestra` | Orchestra 模块 | `gh issue edit 123 --add-label "component/orchestra"` |
 
 ### 2.2 特殊用途标签
 
 | 标签名称 | 描述 | 使用场景 |
 |---------|------|----------|
+| `orchestra` | Governance reviewed marker | governance 扫描后的"已审查"标记，下次扫描自动跳过 |
 | `supervisor` | Supervisor-governed orchestration issue | 标记需要 Supervisor 治理的编排问题 |
-| `orchestra` | Orchestra scheduling and automation | 标记 Orchestra 调度和自动化相关 issue |
 | `tech-debt` | Technical debt tracking | 追踪技术债务和需要优化的代码 |
 | `improvement` | Non-urgent improvements | 非紧急的改进和增强项 |
 
@@ -223,7 +224,7 @@ gh issue list --milestone "Phase 1: 基础设施"
 | 需要讨论的设计 | `type/feature` + `roadmap/rfc` |
 | 性能优化 | `type/perf` + `priority/7` + `roadmap/p0` |
 | 技术债务清理 | `tech-debt` + `priority/5` + `roadmap/p1` |
-| 编排系统改进 | `orchestra` + `type/feature` + `roadmap/p1` |
+| 编排系统改进 | `component/orchestra` + `type/feature` + `roadmap/p1` |
 | Supervisor 治理问题 | `supervisor` + `priority/7` + `roadmap/p0` |
 | 非紧急改进 | `improvement` + `priority/3` + `roadmap/p2` |
 | 完成 PR 需要AI审查 | `trigger/ai-review`（手动添加，workflow自动移除） |
