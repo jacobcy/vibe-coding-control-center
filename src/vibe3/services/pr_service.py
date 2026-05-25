@@ -321,14 +321,13 @@ class PRService:
         self,
         pr_number: int | None = None,
         branch: str | None = None,
-        use_cache: bool = True,
     ) -> PRResponse | None:
         """Get PR details."""
         logger.bind(
             domain="pr", action="get", pr_number=pr_number, branch=branch
         ).debug("Getting PR")
 
-        if use_cache and pr_number is not None:
+        if pr_number is not None:
             cached = self._pr_cache.get(pr_number)
             if cached and (time.monotonic() - cached[1]) < self._pr_cache_ttl:
                 return cached[0]
@@ -341,7 +340,7 @@ class PRService:
             pr.comments = self.github_client.list_pr_comments(pr.number)
             pr.review_comments = self.github_client.list_pr_review_comments(pr.number)
             pr.reviews = self.github_client.list_pr_reviews(pr.number)
-            if use_cache and pr_number is not None:
+            if pr_number is not None:
                 self._pr_cache[pr_number] = (pr, time.monotonic())
         return pr
 

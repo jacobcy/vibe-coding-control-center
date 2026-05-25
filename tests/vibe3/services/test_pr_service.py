@@ -398,8 +398,10 @@ def test_get_pr_caches_result(pr_service: PRService) -> None:
     assert gh_instance.get_pr.call_count == 1  # No additional call
 
 
-def test_get_pr_bypasses_cache_with_flag(pr_service: PRService) -> None:
-    """Test that get_pr bypasses cache when use_cache=False."""
+def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
+    """Test that get_pr re-fetches after TTL expires."""
+    import time as time_module
+
     gh_instance = pr_service.github_client
     mock_pr = PRResponse(
         number=123,
@@ -416,12 +418,20 @@ def test_get_pr_bypasses_cache_with_flag(pr_service: PRService) -> None:
     gh_instance.list_pr_review_comments.return_value = []
     gh_instance.list_pr_reviews.return_value = []
 
-    # First call
-    result1 = pr_service.get_pr(pr_number=123, use_cache=False)
+    # First call — populates cache
+    result1 = pr_service.get_pr(pr_number=123)
     assert result1.number == 123
     assert gh_instance.get_pr.call_count == 1
 
-    # Second call with bypass - should hit API again
-    result2 = pr_service.get_pr(pr_number=123, use_cache=False)
+    # Second call within TTL — uses cache
+    result2 = pr_service.get_pr(pr_number=123)
     assert result2.number == 123
-    assert gh_instance.get_pr.call_count == 2  # Additional call made
+    assert gh_instance.get_pr.call_count == 1
+
+    # Simulate TTL expiry by advancing monotonic clock
+    with patch.object(
+        time_module, "monotonic", return_value=time_module.monotonic() + 120
+    ):
+        result3 = pr_service.get_pr(pr_number=123)
+        assert result3.number == 123
+        assert gh_instance.get_pr.call_count == 2  # Called again after expiry

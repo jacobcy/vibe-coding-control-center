@@ -8,7 +8,7 @@ Issue number conversion should ONLY happen at command layer, not in cache servic
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -214,15 +214,10 @@ class IssueTitleCacheService:
         if not prs:
             return
 
-        # Collect all branches that need cache lookup
         branches = [branch for branch, _, _ in prs]
 
-        # Batch get existing cache entries
-        existing_cache: dict[str, dict[str, Any]] = {}
-        for branch in branches:
-            cache = self.store.get_flow_context_cache(branch)
-            if cache:
-                existing_cache[branch] = cache
+        # Batch read existing cache entries
+        existing_cache = self.store.get_flow_context_cache_bulk(branches)
 
         # Prepare bulk entries
         entries: list[tuple[str, int | None, str | None, int | None, str | None]] = []
