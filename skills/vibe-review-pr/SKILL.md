@@ -305,6 +305,22 @@ Phase_0():
   assert TeamCreate, TaskCreate, TaskUpdate available
   // 禁止在此步执行 gh pr view / gh pr diff / git diff
 
+  // Step 1.5: Governance Backlog Check
+  // 检查 PR 关联 issue 是否有未消化 governance suggest
+  PR_BODY=$(gh pr view {PR_NUMBER} --json body -q .body)
+  if PR_BODY contains "## Governance Backlog":
+    output("⚠️ PR body 包含 Governance Backlog section，审查时请注意未消化的 governance suggest")
+    列出 backlog 中 unchecked items
+  else:
+    // PR 无 backlog section，检查关联 issue
+    PR_BRANCH=$(gh pr view {PR_NUMBER} --json headRefName -q .headRefName)
+    ISSUE_NUM=$(echo "$PR_BRANCH" | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+    if ISSUE_NUM:
+      SUGGESTS=$(gh issue view "$ISSUE_NUM" --json comments --jq '.comments[] | select(.body | startswith("[governance suggest]"))')
+      if SUGGESTS not empty:
+        output("⚠️ Governance Backlog: 关联 issue #" + ISSUE_NUM + " 存在未消化 governance suggest")
+  // 这些提示不阻断审查流程
+
   // Step 2: 选择执行模式
   // 询问用户选择执行模式
   AskUserQuestion(questions=[{

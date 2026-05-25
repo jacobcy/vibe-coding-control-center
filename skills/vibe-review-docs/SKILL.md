@@ -32,6 +32,31 @@ TaskCreate(
 
 ---
 
+## Step 0.5: Governance Backlog Check
+
+在开始审查前，检查关联 issue 的 governance backlog：
+
+```bash
+# 获取关联 issue 编号
+ISSUE_NUM=$(git branch --show-current | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+
+if [ -n "$ISSUE_NUM" ]; then
+  SUGGEST_COUNT=$(gh issue view "$ISSUE_NUM" --json comments --jq '[.comments[] | select(.body | startswith("[governance suggest]"))] | length')
+  if [ "$SUGGEST_COUNT" -gt 0 ]; then
+    echo "⚠️ Governance Backlog: 本 issue 存在 $SUGGEST_COUNT 条未消化 governance suggest"
+    gh issue view "$ISSUE_NUM" --json comments --jq '.comments[] | select(.body | startswith("[governance suggest]")) | "  - " + .body[:200]'
+  fi
+fi
+```
+
+重点关注：
+- `[governance suggest] needs split` (文档类 epic)
+- `[governance suggest] Recommend Close` (过时文档)
+
+这些提示**不阻断** review 流程。
+
+---
+
 ## Step 1: 确定审查范围
 
 ### PR 文档审查

@@ -317,6 +317,7 @@ Inputs:
 - target issue
 - latest human comment
 - latest governance suggest (if exists)
+- accumulated governance suggests (all, not just latest)
 - current labels/state
 - current scene
 - current handoff
@@ -331,6 +332,22 @@ Steps:
 3. **识别最新 governance 建议**：
    - 署名为 `[governance suggest]` 或含 `[governance]` 标记。
 4. 读取当前 labels/state
+4.5. 分析 governance suggest 累积状态：
+   - 统计本 issue 上所有 [governance suggest] 评论：
+     ```bash
+     gh issue view <issue-number> --json comments --jq '[.comments[] | select(.body | startswith("[governance suggest]"))] | length'
+     gh issue view <issue-number> --json comments --jq '[.comments[] | select(.body | startswith("[governance suggest]"))] | max_by(.createdAt) | .createdAt'
+     ```
+   - 查找最近一次 [roadmap decision] 评论：
+     ```bash
+     gh issue view <issue-number> --json comments --jq '[.comments[] | select(.body | startswith("[roadmap decision]"))] | max_by(.createdAt) | .createdAt'
+     ```
+   - 若无 [roadmap decision] 或其时间早于最新 [governance suggest] → 标记为"未消化"
+   - 读取未消化 suggest 的具体内容，按类型分类：
+     - needs split / auto-split: 需要 vibe-roadmap 消化
+     - Recommend Close: manager 可在 ready 阶段处理
+     - waiting on #X: 显示依赖状态
+     - pool entry / auto-recover: 已完成，无需提醒
 5. 核查当前 issue / flow / task / branch / worktree / session
 6. 读取 handoff 与 refs
 
@@ -412,6 +429,19 @@ Steps:
        - 这会自动：写入 `blocked_reason`、转换 label、在 `flow_issue_links` 表中记录 `dependency` 角色
      - 多个依赖时，对每个依赖分别调用一次
      - `exit()`
+
+4.6. **Governance Suggest 检查**：检查是否有未消化的 governance suggest：
+   - 从 read_context() 的分析结果中，检查是否存在未消化 suggest
+   - 若存在 "needs split" 或 "auto-split"（待复核）类型未消化 suggest：
+     - 本轮不应推进至 plan，应 blocked 等待 vibe-roadmap 消化拆分建议
+     - 调用：
+       ```bash
+       vibe3 flow blocked --reason "存在未消化的 governance suggest（needs split/auto-split），等待 vibe-roadmap 处理"
+       ```
+     - 写 issue comment 列出相关 suggest 内容
+     - `exit()`
+   - 若存在 "Recommend Close" 类型 suggest：已在步骤 2 的 Governance 建议判断中处理，此处跳过
+   - 若存在 "waiting on #X" 类型 suggest：记录依赖状态，但不在此处阻塞（依赖检查已在步骤 4.5 处理）
 
 5. 如果 scene 不健康：
    - 调用 `check_blocker_explained()` 检查是否需要写新 comment
@@ -883,6 +913,21 @@ Steps:
 2. 调用 `check_scene_health()` 确认 scene 健康
 3. 写 handoff indicate（PR发布指令文件），通知 executor 当前进入 commit + PR 阶段
 
+若 read_context() 发现未消化 governance suggest，在 handoff indicate 文件中包含以下 PR body 追加内容：
+
+```markdown
+## Governance Backlog
+
+本 PR 关联 issue 存在未消化的 governance suggest，建议人类 reviewer 在合并前确认：
+
+- [ ] `[governance suggest] waiting on #1234` — 依赖未关闭，是否仍需阻塞？
+- [ ] `[governance auto-split] split into #5, #6, #7` — vibe-roadmap 是否已复核拆分？
+
+若 backlog 已过时，请触发 `/vibe-roadmap` 综合消化。
+```
+
+每条未消化 suggest 对应一个 checkbox。仅当存在未消化 suggest 时才包含此 section。
+
 ```bash
 uv run python src/vibe3/cli.py handoff indicate <path>
 ```
@@ -963,6 +1008,12 @@ Steps:
     gh api repos/{owner}/{repo}/issues/comments/<comment_id> -X PATCH -f body=”<修正后的完整内容>”
     ```
   - 禁止为纠正自身输出格式问题而发新评论
+
+### Governance Marker 边界
+
+- manager **不写** `[governance suggest]` 评论（这是 governance 层[roadmap-intake/assignee-pool]的职责）
+- manager **可以**在 PR body（通过 handoff indicate）中引用 / 链接到已有的 `[governance suggest]` 评论
+- manager 在 issue comment 中讨论 governance suggest 时，使用自身 `[manager]` 前缀，不伪造 governance marker
 
 ## Handoff Contract
 

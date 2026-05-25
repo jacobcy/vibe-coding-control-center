@@ -52,6 +52,33 @@ Route elsewhere when:
 
 ## Execution Flow
 
+### 0. Governance Backlog Check
+
+Before starting the review, check for unprocessed governance suggests on the associated issue:
+
+```bash
+# If reviewing a PR, infer the issue number from branch name first
+ISSUE_NUM=$(gh pr view <number> --json headRefName -q .headRefName | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+# If reviewing local branch, use current branch
+ISSUE_NUM=$(git branch --show-current | grep -oE 'issue-[0-9]+' | grep -oE '[0-9]+')
+
+if [ -n "$ISSUE_NUM" ]; then
+  # Find unprocessed suggests: those without a later [roadmap decision]
+  SUGGEST_COUNT=$(gh issue view "$ISSUE_NUM" --json comments --jq '[.comments[] | select(.body | startswith("[governance suggest]"))] | length')
+  LATEST_SUGGEST=$(gh issue view "$ISSUE_NUM" --json comments --jq '[.comments[] | select(.body | startswith("[governance suggest]"))] | max_by(.createdAt) | .createdAt')
+  LATEST_DECISION=$(gh issue view "$ISSUE_NUM" --json comments --jq '[.comments[] | select(.body | startswith("[roadmap decision]"))] | max_by(.createdAt) | .createdAt')
+  
+  if [ "$SUGGEST_COUNT" -gt 0 ] && { [ -z "$LATEST_DECISION" ] || [ "$LATEST_SUGGEST" \> "$LATEST_DECISION" ]; }; then
+    echo "⚠️ Governance Backlog: 本 issue 存在未消化的 governance suggest"
+    gh issue view "$ISSUE_NUM" --json comments --jq '.comments[] | select(.body | startswith("[governance suggest]")) | "  - " + .body[:200]'
+  fi
+fi
+```
+
+- 若发现未消化 suggest：在输出顶部加 "⚠️ Governance Backlog" 段落，列出 suggest 摘要
+- 这些提示**不阻断** review 流程，仅作为信息层提醒
+- 若 PR 无关联 issue（非 flow 分支），跳过此检查
+
 ### 1. Resolve Scope
 
 Identify the review target:
