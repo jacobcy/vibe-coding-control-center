@@ -129,11 +129,12 @@ Forbidden:
 - 必须在建议中说明关闭原因（如"依赖 X 已在 #123 移除"）
 - 不要让确定不做的 issue 悬而不决
 
-**不确定 → 看池子状态**
-- 若 assignee pool 为空（无任何候选 issue），且 issue 不确定是否可执行：
-  - 写 `[governance suggest]` 说明不确定性
-  - 放行给 manager 判断是否值得执行
-- 若 assignee pool 非空，保守等待
+**不确定 → 优先交给 manager 或标记 RFC**
+- 若 issue 目标明确，只是 scope 偏大或拆分选择未定：
+  - 写 `[governance suggest]` 建议 manager 拆分或继续单 issue
+  - 不把普通拆分选择升级为人类阻塞
+- 若目标、架构方向或拆分形态都无法判断：
+  - 写 `[governance suggest]` 建议标记 `roadmap/rfc`
 
 **队列偏浅时的保守边界**：
 - 如果当前 ready queue 只剩少量候选，或 blocked / in-progress 已经占住大部分池子，不要机械地把所有灰区 issue 都归入“保守等待”
@@ -146,24 +147,12 @@ Forbidden:
 
 ```
 issue 是否可纳入？
-  ├─ **Epic 检查**（强制阻断）
-  │   └─ 有 `roadmap/epic` 标签 + `## Sub-issues` section？
-  │       └─ 是 → 跳过（主 issue 不入池，等待 sub-issues 完成）
-  │
-  ├─ 检查实质条件
-  │   ├─ 范围是否明确？
-  │   ├─ 验收标准是否清晰？
-  │   └─ 代码缺口是否可确定？
-  │
-  ├─ 明确范围 + 清晰验收 → 可纳入（包括重构）
-  │
-  ├─ 范围过大 → 建议 manager 拆分
-  │
-  ├─ 确定不适用 → 建议关闭（附原因）
-  │
-  └─ 不确定
-      ├─ pool 为空 → 建议放行给 manager 判断
-      └─ pool 非空 → 保守等待
+  - Epic 主 issue：主 issue 保持治理容器；检查 sub-issues 是否完整，建议补齐或选择具体 sub-issue
+  - 明确范围 + 清晰验收：可纳入（包括重构）
+  - 范围过大但边界可拆：建议 manager 拆分，或由 roadmap decider 先拆
+  - 范围偏大但 manager 可收敛：放行给 manager 继续单 issue
+  - 确定不适用：建议关闭（附原因）
+  - 目标/架构/拆分形态无法判断：建议 `roadmap/rfc`
 ```
 
 ### 例子
@@ -179,7 +168,7 @@ issue 是否可纳入？
 - #503: chore: src/vibe3 总行数超过35000行限制
   - 范围过大：涉及整个 src/vibe3
   - 建议：拆分为多个模块级别的清理任务
-  - **结论**：写 `[governance suggest]` 建议拆分
+  - **结论**：写 `[governance suggest]` 建议 manager / roadmap decider 拆分；拆分后主 issue 继续作为治理容器
 
 **应关闭的 issue**
 - #556: tech-debt: 清理事件系统向后兼容别名
@@ -189,8 +178,7 @@ issue 是否可纳入？
 **不确定的 issue**
 - #539: 讨论：统一 vibe3 plan/review/run 命令参数和行为
   - 范围不明确，需要架构讨论
-  - 若 pool 为空：写 `[governance suggest]` 说明不确定性，放行给 manager
-  - 若 pool 非空：保守等待
+  - **结论**：写 `[governance suggest]` 建议补 scope 或标记 `roadmap/rfc`
 
 **可自动恢复的 blocked issue**
 - #123: state/blocked (blocked_reason: state unchanged)
@@ -243,7 +231,11 @@ issue 是否可纳入？
 
 Steps:
 
-1. 读取当前 running issues 与 queue / flow 现场
+1. 运行全局现场观察命令，读取当前 running issues、ready queue、blocked issues、remote tasks 与 flow 现场：
+   ```bash
+   uv run python src/vibe3/cli.py task status
+   ```
+   这是 assignee pool 的主观察入口；单个 issue 的评论、refs 与去重细节再用 `vibe3 task show <issue-number>`。
 2. **依赖过滤**：从候选中排除不可进入 ready queue 的 issue：
    - 检查 issue body 和 comments 中的依赖引用（如 "Depends on #123"）
    - 若被依赖的 issue 未关闭或未处于 `state/done`，从候选中排除
@@ -283,6 +275,7 @@ Steps:
 输出时额外检查：
 - 如果你写出“already in assignee pool”，必须同时回答这些 issue 当前是否仍有 assignee、state、ready queue 资格
 - 如果当前 ready queue 少于稳定运行所需的候选量，必须明确指出缺口来源，而不是仅罗列历史已纳入对象
+- 如果你判断某个 issue 应拆分或继续单 issue，必须说明该判断来自 `task status` 现场、issue body/comment、还是代码缺口；不要只凭标签判断
 
 Decision sketch:
 

@@ -19,7 +19,8 @@
 **闭环目标**：
 - broader repo issue pool 中只要存在边界明确、依赖就绪、可由 manager 继续收敛的 issue，就应尽量纳入 assignee issue pool
 - 不要把“尚有若干实现选项”误判成“必须人类拍板”
-- 只有当 issue 的目标本身不明确，或会改变架构/产品方向时，才用 `needs human decision` 跳过
+- scope 较大但拆分形态清楚时，交给 roadmap decider / manager 拆分；拆分只是保留主 issue 的治理容器并显式化执行环节
+- 只有当 issue 的目标本身不明确、会改变架构/产品方向，或连如何拆分都无法判断时，才用 `roadmap/rfc` / `needs human decision` 跳过
 
 ## 职责
 
@@ -60,7 +61,7 @@
 - ✅ 范围明确：涉及哪些模块/文件清晰可列
 - ✅ 边界清晰：不涉及未定义的跨模块协调
 - ✅ 验收标准确定：可明确判断"完成"（如测试通过、移除旧代码）
-- ❌ 若范围不明确：建议拆分或等待架构讨论
+- ❌ 若范围不明确：优先建议拆分；无法判断拆分形态时再等待架构讨论
 - 例子：
   - ✅ #550 refactor(error): decouple ErrorTrackingService singleton
     - 范围明确：只涉及 `error/tracking.py`
@@ -77,34 +78,35 @@
 - 明确不适用当前架构
 
 **建议调整**（Level 1 或 Level 2 部分不通过）：
-- 范围过大 → 建议拆分
+- 范围过大 → 建议 roadmap decider / manager 拆分；若边界清楚，也可直接纳入让 manager 拆
 - 架构已变更 → 建议更新内容
 - 依赖未就绪 → 建议等依赖完成后重新提出
 
-**跳过（保守等待）**：
+**跳过（保守等待 / RFC）**：
 - issue 的目标/验收口径本身不明确，无法确定做完算什么
 - 需要先决定架构方向、产品策略或跨团队边界
 - 不确定是否过时
 - **Epic 主 issue**（有 `roadmap/epic` 标签且 body 包含 `## Sub-issues`）：
-  - 不纳入 assignee pool（主 issue 本身不应进入执行）
-  - 等待所有 sub-issues 完成后再处理主 issue 的关闭
+  - 主 issue 是治理容器，不直接作为执行任务纳入 assignee pool
+  - 优先检查 sub-issues 是否已经覆盖拆分；不完整时建议补齐，而不是把 epic 当成失败状态
 
 **不要误判为 `needs human decision` 的情况**：
 - 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么
 - manager 可以先读代码再决定采用哪种小范围实现
 - 描述里列了若干候选方案，但这些方案不会改变系统边界，只影响落地细节
+- 范围偏大但可以自然拆成独立执行环节；这种情况应建议拆分或交给 manager 拆分
 
 ### 与 Assignee Pool 的职责边界
 
-**Roadmap Intake（第一道闸门）**：
+**Roadmap Intake（第一道闸门 / decider）**：
 - 重点：**是否应该存在** + **架构一致性**
 - 检查：生命周期、依赖、API、模块
-- 决策：纳入 / 关闭 / 调整 / 等待
+- 决策：纳入 / 拆分 / 关闭 / RFC
 
-**Assignee Pool（第二道闸门）**：
+**Manager / Assignee Pool（第二道闸门）**：
 - 重点：**优先级** + **可执行性**
 - 检查：实质范围、验收标准、代码缺口
-- 决策：接受 / 拆分 / 放行 / 等待
+- 决策：接受 / 拆分 / 继续单 issue / RFC
 
 **协同示例**：
 ```
@@ -167,8 +169,8 @@ Assignee Pool（第二道）：
     ```
   - 在 Actions 中记录：`Supervisor #YYY: suggest close (duplicate with #ZZZ)`
 - **不确定**：
-  - 保守等待，不修改 state
-  - 在 Actions 中记录：`Supervisor #ZZZ: waiting (unclear scope, needs human review)`
+  - 等待或建议 `roadmap/rfc`，不修改 state
+  - 在 Actions 中记录：`Supervisor #ZZZ: rfc/waiting (unclear scope, needs human review)`
 
 **输出要求**：
 
@@ -190,7 +192,7 @@ Why: ...
 - **架构检查优先于标签分类**：不只是看 bug/feature 标签，要看代码架构是否仍相关
 - **关闭优于等待**：明确过时的 issue 应关闭，不要留在 pool 中悬而不决
 - **调整优于拒绝**：有问题的 issue 建议调整内容，而不是保守等待
-- **保守兜底**：不确定时等待，避免误纳入或误关闭
+- **RFC 兜底**：无法判断目标、架构方向或拆分形态时，建议 `roadmap/rfc`，避免误纳入或误关闭
 - **纳入优于空转**：如果当前 ready queue 很浅，且候选 issue 满足三级审查，不要因为“可能有别的实现写法”而空转
 
 ## Assignee Selection Rule
@@ -273,22 +275,27 @@ Forbidden:
 ## Execution Pattern
 
 1. 先看 broader repo issue pool 中当前 open issues
-2. 先过滤掉 discussion、明确的大 feature、以及真正需要人类先定方向的 issue
-3. 重点识别以下可纳入对象：
+2. 先运行全局现场观察命令，确认当前 assignee pool / ready queue / blocked / remote tasks 事实：
+   ```bash
+   uv run python src/vibe3/cli.py task status
+   ```
+   `task status` 用于理解池子深浅、已有 flow、ready queue 与 blocked 现场；单个 issue 的最近评论与细节仍用 `vibe3 task show <issue-number>`。
+3. 先过滤掉 discussion、明确的大 feature、以及真正需要人类先定方向的 issue
+4. 重点识别以下可纳入对象：
    - bug fix
    - 方案明确的 small feature
    - **边界明确的 refactor / cleanup**
-4. **事实确认（强制）**：在决定对某个 issue 写 `[governance suggest]` comment 前，必须先运行：
+5. **事实确认（强制）**：在决定对某个 issue 写 `[governance suggest]` comment 前，必须先运行：
    ```bash
    vibe3 task show <issue-number>
    ```
    查看该 issue 最近的 2-3 条评论。如果最近已有 `[governance suggest]` 或 `[governance]` 开头的评论（无论是你自己还是其他 agent 写的），**一律跳过，不再重复写 comment**。靠事实判断，不靠猜测。
-5. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
-6. 对可纳入对象执行最小动作：
+6. 检查这些 issue 是否已在 assignee issue pool，避免重复纳入
+7. 对可纳入对象执行最小动作：
    - 派为 assignee issue，并明确指派给一个配置中的 manager assignee（必须使用 `{manager_bot}`，禁止使用人类用户名）
    - 如有必要补最小 routing labels
-7. 对不适合纳入的对象记录简短原因
-8. **扫描 `supervisor + state/ready` issues**，对每个执行：
+8. 对不适合纳入的对象记录简短原因
+9. **扫描 `supervisor + state/ready` issues**，对每个执行：
    - 先运行 `vibe3 task show <issue-number>` 确认最近没有重复 governance comment
    - 三级审查（基础条件 + 架构一致性 + 生命周期）
    - 通过：移除 `state/ready`，补 `state/handoff`，记录到 Actions
@@ -300,12 +307,12 @@ Forbidden:
      ```bash
      gh issue close <issue-number> --comment "关闭理由：<具体理由>"
      ```
-   - 不确定：保守等待，记录到 Actions
-9. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
+   - 不确定：等待或建议 `roadmap/rfc`，记录到 Actions
+10. 如果本轮 `Accepted` 为空，必须在 `Why` 中明确说明：
    - 是因为候选确实都不满足三级审查
    - 还是因为当前材料把”实现选择”误当成了”人类拍板”
    - 若 ready queue 偏浅，优先重新检查是否存在被误判可纳入的 bounded refactor / bugfix
-10. 输出结论后停止
+11. 输出结论后停止
 
 ## Comment Contract
 
@@ -318,7 +325,7 @@ Forbidden:
 合规示例：
 ```
 [governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
-[governance suggest] Skipped: needs human scope confirmation before automation.
+[governance suggest] Skipped: recommend roadmap/rfc; needs human scope confirmation before automation.
 ```
 
 ## Output Contract

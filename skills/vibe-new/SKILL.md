@@ -51,7 +51,7 @@ git log main..origin/main --oneline | wc -l
 
 **原因**：避免 Issue #1250 类型的问题——长时间重构期间 main 已演进，新分支从一开始就落后会导致后续严重冲突。
 
-## 3. Epic 入口阻断检查
+## 3. Epic 入口分流检查
 
 在确认目标 issue 后，检查是否为 Epic 主 issue：
 
@@ -62,10 +62,10 @@ gh issue view <issue-number> --json labels,body
 检查逻辑：
 - 如果 issue 有 `roadmap/epic` 标签 **且** body 包含 `## Sub-issues` 或 `## 子任务` section：
   - 打印 Sub-issues 列表（从 body 的 `## Sub-issues` section 解析）
-  - 告知用户："该 issue 是 Epic 主 issue，请选择具体 sub-issue 进入 /vibe-new"
-  - 停止 — 不继续 bootstrap
+  - 告知用户："该 issue 是 Epic 主 issue；主 issue 保持为治理容器，请选择具体 sub-issue 进入 /vibe-new，或先补齐拆分。"
+  - 停止 — 不继续 bootstrap 主 issue
 - 如果只有 `roadmap/epic` 标签但无 `## Sub-issues` section：
-  - 提示用户："该 issue 标记为 Epic 但缺少 ## Sub-issues section，请先补齐 Sub-issues 或移除标签"
+  - 提示用户："该 issue 标记为 Epic 但缺少 ## Sub-issues section，请先由 roadmap decider/manager 补齐拆分，或移除标签后按单 issue 继续"
   - 停止 — 不继续 bootstrap
 - 否则继续正常流程
 

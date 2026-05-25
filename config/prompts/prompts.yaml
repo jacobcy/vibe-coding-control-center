@@ -573,6 +573,9 @@ plan:
     Before starting, read the current task context:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest ref, and next step.
     Use `--comments` flag to load the latest human instruction in full.
+    Scope split decisions are owned by roadmap decider / manager before this planning handoff.
+    Do not split the issue into sub-issues during planning.
+    If the current issue scope cannot be planned as-is, write a blocker comment and stop instead of changing scope.
 
     ### Pre-Planning Sync Check
     **For architectural refactors** (labels: component/*, type/refactor; or title contains "refactor"/"重构"):

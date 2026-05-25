@@ -59,6 +59,7 @@ vibe-commit: BLOCKED - test failure in pre-push hook
 Allowed:
 
 - `issue`: read, write (包括编辑 title、body 以纠正事实错误，但不得修改 scope)
+- `issue.create`: allowed only when splitting the current ready issue into sub-issues before plan handoff
 - `labels`: read, write
 - `comments`: read, write
 - `handoff`: read, write
@@ -95,10 +96,11 @@ Forbidden:
 - `code_write`: 任何形式的源码修改
 - `direct_implementation`: 直接实现功能或修复
 - `direct_code_fix`: 直接修改代码文件
-- `scope_expansion`: 擅自扩大或缩小 issue scope（纠正 title/body 信息不等于改 scope）
+- `scope_expansion`: 擅自扩大或缩小 issue scope（纠正 title/body 信息不等于改 scope；plan 前拆分为 sub-issues 不改变主 issue scope）
 - `multi_flow_orchestration`: 多 flow 编排
 - 替代 planner/executor/reviewer 执行具体技术工作（可以审查评判质量，但不能替代实现）
 - 在 `ready` 阶段跳过 `claimed`
+- 在 plan agent 接手后再拆分 issue；拆分决策必须发生在 `state/ready` 进入 `state/claimed` 之前
 - 在未核验 labels 前假设已经进入下一状态
 - 因为当前 flow 绑定了别的 issue，就切换处理别的 issue
 - 把 labels 治理当成实现任务
@@ -296,6 +298,14 @@ uv run python src/vibe3/cli.py handoff show @task-xxx/run-yyy.md
   4. 返回 scene 是否健康的结果
 - 注意：`state/ready` 阶段的 scene 健康只根据 **target issue + target branch/worktree/task-scene** 判断；全局 `task status`、server `stopped/unreachable`、或"当前没有 active issues"这些全局信号本身都**不能单独构成 blocker**
 
+#### `check_scope_split_before_plan()`
+- 作用：在 plan agent 接手之前判断当前 issue 是否应拆分。
+- 允许结果：
+  1. `continue`：scope 足够清楚，可作为单 issue 进入 `state/claimed`
+  2. `split`：scope 可拆成独立执行环节，主 issue 保持治理容器，创建或要求补齐 sub-issues
+  3. `rfc`：目标、架构方向或拆分形态无法判断，标记 `roadmap/rfc` 并进入 `state/blocked`
+- Hard rule：一旦 manager 将 issue 推进到 `state/claimed` 并等待 plan agent，拆分窗口关闭；后续 plan/run/review 只能在当前 issue scope 内执行或因 scope 不清而 blocked，不能再改成 sub-issue 拆分。
+
 #### `is_flow_terminal()`
 - 作用：检查 flow 是否处于终态（done/aborted）
 - Steps:
@@ -319,6 +329,7 @@ Inputs:
 - latest governance suggest (if exists)
 - current labels/state
 - current scene
+- global task status summary
 - current handoff
 
 Steps:
@@ -330,9 +341,10 @@ Steps:
    - 忽略历史中无前缀的自动化状态报告（通常由旧版 manager 产生）。
 3. **识别最新 governance 建议**：
    - 署名为 `[governance suggest]` 或含 `[governance]` 标记。
-4. 读取当前 labels/state
-5. 核查当前 issue / flow / task / branch / worktree / session
-6. 读取 handoff 与 refs
+4. 运行 `uv run python src/vibe3/cli.py task status` 读取全局队列/flow/blocked 现场，仅作为背景和去重依据
+5. 读取当前 labels/state
+6. 核查当前 issue / flow / task / branch / worktree / session
+7. 读取 handoff 与 refs
 
 Exit:
 
@@ -403,7 +415,20 @@ Steps:
    - 调用 `check_scene_health()` 确认 scene 是否健康
    - 确认最新评论中没有明确的暂停/阻止指示
 
-4.5. **依赖检查**：检查 Issue 是否有未解决的依赖：
+4.5. **Scope 拆分判断（plan 前最后窗口）**：调用 `check_scope_split_before_plan()`：
+   - 若结果为 `split`：
+     - 写 `[manager]` comment 说明拆分理由，并指出主 issue 保持治理容器
+     - 创建 sub-issues，或在权限不足时要求补齐 sub-issues；必要时添加 `roadmap/epic`
+     - 当前 issue 不进入 `state/claimed`
+     - `exit()`
+   - 若结果为 `rfc`：
+     - 添加 `roadmap/rfc`
+     - 将当前 issue 调整为 `state/blocked`
+     - comment 说明目标、架构方向或拆分形态需要人类判断
+     - `exit()`
+   - 若结果为 `continue`：继续后续依赖检查与 claim 流程
+
+4.6. **依赖检查**：检查 Issue 是否有未解决的依赖：
    - 检查 issue body 和 comments 中引用的其他 issue（如 "Depends on #123"、"blocked by #456"）
    - 对每个被依赖的 issue，检查其状态是否已关闭或处于 `state/done`
    - 如果存在未解除的依赖：
@@ -501,9 +526,10 @@ Steps:
        - 写 handoff append: 说明架构冲突风险，建议人工判断是否需要 rebase 或调整 scope
        - `exit()`
 3. 复述当前已进入 claimed
-4. 写 issue comment：当前 scene、当前风险、下一阶段应由 plan agent 接手
-5. 写 handoff append：说明当前已进入 claimed，等待 plan
-6. `exit()`
+4. 明确记录：拆分窗口已关闭，后续 plan/run/review 不得再改变为 sub-issue 拆分；若 plan agent 发现 scope 无法执行，应 blocked 回 manager/人类，而不是自行拆分
+5. 写 issue comment：当前 scene、当前风险、下一阶段为 plan agent 接手，scope 按当前 issue 执行
+6. 写 handoff append：说明当前已进入 claimed，等待 plan，且不得再拆分
+7. `exit()`
 
 ### `handle_handoff()`
 
