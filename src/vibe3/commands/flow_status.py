@@ -96,16 +96,27 @@ def show(
         output_format = "json"
 
     service = FlowService()
-    try:
-        target_branch = resolve_command_branch(
-            branch_opt=branch_opt,
-            pr_opt=pr_opt,
-            position_arg=branch_arg,
-            flow_service=service,
-        )
-    except (UserError, SystemError) as error:
-        typer.echo(f"Error: {error}", err=True)
-        raise typer.Exit(1) from error
+
+    # Extract issue number from position arg if it's numeric and remote is set
+    issue_number_from_arg = None
+    if remote and branch_arg and branch_arg.isdigit():
+        issue_number_from_arg = int(branch_arg)
+
+    # When --remote is set with a numeric position arg, bypass branch resolution
+    # and use the issue number directly for remote fetch
+    if remote and issue_number_from_arg is not None:
+        target_branch = f"dev/issue-{issue_number_from_arg}"  # Placeholder branch
+    else:
+        try:
+            target_branch = resolve_command_branch(
+                branch_opt=branch_opt,
+                pr_opt=pr_opt,
+                position_arg=branch_arg,
+                flow_service=service,
+            )
+        except (UserError, SystemError) as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
 
     # Get task issue number for remote fallback
     links = service.store.get_issue_links(target_branch)
@@ -114,8 +125,11 @@ def show(
         None,
     )
 
-    # Fallback: parse issue number from branch name when local DB missing
-    if task_issue_number is None:
+    # Use issue_number_from_arg if available, otherwise parse from branch
+    if issue_number_from_arg is not None:
+        task_issue_number = issue_number_from_arg
+    elif task_issue_number is None:
+        # Fallback: parse issue number from branch name when local DB missing
         from vibe3.services.issue_flow_service import IssueFlowService
 
         issue_flow_service = IssueFlowService(store=service.store)

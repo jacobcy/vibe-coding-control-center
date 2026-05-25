@@ -237,3 +237,71 @@ def test_flow_status_check_surfaces_check_warning(
     assert result.exit_code == 0
     assert "Warning: vibe3 check incomplete before status" in result.stderr
     assert "Fixed 1/2, 1 had unfixable issues" in result.stderr
+
+
+class TestFlowShowRemoteWithIssueNumber:
+    """测试 flow show --remote <issue_number> 在没有本地 flow 时工作"""
+
+    def test_flow_show_remote_issue_number_no_local_flow(self):
+        """测试 flow show --remote 1357 在没有本地 flow 时从 GitHub 获取"""
+        from vibe3.models.data_source import DataSource
+
+        with patch("vibe3.commands.flow_status.FlowService") as mock_service_class:
+            mock_service = MagicMock()
+
+            # Mock store
+            mock_store = MagicMock()
+            mock_store.get_issue_links.return_value = []  # No local flow
+            mock_store.get_events.return_value = []  # Mock events
+            mock_service.store = mock_store
+
+            # Mock get_current_branch
+            mock_service.get_current_branch.return_value = "main"
+
+            mock_service_class.return_value = mock_service
+
+            # Mock FlowStatusResolver
+            with patch(
+                "vibe3.services.flow_status_resolver.FlowStatusResolver"
+            ) as mock_resolver_class:
+                mock_resolver = MagicMock()
+
+                # Mock resolve to return remote flow status
+                mock_flow_status = MagicMock()
+                mock_flow_status.flow_status = "active"
+                mock_flow_status.branch = "dev/issue-1357"
+                mock_flow_status.task_issue_number = 1357
+                mock_flow_status.data_source = DataSource.ISSUE_BODY_FALLBACK
+                # Add missing attributes to avoid TypeError
+                mock_flow_status.spec_ref = None
+                mock_flow_status.plan_ref = None
+                mock_flow_status.report_ref = None
+                mock_flow_status.pr_number = None
+                mock_flow_status.latest_actor = None
+                mock_resolver.resolve.return_value = mock_flow_status
+
+                mock_resolver_class.return_value = mock_resolver
+
+                # Mock GitHub client
+                with patch(
+                    "vibe3.clients.github_client.GitHubClient"
+                ) as mock_github_class:
+                    mock_github = MagicMock()
+                    mock_github.view_issue.return_value = {
+                        "number": 1357,
+                        "title": "Test Issue",
+                        "body": "",
+                        "comments": [],
+                    }
+                    mock_github_class.return_value = mock_github
+
+                    # Run command
+                    result = runner.invoke(app, ["flow", "show", "--remote", "1357"])
+
+                    # Should succeed (not raise UserError)
+                    assert result.exit_code == 0
+                    # Resolver should be called with issue_number=1357
+                    mock_resolver.resolve.assert_called_once()
+                    call_kwargs = mock_resolver.resolve.call_args[1]
+                    assert call_kwargs["issue_number"] == 1357
+                    assert call_kwargs["remote"] is True
