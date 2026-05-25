@@ -61,7 +61,7 @@ intake gate 约束：
 - 远端写操作优先通过 `gh` / GitHub 原生命令完成
 - 只有涉及本地 flow 绑定时才使用 `vibe3 flow bind`
 - 调度器无法判断优先级时，必须要求人类讨论
-- 若涉及主 issue / sub-issue，只承接 skill/workflow 已做出的范围判断，不在 shell 层发明 parent/sub-issue 运行时逻辑
+- 若涉及主 issue / sub-issue，vibe-roadmap 可以作为 decider 决定拆分或不拆分；只有无法判断拆分形态时才标记 `roadmap/rfc`
 - 所有 roadmap 管理通过 GitHub issue labels 触发，不在本地实现数据存储
 - 不负责根据当前 active / ready / blocked 现场判断”现在下一个该做谁”；这是 `vibe-orchestra` 的职责
 
@@ -100,7 +100,7 @@ print(usernames[0] if usernames else 'vibe-manager-agent')
 - `task <-> flow` 映射核对与修复：交给 `vibe-task`
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
 - 基于当前运行现场寻找下一个值得处理的 issue：交给 `vibe-orchestra`
-- parent issue / sub-issue 的范围判断：交给 `vibe-issue` 等 skill/workflow；`vibe-roadmap` 只消费判断结果
+- parent issue / sub-issue 的范围判断：`vibe-issue` 可在 intake 时创建结构，`vibe-roadmap` 可在规划时决定拆分或继续单 issue
 
 ## Intake Gate 机制
 
@@ -124,20 +124,19 @@ print(usernames[0] if usernames else 'vibe-manager-agent')
 
 ### 决策逻辑（决策矩阵）
 
-vibe-roadmap 作为 decider，对 governance observer 层的输出执行**强制决策**，不再只写建议：
+vibe-roadmap 作为 decider，对 governance observer 层的输出执行**强制决策**，不再只写建议。scope 过大时优先自己判断是否拆分；拆分不会改变主 issue 的治理真源，只是把独立执行环节显式化。
 
 | governance observer 输出 | vibe-roadmap decision | 执行动作 |
 |---|---|---|
-| `[governance suggest] needs split` | `[roadmap decision] split` | 调用 `/vibe-issue` 拆分 → 写 decision comment |
+| `[governance suggest] needs split` | `[roadmap decision] split` 或 `[roadmap decision] continue` | 能拆就拆；判断单 issue 足够清晰则继续规划 |
 | `[governance suggest] Recommend Close` | `[roadmap decision] close` | 写 comment 说明关闭理由；建议人类关闭（不自动关闭） |
-| `[governance suggest] Skipped (needs human)` | `[roadmap decision] deferred` | 进入用户对话；用户决策后写 decision comment |
-| `[governance auto-split]` (来自 #1100) | `[roadmap decision] confirm split` 或 `[roadmap decision] revert split` | 复核拆分结果；合理则确认，不合理则回滚 |
+| `[governance suggest] Skipped (needs human)` | `[roadmap decision] rfc` 或 `[roadmap decision] continue` | 只有无法判断目标或拆分形态时标记 `roadmap/rfc`；能判断则继续 |
 | `[governance suggest] waiting on #X` | `[roadmap decision] hold until #X` 或调整 milestone | 校验依赖图无循环 → 写 decision |
 
 **决策原则**：
 - 每个 suggest 必须产生一个对应的 decision
 - decision 优先于 suggest（decider 覆盖 observer）
-- 无法自动决策时（如 `needs human`），标记为 `[roadmap decision] deferred` 并说明等待人类输入
+- 无法判断 scope、目标或拆分形态时，标记为 `[roadmap decision] rfc` 并添加 `roadmap/rfc`
 
 ## Assignee 自动分配
 
@@ -171,10 +170,10 @@ Manager assignee 配置位于：
 
 ### 人机协作路径
 
-**要求人类讨论**（审查不通过）：
-- 未通过三级审查 → 写 comment 说明原因
+**要求人类讨论**（decider 无法判断）：
+- 目标、架构方向或拆分形态无法由 roadmap decider 判断 → 写 comment 说明原因
 - 不分配 assignee
-- 标记为 `roadmap/rfc` 或 `roadmap/next`
+- 标记为 `roadmap/rfc`
 
 **建议关闭**（Level 2/3 不通过）：
 - 写 comment 说明关闭原因
@@ -191,8 +190,8 @@ Manager assignee 配置位于：
 
 **Human-Machine Collaboration Path（人机协作路径）**：
 - Roadmap skill + human decision gate
-- 三级审查不通过 → 要求人类讨论 → 人类决定后继续
-- 需要人类确认
+- 只有 decider 无法判断目标或拆分形态时才进入 `roadmap/rfc`
+- 人类明确方向后再回到 roadmap / manager 自动路径
 
 ### 决策逻辑
 
@@ -201,10 +200,10 @@ Manager assignee 配置位于：
 - small feature：方案明确 + 范围小
 - refactor：范围明确 + 边界清晰
 
-**要求人类讨论**（Level 1 不通过）：
+**要求人类讨论**（decider 无法判断）：
 - issue 目标不明确
 - 需要架构/产品方向决策
-- 范围过大需拆分
+- 范围过大且 decider 无法判断如何拆分
 
 **建议关闭**（Level 2/3 不通过）：
 - 依赖已移除
@@ -229,9 +228,10 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 合规示例：
 ```
 [roadmap decision] split epic into #42, #43, #44; reason: scope exceeds single-iteration threshold.
+[roadmap decision] continue #78; reason: bounded enough for manager to plan inside one issue.
 [roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
 [roadmap decision] hold #55 until #56 completes; reason: dependency graph constraint.
-[roadmap decision] confirm auto-split from #110; sub-issues #111, #112 validated.
+[roadmap decision] rfc #77; reason: cannot determine split shape without architecture input.
 ```
 
 ## 基于 Label 的 Roadmap 管理
@@ -260,7 +260,7 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 | `roadmap/p2`     | 有容量时完成     | 一般功能           |
 | `roadmap/next`   | 下个迭代规划中   | 待确认的功能       |
 | `roadmap/future` | 未来考虑         | 长期规划           |
-| `roadmap/rfc`    | RFC/设计阶段     | 需要讨论设计的功能 |
+| `roadmap/rfc`    | RFC/设计阶段     | agent 无法判断目标、架构方向或拆分形态 |
 
 ### Milestone 管理
 
@@ -302,14 +302,13 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 
 3. **按 issue × suggest 类型分组展示**：
    - 格式：`#N: [governance suggest] <type> — <summary>`
-   - 类型：`needs split` / `Recommend Close` / `Skipped (needs human)` / `auto-split` / `waiting on #X`
+   - 类型：`needs split` / `Recommend Close` / `Skipped (needs human)` / `waiting on #X`
 
 4. **决策优先级**：
-   - 先处理 `[governance auto-split]`（复核最轻量）
-   - 再处理 `[governance suggest] needs split`（产出最大）
+   - 先处理 `[governance suggest] needs split`（拆分或继续，产出最大）
    - 再处理 `[governance suggest] Recommend Close`（清积压）
    - 再处理 `[governance suggest] waiting on #X`（依赖校验）
-   - 最后处理 `[governance suggest] Skipped (needs human)`（需用户参与）
+   - 最后处理 `[governance suggest] Skipped (needs human)`（判断是 `rfc` 还是可继续）
 
 5. **闭环要求**：处理完每个 suggest 后必须写 `[roadmap decision]` 评论关闭闭环。
 
@@ -349,11 +348,11 @@ gh issue list -l "roadmap/p0"
 **场景 B: 有版本目标但有新 `GitHub issue`**
 
 - 对新的 `GitHub issue` 进行分类：
-- **Epic 检查**（强制阻断）：
+- **Epic 检查**（结构分流）：
   - 如果 issue 有 `roadmap/epic` 标签且 body 包含 `## Sub-issues` section：
-    - 告知用户："该 issue 是 Epic 主 issue，请先规划 sub-issues 或选择具体 sub-issue 进入"
-    - 停止 — 不继续规划主 issue
-    - 引导用户处理 sub-issues
+    - 将主 issue 视为治理容器，优先规划未完成 sub-issues
+    - 如果所有 sub-issues 已完成，写 closure/summary decision
+    - 如果 sub-issues 不完整，补齐或调整拆分；不要把 epic 本身当成失败状态
 - 1.  分配适当的 Milestone
 - 2.  添加 roadmap 状态标签（`roadmap/p0`、`roadmap/p1`、`roadmap/p2` 等）
 - 3.  必要时补 `priority/[0-9]` 作为同一 roadmap 桶内的细粒度顺位提示
@@ -369,21 +368,21 @@ gh issue list -l "roadmap/p0"
 - 重新评估待分类 Issue
 - 更新 roadmap 状态标签
 
-### Step 2.5: Epic 拆分（强制）
+### Step 2.5: Scope 拆分决策
 
-在版本规划决策过程中，发现 epic 候选时必须**强制执行拆分**，不再只写 suggest。
+在版本规划决策过程中，roadmap decider 必须在三种结果里选择一个：拆分、继续单 issue、或标记 `roadmap/rfc`。拆分本身不是破坏性动作：主 issue 保持为治理容器，sub-issues 只是独立执行环节。
 
 **Epic 候选识别条件**（满足任一即触发）：
 - Issue body 中已有 `## Sub-issues` section（人工预标注）
 - Scope estimate 超阈值（涉及 3+ 模块、预估 >1 迭代窗口）
 - 已被 `[governance suggest] needs split` 标记
 
-**强制拆分动作**：
+**拆分动作**：
 1. 主 issue 加 `roadmap/epic` 标签：
    ```bash
    gh issue edit <epic-number> --add-label "roadmap/epic"
    ```
-2. 主 issue **不分配** `vibe-manager-agent` assignee（epic 本身不入 manager pool）
+2. 主 issue 通常不分配 `vibe-manager-agent` assignee；由具体 sub-issues 进入 manager pool
 3. 调用 `/vibe-issue` 创建 sub-issues（每个 sub-issue body 中包含 `## Parent issue\n- #<epic-number>`）
 4. 在主 issue body 中追加或更新 `## Sub-issues` 清单：
    ```markdown
@@ -401,7 +400,7 @@ gh issue list -l "roadmap/p0"
 **阈值参考**：
 - 涉及 1 个模块、≤200 LOC → single issue，不拆分
 - 涉及 2 个模块、200-500 LOC → 视耦合度决定
-- 涉及 3+ 模块、>500 LOC → 强制拆分
+- 涉及 3+ 模块、>500 LOC → 优先拆分；如果无法判断拆分边界，标记 `roadmap/rfc`
 
 ### Step X: Intake 判断（新增）
 
@@ -419,12 +418,12 @@ gh issue list -l "roadmap/p0"
      ```
 
 **场景 B: 需要人类讨论**
-- 检查：未通过 Level 1（目标不明确、范围过大、架构变更）
-- 决策：要求人类讨论
+- 检查：目标不明确、架构方向需要人类判断，或 scope 过大但无法判断拆分形态
+- 决策：标记 RFC
 - 执行动作：
   1. 写 comment 说明原因：
      ```bash
-     gh issue comment <number> --body "[roadmap decision] deferred: needs human scope confirmation before automation. Reason: <具体原因>."
+     gh issue comment <number> --body "[roadmap decision] rfc: needs human scope confirmation before automation. Reason: <具体原因>."
      ```
   2. 不分配 assignee
   3. 标记为待讨论：
@@ -578,7 +577,6 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
 | 角色 | Marker | 性质 |
 |---|---|---|
 | roadmap-intake / assignee-pool（observer） | `[governance suggest]` | 观察者意见，无强制力 |
-| roadmap-intake（obvious-split 场景） | `[governance auto-split]` | 例外：清晰可拆 epic 的自主拆分（见 #1100） |
 | **vibe-roadmap（decider）** | `[roadmap decision]` | 决策者结论，覆盖 governance 建议 |
 
 ### 强制规则
@@ -590,16 +588,16 @@ vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marke
    ```text
    [roadmap decision] <动作动词>: <简要理由>
    ```
-   动作动词统一使用：`split`, `close`, `hold`, `deferred`, `confirm split`, `revert split`, `assign`, `unblock`
+   动作动词统一使用：`split`, `continue`, `close`, `hold`, `rfc`, `assign`, `unblock`
 
 ### 示例
 
 ```
 [roadmap decision] split epic into #42, #43, #44; reason: 3 modules, ~800 LOC, exceeds single-iteration threshold.
+[roadmap decision] continue #78; reason: bounded to one module and manager can plan within the existing issue.
 [roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
 [roadmap decision] hold #55 until #56 completes; reason: #56 provides core infrastructure #55 depends on.
-[roadmap decision] deferred #77; reason: needs human decision on architecture direction.
-[roadmap decision] confirm auto-split from #110; sub-issues #111, #112 correctly scoped.
+[roadmap decision] rfc #77; reason: needs human decision on architecture direction.
 ```
 
 ## Reference Documents

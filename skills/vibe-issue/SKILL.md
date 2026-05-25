@@ -28,7 +28,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - **进入执行现场属于后续阶段**：创建完成后，若要做版本规划转给 `vibe-roadmap`；若用户已明确要人工开工，则转给 `vibe-new`。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 - **依赖必须显式**：草稿中出现的依赖引用必须解析并标准化到 `## Dependencies` section。
-- **Scope 必须自检**：命中 epic 信号的 issue 必须触发拆分询问或写入 `## Scope estimate`。
+- **Scope 必须自检**：命中 epic 信号的 issue 必须触发拆分判断；能拆则建立主/子结构，不拆则写入 `## Scope estimate` 供 roadmap decider / manager 继续判断。
 
 ## 使用逻辑
 
@@ -93,14 +93,14 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - body 列出 >3 个独立子任务（编号列表或 checkbox 列表项 >3）
 
 **命中后的行为**：
-1. 明确询问用户：「这个 issue 看起来 scope 较大，建议拆为主 issue + sub-issues 结构。是否要建主/子结构？」
-2. 若用户确认拆分：
+1. 明确提示用户：「这个 issue 看起来 scope 较大，建议拆为主 issue + sub-issues 结构；拆分不会改变主 issue，只是把独立执行环节显式化。」
+2. 若用户确认拆分，或用户授权 agent 直接处理 scope：
    - 当前 issue 作为主 issue，建议添加 `roadmap/epic` 标签
    - body 写入 `## Sub-issues` section（留空模板，格式见下方「标准 Section」）
    - 引导用户单独触发 `/vibe-issue` 创建每个 sub-issue
-3. 若用户坚持单 issue：
+3. 若用户坚持单 issue，或拆分边界暂时无法判断：
    - body 写入 `## Scope estimate` section，记录范围预估（文件数/模块数/预期工作量）
-   - 便于 roadmap-intake 后续判断
+   - 便于 roadmap decider / manager 后续决定继续单 issue、拆分，或标记 `roadmap/rfc`
 
 #### 现有主/子结构判断
 
@@ -146,8 +146,8 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 记录主 issue 下的子任务清单。
 
 - **格式**: 一行一条 `- [ ] #<id> — <子任务短描述>`（checkbox 格式）
-- **写入者**: 用户确认拆分后，`vibe-issue` 写入空模板；sub-issue 创建后回填
-- **消费者**: manager 读取子任务完成进度，roadmap-intake 判断主 issue scope
+- **写入者**: 用户确认拆分、roadmap decider 决定拆分，或 manager 在执行规划中决定拆分后维护；sub-issue 创建后回填
+- **消费者**: manager 读取子任务完成进度，roadmap-intake / vibe-roadmap 判断主 issue scope
 - **示例**:
   ```markdown
   ## Sub-issues
@@ -160,8 +160,8 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 记录 scope 自检结果（仅单 issue 模式写入）。
 
 - **格式**: 自由文本，建议包含预估文件数/模块数/工作量级别
-- **写入者**: 用户拒绝拆分但 issue 命中 epic 信号时，`vibe-issue` 引导用户填写
-- **消费者**: roadmap-intake 用于判断是否应在 intake 阶段拦截过大 scope
+- **写入者**: issue 继续保持单 issue 或暂时无法判断拆分形态时，`vibe-issue` 引导用户填写
+- **消费者**: roadmap-intake / vibe-roadmap / manager 用于判断继续单 issue、拆分，或标记 `roadmap/rfc`
 - **示例**:
   ```markdown
   ## Scope estimate

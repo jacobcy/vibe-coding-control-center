@@ -573,6 +573,11 @@ plan:
     Before starting, read the current task context:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest ref, and next step.
     Use `--comments` flag to load the latest human instruction in full.
+    Scope split decisions are owned by roadmap decider / manager before this planning handoff.
+    Do not split the issue into sub-issues during planning.
+    If the current issue scope cannot be planned as-is, write a blocker comment, then run:
+    `uv run python src/vibe3/cli.py flow blocked --reason "Planner cannot produce plan as-is after state/claimed; scope or split shape needs manager/human decision."`
+    This moves `state/claimed` to `state/blocked` through the unified blocked writer. Then stop instead of changing scope.
 
     ### Pre-Planning Sync Check
     **For architectural refactors** (labels: component/*, type/refactor; or title contains "refactor"/"重构"):
@@ -617,7 +622,7 @@ plan:
     1. **Understand your current position and task** — Run `task show` and `handoff status` first
     2. **If you cannot clearly answer "where am I" and "what should I do"** — Block immediately
        - Write blocker explaining confusion: `uv run python src/vibe3/cli.py handoff append "任务理解困难：<具体困惑点>" --kind blocker --actor "<actor>"`
-       - Set to blocked: `gh issue edit <ISSUE_NUMBER> --add-label "state/blocked" --remove-label "state/claimed"`
+       - Set to blocked with reason: `uv run python src/vibe3/cli.py flow blocked --reason "Planner retry cannot determine current task: <具体困惑点>"`
        - Comment explaining situation: `gh issue comment <ISSUE_NUMBER> --body "[plan] 无法理解当前任务：\n\n<具体困惑点>\n\n需要人类澄清后才能继续。"`
        - **Then stop working and exit** — do not attempt any planning
     3. **If you can determine your task** — Read manager instructions in handoff
