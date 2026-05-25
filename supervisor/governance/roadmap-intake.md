@@ -98,12 +98,13 @@
 
 ### 与 Assignee Pool 的职责边界
 
-**Roadmap Intake（第一道闸门 / decider）**：
+**Roadmap Intake（第一道观察 / observer）**：
 - 重点：**是否应该存在** + **架构一致性**
 - 检查：生命周期、依赖、API、模块
-- 决策：纳入 / 拆分 / 关闭 / RFC
+- 输出：`[governance suggest]` 建议纳入 / 拆分 / 关闭 / RFC
+- 边界：Roadmap Intake 不自称最终 decider；真正的规划决策由 `vibe-roadmap`（roadmap decider）或 manager 在接手前执行
 
-**Manager / Assignee Pool（第二道闸门）**：
+**Vibe Roadmap / Manager（两道决策闸门）**：
 - 重点：**优先级** + **可执行性**
 - 检查：实质范围、验收标准、代码缺口
 - 决策：接受 / 拆分 / 继续单 issue / RFC
@@ -112,14 +113,14 @@
 ```
 Issue: #556 清理事件系统向后兼容别名
 
-Roadmap Intake（第一道）：
+Roadmap Intake（observer）：
   ├─ 检查：事件系统旧别名是否还存在？
-  ├─ 若已移除：建议关闭（原因：依赖已在 #XYZ 移除）
-  └─ 若存在：纳入 pool
+  ├─ 若已移除：写 [governance suggest] 建议关闭（原因：依赖已在 #XYZ 移除）
+  └─ 若存在：建议纳入 pool
 
-Assignee Pool（第二道）：
+Vibe Roadmap / Manager（decider）：
   ├─ 检查：范围、验收、代码缺口
-  └─ 决策：接受为重构任务 / 建议 manager 处理
+  └─ 决策：接受为重构任务 / 拆分 / RFC / 不执行
 ```
 
 ### Supervisor Issue Intake

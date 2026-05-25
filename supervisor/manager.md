@@ -419,12 +419,21 @@ Steps:
    - 若结果为 `split`：
      - 写 `[manager]` comment 说明拆分理由，并指出主 issue 保持治理容器
      - 创建 sub-issues，或在权限不足时要求补齐 sub-issues；必要时添加 `roadmap/epic`
-     - 当前 issue 不进入 `state/claimed`
+     - 当前 issue 不进入 `state/claimed`；它必须离开 `state/ready`
+     - 调用：
+       ```bash
+       uv run python src/vibe3/cli.py flow blocked --reason "Scope split: parent issue remains roadmap/epic governance container; execution continues in sub-issues."
+       ```
+       这会原子写入 `blocked_reason` 并转换为 `state/blocked`，表示主 issue 未关闭但不再派发执行
      - `exit()`
    - 若结果为 `rfc`：
      - 添加 `roadmap/rfc`
-     - 将当前 issue 调整为 `state/blocked`
      - comment 说明目标、架构方向或拆分形态需要人类判断
+     - 调用：
+       ```bash
+       uv run python src/vibe3/cli.py flow blocked --reason "RFC required: target, architecture direction, or split shape needs human decision before dispatch."
+       ```
+       这会原子写入 `blocked_reason` 并转换为 `state/blocked`
      - `exit()`
    - 若结果为 `continue`：继续后续依赖检查与 claim 流程
 
