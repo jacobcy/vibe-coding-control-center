@@ -196,6 +196,7 @@ Issue / PR 评论和 handoff 是两条互补但不可替换的通道。
 | reviewer | `[review]` | review 裁决、追问、合并建议 |
 | resume | `[resume]` | 任务恢复时的现场说明 |
 | governance | `[governance]` / `[governance suggest]` | 治理建议、自动恢复、 routing |
+| roadmap (decider) | `[roadmap decision]` | 路线图决策、强制拆分、依赖编排 |
 | apply / supervisor | `[apply]` / `[orchestra]` | 治理执行、编排公告 |
 
 格式约束：

@@ -100,6 +100,7 @@ AUTOMATED_MARKERS: Final[tuple[str, ...]] = (
     "[governance auto-recover]",
     "[governance apply]",
     "[governance]",
+    "[roadmap decision]",
 )
 
 # Generic agent marker pattern for fallback identification
