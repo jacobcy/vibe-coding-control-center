@@ -80,10 +80,35 @@ def resolve_issue_branch_input(
     if allow_no_flow:
         return None
 
+    # Check if this might be a PR number before raising error
+    # Try to fetch PR info to provide better hint
+    import json
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", str(issue_number), "--json", "headRefName,number"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            pr_data = json.loads(result.stdout)
+            if pr_data.get("headRefName"):
+                # This is a PR, provide PR-specific hint
+                raise UserError(
+                    f"#{issue_number} 是一个 Pull Request，不是 issue。\n"
+                    f"请使用以下命令：\n"
+                    f"  - vibe3 pr show {issue_number} 查看 PR 详情\n"
+                    f"  - vibe3 task show --pr {issue_number} 查看 PR 关联的 issue 详情"
+                )
+    except (subprocess.TimeoutExpired, Exception):
+        # Ignore errors in PR detection, fall through to default error
+        pass
+
     raise UserError(
         f"No flow found for issue #{issue_number}. "
-        f"Use '/vibe-new issue {issue_number}' to create a flow.\n"
-        f"提示：如果是 PR 号，请使用 --pr {issue_number}"
+        f"Use '/vibe-new issue {issue_number}' to create a flow."
     )
 
 

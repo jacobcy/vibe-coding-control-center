@@ -114,6 +114,58 @@ def render_task_show(
                 console.print("Tip: Use 'vibe3 flow update' to register current branch")
             return
         # Non-numeric branch without flow
+        # Check if we have issue info from branch name parsing
+        if task_result.issue_title or task_result.issue_state:
+            pr_data = asdict(task_result.pr_summary) if task_result.pr_summary else None
+            if output_format == "json":
+                console.print(
+                    json.dumps(
+                        {
+                            "branch": branch,
+                            "issue_number": (
+                                task_result.issue_title
+                                and task_result.latest_human_instruction
+                                and int(branch.split("-")[-1])
+                                if branch.split("-")[-1].isdigit()
+                                else None
+                            ),
+                            "title": task_result.issue_title,
+                            "state": task_result.issue_state,
+                            "pr": pr_data,
+                        },
+                        indent=2,
+                        default=str,
+                    ),
+                    markup=False,
+                )
+            elif output_format == "yaml":
+                console.print(
+                    _get_yaml().dump(
+                        {
+                            "branch": branch,
+                            "title": task_result.issue_title,
+                            "state": task_result.issue_state,
+                            "pr": pr_data,
+                        },
+                        default_flow_style=False,
+                        allow_unicode=True,
+                    ),
+                    markup=False,
+                )
+            else:
+                console.print("[bold]Issue Info[/]")
+                console.print(f"Branch: {branch}")
+                if task_result.issue_title:
+                    console.print(f"Title:  {task_result.issue_title}")
+                if task_result.issue_state:
+                    console.print(f"State:  {task_result.issue_state.lower()}")
+                if task_result.pr_summary:
+                    pr = task_result.pr_summary
+                    console.print("\n[bold]PR / CI[/]")
+                    console.print(f"PR: #{pr.number} {pr.state} {pr.title}")
+                    if pr.checks:
+                        console.print(f"Checks: {pr.checks}")
+            return
         if output_format in ("json", "yaml"):
             output_data = {"branch": branch, "error": "No flow found"}
             if output_format == "json":

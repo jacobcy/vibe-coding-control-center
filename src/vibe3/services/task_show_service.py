@@ -396,6 +396,14 @@ class TaskShowService:
         elif target_branch.isdigit():
             # Branch is an issue number but no flow exists
             issue_number = int(target_branch)
+        else:
+            # Try to parse issue number from branch name
+            from vibe3.services.issue_flow_service import IssueFlowService
+
+            issue_flow_service = IssueFlowService(store=self.store)
+            parsed = issue_flow_service.parse_issue_number_any(target_branch)
+            if parsed:
+                issue_number = parsed
 
         if issue_number:
             issue = self.fetch_issue_with_comments(issue_number)
