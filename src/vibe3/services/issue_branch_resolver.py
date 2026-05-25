@@ -15,7 +15,12 @@ def iter_issue_branch_candidates(issue_number: int) -> Iterable[str]:
     yield convention.branch.dev_branch(issue_number)
 
 
-def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | None:
+def resolve_issue_branch_input(
+    branch: str | None,
+    flow_service: Any,
+    *,
+    allow_no_flow: bool = False,
+) -> str | None:
     """Resolve numeric issue input with conflict detection.
 
     Changes from original:
@@ -26,9 +31,12 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
     Args:
         branch: User input (branch name or issue number)
         flow_service: FlowService instance
+        allow_no_flow: If True, return None instead of raising UserError
+            when no flows exist at all (Step 5). All other error paths
+            (conflict, all-aborted, unbound-candidates) still raise.
 
     Returns:
-        Resolved branch name
+        Resolved branch name, or None if allow_no_flow=True and no flows exist
 
     Raises:
         UserError: When conflicts or missing flows detected
@@ -69,6 +77,8 @@ def resolve_issue_branch_input(branch: str | None, flow_service: Any) -> str | N
         )
 
     # Step 5: No flows at all
+    if allow_no_flow:
+        return None
     raise UserError(
         f"No flow found for issue #{issue_number}. "
         f"Use '/vibe-new issue {issue_number}' to create a flow.\n"

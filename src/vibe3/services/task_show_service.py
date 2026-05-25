@@ -116,6 +116,7 @@ class TaskShowService:
         *,
         pr_number: int | None = None,
         position_arg: str | None = None,
+        allow_no_flow: bool = False,
     ) -> str:
         """Resolve explicit or current branch for task commands.
 
@@ -123,6 +124,8 @@ class TaskShowService:
             branch: Branch name or issue number (--branch option)
             pr_number: PR number to resolve branch from
             position_arg: Positional argument (issue number or branch)
+            allow_no_flow: If True, return raw numeric string instead of raising
+                UserError when no flows exist for an issue number.
 
         Returns:
             Resolved branch name
@@ -136,6 +139,7 @@ class TaskShowService:
             position_arg=position_arg,
             flow_service=self.flow_service,
             github_client=self.github_client,
+            allow_no_flow=allow_no_flow,
         )
 
     @staticmethod
@@ -328,7 +332,11 @@ class TaskShowService:
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state plus quick remote summary."""
-        target_branch = self.resolve_branch(branch)
+        # Skip re-resolution if branch is already provided (resolved by command layer)
+        if branch is None:
+            target_branch = self.resolve_branch()
+        else:
+            target_branch = branch
         local_task = self.flow_service.get_flow_status(target_branch)
 
         issue_links = self.store.get_issue_links(target_branch)

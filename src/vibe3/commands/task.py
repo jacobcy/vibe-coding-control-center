@@ -13,7 +13,6 @@ from vibe3.exceptions import SystemError, UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.observability.logger import setup_logging
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_branch_resolver import resolve_issue_branch_input
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import (
@@ -96,8 +95,9 @@ def show(
 
     try:
         # Pass branch_opt and issue separately for conflict detection
+        # allow_no_flow=True allows showing remote issue info without local flow
         target_branch = task_svc.resolve_branch(
-            branch_opt, pr_number=pr_opt, position_arg=issue
+            branch_opt, pr_number=pr_opt, position_arg=issue, allow_no_flow=True
         )
     except (UserError, SystemError) as error:
         typer.echo(f"Error: {error}", err=True)
@@ -109,19 +109,15 @@ def show(
     if trace:
         enable_method_trace()
 
-    # Resolve issue number from branch using standard resolver
-    resolved_branch = (
-        resolve_issue_branch_input(target_branch, task_svc.flow_service)
-        or target_branch
-    )
-    task_result = task_svc.show_task(resolved_branch)
+    # Pass target_branch directly to show_task (re-resolution is handled inside)
+    task_result = task_svc.show_task(target_branch)
 
     issue_number = None
     if task_result.local_task and task_result.local_task.task_issue_number:
         issue_number = task_result.local_task.task_issue_number
-    elif resolved_branch.isdigit():
+    elif target_branch.isdigit():
         # Branch resolved to numeric issue (no flow exists)
-        issue_number = int(resolved_branch)
+        issue_number = int(target_branch)
 
     render_task_show(task_result, output_format, full=full)
 

@@ -340,3 +340,99 @@ def test_task_show_json_includes_task_issue_numbers(
     payload = json.loads(result.stdout)
     # Should include task_issue_numbers array
     assert payload["task_issue_numbers"] == [123, 456]
+
+
+# Tests for issue number without local flow
+
+
+@patch("vibe3.commands.task.render_task_comments")
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_issue_no_flow_renders_issue_info(
+    mock_task_service_cls,
+    mock_render_task_comments,
+) -> None:
+    """task show <issue> with no local flow should render remote issue info."""
+    task_service = MagicMock()
+    # resolve_branch returns raw numeric string when allow_no_flow=True
+    # and no flow exists
+    task_service.resolve_branch.return_value = "999"
+    # show_task returns result with remote issue info but no local_task
+    task_service.show_task.return_value = TaskShowResult(
+        branch="999",
+        local_task=None,
+        issue_title="Remote issue without local flow",
+        issue_state="OPEN",
+    )
+    task_service.fetch_issue_with_comments.return_value = None
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "999"])
+
+    assert result.exit_code == 0
+    output = result.output
+    # Should show neutral informational line (not yellow warning)
+    assert "Remote issue #999 (no local flow)" in output
+    assert "Title:  Remote issue without local flow" in output
+    assert "State:  open" in output
+    # Should NOT show yellow warning about "No flow found"
+    assert "[yellow]" not in output
+
+
+@patch("vibe3.commands.task.render_task_comments")
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_issue_with_flow_resolves_to_branch(
+    mock_task_service_cls,
+    mock_render_task_comments,
+) -> None:
+    """task show <issue> with existing active flow should show normal task view."""
+    task_service = MagicMock()
+    # resolve_branch returns resolved branch name
+    task_service.resolve_branch.return_value = "task/issue-999"
+    task_service.show_task.return_value = TaskShowResult(
+        branch="task/issue-999",
+        local_task=FlowStatusResponse(
+            branch="task/issue-999",
+            flow_slug="issue-999",
+            flow_status="active",
+            task_issue_number=999,
+        ),
+        issue_title="Issue with active flow",
+        issue_state="OPEN",
+    )
+    task_service.fetch_issue_with_comments.return_value = None
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "999"])
+
+    assert result.exit_code == 0
+    output = result.output
+    # Should show normal task view (Current Task header)
+    assert "Current Task" in output
+    assert "Branch: task/issue-999" in output
+    # Should NOT show "Remote issue" message
+    assert "Remote issue" not in output
+
+
+@patch("vibe3.commands.task.TaskService")
+def test_task_show_issue_all_aborted_raises_error(
+    mock_task_service_cls,
+) -> None:
+    """task show <issue> with only aborted flows should exit with error."""
+    task_service = MagicMock()
+    from vibe3.exceptions import UserError
+
+    # resolve_branch raises UserError for all-aborted case
+    task_service.resolve_branch.side_effect = UserError(
+        "All flows for issue #999 are aborted:\n"
+        "  - task/issue-999 (status: aborted, pr: none)\n\n"
+        "Use 'vibe3 flow restore <branch>' to reactivate a flow."
+    )
+    mock_task_service_cls.return_value = task_service
+
+    result = runner.invoke(app, ["task", "show", "999"])
+
+    # Should exit with error
+    assert result.exit_code == 1
+    output = result.output
+    assert "Error:" in output
+    assert "All flows for issue #999 are aborted" in output
