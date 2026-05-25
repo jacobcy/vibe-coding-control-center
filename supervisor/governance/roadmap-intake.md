@@ -85,6 +85,9 @@
 - issue 的目标/验收口径本身不明确，无法确定做完算什么
 - 需要先决定架构方向、产品策略或跨团队边界
 - 不确定是否过时
+- **Epic 主 issue**（有 `roadmap/epic` 标签且 body 包含 `## Sub-issues`）：
+  - 不纳入 assignee pool（主 issue 本身不应进入执行）
+  - 等待所有 sub-issues 完成后再处理主 issue 的关闭
 
 **不要误判为 `needs human decision` 的情况**：
 - 同一目标下有 2-3 个局部实现路径，但 issue 本身已说明要修什么、验收看什么

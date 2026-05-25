@@ -90,6 +90,7 @@ sync_label "roadmap/p2" "有容量时完成" "FFCC00"
 sync_label "roadmap/next" "下个迭代规划中" "99CCFF"
 sync_label "roadmap/future" "未来考虑" "CCCCFF"
 sync_label "roadmap/rfc" "RFC/设计阶段" "CC99FF"
+sync_label "roadmap/epic" "Epic 主 issue（有 Sub-issues）" "9933FF"
 
 echo ""
 echo -e "${BLUE}=== Scope Labels ===${NC}"

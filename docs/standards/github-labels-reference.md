@@ -96,6 +96,7 @@
 | `roadmap/next` | 下个迭代规划中 | `gh issue edit 123 --add-label "roadmap/next"` |
 | `roadmap/future` | 未来考虑 | `gh issue edit 123 --add-label "roadmap/future"` |
 | `roadmap/rfc` | RFC/设计阶段 | `gh issue edit 123 --add-label "roadmap/rfc"` |
+| `roadmap/epic` | Epic 主 issue（有 Sub-issues） | `gh issue edit 123 --add-label "roadmap/epic"` |
 
 ### 2.4 关系镜像标签
 
@@ -222,6 +223,7 @@ gh issue list --milestone "Phase 1: 基础设施"
 | 中优先级 bug 修复 | `type/fix` + `priority/5` + `roadmap/p1` |
 | 低优先级文档更新 | `type/docs` + `priority/3` + `roadmap/p2` |
 | 需要讨论的设计 | `type/feature` + `roadmap/rfc` |
+| Epic 主 issue | `roadmap/epic` + `type/feature`（引导用户选择 sub-issue 进入） |
 | 性能优化 | `type/perf` + `priority/7` + `roadmap/p0` |
 | 技术债务清理 | `tech-debt` + `priority/5` + `roadmap/p1` |
 | 编排系统改进 | `component/orchestra` + `type/feature` + `roadmap/p1` |

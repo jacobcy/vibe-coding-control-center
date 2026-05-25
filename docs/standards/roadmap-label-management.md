@@ -342,12 +342,16 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 | `roadmap/next` | 下个迭代规划中 | 待确认的功能 |
 | `roadmap/future` | 未来考虑 | 长期规划、想法阶段 |
 | `roadmap/rfc` | RFC/设计阶段 | 需要讨论设计的功能 |
+| `roadmap/epic` | Epic 主 issue | 有 Sub-issues 的主 issue，需引导选择 sub-issue 进入 |
 
 ### 4.3 标签组合原则
 
 - 一个 issue 应该同时有 `type/*` 和 `priority/*` 标签
 - `roadmap/p0` 通常配合 `priority/high` 使用
 - `roadmap/rfc` 可以没有 `priority/*` 标签
+- `roadmap/epic` 表示主 issue 有 Sub-issues，不应直接进入执行，需引导用户选择具体 sub-issue
+- `roadmap/epic` 与 `roadmap/rfc` 语义不同：epic 是结构维度（主/子），rfc 是讨论维度（设计阶段）
+- 一个 issue 可以同时是 `roadmap/epic` 和 `roadmap/rfc`（需要设计讨论的 epic）
 - flow 绑定的 issue 会自动镜像 `vibe-task` 标签；执行状态以 flow 状态为准
 
 ---
@@ -433,6 +437,38 @@ uv run python src/vibe3/cli.py flow show --branch <branch>
 - 版本目标不明确
 - 技术方案需要评估
 - 资源分配需要协调
+
+### 6.4 Epic 处理流程
+
+当遇到标记为 `roadmap/epic` 的 issue 时：
+
+**检查逻辑**：
+```bash
+gh issue view <issue-number> --json labels,body
+```
+
+**阻断条件**：
+- 如果 issue 有 `roadmap/epic` 标签且 body 包含 `## Sub-issues` section：
+  - **禁止直接进入规划流程**
+  - 告知用户："该 issue 是 Epic 主 issue，请选择具体 sub-issue 进入"
+  - 列出 Sub-issues 列表供选择
+  - 停止 — 不继续规划
+
+**引导逻辑**：
+- 如果用户尝试对 Epic 主 issue 进行规划：
+  - 检查是否所有 Sub-issues 已完成
+  - 若全部完成，允许关闭主 issue
+  - 若未完成，引导用户选择未完成的 sub-issue
+
+**特殊情况**：
+- Epic + RFC：issue 既是 Epic 主 issue 又需要设计讨论
+  - 先完成设计讨论（`roadmap/rfc`）
+  - 设计确定后再处理 Sub-issues
+
+**语义分离原则**：
+- `roadmap/epic`：结构维度（主/子关系）
+- `roadmap/rfc`：讨论维度（设计阶段）
+- 一个 issue 可以同时具有两个标签，也可以只有其中一个
 
 ---
 

@@ -146,6 +146,10 @@ Forbidden:
 
 ```
 issue 是否可纳入？
+  ├─ **Epic 检查**（强制阻断）
+  │   └─ 有 `roadmap/epic` 标签 + `## Sub-issues` section？
+  │       └─ 是 → 跳过（主 issue 不入池，等待 sub-issues 完成）
+  │
   ├─ 检查实质条件
   │   ├─ 范围是否明确？
   │   ├─ 验收标准是否清晰？

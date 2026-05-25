@@ -349,6 +349,11 @@ gh issue list -l "roadmap/p0"
 **场景 B: 有版本目标但有新 `GitHub issue`**
 
 - 对新的 `GitHub issue` 进行分类：
+- **Epic 检查**（强制阻断）：
+  - 如果 issue 有 `roadmap/epic` 标签且 body 包含 `## Sub-issues` section：
+    - 告知用户："该 issue 是 Epic 主 issue，请先规划 sub-issues 或选择具体 sub-issue 进入"
+    - 停止 — 不继续规划主 issue
+    - 引导用户处理 sub-issues
 - 1.  分配适当的 Milestone
 - 2.  添加 roadmap 状态标签（`roadmap/p0`、`roadmap/p1`、`roadmap/p2` 等）
 - 3.  必要时补 `priority/[0-9]` 作为同一 roadmap 桶内的细粒度顺位提示
@@ -374,9 +379,9 @@ gh issue list -l "roadmap/p0"
 - 已被 `[governance suggest] needs split` 标记
 
 **强制拆分动作**：
-1. 主 issue 加 `roadmap/rfc` 标签：
+1. 主 issue 加 `roadmap/epic` 标签：
    ```bash
-   gh issue edit <epic-number> --add-label "roadmap/rfc"
+   gh issue edit <epic-number> --add-label "roadmap/epic"
    ```
 2. 主 issue **不分配** `vibe-manager-agent` assignee（epic 本身不入 manager pool）
 3. 调用 `/vibe-issue` 创建 sub-issues（每个 sub-issue body 中包含 `## Parent issue\n- #<epic-number>`）
