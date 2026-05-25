@@ -109,6 +109,7 @@ class TestPRStatusDetection:
             store=store, git_client=git_client, github_client=github_client
         )
         with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+            mock_reset.return_value = (None, [])
             service.verify_current_flow()
 
             # ASSERT: Should call reset to READY (not mark as aborted)
@@ -280,3 +281,88 @@ class TestMergedPRCacheIntegration:
                 assert result["number"] == 100
                 # Sync should have been called (via list_merged_prs)
                 mock_client.list_merged_prs.assert_called()
+
+
+class TestClosedPRNoTaskIssue:
+    """Test closed-PR cleanup when flow has no task issue link."""
+
+    def test_closed_pr_no_task_issue_cleans_physical_resources(self, tmp_path):
+        """Should mark flow aborted AND clean physical resources when PR closed."""
+        # ARRANGE: Flow with closed PR but no task issue link
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        store.update_flow_state(
+            "dev/no-task-issue",
+            flow_slug="no_task_issue",
+            flow_status="active",
+        )
+        # No issue link added (no task issue)
+
+        # Mock git client
+        from vibe3.clients.git_client import GitClient
+
+        git_client = MagicMock(spec=GitClient)
+        git_client.get_current_branch.return_value = "dev/no-task-issue"
+        git_client.get_git_common_dir.return_value = tmp_path / ".git"
+
+        # Mock GitHub client to return closed PR (not merged)
+        github_client = MagicMock(spec=GitHubClient)
+        closed_pr = PRResponse(
+            number=42,
+            title="Test PR",
+            state=PRState.CLOSED,
+            head_branch="dev/no-task-issue",
+            base_branch="main",
+            url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
+        )
+        github_client.list_prs_for_branch.return_value = [closed_pr]
+        github_client.list_all_prs.return_value = [closed_pr]
+
+        # Create handoff file
+        from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+        handoff_dir = get_branch_handoff_dir(tmp_path, "dev/no-task-issue")
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / "current.md").touch()
+
+        # ACT: Run check with mocked cleanup service
+        service = CheckService(
+            store=store, git_client=git_client, github_client=github_client
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "vibe3.services.flow_cleanup_service.FlowCleanupService"
+        ) as mock_cleanup_class:
+            mock_cleanup = MagicMock()
+            mock_cleanup_class.return_value = mock_cleanup
+            # Mock cleanup result: all steps succeeded
+            mock_cleanup.cleanup_flow_scene.return_value = {
+                "worktree": True,
+                "local_branch": True,
+                "remote_branch": True,
+                "handoff": True,
+                "flow_record": True,
+            }
+
+            result = service.verify_current_flow()
+
+            # ASSERT 1: Flow should be marked as aborted
+            flow = store.get_flow_state("dev/no-task-issue")
+            assert flow["flow_status"] == "aborted"
+
+            # ASSERT 2: cleanup_flow_scene should be called with correct args
+            mock_cleanup.cleanup_flow_scene.assert_called_once_with(
+                "dev/no-task-issue",
+                include_remote=True,
+                keep_flow_record=False,
+            )
+
+            # ASSERT 3: Result should be valid and contain cleanup warning
+            assert result.is_valid is True
+            assert len(result.issues) > 0
+            # Should mention cleanup in the warning
+            assert any("cleaned:" in issue for issue in result.issues)

@@ -185,16 +185,21 @@ class CheckService(CheckRemote):
 
         if pr.state == PRState.CLOSED:
             # PR closed without merge → clean up and return to READY
-            reset_error = self._reset_issue_after_pr_closed(branch, pr.number)
+            reset_error, reset_warnings = self._reset_issue_after_pr_closed(
+                branch, pr.number
+            )
             self._update_pr_cache(branch, pr)
 
             if reset_error:
                 return CheckResult(is_valid=False, branch=branch, issues=[reset_error])
+            result_issues.extend(reset_warnings)
             return CheckResult(is_valid=True, branch=branch, issues=result_issues)
 
         return None
 
-    def _reset_issue_after_pr_closed(self, branch: str, pr_number: int) -> str | None:
+    def _reset_issue_after_pr_closed(
+        self, branch: str, pr_number: int
+    ) -> tuple[str | None, list[str]]:
         """Reset issue to READY after PR closed without merge.
 
         Cleans up flow scene (worktree, branch, flow record) and
@@ -203,6 +208,10 @@ class CheckService(CheckRemote):
         Args:
             branch: Branch name (e.g., "task/issue-456")
             pr_number: Closed PR number
+
+        Returns:
+            Tuple of (error_str, warnings). error_str is None on success,
+            warnings contains cleanup result messages.
         """
         from vibe3.models.flow import FlowStatusResponse
         from vibe3.services.task_resume_operations import TaskResumeOperations
@@ -226,7 +235,35 @@ class CheckService(CheckRemote):
             self._flow_status_service.mark_flow_aborted(
                 branch, f"PR #{pr_number} closed without merge (no issue link)"
             )
-            return None
+
+            # Clean up physical resources (worktree, branches, flow record)
+            from vibe3.services.flow_cleanup_service import FlowCleanupService
+
+            cleanup_service = FlowCleanupService(
+                store=self.store,
+                git_client=self.git_client,
+            )
+            cleanup_result = cleanup_service.cleanup_flow_scene(
+                branch, include_remote=True, keep_flow_record=False
+            )
+
+            # Build warning message from cleanup results
+            cleaned_items = []
+            if cleanup_result.get("worktree"):
+                cleaned_items.append("worktree")
+            if cleanup_result.get("local_branch"):
+                cleaned_items.append("local branch")
+            if cleanup_result.get("remote_branch"):
+                cleaned_items.append("remote branch")
+            if cleanup_result.get("flow_record"):
+                cleaned_items.append("flow record")
+
+            warning_msg = (
+                f"Flow '{branch}' marked aborted; cleaned: {', '.join(cleaned_items)}"
+                if cleaned_items
+                else f"Flow '{branch}' marked aborted (no cleanup needed)"
+            )
+            return (None, [warning_msg])
 
         # Check if issue already closed
         gh_issue = self.github_client.view_issue(task_issue_number)
@@ -239,7 +276,7 @@ class CheckService(CheckRemote):
                     branch=branch,
                     issue_number=task_issue_number,
                 ).info(f"Issue #{task_issue_number} already closed, skip reset")
-                return None
+                return (None, [])
 
         # Build minimal FlowStatusResponse for task resume
         flow = FlowStatusResponse(
@@ -294,10 +331,11 @@ class CheckService(CheckRemote):
             ).warning(f"Failed to reset issue: {exc}")
             return (
                 f"Failed to reset issue #{task_issue_number} after PR "
-                f"#{pr_number} closed: {exc}"
+                f"#{pr_number} closed: {exc}",
+                [],
             )
 
-        return None
+        return (None, [])
 
     def _check_multiple_state_labels(
         self, issue_number: int, issue_payload: dict
