@@ -98,13 +98,21 @@ def _resolve_pr_target(
     Returns:
         PrQueryTarget with resolved PR number and branch
     """
-    # Priority 1: Explicit PR number or branch (resolve branch if needed)
-    if pr_number or branch:
+    # Short-circuit: explicit PR number bypasses all issue/branch resolution
+    if pr_number is not None:
+        return PrQueryTarget(
+            pr_number=pr_number,
+            branch=branch,
+            current_branch=None,
+            from_flow=False,
+        )
+
+    # Priority 1: Explicit branch (resolve if needed)
+    if branch:
         # Resolve branch if it looks like an issue number
-        resolved_branch = branch
-        if branch:
-            flow_service = FlowService(store=pr_svc.store)
-            resolved_branch = resolve_issue_branch_input(branch, flow_service)
+        resolved_branch: str | None = branch
+        flow_service = FlowService(store=pr_svc.store)
+        resolved_branch = resolve_issue_branch_input(branch, flow_service)
 
         # Short-circuit: if resolve returned the original numeric input unchanged,
         # no real branch was found — skip the misleading API call
