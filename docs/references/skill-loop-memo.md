@@ -17,7 +17,7 @@ related_docs:
   - skills/vibe-task/SKILL.md
   - skills/vibe-check/SKILL.md
   - skills/vibe-new/SKILL.md
-  - skills/vibe-start/SKILL.md
+  - skills/vibe-continue/SKILL.md
   - skills/vibe-commit/SKILL.md
   - skills/vibe-integrate/SKILL.md
   - skills/vibe-done/SKILL.md
@@ -35,7 +35,7 @@ related_docs:
 
 ## 主链路
 
-`GitHub issue -> vibe-new -> vibe-start -> spec execution -> PR -> review/integrate -> done`
+`GitHub issue -> vibe-new -> vibe-continue -> spec execution -> PR -> review/integrate -> done`
 
 > Note: `roadmap item` 是历史兼容/规划参考语义（见 glossary.md §3.2）。当前治理直接管理 assignee issue，不经过 roadmap item 中间层转换。
 
@@ -56,10 +56,10 @@ related_docs:
    - 不做什么：不创建 task，不直接开始执行。
    - 记忆句：它处理“怎么进入新链”，不是“进来后怎么落 task”。
 
-4. `vibe-start`
-   - 做什么：进入新 flow 后，从 issue 落 task，再把 `spec_standard/spec_ref` 交给对应执行体系。
+4. `vibe-continue`
+   - 做什么：恢复或加载当前 flow 的任务上下文，确保共享真源与本地现场一致。
    - 不做什么：不承担旧 flow 到新 flow 的转换，不负责 issue intake。
-   - 记忆句：它是“从 issue 落 task 后开始做”，不是“决定切到哪个主 issue”。
+   - 记忆句：它是“恢复工作现场”，不是“决定切到哪个主 issue”。
 
 5. `vibe-commit`
    - 做什么：commit 分组、PR 切片、提交并发 PR。
@@ -95,7 +95,7 @@ related_docs:
 - `vibe-issue`：发 issue
 - `vibe-roadmap`：排 roadmap
 - `vibe-new`：旧 flow 到新 flow 的转换，不创建 task
-- `vibe-start`：从 issue 落 task，然后开始做
+- `vibe-continue`：恢复并加载执行现场
 - `vibe-commit`：提交 + PR
 - `vibe-integrate`：review / CI / merge readiness
 - `vibe-done`：merge and clear
