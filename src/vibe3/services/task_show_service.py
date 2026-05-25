@@ -331,7 +331,7 @@ class TaskShowService:
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
         """Load task detail from local state plus quick remote summary."""
-        target_branch = self.resolve_branch(branch)
+        target_branch = self.resolve_branch(branch, allow_no_flow=True)
         local_task = self.flow_service.get_flow_status(target_branch)
 
         issue_links = self.store.get_issue_links(target_branch)

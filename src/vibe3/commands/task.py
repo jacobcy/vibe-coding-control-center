@@ -112,7 +112,9 @@ def show(
 
     # Resolve issue number from branch using standard resolver
     resolved_branch = (
-        resolve_issue_branch_input(target_branch, task_svc.flow_service)
+        resolve_issue_branch_input(
+            target_branch, task_svc.flow_service, allow_no_flow=True
+        )
         or target_branch
     )
     task_result = task_svc.show_task(resolved_branch)
