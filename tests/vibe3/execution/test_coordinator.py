@@ -254,10 +254,7 @@ def test_sync_skips_when_live_session_exists_for_target(mock_dependencies, monke
         "vibe3.execution.coordinator.SessionRegistryService", return_value=mock_registry
     ):
         coordinator = ExecutionCoordinator(
-            config=config,
-            store=store,
-            backend=backend,
-            capacity=capacity,
+            config=config, store=store, backend=backend, capacity=capacity
         )
 
         request = ExecutionRequest(
@@ -275,9 +272,7 @@ def test_sync_skips_when_live_session_exists_for_target(mock_dependencies, monke
     assert result.launched is False
     assert result.reason_code == "duplicate_dispatch"
     mock_registry.get_truly_live_sessions_for_target.assert_called_once_with(
-        role="manager",
-        branch="task/issue-42",
-        target_id="42",
+        role="manager", branch="task/issue-42", target_id="42"
     )
 
 
@@ -287,10 +282,7 @@ def test_sync_worker_uses_codeagent_execution_service(mock_dependencies):
     capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
-        config=config,
-        store=store,
-        backend=backend,
-        capacity=capacity,
+        config=config, store=store, backend=backend, capacity=capacity
     )
 
     request = ExecutionRequest(
@@ -326,10 +318,7 @@ def test_sync_reviewer_uses_unified_execution_shell(mock_dependencies):
     capacity.can_dispatch.return_value = True
 
     coordinator = ExecutionCoordinator(
-        config=config,
-        store=store,
-        backend=backend,
-        capacity=capacity,
+        config=config, store=store, backend=backend, capacity=capacity
     )
 
     request = ExecutionRequest(
