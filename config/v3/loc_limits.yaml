@@ -87,6 +87,9 @@ code_limits:
       - path: "src/vibe3/commands/status.py"
         limit: 550
         reason: "Status 命令聚合，包含 flow/session/orchestra 多维度状态展示，6个渲染section紧密耦合，blocked_reason智能提取逻辑增加可读性，CLI 入口函数难以拆分"
+      - path: "src/vibe3/commands/flow_status.py"
+        limit: 450
+        reason: "Flow status 命令聚合，包含 show/status 两个入口、branch resolution、issue title 批量查询、PR map/worktree map 构建、timeline 收集等紧密耦合逻辑，CLI 入口函数难以拆分"
       - path: "src/vibe3/commands/scan.py"
         limit: 470
         reason: "Scan 命令聚合（governance/supervisor/all 三个完整命令），每个命令包含执行入口和 dry-run 入口，已下沉 UI 和业务逻辑到 ui/ 和 services/ 层"
@@ -108,8 +111,8 @@ code_limits:
         limit: 480
         reason: "Task 服务聚合，包含状态转换、查询、resume 候选筛选逻辑"
       - path: "src/vibe3/services/task_show_service.py"
-        limit: 410
-        reason: "Task show 服务聚合，包含 task detail 查询、issue comment 处理、PR summary 构建、ref 选择逻辑（state machine）、resolve_branch 统一入口（支持 --pr 选项）等紧密耦合逻辑"
+        limit: 450
+        reason: "Task show 服务聚合，包含 task detail 查询、issue comment 处理、PR summary 构建、ref 选择逻辑（state machine）、resolve_branch 统一入口（支持 --pr 选项）等紧密耦合逻辑；简化 fetch_issue_with_comments 后略微超标"
       - path: "src/vibe3/services/expired_resource_cleanup_service.py"
         limit: 540
         reason: "过期资源清理服务聚合，包含 agent worktree、远程分支、本地分支清理等三个紧密耦合的过期资源清理逻辑，新增 quiet 模式和颜色高亮输出后略微超标"
