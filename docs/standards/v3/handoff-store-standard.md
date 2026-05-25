@@ -114,23 +114,33 @@ CREATE TABLE schema_meta (
 CREATE TABLE flow_state (
   branch TEXT PRIMARY KEY,
   flow_slug TEXT NOT NULL,
-  task_issue_number INTEGER,
-  pr_number INTEGER,
   spec_ref TEXT,
   plan_ref TEXT,
   report_ref TEXT,
   audit_ref TEXT,
+  indicate_ref TEXT,
+  pr_ref TEXT,
   planner_actor TEXT,
-  planner_session_id TEXT,
   executor_actor TEXT,
-  executor_session_id TEXT,
   reviewer_actor TEXT,
-  reviewer_session_id TEXT,
+  manager_actor TEXT,
   latest_actor TEXT,
-  blocked_by TEXT,
+  initiated_by TEXT,
+  blocked_by_issue INTEGER,
+  blocked_reason TEXT,
+  failed_reason TEXT,
   next_step TEXT,
   flow_status TEXT NOT NULL DEFAULT 'active',
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  planner_status TEXT,
+  executor_status TEXT,
+  reviewer_status TEXT,
+  execution_pid INTEGER,
+  execution_started_at TEXT,
+  execution_completed_at TEXT,
+  latest_verdict TEXT,
+  deleted_at TEXT,
+  transition_count INTEGER DEFAULT 0
 );
 ```
 
@@ -140,29 +150,27 @@ CREATE TABLE flow_state (
   - 本地 runtime 主键
 - `flow_slug`
   - 用户可读 flow 名称
-- `task_issue_number`
-  - 单值，允许为空
-- `pr_number`
-  - 单值，允许为空
-- `spec_ref`
+- `spec_ref` / `plan_ref` / `report_ref` / `audit_ref` / `indicate_ref`
   - 文档引用，不复制正文
-- `plan_ref` / `report_ref` / `audit_ref`
-  - 文档引用，不复制正文
-- `planner_actor` / `executor_actor` / `reviewer_actor`
+- `pr_ref`
+  - PR URL
+- `planner_actor` / `executor_actor` / `reviewer_actor` / `manager_actor`
   - 必须使用 `agent/model` 形态
   - 示例：`codex/gpt-5.4`
-- `planner_session_id` / `executor_session_id` / `reviewer_session_id`
-  - 用于记录和恢复会话的字段
-  - 现阶段仅保留字段，不实现功能
-  - 面向未来设计，用于会话连续性支持
 - `latest_actor`
   - 最近一次写入 handoff 的 actor
-- `blocked_by`
-  - 文本提示字段，可存 `#123`、`task/xxx`、`pr#17`
+- `blocked_by_issue`
+  - 阻塞当前 flow 的 issue 编号
+- `blocked_reason`
+  - 阻塞原因文本
+- `failed_reason`
+  - **已废弃**：优先使用 `blocked_reason`
 - `next_step`
   - 简短下一步提示
 - `flow_status`
-  - 只允许：`active`, `blocked`, `done`, `stale`
+  - 只允许：`active`, `blocked`, `done`, `stale`, `aborted`
+- `transition_count`
+  - 状态流转计数
 - `updated_at`
   - ISO 8601 时间戳
 

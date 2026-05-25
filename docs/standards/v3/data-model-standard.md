@@ -56,11 +56,15 @@ related_docs:
 - **职责**：当前开放 flow 的运行时状态真源
 - **主键**：`branch`（TEXT）
 - **核心字段**：
-  - `flow_slug`：显示名称（V3 中使用，对应原 v2 的 flow name）
-  - `status`：现场层状态（`active`/`idle`/`missing`/`stale`）
-  - `current_task_id`：当前执行中的 task
+  - `flow_slug`：显示名称
+  - `flow_status`：执行状态（`active`/`blocked`/`done`/`stale`/`aborted`）
+  - `blocked_by_issue`：阻塞当前 flow 的 issue 编号
+  - `blocked_reason`：阻塞原因文本
+  - `transition_count`：状态流转计数（用于防死循环）
+  - `spec_ref`, `plan_ref`, `report_ref`, `audit_ref`, `indicate_ref`：各阶段文档引用
+  - `planner_actor`, `executor_actor`, `reviewer_actor`, `manager_actor`：各角色执行者
   - `created_at`, `updated_at`：时间戳
-- **约束**：`branch` 是 PRIMARY KEY，`flow_slug` 是显示名称
+- **约束**：`branch` 是 PRIMARY KEY，`flow_status` 必须符合 canonical 枚举
 
 #### `flow_issue_links` 表
 - **职责**：flow 与 GitHub issue 的多对多关联关系
@@ -158,15 +162,18 @@ related_docs:
 现场层状态只允许：
 
 - `active`
-- `idle`
-- `missing`
+- `blocked`
+- `done`
 - `stale`
+- `aborted`
 
 禁止：
 
-- `in-progress`
-- `done`
+- `idle`
+- `missing`
 - `merged`
+- `in-progress`
+- `done` (作为规划层状态时禁止)
 - `skipped`
 - 用模糊字段 `state` 混装不同层状态
 

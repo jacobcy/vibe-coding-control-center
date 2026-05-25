@@ -48,26 +48,27 @@ Flow 生命周期涉及三个真源：
 见 [glossary.md](glossary.md) §3.4.1 Flow Status 语义。
 
 ```
-new → active → blocked → active (恢复)
-           ↓    ↘    ↓
-         done  stale  failed → blocked (业务错误)
-           ↓
-        aborted
+new → active ↔ blocked
+        ↓        ↓
+      done     stale
+        ↓
+     aborted
 ```
 
 **区分 Flow Status 和 Issue State**：
 
-- **Flow Status**：`active/blocked/done/aborted`（SQLite flow_state）
+- **Flow Status**：`active/blocked/done/stale/aborted`（SQLite flow_state）
   - 描述 flow 的执行状态
-  - 图中的 `failed → blocked` 表示：失败原因可能收口为 blocked，但 blocked 不等于 failed
+  - `failed` 已废弃，通过 `active` 状态配合 `blocked_reason` 表达
 
 - **Issue State**：`ready/claimed/in-progress/blocked/handoff/review/merge-ready/done`（GitHub label）
   - 描述 issue 的编排状态
   - IssueState.FAILED 已废弃，统一到 BLOCKED
 
 **关系**：
-- Flow Status `failed` → Issue State `blocked`
+- Flow Status `blocked` → Issue State `blocked`
 - Flow Status `aborted` → Issue State `ready`（被动清理）
+- Flow Status `stale` → Issue State `ready`（被动清理）
 
 ### 2.2 Issue State 统一模型
 
@@ -231,8 +232,8 @@ QualifyGate 通过 `CoordinationTruth.is_blocked` 判断阻塞状态，其真源
 | blocked → active（自动） | blocked → active | `state/blocked` → 推断目标 label | QualifyGate 处理 |
 | blocked → active（手动） | blocked → active | `state/blocked` → 用户指定 label | `task resume` 处理 |
 | → done | active → done | 无需处理（issue 自动关闭） | PR merged 触发 |
-| → aborted | * → aborted | ⚠️ 未显式处理 | **实现缺口** |
-| → stale | active → stale | ⚠️ 未显式处理 | **实现缺口** |
+| → aborted | * → aborted | `state/*` → `state/ready` (被动) | `vibe3 check` 清理时恢复 |
+| → stale | active → stale | `state/*` → `state/ready` (被动) | Governance 机制处理 |
 
 **实现缺口说明**：`mark_flow_aborted()` 和 `mark_flow_stale()` 当前未在方法内显式管理 task issue label。对于 aborted，后续 `vibe3 check --clean-branch` 的被动清理会恢复 label；对于 stale，依赖 governance 机制在重建 ready flow 时处理。
 
