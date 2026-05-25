@@ -13,6 +13,8 @@ related_docs:
   - AGENTS.md
   - SOUL.md
   - STRUCTURE.md
+  - docs/standards/v3/git-workflow-standard.md
+  - docs/standards/v3/skill-trigger-standard.md
 ---
 
 # AI Agent Workspace (.agent)
