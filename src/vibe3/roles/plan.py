@@ -25,7 +25,7 @@ from vibe3.execution.issue_role_support import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.role_contracts import PLANNER_GATE_CONFIG
+from vibe3.execution.role_contracts import PLANNER_GATE_CONFIG, WorktreeRequirement
 from vibe3.execution.role_request_factory import (
     build_role_async_request,
     build_role_sync_request,
@@ -379,6 +379,7 @@ def execute_spec_plan_async(
             cmd=build_self_invocation(cli_args),
             cwd=None,  # Let coordinator resolve worktree path
             repo_path=str(repo_root),
+            worktree_requirement=WorktreeRequirement.PERMANENT,
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
             refs=(
                 {"issue_number": str(issue_number)} if issue_number is not None else {}

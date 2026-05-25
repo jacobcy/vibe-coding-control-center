@@ -30,7 +30,7 @@ from vibe3.execution.issue_role_support import (
     resolve_env_overridable_agent_options,
 )
 from vibe3.execution.prompt_meta import build_prompt_meta
-from vibe3.execution.role_contracts import REVIEWER_GATE_CONFIG
+from vibe3.execution.role_contracts import REVIEWER_GATE_CONFIG, WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
@@ -419,6 +419,7 @@ def _dispatch_async_manual_review(
             cmd=build_self_invocation(cli_args),
             cwd=None,  # Let coordinator resolve worktree path
             repo_path=str(repo_root),
+            worktree_requirement=WorktreeRequirement.PERMANENT,
             refs={
                 "task": instructions or "",
                 "review_scope": request.scope.kind,

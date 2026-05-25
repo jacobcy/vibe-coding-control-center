@@ -22,6 +22,7 @@ from vibe3.execution.codeagent_support import build_self_invocation
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.execution.prompt_meta import PromptContextMode, build_prompt_meta
+from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.execution.session_service import load_session_id
 from vibe3.roles.run_helpers import (
     publish_run_command_failure,
@@ -84,6 +85,7 @@ def dispatch_run_command_async(
             cmd=build_self_invocation(cli_args),
             cwd=None,  # Let coordinator resolve worktree path
             repo_path=str(repo_root),
+            worktree_requirement=WorktreeRequirement.PERMANENT,
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
             refs=refs,
             actor="agent:run",
