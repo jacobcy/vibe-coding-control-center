@@ -1,5 +1,5 @@
 #!/bin/bash
-# Block destructive commands: rm -rf /, rm -rf ~, DROP TABLE, force push, etc.
+# Block destructive system-level commands and quality gate bypasses
 INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
@@ -10,8 +10,7 @@ fi
 PATTERNS=(
   "rm\s+-rf\s+(/|~|\$HOME)"
   "rm\s+-rf\s+.*\s+(/|~)"
-  # Fixed: match -f/--force as flags (with space before/after or at end), not in branch names
-  "git\s+push\s+.*(\s+(-f|--force)|(-f|--force)\s+|(-f|--force)\$)"
+  "git\s+commit\s+.*--no-verify"
   "(DROP|TRUNCATE)\s+(TABLE|DATABASE)"
 )
 
