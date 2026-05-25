@@ -129,7 +129,7 @@ vibe-roadmap 作为 decider，对 governance observer 层的输出执行**强制
 | governance observer 输出 | vibe-roadmap decision | 执行动作 |
 |---|---|---|
 | `[governance suggest] needs split` | `[roadmap decision] split` | 调用 `/vibe-issue` 拆分 → 写 decision comment |
-| `[governance suggest] Recommend Close` | `[roadmap decision] close` | `gh issue close <N> --comment "[roadmap decision] close; reason: ..."` |
+| `[governance suggest] Recommend Close` | `[roadmap decision] close` | 写 comment 说明关闭理由；建议人类关闭（不自动关闭） |
 | `[governance suggest] Skipped (needs human)` | `[roadmap decision] deferred` | 进入用户对话；用户决策后写 decision comment |
 | `[governance auto-split]` (来自 #1100) | `[roadmap decision] confirm split` 或 `[roadmap decision] revert split` | 复核拆分结果；合理则确认，不合理则回滚 |
 | `[governance suggest] waiting on #X` | `[roadmap decision] hold until #X` 或调整 milestone | 校验依赖图无循环 → 写 decision |
@@ -276,9 +276,13 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 
 1. **找到上次决策锚点**：
    ```bash
-   # 找到最近一条 [roadmap decision] 评论的时间
-   gh issue list --limit 100 --search "comment:[roadmap decision]" \
-     --json comments --jq '.[].comments[] | select(.body | startswith("[roadmap decision]")) | .createdAt' \
+   # 方式 A: 针对单个 issue 查询最近 [roadmap decision] 评论
+   gh issue view <N> --json comments --jq '.comments | map(select(.body | startswith("[roadmap decision]"))) | sort_by(.createdAt) | .[-1].createdAt'
+   
+   # 方式 B: 跨 issue 搜索（使用 GraphQL 或 REST API）
+   # 注: gh issue list 不支持 --json comments，需用 gh api 或 GraphQL
+   gh api search/issues?q='comment:"[roadmap decision]"' --jq '.items[].comments_url' \
+     | xargs -I {} gh api {} --jq '.[] | select(.body | startswith("[roadmap decision]")) | .createdAt' \
      | sort | tail -1
    ```
    若无历史 `[roadmap decision]` 评论（首次运行），锚点设为 7 天前。
@@ -286,7 +290,14 @@ vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[ro
 2. **列出锚点之后所有未消化的 `[governance suggest]`**：
    ```bash
    # 列出锚点之后带 [governance suggest] 评论的 issues
-   gh issue list --limit 100 --search "comment:[governance suggest]"
+   # 注: 需在本地过滤锚点时间（gh search 不支持 updated:> 按评论时间过滤）
+   gh api search/issues?q='comment:"[governance suggest]"' --jq '.items[] | .number' \
+     | while read num; do
+         last_decision=$(gh issue view $num --json comments --jq '.comments | map(select(.body | startswith("[roadmap decision]"))) | sort_by(.createdAt) | .[-1].createdAt // "1970-01-01"')
+         if [[ "$last_decision" > "$anchor_time" ]]; then
+           echo "#$num"
+         fi
+       done
    ```
 
 3. **按 issue × suggest 类型分组展示**：
@@ -372,9 +383,10 @@ gh issue list -l "roadmap/p0"
 4. 在主 issue body 中追加或更新 `## Sub-issues` 清单：
    ```markdown
    ## Sub-issues
-   - #<sub1>: <title>
-   - #<sub2>: <title>
+   - [ ] #<sub1> — <简短描述>
+   - [ ] #<sub2> — <简短描述>
    ```
+   注：格式与 `skills/vibe-issue/SKILL.md` 标准对齐
 5. 在 sub-issues 之间用 `## Dependencies` 建立顺序（见依赖图编排章节）
 6. 写 `[roadmap decision]` comment：
    ```bash
@@ -450,9 +462,9 @@ gh issue edit <issue_number> --milestone "Phase 1: 基础设施" --add-label "ro
 milestone 分配时必须校验依赖图：
 
 **真源读取**：
-- 读取 issue body 中的 `## Dependencies` section
-- 读取 GitHub `flow_issue_links`（若项目启用了 GitHub issue links）
-- 以 issue body `## Dependencies` 为主真源，`flow_issue_links` 为补充
+- 读取 issue body 中的 `## Dependencies` section（主真源，远端可读）
+- 读取本地 SQLite `flow_issue_links` 表（`issue_role='dependency'`）（补充真源，执行现场）
+- 注：`flow_issue_links` 是本地数据库表，不是 GitHub 功能
 
 **校验规则**：
 1. **无循环检测**：从当前 issue 出发 DFS 遍历 `## Dependencies`，确认无环
