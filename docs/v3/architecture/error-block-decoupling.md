@@ -11,6 +11,20 @@ ERROR tracking and BLOCK management are two orthogonal systems that serve differ
 | **Trigger** | Exceptions, API failures, recovery events | Manual block, auto-block via FailedGate |
 | **Output** | Error count, threshold reached flag | Blocked/unblocked state, fail issue |
 
+## Module Placement Trade-off
+
+The `record_error()` helper is placed in `exceptions/error_helpers.py` rather than `services/` for ergonomic reasons:
+
+**Design Goal**: Provide a unified entry point for error recording at the same level as exception definitions (`vibe3.exceptions`), making it easy to discover and use.
+
+**Trade-off**: This placement creates a reverse dependency from `exceptions/` → `services/` (via lazy import of `ErrorTrackingService`). While technically violating the standard layer direction (`CLI → Commands → Services → Clients → Models`), this is a conscious trade-off:
+
+1. **Usage ergonomics**: Developers naturally look in `vibe3.exceptions` for error-related utilities
+2. **Lazy import**: Circular dependency avoided by importing inside function
+3. **Thin façade**: `record_error()` is a pure delegation to `ErrorTrackingService.record_error()`, no business logic
+
+**Alternative considered**: Placing in `services/error_helpers.py` would follow layering rules but hurt discoverability. The current design prioritizes developer experience over architectural purity for this specific helper.
+
 ## ERROR System
 
 ### Storage
@@ -103,28 +117,44 @@ FlowService(store=store_instance).block_flow(
 
 ## Architecture Diagram
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Execution Layer                       │
-│  (codeagent_runner, dispatch, auto_scene_recovery, ...) │
-└──────────────┬──────────────────────┬───────────────────┘
-               │                      │
-        record_error()          block_flow()
-               │                      │
-               ▼                      ▼
-┌──────────────────────┐  ┌──────────────────────┐
-│   ERROR System       │  │   BLOCK System       │
-│                      │  │                      │
-│ ErrorTrackingService │  │ BlockedStateService  │
-│ error_log table      │  │ flow_state.blocked_reason  │
-│ error_classification │  │ flow_block_mixin     │
-│ error_codes          │  │ blocked_state_io     │
-│ error_helpers        │  │ blocked_state_types  │
-└──────────┬───────────┘  └──────────────────────┘
-           │                       ▲
-           │  threshold reached    │
-           └───────────────────────┘
-              FailedGate (read-only)
+```mermaid
+flowchart TB
+    subgraph Execution["Execution Layer"]
+        codeagent_runner
+        dispatch
+        auto_scene_recovery
+    end
+
+    record_error["record_error()"]
+    block_flow["block_flow()"]
+
+    subgraph ERROR["ERROR System"]
+        ErrorTrackingService["ErrorTrackingService"]
+        error_log["error_log table"]
+        error_classification["error_classification"]
+        error_codes["error_codes"]
+        error_helpers["error_helpers"]
+    end
+
+    subgraph BLOCK["BLOCK System"]
+        BlockedStateService["BlockedStateService"]
+        flow_state_blocked["flow_state.blocked_reason"]
+        flow_block_mixin["flow_block_mixin"]
+        blocked_state_io["blocked_state_io"]
+        blocked_state_types["blocked_state_types"]
+    end
+
+    FailedGate["FailedGate (read-only)"]
+
+    Execution --> record_error
+    Execution --> block_flow
+    record_error --> ERROR
+    block_flow --> BLOCK
+    ERROR -->|"threshold reached"| FailedGate
+    FailedGate --> BLOCK
+
+    style ERROR fill:#ffe6e6
+    style BLOCK fill:#e6f3ff
 ```
 
 Key constraint: ERROR system writes to `error_log`, BLOCK system writes to `flow_state.blocked_reason`. The only coupling point is `FailedGate`, which reads `error_log` (read-only) and may trigger a BLOCK.

@@ -235,3 +235,8 @@ class InvalidTransitionError(UserError):
 #
 # Error recording helper (convenience function):
 #   from vibe3.exceptions.error_helpers import record_error
+#   or: from vibe3.exceptions import record_error
+
+
+# Re-export for convenience
+from .error_helpers import record_error  # noqa: E402, F401
