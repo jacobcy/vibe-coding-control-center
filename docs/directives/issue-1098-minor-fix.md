@@ -2,12 +2,12 @@
 
 ## Quality Review Summary
 
-**Audit Ref**: docs/reports/issue-1098-audit-report.md
+**Audit Ref**: (audit report not created — MINOR fix scope)
 **Verdict**: MINOR
 
 ### Finding
 
-Step 3.5 (lines 68-69 in `skills/vibe-issue/SKILL.md`) conflates two different scenarios:
+Step 3.5 in `skills/vibe-issue/SKILL.md` conflates two different scenarios:
 - "issue不存在" (issue doesn't exist in database)
 - "issue已关闭" (issue is closed/completed)
 
@@ -19,7 +19,7 @@ These are **semantically different**:
 
 ### Fix Required
 
-Modify lines 68-69 to distinguish these cases:
+Modify the dependency handling logic to distinguish these cases:
 
 ```markdown
 # Current (conflated):
@@ -35,7 +35,7 @@ Modify lines 68-69 to distinguish these cases:
 
 ### Execution Instructions
 
-1. Read current implementation: `skills/vibe-issue/SKILL.md` lines 68-69
+1. Read current implementation: `skills/vibe-issue/SKILL.md` Step 3.5 dependency handling
 2. Split the conditional logic into two separate cases
 3. Update user messages to distinguish semantics
 4. Verify the change doesn't break step ordering
@@ -44,7 +44,7 @@ Modify lines 68-69 to distinguish these cases:
 ### Scope
 
 - **Files to modify**: `skills/vibe-issue/SKILL.md` only
-- **Lines**: 68-69 (approximately 2-4 lines changed)
+- **Lines**: Step 3.5 dependency handling (approximately 2-4 lines changed)
 - **No other changes needed**: All other aspects pass review
 
 ### Quality Criteria

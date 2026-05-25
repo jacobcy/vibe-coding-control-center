@@ -90,7 +90,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 **Body 信号**：
 - 提到 `>N 个文件`、`>M 个模块`、`N+ 个`、`全量` 等量化范围描述
-- body 列出 >= 3 个独立子任务（编号列表或 checkbox 列表项 >= 3）
+- body 列出 >3 个独立子任务（编号列表或 checkbox 列表项 >3）
 
 **命中后的行为**：
 1. 明确询问用户：「这个 issue 看起来 scope 较大，建议拆为主 issue + sub-issues 结构。是否要建主/子结构？」
@@ -133,7 +133,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 - **格式**: 一行一条 `- Depends on #<id> — <短描述>`
 - **写入者**: `vibe-issue` 在 Step 3.5 引导用户确认并写入
-- **消费者**: roadmap-intake 读取依赖关系，dispatcher 用于依赖方向判断
+- **消费者**: `CoordinationResolver` 通过 issue body 解析依赖关系（远程真源），同步到 `flow_issue_links`。dispatcher 用于依赖方向判断
 - **示例**:
   ```markdown
   ## Dependencies
