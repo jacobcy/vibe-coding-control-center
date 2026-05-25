@@ -23,8 +23,8 @@ def _make_check_service():
     )
 
 
-def test_handle_closed_pr_blocks_issue_state_with_comment() -> None:
-    """When PR is closed (not merged), issue should be blocked with guidance comment."""
+def test_handle_closed_pr_resets_issue_to_ready() -> None:
+    """When PR is closed (not merged), issue should be reset to READY."""
     service = _make_check_service()
 
     # Mock PR closed (not merged)
@@ -33,50 +33,76 @@ def test_handle_closed_pr_blocks_issue_state_with_comment() -> None:
     mock_pr.state = PRState.CLOSED
     mock_pr.merged_at = None
 
-    # Mock flow state exists
-    service.store.get_flow_state.return_value = {
-        "branch": "task/issue-456",
-        "flow_status": "active",
-        "latest_actor": "agent:test",
-    }
-
     # Mock issue links
     service.store.get_issue_links.return_value = [
         {"issue_role": "task", "issue_number": 456}
     ]
 
-    # Mock issue state
+    # Mock issue state (open)
     service.github_client.view_issue.return_value = {
         "state": "open",
-        "labels": [{"name": "state/in-progress"}],
     }
 
-    with patch.object(service._flow_status_service, "mark_flow_aborted") as mock_abort:
-        with patch.object(service, "_block_issue_for_pr_closed") as mock_block:
-            result = service._handle_closed_pr("task/issue-456", mock_pr)
+    with patch(
+        "vibe3.services.task_resume_operations.TaskResumeOperations"
+    ) as mock_resume_ops_cls:
+        mock_resume_ops = MagicMock()
+        mock_resume_ops_cls.return_value = mock_resume_ops
 
-    # Verify flow marked aborted
-    mock_abort.assert_called_once()
+        result = service._handle_closed_pr("task/issue-456", mock_pr)
 
-    # Verify issue blocked with comment
-    mock_block.assert_called_once_with("task/issue-456", 123)
+        # Verify reset_issue_to_ready was called
+        mock_resume_ops.reset_issue_to_ready.assert_called_once()
+        call_kwargs = mock_resume_ops.reset_issue_to_ready.call_args[1]
+        assert call_kwargs["issue_number"] == 456
+        assert call_kwargs["resume_kind"] == "pr_closed"
 
-    # Verify check result is valid
-    assert result.is_valid is True
+        # Verify check result is valid
+        assert result.is_valid is True
+
+
+def test_handle_closed_pr_reports_reset_failure() -> None:
+    """When reset fails, check should report the closed PR cleanup as invalid."""
+    service = _make_check_service()
+
+    mock_pr = MagicMock()
+    mock_pr.number = 123
+    mock_pr.state = PRState.CLOSED
+    mock_pr.merged_at = None
+
+    service.store.get_issue_links.return_value = [
+        {"issue_role": "task", "issue_number": 456}
+    ]
+    service.github_client.view_issue.return_value = {
+        "state": "open",
+    }
+
+    with patch(
+        "vibe3.services.task_resume_operations.TaskResumeOperations"
+    ) as mock_resume_ops_cls:
+        mock_resume_ops = MagicMock()
+        mock_resume_ops.reset_issue_to_ready.side_effect = RuntimeError(
+            "scene cleanup failed"
+        )
+        mock_resume_ops_cls.return_value = mock_resume_ops
+
+        result = service._handle_closed_pr("task/issue-456", mock_pr)
+
+    assert result is not None
+    assert result.is_valid is False
+    assert result.issues == [
+        "Failed to reset issue #456 after PR #123 closed: scene cleanup failed"
+    ]
 
 
 def test_handle_closed_pr_skips_already_closed_issue() -> None:
-    """When issue already closed, skip blocking."""
+    """When issue already closed, skip reset."""
     service = _make_check_service()
 
     mock_pr = MagicMock()
     mock_pr.number = 123
     mock_pr.state = PRState.CLOSED
 
-    service.store.get_flow_state.return_value = {
-        "branch": "task/issue-456",
-        "flow_status": "active",
-    }
     service.store.get_issue_links.return_value = [
         {"issue_role": "task", "issue_number": 456}
     ]
@@ -86,41 +112,14 @@ def test_handle_closed_pr_skips_already_closed_issue() -> None:
         "state": "CLOSED",
     }
 
-    with patch.object(service._flow_status_service, "mark_flow_aborted"):
+    with patch(
+        "vibe3.services.task_resume_operations.TaskResumeOperations"
+    ) as mock_resume_ops_cls:
+        mock_resume_ops = MagicMock()
+        mock_resume_ops_cls.return_value = mock_resume_ops
+
         result = service._handle_closed_pr("task/issue-456", mock_pr)
 
-    # Should not try to block closed issue
-    # Check that no label transition was attempted
-    assert result.is_valid is True
-
-
-def test_block_issue_for_pr_closed_adds_guidance_comment() -> None:
-    """Blocking issue should add helpful guidance comment."""
-    service = _make_check_service()
-
-    service.store.get_issue_links.return_value = [
-        {"issue_role": "task", "issue_number": 456}
-    ]
-    service.github_client.view_issue.return_value = {
-        "state": "open",
-    }
-
-    with patch("vibe3.services.label_service.LabelService") as mock_label_cls:
-        mock_label = MagicMock()
-        mock_label_cls.return_value = mock_label
-
-        service._block_issue_for_pr_closed("task/issue-456", pr_number=123)
-
-    # Verify comment added
-    service.github_client.add_comment.assert_called_once()
-    call_args = service.github_client.add_comment.call_args
-    assert call_args[0][0] == 456  # issue_number
-
-    comment_body = call_args[0][1]
-    assert "PR #123" in comment_body
-    assert "已关闭" in comment_body
-    assert "follow-up issue" in comment_body.lower()
-    assert (
-        "vibe task resume" in comment_body.lower()
-        or "vibe check --clean-branch" in comment_body.lower()
-    )
+        # Should not try to reset closed issue
+        mock_resume_ops.reset_issue_to_ready.assert_not_called()
+        assert result.is_valid is True

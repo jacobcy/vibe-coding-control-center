@@ -210,14 +210,13 @@ def test_verify_branch_handles_closed_pr(tmp_path: Path) -> None:
     )
     service._branch_to_pr = {branch: closed_pr}
 
-    # Mock flow_status_service.mark_flow_aborted to avoid side effects
-    with patch.object(
-        service._flow_status_service, "mark_flow_aborted"
-    ) as mock_mark_aborted:
+    # Mock _reset_issue_after_pr_closed to avoid side effects
+    with patch.object(service, "_reset_issue_after_pr_closed") as mock_reset:
+        mock_reset.return_value = None
         result = service.verify_branch(branch)
 
-        # Should call mark_flow_aborted
-        mock_mark_aborted.assert_called_once()
+        # Should call _reset_issue_after_pr_closed
+        mock_reset.assert_called_once()
         assert result.is_valid is True
 
 
