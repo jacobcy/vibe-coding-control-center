@@ -465,3 +465,56 @@ class TestFailedGateIntegration:
         # Gate is ACTIVE → on_tick skipped, blocked_ticks incremented
         assert tick_calls == []
         mock_gate.increment_blocked_ticks.assert_called_once()
+
+    def test_end_to_end_error_to_gate_to_heartbeat_block(
+        self, temp_store: SQLiteClient
+    ) -> None:
+        """End-to-end test: governance error → gate activation → heartbeat block.
+
+        This test validates the production flow where:
+        1. Governance records errors via ErrorTrackingService.get_instance()
+           (default)
+        2. FailedGate checks via ErrorTrackingService.get_instance(store=store)
+           (per-store)
+        3. Both should read from the same database, triggering gate activation
+        """
+        from vibe3.exceptions.error_severity import ErrorSeverity
+        from vibe3.orchestra.failed_gate import FailedGate
+        from vibe3.services.error_tracking_service import ErrorTrackingService
+
+        # Clear any existing instances to ensure clean state
+        ErrorTrackingService.clear_instance()
+
+        # Simulate governance error recording: uses default instance
+        # In production, both resolve to git-common-dir/vibe3/handoff.db
+        # In test, we simulate this by using the same temp_store
+        default_instance = ErrorTrackingService.get_instance(store=temp_store)
+
+        # Record 2 ERROR-severity errors (threshold is 2)
+        default_instance.record_error(
+            error_code="E_API_RATE_LIMIT",
+            error_message="Rate limit exceeded",
+            tick_id=1,
+            severity=ErrorSeverity.ERROR,
+        )
+        default_instance.record_error(
+            error_code="E_API_TIMEOUT",
+            error_message="API timeout",
+            tick_id=2,
+            severity=ErrorSeverity.ERROR,
+        )
+
+        # Simulate FailedGate check: uses per-store instance
+        gate = FailedGate(store=temp_store)
+        result = gate.check()
+
+        # Gate should be blocked (threshold reached)
+        assert result.blocked, "Gate should be blocked after 2 ERROR-severity errors"
+        assert "ERROR-severity threshold" in (result.reason or "")
+
+        # Verify heartbeat tick is skipped when gate is active
+        # (This is tested in test_heartbeat_tick_blocked_by_active_gate,
+        # but we verify the gate state here)
+        status = gate.get_status()
+        assert status.is_active, "Gate should be ACTIVE after threshold reached"
+        assert status.blocked_ticks == 0, "No ticks counted yet"

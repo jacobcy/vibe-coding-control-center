@@ -177,6 +177,14 @@ class FailedGate:
         # Check for frequent ERROR-severity errors (threshold: 2+ in window)
         error_count = error_tracking.get_threshold_error_count()
 
+        # Diagnostic logging: report errors exist but below threshold
+        if error_count > 0 and error_count < ErrorTrackingService.THRESHOLD_COUNT:
+            log.info(
+                f"ERROR-severity count below threshold: {error_count} errors "
+                f"(threshold: {ErrorTrackingService.THRESHOLD_COUNT} in "
+                f"{ErrorTrackingService.TIME_WINDOW_MINUTES} minutes)"
+            )
+
         if error_count >= ErrorTrackingService.THRESHOLD_COUNT:
             log.warning(
                 f"ERROR-severity threshold reached: {error_count} errors "
