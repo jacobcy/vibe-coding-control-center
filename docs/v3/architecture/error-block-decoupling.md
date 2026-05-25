@@ -7,7 +7,7 @@ ERROR tracking and BLOCK management are two orthogonal systems that serve differ
 | | ERROR System | BLOCK System |
 |---|---|---|
 | **Purpose** | Track error frequency for threshold detection | Manage issue flow state (block/unblock) |
-| **Storage** | `error_log` table in SQLite | `blocked_state` table in SQLite |
+| **Storage** | `error_log` table in SQLite | `flow_state.blocked_reason` field + issue labels |
 | **Trigger** | Exceptions, API failures, recovery events | Manual block, auto-block via FailedGate |
 | **Output** | Error count, threshold reached flag | Blocked/unblocked state, fail issue |
 
@@ -47,7 +47,7 @@ record_error(
     issue_number=1357,
     branch="task/issue-1357",
     store=store_instance,
-    severity=ErrorSeverity.HIGH,
+    severity=ErrorSeverity.ERROR,
 )
 ```
 
@@ -67,27 +67,25 @@ Severity levels are defined in `vibe3.exceptions.error_severity` and mapped via 
 
 ### Storage
 
-Blocked states are stored in the `blocked_state` SQLite table via `BlockedStateService`.
+Blocked states are stored in the `flow_state` table (via `BlockedStateService`) and reflected in issue labels (`state/blocked`).
 
 ### Control Flow
 
 1. Block condition triggered (manual or auto via FailedGate)
 2. `block_flow()` is called via `FlowBlockMixin`
-3. `BlockedStateService` writes to `blocked_state` table
+3. `BlockedStateService` writes to `flow_state.blocked_reason`
 4. Issue label set to `state/blocked`
 5. Unblock removes the state and restores issue label
 
 ### Blocking Flows
 
-Use the `block_flow()` function from `flow_block_mixin`:
+Use the `block_flow()` method from `FlowService`:
 
 ```python
-from vibe3.services.flow_block_mixin import block_flow
+from vibe3.services.flow_service import FlowService
 
-block_flow(
-    store=store_instance,
+FlowService(store=store_instance).block_flow(
     branch="task/issue-1357",
-    issue_number=1357,
     reason="Auto-blocked: error threshold exceeded",
 )
 ```
@@ -118,7 +116,7 @@ block_flow(
 │   ERROR System       │  │   BLOCK System       │
 │                      │  │                      │
 │ ErrorTrackingService │  │ BlockedStateService  │
-│ error_log table      │  │ blocked_state table  │
+│ error_log table      │  │ flow_state.blocked_reason  │
 │ error_classification │  │ flow_block_mixin     │
 │ error_codes          │  │ blocked_state_io     │
 │ error_helpers        │  │ blocked_state_types  │
@@ -129,4 +127,4 @@ block_flow(
               FailedGate (read-only)
 ```
 
-Key constraint: ERROR system writes to `error_log`, BLOCK system writes to `blocked_state`. The only coupling point is `FailedGate`, which reads `error_log` (read-only) and may trigger a BLOCK.
+Key constraint: ERROR system writes to `error_log`, BLOCK system writes to `flow_state.blocked_reason`. The only coupling point is `FailedGate`, which reads `error_log` (read-only) and may trigger a BLOCK.

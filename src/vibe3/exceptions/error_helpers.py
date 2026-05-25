@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.datamodel.sqlite_client import SQLiteClient
+    from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.exceptions.error_severity import ErrorSeverity
 
 

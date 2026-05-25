@@ -9,7 +9,7 @@ def get_file_content(file_path: Path) -> str:
     """Read file content, return empty string if not exists."""
     if not file_path.exists():
         return ""
-    return file_path.read_text()
+    return file_path.read_text(encoding="utf-8")
 
 
 class TestErrorModulesDoNotImportBlockModules:
@@ -90,14 +90,19 @@ class TestBlockModulesDoNotImportErrorModules:
             content = get_file_content(file_path)
             # Exclude docstring references to "error_log" table
             lines = content.split("\n")
+            in_docstring = False
             for i, line in enumerate(lines):
-                # Skip lines that are clearly comments/docstrings
                 stripped = line.strip()
-                if (
-                    stripped.startswith("#")
-                    or stripped.startswith('"""')
-                    or stripped.startswith("'''")
-                ):
+                # Track docstring state
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    # Toggle docstring state
+                    in_docstring = not in_docstring
+                    # Handle single-line docstrings
+                    if stripped.count('"""') >= 2 or stripped.count("'''") >= 2:
+                        in_docstring = False
+                    continue
+                # Skip lines inside docstrings or comments
+                if in_docstring or stripped.startswith("#"):
                     continue
                 assert (
                     "error_log" not in line
