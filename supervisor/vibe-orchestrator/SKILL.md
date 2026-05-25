@@ -22,14 +22,14 @@ input_examples:
 2. Gate 1: Scope Gate
 3. Gate 2: Spec Gate
 4. Gate 3: Plan Gate
-   **(HARD STOP) /vibe-new 只能走到此处，等待人类用 /vibe-start 唤醒执行机**
+   **(HARD STOP) /vibe-new 只能走到此处，等待人类用 /vibe-continue 唤醒执行机**
 5. Gate 4: Test Gate
 6. Gate 5: Execution Gate
 7. Gate 6: Audit / Review Gate
 
 ## Exception Escalation Hook (异常举报通道)
 
-作为总编排器，你还需要接管来自下层技能（特别是 `vibe-start` 步进器）的异常举报（Escalation）。
+作为总编排器，你还需要接管来自下层技能（特别是 `vibe-continue` 步进器）的异常举报（Escalation）。
 下属技能如果在执行途中遇到以下情况，将主动挂起并向你报告：
 
 1. **文档缺失/前提错误**：执行依赖的关键配置或规范不存在。
@@ -157,7 +157,7 @@ input_examples:
 - 检查是否存在可执行计划（目标、非目标、步骤、验证命令）
 - 无计划时，先产出计划文件再继续
 - 禁止"先改再补计划"
-- **HARD STOP**：一旦产生 Plan，如果入口是 `/vibe-new`，强制挂起，并提示用户运行 `/vibe-start` 或人工审查。严禁直接继续走到 Gate 4！
+- **HARD STOP**：一旦产生 Plan，如果入口是 `/vibe-new`，强制挂起，并提示用户运行 `/vibe-continue` 或人工审查。严禁直接继续走到 Gate 4！
 
 ### Gate 4: Test Gate
 
@@ -170,7 +170,7 @@ input_examples:
 - 按计划逐任务执行，禁止跳步
 - 执行前声明改动范围（文件数、预计行数）
 - 执行中收集验证证据（命令与输出）
-- 若入口来自 `/vibe-new`，则无权进入此 Gate。此 Gate 仅为 `/vibe-start` 开放。
+- 若入口来自 `/vibe-new`，则无权进入此 Gate。此 Gate 仅为 `/vibe-continue` 开放。
 - 共享 registry、worktree 绑定、共享任务存储修改必须委托给 Shell 命令（Tier 1）：
   - 当前目录模式：
     1. 确保在正确的分支上（`git checkout <branch>` 或创建新分支）
@@ -220,7 +220,7 @@ input_examples:
 ## Entry Command Contract
 
 - 当用户通过 `/vibe-new <feature>` 进入时，默认走慢速通道并从 Scope Gate 开始，并在 Gate 3 (Plan) 结束后触发绝对硬停止（HARD STOP）。
-- 当用户通过 `/vibe-start` 进入时，它是静默执行机。如果期间触发报错，它会将警报升级 (Escalate) 给你。
+- 当用户通过 `/vibe-continue` 进入时，它是静默执行机。如果期间触发报错，它会将警报升级 (Escalate) 给你。
 - 当用户请求 `/vibe-commit` 时，仅在 Audit / Review Gate 通过后进入提交建议阶段
 
 ## Output Contract

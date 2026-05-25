@@ -46,11 +46,11 @@ related_docs:
 ## 🧭 Namespace 约定
 
 - `workflow` 使用 `vibe:*`
-  - 例：`vibe:new`、`vibe:start`、`vibe:commit`
+  - 例：`vibe:new`、`vibe:continue`、`vibe:commit`
 - `skill` 使用 `vibe-*`
-  - 例：`vibe-new`、`vibe-start`、`vibe-commit`
+  - 例：`vibe-new`、`vibe-continue`、`vibe-commit`
 
-兼容期内，用户仍可使用 `/vibe-new`、`/vibe-start` 等 slash 入口；这些入口触发的是 workflow，workflow 再委托同名 skill。
+兼容期内，用户仍可使用 `/vibe-new`、`/vibe-continue` 等 slash 入口；这些入口触发的是 workflow，workflow 再委托同名 skill。
 
 ## 🤖 AI 互操作协议 (AI Interoperability Protocol)
 
@@ -73,7 +73,7 @@ related_docs:
 | Workflow | Description | Usage |
 | :--- | :--- | :--- |
 | **[/vibe-new](workflows/vibe:new.md)** | 规划入口 | intake 新目标、handoff 或缺 spec 的 task，委托 `vibe-new` skill 产出 plan 和 task 绑定。 |
-| **[/vibe-start](workflows/vibe:start.md)** | 执行入口 | 执行当前 flow 已绑定且带 plan 的 task，委托 `vibe-start` skill 按图纸推进。 |
+| **[/vibe-continue](workflows/vibe:continue.md)** | 执行入口 | 执行当前 flow 已绑定且带 plan 的 task，委托 `vibe-continue` skill 按图纸推进。 |
 | **[/vibe-commit](workflows/vibe:commit.md)** | 提交与发 PR 入口 | 读取工作区和 flow 事实，再委托 `vibe-commit` skill 处理提交分组与 PR 切片。 |
 
 ## 🧩 专项 workflow

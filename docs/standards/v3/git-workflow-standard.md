@@ -154,7 +154,7 @@ closeout 约束：
 1. 从 `GitHub issue` 确认来源层目标（直接真源）
 2. 若有必要，同步对应的 `roadmap item`（仅作规划参考）
 3. 通过 `vibe-new` 确认/创建目标 issue、创建/注册 flow、绑定 issue 并创建 PR draft
-4. 进入新 flow 后，通过 `vibe-start` 确认并补齐 flow 环境
+4. 进入新 flow 后，通过 `vibe-continue` 确认并补齐 flow 环境
 5. 让该 `flow` 绑定本轮要交付的 `task` (execution record)
 6. 在该 `flow` 对应的 `branch` 上提交本地 commit
 7. 执行 `review`
