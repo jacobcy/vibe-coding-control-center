@@ -400,8 +400,6 @@ def test_get_pr_caches_result(pr_service: PRService) -> None:
 
 def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
     """Test that get_pr re-fetches after TTL expires."""
-    import time as time_module
-
     gh_instance = pr_service.github_client
     mock_pr = PRResponse(
         number=123,
@@ -418,20 +416,24 @@ def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
     gh_instance.list_pr_review_comments.return_value = []
     gh_instance.list_pr_reviews.return_value = []
 
-    # First call — populates cache
-    result1 = pr_service.get_pr(pr_number=123)
-    assert result1.number == 123
-    assert gh_instance.get_pr.call_count == 1
+    clock = [0.0]
 
-    # Second call within TTL — uses cache
-    result2 = pr_service.get_pr(pr_number=123)
-    assert result2.number == 123
-    assert gh_instance.get_pr.call_count == 1
-
-    # Simulate TTL expiry by advancing monotonic clock
-    with patch.object(
-        time_module, "monotonic", return_value=time_module.monotonic() + 120
+    with patch(
+        "vibe3.services.pr_service.time.monotonic",
+        side_effect=lambda: clock[0],
     ):
+        # First call — populates cache at t=0
+        result1 = pr_service.get_pr(pr_number=123)
+        assert result1.number == 123
+        assert gh_instance.get_pr.call_count == 1
+
+        # Second call within TTL — uses cache
+        result2 = pr_service.get_pr(pr_number=123)
+        assert result2.number == 123
+        assert gh_instance.get_pr.call_count == 1
+
+        # Advance clock past TTL (> 60s)
+        clock[0] = 120.0
         result3 = pr_service.get_pr(pr_number=123)
         assert result3.number == 123
-        assert gh_instance.get_pr.call_count == 2  # Called again after expiry
+        assert gh_instance.get_pr.call_count == 2
