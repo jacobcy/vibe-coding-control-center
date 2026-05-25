@@ -105,7 +105,30 @@ def show(
     # When --remote is set with a numeric position arg, bypass branch resolution
     # and use the issue number directly for remote fetch
     if remote and issue_number_from_arg is not None:
-        target_branch = f"dev/issue-{issue_number_from_arg}"  # Placeholder branch
+        # Check for parameter conflicts before bypassing
+        provided = [
+            name
+            for opt, name in [
+                (branch_opt, "--branch"),
+                (pr_opt, "--pr"),
+                (branch_arg, "<arg>"),
+            ]
+            if opt is not None
+        ]
+        if len(provided) > 1:
+            typer.echo(
+                f"错误：不能同时使用 {', '.join(provided)}，请只指定一个目标。",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        # Use ConventionResolver to derive placeholder branch
+        from vibe3.services.convention_resolver import (
+            ConventionResolver as _ConventionResolver,
+        )
+
+        _convention = _ConventionResolver.from_repo().resolve()
+        target_branch = _convention.branch.dev_branch(issue_number_from_arg)
     else:
         try:
             target_branch = resolve_command_branch(
