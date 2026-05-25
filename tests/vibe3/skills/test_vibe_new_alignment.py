@@ -7,7 +7,7 @@ def test_vibe_new_skill_uses_layered_pseudocode_sections() -> None:
 
     # Simplified structure: numbered steps instead of explicit section headers
     assert "## 1. 强制前置检查" in content
-    assert "## 3. Bootstrap flow scene" in content
+    assert "## 4. Bootstrap flow scene" in content
     assert "## 停止条件" in content
 
 

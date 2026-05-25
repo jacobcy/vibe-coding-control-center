@@ -434,6 +434,20 @@ run:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest plan ref, and next step.
     Use `--comments` flag to load the latest human instruction in full.
 
+    ### Pre-Sync Check (MANDATORY for architectural refactors)
+    **If issue involves architectural refactoring** (labels: component/*, type/refactor; or title contains "refactor"/"重构"):
+    1. Fetch latest main: `git fetch origin main`
+    2. Check lag: `git log HEAD..origin/main --oneline | wc -l`
+    3. Check impact on target component: `git diff --stat origin/main...HEAD -- src/vibe3/<target-module>/ | wc -l`
+    4. **Decision**:
+       - **If lag > 10 commits OR target component has > 20 changed files on main**:
+         - This branch is too far behind main. Proceeding risks severe merge conflicts.
+         - Write blocker: `uv run python src/vibe3/cli.py handoff append "架构同步风险：main 已领先 {lag} commits，目标模块有 {changes} 文件变化。建议先 rebase 或人工判断。"`
+         - Block issue: `vibe3 flow blocked --reason "架构冲突风险：main 分支已大幅演进"`
+         - **Then exit** — do not start implementation on stale architecture
+       - **If lag ≤ 10 AND target component changes ≤ 20**:
+         - Proceed with normal implementation (still consider rebasing if lag > 5)
+
     ### Pre-Execution Checks (before starting implementation)
     1. Run `git log --oneline -5` to check if the expected work may already be committed
     2. If the plan describes changes that appear to already exist in recent commits:
@@ -559,6 +573,21 @@ plan:
     Before starting, read the current task context:
     `uv run python src/vibe3/cli.py task show` — shows branch, flow, issue number, latest ref, and next step.
     Use `--comments` flag to load the latest human instruction in full.
+
+    ### Pre-Planning Sync Check
+    **For architectural refactors** (labels: component/*, type/refactor; or title contains "refactor"/"重构"):
+    1. Fetch latest main: `git fetch origin main`
+    2. Check if target component has recent changes on main:
+       ```bash
+       git log HEAD..origin/main --oneline -- src/vibe3/<target-module>/
+       ```
+    3. **If changes detected on main**:
+       - You MUST plan against the **current** architecture on main, not the stale branch
+       - Use `git show origin/main:src/vibe3/<file>` to read current file state from main
+       - Document in plan: "Target architecture has evolved from main, design adapted accordingly"
+       - Recommend: rebase before implementation to reduce conflict risk
+    4. **If no relevant changes on main**:
+       - Proceed with normal planning
 
     Analyze requirements and identify affected files using inspect tools.
     Design minimal changes with clear implementation steps.
