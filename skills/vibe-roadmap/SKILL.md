@@ -122,28 +122,22 @@ print(usernames[0] if usernames else 'vibe-manager-agent')
 - 非重复已关闭 issue
 - 不需要先关闭其他依赖 issue
 
-### 决策逻辑
+### 决策逻辑（决策矩阵）
 
-**优先纳入**（通过全部三级）：
-- bug fix：问题明确 + 架构仍相关 + 未过时
-- small feature：方案明确 + 范围小 + 架构一致
-- 重构类：范围明确 + 边界清晰 + 验收标准确定
+vibe-roadmap 作为 decider，对 governance observer 层的输出执行**强制决策**，不再只写建议：
 
-**建议关闭**（Level 2 或 Level 3 不通过）：
-- 依赖的模块已在其他 PR 移除
-- 引用的 API 已废弃
-- 与已关闭 issue 重复
-- 明确不适用当前架构
+| governance observer 输出 | vibe-roadmap decision | 执行动作 |
+|---|---|---|
+| `[governance suggest] needs split` | `[roadmap decision] split` | 调用 `/vibe-issue` 拆分 → 写 decision comment |
+| `[governance suggest] Recommend Close` | `[roadmap decision] close` | `gh issue close <N> --comment "[roadmap decision] close; reason: ..."` |
+| `[governance suggest] Skipped (needs human)` | `[roadmap decision] deferred` | 进入用户对话；用户决策后写 decision comment |
+| `[governance auto-split]` (来自 #1100) | `[roadmap decision] confirm split` 或 `[roadmap decision] revert split` | 复核拆分结果；合理则确认，不合理则回滚 |
+| `[governance suggest] waiting on #X` | `[roadmap decision] hold until #X` 或调整 milestone | 校验依赖图无循环 → 写 decision |
 
-**建议调整**（Level 1 或 Level 2 部分不通过）：
-- 范围过大 → 建议拆分
-- 架构已变更 → 建议更新内容
-- 依赖未就绪 → 建议等依赖完成后重新提出
-
-**跳过（保守等待）**：
-- issue 的目标/验收口径本身不明确
-- 需要先决定架构方向、产品策略或跨团队边界
-- 不确定是否过时
+**决策原则**：
+- 每个 suggest 必须产生一个对应的 decision
+- decision 优先于 suggest（decider 覆盖 observer）
+- 无法自动决策时（如 `needs human`），标记为 `[roadmap decision] deferred` 并说明等待人类输入
 
 ## Assignee 自动分配
 
@@ -225,17 +219,19 @@ Manager assignee 配置位于：
 
 ## Comment Contract
 
-任何 intake 类 routing 评论必须遵循 marker 规则：
+vibe-roadmap 作为治理-决策双轨中的**决策者**，使用独立的 `[roadmap decision]` marker，与 observer 层的 `[governance suggest]` 严格区分：
 
-- 第一行行首必须是 `[governance]` 或更具体的 `[governance suggest]`（前面只允许空白字符）
-- intake 决策建议用 `[governance suggest]`，因为 roadmap skill 只产出 routing 信号、不做强制结论
-- 不要把 intake 说明嵌入到自由文本中而不带 marker；缺失 marker 会被人类指令解析器误读为人类指令
+- 第一行行首必须是 `[roadmap decision]`（前面只允许空白字符）
+- vibe-roadmap **禁止**写 `[governance suggest]` 评论（marker 必须区分 observer / decider）
+- 缺失 marker 或使用错误 marker 会被人类指令解析器误读为人类指令
+- 详细 marker contract 见下方「Comment Marker Contract」章节
 
 合规示例：
 ```
-[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix.
-[governance suggest] Skipped: needs human scope confirmation before automation.
-[governance suggest] Recommend Close: dependency removed in #123, API deprecated.
+[roadmap decision] split epic into #42, #43, #44; reason: scope exceeds single-iteration threshold.
+[roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
+[roadmap decision] hold #55 until #56 completes; reason: dependency graph constraint.
+[roadmap decision] confirm auto-split from #110; sub-issues #111, #112 validated.
 ```
 
 ## 基于 Label 的 Roadmap 管理
@@ -273,6 +269,38 @@ Manager assignee 配置位于：
 - Milestone 与 roadmap 状态标签配合使用
 
 ## Workflow
+
+### Step 0: 消化未处理的 governance suggest
+
+每次 `/vibe-roadmap` 被触发，**必做的第一步**：
+
+1. **找到上次决策锚点**：
+   ```bash
+   # 找到最近一条 [roadmap decision] 评论的时间
+   gh issue list --limit 100 --search "comment:[roadmap decision]" \
+     --json comments --jq '.[].comments[] | select(.body | startswith("[roadmap decision]")) | .createdAt' \
+     | sort | tail -1
+   ```
+   若无历史 `[roadmap decision]` 评论（首次运行），锚点设为 7 天前。
+
+2. **列出锚点之后所有未消化的 `[governance suggest]`**：
+   ```bash
+   # 列出锚点之后带 [governance suggest] 评论的 issues
+   gh issue list --limit 100 --search "comment:[governance suggest]"
+   ```
+
+3. **按 issue × suggest 类型分组展示**：
+   - 格式：`#N: [governance suggest] <type> — <summary>`
+   - 类型：`needs split` / `Recommend Close` / `Skipped (needs human)` / `auto-split` / `waiting on #X`
+
+4. **决策优先级**：
+   - 先处理 `[governance auto-split]`（复核最轻量）
+   - 再处理 `[governance suggest] needs split`（产出最大）
+   - 再处理 `[governance suggest] Recommend Close`（清积压）
+   - 再处理 `[governance suggest] waiting on #X`（依赖校验）
+   - 最后处理 `[governance suggest] Skipped (needs human)`（需用户参与）
+
+5. **闭环要求**：处理完每个 suggest 后必须写 `[roadmap decision]` 评论关闭闭环。
 
 ### Step 1: 检查版本目标
 
@@ -325,6 +353,39 @@ gh issue list -l "roadmap/p0"
 - 重新评估待分类 Issue
 - 更新 roadmap 状态标签
 
+### Step 2.5: Epic 拆分（强制）
+
+在版本规划决策过程中，发现 epic 候选时必须**强制执行拆分**，不再只写 suggest。
+
+**Epic 候选识别条件**（满足任一即触发）：
+- Issue body 中已有 `## Sub-issues` section（人工预标注）
+- Scope estimate 超阈值（涉及 3+ 模块、预估 >1 迭代窗口）
+- 已被 `[governance suggest] needs split` 标记
+
+**强制拆分动作**：
+1. 主 issue 加 `roadmap/rfc` 标签：
+   ```bash
+   gh issue edit <epic-number> --add-label "roadmap/rfc"
+   ```
+2. 主 issue **不分配** `vibe-manager-agent` assignee（epic 本身不入 manager pool）
+3. 调用 `/vibe-issue` 创建 sub-issues（每个 sub-issue body 中包含 `## Parent issue\n- #<epic-number>`）
+4. 在主 issue body 中追加或更新 `## Sub-issues` 清单：
+   ```markdown
+   ## Sub-issues
+   - #<sub1>: <title>
+   - #<sub2>: <title>
+   ```
+5. 在 sub-issues 之间用 `## Dependencies` 建立顺序（见依赖图编排章节）
+6. 写 `[roadmap decision]` comment：
+   ```bash
+   gh issue comment <epic-number> --body "[roadmap decision] split epic into #<sub1>, #<sub2>, #<sub3>; reason: <拆分理由>"
+   ```
+
+**阈值参考**：
+- 涉及 1 个模块、≤200 LOC → single issue，不拆分
+- 涉及 2 个模块、200-500 LOC → 视耦合度决定
+- 涉及 3+ 模块、>500 LOC → 强制拆分
+
 ### Step X: Intake 判断（新增）
 
 **场景 A: 适合自动化推进**
@@ -336,7 +397,7 @@ gh issue list -l "roadmap/p0"
      - 执行分配：`gh issue edit <number> --assignee <manager_bot_name>`
   2. 写 intake comment：
      ```bash
-     gh issue comment <number> --body "[governance suggest] Intake: assigned to @{manager_bot} (manager-pool); scope=bugfix."
+     gh issue comment <number> --body "[roadmap decision] assign to @{manager_bot} (manager-pool); scope=bugfix."
      # scope 可选值：bugfix, feature, refactor
      ```
 
@@ -346,7 +407,7 @@ gh issue list -l "roadmap/p0"
 - 执行动作：
   1. 写 comment 说明原因：
      ```bash
-     gh issue comment <number> --body "[governance suggest] Skipped: needs human scope confirmation before automation. Reason: <具体原因>."
+     gh issue comment <number> --body "[roadmap decision] deferred: needs human scope confirmation before automation. Reason: <具体原因>."
      ```
   2. 不分配 assignee
   3. 标记为待讨论：
@@ -360,7 +421,7 @@ gh issue list -l "roadmap/p0"
 - 执行动作：
   1. 写 comment 说明关闭原因：
      ```bash
-     gh issue comment <number> --body "[governance suggest] Recommend Close: dependency removed in #<PR>, API deprecated, duplicate of #<issue>."
+     gh issue comment <number> --body "[roadmap decision] close: dependency removed in #<PR>, API deprecated, duplicate of #<issue>."
      ```
   2. 建议人类关闭 issue（不自动关闭）
 
@@ -383,6 +444,38 @@ gh issue edit <issue_number> --milestone "Phase 1: 基础设施" --add-label "ro
 ```
 
 详细操作指南见 `docs/standards/roadmap-label-management.md`。
+
+### 依赖图编排
+
+milestone 分配时必须校验依赖图：
+
+**真源读取**：
+- 读取 issue body 中的 `## Dependencies` section
+- 读取 GitHub `flow_issue_links`（若项目启用了 GitHub issue links）
+- 以 issue body `## Dependencies` 为主真源，`flow_issue_links` 为补充
+
+**校验规则**：
+1. **无循环检测**：从当前 issue 出发 DFS 遍历 `## Dependencies`，确认无环
+2. **倒序分配**：被依赖的 issue **必须**进入更早或同一 milestone
+   - 不允许被依赖 issue 进入更晚 milestone
+   - 若违反，调整被依赖 issue 的 milestone 到较早窗口
+3. **同 milestone 优先级**：同一 milestone 内，被依赖的 issue 应给更高 `priority/[0-9]`
+
+**操作示例**：
+```bash
+# 校验 #42 的依赖 #40 是否在更早 milestone
+gh issue view 40 --json milestone,labels
+
+# 若 #40 milestone 晚于 #42，调整 #40
+gh issue edit 40 --milestone "<earlier-milestone>"
+
+# 同 milestone 内提高被依赖 issue 优先级
+gh issue edit 40 --add-label "priority/8"
+```
+
+**冲突处理**：
+- 若依赖图检测到循环 → 写 `[roadmap decision] cycle detected: #A → #B → #A; requires human resolution`
+- 若被依赖 issue 已 closed → 写 `[roadmap decision] dependency #X is closed; unblocking #Y`
 
 ### Step 4: 输出状态
 
@@ -458,6 +551,39 @@ Agent 应通过以下方式使用标签触发机制：
 - 直接展示 CLI 返回的阻塞原因
 - 明确告诉用户当前无法进行路线图管理
 - 不要自行 fallback 到直接修改数据库
+
+## Comment Marker Contract
+
+### 角色定位
+
+vibe-roadmap 是治理-决策双轨中的**决策者**，不是 observer。marker 必须明确区分：
+
+| 角色 | Marker | 性质 |
+|---|---|---|
+| roadmap-intake / assignee-pool（observer） | `[governance suggest]` | 观察者意见，无强制力 |
+| roadmap-intake（obvious-split 场景） | `[governance auto-split]` | 例外：清晰可拆 epic 的自主拆分（见 #1100） |
+| **vibe-roadmap（decider）** | `[roadmap decision]` | 决策者结论，覆盖 governance 建议 |
+
+### 强制规则
+
+1. vibe-roadmap 的**所有**决策动作必须写 `[roadmap decision] <动作>: <理由>` comment
+2. **禁止** vibe-roadmap 写 `[governance suggest]`（marker 必须区分 observer / decider）
+3. `[roadmap decision]` marker 同时作为 cron-supervisor / 下次 vibe-roadmap 自身判断"上次审查时间"的锚点
+4. 格式：
+   ```text
+   [roadmap decision] <动作动词>: <简要理由>
+   ```
+   动作动词统一使用：`split`, `close`, `hold`, `deferred`, `confirm split`, `revert split`, `assign`, `unblock`
+
+### 示例
+
+```
+[roadmap decision] split epic into #42, #43, #44; reason: 3 modules, ~800 LOC, exceeds single-iteration threshold.
+[roadmap decision] close #99; reason: dependency removed in #123, API deprecated.
+[roadmap decision] hold #55 until #56 completes; reason: #56 provides core infrastructure #55 depends on.
+[roadmap decision] deferred #77; reason: needs human decision on architecture direction.
+[roadmap decision] confirm auto-split from #110; sub-issues #111, #112 correctly scoped.
+```
 
 ## Reference Documents
 
