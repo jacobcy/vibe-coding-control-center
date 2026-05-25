@@ -73,11 +73,12 @@ def test_pr_create_requires_human_confirmation(
     mock_pr_service.create_pr.assert_not_called()
 
 
+@patch("vibe3.commands.pr_create.check_branch_behind", return_value=None)
 @patch("vibe3.commands.pr_create.render_pr_created")
 @patch("vibe3.commands.pr_create.PRService")
 @patch("vibe3.commands.pr_create.FlowService")
 def test_pr_create_allows_yes_when_task_issue_missing(
-    mock_flow_service_cls, mock_pr_service_cls, _render_pr_created
+    mock_flow_service_cls, mock_pr_service_cls, _render_pr_created, _check_behind
 ) -> None:
     """pr create --yes should bypass gates."""
     flow_service = MagicMock()
