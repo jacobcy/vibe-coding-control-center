@@ -203,32 +203,6 @@ class HeartbeatServer:
                         f"(retention={error_tracking.retention_days}d)"
                     )
 
-            # Cleanup terminal issue errors
-            try:
-                deleted_terminal = error_tracking.cleanup_terminal_issue_errors()
-            except Exception as exc:
-                append_orchestra_event(
-                    "server",
-                    f"tick #{tick_number} cleanup_terminal_issue_errors failed: {exc}",
-                    level="WARNING",
-                )
-                logger.bind(domain="orchestra", action="cleanup").warning(
-                    f"cleanup_terminal_issue_errors failed: {exc}"
-                )
-            else:
-                if deleted_terminal > 0:
-                    append_orchestra_event(
-                        "server",
-                        (
-                            f"tick #{tick_number} cleanup: deleted {deleted_terminal} "
-                            "terminal issue error records"
-                        ),
-                        level="DEBUG",
-                    )
-                    logger.bind(domain="orchestra", action="cleanup").debug(
-                        f"Cleaned up {deleted_terminal} errors for terminal issues"
-                    )
-
             # Periodic consistency check
             # (PR merged/closed, issue closed, label anomalies, etc.)
             if (

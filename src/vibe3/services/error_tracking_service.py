@@ -20,9 +20,6 @@ from vibe3.exceptions.error_severity import ErrorSeverity
 from vibe3.services.error_tracking_cleanup import (
     cleanup_old_errors as _cleanup_old_errors,
 )
-from vibe3.services.error_tracking_cleanup import (
-    cleanup_terminal_issue_errors as _cleanup_terminal_issue_errors,
-)
 from vibe3.services.error_tracking_cleanup import clear_errors as _clear_errors
 from vibe3.services.error_tracking_queries import (
     get_all_errors_status as _get_all_errors_status,
@@ -296,7 +293,3 @@ class ErrorTrackingService:
     def cleanup_old_errors(self) -> int:
         """Delete error records older than retention period."""
         return _cleanup_old_errors(self.db_path, self.retention_days)
-
-    def cleanup_terminal_issue_errors(self) -> int:
-        """Delete error records for issues with terminal flow status."""
-        return _cleanup_terminal_issue_errors(self.db_path)
