@@ -308,7 +308,21 @@ state trigger 是消费已有 `state/*` labels 的 service 集合。
 - 若已有对应 live tmux session，则本轮 skip
 - 不得在每轮 tick 中重复创建同一任务
 
-## 9. 标准结论
+## 10. Flow Status 语义
+
+Orchestra 运行时识别以下 `flow_status` 枚举（真源见 `src/vibe3/models/flow.py`）：
+
+- **`active`**：flow 正常执行中，准备就绪或正在处理。
+- **`blocked`**：flow 被阻塞。包括手动标记阻塞和依赖项（`dependency`）未满足导致的自动化阻塞。
+- **`done`**：flow 执行完成且 PR 已合并。
+- **`stale`**：flow 长期未活动或被标记为休眠，通常由 governance 机制识别。
+- **`aborted`**：flow 被人工或自动中止（如 PR 关闭未合并）。
+
+**状态迁移要求**：
+- 任何状态迁移必须发布对应的领域事件。
+- 自动化服务（如 `BlockedStateService`）负责在 `blocked` 状态下同步 GitHub 标签和本地缓存。
+
+## 11. 标准结论
 
 统一语义如下：
 

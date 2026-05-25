@@ -100,7 +100,6 @@ related_docs:
 - `flow aborted`
 - `task show`
 - `task list`
-- `task status`
 
 ### 3.2 `vibe3 task status`
 
